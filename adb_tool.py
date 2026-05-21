@@ -8,14 +8,21 @@ import sys
 import os
 import argparse
 import time
-from typing import Optional, List
+
+# Reconfigure stdout/stderr to UTF-8 so Vietnamese strings in help text and
+# log output don't crash on Windows' default cp1252 console.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+    except (AttributeError, OSError):
+        pass
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.core.adb import ADBController, DeviceScanner
 from src.core.adb.constants import EMULATOR_PORT_RANGES
-from src.utils import log_error, log_info, log_success, log_warning, log_normal
+from src.utils import log_error, log_info, log_success, log_warning
 
 
 def print_header(text: str):
@@ -125,8 +132,8 @@ def cmd_list(args):
                 controller.device_id = device.serial
                 name = controller.get_device_name()
                 print(f"   Name: {name}")
-            except:
-                pass
+            except Exception as e:
+                log_warning(f"   Name: (error: {e})")
             
             # Get current app
             try:
@@ -135,8 +142,8 @@ def cmd_list(args):
                     app_name = controller.get_app_name(app)
                     print(f"   App: {app_name}")
                     print(f"   Package: {app}")
-            except:
-                pass
+            except Exception as e:
+                log_warning(f"   App: (error: {e})")
             
             print()
     except Exception as e:

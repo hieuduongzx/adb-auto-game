@@ -17,7 +17,7 @@ import os
 import threading
 
 import yaml
-from utils import log_with_time, log_error, log_warning, log_success, log_info
+from src.utils import log_with_time, log_error, log_warning, log_success, log_info
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,

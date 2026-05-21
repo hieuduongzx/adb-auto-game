@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple, Set
 from ppadb.client import Client as AdbClient
 
 from .constants import ALL_EMULATOR_PORTS, EMULATOR_PORT_RANGES, get_adb_path
-from src.utils import log_error, log_info, log_success, log_normal
+from src.utils import log_error, log_info, log_success, log_warning, log_normal
 
 
 class DeviceScanner:

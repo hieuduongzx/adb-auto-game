@@ -5,12 +5,10 @@ pyautogui>=0.9.54
 pillow>=10.0.0
 pyyaml>=6.0.1
 
-# GUI Framework
-customtkinter>=5.2.0
-PyQt6>=6.6.0
-pywebview>=4.4.1  # Webview-based GUI
+# GUI Framework (webview-based)
+pywebview>=4.4.1
 
-# Window management
+# Window management (Windows-only helpers used by windows_auto.py)
 pywin32>=306; platform_system == "Windows"
 pygetwindow>=0.0.9
 
@@ -18,22 +16,19 @@ pygetwindow>=0.0.9
 pure-python-adb>=0.3.0.dev0
 
 # Utilities
-mss>=9.0.1  # Fast screen capture
-keyboard>=0.13.5
+mss>=9.0.1            # Fast screen capture (windows_auto)
+keyboard>=0.13.5      # Keyboard hotkeys (q to quit)
 mouse>=0.7.1
-colorama>=0.4.6
+colorama>=0.4.6       # Coloured console output
 
-# Development
-pytest>=7.4.0
-black>=23.7.0
-flake8>=6.1.0
-mypy>=1.5.1
-pre-commit>=3.3.3
+# Misc
+typing-extensions>=4.7.1
+python-dotenv>=1.0.0
 
-# Additional dependencies
-typing-extensions==4.7.1
-python-dotenv==1.0.0
-pylint==2.17.5  # for linting 
-
-colorama
-numpy
+# Development tools (optional, install with: pip install -r requirements-dev.txt)
+# pytest>=7.4.0
+# black>=23.7.0
+# flake8>=6.1.0
+# mypy>=1.5.1
+# pylint>=2.17.5
+# pre-commit>=3.3.3

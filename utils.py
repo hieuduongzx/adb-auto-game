@@ -1,39 +1,36 @@
-from datetime import datetime
-from colorama import init, Fore, Style
+"""
+Backward-compatibility shim for the legacy top-level ``utils`` module.
 
-# Initialize colorama for Windows support
-init()
-current_state = None
+When ``src/`` is added to ``sys.path``, ``from utils import ...`` resolves
+here. We forward to the canonical implementation in :mod:`src.utils` to keep a
+single source of truth.
+"""
+from src.utils import (  # noqa: F401
+    Fore,
+    Style,
+    setup_logger,
+    set_current_state,
+    log_with_time,
+    log_error,
+    log_warning,
+    log_success,
+    log_info,
+    log_state,
+    log_quest,
+    log_normal,
+)
 
-def log_with_time(message: str, color: str = Fore.WHITE):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-    if current_state:
-        print(f"{Fore.CYAN}[{timestamp}][{current_state}]{Style.RESET_ALL} {color}{message}{Style.RESET_ALL}")
-    else:
-        print(f"{Fore.CYAN}[{timestamp}]{Style.RESET_ALL} {color}{message}{Style.RESET_ALL}")
-
-def log_error(message: str):
-    log_with_time(message, Fore.RED)
-
-def log_warning(message: str):
-    log_with_time(message, Fore.YELLOW)
-
-def log_success(message: str):
-    log_with_time(message, Fore.GREEN)
-
-def log_info(message: str):
-    log_with_time(message, Fore.CYAN)
-
-def log_state(message: str):
-    log_with_time(message, Fore.BLUE)
-
-def log_quest(message: str):
-    log_with_time(message, Fore.MAGENTA)
-
-
-def log_normal(message: str):
-    log_with_time(message, Fore.WHITE)
-
-def set_current_state(state: str):
-    global current_state
-    current_state = state
+__all__ = [
+    "Fore",
+    "Style",
+    "setup_logger",
+    "set_current_state",
+    "log_with_time",
+    "log_error",
+    "log_warning",
+    "log_success",
+    "log_info",
+    "log_state",
+    "log_quest",
+    "log_normal",
+]

@@ -2,14 +2,13 @@
 Webview-based GUI for game automation using pywebview.
 Provides a modern web-based interface that communicates with Python backend via JS API.
 """
-import os
 import json
 import threading
 import webview
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any
 from pathlib import Path
 
-from src.games.base_game import BaseGameAutomation, Activity, GUIBase
+from src.games.base_game import BaseGameAutomation, Activity
 from src.utils import log_info, log_error
 
 
@@ -42,8 +41,12 @@ class WebviewAPI:
         """Emit event to JavaScript frontend"""
         if self.window:
             try:
-                # Call JS function to handle event
-                js_code = f"if(window.handleBackendEvent) window.handleBackendEvent('{event}', {json.dumps(data)})"
+                # ``json.dumps`` produces a valid JS literal for both args, so
+                # event names with quotes/backslashes cannot break the call.
+                js_code = (
+                    "if(window.handleBackendEvent) "
+                    f"window.handleBackendEvent({json.dumps(event)}, {json.dumps(data)})"
+                )
                 self.window.evaluate_js(js_code)
             except Exception as e:
                 log_error(f"Error emitting event: {e}")

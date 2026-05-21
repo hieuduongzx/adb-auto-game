@@ -5,10 +5,10 @@ This class provides a structured framework for creating game automation tools.
 import os
 import time
 import threading
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Callable, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Callable, Optional, Any
+from dataclasses import dataclass
 from enum import Enum
 
 from src.core import ADBGameAutomation
@@ -45,7 +45,7 @@ class Activity:
         self.error_message = None
 
 
-class BaseGameAutomation(ADBGameAutomation):
+class BaseGameAutomation(ADBGameAutomation, ABC):
     """
     Base class for game automation with GUI support and activity management.
     
@@ -98,7 +98,9 @@ class BaseGameAutomation(ADBGameAutomation):
         self._current_activity: Optional[Activity] = None
         self._activity_order: List[str] = []
         
-        # Thread pool for concurrent operations
+        # Optional thread pool subclasses can use for parallel sub-tasks.
+        # Lazily created via :meth:`get_executor` so we don't spin up threads
+        # for games that don't need them.
         self.max_workers: int = 3
         self._executor: Optional[ThreadPoolExecutor] = None
         
@@ -144,10 +146,13 @@ class BaseGameAutomation(ADBGameAutomation):
         self._activity_map = {act.id: act for act in activities}
         self._activity_order = [act.id for act in activities if act.enabled]
         
-        # Initialize thread pool
-        self._executor = ThreadPoolExecutor(max_workers=self.max_workers)
-        
         log_info(f"Initialized {len(activities)} activities: {self._activity_order}")
+    
+    def get_executor(self) -> ThreadPoolExecutor:
+        """Lazily create and return the thread pool for parallel sub-tasks."""
+        if self._executor is None:
+            self._executor = ThreadPoolExecutor(max_workers=self.max_workers)
+        return self._executor
     
     # ==================== Template Helpers ====================
     
@@ -347,9 +352,10 @@ class BaseGameAutomation(ADBGameAutomation):
         # Stop continuous capture
         self.stop_continuous_capture()
         
-        # Shutdown executor
-        if self._executor:
+        # Shutdown executor if it was ever created
+        if self._executor is not None:
             self._executor.shutdown(wait=False)
+            self._executor = None
         
         # Close visualizer
         self.visualizer.close()
@@ -378,13 +384,21 @@ class BaseGameAutomation(ADBGameAutomation):
                 if not activity or not activity.enabled:
                     continue
                 
-                # Execute activity
-                success = self._execute_activity(activity)
-                
-                # Handle failure with retry
-                if not success and activity.execution_count < activity.max_retries:
-                    log_info(f"Retrying activity {activity.id} (attempt {activity.execution_count + 1})")
+                # Execute activity, retrying up to ``max_retries`` times in
+                # total (the first run counts as attempt 1).
+                success = False
+                for attempt in range(1, max(1, activity.max_retries) + 1):
+                    if not self.running:
+                        break
+                    if attempt > 1:
+                        log_info(
+                            f"Retrying activity {activity.id} "
+                            f"(attempt {attempt}/{activity.max_retries})"
+                        )
+                        activity.reset()
                     success = self._execute_activity(activity)
+                    if success:
+                        break
                 
                 # Small delay between activities
                 if self.running:
