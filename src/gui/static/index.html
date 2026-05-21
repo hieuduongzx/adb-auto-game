@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Automation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        border: "hsl(var(--border))",
+                        input: "hsl(var(--input))",
+                        ring: "hsl(var(--ring))",
+                        background: "hsl(var(--background))",
+                        foreground: "hsl(var(--foreground))",
+                        primary: {
+                            DEFAULT: "hsl(var(--primary))",
+                            foreground: "hsl(var(--primary-foreground))",
+                        },
+                        secondary: {
+                            DEFAULT: "hsl(var(--secondary))",
+                            foreground: "hsl(var(--secondary-foreground))",
+                        },
+                        destructive: {
+                            DEFAULT: "hsl(var(--destructive))",
+                            foreground: "hsl(var(--destructive-foreground))",
+                        },
+                        muted: {
+                            DEFAULT: "hsl(var(--muted))",
+                            foreground: "hsl(var(--muted-foreground))",
+                        },
+                        accent: {
+                            DEFAULT: "hsl(var(--accent))",
+                            foreground: "hsl(var(--accent-foreground))",
+                        },
+                        popover: {
+                            DEFAULT: "hsl(var(--popover))",
+                            foreground: "hsl(var(--popover-foreground))",
+                        },
+                        card: {
+                            DEFAULT: "hsl(var(--card))",
+                            foreground: "hsl(var(--card-foreground))",
+                        },
+                    },
+                    borderRadius: {
+                        lg: "var(--radius)",
+                        md: "calc(var(--radius) - 2px)",
+                        sm: "calc(var(--radius) - 4px)",
+                    },
+                },
+            },
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer base {
+            :root {
+                --background: 0 0% 100%;
+                --foreground: 222.2 84% 4.9%;
+                --card: 0 0% 100%;
+                --card-foreground: 222.2 84% 4.9%;
+                --popover: 0 0% 100%;
+                --popover-foreground: 222.2 84% 4.9%;
+                --primary: 222.2 47.4% 11.2%;
+                --primary-foreground: 210 40% 98%;
+                --secondary: 210 40% 96.1%;
+                --secondary-foreground: 222.2 47.4% 11.2%;
+                --muted: 210 40% 96.1%;
+                --muted-foreground: 215.4 16.3% 46.9%;
+                --accent: 210 40% 96.1%;
+                --accent-foreground: 222.2 47.4% 11.2%;
+                --destructive: 0 84.2% 60.2%;
+                --destructive-foreground: 210 40% 98%;
+                --border: 214.3 31.8% 91.4%;
+                --input: 214.3 31.8% 91.4%;
+                --ring: 222.2 84% 4.9%;
+                --radius: 0.5rem;
+            }
+            .dark {
+                --background: 222.2 84% 4.9%;
+                --foreground: 210 40% 98%;
+                --card: 222.2 84% 4.9%;
+                --card-foreground: 210 40% 98%;
+                --popover: 222.2 84% 4.9%;
+                --popover-foreground: 210 40% 98%;
+                --primary: 210 40% 98%;
+                --primary-foreground: 222.2 47.4% 11.2%;
+                --secondary: 217.2 32.6% 17.5%;
+                --secondary-foreground: 210 40% 98%;
+                --muted: 217.2 32.6% 17.5%;
+                --muted-foreground: 215 20.2% 65.1%;
+                --accent: 217.2 32.6% 17.5%;
+                --accent-foreground: 210 40% 98%;
+                --destructive: 0 62.8% 30.6%;
+                --destructive-foreground: 210 40% 98%;
+                --border: 217.2 32.6% 17.5%;
+                --input: 217.2 32.6% 17.5%;
+                --ring: 212.7 26.8% 83.9%;
+            }
+        }
+        @layer base {
+            * {
+                @apply border-border;
+            }
+            body {
+                @apply bg-background text-foreground;
+                font-feature-settings: "rlig" 1, "calt" 1;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="min-h-screen bg-background text-foreground antialiased">
+    <div class="flex flex-col min-h-screen">
+        <!-- Header -->
+        <header class="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+            <div class="container mx-auto px-4 h-14 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
+                        <i class="fa-solid fa-gamepad text-primary-foreground text-sm"></i>
+                    </div>
+                    <h1 class="font-semibold text-lg tracking-tight">Game Automation</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div id="statusBadge" class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-muted text-muted-foreground">
+                        <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground mr-1.5" id="statusDot"></span>
+                        <span id="statusText">Ready</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 container mx-auto px-4 py-6">
+            <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <!-- Control Panel -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Actions Card -->
+                    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+                        <div class="flex flex-col space-y-1.5 p-6">
+                            <h3 class="text-2xl font-semibold leading-none tracking-tight">Controls</h3>
+                            <p class="text-sm text-muted-foreground">Manage your automation session</p>
+                        </div>
+                        <div class="p-6 pt-0">
+                            <div class="flex flex-wrap gap-3">
+                                <button id="btnStart" onclick="startAutomation()" 
+                                    class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 gap-2">
+                                    <i class="fa-solid fa-play text-xs"></i>
+                                    Start
+                                </button>
+                                <button id="btnPause" onclick="togglePause()" disabled
+                                    class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 gap-2">
+                                    <i class="fa-solid fa-pause text-xs" id="pauseIcon"></i>
+                                    <span id="pauseText">Pause</span>
+                                </button>
+                                <button id="btnStop" onclick="stopAutomation()" disabled
+                                    class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90 h-10 px-4 py-2 gap-2">
+                                    <i class="fa-solid fa-stop text-xs"></i>
+                                    Stop
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Activities Card -->
+                    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+                        <div class="flex flex-col space-y-1.5 p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-2xl font-semibold leading-none tracking-tight">Activities</h3>
+                                    <p class="text-sm text-muted-foreground mt-1">Configure and monitor automation tasks</p>
+                                </div>
+                                <div class="text-sm text-muted-foreground" id="currentActivity">No activity running</div>
+                            </div>
+                        </div>
+                        <div class="p-6 pt-0">
+                            <div id="activityList" class="space-y-3">
+                                <!-- Activities will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="space-y-6">
+                    <!-- Performance Card -->
+                    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+                        <div class="flex flex-col space-y-1.5 p-6">
+                            <h3 class="text-lg font-semibold leading-none tracking-tight">Performance</h3>
+                            <p class="text-sm text-muted-foreground">Template matching metrics</p>
+                        </div>
+                        <div class="p-6 pt-0">
+                            <div id="performanceMetrics" class="grid grid-cols-2 gap-3">
+                                <div class="rounded-lg border p-3">
+                                    <div class="text-2xl font-bold" id="metricSuccessRate">--</div>
+                                    <div class="text-xs text-muted-foreground">Success Rate</div>
+                                </div>
+                                <div class="rounded-lg border p-3">
+                                    <div class="text-2xl font-bold" id="metricMatches">--</div>
+                                    <div class="text-xs text-muted-foreground">Matches</div>
+                                </div>
+                                <div class="rounded-lg border p-3">
+                                    <div class="text-2xl font-bold" id="metricFailures">--</div>
+                                    <div class="text-xs text-muted-foreground">Failures</div>
+                                </div>
+                                <div class="rounded-lg border p-3">
+                                    <div class="text-2xl font-bold" id="metricAvgTime">--</div>
+                                    <div class="text-xs text-muted-foreground">Avg Time</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Log Card -->
+                    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+                        <div class="flex flex-col space-y-1.5 p-6">
+                            <h3 class="text-lg font-semibold leading-none tracking-tight">Log</h3>
+                            <p class="text-sm text-muted-foreground">Real-time automation logs</p>
+                        </div>
+                        <div class="p-6 pt-0">
+                            <div id="logContainer" class="rounded-md bg-muted p-4 font-mono text-xs h-64 overflow-y-auto space-y-1">
+                                <div class="text-muted-foreground">[System] Ready to start automation...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Global state
+        let isRunning = false;
+        let isPaused = false;
+        let activities = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadActivities();
+            updatePerformanceMetrics();
+            setInterval(updatePerformanceMetrics, 2000);
+        });
+
+        // Load activities from backend
+        async function loadActivities() {
+            try {
+                const result = await pywebview.api.get_activities();
+                activities = JSON.parse(result);
+                renderActivities();
+            } catch (error) {
+                log('Error loading activities: ' + error, 'error');
+            }
+        }
+
+        // Render activities list
+        function renderActivities() {
+            const container = document.getElementById('activityList');
+            if (!activities.length) {
+                container.innerHTML = '<div class="text-sm text-muted-foreground text-center py-8">No activities configured</div>';
+                return;
+            }
+
+            container.innerHTML = activities.map(act => {
+                const statusColors = {
+                    'pending': 'bg-muted text-muted-foreground',
+                    'running': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+                    'completed': 'bg-green-500/10 text-green-500 border-green-500/20',
+                    'failed': 'bg-red-500/10 text-red-500 border-red-500/20',
+                    'skipped': 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                };
+
+                const statusClass = statusColors[act.status] || statusColors['pending'];
+
+                return `
+                    <div class="rounded-lg border p-4 transition-all ${act.status === 'running' ? 'border-primary/50 bg-primary/5' : ''}" id="activity-${act.id}">
+                        <div class="flex items-start gap-3">
+                            <div class="flex items-center h-5">
+                                <input type="checkbox" 
+                                    class="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                                    ${act.enabled ? 'checked' : ''}
+                                    onchange="toggleActivity('${act.id}', this.checked)"
+                                    ${isRunning ? 'disabled' : ''}>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div>
+                                        <p class="text-sm font-medium leading-none">${act.name}</p>
+                                        <p class="text-xs text-muted-foreground mt-1">${act.description}</p>
+                                    </div>
+                                    <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusClass}" id="status-${act.id}">
+                                        ${act.status}
+                                    </span>
+                                </div>
+                                <div class="mt-3">
+                                    <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                                        <div class="h-full rounded-full bg-primary transition-all duration-300" id="progress-${act.id}" style="width: ${act.progress}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Toggle activity enabled state
+        async function toggleActivity(id, enabled) {
+            try {
+                await pywebview.api.set_activity_enabled(id, enabled);
+                log(`${enabled ? 'Enabled' : 'Disabled'} activity: ${id}`, 'info');
+            } catch (error) {
+                log('Error toggling activity: ' + error, 'error');
+            }
+        }
+
+        // Start automation
+        async function startAutomation() {
+            try {
+                const result = await pywebview.api.start_automation();
+                const data = JSON.parse(result);
+
+                if (data.success) {
+                    isRunning = true;
+                    isPaused = false;
+                    updateUIState();
+                    log('Automation started', 'success');
+
+                    // Reset all progress
+                    activities.forEach(act => {
+                        act.progress = 0;
+                        act.status = 'pending';
+                    });
+                    renderActivities();
+                } else {
+                    log('Failed to start: ' + data.error, 'error');
+                }
+            } catch (error) {
+                log('Error starting automation: ' + error, 'error');
+            }
+        }
+
+        // Stop automation
+        async function stopAutomation() {
+            try {
+                await pywebview.api.stop_automation();
+                isRunning = false;
+                isPaused = false;
+                updateUIState();
+                log('Automation stopped', 'info');
+            } catch (error) {
+                log('Error stopping automation: ' + error, 'error');
+            }
+        }
+
+        // Toggle pause/resume
+        async function togglePause() {
+            try {
+                if (isPaused) {
+                    await pywebview.api.resume_automation();
+                    isPaused = false;
+                    log('Automation resumed', 'info');
+                } else {
+                    await pywebview.api.pause_automation();
+                    isPaused = true;
+                    log('Automation paused', 'info');
+                }
+                updateUIState();
+            } catch (error) {
+                log('Error toggling pause: ' + error, 'error');
+            }
+        }
+
+        // Update UI state
+        function updateUIState() {
+            const btnStart = document.getElementById('btnStart');
+            const btnPause = document.getElementById('btnPause');
+            const btnStop = document.getElementById('btnStop');
+            const statusBadge = document.getElementById('statusBadge');
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const pauseIcon = document.getElementById('pauseIcon');
+            const pauseText = document.getElementById('pauseText');
+
+            btnStart.disabled = isRunning;
+            btnPause.disabled = !isRunning;
+            btnStop.disabled = !isRunning;
+
+            if (isPaused) {
+                pauseIcon.className = 'fa-solid fa-play text-xs';
+                pauseText.textContent = 'Resume';
+            } else {
+                pauseIcon.className = 'fa-solid fa-pause text-xs';
+                pauseText.textContent = 'Pause';
+            }
+
+            if (isRunning) {
+                if (isPaused) {
+                    statusBadge.className = 'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-yellow-500/10 text-yellow-500';
+                    statusDot.className = 'w-1.5 h-1.5 rounded-full bg-yellow-500 mr-1.5';
+                    statusText.textContent = 'Paused';
+                } else {
+                    statusBadge.className = 'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-green-500/10 text-green-500';
+                    statusDot.className = 'w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse';
+                    statusText.textContent = 'Running';
+                }
+            } else {
+                statusBadge.className = 'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-muted text-muted-foreground';
+                statusDot.className = 'w-1.5 h-1.5 rounded-full bg-muted-foreground mr-1.5';
+                statusText.textContent = 'Ready';
+            }
+
+            // Disable checkboxes when running
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.disabled = isRunning;
+            });
+        }
+
+        // Add log entry
+        function log(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            const time = new Date().toLocaleTimeString();
+
+            const colors = {
+                'error': 'text-red-500',
+                'success': 'text-green-500',
+                'info': 'text-blue-500',
+                'warning': 'text-yellow-500'
+            };
+
+            entry.className = colors[type] || colors['info'];
+            entry.textContent = `[${time}] ${message}`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+
+            // Keep only last 100 entries
+            while (container.children.length > 100) {
+                container.removeChild(container.firstChild);
+            }
+        }
+
+        // Update performance metrics
+        async function updatePerformanceMetrics() {
+            try {
+                const result = await pywebview.api.get_performance_metrics();
+                const metrics = JSON.parse(result);
+
+                document.getElementById('metricSuccessRate').textContent =
+                    metrics.success_rate ? (metrics.success_rate * 100).toFixed(1) + '%' : '--';
+                document.getElementById('metricMatches').textContent =
+                    metrics.template_matches || '0';
+                document.getElementById('metricFailures').textContent =
+                    metrics.template_failures || '0';
+                document.getElementById('metricAvgTime').textContent =
+                    metrics.avg_match_time ? metrics.avg_match_time.toFixed(3) + 's' : '--';
+            } catch (error) {
+                // Silently ignore errors
+            }
+        }
+
+        // Handle backend events
+        window.handleBackendEvent = function(event, data) {
+            switch (event) {
+                case 'automation_start':
+                    log('Automation started', 'success');
+                    break;
+
+                case 'automation_stop':
+                    isRunning = false;
+                    isPaused = false;
+                    updateUIState();
+                    log('Automation stopped', 'info');
+                    break;
+
+                case 'activity_start':
+                    log(`Activity started: ${data.name}`, 'info');
+                    updateActivityStatus(data.id, 'running');
+                    document.getElementById('currentActivity').textContent = `Running: ${data.name}`;
+                    break;
+
+                case 'activity_complete':
+                    log(`Activity ${data.success ? 'completed' : 'failed'}: ${data.name}`,
+                        data.success ? 'success' : 'error');
+                    updateActivityStatus(data.id, data.success ? 'completed' : 'failed');
+                    break;
+
+                case 'activity_failed':
+                    log(`Activity error: ${data.name} - ${data.error}`, 'error');
+                    updateActivityStatus(data.id, 'failed');
+                    break;
+
+                case 'progress':
+                    updateActivityProgress(data.activity_id, data.progress);
+                    break;
+
+                case 'error':
+                    log('Error: ' + data.message, 'error');
+                    break;
+
+                case 'status_change':
+                    isPaused = data.paused;
+                    updateUIState();
+                    break;
+            }
+        };
+
+        // Update activity status in UI
+        function updateActivityStatus(id, status) {
+            const item = document.getElementById(`activity-${id}`);
+            const statusLabel = document.getElementById(`status-${id}`);
+
+            const statusColors = {
+                'pending': 'bg-muted text-muted-foreground',
+                'running': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+                'completed': 'bg-green-500/10 text-green-500 border-green-500/20',
+                'failed': 'bg-red-500/10 text-red-500 border-red-500/20',
+                'skipped': 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+            };
+
+            if (item && statusLabel) {
+                if (status === 'running') {
+                    item.classList.add('border-primary/50', 'bg-primary/5');
+                } else {
+                    item.classList.remove('border-primary/50', 'bg-primary/5');
+                }
+                statusLabel.className = `inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusColors[status] || statusColors['pending']}`;
+                statusLabel.textContent = status;
+            }
+
+            const act = activities.find(a => a.id === id);
+            if (act) {
+                act.status = status;
+            }
+        }
+
+        // Update activity progress
+        function updateActivityProgress(id, progress) {
+            const progressBar = document.getElementById(`progress-${id}`);
+            if (progressBar) {
+                progressBar.style.width = progress + '%';
+            }
+
+            const act = activities.find(a => a.id === id);
+            if (act) {
+                act.progress = progress;
+            }
+        }
+    </script>
+</body>
+</html>
