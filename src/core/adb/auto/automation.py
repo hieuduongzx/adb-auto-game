@@ -14,6 +14,7 @@ from typing import Tuple, Optional, List, Dict, Any
 from src.utils import log_error, log_info, log_warning, log_normal
 from ..controller import ADBController
 from .config import Config, PerformanceMetrics
+from .ocr import OCRReader, Region
 from .template_matcher import TemplateMatcher
 from .visualizer import DebugVisualizer
 
@@ -62,6 +63,11 @@ class ADBGameAutomation:
         self.visualizer = DebugVisualizer()
         if self.is_debug:
             self.visualizer.enable(self.is_debug_fail)
+
+        # OCR reader (Tesseract). Constructed lazily-friendly: if Tesseract
+        # isn't installed the reader stays in ``available=False`` mode and
+        # OCR helpers below return safe empty results.
+        self.ocr = OCRReader()
         
         # Performance tracking
         self.metrics = PerformanceMetrics() if self.config.performance_tracking else None
@@ -74,8 +80,16 @@ class ADBGameAutomation:
         self.templates_dir = ""
     
     def _update_screen_size(self):
-        """Update screen size from ADB"""
-        width, height = self.adb.get_screen_size()
+        """Update screen size from ADB. Silently no-ops if no device is
+        connected yet (e.g. when the GUI is launched without an emulator
+        running).
+        """
+        if not getattr(self.adb, "device", None):
+            return
+        try:
+            width, height = self.adb.get_screen_size()
+        except Exception:
+            return
         if width > 0 and height > 0:
             self.monitor["width"] = width
             self.monitor["height"] = height
@@ -120,7 +134,112 @@ class ADBGameAutomation:
         """Get latest captured screen (thread-safe)"""
         with self.screen_lock:
             return self.latest_screen.copy() if self.latest_screen is not None else None
-    
+
+    # ==================== Region / OCR helpers ====================
+
+    def crop_region(
+        self,
+        region: Region,
+        last_screen: bool = True,
+    ) -> Optional[np.ndarray]:
+        """Return ``screen[y:y+h, x:x+w]`` as a BGR ndarray, or ``None``.
+
+        Pulls the latest captured screen by default (cheap), falls back
+        to a fresh ``capture_screen()`` when ``last_screen=False``. The
+        region is clipped to the screen bounds, so passing a slightly
+        out-of-bounds rect still returns a valid (possibly smaller) crop.
+        """
+        screen = self.get_latest_screen() if last_screen else self.capture_screen()
+        if screen is None:
+            return None
+        return OCRReader._crop(screen, region)  # noqa: SLF001 - intentional reuse
+
+    def read_text(
+        self,
+        region: Optional[Region] = None,
+        last_screen: bool = True,
+        lang: Optional[str] = None,
+        config: Optional[str] = None,
+        whitelist: Optional[str] = None,
+        preprocess: bool = True,
+    ) -> str:
+        """Run OCR on the current screen (optionally cropped to ``region``).
+
+        Returns the recognised text stripped of trailing whitespace, or
+        ``""`` when OCR is unavailable / the screen could not be captured.
+        See :class:`src.core.adb.auto.ocr.OCRReader` for engine setup.
+        """
+        screen = self.get_latest_screen() if last_screen else self.capture_screen()
+        if screen is None:
+            return ""
+        return self.ocr.read_text(
+            screen, region=region, lang=lang, config=config,
+            whitelist=whitelist, preprocess=preprocess,
+        )
+
+    def region_contains_text(
+        self,
+        needle: str,
+        region: Optional[Region] = None,
+        last_screen: bool = True,
+        case_sensitive: bool = False,
+        normalize_whitespace: bool = True,
+        **kwargs,
+    ) -> bool:
+        """Return ``True`` if ``needle`` is present in the OCR output of
+        the given region.
+
+        Whitespace inside both haystack and needle is collapsed before the
+        check by default, so spaces/newlines from Tesseract output don't
+        break ``"0/5"`` matches.
+
+        Extra ``kwargs`` are forwarded to :meth:`read_text` (``lang``,
+        ``config``, ``whitelist``, ``preprocess``).
+        """
+        text = self.read_text(region=region, last_screen=last_screen, **kwargs)
+        if not text:
+            return False
+
+        import re as _re
+        haystack = text
+        target = needle
+        if normalize_whitespace:
+            haystack = _re.sub(r"\s+", "", haystack)
+            target = _re.sub(r"\s+", "", target)
+        if not case_sensitive:
+            haystack = haystack.lower()
+            target = target.lower()
+        return target in haystack
+
+    def wait_for_text_in_region(
+        self,
+        needle: str,
+        region: Region,
+        timeout: float = 10.0,
+        interval: float = 0.5,
+        case_sensitive: bool = False,
+        whitelist: Optional[str] = None,
+    ) -> bool:
+        """Poll ``region`` until ``needle`` is recognised or ``timeout``.
+
+        Useful as a finished-state probe (e.g. arena counter showing
+        ``"0/5"``). Returns ``True`` on first match, ``False`` on timeout.
+        """
+        start = time.time()
+        while time.time() - start < timeout:
+            if self.region_contains_text(
+                needle, region=region,
+                case_sensitive=case_sensitive, whitelist=whitelist,
+            ):
+                elapsed = time.time() - start
+                log_info(
+                    f"[OCR] Found '{needle}' in region {region} after {elapsed:.2f}s"
+                )
+                return True
+            time.sleep(interval)
+        log_warning(f"[OCR] Timeout waiting for '{needle}' in region {region}")
+        return False
+
     def get_screen_size(self) -> Tuple[int, int]:
         """Get screen dimensions"""
         return self.adb.get_screen_size()

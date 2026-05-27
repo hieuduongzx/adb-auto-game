@@ -1,5 +1,9 @@
 """GUI components for game automation."""
 
-from src.gui.webview_gui import WebviewGUI, WebviewAPI, run_with_webview, run_cli
+from src.gui.pyside_gui import GameAutomationWindow, run_with_pyside
 
-__all__ = ["WebviewGUI", "WebviewAPI", "run_with_webview", "run_cli"]
+__all__ = [
+    "GameAutomationWindow",
+    "run_with_pyside",
+    "run_cli",
+]

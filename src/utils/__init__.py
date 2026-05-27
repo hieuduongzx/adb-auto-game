@@ -7,8 +7,9 @@ captured by any handlers attached to the root logger (e.g. log files).
 """
 import logging
 import os
+import threading
 from datetime import datetime
-from typing import Optional
+from typing import Callable, List, Optional
 
 from colorama import init as _colorama_init, Fore, Style
 
@@ -17,6 +18,40 @@ _colorama_init()
 
 # Module-level "current state" tag prepended to every message when set.
 _current_state: Optional[str] = None
+
+# Subscribers receive every log message ``(level, message)`` where ``level``
+# is one of: ``info``, ``success``, ``warning``, ``error``, ``state``,
+# ``quest``, ``normal``. Used by the GUI to mirror logs in its log panel.
+_subscribers: List[Callable[[str, str], None]] = []
+_subscribers_lock = threading.Lock()
+
+
+def add_log_subscriber(callback: Callable[[str, str], None]) -> None:
+    """Register ``callback(level, message)`` to receive every log message."""
+    with _subscribers_lock:
+        if callback not in _subscribers:
+            _subscribers.append(callback)
+
+
+def remove_log_subscriber(callback: Callable[[str, str], None]) -> None:
+    """Unregister a previously added subscriber."""
+    with _subscribers_lock:
+        if callback in _subscribers:
+            _subscribers.remove(callback)
+
+
+def _notify_subscribers(level: str, message: str) -> None:
+    """Fan out a message to every subscriber. Failures are swallowed so a
+    misbehaving GUI sink can never break console logging.
+    """
+    with _subscribers_lock:
+        subs = list(_subscribers)
+    for cb in subs:
+        try:
+            cb(level, message)
+        except Exception:
+            pass
+
 
 # Root logger configured exactly once with a console handler.
 _root_logger = logging.getLogger()
@@ -86,31 +121,38 @@ def log_error(message: str, exc_info: bool = False) -> None:
     print(_format(message, Fore.RED))
     if exc_info:
         _root_logger.error(message, exc_info=True)
+    _notify_subscribers("error", message)
 
 
 def log_warning(message: str) -> None:
     log_with_time(message, Fore.YELLOW)
+    _notify_subscribers("warning", message)
 
 
 def log_success(message: str) -> None:
     log_with_time(message, Fore.GREEN)
+    _notify_subscribers("success", message)
 
 
 def log_info(message: str) -> None:
     log_with_time(message, Fore.CYAN)
+    _notify_subscribers("info", message)
 
 
 def log_state(message: str) -> None:
     """Log a state-change message (blue)."""
     log_with_time(message, Fore.BLUE)
+    _notify_subscribers("state", message)
 
 
 def log_quest(message: str) -> None:
     log_with_time(message, Fore.MAGENTA)
+    _notify_subscribers("quest", message)
 
 
 def log_normal(message: str) -> None:
     log_with_time(message, Fore.WHITE)
+    _notify_subscribers("normal", message)
 
 
 __all__ = [
@@ -126,4 +168,6 @@ __all__ = [
     "log_state",
     "log_quest",
     "log_normal",
+    "add_log_subscriber",
+    "remove_log_subscriber",
 ]

@@ -1,20 +1,3 @@
-"""
-Game Automation Launcher.
-
-Auto-discovers games under ``src/games/<name>/<name>.py`` and exposes them via
-both an interactive menu (no args) and explicit CLI flags.
-
-Usage:
-    python launcher.py                       # Interactive menu
-    python launcher.py --list                # List available games
-    python launcher.py <game>                # Run a game in CLI mode
-    python launcher.py <game> --gui          # Run a game with the webview GUI
-
-Examples:
-    python launcher.py bd2
-    python launcher.py bd2 --gui
-    python launcher.py cherrytale
-"""
 from __future__ import annotations
 
 import argparse
@@ -79,14 +62,14 @@ def _run_cli(game_class: Type) -> None:
 
 def _run_gui(game_class: Type, title: str) -> None:
     # Import lazily so the launcher works in CLI-only environments.
-    from src.gui.webview_gui import run_with_webview
-    run_with_webview(game_class, title)
+    from src.gui.pyside_gui import run_with_pyside
+    run_with_pyside(game_class, title)
 
 
 def run_game(game_class: Type, title: str, gui: bool) -> None:
     try:
         if gui:
-            log_success(f"Starting {title} with Webview GUI...")
+            log_success(f"Starting {title} with PySide6 GUI...")
             _run_gui(game_class, title)
         else:
             log_success(f"Starting {title} (CLI). Press 'q' to stop.")
@@ -172,7 +155,7 @@ def main() -> int:
         ),
     )
     parser.add_argument("game", nargs="?", help="Name of the game to run")
-    parser.add_argument("--gui", action="store_true", help="Run with the webview GUI")
+    parser.add_argument("--gui", action="store_true", help="Run with the PySide6 GUI")
     parser.add_argument("--list", "-l", action="store_true", help="List available games")
     args = parser.parse_args()
 

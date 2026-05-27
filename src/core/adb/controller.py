@@ -63,7 +63,8 @@ class ADBController:
         self,
         device_id: Optional[str] = None,
         host: str = DEFAULT_HOST,
-        port: int = DEFAULT_PORT
+        port: int = DEFAULT_PORT,
+        auto_connect: bool = False,
     ):
         # Set up ADB path in environment
         adb_path = get_adb_path()
@@ -78,8 +79,13 @@ class ADBController:
         self.scanner = DeviceScanner(host=host, port=port)
         self._cache = get_cache()
         
-        # Attempt connection
-        self.check_adb_connection()
+        # Attempt connection only when explicitly requested. The GUI passes
+        # ``auto_connect=False`` (the default) so the window can open
+        # immediately and a port scan can't block startup. The CLI flow
+        # calls :meth:`check_adb_connection` from ``start()`` once the user
+        # actually wants to run automation.
+        if auto_connect:
+            self.check_adb_connection()
     
     def _get_current_app_for_device(self, device) -> Optional[str]:
         """Get current app for a specific device without changing self.device"""
@@ -358,3 +364,83 @@ class ADBController:
     def get_app_name(self, package_name: str) -> str:
         """Get display name for app package"""
         return self._get_app_name_for_package(package_name)
+
+    # ==================== Status helpers ====================
+
+    def is_connected(self) -> bool:
+        """Lightweight check whether we currently have a usable device."""
+        if self.device is None:
+            return False
+        try:
+            # ``shell`` raises if the device went away; this is much cheaper
+            # than re-running the full check_adb_connection flow.
+            self.device.shell("echo ok")
+            return True
+        except Exception:
+            self.device = None
+            return False
+
+    def quick_refresh(self) -> bool:
+        """Re-scan **already-connected** ADB devices without port scanning.
+
+        Cheap (~tens of ms) so it's safe to call from a UI poll. Returns
+        ``True`` if we now have a device. Use :meth:`check_adb_connection`
+        for the heavy version that also scans emulator ports.
+        """
+        try:
+            self.scanner.ensure_adb_server_running()
+            devices = self.client.devices()
+            if not devices:
+                self.device = None
+                return False
+            # Prefer the previously-selected device id; otherwise pick the
+            # first available one.
+            target = None
+            if self.device_id:
+                for d in devices:
+                    if d.serial == self.device_id:
+                        target = d
+                        break
+            if target is None:
+                target = devices[0]
+                self.device_id = target.serial
+            self.device = target
+            return True
+        except Exception:
+            self.device = None
+            return False
+
+    def get_status_summary(self) -> dict:
+        """Return a snapshot suitable for display in a status bar.
+
+        Keys:
+            connected (bool):    whether ``self.device`` is usable
+            device_id (str|None)
+            device_name (str|None)
+            app_package (str|None)
+            app_name (str|None)
+        """
+        if self.device is None:
+            return {
+                "connected": False,
+                "device_id": self.device_id,
+                "device_name": None,
+                "app_package": None,
+                "app_name": None,
+            }
+        try:
+            device_name = self._get_device_name_for_device(self.device)
+        except Exception:
+            device_name = self.device_id
+        try:
+            app_pkg = _detect_current_app(self.device)
+        except Exception:
+            app_pkg = None
+        app_name = self._get_app_name_for_package(app_pkg) if app_pkg else None
+        return {
+            "connected": True,
+            "device_id": self.device_id or self.device.serial,
+            "device_name": device_name,
+            "app_package": app_pkg,
+            "app_name": app_name,
+        }

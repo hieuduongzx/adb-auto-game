@@ -27,7 +27,17 @@ class ActivityStatus(Enum):
 
 @dataclass
 class Activity:
-    """Represents an automation activity/task"""
+    """Represents an automation activity/task.
+
+    There are two execution modes:
+
+    * **Sequential** (default): the activity runs once, in order, as part of
+      the main automation loop in :meth:`BaseGameAutomation.process_game_actions`.
+    * **Background** (``background=True``): the activity loops in its own
+      thread, polling every ``poll_interval`` seconds, and can be toggled on
+      and off at runtime via :meth:`BaseGameAutomation.set_activity_enabled`
+      while the main loop is running.
+    """
     id: str
     name: str
     description: str = ""
@@ -37,6 +47,9 @@ class Activity:
     error_message: Optional[str] = None
     execution_count: int = 0
     max_retries: int = 3
+    # Background execution support
+    background: bool = False
+    poll_interval: float = 1.0
     
     def reset(self):
         """Reset activity state"""
@@ -121,6 +134,11 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         self._pause_event = threading.Event()
         self._pause_event.set()  # Not paused by default
         
+        # Background activity management
+        self._background_threads: Dict[str, threading.Thread] = {}
+        self._background_stop_events: Dict[str, threading.Event] = {}
+        self._background_lock = threading.Lock()
+        
         # Initialize activities
         self._initialize_activities()
     
@@ -144,9 +162,18 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         activities = self.define_activities()
         self._activities = activities
         self._activity_map = {act.id: act for act in activities}
-        self._activity_order = [act.id for act in activities if act.enabled]
+        # Only sequential, enabled activities go into the run order. Background
+        # activities are managed separately via worker threads.
+        self._activity_order = [
+            act.id for act in activities
+            if act.enabled and not act.background
+        ]
         
-        log_info(f"Initialized {len(activities)} activities: {self._activity_order}")
+        log_info(
+            f"Initialized {len(activities)} activities "
+            f"(sequential: {self._activity_order}, "
+            f"background: {[a.id for a in activities if a.background]})"
+        )
     
     def get_executor(self) -> ThreadPoolExecutor:
         """Lazily create and return the thread pool for parallel sub-tasks."""
@@ -187,15 +214,29 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         return self._activity_map.get(activity_id)
     
     def set_activity_enabled(self, activity_id: str, enabled: bool):
-        """Enable or disable an activity"""
+        """Enable or disable an activity.
+
+        For background activities this also starts/stops the worker thread
+        immediately, so the user can toggle them on and off while the main
+        automation loop is running.
+        """
         activity = self._activity_map.get(activity_id)
-        if activity:
-            activity.enabled = enabled
+        if not activity:
+            return
+        activity.enabled = enabled
+        if activity.background:
+            # Background activities are not part of the sequential order; we
+            # only need to manage their worker thread.
+            if enabled:
+                self._start_background_activity(activity)
+            else:
+                self._stop_background_activity(activity)
+        else:
             if enabled and activity_id not in self._activity_order:
                 self._activity_order.append(activity_id)
             elif not enabled and activity_id in self._activity_order:
                 self._activity_order.remove(activity_id)
-            log_info(f"Activity '{activity_id}' {'enabled' if enabled else 'disabled'}")
+        log_info(f"Activity '{activity_id}' {'enabled' if enabled else 'disabled'}")
     
     def set_activity_order(self, order: List[str]):
         """Set the execution order of activities"""
@@ -217,6 +258,107 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
     def get_current_activity(self) -> Optional[Activity]:
         """Get currently running activity"""
         return self._current_activity
+    
+    # ==================== Background Activity Management ====================
+    
+    def _background_worker(self, activity: Activity, stop_event: threading.Event):
+        """Worker loop for a single background activity.
+
+        Calls ``handle_activity_<id>`` repeatedly every ``poll_interval``
+        seconds until ``stop_event`` is set.
+
+        The handler return value is treated as a tick result rather than a
+        completion: the loop keeps going regardless. Exceptions are caught
+        and logged so a buggy handler cannot kill the worker thread.
+
+        Background workers run independently of the sequential automation
+        loop: a user can toggle them on/off even when ``self.running`` is
+        ``False`` (e.g. before the main automation has been started).
+        """
+        handler = self._get_activity_handler(activity.id)
+        if handler is None:
+            log_error(
+                f"Background activity '{activity.id}' has no handler "
+                f"(expected method 'handle_activity_{activity.id}'); aborting"
+            )
+            return
+        log_info(f"[bg] Background activity started: {activity.name}")
+        activity.status = ActivityStatus.RUNNING
+        try:
+            while not stop_event.is_set():
+                # Honour pause: skip ticks while the main loop is paused.
+                if not self._paused:
+                    try:
+                        handler()
+                        activity.execution_count += 1
+                    except Exception as e:
+                        # Swallow errors so a bug in one tick does not kill
+                        # the whole background loop.
+                        log_error(f"[bg] Error in background '{activity.id}': {e}")
+                # Sleep on the stop event so we wake immediately on disable.
+                if stop_event.wait(timeout=max(0.05, activity.poll_interval)):
+                    break
+        finally:
+            activity.status = ActivityStatus.PENDING
+            log_info(f"[bg] Background activity stopped: {activity.name}")
+    
+    def _start_background_activity(self, activity: Activity) -> bool:
+        """Start a background activity worker thread.
+
+        Idempotent: returns ``True`` if a worker is now running for the
+        activity, ``False`` if the activity is not actually a background one.
+
+        Ensures ADB connection and continuous screen capture are running
+        first so the worker has frames to look at, even if the main
+        automation loop hasn't been started yet.
+        """
+        if not activity.background:
+            return False
+        # Make sure ADB and capture are alive before kicking off the worker.
+        # This is a no-op when the main automation loop is already running.
+        self._ensure_runtime_ready()
+        with self._background_lock:
+            existing = self._background_threads.get(activity.id)
+            if existing is not None and existing.is_alive():
+                return True
+            stop_event = threading.Event()
+            thread = threading.Thread(
+                target=self._background_worker,
+                args=(activity, stop_event),
+                name=f"bg-{activity.id}",
+                daemon=True,
+            )
+            self._background_stop_events[activity.id] = stop_event
+            self._background_threads[activity.id] = thread
+            thread.start()
+        return True
+    
+    def _stop_background_activity(self, activity: Activity, join_timeout: float = 2.0) -> None:
+        """Signal a background worker to stop and wait briefly for it."""
+        with self._background_lock:
+            stop_event = self._background_stop_events.pop(activity.id, None)
+            thread = self._background_threads.pop(activity.id, None)
+        if stop_event is not None:
+            stop_event.set()
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=join_timeout)
+    
+    def _start_all_background_activities(self) -> None:
+        """Start workers for every enabled background activity."""
+        for activity in self._activities:
+            if activity.background and activity.enabled:
+                self._start_background_activity(activity)
+    
+    def _stop_all_background_activities(self) -> None:
+        """Signal every background worker to stop."""
+        for activity in list(self._activities):
+            if activity.background:
+                self._stop_background_activity(activity)
+    
+    def is_background_running(self, activity_id: str) -> bool:
+        """Whether a given background activity currently has a live worker."""
+        thread = self._background_threads.get(activity_id)
+        return thread is not None and thread.is_alive()
     
     # ==================== Activity Handlers ====================
     
@@ -323,7 +465,81 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             self._trigger_callback('on_progress', self._current_activity.id, progress)
     
     # ==================== Control Methods ====================
-    
+
+    def _ensure_runtime_ready(self) -> bool:
+        """Make sure ADB is connected and continuous capture is running.
+
+        Used by both the main ``start()`` flow and ad-hoc operations like
+        background-activity toggles or single-activity runs that need a
+        live screencap stream but haven't been routed through ``start()``.
+
+        Returns ``True`` on success, ``False`` if ADB couldn't be reached.
+        """
+        try:
+            if not self.adb.device:
+                self.adb.check_adb_connection()
+            if not self.adb.device:
+                log_error("Failed to connect to ADB device")
+                return False
+            # Refresh screen size in case it changed (rotation, new device).
+            self._update_screen_size()
+            # Start the continuous capture thread if it's not already up.
+            if not getattr(self, "capture_running", False):
+                self.start_continuous_capture()
+            return True
+        except Exception as e:
+            log_error(f"Runtime not ready: {e}")
+            return False
+
+    def run_single_activity(self, activity_id: str) -> bool:
+        """Execute one specific activity once, outside the main loop.
+
+        Useful when the user wants to run a single task on demand (e.g. via
+        a per-row "Run" button in the GUI) without having to start the
+        whole sequential queue.
+
+        - Ensures ADB + capture are alive
+        - Skips when another single-activity run, the main loop, or this
+          activity itself is already running
+        - Honours pause state
+        - Emits the same callbacks (``on_activity_start`` / ``_complete`` /
+          ``_failed``) the main loop uses, so the UI updates the same way
+
+        Returns ``True`` if the activity returned success.
+        """
+        activity = self._activity_map.get(activity_id)
+        if not activity:
+            log_error(f"Unknown activity: {activity_id}")
+            return False
+        if activity.background:
+            log_warning(
+                f"'{activity_id}' is a background activity; toggle it on "
+                "instead of running it once."
+            )
+            return False
+        if self.running:
+            log_warning("Cannot run a single activity while the main loop is running.")
+            return False
+        if self._current_activity is not None:
+            log_warning(
+                f"Another activity is already running: "
+                f"{self._current_activity.id}"
+            )
+            return False
+
+        if not self._ensure_runtime_ready():
+            return False
+
+        # Reset the activity's state so the UI reflects a fresh run.
+        activity.reset()
+        self._update_progress(activity_id, 0.0)
+
+        log_info(f"Running single activity: {activity.name}")
+        try:
+            return self._execute_activity(activity)
+        finally:
+            log_info(f"Single activity finished: {activity.name}")
+
     def pause(self):
         """Pause automation (will pause after current operation)"""
         self._paused = True
@@ -352,6 +568,9 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         # Stop continuous capture
         self.stop_continuous_capture()
         
+        # Stop all background activity workers (idempotent if already stopped)
+        self._stop_all_background_activities()
+        
         # Shutdown executor if it was ever created
         if self._executor is not None:
             self._executor.shutdown(wait=False)
@@ -372,6 +591,9 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         """
         log_info(f"Starting automation with activities: {self._activity_order}")
         self._trigger_callback('on_start')
+        # Spin up any background activities that are enabled. They will run
+        # alongside the sequential activities below.
+        self._start_all_background_activities()
         
         try:
             for activity_id in self._activity_order:
@@ -414,6 +636,10 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         except Exception as e:
             log_error(f"Error in automation loop: {e}")
             self._trigger_callback('on_error', e)
+        finally:
+            # Always tear down background workers when the main loop exits,
+            # even on error or KeyboardInterrupt.
+            self._stop_all_background_activities()
     
     # ==================== Utility Methods ====================
     
@@ -442,6 +668,8 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
                     'status': act.status.value,
                     'progress': act.progress,
                     'enabled': act.enabled,
+                    'background': act.background,
+                    'background_running': self.is_background_running(act.id) if act.background else False,
                 }
                 for act in self._activities
             ],
