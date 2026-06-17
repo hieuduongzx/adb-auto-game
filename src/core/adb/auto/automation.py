@@ -162,8 +162,15 @@ class ADBGameAutomation:
         config: Optional[str] = None,
         whitelist: Optional[str] = None,
         preprocess: bool = True,
+        psm: Optional[int] = None,
+        ascii_only: bool = False,
     ) -> str:
         """Run OCR on the current screen (optionally cropped to ``region``).
+
+        ``ascii_only=True`` strips Vietnamese / Latin diacritics from the
+        result before returning. Useful when the OCR engine reads
+        Vietnamese labels with the wrong tone marks - downstream code
+        can match against an ASCII needle and ignore accent noise.
 
         Returns the recognised text stripped of trailing whitespace, or
         ``""`` when OCR is unavailable / the screen could not be captured.
@@ -174,7 +181,8 @@ class ADBGameAutomation:
             return ""
         return self.ocr.read_text(
             screen, region=region, lang=lang, config=config,
-            whitelist=whitelist, preprocess=preprocess,
+            whitelist=whitelist, preprocess=preprocess, psm=psm,
+            ascii_only=ascii_only,
         )
 
     def region_contains_text(
@@ -184,6 +192,7 @@ class ADBGameAutomation:
         last_screen: bool = True,
         case_sensitive: bool = False,
         normalize_whitespace: bool = True,
+        ascii_fold: bool = False,
         **kwargs,
     ) -> bool:
         """Return ``True`` if ``needle`` is present in the OCR output of
@@ -191,18 +200,25 @@ class ADBGameAutomation:
 
         Whitespace inside both haystack and needle is collapsed before the
         check by default, so spaces/newlines from Tesseract output don't
-        break ``"0/5"`` matches.
+        break ``"0/5"`` matches. ``ascii_fold=True`` strips diacritics
+        from both sides before comparing - lets you match Vietnamese
+        text via an ASCII needle (``"Phuc Loi"`` matches ``"Phúc Lợi"``
+        even when Tesseract garbles the tone marks).
 
         Extra ``kwargs`` are forwarded to :meth:`read_text` (``lang``,
-        ``config``, ``whitelist``, ``preprocess``).
+        ``config``, ``whitelist``, ``preprocess``, ``psm``).
         """
         text = self.read_text(region=region, last_screen=last_screen, **kwargs)
         if not text:
             return False
 
         import re as _re
+        from src.core.adb.auto.ocr import strip_diacritics
         haystack = text
         target = needle
+        if ascii_fold:
+            haystack = strip_diacritics(haystack)
+            target = strip_diacritics(target)
         if normalize_whitespace:
             haystack = _re.sub(r"\s+", "", haystack)
             target = _re.sub(r"\s+", "", target)
@@ -219,17 +235,20 @@ class ADBGameAutomation:
         interval: float = 0.5,
         case_sensitive: bool = False,
         whitelist: Optional[str] = None,
+        ascii_fold: bool = False,
     ) -> bool:
         """Poll ``region`` until ``needle`` is recognised or ``timeout``.
 
         Useful as a finished-state probe (e.g. arena counter showing
         ``"0/5"``). Returns ``True`` on first match, ``False`` on timeout.
+        ``ascii_fold=True`` lets an ASCII needle match diacritic text.
         """
         start = time.time()
         while time.time() - start < timeout:
             if self.region_contains_text(
                 needle, region=region,
                 case_sensitive=case_sensitive, whitelist=whitelist,
+                ascii_fold=ascii_fold,
             ):
                 elapsed = time.time() - start
                 log_info(

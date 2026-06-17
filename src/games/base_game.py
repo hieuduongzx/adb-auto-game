@@ -7,9 +7,11 @@ import time
 import threading
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Callable, Optional, Any
+from typing import Dict, List, Callable, Optional, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
+
+import cv2
 
 from src.core import ADBGameAutomation
 from src.core.adb.auto.config import Config
@@ -202,7 +204,281 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             log_error(f"Missing templates: {missing}")
             return False
         return True
-    
+
+    # ==================== Color / Active-State Helpers ====================
+    #
+    # ``cv2.matchTemplate`` only compares shape/structure, so a button that's
+    # been desaturated to indicate "already used / disabled" still matches
+    # its colored template with very high confidence. These helpers add a
+    # post-match color check.
+    #
+    # We use a *colored-pixel ratio* metric rather than mean saturation:
+    # count how many strongly-saturated pixels exist in the template, then
+    # how many exist in the matched ROI, and compare. A disabled (grayed
+    # out) button loses almost every strongly-saturated pixel, so the
+    # ratio collapses to near-zero, while an active button stays close to
+    # 1.0. This separation is much sharper than mean saturation, which
+    # gets diluted by neutral background pixels inside the button bbox.
+
+    # Pixels with HSV saturation >= this value are treated as "colored".
+    # 80 keeps us comfortably above noisy near-gray pixels (typically <40)
+    # while still catching pastel UI elements.
+    _COLORED_PIXEL_SAT_THRESHOLD = 80
+
+    @staticmethod
+    def _colored_pixel_count(img_bgr, sat_threshold: int) -> int:
+        """Count pixels in a BGR image whose HSV saturation is >= threshold."""
+        if img_bgr is None or len(img_bgr.shape) < 3:
+            return 0
+        hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+        return int((hsv[:, :, 1] >= sat_threshold).sum())
+
+    def is_button_active(
+        self,
+        template_path: str,
+        center: Tuple[int, int],
+        min_color_ratio: float = 0.4,
+        sat_threshold: Optional[int] = None,
+    ) -> bool:
+        """Check whether the matched button is in its active (colored) state.
+
+        Counts strongly-saturated pixels in both the template and the
+        matched ROI, then compares::
+
+            ratio = colored_pixels(roi) / colored_pixels(template)
+
+        ``ratio`` near ``1.0`` means the ROI carries roughly as much color
+        as the template (active). Disabled / grayed-out buttons collapse
+        to ``~0`` because almost no pixel survives the saturation cutoff.
+
+        Args:
+            template_path: Template that was matched. Used to size the ROI
+                *and* to read the reference colored-pixel count.
+            center: ``(cx, cy)`` returned by ``find_template``.
+            min_color_ratio: ROI must reach at least this fraction of the
+                template's colored-pixel count to count as active. ``0.4``
+                is a comfortable default; lower it for buttons whose
+                disabled state still keeps a few colored accents.
+            sat_threshold: Optional override for the saturation cutoff
+                that defines a "colored" pixel. Defaults to
+                ``_COLORED_PIXEL_SAT_THRESHOLD`` (80).
+
+        Returns:
+            ``True`` if the region looks colored, ``False`` if it looks gray
+            or the check could not be performed (caller should treat that as
+            "don't tap" to be safe).
+        """
+        screen = self.get_latest_screen()
+        if screen is None or len(screen.shape) < 3:
+            return False
+
+        template = cv2.imread(template_path, cv2.IMREAD_COLOR)
+        if template is None:
+            return False
+
+        th, tw = template.shape[:2]
+        cx, cy = center
+        x1 = max(cx - tw // 2, 0)
+        y1 = max(cy - th // 2, 0)
+        x2 = min(x1 + tw, screen.shape[1])
+        y2 = min(y1 + th, screen.shape[0])
+        if x2 <= x1 or y2 <= y1:
+            return False
+
+        sat_thr = sat_threshold if sat_threshold is not None else self._COLORED_PIXEL_SAT_THRESHOLD
+
+        roi = screen[y1:y2, x1:x2]
+        roi_colored = self._colored_pixel_count(roi, sat_thr)
+        tpl_colored = self._colored_pixel_count(template, sat_thr)
+
+        # If the template itself has almost no colored pixels (e.g. a pure
+        # white-on-dark icon), the metric is meaningless. Fail open so the
+        # caller can fall back to a different strategy.
+        if tpl_colored < 50:
+            log_warning(
+                f"[ACTIVE CHECK] {os.path.basename(template_path)} has too "
+                f"few colored pixels ({tpl_colored}); skipping active check"
+            )
+            return True
+
+        ratio = roi_colored / tpl_colored
+        passed = ratio >= min_color_ratio
+
+        log_info(
+            f"[ACTIVE CHECK] {os.path.basename(template_path)} "
+            f"roi_colored={roi_colored} tpl_colored={tpl_colored} "
+            f"ratio={ratio:.2f} (min_ratio={min_color_ratio}, "
+            f"sat_thr={sat_thr}) -> {'ACTIVE' if passed else 'DISABLED'}"
+        )
+        return passed
+
+    def find_active_template(
+        self,
+        template_path: str,
+        timeout: float = 5.0,
+        threshold: float = 0.85,
+        min_color_ratio: float = 0.4,
+        sat_threshold: Optional[int] = None,
+    ) -> Optional[Tuple[int, int, float]]:
+        """Find a template only if the matched region is in its colored state.
+
+        Wraps ``wait_for_template`` + :meth:`is_button_active` so callers
+        can replace ``wait_and_tap`` with a two-step "find then tap" flow
+        whenever a disabled-button false positive would be a problem::
+
+            active = self.find_active_template(self.tpl['take_all'], timeout=5)
+            if active:
+                x, y, _ = active
+                self.tap(x, y)
+
+        Returns the same ``(x, y, conf)`` tuple as ``find_template`` when
+        the button is active, ``None`` otherwise (template missing, not
+        visible, or visible but grayed out).
+        """
+        result = self.wait_for_template(
+            template_path, timeout=timeout, threshold=threshold
+        )
+        if not result:
+            return None
+        x, y, _ = result
+        if not self.is_button_active(
+            template_path, (x, y),
+            min_color_ratio=min_color_ratio,
+            sat_threshold=sat_threshold,
+        ):
+            return None
+        return result
+
+    def wait_and_tap_active(
+        self,
+        template_path: str,
+        timeout: float = 5.0,
+        threshold: float = 0.85,
+        min_color_ratio: float = 0.4,
+        sat_threshold: Optional[int] = None,
+        offset: Tuple[int, int] = (0, 0),
+    ) -> bool:
+        """Like ``wait_and_tap`` but only taps when the button is colored.
+
+        Convenience wrapper around :meth:`find_active_template` that performs
+        the tap in a single call. Returns ``True`` only when an active match
+        was found and the tap succeeded.
+        """
+        result = self.find_active_template(
+            template_path, timeout=timeout, threshold=threshold,
+            min_color_ratio=min_color_ratio,
+            sat_threshold=sat_threshold,
+        )
+        if not result:
+            return False
+        x, y, _ = result
+        return self.tap(x + offset[0], y + offset[1])
+
+    # ==================== OCR Helpers ====================
+    #
+    # Thin wrappers over the OCR methods on ``ADBGameAutomation`` that add
+    # consistent ``[OCR]`` logging and a fast-path "OCR not installed"
+    # check. They're meant to be the primary OCR entry points for game
+    # subclasses, mirroring the convenience tier of ``wait_and_tap`` /
+    # ``find_and_tap`` over the lower-level ``find_template``.
+
+    Region = Tuple[int, int, int, int]
+
+    def region_has_text(
+        self,
+        needle: str,
+        region: "BaseGameAutomation.Region",
+        whitelist: Optional[str] = None,
+        case_sensitive: bool = False,
+        last_screen: bool = True,
+        ascii_fold: bool = False,
+    ) -> bool:
+        """Return ``True`` if ``needle`` appears in OCR output of ``region``.
+
+        Convenience wrapper around :meth:`ADBGameAutomation.region_contains_text`
+        with logging tuned for game flows. Returns ``False`` immediately
+        when the OCR engine isn't available (Tesseract not installed),
+        so callers can chain it before falling back to template checks::
+
+            if self.region_has_text("0/5", region=COUNTER_REGION,
+                                    whitelist="0123456789/"):
+                return True
+            # template fallback...
+
+        Args:
+            needle: Substring to look for. Whitespace is ignored.
+            region: ``(x, y, w, h)`` in device pixels.
+            whitelist: Optional Tesseract char whitelist (e.g.
+                ``"0123456789/"`` for digit-only labels).
+            case_sensitive: Default ``False``.
+            last_screen: Use the most recent capture instead of forcing
+                a fresh ``capture_screen()``. Default ``True``.
+            ascii_fold: When ``True``, strip diacritics from both the
+                OCR result and ``needle`` before comparing. Lets you
+                match Vietnamese labels via ASCII needles - useful when
+                Tesseract reads "Phúc Lợi" as "Phue Loi" / "Phuc Loi"
+                etc and you don't want to enumerate every variant.
+        """
+        if not getattr(self.ocr, "available", False):
+            return False
+
+        text = self.read_text(
+            region=region, whitelist=whitelist, last_screen=last_screen,
+            ascii_only=ascii_fold,
+        )
+        if not text:
+            log_info(f"[OCR] region {region} empty")
+            return False
+
+        # Reuse the lower-level method so case/whitespace rules stay in
+        # one place. We've already logged the raw read.
+        log_info(f"[OCR] region {region} -> {text!r}")
+        return self.region_contains_text(
+            needle, region=region,
+            whitelist=whitelist, case_sensitive=case_sensitive,
+            last_screen=last_screen, ascii_fold=ascii_fold,
+        )
+
+    def wait_region_has_text(
+        self,
+        needle: str,
+        region: "BaseGameAutomation.Region",
+        timeout: float = 10.0,
+        interval: float = 0.5,
+        whitelist: Optional[str] = None,
+        case_sensitive: bool = False,
+        ascii_fold: bool = False,
+    ) -> bool:
+        """Poll ``region`` until ``needle`` is recognised or timeout.
+
+        Pause-aware: while the automation is paused the poll skips reads
+        and just sleeps, so a long ``wait_region_has_text`` won't burn
+        ADB during a Pause. ``ascii_fold=True`` lets an ASCII needle
+        match Vietnamese diacritic text.
+        """
+        if not getattr(self.ocr, "available", False):
+            log_warning(
+                f"[OCR] '{needle}' wait skipped - Tesseract unavailable"
+            )
+            return False
+
+        start = time.time()
+        while time.time() - start < timeout:
+            self._pause_event.wait()
+            if self.region_has_text(
+                needle, region=region,
+                whitelist=whitelist, case_sensitive=case_sensitive,
+                ascii_fold=ascii_fold,
+            ):
+                elapsed = time.time() - start
+                log_success(
+                    f"[OCR] Found '{needle}' in {region} after {elapsed:.2f}s"
+                )
+                return True
+            time.sleep(interval)
+        log_warning(f"[OCR] Timeout waiting for '{needle}' in {region}")
+        return False
+
     # ==================== Activity Management ====================
     
     def get_activities(self) -> List[Activity]:
