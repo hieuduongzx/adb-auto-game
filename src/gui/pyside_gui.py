@@ -200,7 +200,7 @@ class Icon(QWidget):
         c = QColor(self._color)
         p.setBrush(QBrush(c))
         p.setPen(QPen(c, 1.6, Qt.PenStyle.SolidLine,
-                      Qt.PenStyle.RoundCap, Qt.PenStyle.RoundJoin))
+                      Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
         w = self.width()
         h = self.height()
         m = w * 0.18  # margin so glyphs don't touch edges
@@ -662,7 +662,7 @@ class SearchField(QLineEdit):
             c = QColor(C.TEXT_MUTED)
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.setPen(QPen(c, 1.4, Qt.PenStyle.SolidLine,
-                          Qt.PenStyle.RoundCap, Qt.PenStyle.RoundJoin))
+                          Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
             r = self._clear_btn.geometry()
             m = 3
             p.drawLine(QPointF(r.left() + m, r.top() + m),
@@ -1178,9 +1178,13 @@ class GameAutomationWindow(QMainWindow):
         self._timer.start()
 
         self._build_ui()
+        log_info("UI built")
         self._build_actions()
+        log_info("Actions built")
         self._register_callbacks()
+        log_info("Callbacks registered")
         self._refresh_button_state()
+        log_info("Button state refreshed")
         QTimer.singleShot(150, lambda: self._kick_device_status_refresh(deep=True))
 
     # ----- callback wiring --------------------------------------------------
@@ -1366,7 +1370,7 @@ class GameAutomationWindow(QMainWindow):
         status_wrap.setStyleSheet(
             f"QFrame#statusPillWrap {{ background-color: {C.PANEL_ALT};"
             f" border: 1px solid {C.BORDER}; border-radius: 18px;"
-            " padding: 4px 14px; }}"
+            " padding: 4px 14px; }"
         )
         status_row = QHBoxLayout(status_wrap)
         status_row.setContentsMargins(14, 6, 14, 6)
@@ -2470,8 +2474,14 @@ def run_with_pyside(game_class, title: str = "Game Automation") -> None:
 
     game = game_class()
     window = GameAutomationWindow(game, title)
+    log_info("About to show window")
     window.show()
+    log_info(f"Window shown: visible={window.isVisible()} geo={window.geometry().getRect()}")
+    window.raise_()
+    window.activateWindow()
+    log_info("Entering Qt event loop")
     app.exec()
+    log_info("Qt event loop exited")
 
 
 if __name__ == "__main__":
