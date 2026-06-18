@@ -14,8 +14,8 @@ Layout::
     |  SEQUENTIAL (n)  [All][None]   |  BACKGROUND (n)            |
     |   table with progress bars     |   rows with iOS toggles    |
     +-------------------------------------------------------------+
-    |  LOG  [search…] [Info][OK][Warn][Err] [Clear] | METRICS     |
-    |   monospace terminal                           | 2x3 cards   |
+    |  LOG  [search…] [Info][OK][Warn][Err] [Clear]              |
+    |   monospace terminal                                         |
     +-------------------------------------------------------------+
     |  status bar: activity • device • app • elapsed              |
     +-------------------------------------------------------------+
@@ -50,13 +50,9 @@ from PySide6.QtCore import (
     QPointF,
 )
 from PySide6.QtGui import (
-    QAction,
     QBrush,
     QColor,
-    QFont,
     QFontDatabase,
-    QIcon,
-    QKeySequence,
     QPainter,
     QPainterPath,
     QPalette,
@@ -69,14 +65,11 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
     QGraphicsDropShadowEffect,
-    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
     QMainWindow,
-    QMenu,
-    QMenuBar,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
@@ -551,70 +544,6 @@ class ElapsedTimer(QLabel):
         self.setText(f"{h:02d}:{m:02d}:{s:02d}")
 
 
-class StatCard(QFrame):
-    """A metric micro-card with an optional left accent bar, a small
-    uppercase label, and a large coloured value.
-    """
-
-    def __init__(
-        self,
-        label: str,
-        value: str,
-        value_color: str = C.TEXT,
-        accent: Optional[str] = None,
-        parent: Optional[QWidget] = None,
-    ) -> None:
-        super().__init__(parent)
-        self.setObjectName("microCard")
-
-        outer = QHBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(0)
-
-        if accent:
-            bar = QFrame()
-            bar.setFixedWidth(3)
-            bar.setStyleSheet(
-                f"background-color:{accent}; border:none;"
-                "border-top-left-radius:10px; border-bottom-left-radius:10px;"
-            )
-            outer.addWidget(bar)
-
-        body = QWidget()
-        body.setProperty("class", "statBody")
-        lay = QVBoxLayout(body)
-        lay.setContentsMargins(12, 10, 12, 10)
-        lay.setSpacing(3)
-
-        self._label = QLabel(label.upper())
-        self._label.setStyleSheet(
-            f"color:{C.TEXT_MUTED}; font-size:10px; font-weight:700;"
-            "letter-spacing:0.7px;"
-        )
-        self._value = QLabel(value)
-        self._value.setStyleSheet(
-            f"color:{value_color}; font-size:18px; font-weight:700;"
-            "letter-spacing:-0.2px;"
-        )
-        lay.addWidget(self._label)
-        lay.addWidget(self._value)
-        lay.addStretch(1)
-
-        outer.addWidget(body, 1)
-
-    def setValue(self, text: str) -> None:
-        self._value.setText(text)
-
-    def setValueColor(self, color: str) -> None:
-        self._value.setStyleSheet(
-            f"color:{color}; font-size:18px; font-weight:700;"
-            "letter-spacing:-0.2px;"
-        )
-
-    def setLabel(self, text: str) -> None:
-        self._label.setText(text.upper())
-
-
 class SearchField(QLineEdit):
     """A rounded search input with a leading search icon and a trailing
     clear button. Emits ``textChanged`` like a normal QLineEdit.
@@ -690,44 +619,6 @@ QLabel, QCheckBox {{
     background: transparent;
 }}
 
-QMenuBar {{
-    background-color: {C.PANEL};
-    border-bottom: 1px solid {C.BORDER};
-    padding: 2px 6px;
-    spacing: 4px;
-}}
-QMenuBar::item {{
-    padding: 5px 10px;
-    background: transparent;
-    border-radius: 6px;
-    color: {C.TEXT_DIM};
-    font-weight: 600;
-}}
-QMenuBar::item:selected {{
-    background-color: {C.PANEL_HI};
-    color: {C.TEXT};
-}}
-QMenu {{
-    background-color: {C.PANEL};
-    border: 1px solid {C.BORDER};
-    border-radius: 8px;
-    padding: 6px;
-}}
-QMenu::item {{
-    padding: 6px 22px 6px 14px;
-    border-radius: 6px;
-    color: {C.TEXT};
-}}
-QMenu::item:selected {{
-    background-color: {C.ACCENT_BG};
-    color: {C.ACCENT_DIM};
-}}
-QMenu::separator {{
-    height: 1px;
-    background-color: {C.BORDER};
-    margin: 4px 8px;
-}}
-
 QToolTip {{
     background-color: {C.TEXT};
     color: #f9fafb;
@@ -742,14 +633,6 @@ QFrame#card {{
     background-color: {C.PANEL};
     border: 1px solid {C.BORDER};
     border-radius: 14px;
-}}
-QFrame#microCard {{
-    background-color: {C.PANEL};
-    border: 1px solid {C.BORDER};
-    border-radius: 10px;
-}}
-QFrame#microCard:hover {{
-    border-color: {C.BORDER_HI};
 }}
 
 /* Logo badge */
@@ -1179,8 +1062,6 @@ class GameAutomationWindow(QMainWindow):
 
         self._build_ui()
         log_info("UI built")
-        self._build_actions()
-        log_info("Actions built")
         self._register_callbacks()
         log_info("Callbacks registered")
         self._refresh_button_state()
@@ -1250,81 +1131,9 @@ class GameAutomationWindow(QMainWindow):
 
         root.addWidget(self._build_header())
         root.addWidget(self._build_activities_split(), 3)
-        root.addWidget(self._build_bottom_row(), 2)
+        root.addWidget(self._build_log_panel(), 2)
 
         self._build_status_bar()
-
-    # ---- menu + keyboard shortcuts ----------------------------------------
-
-    def _build_actions(self) -> None:
-        """Create QActions with shortcuts and attach them to a menu bar.
-
-        QAction shortcuts work application-wide while the window is active
-        and are also surfaced in the menu so users can discover them.
-        """
-        mb = self.menuBar()
-        mb.setObjectName("menuBar")
-
-        file_menu = mb.addMenu("File")
-        self._act_start = QAction("Start", self)
-        self._act_start.setShortcut(QKeySequence("Ctrl+Shift+S"))
-        self._act_start.triggered.connect(self._cb_start)
-        file_menu.addAction(self._act_start)
-
-        self._act_pause = QAction("Pause / Resume", self)
-        self._act_pause.setShortcut(QKeySequence("Space"))
-        self._act_pause.triggered.connect(self._cb_pause)
-        file_menu.addAction(self._act_pause)
-
-        self._act_stop = QAction("Stop", self)
-        self._act_stop.setShortcut(QKeySequence("Esc"))
-        self._act_stop.triggered.connect(self._cb_stop)
-        file_menu.addAction(self._act_stop)
-
-        file_menu.addSeparator()
-        quit_act = QAction("Quit", self)
-        quit_act.setShortcut(QKeySequence("Ctrl+Q"))
-        quit_act.triggered.connect(self.close)
-        file_menu.addAction(quit_act)
-
-        view_menu = mb.addMenu("View")
-        refresh_act = QAction("Refresh devices", self)
-        refresh_act.setShortcut(QKeySequence("F5"))
-        refresh_act.triggered.connect(self._cb_refresh_devices)
-        view_menu.addAction(refresh_act)
-
-        clear_log_act = QAction("Clear log", self)
-        clear_log_act.setShortcut(QKeySequence("Ctrl+L"))
-        clear_log_act.triggered.connect(self._cb_clear_log)
-        view_menu.addAction(clear_log_act)
-
-        focus_search_act = QAction("Focus log search", self)
-        focus_search_act.setShortcut(QKeySequence("Ctrl+F"))
-        focus_search_act.triggered.connect(self._focus_log_search)
-        view_menu.addAction(focus_search_act)
-
-        help_menu = mb.addMenu("Help")
-        about_act = QAction("About", self)
-        about_act.triggered.connect(self._show_about)
-        help_menu.addAction(about_act)
-
-    def _show_about(self) -> None:
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.about(
-            self,
-            "About",
-            f"<h3>{self.title}</h3>"
-            "<p>ADB game automation control panel.</p>"
-            "<p>Built with PySide6.</p>"
-            "<p><b>Shortcuts:</b><br>"
-            "Ctrl+Shift+S &mdash; Start<br>"
-            "Space &mdash; Pause / Resume<br>"
-            "Esc &mdash; Stop<br>"
-            "F5 &mdash; Refresh devices<br>"
-            "Ctrl+L &mdash; Clear log<br>"
-            "Ctrl+F &mdash; Focus log search<br>"
-            "Ctrl+Q &mdash; Quit</p>",
-        )
 
     # ---- header ------------------------------------------------------------
 
@@ -1776,24 +1585,7 @@ class GameAutomationWindow(QMainWindow):
         layout.addWidget(list_wrap, 1)
         return card
 
-    # ---- bottom: log + metrics --------------------------------------------
-
-    def _build_bottom_row(self) -> QWidget:
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self._build_log_panel())
-        splitter.addWidget(self._build_metrics_panel())
-        splitter.setStretchFactor(0, 72)
-        splitter.setStretchFactor(1, 28)
-        splitter.setHandleWidth(14)
-        splitter.setChildrenCollapsible(False)
-
-        wrap = QWidget()
-        wrap_layout = QVBoxLayout(wrap)
-        wrap_layout.setContentsMargins(0, 0, 0, 0)
-        wrap_layout.addWidget(splitter)
-        wrap.setMinimumHeight(240)
-        wrap.setMaximumHeight(340)
-        return wrap
+    # ---- bottom: log -------------------------------------------------------
 
     def _build_log_panel(self) -> QWidget:
         card = QFrame()
@@ -1872,46 +1664,6 @@ class GameAutomationWindow(QMainWindow):
         chip.setChecked(default)
         chip.setCursor(Qt.CursorShape.PointingHandCursor)
         return chip
-
-    def _build_metrics_panel(self) -> QWidget:
-        card = QFrame()
-        card.setObjectName("card")
-        _add_card_shadow(card)
-        outer = QVBoxLayout(card)
-        outer.setContentsMargins(18, 16, 18, 16)
-        outer.setSpacing(10)
-
-        title = QLabel("METRICS")
-        title.setObjectName("sectionTitle")
-        outer.addWidget(title)
-
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(10)
-        grid.setContentsMargins(0, 0, 0, 0)
-
-        self.metric_success  = self._make_stat_card("Success rate", "—", C.OK,   C.OK)
-        self.metric_matches  = self._make_stat_card("Matches",      "0", C.ACCENT, C.ACCENT)
-        self.metric_failures = self._make_stat_card("Failures",     "0", C.ERR,  C.ERR)
-        self.metric_avg_time = self._make_stat_card("Avg time",     "0.000s", C.TEXT, None)
-        self.metric_ops      = self._make_stat_card("Total ops",    "0", C.TEXT_DIM, None)
-        self.metric_elapsed  = self._make_stat_card("Elapsed",      "00:00:00", C.TEXT, C.WARN)
-
-        grid.addWidget(self.metric_success["card"],  0, 0)
-        grid.addWidget(self.metric_matches["card"],  0, 1)
-        grid.addWidget(self.metric_failures["card"], 1, 0)
-        grid.addWidget(self.metric_avg_time["card"], 1, 1)
-        grid.addWidget(self.metric_ops["card"],      2, 0)
-        grid.addWidget(self.metric_elapsed["card"],  2, 1)
-
-        outer.addLayout(grid, 1)
-        return card
-
-    @staticmethod
-    def _make_stat_card(label: str, default: str, value_color: str,
-                        accent: Optional[str]) -> Dict[str, Any]:
-        card = StatCard(label, default, value_color=value_color, accent=accent)
-        return {"card": card, "value": card}
 
     # ---- status bar --------------------------------------------------------
 
@@ -2067,12 +1819,6 @@ class GameAutomationWindow(QMainWindow):
         self.btn_stop.setEnabled(self._is_running)
         self.btn_pause.setLabel("Resume" if self._is_paused else "Pause")
         self.btn_pause.setIconName("play" if self._is_paused else "pause")
-
-        # Menu actions mirror the buttons.
-        self._act_start.setEnabled(not self._is_running)
-        self._act_pause.setEnabled(self._is_running)
-        self._act_stop.setEnabled(self._is_running)
-        self._act_pause.setText("Resume" if self._is_paused else "Pause")
 
         if not self._is_running:
             self._set_status_header("READY", C.OK)
@@ -2233,7 +1979,6 @@ class GameAutomationWindow(QMainWindow):
             if btn is not None:
                 btn.setEnabled(enabled)
         self.btn_start.setEnabled(enabled and not self._is_running)
-        self._act_start.setEnabled(enabled and not self._is_running)
 
     def _cb_clear_log(self) -> None:
         self._log_buffer.clear()
@@ -2360,28 +2105,6 @@ class GameAutomationWindow(QMainWindow):
     # ----- periodic refresh -------------------------------------------------
 
     def _periodic_refresh(self) -> None:
-        try:
-            metrics = self.automation.get_performance_metrics() or {}
-        except Exception:
-            metrics = {}
-
-        success_rate = metrics.get("success_rate", 0.0) or 0.0
-        self.metric_success["value"].setValue(f"{success_rate * 100:.1f}%")
-        self.metric_matches["value"].setValue(
-            str(metrics.get("template_matches", 0) or 0)
-        )
-        self.metric_failures["value"].setValue(
-            str(metrics.get("template_failures", 0) or 0)
-        )
-        self.metric_avg_time["value"].setValue(
-            f"{(metrics.get('avg_match_time') or 0):.3f}s"
-        )
-        self.metric_ops["value"].setValue(
-            str(metrics.get("total_operations", 0) or 0)
-        )
-        # Mirror the elapsed-timer widget into the metrics grid.
-        self.metric_elapsed["value"].setValue(self.elapsed_timer.text())
-
         self._kick_device_status_refresh(deep=False)
 
     # ----- device / app status ---------------------------------------------
