@@ -4,7 +4,9 @@ import argparse
 import importlib
 import sys
 from pathlib import Path
-from typing import Dict, Optional, Type
+from typing import Dict, List, Optional, Type
+
+from colorama import Fore, Style
 
 # Make ``src/`` importable when running this script directly.
 _PROJECT_ROOT = Path(__file__).resolve().parent
@@ -13,6 +15,62 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from src.utils import log_error, log_info, log_success, log_warning  # noqa: E402
 
+
+# ---------------------------------------------------------------------------
+# Console UI helpers
+# ---------------------------------------------------------------------------
+
+# Accent colours used across the launcher UI.
+_C_TITLE = Fore.CYAN          # banner title
+_C_ACCENT = Fore.MAGENTA      # headings / prompt
+_C_LABEL = Fore.YELLOW        # inline labels / numbers
+_C_DIM = Fore.WHITE           # secondary text / rules
+_C_HINT = Fore.GREEN          # usage hints / keys
+
+
+def _banner(title: str, subtitle: str = "") -> None:
+    """Render a double-line banner box.
+
+    The box auto-sizes to the longest line so it always looks balanced.
+    """
+    inner = [title]
+    if subtitle:
+        inner.append("")
+        inner.append(subtitle)
+
+    width = max(len(line) for line in inner) + 4
+
+    top = "╔" + "═" * width + "╗"
+    bot = "╚" + "═" * width + "╝"
+
+    print()
+    print(f"{_C_TITLE}{top}{Style.RESET_ALL}")
+    for line in inner:
+        pad = (width - len(line)) // 2
+        centered = " " * pad + line + " " * (width - len(line) - pad)
+        print(f"{_C_TITLE}║{centered}║{Style.RESET_ALL}")
+    print(f"{_C_TITLE}{bot}{Style.RESET_ALL}")
+
+
+def _rule(width: int = 52) -> None:
+    print(_C_DIM + ("─" * width) + Style.RESET_ALL)
+
+
+def _section_header(label: str) -> None:
+    """A small uppercase section label with an underline rule."""
+    print()
+    print(f"{_C_ACCENT}{label}{Style.RESET_ALL}")
+    _rule(max(len(label), 40))
+
+
+def _hint_row(key: str, desc: str) -> None:
+    """A two-column hint line: highlighted key + dim description."""
+    print(f"    {_C_HINT}{key:<18}{Style.RESET_ALL}{_C_DIM}{desc}{Style.RESET_ALL}")
+
+
+# ---------------------------------------------------------------------------
+# Game discovery / loading
+# ---------------------------------------------------------------------------
 
 def scan_games() -> Dict[str, Dict[str, str]]:
     """Discover available games under ``src/games``.
@@ -82,15 +140,46 @@ def run_game(game_class: Type, title: str, gui: bool) -> None:
         log_info("Automation ended")
 
 
+# ---------------------------------------------------------------------------
+# Presentation
+# ---------------------------------------------------------------------------
+
 def list_games(games: Dict[str, Dict[str, str]]) -> None:
-    print("\nAvailable games:")
-    print("-" * 40)
+    """Compact one-shot game listing (used by ``--list``)."""
+    _section_header("AVAILABLE GAMES")
     if not games:
-        print("  (none)")
-    else:
-        for name, info in games.items():
-            print(f"  - {name}  ({info['display_name']})")
-    print("-" * 40)
+        print(f"  {_C_DIM}(none){Style.RESET_ALL}")
+        return
+    for name, info in games.items():
+        print(
+            f"  {_C_LABEL}{name:<16}{Style.RESET_ALL}"
+            f"{_C_DIM}→{Style.RESET_ALL} {_C_TITLE}{info['display_name']}{Style.RESET_ALL}"
+        )
+
+
+def _print_games_panel(names: List[str], games: Dict[str, Dict[str, str]]) -> None:
+    """Render the numbered games panel for the interactive menu."""
+    _section_header("GAMES")
+    if not names:
+        print(f"  {_C_DIM}No games detected in src/games/{Style.RESET_ALL}")
+        return
+
+    # Width of the number column so rows align.
+    num_w = len(str(len(names)))
+
+    for idx, name in enumerate(names, 1):
+        display = games[name]["display_name"]
+        print(
+            f"  {_C_LABEL}{idx:>{num_w}}.{Style.RESET_ALL}  "
+            f"{_C_TITLE}{display}{Style.RESET_ALL}"
+        )
+
+
+def _print_usage_legend() -> None:
+    _section_header("USAGE")
+    _hint_row("1", "select game by number")
+    _hint_row("1g", "launch with GUI (append 'g')")
+    _hint_row("0", "exit")
 
 
 def interactive_menu(games: Dict[str, Dict[str, str]]) -> None:
@@ -99,23 +188,26 @@ def interactive_menu(games: Dict[str, Dict[str, str]]) -> None:
         return
 
     while True:
-        print("\n" + "=" * 50)
-        print("       ADB GAME AUTOMATION")
-        print("=" * 50)
-        print("\nAvailable games:")
-        print("-" * 50)
-        names = list(games.keys())
-        for idx, name in enumerate(names, 1):
-            print(f"  {idx}. {games[name]['display_name']}")
-        print("-" * 50)
-        print("  0. Exit")
-        print("=" * 50)
+        _banner("ADB GAME AUTOMATION", "Control ADB games from your terminal")
 
+        names = list(games.keys())
+        _print_games_panel(names, games)
+        _print_usage_legend()
+
+        # Coloured prompt.
+        prompt = (
+            f"\n  {_C_ACCENT}❯{Style.RESET_ALL} "
+            f"{_C_DIM}Select a game:{Style.RESET_ALL} "
+        )
         try:
-            choice = input("\nSelect a game (number, append 'g' for GUI, e.g. '1g'): ").strip()
+            choice = input(prompt).strip()
         except (KeyboardInterrupt, EOFError):
-            log_info("\nExiting...")
+            print()
+            log_info("Exiting...")
             return
+
+        if choice == "":
+            continue
 
         if choice == "0":
             log_info("Exiting...")

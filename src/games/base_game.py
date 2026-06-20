@@ -513,7 +513,21 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             elif not enabled and activity_id in self._activity_order:
                 self._activity_order.remove(activity_id)
         log_info(f"Activity '{activity_id}' {'enabled' if enabled else 'disabled'}")
-    
+
+    def set_activity_poll_interval(self, activity_id: str, interval: float) -> bool:
+        """Change the poll interval of a background activity at runtime.
+
+        The worker loop picks up the new value on its next sleep, so there is
+        no need to restart the thread. Returns ``True`` if the activity exists
+        and is a background activity.
+        """
+        activity = self._activity_map.get(activity_id)
+        if not activity or not activity.background:
+            return False
+        activity.poll_interval = max(0.05, float(interval))
+        log_info(f"[bg] '{activity_id}' poll interval set to {activity.poll_interval:.2f}s")
+        return True
+
     def set_activity_order(self, order: List[str]):
         """Set the execution order of activities"""
         # Validate all IDs exist
@@ -903,9 +917,28 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
                     time.sleep(0.5)
             
             log_success("All activities completed")
-            # Mark as not running so the outer start() loop exits instead of
-            # immediately re-running every activity again.
-            self.running = False
+
+            # If there are no enabled background activities to keep the
+            # session alive, mark as not running so the outer start() loop
+            # exits instead of immediately re-running every activity again.
+            has_bg = any(
+                a.background and a.enabled and self.is_background_running(a.id)
+                for a in self._activities
+            )
+            if has_bg:
+                # Background workers are alive - keep the session running
+                # until the user explicitly stops via ``stop()``. ``running``
+                # stays True so the outer ``while self.running`` loop in
+                # ``start()`` idles without re-running sequential activities.
+                log_info(
+                    "Sequential activities done; keeping background "
+                    "workers alive. Press Stop to end."
+                )
+                while self.running:
+                    self._pause_event.wait()
+                    time.sleep(0.5)
+            else:
+                self.running = False
             
         except KeyboardInterrupt:
             log_info("Automation interrupted by user")

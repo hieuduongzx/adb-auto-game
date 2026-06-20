@@ -72,12 +72,12 @@ from src.utils import (
 # ---------------------------------------------------------------------------
 
 class C:
-    BG          = "#ececec"
+    BG          = "#f0f0f0"
     PANEL       = "#ffffff"
     PANEL_ALT   = "#f5f5f5"
-    BORDER      = "#cccccc"
+    BORDER      = "#dcdcdc"
 
-    TEXT        = "#111111"
+    TEXT        = "#1a1a1a"
     TEXT_DIM    = "#555555"
     TEXT_MUTED  = "#888888"
 
@@ -92,12 +92,10 @@ class C:
     ERR_BG      = "#fef2f2"
     INFO        = "#2563eb"
     INFO_BG     = "#eff6ff"
-    SLATE_BG    = "#e8eaed"
-    SLATE_FG    = "#555555"
 
 
 _STATUS_PILL: Dict[str, tuple] = {
-    "pending":   (C.SLATE_BG, C.SLATE_FG),
+    "pending":   ("#e8eaed", "#555555"),
     "running":   (C.INFO_BG, C.INFO),
     "completed": (C.OK_BG, C.OK),
     "failed":    (C.ERR_BG, C.ERR),
@@ -162,15 +160,11 @@ QWidget {{
     font-size: 12px;
 }}
 
-QLabel, QCheckBox {{
-    background: transparent;
-}}
-
 QToolTip {{
     background-color: {C.TEXT};
-    color: #fafafa;
-    border: 1px solid {C.TEXT};
-    padding: 3px 6px;
+    color: white;
+    border: none;
+    padding: 4px 8px;
     border-radius: 2px;
     font-size: 11px;
 }}
@@ -181,7 +175,7 @@ QFrame#panel {{
 }}
 
 QLabel#title {{
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     color: {C.TEXT};
 }}
@@ -194,21 +188,20 @@ QPushButton {{
     background-color: {C.PANEL};
     color: {C.TEXT};
     border: 1px solid {C.BORDER};
-    padding: 5px 12px;
-    border-radius: 3px;
-    font-weight: 600;
+    padding: 4px 10px;
+    font-weight: 500;
     font-size: 12px;
 }}
-QPushButton:hover    {{ background-color: #e0e0e0; border-color: #aaaaaa; }}
-QPushButton:pressed  {{ background-color: #d0d0d0; }}
-QPushButton:disabled {{ color: {C.TEXT_MUTED}; background-color: #f5f5f5; border-color: #e0e0e0; }}
+QPushButton:hover    {{ background-color: #e8e8e8; }}
+QPushButton:pressed  {{ background-color: #ddd; }}
+QPushButton:disabled {{ color: {C.TEXT_MUTED}; background-color: {C.PANEL_ALT}; }}
 
 QPushButton#btnStart {{
     background-color: {C.OK};
     color: white;
     border: 1px solid {C.OK};
-    padding: 5px 16px;
-    font-size: 12px;
+    padding: 4px 14px;
+    font-weight: 600;
 }}
 QPushButton#btnStart:hover    {{ background-color: #15803d; }}
 QPushButton#btnStart:pressed  {{ background-color: #166534; }}
@@ -217,52 +210,35 @@ QPushButton#btnStart:disabled {{ background-color: #bbf7d0; color: #86efac; }}
 QPushButton#btnPause {{
     background-color: {C.WARN_BG};
     color: {C.WARN};
-    border: 1px solid #fed7aa;
-    padding: 5px 16px;
-    font-size: 12px;
+    border: 1px solid {C.WARN_BG};
+    padding: 4px 14px;
+    font-weight: 600;
 }}
 QPushButton#btnPause:hover    {{ background-color: #fed7aa; }}
 QPushButton#btnPause:pressed  {{ background-color: #fdba74; }}
-QPushButton#btnPause:disabled {{ background-color: #fff7ed; color: #fdba74; }}
+QPushButton#btnPause:disabled {{ background-color: {C.WARN_BG}; color: #fdba74; }}
 
 QPushButton#btnStop {{
     background-color: {C.ERR_BG};
     color: {C.ERR};
-    border: 1px solid #fecaca;
-    padding: 5px 16px;
-    font-size: 12px;
+    border: 1px solid {C.ERR_BG};
+    padding: 4px 14px;
+    font-weight: 600;
 }}
 QPushButton#btnStop:hover    {{ background-color: #fecaca; }}
 QPushButton#btnStop:pressed  {{ background-color: #fca5a5; }}
-QPushButton#btnStop:disabled {{ background-color: #fff5f5; color: #fca5a5; }}
+QPushButton#btnStop:disabled {{ background-color: {C.ERR_BG}; color: #fca5a5; }}
 
 QPushButton.smallBtn {{
     background-color: transparent;
     border: 1px solid {C.BORDER};
     color: {C.TEXT_DIM};
-    padding: 3px 8px;
-    border-radius: 2px;
+    padding: 2px 6px;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
 }}
-QPushButton.smallBtn:hover {{ background-color: #e0e0e0; color: {C.TEXT}; }}
+QPushButton.smallBtn:hover {{ background-color: #e8e8e8; color: {C.TEXT}; }}
 QPushButton.smallBtn:disabled {{ color: {C.TEXT_MUTED}; }}
-
-QPushButton.chip {{
-    border-radius: 8px;
-    padding: 2px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    background-color: transparent;
-    border: 1px solid {C.BORDER};
-    color: {C.TEXT_MUTED};
-}}
-QPushButton.chip:hover {{ background-color: #e0e0e0; }}
-QPushButton.chip:checked {{ color: white; border-color: transparent; }}
-QPushButton.chip:checked[level="info"]    {{ background-color: {C.INFO}; }}
-QPushButton.chip:checked[level="success"] {{ background-color: {C.OK}; }}
-QPushButton.chip:checked[level="warning"] {{ background-color: {C.WARN}; }}
-QPushButton.chip:checked[level="error"]   {{ background-color: {C.ERR}; }}
 
 QTableWidget {{
     background-color: {C.PANEL};
@@ -277,73 +253,62 @@ QHeaderView::section {{
     padding: 4px 6px;
     border: none;
     border-bottom: 1px solid {C.BORDER};
-    font-weight: 700;
+    font-weight: 600;
     font-size: 11px;
 }}
 
 QProgressBar {{
     background-color: #e0e0e0;
     border: none;
-    border-radius: 2px;
     text-align: center;
     color: transparent;
-    height: 7px;
-    max-height: 7px;
+    height: 6px;
+    max-height: 6px;
 }}
 QProgressBar::chunk {{
     background-color: {C.ACCENT};
-    border-radius: 2px;
 }}
 QProgressBar#headerProgress::chunk {{
     background-color: {C.OK};
+}}
+QProgressBar#rowProgress {{
+    background-color: #e0e0e0;
+    border: none;
+    height: 5px;
+    max-height: 5px;
+}}
+QProgressBar#rowProgress::chunk {{
+    background-color: {C.ACCENT};
 }}
 
 QPlainTextEdit#logView {{
     background-color: #1e1e1e;
     color: #d4d4d4;
     border: 1px solid #333;
-    border-radius: 2px;
     font-family: "Consolas", "Courier New", monospace;
     font-size: 11px;
     padding: 4px 6px;
 }}
 
-QCheckBox {{
-    color: {C.TEXT};
-    spacing: 2px;
-    font-size: 12px;
-}}
-QCheckBox::indicator {{
-    width: 14px;
-    height: 14px;
-    border-radius: 2px;
-    border: 1px solid #aaaaaa;
-    background: {C.PANEL};
-}}
-QCheckBox::indicator:hover {{ border-color: {C.ACCENT}; }}
-QCheckBox::indicator:checked {{
-    background: {C.ACCENT};
-    border-color: {C.ACCENT};
-}}
-
 QTabWidget::pane {{
     border: 1px solid {C.BORDER};
     background: {C.PANEL};
+    top: -1px;
 }}
 QTabBar::tab {{
     background: {C.PANEL_ALT};
     border: 1px solid {C.BORDER};
-    padding: 5px 12px;
-    margin-right: 1px;
-    font-weight: 600;
+    padding: 4px 12px;
+    margin-right: 2px;
+    font-weight: 500;
     font-size: 12px;
 }}
 QTabBar::tab:selected {{
     background: {C.PANEL};
     border-bottom-color: {C.PANEL};
-    color: {C.ACCENT};
+    font-weight: 600;
 }}
-QTabBar::tab:hover {{ background: #e0e0e0; }}
+QTabBar::tab:hover:!selected {{ background: #e0e0e0; }}
 
 QStatusBar {{
     background-color: {C.PANEL};
@@ -362,13 +327,12 @@ QScrollBar:vertical {{
 }}
 QScrollBar::handle:vertical {{
     background: #c0c0c0;
-    border-radius: 2px;
     min-height: 14px;
 }}
 QScrollBar::handle:vertical:hover {{ background: #a0a0a0; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 QScrollBar:horizontal {{ height: 6px; background: transparent; margin: 0px; }}
-QScrollBar::handle:horizontal {{ background: #c0c0c0; border-radius: 2px; min-width: 14px; }}
+QScrollBar::handle:horizontal {{ background: #c0c0c0; min-width: 14px; }}
 QScrollBar::handle:horizontal:hover {{ background: #a0a0a0; }}
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
 """
@@ -399,7 +363,8 @@ class _Signals(QObject):
 _HEADER_CHECK = 0
 _HEADER_NAME  = 1
 _HEADER_STATE = 2
-_HEADER_RUN   = 3
+_HEADER_PROG  = 3
+_HEADER_RUN   = 4
 
 
 class GameAutomationWindow(QMainWindow):
@@ -422,7 +387,6 @@ class GameAutomationWindow(QMainWindow):
 
         self._log_buffer: List[tuple] = []
         self._max_log_entries = 2000
-        self._log_show = {"info": True, "success": True, "warning": True, "error": True}
 
         self._sig = _Signals()
         self._sig.automation_start.connect(self._on_automation_start)
@@ -497,13 +461,13 @@ class GameAutomationWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         self.setWindowTitle(self.title)
-        self.setFixedSize(414, 816)
+        self.setFixedSize(420, 820)
 
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
-        root.setContentsMargins(5, 3, 5, 1)
-        root.setSpacing(3)
+        root.setContentsMargins(6, 4, 6, 2)
+        root.setSpacing(4)
 
         root.addWidget(self._build_header())
         root.addWidget(self._build_tabs(), 3)
@@ -514,24 +478,25 @@ class GameAutomationWindow(QMainWindow):
         panel = QFrame()
         panel.setObjectName("panel")
         outer = QVBoxLayout(panel)
-        outer.setContentsMargins(8, 5, 8, 4)
-        outer.setSpacing(3)
+        outer.setContentsMargins(10, 8, 10, 6)
+        outer.setSpacing(4)
 
-        # Title + Status
+        # Row 1: Title + Status
         r1 = QHBoxLayout()
         r1.setSpacing(6)
         t = QLabel(self.title)
         t.setObjectName("title")
         r1.addWidget(t)
         r1.addStretch(1)
+
         self.status_value = QLabel("READY")
-        self.status_value.setStyleSheet(f"color:{C.TEXT}; font-weight:700; font-size:12px;")
+        self.status_value.setStyleSheet(f"color:{C.TEXT_DIM}; font-weight:600; font-size:12px;")
         r1.addWidget(self.status_value)
         outer.addLayout(r1)
 
-        # Progress + Elapsed
+        # Row 2: Progress + Elapsed
         r2 = QHBoxLayout()
-        r2.setSpacing(4)
+        r2.setSpacing(6)
         self.header_progress_count = QLabel("0/0")
         self.header_progress_count.setStyleSheet(f"color:{C.TEXT_DIM}; font-weight:600; font-size:11px;")
         self.header_progress = QProgressBar()
@@ -539,7 +504,7 @@ class GameAutomationWindow(QMainWindow):
         self.header_progress.setRange(0, 100)
         self.header_progress.setValue(0)
         self.header_progress.setTextVisible(False)
-        self.header_progress.setFixedHeight(7)
+        self.header_progress.setFixedHeight(6)
         r2.addWidget(self.header_progress_count)
         r2.addWidget(self.header_progress, 1)
 
@@ -547,15 +512,13 @@ class GameAutomationWindow(QMainWindow):
         self.elapsed_timer.setStyleSheet(
             f"color:{C.TEXT_DIM}; font-weight:600; font-size:11px;"
             "font-family: 'Consolas', monospace;"
-            f"padding: 1px 3px; background-color: {C.PANEL_ALT};"
-            f"border: 1px solid {C.BORDER}; border-radius: 2px;"
         )
         r2.addWidget(self.elapsed_timer)
         outer.addLayout(r2)
 
-        # Buttons + info
+        # Row 3: Buttons + device
         r3 = QHBoxLayout()
-        r3.setSpacing(4)
+        r3.setSpacing(6)
 
         self.btn_start = QPushButton("Start")
         self.btn_start.setObjectName("btnStart")
@@ -571,11 +534,6 @@ class GameAutomationWindow(QMainWindow):
         r3.addWidget(self.btn_pause)
         r3.addWidget(self.btn_stop)
         r3.addStretch(1)
-
-        self.header_subtitle = QLabel("")
-        self.header_subtitle.setObjectName("subtitle")
-        r3.addWidget(self.header_subtitle)
-        r3.addSpacing(4)
 
         self.dev_value = QLabel("No device")
         self.dev_value.setStyleSheet(f"color:{C.ERR}; font-size:11px; font-weight:600;")
@@ -596,19 +554,18 @@ class GameAutomationWindow(QMainWindow):
         bg  = [a for a in self._activities if a.background]
 
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_table_tab(seq, "seq"), f"Seq ({len(seq)})")
-        self.tabs.addTab(self._build_table_tab(bg, "bg"),   f"Bg ({len(bg)})")
+        self.tabs.addTab(self._build_table_tab(seq, "seq"), f"Sequential ({len(seq)})")
+        self.tabs.addTab(self._build_table_tab(bg, "bg"),   f"Background ({len(bg)})")
         return self.tabs
 
     def _build_table_tab(self, acts: List[Activity], kind: str) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(4, 2, 4, 2)
-        layout.setSpacing(2)
+        layout.setContentsMargins(4, 4, 4, 2)
+        layout.setSpacing(4)
 
-        # Actions row
         ar = QHBoxLayout()
-        ar.setSpacing(3)
+        ar.setSpacing(4)
         lbl = QLabel("One-time tasks" if kind == "seq" else "Loop tasks")
         lbl.setObjectName("subtitle")
         ar.addWidget(lbl)
@@ -639,8 +596,8 @@ class GameAutomationWindow(QMainWindow):
             return page
 
         table = QTableWidget()
-        table.setColumnCount(4)
-        table.setHorizontalHeaderLabels(["", "Name", "Status", ""])
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels(["", "Name", "Status", "Prog", ""])
         table.verticalHeader().setVisible(False)
         table.setAlternatingRowColors(True)
         table.setShowGrid(True)
@@ -655,10 +612,12 @@ class GameAutomationWindow(QMainWindow):
         hdr.setSectionResizeMode(_HEADER_CHECK, QHeaderView.ResizeMode.Fixed)
         hdr.setSectionResizeMode(_HEADER_NAME, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(_HEADER_STATE, QHeaderView.ResizeMode.Fixed)
+        hdr.setSectionResizeMode(_HEADER_PROG, QHeaderView.ResizeMode.Fixed)
         hdr.setSectionResizeMode(_HEADER_RUN, QHeaderView.ResizeMode.Fixed)
-        table.setColumnWidth(_HEADER_CHECK, 26)
-        table.setColumnWidth(_HEADER_STATE, 80)
-        table.setColumnWidth(_HEADER_RUN, 38)
+        table.setColumnWidth(_HEADER_CHECK, 24)
+        table.setColumnWidth(_HEADER_STATE, 74)
+        table.setColumnWidth(_HEADER_PROG, 54)
+        table.setColumnWidth(_HEADER_RUN, 36)
 
         for row, act in enumerate(acts):
             cb = QCheckBox()
@@ -681,15 +640,27 @@ class GameAutomationWindow(QMainWindow):
             self._apply_pill(pill, act.status.value)
             table.setCellWidget(row, _HEADER_STATE, self._center(pill))
 
+            prog = QProgressBar()
+            prog.setObjectName("rowProgress")
+            prog.setRange(0, 100)
+            prog.setValue(int(act.progress))
+            prog.setTextVisible(False)
+            prog.setFixedHeight(5)
+            table.setCellWidget(row, _HEADER_PROG, self._center(prog))
+
             run_btn = QPushButton("Run")
             run_btn.setProperty("class", "smallBtn")
             run_btn.setToolTip(f"Run only: {act.name}")
+            run_btn.setFixedWidth(30)
             run_btn.clicked.connect(
                 lambda _checked=False, aid=act.id: self._cb_run_single(aid)
             )
             table.setCellWidget(row, _HEADER_RUN, self._center(run_btn))
 
-            rows[act.id] = {"checkbox": cb, "pill": pill, "run_btn": run_btn, "name": act.name}
+            rows[act.id] = {
+                "checkbox": cb, "pill": pill, "prog": prog,
+                "run_btn": run_btn, "name": act.name,
+            }
 
         layout.addWidget(table, 1)
         if kind == "seq":
@@ -704,33 +675,23 @@ class GameAutomationWindow(QMainWindow):
         panel = QFrame()
         panel.setObjectName("panel")
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(6, 3, 6, 4)
-        layout.setSpacing(3)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(4)
 
         head = QHBoxLayout()
-        head.setSpacing(3)
+        head.setSpacing(4)
 
         ll = QLabel("LOG")
         ll.setStyleSheet(f"color:{C.TEXT}; font-weight:700; font-size:11px;")
         head.addWidget(ll)
         head.addStretch(1)
 
-        for lvl, label in [("info","Inf"), ("success","OK"), ("warning","Wrn"), ("error","Err")]:
-            chip = QPushButton(label)
-            chip.setProperty("class", "chip")
-            chip.setProperty("level", lvl)
-            chip.setCheckable(True)
-            chip.setChecked(True)
-            chip.setCursor(Qt.CursorShape.PointingHandCursor)
-            chip.toggled.connect(lambda c, l=lvl: self._set_log_filter(l, c))
-            head.addWidget(chip)
-
-        clr = QPushButton("Clr")
+        clr = QPushButton("Clear")
         clr.setFlat(True)
         clr.setStyleSheet(
             f"QPushButton {{ color:{C.TEXT_MUTED}; background:transparent;"
             "border:none; padding:1px 4px; font-weight:600; font-size:10px; }}"
-            f"QPushButton:hover {{ color:{C.TEXT}; background:{C.PANEL_ALT}; }}"
+            f"QPushButton:hover {{ color:{C.TEXT}; }}"
         )
         clr.setCursor(Qt.CursorShape.PointingHandCursor)
         clr.clicked.connect(self._cb_clear_log)
@@ -754,7 +715,7 @@ class GameAutomationWindow(QMainWindow):
         sb.setSizeGripEnabled(False)
         self.setStatusBar(sb)
         self.sb_activity = QLabel("Idle")
-        self.sb_device = QLabel("Dev: —")
+        self.sb_device = QLabel("Dev: --")
         sb.addWidget(self.sb_activity, 1)
         sb.addPermanentWidget(self.sb_device)
 
@@ -768,23 +729,12 @@ class GameAutomationWindow(QMainWindow):
 
     # ----- log --------------------------------------------------------------
 
-    def _set_log_filter(self, level: str, visible: bool) -> None:
-        self._log_show[level] = bool(visible)
-        self._rebuild_log()
-
-    def _rebuild_log(self) -> None:
-        self.log_view.clear()
-        for ts, lvl, msg in self._log_buffer:
-            if self._log_show.get(lvl, True):
-                self._render_line(ts, lvl, msg)
-
     def _append_log(self, level: str, msg: str) -> None:
         ts = datetime.now().strftime("%H:%M:%S")
         self._log_buffer.append((ts, level, msg))
         if len(self._log_buffer) > self._max_log_entries:
             del self._log_buffer[: len(self._log_buffer) - self._max_log_entries]
-        if self._log_show.get(level, True):
-            self._render_line(ts, level, msg)
+        self._render_line(ts, level, msg)
 
     def _render_line(self, ts: str, level: str, msg: str) -> None:
         pfx = {"info": "INF", "success": "OK ", "warning": "WRN", "error": "ERR"}.get(level, "INF")
@@ -809,11 +759,16 @@ class GameAutomationWindow(QMainWindow):
         pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pill.setStyleSheet(
             f"background-color:{bg}; color:{fg};"
-            "padding:2px 8px; border-radius:5px; font-weight:700; font-size:10px;"
+            "padding:2px 8px; font-weight:700; font-size:10px;"
         )
 
     def _set_status(self, label: str) -> None:
+        color = {
+            "READY": C.TEXT_DIM, "RUNNING": C.OK, "PAUSED": C.WARN,
+            "STOPPED": C.ERR, "ERROR": C.ERR,
+        }.get(label, C.TEXT)
         self.status_value.setText(label)
+        self.status_value.setStyleSheet(f"color:{color}; font-weight:700; font-size:12px;")
         self.setWindowTitle(f"{self.title} - {label}")
 
     def _update_progress(self) -> None:
@@ -825,22 +780,6 @@ class GameAutomationWindow(QMainWindow):
             done = sum(1 for a in seq if a.status.value in ("completed", "skipped"))
         self.header_progress_count.setText(f"{done}/{total}")
         self.header_progress.setValue(int(done / total * 100) if total else 0)
-
-    def _update_status_bar(self) -> None:
-        if self._is_running:
-            cur = self.automation.get_current_activity()
-            if cur:
-                self.sb_activity.setText(f"Running: {cur.name}")
-                self.header_subtitle.setText(cur.name)
-            elif self._is_paused:
-                self.sb_activity.setText("Paused")
-                self.header_subtitle.setText("Paused")
-            else:
-                self.sb_activity.setText("Running")
-                self.header_subtitle.setText("")
-        else:
-            self.sb_activity.setText("Idle")
-            self.header_subtitle.setText("")
 
     def _refresh_button_state(self) -> None:
         self.btn_start.setEnabled(not self._is_running)
@@ -869,7 +808,6 @@ class GameAutomationWindow(QMainWindow):
                     btn.setEnabled(run_ok)
 
         self._update_progress()
-        self._update_status_bar()
 
     # ----- slots ------------------------------------------------------------
 
@@ -917,13 +855,25 @@ class GameAutomationWindow(QMainWindow):
 
     def _cb_toggle_activity(self, aid: str, checked: bool) -> None:
         try:
-            self.automation.set_activity_enabled(aid, checked)
-            for act in self._activities:
-                if act.id == aid:
-                    act.enabled = checked
-                    break
+            is_bg = any(a.background for a in self._activities if a.id == aid)
+            if is_bg:
+                # Background toggles call join() on worker threads which can
+                # block for up to 2 s — run off the UI thread to avoid a freeze.
+                threading.Thread(
+                    target=self._do_toggle_activity, args=(aid, checked),
+                    daemon=True,
+                ).start()
+            else:
+                self._do_toggle_activity(aid, checked)
         except Exception as e:
             log_error(f"Toggle error: {e}")
+
+    def _do_toggle_activity(self, aid: str, checked: bool) -> None:
+        self.automation.set_activity_enabled(aid, checked)
+        for act in self._activities:
+            if act.id == aid:
+                act.enabled = checked
+                break
 
     def _cb_select_all(self, enabled: bool) -> None:
         for act in self._activities:
@@ -1001,7 +951,6 @@ class GameAutomationWindow(QMainWindow):
     @Slot(dict)
     def _on_activity_start(self, data: dict) -> None:
         self._update_activity_status(data["id"], "running")
-        self._update_status_bar()
 
     @Slot(dict)
     def _on_activity_complete(self, data: dict) -> None:
@@ -1015,7 +964,7 @@ class GameAutomationWindow(QMainWindow):
 
     @Slot(str, float)
     def _on_progress(self, activity_id: str, progress: float) -> None:
-        pass
+        self._update_activity_progress(activity_id, progress)
 
     @Slot(str)
     def _on_error(self, _msg: str) -> None:
@@ -1047,7 +996,7 @@ class GameAutomationWindow(QMainWindow):
         else:
             self.dev_value.setText("No device")
             self.dev_value.setStyleSheet(f"color:{C.ERR}; font-size:11px; font-weight:600;")
-            self.sb_device.setText("Dev: —")
+            self.sb_device.setText("Dev: --")
         self.btn_refresh.setEnabled(True)
         self.btn_refresh.setText("Refresh")
 
@@ -1056,8 +1005,23 @@ class GameAutomationWindow(QMainWindow):
             r = rows.get(aid)
             if r:
                 self._apply_pill(r["pill"], status)
+                prog = r.get("prog")
+                if prog is not None:
+                    if status == "completed":
+                        prog.setValue(100)
+                    elif status in ("pending", "failed", "skipped"):
+                        prog.setValue(0)
                 break
         self._update_progress()
+
+    def _update_activity_progress(self, aid: str, progress: float) -> None:
+        for rows in (self._seq_rows, self._bg_rows):
+            r = rows.get(aid)
+            if r:
+                prog = r.get("prog")
+                if prog is not None:
+                    prog.setValue(int(progress))
+                break
 
     def _periodic_refresh(self) -> None:
         self._kick_device_status_refresh(deep=False)
