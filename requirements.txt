@@ -1,7 +1,6 @@
 # Core dependencies
 opencv-python>=4.8.0
 numpy>=1.24.0
-pyautogui>=0.9.54
 pillow>=10.0.0
 pyyaml>=6.0.1
 
@@ -17,21 +16,13 @@ pyyaml>=6.0.1
 pytesseract>=0.3.10
 
 # GUI Framework
-PySide6>=6.6.0         # Native Qt UI (primary)
-dearpygui>=2.0.0       # Legacy GPU-accelerated UI (kept for backward compat)
-pywebview>=4.4.1       # Legacy webview UI (kept for backward compat)
-
-# Window management (Windows-only helpers used by windows_auto.py)
-pywin32>=306; platform_system == "Windows"
-pygetwindow>=0.0.9
+PySide6>=6.6.0         # Native Qt UI
 
 # Mobile automation
 pure-python-adb>=0.3.0.dev0
 
 # Utilities
-mss>=9.0.1            # Fast screen capture (windows_auto)
 keyboard>=0.13.5      # Keyboard hotkeys (q to quit)
-mouse>=0.7.1
 colorama>=0.4.6       # Coloured console output
 
 # Misc

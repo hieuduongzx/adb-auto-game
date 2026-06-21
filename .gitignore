@@ -43,6 +43,14 @@ logs/
 *.log
 log.txt
 
+# Tool output (dev_helper crops, screenshots, etc.)
+out/
+
+# Lint/cache
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
 # OS specific
 .DS_Store
 Thumbs.db

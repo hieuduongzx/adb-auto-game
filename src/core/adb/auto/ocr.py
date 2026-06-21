@@ -103,10 +103,10 @@ _WINDOWS_TESSERACT_CANDIDATES = (
 # file's location) and the current working directory, so the binary can
 # live alongside the code OR next to wherever the user launches the app.
 _PROJECT_TESSERACT_CANDIDATES = (
-    "ocr/Tesseract-OCR/tesseract.exe",
-    "ocr/tesseract/tesseract.exe",
     "vendor/tesseract/tesseract.exe",
     "vendor/Tesseract-OCR/tesseract.exe",
+    "ocr/Tesseract-OCR/tesseract.exe",
+    "ocr/tesseract/tesseract.exe",
     "tools/tesseract/tesseract.exe",
     "tools/Tesseract-OCR/tesseract.exe",
     "tesseract/tesseract.exe",

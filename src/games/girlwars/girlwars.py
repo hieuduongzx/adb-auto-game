@@ -6,7 +6,7 @@ from typing import List
 from src.games.base_game import BaseGameAutomation, Activity
 import time
 
-from src.utils import log_info, log_success, log_warning
+from src.utils import log_info, log_success, log_warning, log_error
 
 
 # Package name of GirlWars on the device
@@ -40,6 +40,7 @@ class GirlWars(BaseGameAutomation):
             'icon_dungeon': f"{self.assets_path}/adventure/dungeon/icon_dungeon.png",
             'is_dungeon' : f"{self.assets_path}/adventure/dungeon/is_dungeon.png",
             'continue_battle': f"{self.assets_path}/adventure/dungeon/continue_battle.png",
+            'next_floor': f"{self.assets_path}/adventure/dungeon/next_floor.png",
         }
 
     def define_activities(self) -> List[Activity]:
@@ -87,6 +88,13 @@ class GirlWars(BaseGameAutomation):
             ),
         ]
 
+    def process_game_actions(self):
+        """Run the base activity loop only after GirlWars is foregrounded."""
+        if not self._ensure_app_foreground():
+            log_error("Aborting: GirlWars app could not be started")
+            return
+        super().process_game_actions()
+
     # ==================== Background Handlers ====================
 
     def handle_activity_auto_skip_dialog(self) -> bool:
@@ -119,7 +127,6 @@ class GirlWars(BaseGameAutomation):
         return False
 
     # ==================== Sequence Handlers ====================
-
     # Main Story
     def handle_activity_main_story(self) -> bool:
         is_home_tpl = self.templates.get('is_home')
@@ -201,7 +208,10 @@ class GirlWars(BaseGameAutomation):
         if not self.wait_for_template(is_dungeon_tpl, timeout=15):
             log_warning("[dungeon] is_dungeon not reached")
             return False
-
+        if self.wait_and_tap(self.adventure_templates.get('next_floor'), timeout=10):
+            log_info("[dungeon] next_floor found, tapping to enter next floor")
+            self.safe_sleep(2.0)  # wait for the next floor to load
+            
         prep_region = (161, 22, 328, 55)
 
         #3: vào battle rồi lặp Preparation.
@@ -230,7 +240,6 @@ class GirlWars(BaseGameAutomation):
                 return False
 
         return False
-    
     # Main Story Elite Battle
     def handle_activity_main_story_elite_battle(self) -> bool:
         is_home_tpl = self.templates.get('is_home')

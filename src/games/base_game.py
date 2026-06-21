@@ -872,6 +872,44 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             log_error(f"Runtime not ready: {e}")
             return False
 
+    def _ensure_app_foreground(self, timeout: float = 60.0) -> bool:
+        """Make sure the game app is in the foreground before running.
+
+        Launches the app via ``monkey`` when a different one (or the home
+        screen) is focused, then polls until it reports as the current app.
+        Returns ``True`` when the app is foregrounded, ``False`` on timeout
+        or when automation was stopped while waiting.
+
+        Requires ``self.package_name`` to be set by the subclass.
+        """
+        package = getattr(self, "package_name", None)
+        if not package:
+            log_error("[app] package_name not set; cannot launch app")
+            return False
+        if not getattr(self.adb, "device", None):
+            log_error("[app] no device connected; cannot launch app")
+            return False
+
+        self.adb.clear_info_cache()
+        current = self.adb.get_current_app()
+        if current == package:
+            return True
+
+        log_warning(f"[app] foreground is '{current}', launching {package}...")
+        if not self.adb.launch_app(package):
+            return False
+
+        start = time.time()
+        while self.running and time.time() - start < timeout:
+            self.adb.clear_info_cache()
+            current = self.adb.get_current_app()
+            if current == package:
+                log_success(f"[app] {package} is in foreground")
+                return True
+            self.safe_sleep(2.0)
+        log_error(f"[app] {package} did not come to foreground")
+        return False
+
     def run_single_activity(self, activity_id: str) -> bool:
         """Execute one specific activity once, outside the main loop.
 

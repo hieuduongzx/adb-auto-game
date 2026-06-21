@@ -85,7 +85,7 @@ def scan_games() -> Dict[str, Dict[str, str]]:
         return games
 
     for item in sorted(games_dir.iterdir()):
-        if not item.is_dir() or item.name.startswith("__") or item.name == "template":
+        if not item.is_dir() or item.name.startswith("__"):
             continue
         game_file = item / f"{item.name}.py"
         if not game_file.exists():

@@ -396,8 +396,41 @@ class ADBController:
         """Get current running app package name"""
         def _fetch_app():
             return _detect_current_app(self.device)
-        
+
         return self._cache.get(self.device_id or "default", "current_app", _fetch_app)
+
+    def clear_info_cache(self) -> None:
+        """Drop cached device info (current_app, device_name) for this device.
+
+        Call after launching / switching apps so the next :meth:`get_current_app`
+        reflects the new foreground app instead of the stale cached value.
+        """
+        self._cache.clear(self.device_id or "default")
+
+    def launch_app(self, package: str) -> bool:
+        """Bring ``package`` to the foreground via ``monkey``.
+
+        ``monkey`` resolves the package's launcher activity through the package
+        manager, so we don't need to know the main activity class name. Clears
+        the cached ``current_app`` afterwards so a follow-up
+        :meth:`get_current_app` returns the freshly-launched app.
+
+        Returns ``True`` when the launch command was issued successfully; this
+        does not guarantee the app is already fully foregrounded - poll
+        :meth:`get_current_app` if you need to confirm.
+        """
+        if not self.device:
+            log_error("Cannot launch app: no device connected")
+            return False
+        try:
+            self.device.shell(
+                f"monkey -p {package} -c android.intent.category.LAUNCHER 1"
+            )
+        except Exception as e:
+            log_error(f"Could not launch {package}: {e}")
+            return False
+        self.clear_info_cache()
+        return True
     
     def get_device_name(self) -> str:
         """Get device name"""
