@@ -134,8 +134,9 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         host: str = "127.0.0.1",
         port: int = 5037,
         config: Optional[Config] = None,
+        ocr_backend: Optional[str] = None,
     ):
-        super().__init__(config_file, device_id, host, port, config)
+        super().__init__(config_file, device_id, host, port, config, ocr_backend=ocr_backend)
         
         # Game-specific paths (override in subclass)
         self.assets_path: str = ""
@@ -451,14 +452,13 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         whitelist: Optional[str] = None,
         case_sensitive: bool = False,
         last_screen: bool = True,
-        ascii_fold: bool = False,
     ) -> bool:
         """Return ``True`` if ``needle`` appears in OCR output of ``region``.
 
         Convenience wrapper around :meth:`ADBGameAutomation.region_contains_text`
         with logging tuned for game flows. Returns ``False`` immediately
-        when the OCR engine isn't available (Tesseract not installed),
-        so callers can chain it before falling back to template checks::
+        when the OCR engine isn't available, so callers can chain it
+        before falling back to template checks::
 
             if self.region_has_text("0/5", region=COUNTER_REGION,
                                     whitelist="0123456789/"):
@@ -468,23 +468,17 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         Args:
             needle: Substring to look for. Whitespace is ignored.
             region: ``(x, y, w, h)`` in device pixels.
-            whitelist: Optional Tesseract char whitelist (e.g.
-                ``"0123456789/"`` for digit-only labels).
+            whitelist: Optional char whitelist (e.g. ``"0123456789/"``
+                for digit-only labels).
             case_sensitive: Default ``False``.
             last_screen: Use the most recent capture instead of forcing
                 a fresh ``capture_screen()``. Default ``True``.
-            ascii_fold: When ``True``, strip diacritics from both the
-                OCR result and ``needle`` before comparing. Lets you
-                match Vietnamese labels via ASCII needles - useful when
-                Tesseract reads "Phúc Lợi" as "Phue Loi" / "Phuc Loi"
-                etc and you don't want to enumerate every variant.
         """
         if not getattr(self.ocr, "available", False):
             return False
 
         text = self.read_text(
             region=region, whitelist=whitelist, last_screen=last_screen,
-            ascii_only=ascii_fold,
         )
         if not text:
             return False
@@ -494,7 +488,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         return self.region_contains_text(
             needle, region=region,
             whitelist=whitelist, case_sensitive=case_sensitive,
-            last_screen=last_screen, ascii_fold=ascii_fold,
+            last_screen=last_screen,
         )
 
     def wait_region_has_text(
@@ -505,18 +499,16 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         interval: float = 0.5,
         whitelist: Optional[str] = None,
         case_sensitive: bool = False,
-        ascii_fold: bool = False,
     ) -> bool:
         """Poll ``region`` until ``needle`` is recognised or timeout.
 
         Pause-aware: while the automation is paused the poll skips reads
         and just sleeps, so a long ``wait_region_has_text`` won't burn
-        ADB during a Pause. ``ascii_fold=True`` lets an ASCII needle
-        match Vietnamese diacritic text.
+        ADB during a Pause.
         """
         if not getattr(self.ocr, "available", False):
             log_warning(
-                f"[OCR] '{needle}' wait skipped - Tesseract unavailable"
+                f"[OCR] '{needle}' wait skipped - OCR unavailable"
             )
             return False
 
@@ -526,7 +518,6 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             if self.region_has_text(
                 needle, region=region,
                 whitelist=whitelist, case_sensitive=case_sensitive,
-                ascii_fold=ascii_fold,
             ):
                 elapsed = time.time() - start
                 log_success(
@@ -609,28 +600,54 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         """Get currently running activity"""
         return self._current_activity
     
+    def set_ocr_backend(self, backend: str) -> bool:
+        """Switch the OCR backend at runtime and persist the choice.
+
+        Supported backends: ``"tesseract"``, ``"easyocr"``. Returns
+        ``True`` if the new backend became available. The choice is
+        saved to the game's settings file so it survives restarts.
+        """
+        ok = super().set_ocr_backend(backend)
+        self._save_activity_settings()
+        return ok
+
     def _load_activity_settings(self) -> List[Dict[str, Any]]:
-        """Load persisted activity settings for this game, if any."""
+        """Load persisted activity settings for this game, if any.
+
+        Also restores the OCR backend when present in the settings file.
+        Returns the activity list (possibly empty).
+        """
         if not self._settings_file or not self._settings_file.exists():
             return []
         try:
             with self._settings_file.open("r", encoding="utf-8") as f:
                 data = json.load(f)
-            if isinstance(data, dict):
-                return data.get("activities", [])
-            if isinstance(data, list):
-                return data
         except Exception as e:
             log_warning(f"Could not load activity settings: {e}")
+            return []
+
+        # New format: dict with "ocr_backend" + "activities".
+        if isinstance(data, dict):
+            backend = data.get("ocr_backend")
+            if backend and backend != self.ocr.backend_name:
+                # Only auto-restore when the caller didn't already pin a
+                # backend at construction time (construction-time choice
+                # has already been applied and wins).
+                super().set_ocr_backend(backend)
+            return data.get("activities", [])
+        # Legacy format: bare list.
+        if isinstance(data, list):
+            return data
         return []
 
     def _save_activity_settings(self) -> None:
-        """Persist current enabled/poll_interval state for next run."""
+        """Persist current enabled/poll_interval state + OCR backend."""
         if not self._settings_file:
             return
         try:
             self._settings_dir.mkdir(parents=True, exist_ok=True)
             payload = {
+                "ocr_backend": self.ocr.backend_name if self.ocr.available else None,
                 "activities": [
                     act.to_settings_dict() for act in self._activities
                 ],

@@ -36,6 +36,7 @@ class ADBGameAutomation:
         host: str = "127.0.0.1",
         port: int = 5037,
         config: Optional[Config] = None,
+        ocr_backend: Optional[str] = None,
     ):
         # Initialize ADB controller
         self.adb = ADBController(device_id=device_id, host=host, port=port)
@@ -64,10 +65,12 @@ class ADBGameAutomation:
         if self.is_debug:
             self.visualizer.enable(self.is_debug_fail)
 
-        # OCR reader (Tesseract). Constructed lazily-friendly: if Tesseract
-        # isn't installed the reader stays in ``available=False`` mode and
-        # OCR helpers below return safe empty results.
-        self.ocr = OCRReader()
+        # OCR reader. Backend is chosen via ``ocr_backend``; ``None``
+        # auto-detects (tesseract first, then easyocr). If the chosen
+        # backend isn't installed, the reader stays in
+        # ``available=False`` mode and OCR helpers return safe empty
+        # results. Switch at runtime via :meth:`set_ocr_backend`.
+        self.ocr = OCRReader(backend=ocr_backend)
         
         # Performance tracking
         self.metrics = PerformanceMetrics() if self.config.performance_tracking else None
@@ -163,18 +166,13 @@ class ADBGameAutomation:
         whitelist: Optional[str] = None,
         preprocess: bool = True,
         psm: Optional[int] = None,
-        ascii_only: bool = False,
     ) -> str:
         """Run OCR on the current screen (optionally cropped to ``region``).
 
-        ``ascii_only=True`` strips Vietnamese / Latin diacritics from the
-        result before returning. Useful when the OCR engine reads
-        Vietnamese labels with the wrong tone marks - downstream code
-        can match against an ASCII needle and ignore accent noise.
-
-        Returns the recognised text stripped of trailing whitespace, or
-        ``""`` when OCR is unavailable / the screen could not be captured.
-        See :class:`src.core.adb.auto.ocr.OCRReader` for engine setup.
+        English-only. Returns the recognised text stripped of trailing
+        whitespace, or ``""`` when OCR is unavailable / the screen could
+        not be captured. See :class:`src.core.adb.auto.ocr.OCRReader`
+        for engine setup.
         """
         screen = self.get_latest_screen() if last_screen else self.capture_screen()
         if screen is None:
@@ -182,7 +180,6 @@ class ADBGameAutomation:
         return self.ocr.read_text(
             screen, region=region, lang=lang, config=config,
             whitelist=whitelist, preprocess=preprocess, psm=psm,
-            ascii_only=ascii_only,
         )
 
     def region_contains_text(
@@ -192,18 +189,14 @@ class ADBGameAutomation:
         last_screen: bool = True,
         case_sensitive: bool = False,
         normalize_whitespace: bool = True,
-        ascii_fold: bool = False,
         **kwargs,
     ) -> bool:
         """Return ``True`` if ``needle`` is present in the OCR output of
         the given region.
 
         Whitespace inside both haystack and needle is collapsed before the
-        check by default, so spaces/newlines from Tesseract output don't
-        break ``"0/5"`` matches. ``ascii_fold=True`` strips diacritics
-        from both sides before comparing - lets you match Vietnamese
-        text via an ASCII needle (``"Phuc Loi"`` matches ``"Phúc Lợi"``
-        even when Tesseract garbles the tone marks).
+        check by default, so spaces/newlines from the OCR output don't
+        break ``"0/5"`` matches.
 
         Extra ``kwargs`` are forwarded to :meth:`read_text` (``lang``,
         ``config``, ``whitelist``, ``preprocess``, ``psm``).
@@ -213,12 +206,8 @@ class ADBGameAutomation:
             return False
 
         import re as _re
-        from src.core.adb.auto.ocr import strip_diacritics
         haystack = text
         target = needle
-        if ascii_fold:
-            haystack = strip_diacritics(haystack)
-            target = strip_diacritics(target)
         if normalize_whitespace:
             haystack = _re.sub(r"\s+", "", haystack)
             target = _re.sub(r"\s+", "", target)
@@ -226,6 +215,17 @@ class ADBGameAutomation:
             haystack = haystack.lower()
             target = target.lower()
         return target in haystack
+
+    def set_ocr_backend(self, backend: str) -> bool:
+        """Switch the OCR backend at runtime.
+
+        Releases the previously active backend (so we don't keep two
+        neural models in memory) and (lazily) initialises the new one.
+        Returns ``True`` if the new backend became available.
+
+        Supported backends: ``"tesseract"``, ``"easyocr"``.
+        """
+        return self.ocr.set_backend(backend)
 
     def wait_for_text_in_region(
         self,
@@ -235,20 +235,17 @@ class ADBGameAutomation:
         interval: float = 0.5,
         case_sensitive: bool = False,
         whitelist: Optional[str] = None,
-        ascii_fold: bool = False,
     ) -> bool:
         """Poll ``region`` until ``needle`` is recognised or ``timeout``.
 
         Useful as a finished-state probe (e.g. arena counter showing
         ``"0/5"``). Returns ``True`` on first match, ``False`` on timeout.
-        ``ascii_fold=True`` lets an ASCII needle match diacritic text.
         """
         start = time.time()
         while time.time() - start < timeout:
             if self.region_contains_text(
                 needle, region=region,
                 case_sensitive=case_sensitive, whitelist=whitelist,
-                ascii_fold=ascii_fold,
             ):
                 elapsed = time.time() - start
                 log_info(

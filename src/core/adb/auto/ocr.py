@@ -1,41 +1,56 @@
 """
 OCR (text recognition) helpers for region-based game checks.
 
-This module wraps **Tesseract** (via ``pytesseract``) as the only OCR
-backend. Tesseract is fast for short Latin labels (e.g. ``"0/5"``,
-``"VIP 3"``, ``"Lv 35"``), which is what the in-game probes need.
+This module provides a unified :class:`OCRReader` facade over multiple
+backends. English-only - the project targets Latin in-game labels
+(e.g. ``"0/5"``, ``"VIP 3"``, ``"Lv 35"``).
 
-If Tesseract isn't installed, :class:`OCRReader` keeps working in a
-degraded mode where every read returns ``""`` so callers can fall back
-to template matching without crashing.
+* **tesseract** - thin wrapper around the ``pytesseract`` binding. Fast
+  and light; the default backend.
+* **easyocr** - neural OCR via the ``easyocr`` package. Better with
+  stylised fonts, but heavier (loads a Torch model).
+* **paddleocr** - neural OCR via the ``paddleocr`` package. Strong
+  accuracy; pulls its own ``paddlepaddle`` runtime.
+
+If the requested backend isn't installed, :class:`OCRReader` keeps
+working in a degraded mode where every read returns ``""`` so callers
+can fall back to template matching without crashing.
 
 Typical usage::
 
-    ocr = OCRReader()
+    ocr = OCRReader(backend="tesseract")
     text = ocr.read_text(screen, region=(1546, 942, 164, 53))
     if "0/5" in text:
         ...
 
+Switch backends at runtime::
+
+    ocr.set_backend("paddleocr")
+
 Install:
 
-* ``pip install pytesseract``
-* Plus the system Tesseract binary:
+* Tesseract:
+  - ``pip install pytesseract``
+  - plus the system Tesseract binary:
+    - Windows: https://github.com/UB-Mannheim/tesseract/wiki
+    - Linux:   ``apt-get install tesseract-ocr``
+    - macOS:   ``brew install tesseract``
+  - If the Windows installer puts Tesseract off PATH, set the
+    ``TESSERACT_CMD`` environment variable to the binary path.
 
-  - Windows: https://github.com/UB-Mannheim/tesseract/wiki
-  - Linux:   ``apt-get install tesseract-ocr``
-  - macOS:   ``brew install tesseract``
+* EasyOCR:
+  - ``pip install easyocr``
+  - First run downloads the language models (~100MB).
 
-If the Windows installer puts Tesseract somewhere off PATH, set the
-``TESSERACT_CMD`` environment variable to the absolute path of
-``tesseract.exe`` and the reader will pick it up automatically.
+* PaddleOCR:
+  - ``pip install paddlepaddle paddleocr``
+  - First run downloads the detection + recognition models (~50-100MB).
 """
 from __future__ import annotations
 
 import os
 import re
 import shutil
-import unicodedata
-from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
 import cv2
@@ -46,42 +61,6 @@ from src.utils import log_error, log_info, log_warning
 
 # Type alias: (x, y, width, height) in image (device) pixel space.
 Region = Tuple[int, int, int, int]
-
-
-# Pre-compiled regex used to drop the ``đ`` -> ``d`` style mappings that
-# ``unicodedata.normalize`` doesn't decompose.
-_ASCII_FOLD_MAP = str.maketrans({
-    "đ": "d", "Đ": "D",
-    "ư": "u", "Ư": "U",
-    "ơ": "o", "Ơ": "O",
-    "ă": "a", "Ă": "A",
-    "â": "a", "Â": "A",
-    "ê": "e", "Ê": "E",
-    "ô": "o", "Ô": "O",
-})
-
-
-def strip_diacritics(text: str) -> str:
-    """Return ``text`` with Vietnamese / Latin diacritics removed.
-
-    Handles both decomposable accents (à, é, ố, ...) via Unicode
-    normalisation and the few characters Unicode keeps as a single
-    codepoint (đ, ư, ơ, ă, â, ê, ô) via an explicit fold map.
-
-    Empty / non-str inputs are returned untouched. Useful when an OCR
-    backend can't get Vietnamese tone marks right but still recognises
-    base letters - the caller can compare ``strip_diacritics(text)``
-    against an ASCII needle like ``"Phuc Loi"``.
-    """
-    if not text:
-        return text
-    # NFKD splits ``ố`` -> ``o`` + combining acute + combining circumflex.
-    decomposed = unicodedata.normalize("NFKD", text)
-    # Drop all combining marks (category Mn).
-    no_marks = "".join(ch for ch in decomposed
-                       if not unicodedata.combining(ch))
-    # Apply the explicit fold map for codepoints NFKD doesn't split.
-    return no_marks.translate(_ASCII_FOLD_MAP)
 
 
 # --- Tesseract config -----------------------------------------------------
@@ -168,59 +147,175 @@ def _try_locate_tesseract_binary() -> Optional[str]:
     return None
 
 
+# --- Backend registry -----------------------------------------------------
+
+# All known backend identifiers, in priority order for auto-detection.
+KNOWN_BACKENDS = ("tesseract", "easyocr", "paddleocr")
+
+
+def _list_available_backends() -> List[str]:
+    """Return the subset of :data:`KNOWN_BACKENDS` that can be imported."""
+    avail = []
+    try:
+        import pytesseract  # noqa: F401
+        avail.append("tesseract")
+    except ImportError:
+        pass
+    try:
+        import easyocr  # noqa: F401
+        avail.append("easyocr")
+    except ImportError:
+        pass
+    try:
+        import paddleocr  # noqa: F401
+        avail.append("paddleocr")
+    except ImportError:
+        pass
+    return avail
+
+
 # --- Public facade --------------------------------------------------------
 
 
 class OCRReader:
-    """Region-aware OCR reader backed by Tesseract.
+    """Region-aware OCR reader with pluggable backends (English-only).
 
-    Construction probes ``pytesseract`` and the system Tesseract binary.
-    If either is missing, :attr:`available` stays ``False`` and every
-    read returns ``""`` so callers can fall back to template matching.
+    Three backends are supported:
 
-    The reader performs cropping + light preprocessing (grayscale + Otsu
-    + 2x upscale for tiny labels) before handing pixels to Tesseract.
+    * ``"tesseract"`` - default; fast and light.
+    * ``"easyocr"`` - neural OCR; better with stylised fonts, heavier
+      (Torch).
+    * ``"paddleocr"`` - neural OCR; strong accuracy, pulls its own
+      ``paddlepaddle`` runtime.
+
+    Construction probes the chosen backend. If it's missing the reader
+    stays in ``available=False`` mode and every read returns ``""`` so
+    callers can fall back to template matching. Use :meth:`set_backend`
+    to switch backends at runtime; the previously active backend is
+    released and the new one is (lazily) initialised.
+
+    Args:
+        backend: Backend name. ``None`` auto-picks the first available
+            from :data:`KNOWN_BACKENDS` (tesseract first).
+        tesseract_cmd: Optional explicit path to the Tesseract binary.
+        default_lang: Language code passed to the backend. Defaults to
+            ``"eng"``; backends translate to their own code (``"en"``).
+        default_config: Tesseract CLI config override.
+        preferred: Backward-compat alias for ``backend``. Ignored when
+            ``backend`` is set.
     """
 
     def __init__(
         self,
+        backend: Optional[str] = None,
         tesseract_cmd: Optional[str] = None,
         default_lang: str = "eng",
         default_config: str = DEFAULT_TESSERACT_CONFIG,
-        # ``backend`` / ``preferred`` are accepted for backward
-        # compatibility with the old multi-backend API. They are
-        # ignored: Tesseract is the only backend now.
-        backend: Optional[str] = None,  # noqa: ARG002
-        preferred: Optional[str] = None,  # noqa: ARG002
+        preferred: Optional[str] = None,  # backward-compat
     ) -> None:
         self.default_lang = default_lang
         self._default_config = default_config
+        self._tesseract_cmd = tesseract_cmd
+
+        # Resolve the requested backend. ``backend`` wins over the
+        # legacy ``preferred`` argument; ``None`` auto-detects.
+        requested = backend or preferred
+        if requested is None:
+            avail = _list_available_backends()
+            requested = avail[0] if avail else "tesseract"
+
+        self._backend_name: str = requested
+        self._available: bool = False
+
+        # Lazy backend handles.
         self._pytesseract = None
-        self._available = False
-        self._init(tesseract_cmd)
+        self._easyocr_reader = None
+        self._paddleocr_reader = None
+
+        self._init_backend()
 
         if self._available:
-            log_info("OCR engine ready (tesseract)")
+            log_info(f"OCR engine ready ({self._backend_name})")
         else:
             log_warning(
-                "Tesseract OCR not available. Install it with:\n"
-                "  pip install pytesseract\n"
-                "And the system binary:\n"
-                "  Windows: https://github.com/UB-Mannheim/tesseract/wiki\n"
-                "  Linux:   apt-get install tesseract-ocr\n"
-                "  macOS:   brew install tesseract\n"
-                "If installed off PATH, set TESSERACT_CMD to the binary path."
+                f"OCR backend '{self._backend_name}' not available. "
+                "Install one of:\n"
+                "  pip install pytesseract (+ system Tesseract binary)\n"
+                "  pip install easyocr\n"
+                "  pip install paddlepaddle paddleocr\n"
+                "For Tesseract off PATH on Windows, set TESSERACT_CMD."
             )
 
-    # ----- init ------------------------------------------------------------
+    # ----- backend lifecycle ----------------------------------------------
 
-    def _init(self, tesseract_cmd: Optional[str]) -> None:
+    def _init_backend(self) -> None:
+        """Probe / construct the active backend."""
+        name = self._backend_name
+        if name == "tesseract":
+            self._init_tesseract()
+        elif name == "easyocr":
+            self._init_easyocr()
+        elif name == "paddleocr":
+            self._init_paddleocr()
+        else:
+            log_warning(f"Unknown OCR backend '{name}'")
+            self._available = False
+
+    def _teardown_backend(self) -> None:
+        """Release resources held by the active backend."""
+        if self._easyocr_reader is not None:
+            try:
+                del self._easyocr_reader
+            except Exception:
+                pass
+            self._easyocr_reader = None
+        if self._paddleocr_reader is not None:
+            try:
+                del self._paddleocr_reader
+            except Exception:
+                pass
+            self._paddleocr_reader = None
+        self._pytesseract = None
+        self._available = False
+
+    def set_backend(self, backend: str) -> bool:
+        """Switch to a different backend at runtime.
+
+        Releases the previously active backend (so we don't keep two
+        Torch models in memory, for example) and (lazily) initialises
+        the new one. Returns ``True`` if the new backend became
+        available, ``False`` otherwise (in which case the reader stays
+        in degraded mode and callers should fall back to templates).
+        """
+        if backend not in KNOWN_BACKENDS:
+            log_warning(
+                f"Unknown OCR backend '{backend}'. "
+                f"Known: {KNOWN_BACKENDS}"
+            )
+            return False
+        if backend == self._backend_name and self._available:
+            return True
+        self._teardown_backend()
+        self._backend_name = backend
+        self._init_backend()
+        if self._available:
+            log_info(f"OCR backend switched to '{backend}'")
+            return True
+        log_warning(
+            f"OCR backend '{backend}' unavailable; "
+            "OCR helpers will return empty results"
+        )
+        return False
+
+    # ----- tesseract backend ----------------------------------------------
+
+    def _init_tesseract(self) -> None:
         try:
             import pytesseract  # type: ignore
         except ImportError:
             return
 
-        cmd = tesseract_cmd or _try_locate_tesseract_binary()
+        cmd = self._tesseract_cmd or _try_locate_tesseract_binary()
         if cmd:
             pytesseract.pytesseract.tesseract_cmd = cmd
 
@@ -232,17 +327,74 @@ class OCRReader:
         self._pytesseract = pytesseract
         self._available = True
 
+    # ----- easyocr backend ------------------------------------------------
+
+    def _init_easyocr(self) -> None:
+        try:
+            import easyocr  # type: ignore
+        except ImportError:
+            return
+        # Translate tesseract-style lang ("eng") to EasyOCR code ("en").
+        easy_langs = self._easyocr_langs()
+        try:
+            self._easyocr_reader = easyocr.Reader(
+                easy_langs, gpu=False, verbose=False,
+            )
+            self._available = True
+        except Exception as e:
+            log_error(f"OCR (easyocr) init failed: {e}")
+            self._easyocr_reader = None
+            self._available = False
+
+    def _easyocr_langs(self) -> List[str]:
+        """Map :attr:`default_lang` to EasyOCR language codes."""
+        lang = self.default_lang or "eng"
+        # EasyOCR uses 'en'; Tesseract uses 'eng'.
+        mapping = {"eng": "en", "en": "en"}
+        return [mapping.get(lang, "en")]
+
+    # ----- paddleocr backend ----------------------------------------------
+
+    def _paddleocr_lang(self) -> str:
+        """Map :attr:`default_lang` to PaddleOCR language codes."""
+        lang = self.default_lang or "eng"
+        # PaddleOCR uses 'en'; Tesseract uses 'eng'.
+        mapping = {"eng": "en", "en": "en"}
+        return mapping.get(lang, "en")
+
+    def _init_paddleocr(self) -> None:
+        try:
+            from paddleocr import PaddleOCR  # type: ignore
+        except ImportError:
+            return
+        try:
+            # mkldnn oneDNN path crashes on Windows with paddle 3.3.x
+            # (NotImplementedError: ConvertPirAttribute2RuntimeAttribute).
+            # Disable it for portability across Windows installs.
+            self._paddleocr_reader = PaddleOCR(
+                lang=self._paddleocr_lang(),
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
+                enable_mkldnn=False,
+            )
+            self._available = True
+        except Exception as e:
+            log_error(f"OCR (paddleocr) init failed: {e}")
+            self._paddleocr_reader = None
+            self._available = False
+
     # ----- public API ------------------------------------------------------
 
     @property
     def available(self) -> bool:
-        """``True`` when Tesseract is reachable."""
+        """``True`` when the active backend is reachable."""
         return self._available
 
     @property
     def backend_name(self) -> str:
         """Name of the active backend, or ``"none"`` when unavailable."""
-        return "tesseract" if self._available else "none"
+        return self._backend_name if self._available else "none"
 
     def read_text(
         self,
@@ -253,38 +405,24 @@ class OCRReader:
         preprocess: bool = True,
         config: Optional[str] = None,
         psm: Optional[int] = None,
-        ascii_only: bool = False,
     ) -> str:
         """Run OCR on ``screen`` (optionally cropped to ``region``).
+
+        English-only. The project targets Latin in-game labels.
 
         Args:
             screen: BGR ndarray captured by ADBGameAutomation.
             region: Optional ``(x, y, w, h)`` crop in device pixels.
-            lang: Tesseract language code (defaults to ``"eng"``). Pass
-                ``"vie"`` if the ``vie.traineddata`` language pack is
-                installed and you want diacritics preserved.
-            whitelist: Optional char whitelist mapped to
-                ``tessedit_char_whitelist``. Use e.g. ``"0123456789/"``
-                for digit-only labels so Tesseract can't hallucinate
-                letters.
+            lang: Language code override. Defaults to ``"eng"`` (or the
+                backend's English equivalent). Backends translate
+                between ``"eng"`` / ``"en"`` automatically.
+            whitelist: Optional char whitelist. Tesseract maps this to
+                ``tessedit_char_whitelist``; neural backends post-filter.
             preprocess: Apply grayscale + Otsu + smart upscale + padding
                 to the crop. Small labels OCR much better with this on.
-            config: Optional Tesseract CLI override. When ``None``, uses
-                ``DEFAULT_TESSERACT_CONFIG`` or builds one from ``psm``.
-            psm: Optional Tesseract page segmentation mode override.
-                Common values for game labels:
-
-                * ``7`` (default) - single text line ("0/5", "Lv 35")
-                * ``8`` - single word
-                * ``6`` - uniform block of text
-                * ``11`` - sparse text
-                * ``13`` - raw line, no assumptions
-            ascii_only: When ``True`` strip Vietnamese / Latin
-                diacritics from the result before returning. Useful when
-                Tesseract reads a Vietnamese label but mangles tone
-                marks - the caller can compare against an ASCII needle
-                like ``"Phuc Loi"`` and not care about ``"Phúc Lợi"``
-                vs ``"Phuc Loi"`` vs ``"Phúe Loi"``.
+            config: Tesseract CLI override (ignored by neural backends).
+            psm: Tesseract page segmentation mode (ignored by neural
+                backends).
 
         Returns ``""`` when OCR is unavailable or recognition fails.
         """
@@ -298,26 +436,92 @@ class OCRReader:
         if preprocess:
             crop = self._preprocess(crop)
 
+        try:
+            if self._backend_name == "tesseract":
+                text = self._read_tesseract(crop, lang, config, psm, whitelist)
+            elif self._backend_name == "easyocr":
+                text = self._read_easyocr(crop, lang, whitelist)
+            elif self._backend_name == "paddleocr":
+                text = self._read_paddleocr(crop, lang, whitelist)
+            else:
+                text = ""
+        except Exception as e:  # pragma: no cover - runtime OCR errors
+            log_error(f"OCR ({self._backend_name}) error: {e}")
+            return ""
+
+        return (text or "").strip()
+
+    def _read_tesseract(
+        self, crop, lang, config, psm, whitelist,
+    ) -> str:
         if config is None:
             mode = psm if psm is not None else 7
             cfg = f"--oem 3 --psm {mode}"
         else:
             cfg = config
-
         if whitelist:
             cfg = f"{cfg} -c tessedit_char_whitelist={whitelist}"
+        return self._pytesseract.image_to_string(
+            crop, lang=lang or self.default_lang, config=cfg,
+        )
 
-        try:
-            text = self._pytesseract.image_to_string(
-                crop, lang=lang or self.default_lang, config=cfg
-            )
-        except Exception as e:  # pragma: no cover - tesseract runtime errors
-            log_error(f"OCR (tesseract) error: {e}")
+    def _read_easyocr(
+        self, crop, lang, whitelist,
+    ) -> str:
+        if self._easyocr_reader is None:
             return ""
-        result = (text or "").strip()
-        if ascii_only:
-            result = strip_diacritics(result)
-        return result
+        # Translate tesseract-style lang if needed.
+        if lang:
+            mapping = {"eng": "en", "en": "en"}
+            easy_lang = mapping.get(lang, "en")
+        else:
+            easy_lang = None
+        # Reconfigure languages if the caller asked for a different one.
+        if easy_lang and easy_lang not in self._easyocr_reader.lang_list:
+            self._easyocr_reader.setLanguage([easy_lang])
+
+        # EasyOCR expects RGB.
+        if len(crop.shape) == 3:
+            rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+        else:
+            rgb = crop
+        results = self._easyocr_reader.readtext(rgb, detail=0, paragraph=True)
+        text = " ".join(str(r) for r in results)
+
+        if whitelist:
+            # EasyOCR has no native whitelist; filter at character level.
+            allowed = set(whitelist)
+            text = "".join(ch for ch in text if ch in allowed or ch.isspace())
+        return text
+
+    def _read_paddleocr(
+        self, crop, lang, whitelist,
+    ) -> str:
+        if self._paddleocr_reader is None:
+            return ""
+        # PaddleOCR expects a 3-channel BGR image. Our shared preprocessor
+        # returns grayscale (single channel), so convert back here.
+        if len(crop.shape) == 2:
+            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
+        # PaddleOCR 3.x accepts an ndarray or a file path. Passing an
+        # ndarray avoids disk I/O and works for the preprocessed crop.
+        results = self._paddleocr_reader.predict(crop)
+        if not results:
+            return ""
+        # ``predict`` returns a list of OCRResult dicts (one per image).
+        # We run on a single crop, so take the first.
+        first = results[0]
+        # OCRResult behaves like a dict; rec_texts is a list[str].
+        texts = []
+        if hasattr(first, "get"):
+            texts = first.get("rec_texts", []) or []
+        elif isinstance(first, dict):
+            texts = first.get("rec_texts", []) or []
+        text = " ".join(str(t) for t in texts)
+        if whitelist:
+            allowed = set(whitelist)
+            text = "".join(ch for ch in text if ch in allowed or ch.isspace())
+        return text
 
     def contains_text(
         self,
@@ -326,16 +530,9 @@ class OCRReader:
         region: Optional[Region] = None,
         case_sensitive: bool = False,
         normalize_whitespace: bool = True,
-        ascii_fold: bool = False,
         **kwargs,
     ) -> bool:
         """Check whether ``needle`` is present in the OCR output.
-
-        Args:
-            ascii_fold: When ``True``, strip diacritics from both the
-                OCR output and ``needle`` before comparing. Lets a
-                caller match Vietnamese text via an ASCII needle even
-                when the OCR engine garbles tone marks.
 
         ``kwargs`` are forwarded to :meth:`read_text`.
         """
@@ -345,9 +542,6 @@ class OCRReader:
 
         haystack = text
         target = needle
-        if ascii_fold:
-            haystack = strip_diacritics(haystack)
-            target = strip_diacritics(target)
         if normalize_whitespace:
             haystack = re.sub(r"\s+", "", haystack)
             target = re.sub(r"\s+", "", target)
@@ -428,5 +622,5 @@ class OCRReader:
 
 
 __all__ = [
-    "OCRReader", "Region", "DEFAULT_TESSERACT_CONFIG", "strip_diacritics",
+    "OCRReader", "Region", "DEFAULT_TESSERACT_CONFIG", "KNOWN_BACKENDS",
 ]

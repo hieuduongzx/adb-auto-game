@@ -1,4 +1,5 @@
 {
+  "ocr_backend": "tesseract",
   "activities": [
     {
       "id": "auto_skip_dialog",

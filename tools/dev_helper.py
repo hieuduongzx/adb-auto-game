@@ -13,7 +13,7 @@ Features
 - Template match tester (threshold / grayscale / multi-scale)
 - Color picker (RGB / HEX at last clicked point)
 - Manual tap / swipe sender
-- OCR via OCRReader (RapidOCR / PaddleOCR / Tesseract)
+- OCR via OCRReader (Tesseract / EasyOCR) - switchable at runtime
 - Live device info panel
 
 Run::
@@ -97,6 +97,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.core.adb import ADBController, DeviceScanner
+from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.utils import (
     add_log_subscriber,
@@ -1125,6 +1126,18 @@ class DevHelper(QMainWindow):
         self._ocr_result = QLineEdit()
         self._ocr_result.setReadOnly(True)
         oform.addWidget(self._ocr_result)
+
+        # Engine selector - lets you A/B test Tesseract vs EasyOCR on
+        # the same crop without restarting the helper.
+        be_row = QHBoxLayout()
+        be_row.addWidget(QLabel("Backend:"))
+        self._ocr_backend_combo = QComboBox()
+        for name in KNOWN_BACKENDS:
+            self._ocr_backend_combo.addItem(name)
+        self._ocr_backend_combo.currentTextChanged.connect(self._on_ocr_backend_changed)
+        be_row.addWidget(self._ocr_backend_combo, 1)
+        oform.addLayout(be_row)
+
         wl_row = QHBoxLayout()
         self._ocr_whitelist = QLineEdit()
         self._ocr_whitelist.setPlaceholderText("Whitelist e.g. 0123456789/")
@@ -1136,8 +1149,6 @@ class DevHelper(QMainWindow):
         wl_row.addWidget(b_read)
         wl_row.addWidget(b_copy_ocr)
         oform.addLayout(wl_row)
-        self._ocr_ascii = QCheckBox("ASCII only (strip Vietnamese diacritics)")
-        oform.addWidget(self._ocr_ascii)
         eng_row = QHBoxLayout()
         eng_row.addWidget(QLabel("Engine:"))
         self._ocr_engine = QLabel("not loaded")
@@ -1758,6 +1769,24 @@ class DevHelper(QMainWindow):
 
     # ===== OCR =====
 
+    def _on_ocr_backend_changed(self, name: str) -> None:
+        """Switch the OCRReader backend when the dropdown changes.
+
+        Lazy-creates the reader on first call. Heavy backends (EasyOCR)
+        load their model here, so the UI freezes briefly - acceptable
+        for a dev tool.
+        """
+        if self._ocr_reader is None:
+            self._ocr_reader = OCRReader(backend=name)
+        else:
+            self._ocr_reader.set_backend(name)
+        engine = self._ocr_reader.backend_name
+        self._ocr_engine.setText(engine if engine != "none" else "n/a")
+        if self._ocr_reader.available:
+            log_info(f"OCR backend: {engine}")
+        else:
+            log_warning(f"OCR backend '{name}' not available")
+
     def _read_region_text(self, *_a) -> None:
         img = self._preview._screen
         if img is None:
@@ -1768,22 +1797,16 @@ class DevHelper(QMainWindow):
             self._set_status("Drag a region or set X/Y/W/H first")
             return
 
-        try:
-            from src.core.adb.auto.ocr import OCRReader
-        except ImportError as e:
-            log_error(
-                f"OCR module unavailable: {e}. Install one of: "
-                "rapidocr-onnxruntime / paddleocr / pytesseract"
-            )
-            return
-
+        # Lazy-init using the currently selected backend.
         if self._ocr_reader is None:
-            self._ocr_reader = OCRReader()
+            self._ocr_reader = OCRReader(
+                backend=self._ocr_backend_combo.currentText(),
+            )
 
         if not self._ocr_reader.available:
             log_error(
                 "No OCR backend available. Install one of: "
-                "rapidocr-onnxruntime / paddleocr / pytesseract"
+                "pytesseract (+ system Tesseract) / easyocr"
             )
             return
 

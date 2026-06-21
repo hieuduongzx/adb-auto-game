@@ -14,6 +14,15 @@ pyyaml>=6.0.1
 #   - macOS:   brew install tesseract
 # If installed off PATH on Windows, set TESSERACT_CMD to the binary path.
 pytesseract>=0.3.10
+# EasyOCR - neural OCR backend (better with stylised fonts, but heavier:
+# pulls torch + downloads ~100MB language models on first use). Optional
+# - OCRReader auto-falls back to tesseract if absent.
+easyocr>=1.7.0
+# PaddleOCR - neural OCR backend (strong multilingual accuracy, pulls
+# its own paddlepaddle runtime). Optional. On Windows with paddle 3.3.x
+# mkldnn must be disabled (OCRReader does this automatically).
+paddleocr>=3.0.0
+paddlepaddle>=3.0.0
 
 # GUI Framework
 PySide6>=6.6.0         # Native Qt UI
