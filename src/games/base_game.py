@@ -2,13 +2,15 @@
 Base game automation class for easy tool development with GUI support.
 This class provides a structured framework for creating game automation tools.
 """
+import json
 import os
 import time
 import threading
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Dict, List, Callable, Optional, Any, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from enum import Enum
 
 import cv2
@@ -52,7 +54,40 @@ class Activity:
     # Background execution support
     background: bool = False
     poll_interval: float = 1.0
-    
+
+    def to_settings_dict(self) -> Dict[str, Any]:
+        """Export only user-tweakable settings for persistence."""
+        return {
+            "id": self.id,
+            "enabled": self.enabled,
+            "poll_interval": self.poll_interval,
+        }
+
+    @classmethod
+    def from_settings_dict(cls, data: Dict[str, Any], defaults: Optional["Activity"] = None) -> Optional["Activity"]:
+        """Build a fresh Activity applying persisted settings over ``defaults``.
+
+        If ``defaults`` is provided, its non-persisted fields are kept and only
+        ``enabled`` / ``poll_interval`` are overwritten. Returns ``None`` if no
+        ID is present in ``data``.
+        """
+        if not data or not data.get("id"):
+            return None
+        if defaults is None:
+            return cls(
+                id=data["id"],
+                name=data.get("name", ""),
+                description=data.get("description", ""),
+                enabled=bool(data.get("enabled", True)),
+                max_retries=int(data.get("max_retries", 3)),
+                background=bool(data.get("background", False)),
+                poll_interval=float(data.get("poll_interval", 1.0)),
+            )
+        # Apply persisted values over the hard-coded defaults.
+        defaults.enabled = bool(data.get("enabled", defaults.enabled))
+        defaults.poll_interval = float(data.get("poll_interval", defaults.poll_interval))
+        return defaults
+
     def reset(self):
         """Reset activity state"""
         self.status = ActivityStatus.PENDING
@@ -140,7 +175,11 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         self._background_threads: Dict[str, threading.Thread] = {}
         self._background_stop_events: Dict[str, threading.Event] = {}
         self._background_lock = threading.Lock()
-        
+
+        # Persisted per-activity settings
+        self._settings_dir = Path("data") / "settings"
+        self._settings_file: Optional[Path] = None
+
         # Initialize activities
         self._initialize_activities()
     
@@ -160,8 +199,29 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
     # ==================== Initialization ====================
     
     def _initialize_activities(self):
-        """Initialize activities from define_activities()"""
+        """Initialize activities from define_activities() and apply saved settings."""
         activities = self.define_activities()
+
+        # Build a settings key from the concrete game class name so each game
+        # keeps its own independent activity settings.
+        settings_key = self.__class__.__name__
+        self._settings_dir = Path("data") / "settings"
+        self._settings_file = self._settings_dir / f"{settings_key}.json"
+        saved = self._load_activity_settings()
+
+        if saved:
+            # Merge saved settings with the hard-coded defaults.
+            by_id = {a.id: a for a in activities}
+            merged: List[Activity] = []
+            for data in saved:
+                aid = data.get("id")
+                default = by_id.pop(aid, None)
+                act = Activity.from_settings_dict(data, defaults=default)
+                if act is not None:
+                    merged.append(act)
+            # Append any new activities that weren't saved yet.
+            activities = merged + list(by_id.values())
+
         self._activities = activities
         self._activity_map = {act.id: act for act in activities}
         # Only sequential, enabled activities go into the run order. Background
@@ -427,12 +487,10 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             ascii_only=ascii_fold,
         )
         if not text:
-            log_info(f"[OCR] region {region} empty")
             return False
 
         # Reuse the lower-level method so case/whitespace rules stay in
         # one place. We've already logged the raw read.
-        log_info(f"[OCR] region {region} -> {text!r}")
         return self.region_contains_text(
             needle, region=region,
             whitelist=whitelist, case_sensitive=case_sensitive,
@@ -513,6 +571,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             elif not enabled and activity_id in self._activity_order:
                 self._activity_order.remove(activity_id)
         log_info(f"Activity '{activity_id}' {'enabled' if enabled else 'disabled'}")
+        self._save_activity_settings()
 
     def set_activity_poll_interval(self, activity_id: str, interval: float) -> bool:
         """Change the poll interval of a background activity at runtime.
@@ -526,6 +585,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             return False
         activity.poll_interval = max(0.05, float(interval))
         log_info(f"[bg] '{activity_id}' poll interval set to {activity.poll_interval:.2f}s")
+        self._save_activity_settings()
         return True
 
     def set_activity_order(self, order: List[str]):
@@ -549,6 +609,37 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         """Get currently running activity"""
         return self._current_activity
     
+    def _load_activity_settings(self) -> List[Dict[str, Any]]:
+        """Load persisted activity settings for this game, if any."""
+        if not self._settings_file or not self._settings_file.exists():
+            return []
+        try:
+            with self._settings_file.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return data.get("activities", [])
+            if isinstance(data, list):
+                return data
+        except Exception as e:
+            log_warning(f"Could not load activity settings: {e}")
+        return []
+
+    def _save_activity_settings(self) -> None:
+        """Persist current enabled/poll_interval state for next run."""
+        if not self._settings_file:
+            return
+        try:
+            self._settings_dir.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "activities": [
+                    act.to_settings_dict() for act in self._activities
+                ],
+            }
+            with self._settings_file.open("w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            log_warning(f"Could not save activity settings: {e}")
+
     # ==================== Background Activity Management ====================
     
     def _background_worker(self, activity: Activity, stop_event: threading.Event):

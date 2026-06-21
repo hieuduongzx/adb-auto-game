@@ -43,6 +43,8 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
@@ -51,6 +53,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QSlider,
     QStatusBar,
     QTabWidget,
     QTableWidget,
@@ -63,6 +66,7 @@ from src.utils import (
     add_log_subscriber,
     log_error,
     log_info,
+    log_warning,
     remove_log_subscriber,
 )
 
@@ -240,6 +244,53 @@ QPushButton.smallBtn {{
 QPushButton.smallBtn:hover {{ background-color: #e8e8e8; color: {C.TEXT}; }}
 QPushButton.smallBtn:disabled {{ color: {C.TEXT_MUTED}; }}
 
+QPushButton#btnPlay {{
+    background-color: transparent;
+    color: {C.OK};
+    border: none;
+    padding: 0px;
+    font-size: 13px;
+}}
+QPushButton#btnPlay:hover {{ color: #15803d; }}
+QPushButton#btnPlay:disabled {{ color: #86efac; }}
+
+QPushButton#btnSettings {{
+    background-color: transparent;
+    color: {C.TEXT_DIM};
+    border: none;
+    padding: 0px;
+    font-size: 13px;
+}}
+QPushButton#btnSettings:hover {{ color: {C.TEXT}; }}
+QPushButton#btnSettings:disabled {{ color: {C.TEXT_MUTED}; }}
+
+QPushButton#btnDevice {{
+    background-color: transparent;
+    color: {C.TEXT_DIM};
+    border: none;
+    padding: 0px;
+    font-size: 13px;
+}}
+QPushButton#btnDevice:hover {{ color: {C.TEXT}; }}
+
+QComboBox#deviceCombo {{
+    background-color: {C.PANEL};
+    color: {C.TEXT};
+    border: 1px solid {C.BORDER};
+    padding: 2px 6px;
+    font-size: 11px;
+    min-width: 120px;
+}}
+QComboBox#deviceCombo::drop-down {{
+    border: none;
+    width: 18px;
+}}
+QComboBox#deviceCombo QAbstractItemView {{
+    background-color: {C.PANEL};
+    border: 1px solid {C.BORDER};
+    selection-background-color: {C.ACCENT_BG};
+}}
+
 QTableWidget {{
     background-color: {C.PANEL};
     alternate-background-color: {C.PANEL_ALT};
@@ -309,6 +360,36 @@ QTabBar::tab:selected {{
     font-weight: 600;
 }}
 QTabBar::tab:hover:!selected {{ background: #e0e0e0; }}
+
+QDialog#settingsDialog {{
+    background-color: {C.PANEL};
+}}
+
+QLabel#settingLabel {{
+    color: {C.TEXT};
+    font-weight: 600;
+    font-size: 12px;
+}}
+
+QDoubleSpinBox#intervalSpin {{
+    background-color: {C.PANEL};
+    border: 1px solid {C.BORDER};
+    padding: 4px 6px;
+    font-size: 12px;
+}}
+
+QSlider#intervalSlider::groove:horizontal {{
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+}}
+QSlider#intervalSlider::handle:horizontal {{
+    background: {C.ACCENT};
+    width: 12px;
+    height: 12px;
+    border-radius: 6px;
+    margin: -4px 0;
+}}
 
 QStatusBar {{
     background-color: {C.PANEL};
@@ -400,6 +481,10 @@ class GameAutomationWindow(QMainWindow):
         self._sig.log_message.connect(self._on_log_message)
         self._sig.single_run_finished.connect(self._on_single_run_finished)
         self._sig.device_status.connect(self._on_device_status)
+
+        self._device_list: List[Dict[str, str]] = []
+        self._selected_serial: Optional[str] = None
+        self._device_status_serial: Optional[str] = None
 
         self._automation_thread: Optional[threading.Thread] = None
         self._single_run_thread: Optional[threading.Thread] = None
@@ -535,12 +620,19 @@ class GameAutomationWindow(QMainWindow):
         r3.addWidget(self.btn_stop)
         r3.addStretch(1)
 
-        self.dev_value = QLabel("No device")
-        self.dev_value.setStyleSheet(f"color:{C.ERR}; font-size:11px; font-weight:600;")
-        r3.addWidget(self.dev_value)
+        # Device selector combo + scan/refresh
+        self.device_combo = QComboBox()
+        self.device_combo.setObjectName("deviceCombo")
+        self.device_combo.setToolTip("Select ADB device")
+        self.device_combo.setEnabled(False)
+        self.device_combo.activated.connect(self._cb_device_selected)
+        r3.addWidget(self.device_combo)
 
-        self.btn_refresh = QPushButton("Refresh")
-        self.btn_refresh.setProperty("class", "smallBtn")
+        self.btn_refresh = QPushButton("🔄")
+        self.btn_refresh.setObjectName("btnDevice")
+        self.btn_refresh.setToolTip("Refresh / scan devices")
+        self.btn_refresh.setFixedSize(22, 22)
+        self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_refresh.clicked.connect(self._cb_refresh_devices)
         r3.addWidget(self.btn_refresh)
         outer.addLayout(r3)
@@ -564,20 +656,21 @@ class GameAutomationWindow(QMainWindow):
         layout.setContentsMargins(4, 4, 4, 2)
         layout.setSpacing(4)
 
-        ar = QHBoxLayout()
-        ar.setSpacing(4)
+        # Header bar for the list view
+        list_header = QHBoxLayout()
+        list_header.setSpacing(4)
         lbl = QLabel("One-time tasks" if kind == "seq" else "Loop tasks")
         lbl.setObjectName("subtitle")
-        ar.addWidget(lbl)
-        ar.addStretch(1)
+        list_header.addWidget(lbl)
+        list_header.addStretch(1)
 
         all_btn = QPushButton("All")
         all_btn.setProperty("class", "smallBtn")
         none_btn = QPushButton("None")
         none_btn.setProperty("class", "smallBtn")
-        ar.addWidget(all_btn)
-        ar.addWidget(none_btn)
-        layout.addLayout(ar)
+        list_header.addWidget(all_btn)
+        list_header.addWidget(none_btn)
+        layout.addLayout(list_header)
 
         rows = self._seq_rows if kind == "seq" else self._bg_rows
         if kind == "seq":
@@ -594,6 +687,12 @@ class GameAutomationWindow(QMainWindow):
             layout.addWidget(empty)
             layout.addStretch(1)
             return page
+
+        # Stacked container for list and inline settings
+        stack = QVBoxLayout()
+        stack.setContentsMargins(0, 0, 0, 0)
+        stack.setSpacing(4)
+        layout.addLayout(stack, 1)
 
         table = QTableWidget()
         table.setColumnCount(5)
@@ -617,7 +716,7 @@ class GameAutomationWindow(QMainWindow):
         table.setColumnWidth(_HEADER_CHECK, 24)
         table.setColumnWidth(_HEADER_STATE, 74)
         table.setColumnWidth(_HEADER_PROG, 54)
-        table.setColumnWidth(_HEADER_RUN, 36)
+        table.setColumnWidth(_HEADER_RUN, 52)
 
         for row, act in enumerate(acts):
             cb = QCheckBox()
@@ -648,26 +747,221 @@ class GameAutomationWindow(QMainWindow):
             prog.setFixedHeight(5)
             table.setCellWidget(row, _HEADER_PROG, self._center(prog))
 
-            run_btn = QPushButton("Run")
-            run_btn.setProperty("class", "smallBtn")
-            run_btn.setToolTip(f"Run only: {act.name}")
-            run_btn.setFixedWidth(30)
-            run_btn.clicked.connect(
+            # Action column: play icon + optional settings gear for background tasks.
+            btn_wrap = QWidget()
+            btn_layout = QHBoxLayout(btn_wrap)
+            btn_layout.setContentsMargins(0, 0, 0, 0)
+            btn_layout.setSpacing(2)
+
+            play_btn = QPushButton("▶")
+            play_btn.setObjectName("btnPlay")
+            play_btn.setToolTip(f"Run only: {act.name}")
+            play_btn.setFixedSize(22, 22)
+            play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            play_btn.clicked.connect(
                 lambda _checked=False, aid=act.id: self._cb_run_single(aid)
             )
-            table.setCellWidget(row, _HEADER_RUN, self._center(run_btn))
+            btn_layout.addWidget(play_btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+            settings_btn = None
+            if act.background:
+                settings_btn = QPushButton("⚙")
+                settings_btn.setObjectName("btnSettings")
+                settings_btn.setToolTip(f"Settings: {act.name}")
+                settings_btn.setFixedSize(22, 22)
+                settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                settings_btn.clicked.connect(
+                    lambda _checked=False, aid=act.id, k=kind: self._cb_show_activity_settings(aid, k)
+                )
+                btn_layout.addWidget(settings_btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+            btn_layout.addStretch(1)
+            table.setCellWidget(row, _HEADER_RUN, btn_wrap)
 
             rows[act.id] = {
                 "checkbox": cb, "pill": pill, "prog": prog,
-                "run_btn": run_btn, "name": act.name,
+                "run_btn": play_btn, "settings_btn": settings_btn,
+                "name": act.name, "background": act.background,
+                "poll_interval": act.poll_interval,
             }
 
-        layout.addWidget(table, 1)
+        stack.addWidget(table)
+
+        # Inline settings panel (hidden by default)
+        settings_panel = self._build_inline_settings_panel(kind, rows)
+        settings_panel.setVisible(False)
+        stack.addWidget(settings_panel)
+
         if kind == "seq":
             self.seq_table = table
+            self.seq_settings_panel = settings_panel
+            self.seq_stack = stack
         else:
             self.bg_table = table
+            self.bg_settings_panel = settings_panel
+            self.bg_stack = stack
         return page
+
+    def _build_inline_settings_panel(self, kind: str, rows: Dict[str, Dict[str, Any]]) -> QWidget:
+        panel = QFrame()
+        panel.setObjectName("panel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        header = QHBoxLayout()
+        header.setSpacing(6)
+
+        back_btn = QPushButton("← Back")
+        back_btn.setObjectName("btnBack")
+        back_btn.clicked.connect(lambda _checked=False, k=kind: self._cb_hide_activity_settings(k))
+        header.addWidget(back_btn)
+
+        self._settings_title = QLabel("Settings")
+        self._settings_title.setObjectName("title")
+        header.addWidget(self._settings_title, 1)
+        layout.addLayout(header)
+
+        desc = QLabel("Adjust poll interval for this background task.")
+        desc.setObjectName("subtitle")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        edit_row = QHBoxLayout()
+        edit_row.setSpacing(6)
+        lbl = QLabel("Interval:")
+        lbl.setObjectName("settingLabel")
+        edit_row.addWidget(lbl)
+
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setObjectName("intervalSlider")
+        slider.setMinimum(1)
+        slider.setMaximum(len(self._PRESETS) - 1)
+        slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        slider.setTickInterval(1)
+        edit_row.addWidget(slider, 1)
+
+        spin = QDoubleSpinBox()
+        spin.setObjectName("intervalSpin")
+        spin.setRange(0.05, 60.0)
+        spin.setDecimals(2)
+        spin.setSingleStep(0.1)
+        spin.setSuffix(" s")
+        spin.setFixedWidth(70)
+        edit_row.addWidget(spin)
+        layout.addLayout(edit_row)
+
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(4)
+        for value in self._PRESETS:
+            btn = QPushButton(f"{value:g}s")
+            btn.setProperty("class", "smallBtn")
+            btn.setFixedHeight(22)
+            btn.clicked.connect(lambda _checked=False, v=value, s=spin, sl=slider: self._apply_interval_preset(v, s, sl))
+            preset_row.addWidget(btn)
+        preset_row.addStretch(1)
+        layout.addLayout(preset_row)
+
+        info = QLabel("Lower interval = faster reaction, higher CPU/battery usage.")
+        info.setObjectName("subtitle")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+        layout.addStretch(1)
+
+        # Store references for the active activity later
+        panel._slider = slider
+        panel._spin = spin
+        panel._kind = kind
+        panel._rows = rows
+
+        slider.valueChanged.connect(lambda idx, s=spin, sl=slider: self._on_settings_slider_changed(idx, s, sl))
+        spin.valueChanged.connect(lambda value, s=spin, sl=slider: self._on_settings_spin_changed(value, s, sl))
+
+        return panel
+
+    _PRESETS = [0.2, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
+
+    @staticmethod
+    def _nearest_preset_index(value: float) -> int:
+        diffs = [abs(value - p) for p in GameAutomationWindow._PRESETS]
+        return int(min(range(len(diffs)), key=lambda i: diffs[i]))
+
+    def _apply_interval_preset(self, value: float, spin: QDoubleSpinBox, slider: QSlider) -> None:
+        spin.blockSignals(True)
+        spin.setValue(value)
+        spin.blockSignals(False)
+        try:
+            idx = self._PRESETS.index(value)
+        except ValueError:
+            idx = self._nearest_preset_index(value)
+        slider.blockSignals(True)
+        slider.setValue(idx)
+        slider.blockSignals(False)
+        self._commit_settings_interval()
+
+    def _on_settings_slider_changed(self, idx: int, spin: QDoubleSpinBox, slider: QSlider) -> None:
+        value = self._PRESETS[idx]
+        spin.blockSignals(True)
+        spin.setValue(value)
+        spin.blockSignals(False)
+        self._commit_settings_interval()
+
+    def _on_settings_spin_changed(self, value: float, spin: QDoubleSpinBox, slider: QSlider) -> None:
+        value = max(0.05, min(value, 60.0))
+        spin.blockSignals(True)
+        spin.setValue(value)
+        spin.blockSignals(False)
+        idx = self._nearest_preset_index(value)
+        slider.blockSignals(True)
+        slider.setValue(idx)
+        slider.blockSignals(False)
+        self._commit_settings_interval()
+
+    def _commit_settings_interval(self) -> None:
+        panel = getattr(self, "_active_settings_panel", None)
+        activity_id = getattr(self, "_active_settings_activity_id", None)
+        if not panel or not activity_id:
+            return
+        interval = panel._spin.value()
+        if self.automation.set_activity_poll_interval(activity_id, interval):
+            rows = panel._rows
+            row = rows.get(activity_id)
+            if row:
+                row["poll_interval"] = interval
+            act = self.automation.get_activity(activity_id)
+            if act:
+                log_info(f"Updated '{act.name}' interval to {interval:.2f}s")
+
+    def _cb_show_activity_settings(self, activity_id: str, kind: str) -> None:
+        rows = self._bg_rows if kind == "bg" else self._seq_rows
+        row = rows.get(activity_id)
+        if not row or not row.get("background"):
+            return
+        act = self.automation.get_activity(activity_id)
+        if not act:
+            return
+
+        panel = self.bg_settings_panel if kind == "bg" else self.seq_settings_panel
+        table = self.bg_table if kind == "bg" else self.seq_table
+
+        # Hide table, show settings panel
+        table.setVisible(False)
+        panel.setVisible(True)
+
+        self._active_settings_panel = panel
+        self._active_settings_activity_id = activity_id
+        panel._rows = rows
+
+        self._settings_title.setText(f"Settings: {act.name}")
+        self._apply_interval_preset(act.poll_interval, panel._spin, panel._slider)
+
+    def _cb_hide_activity_settings(self, kind: str) -> None:
+        panel = self.bg_settings_panel if kind == "bg" else self.seq_settings_panel
+        table = self.bg_table if kind == "bg" else self.seq_table
+        panel.setVisible(False)
+        table.setVisible(True)
+        self._active_settings_panel = None
+        self._active_settings_activity_id = None
 
     # ---- log ---------------------------------------------------------------
 
@@ -926,9 +1220,32 @@ class GameAutomationWindow(QMainWindow):
         self.log_view.clear()
         self._append_log("info", "Cleared")
 
+    def _cb_device_selected(self, index: int) -> None:
+        if not self._device_list or index < 0 or index >= len(self._device_list):
+            return
+        serial = self._device_list[index].get("serial")
+        if not serial:
+            return
+        self._selected_serial = serial
+        self.automation.adb.device_id = serial
+        # Try to connect to the chosen device off the UI thread.
+        def _connect() -> None:
+            try:
+                if self.automation.adb.select_device(serial):
+                    s = self.automation.adb.get_status_summary()
+                    if not getattr(self, "_closing", False):
+                        try:
+                            self._sig.device_status.emit(s)
+                        except RuntimeError:
+                            pass
+            except Exception as e:
+                log_error(f"Device select error: {e}")
+        threading.Thread(target=_connect, name="select-device", daemon=True).start()
+
     def _cb_refresh_devices(self) -> None:
+        # Reuse the periodic deep refresh path so the combo is repopulated
+        # automatically and never stuck on "No device".
         self.btn_refresh.setEnabled(False)
-        self.btn_refresh.setText("...")
         self._kick_device_status_refresh(deep=True)
 
     # ----- signal slots -----------------------------------------------------
@@ -988,17 +1305,77 @@ class GameAutomationWindow(QMainWindow):
 
     @Slot(dict)
     def _on_device_status(self, s: dict) -> None:
+        # Only touch the combo when the signal actually carries a device list.
+        # Status-summary signals (no "device_list" key) only update the bar.
+        if "device_list" in s:
+            device_list = s.get("device_list") or []
+            selected_serial = s.get("selected_serial") or self._selected_serial
+            connected_serial = self._device_status_serial
+
+            # Rebuild only when the set of serials actually changed, so we
+            # don't blow away the user's open dropdown every 2s.
+            new_serials = [d.get("serial", "") for d in device_list]
+            old_serials = [self.device_combo.itemData(i) or "" for i in range(self.device_combo.count())]
+            if new_serials != old_serials:
+                self.device_combo.blockSignals(True)
+                self.device_combo.clear()
+                self._device_list = device_list
+                selected_index = 0
+                for i, dev in enumerate(device_list):
+                    label = dev.get("name") or dev.get("serial") or "Device"
+                    serial = dev.get("serial", "")
+                    display = f"{label} ({serial})" if serial else label
+                    self.device_combo.addItem(display, serial)
+                    if serial:
+                        if serial == connected_serial:
+                            selected_index = i
+                        elif selected_serial and serial == selected_serial and not connected_serial:
+                            selected_index = i
+                self.device_combo.setCurrentIndex(selected_index)
+                self.device_combo.blockSignals(False)
+            else:
+                self._device_list = device_list
+                # Just refresh the selection highlight without rebuilding.
+                idx = self.device_combo.findData(selected_serial or connected_serial or "")
+                if idx >= 0:
+                    self.device_combo.blockSignals(True)
+                    self.device_combo.setCurrentIndex(idx)
+                    self.device_combo.blockSignals(False)
+
+            self.device_combo.setEnabled(bool(device_list))
+
+            # If no device is currently connected, try connecting the saved/preferred one.
+            if not connected_serial and selected_serial and not self._is_running:
+                self._selected_serial = selected_serial
+                self.automation.adb.device_id = selected_serial
+                threading.Thread(
+                    target=self._connect_saved_device,
+                    name="connect-saved-device",
+                    daemon=True,
+                ).start()
+
+        # Track the currently connected serial so list signals can highlight it.
         if s.get("connected"):
+            self._device_status_serial = s.get("device_id")
             label = s.get("device_name") or s.get("device_id") or "OK"
-            self.dev_value.setText(label)
-            self.dev_value.setStyleSheet(f"color:{C.OK}; font-size:11px; font-weight:600;")
             self.sb_device.setText(f"Dev: {label}")
         else:
-            self.dev_value.setText("No device")
-            self.dev_value.setStyleSheet(f"color:{C.ERR}; font-size:11px; font-weight:600;")
             self.sb_device.setText("Dev: --")
         self.btn_refresh.setEnabled(True)
-        self.btn_refresh.setText("Refresh")
+
+    def _connect_saved_device(self) -> None:
+        if not self._selected_serial:
+            return
+        try:
+            self.automation.adb.select_device(self._selected_serial)
+            s = self.automation.adb.get_status_summary()
+            if not getattr(self, "_closing", False):
+                try:
+                    self._sig.device_status.emit(s)
+                except RuntimeError:
+                    pass
+        except Exception as e:
+            log_warning(f"Could not reconnect to saved device: {e}")
 
     def _update_activity_status(self, aid: str, status: str) -> None:
         for rows in (self._seq_rows, self._bg_rows):
@@ -1024,7 +1401,7 @@ class GameAutomationWindow(QMainWindow):
                 break
 
     def _periodic_refresh(self) -> None:
-        self._kick_device_status_refresh(deep=False)
+        self._kick_device_status_refresh(deep=True)
 
     def _kick_device_status_refresh(self, deep: bool = False) -> None:
         if getattr(self, "_closing", False):
@@ -1035,8 +1412,25 @@ class GameAutomationWindow(QMainWindow):
             def _worker() -> None:
                 a = self.automation.adb
                 try:
-                    if deep or not a.is_connected():
-                        a.check_adb_connection() if deep else a.quick_refresh()
+                    # Always list available devices so the combo stays up to
+                    # date and we never block on console input.
+                    devices = a.list_devices()
+                    if devices:
+                        self._sig.device_status.emit({
+                            "connected": False,
+                            "device_list": devices,
+                            "selected_serial": self._selected_serial,
+                        })
+                        # Only (re)connect when nothing is currently connected
+                        # or the current connection is to a different device.
+                        if self._selected_serial:
+                            if a.device is None or a.device_id != self._selected_serial:
+                                a.select_device(self._selected_serial)
+                    elif deep:
+                        # Fallback to old connect flow when nothing is listed.
+                        a.check_adb_connection()
+
+                    a.quick_refresh()
                     s = a.get_status_summary()
                 except Exception:
                     s = {"connected": False, "device_id": None, "device_name": None,

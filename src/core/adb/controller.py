@@ -4,7 +4,7 @@ ADB Controller - Main class for ADB device management
 import os
 import shlex
 import time
-from typing import Optional, List, Tuple
+from typing import Dict, Optional, List, Tuple
 from ppadb.client import Client as AdbClient
 
 from .constants import (
@@ -101,6 +101,57 @@ class ADBController:
             pass
         return device.serial or "Unknown Device"
     
+    def list_devices(self) -> List[Dict[str, str]]:
+        """Return available ADB devices without prompting or connecting.
+
+        Each entry contains ``serial``, ``name``, and optionally ``current_app``.
+        Safe to call from the GUI thread. Quiet: no server-startup logging.
+        """
+        devices: List[Dict[str, str]] = []
+        try:
+            for device in self.client.devices():
+                try:
+                    device_name = self._get_device_name_for_device(device)
+                except Exception:
+                    device_name = device.serial or "Unknown Device"
+                current_app = ""
+                try:
+                    current_app = self._get_current_app_for_device(device) or ""
+                except Exception:
+                    pass
+                entry = {
+                    "serial": device.serial,
+                    "name": device_name,
+                }
+                if current_app:
+                    entry["current_app"] = current_app
+                    entry["app_name"] = self._get_app_name_for_package(current_app)
+                devices.append(entry)
+        except Exception as e:
+            log_warning(f"Could not list devices: {e}")
+        return devices
+
+    def select_device(self, serial: str) -> bool:
+        """Connect to a specific device by serial without prompting.
+
+        Idempotent and quiet: returns ``True`` immediately when we are already
+        connected to ``serial`` without re-logging the connection.
+        """
+        if self.device is not None and self.device_id == serial:
+            return True
+        try:
+            for device in self.client.devices():
+                if device.serial == serial:
+                    self.device = device
+                    self.device_id = device.serial
+                    device_name = self._get_device_name_for_device(self.device)
+                    log_success(f"Connected to device: {self.device_id} ({device_name})")
+                    return True
+            log_warning(f"Device '{serial}' not found")
+        except Exception as e:
+            log_error(f"Error selecting device: {e}")
+        return False
+
     def check_adb_connection(self) -> bool:
         """Check and establish ADB connection"""
         try:
@@ -388,7 +439,6 @@ class ADBController:
         for the heavy version that also scans emulator ports.
         """
         try:
-            self.scanner.ensure_adb_server_running()
             devices = self.client.devices()
             if not devices:
                 self.device = None

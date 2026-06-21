@@ -56,7 +56,7 @@ def _notify_subscribers(level: str, message: str) -> None:
 # Root logger configured exactly once with a console handler.
 _root_logger = logging.getLogger()
 if not _root_logger.handlers:
-    _root_logger.setLevel(logging.DEBUG)
+    _root_logger.setLevel(logging.INFO)
     _formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
@@ -75,7 +75,7 @@ def setup_logger(name: str, log_dir: str = "logs") -> logging.Logger:
         return logger
 
     os.makedirs(log_dir, exist_ok=True)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
     file_formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)s] %(message)s",
@@ -86,7 +86,7 @@ def setup_logger(name: str, log_dir: str = "logs") -> logging.Logger:
         f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log",
     )
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
-    file_handler.setLevel(logging.DEBUG)
+    file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
     return logger
