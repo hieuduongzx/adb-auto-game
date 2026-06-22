@@ -36,6 +36,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QColor,
+    QDoubleValidator,
     QFontDatabase,
     QPalette,
 )
@@ -44,16 +45,15 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
-    QDoubleSpinBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QMainWindow,
+    QLineEdit,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
-    QSlider,
     QStatusBar,
     QTabWidget,
     QTableWidget,
@@ -100,11 +100,11 @@ class C:
 
 
 _STATUS_PILL: Dict[str, tuple] = {
-    "pending":   ("#e8eaed", "#555555"),
-    "running":   (C.INFO_BG, C.INFO),
-    "completed": (C.OK_BG, C.OK),
-    "failed":    (C.ERR_BG, C.ERR),
-    "skipped":   (C.WARN_BG, C.WARN),
+    "pending":   ("#edf7ff", "#222222", "Chưa làm"),
+    "running":   ("#fff6d9", "#8a4b00", "Đang chạy"),
+    "completed": ("#e7f8e7", "#106b21", "Xong"),
+    "failed":    ("#ffe8e8", "#b00000", "Lỗi"),
+    "skipped":   ("#f3f3f3", "#666666", "Bỏ qua"),
 }
 
 _LOG_COLORS: Dict[str, str] = {
@@ -156,7 +156,7 @@ class ElapsedTimer(QLabel):
 
 QSS = f"""
 QMainWindow {{
-    background-color: {C.BG};
+    background-color: #d4d0c8;
 }}
 
 QWidget {{
@@ -176,7 +176,7 @@ QToolTip {{
 
 QFrame#panel {{
     background-color: {C.PANEL};
-    border: 1px solid {C.BORDER};
+    border: 1px solid #8f8f8f;
 }}
 
 QLabel#title {{
@@ -190,16 +190,18 @@ QLabel#subtitle {{
 }}
 
 QPushButton {{
-    background-color: {C.PANEL};
+    background-color: #f3f3f3;
     color: {C.TEXT};
-    border: 1px solid {C.BORDER};
-    padding: 4px 10px;
+    border: 1px solid #8f8f8f;
+    border-top-color: #ffffff;
+    border-left-color: #ffffff;
+    padding: 3px 10px;
     font-weight: 500;
     font-size: 12px;
 }}
-QPushButton:hover    {{ background-color: #e8e8e8; }}
-QPushButton:pressed  {{ background-color: #ddd; }}
-QPushButton:disabled {{ color: {C.TEXT_MUTED}; background-color: {C.PANEL_ALT}; }}
+QPushButton:hover    {{ background-color: #ffffff; }}
+QPushButton:pressed  {{ background-color: #dcdcdc; border-color: #707070; }}
+QPushButton:disabled {{ color: {C.TEXT_MUTED}; background-color: #eeeeee; }}
 
 QPushButton#btnStart {{
     background-color: {C.OK};
@@ -294,17 +296,22 @@ QComboBox#deviceCombo QAbstractItemView {{
 
 QTableWidget {{
     background-color: {C.PANEL};
-    alternate-background-color: {C.PANEL_ALT};
-    gridline-color: {C.BORDER};
-    border: 1px solid {C.BORDER};
+    alternate-background-color: {C.PANEL};
+    gridline-color: transparent;
+    border: 1px solid #b8b8b8;
     font-size: 12px;
+    outline: none;
+}}
+QTableWidget::item {{
+    border: none;
+    padding: 0px;
 }}
 QHeaderView::section {{
-    background-color: {C.PANEL_ALT};
+    background-color: #e6e6e6;
     color: {C.TEXT_DIM};
-    padding: 4px 6px;
+    padding: 3px 6px;
     border: none;
-    border-bottom: 1px solid {C.BORDER};
+    border-bottom: 1px solid #b8b8b8;
     font-weight: 600;
     font-size: 11px;
 }}
@@ -324,13 +331,13 @@ QProgressBar#headerProgress::chunk {{
     background-color: {C.OK};
 }}
 QProgressBar#rowProgress {{
-    background-color: #e0e0e0;
-    border: none;
-    height: 5px;
-    max-height: 5px;
+    background-color: #ececec;
+    border: 1px solid #d0d0d0;
+    height: 6px;
+    max-height: 6px;
 }}
 QProgressBar#rowProgress::chunk {{
-    background-color: {C.ACCENT};
+    background-color: #77b7ff;
 }}
 
 QPlainTextEdit#logView {{
@@ -343,24 +350,25 @@ QPlainTextEdit#logView {{
 }}
 
 QTabWidget::pane {{
-    border: 1px solid {C.BORDER};
+    border: 1px solid #b8b8b8;
     background: {C.PANEL};
     top: -1px;
 }}
 QTabBar::tab {{
-    background: {C.PANEL_ALT};
-    border: 1px solid {C.BORDER};
-    padding: 4px 12px;
+    background: #efefef;
+    color: #24415f;
+    border: none;
+    padding: 5px 8px 4px 8px;
     margin-right: 2px;
-    font-weight: 500;
+    font-weight: 700;
     font-size: 12px;
 }}
 QTabBar::tab:selected {{
     background: {C.PANEL};
-    border-bottom-color: {C.PANEL};
-    font-weight: 600;
+    color: #d9271c;
+    border-bottom: 2px solid #d9271c;
 }}
-QTabBar::tab:hover:!selected {{ background: #e0e0e0; }}
+QTabBar::tab:hover:!selected {{ background: #ffffff; color: #0f3f7f; }}
 
 QDialog#settingsDialog {{
     background-color: {C.PANEL};
@@ -372,24 +380,25 @@ QLabel#settingLabel {{
     font-size: 12px;
 }}
 
-QDoubleSpinBox#intervalSpin {{
-    background-color: {C.PANEL};
-    border: 1px solid {C.BORDER};
-    padding: 4px 6px;
+QLineEdit#settingInput {{
+    background-color: #ffffff;
+    color: {C.TEXT};
+    border: 1px solid #7f9db9;
+    padding: 3px 6px;
     font-size: 12px;
+    selection-background-color: #316ac5;
+    selection-color: #ffffff;
 }}
-
-QSlider#intervalSlider::groove:horizontal {{
-    height: 4px;
-    background: #e0e0e0;
-    border-radius: 2px;
+QLineEdit#settingInput:focus {{
+    border: 1px solid #316ac5;
 }}
-QSlider#intervalSlider::handle:horizontal {{
-    background: {C.ACCENT};
-    width: 12px;
-    height: 12px;
-    border-radius: 6px;
-    margin: -4px 0;
+QLineEdit#settingInput:disabled {{
+    background-color: #eeeeee;
+    color: {C.TEXT_MUTED};
+}}
+QLabel#settingHint {{
+    color: {C.TEXT_MUTED};
+    font-size: 11px;
 }}
 
 QStatusBar {{
@@ -727,14 +736,15 @@ class GameAutomationWindow(QMainWindow):
         table = QTableWidget()
         table.setColumnCount(5)
         table.setHorizontalHeaderLabels(["", "Name", "Status", "Prog", ""])
+        table.horizontalHeader().setVisible(False)
         table.verticalHeader().setVisible(False)
-        table.setAlternatingRowColors(True)
-        table.setShowGrid(True)
+        table.setAlternatingRowColors(False)
+        table.setShowGrid(False)
         table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         table.setRowCount(len(acts))
-        table.verticalHeader().setDefaultSectionSize(32)
+        table.verticalHeader().setDefaultSectionSize(24)
         table.setFrameShape(QFrame.Shape.NoFrame)
 
         hdr = table.horizontalHeader()
@@ -758,10 +768,10 @@ class GameAutomationWindow(QMainWindow):
 
             nw = QWidget()
             nl = QVBoxLayout(nw)
-            nl.setContentsMargins(4, 1, 4, 1)
+            nl.setContentsMargins(2, 0, 2, 0)
             nl.setSpacing(0)
             nm = QLabel(act.name)
-            nm.setStyleSheet(f"color:{C.TEXT}; font-weight:600; font-size:12px;")
+            nm.setStyleSheet(f"color:{C.TEXT}; font-weight:500; font-size:12px;")
             nl.addWidget(nm)
             table.setCellWidget(row, _HEADER_NAME, nw)
 
@@ -774,7 +784,7 @@ class GameAutomationWindow(QMainWindow):
             prog.setRange(0, 100)
             prog.setValue(int(act.progress))
             prog.setTextVisible(False)
-            prog.setFixedHeight(5)
+            prog.setFixedHeight(6)
             table.setCellWidget(row, _HEADER_PROG, self._center(prog))
 
             # Action column: play icon + optional settings gear for background tasks.
@@ -786,7 +796,7 @@ class GameAutomationWindow(QMainWindow):
             play_btn = QPushButton("▶")
             play_btn.setObjectName("btnPlay")
             play_btn.setToolTip(f"Run only: {act.name}")
-            play_btn.setFixedSize(22, 22)
+            play_btn.setFixedSize(20, 20)
             play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             play_btn.clicked.connect(
                 lambda _checked=False, aid=act.id: self._cb_run_single(aid)
@@ -799,7 +809,7 @@ class GameAutomationWindow(QMainWindow):
                 settings_btn = QPushButton("⚙")
                 settings_btn.setObjectName("btnSettings")
                 settings_btn.setToolTip(f"Settings: {act.name}")
-                settings_btn.setFixedSize(22, 22)
+                settings_btn.setFixedSize(20, 20)
                 settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 settings_btn.clicked.connect(
                     lambda _checked=False, aid=act.id, k=kind: self._cb_show_activity_settings(aid, k)
@@ -870,54 +880,54 @@ class GameAutomationWindow(QMainWindow):
         panel._kind = kind
         panel._rows = rows
         # Per-activity widget refs populated in _cb_show_activity_settings:
-        #   { "interval_spin": spin, "interval_slider": slider,
-        #     "custom": { key: {"spin": spin, "slider": slider} } }
+        #   { "interval_input": input, "custom": { key: {"input": input} } }
         panel._active_widgets: Dict[str, Any] = {}
 
         return panel
 
-    _PRESETS = [0.2, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
-
     @staticmethod
-    def _nearest_preset_index(value: float) -> int:
-        diffs = [abs(value - p) for p in GameAutomationWindow._PRESETS]
-        return int(min(range(len(diffs)), key=lambda i: diffs[i]))
+    def _format_setting_value(value: float) -> str:
+        """Format numeric setting values without spinner noise."""
+        if abs(value - int(value)) < 0.000001:
+            return str(int(value))
+        return f"{value:.2f}".rstrip("0").rstrip(".")
 
-    def _apply_interval_preset(self, value: float, spin: QDoubleSpinBox, slider: QSlider) -> None:
-        spin.blockSignals(True)
-        spin.setValue(value)
-        spin.blockSignals(False)
+    def _make_numeric_input(
+        self,
+        value: float,
+        min_value: float,
+        max_value: float,
+        suffix: str = "",
+        width: int = 92,
+    ) -> QLineEdit:
+        input_box = QLineEdit()
+        input_box.setObjectName("settingInput")
+        input_box.setFixedWidth(width)
+        input_box.setAlignment(Qt.AlignmentFlag.AlignRight)
+        input_box.setText(self._format_setting_value(value))
+        if suffix:
+            input_box.setPlaceholderText(suffix.strip())
+        validator = QDoubleValidator(min_value, max_value, 4, input_box)
+        validator.setNotation(QDoubleValidator.Notation.StandardNotation)
+        input_box.setValidator(validator)
+        return input_box
+
+    def _read_numeric_input(
+        self,
+        input_box: QLineEdit,
+        min_value: float,
+        max_value: float,
+    ) -> Optional[float]:
+        raw = input_box.text().strip().replace(",", ".")
+        if not raw:
+            return None
         try:
-            idx = self._PRESETS.index(value)
+            value = float(raw)
         except ValueError:
-            idx = self._nearest_preset_index(value)
-        slider.blockSignals(True)
-        slider.setValue(idx)
-        slider.blockSignals(False)
-        # Note: deliberately NOT calling _commit_settings_interval() here.
-        # This method is used to initialise the widgets from the current
-        # activity value. Committing would re-write the same value back and
-        # persist settings unnecessarily, and earlier in the build flow the
-        # active widget map still pointed at the previous activity, which
-        # cross-contaminated poll_interval between background activities.
-
-    def _on_settings_slider_changed(self, idx: int, spin: QDoubleSpinBox, slider: QSlider) -> None:
-        value = self._PRESETS[idx]
-        spin.blockSignals(True)
-        spin.setValue(value)
-        spin.blockSignals(False)
-        self._commit_settings_interval()
-
-    def _on_settings_spin_changed(self, value: float, spin: QDoubleSpinBox, slider: QSlider) -> None:
-        value = max(0.05, min(value, 999999999999999.0))
-        spin.blockSignals(True)
-        spin.setValue(value)
-        spin.blockSignals(False)
-        idx = self._nearest_preset_index(value)
-        slider.blockSignals(True)
-        slider.setValue(idx)
-        slider.blockSignals(False)
-        self._commit_settings_interval()
+            return None
+        value = max(min_value, min(value, max_value))
+        input_box.setText(self._format_setting_value(value))
+        return value
 
     def _commit_settings_interval(self) -> None:
         panel = getattr(self, "_active_settings_panel", None)
@@ -925,10 +935,12 @@ class GameAutomationWindow(QMainWindow):
         if not panel or not activity_id:
             return
         widgets = getattr(panel, "_active_widgets", {})
-        spin = widgets.get("interval_spin")
-        if spin is None:
+        input_box = widgets.get("interval_input")
+        if input_box is None:
             return
-        interval = spin.value()
+        interval = self._read_numeric_input(input_box, 0.05, 999999.0)
+        if interval is None:
+            return
         if self.automation.set_activity_poll_interval(activity_id, interval):
             rows = panel._rows
             row = rows.get(activity_id)
@@ -950,7 +962,6 @@ class GameAutomationWindow(QMainWindow):
         panel = self.bg_settings_panel if kind == "bg" else self.seq_settings_panel
         table = self.bg_table if kind == "bg" else self.seq_table
 
-        # Hide table, show settings panel
         table.setVisible(False)
         panel.setVisible(True)
 
@@ -961,129 +972,81 @@ class GameAutomationWindow(QMainWindow):
         self._settings_title.setText(f"Settings: {act.name}")
         self._settings_desc.setText(act.description or "")
 
-        # Clear previous body widgets.
         self._clear_layout(self._settings_body)
         widgets: Dict[str, Any] = {}
-
-        # Publish the new widget map BEFORE building any section, because
-        # ``_build_interval_section`` ends with ``_apply_interval_preset`` ->
-        # ``_commit_settings_interval``, which reads ``panel._active_widgets``.
-        # If we assigned it afterwards, the commit would reuse the *previous*
-        # activity's spin value and write it to the *current* activity's
-        # poll_interval (cross-contamination between background activities).
         panel._active_widgets = widgets
 
-        # --- Poll interval (only for background activities) ---
         if act.background:
             self._build_interval_section(self._settings_body, act, widgets)
 
-        # --- Custom settings (sliders / spin boxes) ---
         for spec in act.custom_settings:
             self._build_custom_setting(self._settings_body, activity_id, spec, widgets)
 
-        # Re-add stretch at the bottom.
         self._settings_body.addStretch(1)
 
     def _build_interval_section(
         self, body: QVBoxLayout, act: Activity, widgets: Dict[str, Any]
     ) -> None:
-        """Build the poll-interval slider + spin box (one row, no presets)."""
-        lbl = QLabel("Interval:")
-        lbl.setObjectName("settingLabel")
-        lbl.setMinimumWidth(50)
-
-        slider = QSlider(Qt.Orientation.Horizontal)
-        slider.setObjectName("intervalSlider")
-        slider.setMinimum(1)
-        slider.setMaximum(len(self._PRESETS) - 1)
-        slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        slider.setTickInterval(1)
-
-        spin = QDoubleSpinBox()
-        spin.setObjectName("intervalSpin")
-        spin.setRange(0.05, 999999.0)
-        spin.setDecimals(2)
-        spin.setSingleStep(0.1)
-        spin.setSuffix(" s")
-        spin.setFixedWidth(80)
-
+        """Build the poll-interval input row without +/- spinner buttons."""
         row = QHBoxLayout()
         row.setSpacing(8)
+
+        lbl = QLabel("Interval")
+        lbl.setObjectName("settingLabel")
+        lbl.setMinimumWidth(86)
         row.addWidget(lbl)
-        row.addWidget(slider, 1)
-        row.addWidget(spin)
+
+        input_box = self._make_numeric_input(act.poll_interval, 0.05, 999999.0, "s")
+        input_box.editingFinished.connect(self._commit_settings_interval)
+        row.addWidget(input_box)
+
+        unit = QLabel("seconds")
+        unit.setObjectName("settingHint")
+        row.addWidget(unit)
+        row.addStretch(1)
         body.addLayout(row)
 
-        slider.valueChanged.connect(lambda idx, s=spin, sl=slider: self._on_settings_slider_changed(idx, s, sl))
-        spin.valueChanged.connect(lambda value, s=spin, sl=slider: self._on_settings_spin_changed(value, s, sl))
-
-        widgets["interval_spin"] = spin
-        widgets["interval_slider"] = slider
-
-        self._apply_interval_preset(act.poll_interval, spin, slider)
+        widgets["interval_input"] = input_box
 
     def _build_custom_setting(
         self, body: QVBoxLayout, activity_id: str, spec: Dict[str, Any], widgets: Dict[str, Any]
     ) -> None:
-        """Build a single custom setting (label + slider + spin on one row)."""
+        """Build a single custom setting as a plain numeric input row."""
         key = spec.get("key")
         label_text = spec.get("label", key)
-        min_v = float(spec.get("min", 0.0))
-        max_v = float(spec.get("max", 100.0))
-        step = float(spec.get("step", 1.0))
+        min_value = float(spec.get("min", 0.0))
+        max_value = float(spec.get("max", 100.0))
         suffix = spec.get("suffix", "")
 
         act = self.automation.get_activity(activity_id)
-        current = float(act.custom_values.get(key, spec.get("default", min_v))) if act else float(spec.get("default", min_v))
-
-        lbl = QLabel(f"{label_text}:")
-        lbl.setObjectName("settingLabel")
-        lbl.setMinimumWidth(50)
-
-        slider = QSlider(Qt.Orientation.Horizontal)
-        slider.setObjectName("intervalSlider")
-        slider.setRange(int(min_v * 100), int(max_v * 100))
-        slider.setValue(int(current * 100))
-        slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        slider.setTickInterval(int(step * 100))
-
-        spin = QDoubleSpinBox()
-        spin.setObjectName("intervalSpin")
-        spin.setRange(min_v, max_v)
-        spin.setDecimals(2)
-        spin.setSingleStep(step)
-        if suffix:
-            spin.setSuffix(suffix)
-        spin.setFixedWidth(80)
-        spin.setValue(current)
+        current = float(act.custom_values.get(key, spec.get("default", min_value))) if act else float(spec.get("default", min_value))
 
         row = QHBoxLayout()
         row.setSpacing(8)
+
+        lbl = QLabel(str(label_text))
+        lbl.setObjectName("settingLabel")
+        lbl.setMinimumWidth(86)
         row.addWidget(lbl)
-        row.addWidget(slider, 1)
-        row.addWidget(spin)
+
+        input_box = self._make_numeric_input(current, min_value, max_value, suffix)
+        row.addWidget(input_box)
+
+        hint_text = suffix or f"{self._format_setting_value(min_value)} - {self._format_setting_value(max_value)}"
+        hint = QLabel(hint_text)
+        hint.setObjectName("settingHint")
+        row.addWidget(hint)
+        row.addStretch(1)
         body.addLayout(row)
 
-        def _on_slider(val: int) -> None:
-            spin.blockSignals(True)
-            spin.setValue(val / 100.0)
-            spin.blockSignals(False)
-            _commit(val / 100.0)
+        def _commit() -> None:
+            value = self._read_numeric_input(input_box, min_value, max_value)
+            if value is None:
+                return
+            self.automation.set_custom_setting(activity_id, key, value)
 
-        def _on_spin(val: float) -> None:
-            v = max(min_v, min(val, max_v))
-            slider.blockSignals(True)
-            slider.setValue(int(v * 100))
-            slider.blockSignals(False)
-            _commit(v)
-
-        def _commit(v: float) -> None:
-            self.automation.set_custom_setting(activity_id, key, v)
-
-        slider.valueChanged.connect(_on_slider)
-        spin.valueChanged.connect(_on_spin)
-
-        widgets.setdefault("custom", {})[key] = {"spin": spin, "slider": slider}
+        input_box.editingFinished.connect(_commit)
+        widgets.setdefault("custom", {})[key] = {"input": input_box}
 
     @staticmethod
     def _clear_layout(layout: QVBoxLayout) -> None:
@@ -1191,12 +1154,12 @@ class GameAutomationWindow(QMainWindow):
 
     @staticmethod
     def _apply_pill(pill: QLabel, status: str) -> None:
-        bg, fg = _STATUS_PILL.get(status, _STATUS_PILL["pending"])
-        pill.setText(status.upper())
+        bg, fg, text = _STATUS_PILL.get(status, _STATUS_PILL["pending"])
+        pill.setText(text)
         pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pill.setStyleSheet(
             f"background-color:{bg}; color:{fg};"
-            "padding:2px 8px; font-weight:700; font-size:10px;"
+            "border:1px solid #e6eef5; padding:2px 6px; font-weight:500; font-size:11px;"
         )
 
     def _set_status(self, label: str) -> None:
