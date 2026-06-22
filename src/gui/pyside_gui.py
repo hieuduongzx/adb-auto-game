@@ -894,7 +894,12 @@ class GameAutomationWindow(QMainWindow):
         slider.blockSignals(True)
         slider.setValue(idx)
         slider.blockSignals(False)
-        self._commit_settings_interval()
+        # Note: deliberately NOT calling _commit_settings_interval() here.
+        # This method is used to initialise the widgets from the current
+        # activity value. Committing would re-write the same value back and
+        # persist settings unnecessarily, and earlier in the build flow the
+        # active widget map still pointed at the previous activity, which
+        # cross-contaminated poll_interval between background activities.
 
     def _on_settings_slider_changed(self, idx: int, spin: QDoubleSpinBox, slider: QSlider) -> None:
         value = self._PRESETS[idx]
@@ -960,6 +965,14 @@ class GameAutomationWindow(QMainWindow):
         self._clear_layout(self._settings_body)
         widgets: Dict[str, Any] = {}
 
+        # Publish the new widget map BEFORE building any section, because
+        # ``_build_interval_section`` ends with ``_apply_interval_preset`` ->
+        # ``_commit_settings_interval``, which reads ``panel._active_widgets``.
+        # If we assigned it afterwards, the commit would reuse the *previous*
+        # activity's spin value and write it to the *current* activity's
+        # poll_interval (cross-contamination between background activities).
+        panel._active_widgets = widgets
+
         # --- Poll interval (only for background activities) ---
         if act.background:
             self._build_interval_section(self._settings_body, act, widgets)
@@ -967,8 +980,6 @@ class GameAutomationWindow(QMainWindow):
         # --- Custom settings (sliders / spin boxes) ---
         for spec in act.custom_settings:
             self._build_custom_setting(self._settings_body, activity_id, spec, widgets)
-
-        panel._active_widgets = widgets
 
         # Re-add stretch at the bottom.
         self._settings_body.addStretch(1)

@@ -346,8 +346,11 @@ class FridaSpeedhackManager:
             )
             return False
 
-        check = self._run_adb(f"ls {self._frida_inject_path}")
-        if self._frida_inject_path in check or "No such file" not in check:
+        # Use ``test -f`` and check its exit code instead of parsing ``ls``
+        # output: ``ls`` echoes the path back in its own "No such file" error,
+        # so a naive substring check always falsely reports the file as present.
+        check = self._run_adb(f"test -f {self._frida_inject_path} && echo OK || echo MISSING")
+        if "OK" in check:
             return True
 
         log_info("[speedhack] pushing frida-inject to device...")

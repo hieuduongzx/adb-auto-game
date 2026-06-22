@@ -4,7 +4,7 @@
     {
       "id": "auto_skip_dialog",
       "enabled": true,
-      "poll_interval": 999999.0
+      "poll_interval": 0.2
     },
     {
       "id": "expedition",
