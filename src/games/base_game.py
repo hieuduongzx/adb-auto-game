@@ -126,6 +126,21 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
                 # Implement farming logic
                 pass
     """
+
+    # Default OCR backend for every game that inherits from this class.
+    # Override per-game by setting the class attribute in the subclass:
+    #
+    #     class GirlWars(BaseGameAutomation):
+    #         DEFAULT_OCR_BACKEND = "easyocr"
+    #
+    # Available backends (see src/core/adb/auto/ocr.py KNOWN_BACKENDS):
+    #   - "tesseract" : fast, light, Latin labels ("0/5", "VIP 3", "Lv 35")  ← default
+    #   - "easyocr"   : neural, better with stylised fonts, pulls torch (~520MB)
+    #   - "paddleocr" : neural, strong accuracy, pulls paddlepaddle (~400MB)
+    #
+    # Callers can still pass `ocr_backend=...` at construction time to
+    # A/B test without changing the class attribute.
+    DEFAULT_OCR_BACKEND: str = "tesseract"
     
     def __init__(
         self,
@@ -136,7 +151,9 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         config: Optional[Config] = None,
         ocr_backend: Optional[str] = None,
     ):
-        super().__init__(config_file, device_id, host, port, config, ocr_backend=ocr_backend)
+        # Resolve backend: explicit arg wins > subclass class attribute > "tesseract"
+        backend = ocr_backend or self.DEFAULT_OCR_BACKEND
+        super().__init__(config_file, device_id, host, port, config, ocr_backend=backend)
         
         # Game-specific paths (override in subclass)
         self.assets_path: str = ""
@@ -244,7 +261,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             self._executor = ThreadPoolExecutor(max_workers=self.max_workers)
         return self._executor
     
-    # ==================== Template Helpers ====================
+    # ==================== Template / Region Helpers ====================
     
     def get_template_path(self, template_name: str) -> str:
         """Get full path to a template image"""
@@ -253,6 +270,12 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
     def template_exists(self, template_name: str) -> bool:
         """Check if a template file exists"""
         return os.path.exists(self.get_template_path(template_name))
+
+    @staticmethod
+    def region_center(region: "BaseGameAutomation.Region") -> Tuple[int, int]:
+        """Return the ``(cx, cy)`` center of a ``(x, y, w, h)`` region."""
+        x, y, w, h = region
+        return (x + w // 2, y + h // 2)
     
     def ensure_templates_exist(self, template_names: List[str]) -> bool:
         """Ensure all required templates exist"""
