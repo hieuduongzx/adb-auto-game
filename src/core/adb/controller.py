@@ -408,20 +408,31 @@ class ADBController:
         self._cache.clear(self.device_id or "default")
 
     def launch_app(self, package: str) -> bool:
-        """Bring ``package`` to the foreground via ``monkey``.
+        """Bring ``package`` to the foreground.
 
-        ``monkey`` resolves the package's launcher activity through the package
-        manager, so we don't need to know the main activity class name. Clears
-        the cached ``current_app`` afterwards so a follow-up
-        :meth:`get_current_app` returns the freshly-launched app.
+        Tries ``am start`` with the package's launcher activity (resolved
+        via ``cmd package resolve-activity``), falling back to ``monkey``
+        if ``am`` isn't available. Clears the cached ``current_app``
+        afterwards so a follow-up :meth:`get_current_app` returns the
+        freshly-launched app.
 
-        Returns ``True`` when the launch command was issued successfully; this
-        does not guarantee the app is already fully foregrounded - poll
-        :meth:`get_current_app` if you need to confirm.
+        Returns ``True`` when the launch command was issued successfully;
+        this does not guarantee the app is already fully foregrounded -
+        poll :meth:`get_current_app` if you need to confirm.
         """
         if not self.device:
             log_error("Cannot launch app: no device connected")
             return False
+
+        # 1. Preferred: resolve the launcher activity and use ``am start``.
+        #    ``monkey`` is missing on some stripped emulator builds
+        #    (e.g. older LDPlayer), so ``am start`` is the reliable path.
+        if self._am_start(package):
+            self.clear_info_cache()
+            return True
+
+        # 2. Fallback: ``monkey`` (some stock Android images ship it but
+        #    not ``am``; very rare, but kept for completeness).
         try:
             self.device.shell(
                 f"monkey -p {package} -c android.intent.category.LAUNCHER 1"
@@ -431,6 +442,58 @@ class ADBController:
             return False
         self.clear_info_cache()
         return True
+
+    def _am_start(self, package: str) -> bool:
+        """Launch ``package`` via ``am start`` using its main activity.
+
+        Returns ``False`` if the activity can't be resolved or the shell
+        command fails (caller can then try the ``monkey`` fallback).
+        """
+        try:
+            # Resolve the main launcher activity for this package.
+            out = self.device.shell(
+                f"cmd package resolve-activity --brief -c android.intent.category.LAUNCHER {package}"
+            )
+            # ``--brief`` prints a single line like:
+            #   PING Intent { act=android.intent.action.MAIN ... cmp=pkg/.Activity }
+            # or on older Android: just the component name.
+            component = self._parse_resolve_activity(out, package)
+            if not component:
+                return False
+            self.device.shell(f"am start -n {component}")
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def _parse_resolve_activity(output: str, package: str) -> str:
+        """Extract the ``package/Activity`` component from resolve output.
+
+        ``cmd package resolve-activity --brief`` can emit two formats:
+
+        * Old Android (``am``-style intent dump): a line containing
+          ``cmp=pkg/.Activity``.
+        * Newer Android (``resolve-activity --brief``): a two-line dump
+          whose second line is the bare ``pkg/.Activity`` component.
+
+        We accept either.
+        """
+        if not output:
+            return ""
+        for line in output.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            # Format 1: ``cmp=pkg/.Activity`` inside an intent line.
+            if "cmp=" in line:
+                after = line.split("cmp=", 1)[1]
+                comp = after.split()[0].rstrip("}")
+                if "/" in comp:
+                    return comp
+            # Format 2: a bare ``pkg/.Activity`` line (no spaces, has "/").
+            if "/" in line and " " not in line and line.startswith(package):
+                return line
+        return ""
     
     def get_device_name(self) -> str:
         """Get device name"""

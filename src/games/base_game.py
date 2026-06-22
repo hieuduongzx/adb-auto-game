@@ -915,10 +915,11 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
     def _ensure_app_foreground(self, timeout: float = 60.0) -> bool:
         """Make sure the game app is in the foreground before running.
 
-        Launches the app via ``monkey`` when a different one (or the home
-        screen) is focused, then polls until it reports as the current app.
-        Returns ``True`` when the app is foregrounded, ``False`` on timeout
-        or when automation was stopped while waiting.
+        Launches the app via ``am start`` (falling back to ``monkey``)
+        when a different one (or the home screen) is focused, then polls
+        until it reports as the current app. Returns ``True`` when the
+        app is foregrounded, ``False`` on timeout or when automation was
+        stopped while waiting.
 
         Requires ``self.package_name`` to be set by the subclass.
         """
