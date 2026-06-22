@@ -4,7 +4,7 @@ Refactored to use BaseGameAutomation for better structure and GUI support.
 """
 from typing import List
 
-from src.games.base_game import BaseGameAutomation, Activity
+from src.game_core.base_game import BaseGameAutomation, Activity
 from src.utils import log_error, log_warning, log_success, log_info
 
 

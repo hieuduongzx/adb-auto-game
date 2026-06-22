@@ -10,111 +10,14 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Callable, Optional, Any, Tuple
-from dataclasses import dataclass, asdict, field
-from enum import Enum
 
 import cv2
 
 from src.core import ADBGameAutomation
 from src.core.adb.auto.config import Config
+from src.game_core.activity import Activity, ActivityStatus
+from src.game_core.gui_base import GUIBase
 from src.utils import log_error, log_warning, log_success, log_info
-
-
-class ActivityStatus(Enum):
-    """Status of an activity"""
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    SKIPPED = "skipped"
-
-
-@dataclass
-class Activity:
-    """Represents an automation activity/task.
-
-    There are two execution modes:
-
-    * **Sequential** (default): the activity runs once, in order, as part of
-      the main automation loop in :meth:`BaseGameAutomation.process_game_actions`.
-    * **Background** (``background=True``): the activity loops in its own
-      thread, polling every ``poll_interval`` seconds, and can be toggled on
-      and off at runtime via :meth:`BaseGameAutomation.set_activity_enabled`
-      while the main loop is running.
-
-    ``custom_settings`` lets a subclass declare extra per-activity UI widgets
-    (sliders, spin boxes) beyond the built-in ``poll_interval``. Each entry is
-    a dict like::
-
-        {"key": "speed", "type": "slider", "label": "Speed",
-         "min": 0.5, "max": 5.0, "step": 0.1, "default": 1.0, "suffix": "x"}
-
-    Supported types: ``"slider"`` (float), ``"spin"`` (float).
-    """
-    id: str
-    name: str
-    description: str = ""
-    enabled: bool = True
-    status: ActivityStatus = ActivityStatus.PENDING
-    progress: float = 0.0  # 0.0 to 100.0
-    error_message: Optional[str] = None
-    execution_count: int = 0
-    max_retries: int = 3
-    # Background execution support
-    background: bool = False
-    poll_interval: float = 1.0
-    # Extra per-activity UI settings declared by the game subclass.
-    custom_settings: List[Dict[str, Any]] = field(default_factory=list)
-    # Current values for the custom settings (populated from defaults /
-    # persisted settings). Keys match ``custom_settings[i]["key"]``.
-    custom_values: Dict[str, Any] = field(default_factory=dict)
-
-    def to_settings_dict(self) -> Dict[str, Any]:
-        """Export only user-tweakable settings for persistence."""
-        d: Dict[str, Any] = {
-            "id": self.id,
-            "enabled": self.enabled,
-            "poll_interval": self.poll_interval,
-        }
-        if self.custom_values:
-            d["custom"] = dict(self.custom_values)
-        return d
-
-    @classmethod
-    def from_settings_dict(cls, data: Dict[str, Any], defaults: Optional["Activity"] = None) -> Optional["Activity"]:
-        """Build a fresh Activity applying persisted settings over ``defaults``.
-
-        If ``defaults`` is provided, its non-persisted fields are kept and only
-        ``enabled`` / ``poll_interval`` / ``custom_values`` are overwritten.
-        Returns ``None`` if no ID is present in ``data``.
-        """
-        if not data or not data.get("id"):
-            return None
-        if defaults is None:
-            return cls(
-                id=data["id"],
-                name=data.get("name", ""),
-                description=data.get("description", ""),
-                enabled=bool(data.get("enabled", True)),
-                max_retries=int(data.get("max_retries", 3)),
-                background=bool(data.get("background", False)),
-                poll_interval=float(data.get("poll_interval", 1.0)),
-            )
-        # Apply persisted values over the hard-coded defaults.
-        defaults.enabled = bool(data.get("enabled", defaults.enabled))
-        defaults.poll_interval = float(data.get("poll_interval", defaults.poll_interval))
-        # Merge persisted custom values over declared defaults.
-        persisted_custom = data.get("custom", {})
-        if isinstance(persisted_custom, dict):
-            for k, v in persisted_custom.items():
-                defaults.custom_values[k] = v
-        return defaults
-
-    def reset(self):
-        """Reset activity state"""
-        self.status = ActivityStatus.PENDING
-        self.progress = 0.0
-        self.error_message = None
 
 
 class BaseGameAutomation(ADBGameAutomation, ABC):
@@ -1118,6 +1021,16 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         self._trigger_callback('on_stop')
         log_success("Sequential automation stopped")
     
+    # ==================== Main Process Hooks ====================
+
+    def before_process_game_actions(self) -> bool:
+        """Hook for game-specific startup checks before the activity loop."""
+        return True
+
+    def after_process_game_actions(self):
+        """Hook for game-specific cleanup after the activity loop."""
+        pass
+
     # ==================== Main Process ====================
     
     def process_game_actions(self):
@@ -1125,6 +1038,10 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         Main automation loop - processes activities in order.
         Override this method only if you need custom flow control.
         """
+        if not self.before_process_game_actions():
+            self.running = False
+            return
+
         log_info(f"Starting automation with activities: {self._activity_order}")
         self._trigger_callback('on_start')
         # Spin up any background activities that are enabled. They will run
@@ -1195,6 +1112,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             # Always tear down background workers when the main loop exits,
             # even on error or KeyboardInterrupt.
             self._stop_all_background_activities()
+            self.after_process_game_actions()
     
     # ==================== Utility Methods ====================
     
@@ -1232,143 +1150,4 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         }
 
 
-# ==================== GUI Base Classes ====================
 
-class GUIBase:
-    """
-    Base class for creating GUI interfaces.
-    Extend this class to create custom GUIs (Tkinter, PyQt, etc.)
-    """
-    
-    def __init__(self, automation: BaseGameAutomation):
-        self.automation = automation
-        self._setup_callbacks()
-    
-    def _setup_callbacks(self):
-        """Setup default callbacks to update GUI"""
-        self.automation.register_callback('on_start', self.on_automation_start)
-        self.automation.register_callback('on_stop', self.on_automation_stop)
-        self.automation.register_callback('on_activity_start', self.on_activity_start)
-        self.automation.register_callback('on_activity_complete', self.on_activity_complete)
-        self.automation.register_callback('on_activity_failed', self.on_activity_failed)
-        self.automation.register_callback('on_progress', self.on_progress_update)
-        self.automation.register_callback('on_error', self.on_error)
-        self.automation.register_callback('on_status_change', self.on_status_change)
-    
-    # Callback handlers - override these in your GUI class
-    def on_automation_start(self):
-        """Called when automation starts"""
-        pass
-    
-    def on_automation_stop(self):
-        """Called when automation stops"""
-        pass
-    
-    def on_activity_start(self, activity: Activity):
-        """Called when an activity starts"""
-        pass
-    
-    def on_activity_complete(self, activity: Activity, success: bool):
-        """Called when an activity completes"""
-        pass
-    
-    def on_activity_failed(self, activity: Activity, error: Exception):
-        """Called when an activity fails"""
-        pass
-    
-    def on_progress_update(self, activity_id: str, progress: float):
-        """Called when progress updates"""
-        pass
-    
-    def on_error(self, error: Exception):
-        """Called on error"""
-        pass
-    
-    def on_status_change(self, status: Dict[str, Any]):
-        """Called on status change"""
-        pass
-    
-    def start(self):
-        """Start the GUI - implement in subclass"""
-        raise NotImplementedError("Subclasses must implement start()")
-    
-    def stop(self):
-        """Stop the GUI - implement in subclass"""
-        self.automation.stop()
-
-
-# ==================== Example Usage Template ====================
-
-class ExampleGame(BaseGameAutomation):
-    """
-    Example game implementation showing how to use BaseGameAutomation.
-    Copy and modify this template for your own games.
-    """
-    
-    def __init__(self):
-        super().__init__()
-        self.assets_path = "assets/example"
-        self.templates_dir = f"{self.assets_path}/templates"
-        self.max_workers = 2
-    
-    def define_activities(self) -> List[Activity]:
-        """Define what this game can do"""
-        return [
-            Activity(
-                id="login",
-                name="Auto Login",
-                description="Login to the game",
-                enabled=True,
-            ),
-            Activity(
-                id="daily",
-                name="Daily Quests",
-                description="Complete daily quests",
-                enabled=True,
-            ),
-            Activity(
-                id="farm",
-                name="Auto Farm",
-                description="Farm resources automatically",
-                enabled=False,  # Disabled by default
-            ),
-        ]
-    
-    # Activity handlers - must match pattern: handle_activity_<id>
-    def handle_activity_login(self) -> bool:
-        """Handle login activity"""
-        # Example implementation
-        if self.wait_and_tap(self.get_template_path("login_button.png"), timeout=10):
-            self.update_activity_progress(50.0)
-            if self.wait_for_template(self.get_template_path("main_screen.png"), timeout=15):
-                self.update_activity_progress(100.0)
-                return True
-        return False
-    
-    def handle_activity_daily(self) -> bool:
-        """Handle daily quests activity"""
-        # Example implementation
-        self.update_activity_progress(0.0)
-        
-        # Step 1: Open daily menu
-        if not self.find_and_tap(self.get_template_path("daily_menu.png")):
-            return False
-        self.update_activity_progress(25.0)
-        
-        # Step 2: Claim rewards
-        # ... more steps ...
-        
-        self.update_activity_progress(100.0)
-        return True
-    
-    def handle_activity_farm(self) -> bool:
-        """Handle farming activity"""
-        # Example implementation
-        # Implement your farming logic here
-        return True
-
-
-if __name__ == "__main__":
-    # Example of running without GUI
-    game = ExampleGame()
-    game.start()

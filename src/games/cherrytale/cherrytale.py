@@ -4,15 +4,16 @@ CherryTale Game Automation
 import time
 from typing import List
 
-from src.games.base_game import BaseGameAutomation, Activity
-from src.utils import log_warning, log_success, log_info
+from src.game_core.base_game import BaseGameAutomation, Activity
+from src.game_core.speedhack import SpeedhackMixin
+from src.utils import log_error, log_warning, log_success, log_info
 
 
 # Package name of CherryTale on the device
 CHERRYTALE_PACKAGE = "com.neversoft.rpg.erolabs"
 
 
-class CherryTale(BaseGameAutomation):
+class CherryTale(SpeedhackMixin, BaseGameAutomation):
     """
     CherryTale Game Automation
 
@@ -22,11 +23,16 @@ class CherryTale(BaseGameAutomation):
         - auto_daily:    Run daily routine (after entering the game)
     """
 
+    PACKAGE_NAME = CHERRYTALE_PACKAGE
+    DEFAULT_OCR_BACKEND = "tesseract"
+
     def __init__(self):
         super().__init__()
         self.assets_path = "assets/cherrytale"
         self.templates_dir = f"{self.assets_path}/templates"
         self.max_workers = 3
+        self.package_name = self.PACKAGE_NAME
+        self.setup_speedhack()
 
         # Template paths
         self.main_menu = {
@@ -115,7 +121,17 @@ class CherryTale(BaseGameAutomation):
                 background=True,
                 poll_interval=1.0,
             ),
+            self.speedhack_activity(),
         ]
+
+    # ==================== Main loop entry ====================
+
+    def before_process_game_actions(self) -> bool:
+        """Run activities only after CherryTale is foregrounded."""
+        if self._ensure_app_foreground():
+            return True
+        log_error("Aborting: CherryTale app could not be started")
+        return False
 
     # ==================== Activity Handlers ====================
 

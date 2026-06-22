@@ -8,7 +8,7 @@
     },
     {
       "id": "auto_skip_battle",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 0.5
     },
     {
@@ -30,6 +30,14 @@
       "id": "main_story_elite_battle",
       "enabled": true,
       "poll_interval": 1.0
+    },
+    {
+      "id": "speedhack",
+      "enabled": true,
+      "poll_interval": 999999.0,
+      "custom": {
+        "speed": 2.0
+      }
     }
   ]
 }

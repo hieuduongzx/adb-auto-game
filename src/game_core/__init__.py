@@ -1,0 +1,1 @@
+"""Shared game automation framework."""

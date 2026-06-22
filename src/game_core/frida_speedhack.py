@@ -13,7 +13,7 @@ LDPlayer). The injected script tries two strategies:
 
 Usage in a game class::
 
-    from src.games.echocalypse.frida_speedhack import FridaSpeedhackManager
+    from src.game_core.frida_speedhack import FridaSpeedhackManager
 
     class Echocalypse(BaseGameAutomation):
         def __init__(self):
@@ -289,8 +289,17 @@ class FridaSpeedhackManager:
         return self._current_scale != 1.0
 
     @staticmethod
+    def _project_root() -> Path:
+        """Find the repository root from this shared module location."""
+        current = Path(__file__).resolve()
+        for parent in current.parents:
+            if (parent / "vendor").is_dir() or (parent / "bin").is_dir():
+                return parent
+        return current.parents[2]
+
+    @staticmethod
     def _bundled_inject_path() -> Optional[Path]:
-        root = Path(__file__).resolve().parents[3]
+        root = FridaSpeedhackManager._project_root()
         candidates = [
             root / "vendor" / "frida" / "frida-inject-17.15.1-android-x86_64",
             root / "vendor" / "frida" / "frida-inject",
@@ -304,7 +313,7 @@ class FridaSpeedhackManager:
     def _adb_path() -> str:
         """Return a usable ADB binary path."""
         candidates = []
-        root = Path(__file__).resolve().parents[3]
+        root = FridaSpeedhackManager._project_root()
         bundled = root / "bin" / "adb.exe"
         if bundled.is_file():
             candidates.append(str(bundled))
@@ -500,7 +509,7 @@ def demo():
     import sys
 
     if len(sys.argv) < 2:
-        print("usage: python -m src.games.echocalypse.frida_speedhack <package> [scale]")
+        print("usage: python -m src.game_core.frida_speedhack <package> [scale]")
         sys.exit(1)
 
     pkg = sys.argv[1]

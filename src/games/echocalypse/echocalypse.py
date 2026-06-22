@@ -1,18 +1,14 @@
-from typing import Any, List
+from typing import List
 
-from src.games.base_game import Activity, BaseGameAutomation
-from src.games.echocalypse.frida_speedhack import FridaSpeedhackManager
+from src.game_core.base_game import Activity, BaseGameAutomation
+from src.game_core.speedhack import SpeedhackMixin
 from src.utils import log_error, log_info, log_success, log_warning
 
 # Package name of Echocalypse on the device (used by _ensure_app_foreground).
 ECHOPOCALYPSE_PACKAGE = "com.yoozoo.jgame.us"
 
-# Bounds for the in-GUI speed slider.
-SPEEDHACK_MIN = 0.5
-SPEEDHACK_MAX = 5.0
 
-
-class Echocalypse(BaseGameAutomation):
+class Echocalypse(SpeedhackMixin, BaseGameAutomation):
 
     # App identity
     PACKAGE_NAME = ECHOPOCALYPSE_PACKAGE
@@ -25,13 +21,7 @@ class Echocalypse(BaseGameAutomation):
         self.max_workers = 10
         self.package_name = self.PACKAGE_NAME
 
-        # Frida-based speedhack (frida-inject on device). Disabled until the
-        # user enables the "speedhack" background activity.
-        self.speedhack = FridaSpeedhackManager(
-            package=self.PACKAGE_NAME,
-            time_scale=1.0,
-        )
-        self.speedhack_enabled = False
+        self.setup_speedhack()
 
         self.tpl_common = {
             "bt_skip_dialog":        f"{self.assets_path}/bt_skip_dialog.png",
@@ -58,26 +48,7 @@ class Echocalypse(BaseGameAutomation):
                 background=True,
                 poll_interval=1.0,
             ),
-            Activity(
-                id="speedhack",
-                name="Speedhack",
-                description="Tăng tốc game bằng Frida (cần root + frida-inject). Tự động tắt khi dừng.",
-                enabled=False,
-                background=True,
-                poll_interval=999999.0,
-                custom_settings=[
-                    {
-                        "key": "speed",
-                        "type": "slider",
-                        "label": "Speed",
-                        "min": SPEEDHACK_MIN,
-                        "max": SPEEDHACK_MAX,
-                        "step": 0.1,
-                        "default": 1.0,
-                        "suffix": "x",
-                    },
-                ],
-            ),
+            self.speedhack_activity(),
             Activity(
                 id="expedition",
                 name="Expedition",
@@ -86,43 +57,14 @@ class Echocalypse(BaseGameAutomation):
             ),
         ]
 
-    # ==================== Speedhack helpers ====================
-
-    @property
-    def speedhack_scale(self) -> float:
-        """Current speed multiplier, read from the persisted custom setting."""
-        act = self._activity_map.get("speedhack")
-        if act:
-            v = act.custom_values.get("speed")
-            if v is not None:
-                return float(v)
-        return 1.0
-
-    def apply_custom_setting(self, activity_id: str, key: str, value: Any) -> None:
-        """Apply a custom setting change immediately (called by base_game)."""
-        if activity_id == "speedhack" and key == "speed":
-            if self.speedhack_enabled and self.speedhack.available:
-                log_info(f"[speedhack] applying new scale {value}")
-                self.speedhack.set_scale(float(value))
-
-    def set_activity_enabled(self, activity_id: str, enabled: bool):
-        """Reset the speedhack when its background task is disabled."""
-        super().set_activity_enabled(activity_id, enabled)
-        if activity_id == "speedhack":
-            if enabled:
-                self.speedhack_enabled = True
-            else:
-                self.speedhack_enabled = False
-                self._disable_speedhack()
-
     # ==================== Main loop entry ====================
 
-    def process_game_actions(self):
+    def before_process_game_actions(self) -> bool:
         """Run the base activity loop only after Echocalypse is foregrounded."""
-        if not self._ensure_app_foreground():
-            log_error("Aborting: Echocalypse app could not be started")
-            return
-        super().process_game_actions()
+        if self._ensure_app_foreground():
+            return True
+        log_error("Aborting: Echocalypse app could not be started")
+        return False
 
     # ==================== Background handlers ====================
     def handle_activity_auto_skip_dialog(self) -> bool:
@@ -202,40 +144,6 @@ class Echocalypse(BaseGameAutomation):
             consecutive_empty = 0
         return True
 
-    # ==================== Speedhack handlers ====================
-    def handle_activity_speedhack(self) -> bool:
-        """Background one-shot: inject once, skip if already active."""
-        if self.speedhack.active:
-            return True
-        self.speedhack_enabled = True
-        return self._apply_speedhack()
-
-    def _apply_speedhack(self) -> bool:
-        if not self.speedhack_enabled:
-            return False
-        if not self.speedhack.available:
-            log_warning("[speedhack] frida-inject binary not found in vendor/frida/")
-            return False
-        ok = self.speedhack.set_scale(self.speedhack_scale)
-        if ok:
-            log_success(f"[speedhack] enabled at {self.speedhack_scale}x")
-        else:
-            log_warning("[speedhack] could not set time scale")
-        return ok
-
-    def _disable_speedhack(self) -> None:
-        try:
-            if self.speedhack.active:
-                self.speedhack.set_scale(1.0)
-            self.speedhack.detach()
-        except Exception as e:
-            log_warning(f"[speedhack] error while disabling: {e}")
-        finally:
-            log_info("[speedhack] disabled / restored normal speed")
-
-    def stop(self) -> None:
-        self._disable_speedhack()
-        super().stop()
 
 if __name__ == "__main__":
     Echocalypse().start()

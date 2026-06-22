@@ -61,7 +61,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.games.base_game import Activity, BaseGameAutomation
+from src.game_core.base_game import Activity, BaseGameAutomation
 from src.utils import (
     add_log_subscriber,
     log_error,
