@@ -16,7 +16,7 @@
       "enabled": true,
       "poll_interval": 999999.0,
       "custom": {
-        "speed": 4.0
+        "speed": 2.0
       }
     }
   ]

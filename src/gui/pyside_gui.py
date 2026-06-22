@@ -904,7 +904,7 @@ class GameAutomationWindow(QMainWindow):
         self._commit_settings_interval()
 
     def _on_settings_spin_changed(self, value: float, spin: QDoubleSpinBox, slider: QSlider) -> None:
-        value = max(0.05, min(value, 60.0))
+        value = max(0.05, min(value, 999999999999999.0))
         spin.blockSignals(True)
         spin.setValue(value)
         spin.blockSignals(False)
