@@ -60,6 +60,7 @@ desktop.ini
 # Ignore the whole frida/ dir - both frida-server and frida-inject exceed
 # GitHub's limit and must be downloaded separately into vendor/frida/.
 vendor/frida/
+vendor/scrcpy/
 
 # Distribution / packaging
 .Python

@@ -12,7 +12,7 @@ class DebugVisualizer:
     
     WINDOW_TEMPLATE = "Template Matching Debug"
     WINDOW_GESTURE = "Gesture Debug"
-    
+
     def __init__(self):
         self.enabled = False
         self.show_failures = False
@@ -39,7 +39,7 @@ class DebugVisualizer:
         """Visualize template matching result"""
         if not self.enabled:
             return
-        
+
         if not is_match and not self.show_failures:
             return
         
@@ -161,7 +161,7 @@ class DebugVisualizer:
             
         except Exception as e:
             log_error(f"Error in drag visualization: {e}")
-    
+
     def close(self):
         """Close all debug windows"""
         try:

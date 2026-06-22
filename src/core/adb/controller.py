@@ -78,7 +78,6 @@ class ADBController:
         self.device = None
         self.scanner = DeviceScanner(host=host, port=port)
         self._cache = get_cache()
-        
         # Attempt connection only when explicitly requested. The GUI passes
         # ``auto_connect=False`` (the default) so the window can open
         # immediately and a port scan can't block startup. The CLI flow

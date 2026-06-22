@@ -29,7 +29,6 @@ PySide6>=6.6.0         # Native Qt UI
 
 # Mobile automation
 pure-python-adb>=0.3.0.dev0
-
 # Utilities
 keyboard>=0.13.5      # Keyboard hotkeys (q to quit)
 colorama>=0.4.6       # Coloured console output

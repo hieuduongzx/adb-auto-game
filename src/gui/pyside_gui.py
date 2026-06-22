@@ -301,31 +301,32 @@ QPushButton#btnDevice:hover {{ background-color: {C.PANEL_ALT}; color: {C.TEXT};
 QPushButton#btnDevice:disabled {{ color: {C.TEXT_MUTED}; background-color: transparent; }}
 
 QComboBox#deviceCombo {{
-    background-color: {C.PANEL};
+    background-color: {C.SURFACE};
     color: {C.TEXT};
-    border: 1px solid {C.BORDER};
-    border-radius: 6px;
-    padding: 3px 26px 3px 8px;
+    border: 1px solid #cfd6df;
+    border-radius: 5px;
+    padding: 2px 22px 2px 8px;
     font-size: 11px;
-    min-width: 120px;
-    min-height: 20px;
+    font-weight: 600;
+    min-width: 170px;
+    min-height: 18px;
 }}
-QComboBox#deviceCombo:hover {{ border-color: #c6cfda; }}
-QComboBox#deviceCombo:focus {{ border-color: {C.ACCENT}; }}
+QComboBox#deviceCombo:hover {{ background-color: {C.PANEL}; border-color: #b9c5d2; }}
+QComboBox#deviceCombo:focus {{ background-color: {C.PANEL}; border-color: {C.ACCENT}; }}
 QComboBox#deviceCombo:disabled {{ color: {C.TEXT_MUTED}; background-color: {C.PANEL_ALT}; }}
 
 QComboBox#deviceCombo::drop-down {{
     subcontrol-origin: padding;
     subcontrol-position: top right;
-    width: 20px;
+    width: 18px;
     border: none;
-    border-left: 1px solid {C.BORDER};
-    border-top-right-radius: 6px;
-    border-bottom-right-radius: 6px;
+    border-left: 1px solid #d8dee6;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
     background-color: transparent;
 }}
 QComboBox#deviceCombo::drop-down:hover {{
-    background-color: {C.PANEL_ALT};
+    background-color: {C.ACCENT_BG};
 }}
 QComboBox#deviceCombo::down-arrow {{
     image: none;
@@ -346,7 +347,7 @@ QComboBox#deviceCombo QAbstractItemView {{
     background-color: {C.PANEL};
     color: {C.TEXT};
     border: 1px solid {C.BORDER};
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 4px;
     outline: none;
     selection-background-color: {C.ACCENT_BG};
@@ -364,6 +365,43 @@ QComboBox#deviceCombo QAbstractItemView::item:hover {{
 QComboBox#deviceCombo QAbstractItemView::item:selected {{
     background-color: {C.ACCENT_BG};
     color: {C.ACCENT};
+}}
+
+QComboBox#settingCombo {{
+    background-color: {C.PANEL};
+    color: {C.TEXT};
+    border: 1px solid {C.BORDER};
+    border-radius: 6px;
+    padding: 4px 24px 4px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    min-height: 22px;
+}}
+QComboBox#settingCombo:hover {{ border-color: #c6cfda; }}
+QComboBox#settingCombo:focus {{ border-color: {C.ACCENT}; }}
+QComboBox#settingCombo::drop-down {{
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border: none;
+    border-left: 1px solid {C.BORDER};
+}}
+QComboBox#settingCombo::down-arrow {{
+    image: none;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid {C.TEXT_DIM};
+    width: 0;
+    height: 0;
+}}
+QComboBox#settingCombo QAbstractItemView {{
+    background-color: {C.PANEL};
+    color: {C.TEXT};
+    border: 1px solid {C.BORDER};
+    border-radius: 6px;
+    selection-background-color: {C.ACCENT_BG};
+    selection-color: {C.ACCENT};
+    outline: none;
 }}
 
 QTableWidget {{
@@ -408,7 +446,7 @@ QCheckBox::indicator:hover {{
 QCheckBox::indicator:checked {{
     background-color: {C.ACCENT};
     border-color: {C.ACCENT};
-    image: none;
+    margin: 1px;
 }}
 QCheckBox::indicator:disabled {{
     background-color: {C.PANEL_ALT};
@@ -523,7 +561,7 @@ QStatusBar {{
     background-color: {C.PANEL};
     color: {C.TEXT_DIM};
     border-top: 1px solid {C.BORDER};
-    padding: 1px 6px;
+    padding: 2px 6px;
     font-size: 11px;
 }}
 QStatusBar::item {{ border: none; }}
@@ -700,35 +738,10 @@ class GameAutomationWindow(QMainWindow):
         outer.setContentsMargins(10, 8, 10, 6)
         outer.setSpacing(4)
 
-        # Row 1: Device selector (alone on its own line)
-        r_dev = QHBoxLayout()
-        r_dev.setSpacing(6)
-        dev_lbl = QLabel("Device")
-        dev_lbl.setStyleSheet(f"color:{C.TEXT_DIM}; font-weight:600; font-size:11px;")
-        r_dev.addWidget(dev_lbl)
-
-        self.device_combo = QComboBox()
-        self.device_combo.setObjectName("deviceCombo")
-        self.device_combo.setToolTip("Select ADB device")
-        self.device_combo.setEnabled(False)
-        self.device_combo.activated.connect(self._cb_device_selected)
-        r_dev.addWidget(self.device_combo, 1)
-
-        self.btn_refresh = QPushButton("🔄")
-        self.btn_refresh.setObjectName("btnDevice")
-        self.btn_refresh.setToolTip("Refresh / scan devices")
-        self.btn_refresh.setFixedSize(22, 22)
-        self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_refresh.clicked.connect(self._cb_refresh_devices)
-        r_dev.addWidget(self.btn_refresh)
-
         self.status_value = QLabel("READY")
         self.status_value.setStyleSheet(f"color:{C.TEXT_DIM}; font-weight:600; font-size:11px;")
-        r_dev.addStretch(1)
-        r_dev.addWidget(self.status_value)
-        outer.addLayout(r_dev)
 
-        # Row 2: Title + Progress + Elapsed
+        # Row 1: Title + Progress + Elapsed
         r2 = QHBoxLayout()
         r2.setSpacing(6)
         t = QLabel(self.title)
@@ -753,9 +766,10 @@ class GameAutomationWindow(QMainWindow):
             "font-family: 'Consolas', monospace;"
         )
         r2.addWidget(self.elapsed_timer)
+        r2.addWidget(self.status_value)
         outer.addLayout(r2)
 
-        # Row 3: Buttons (sequential + background toggle)
+        # Row 2: Buttons (sequential + background toggle)
         r3 = QHBoxLayout()
         r3.setSpacing(6)
 
@@ -806,7 +820,55 @@ class GameAutomationWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_table_tab(seq, "seq"), f"Sequential ({len(seq)})")
         self.tabs.addTab(self._build_table_tab(bg, "bg"),   f"Background ({len(bg)})")
+        self.tabs.addTab(self._build_settings_tab(), "Cài đặt")
         return self.tabs
+
+    def _build_settings_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(10)
+
+        panel = QFrame()
+        panel.setObjectName("panel")
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(10, 10, 10, 10)
+        panel_layout.setSpacing(8)
+
+        title = QLabel("Debug Capture")
+        title.setObjectName("title")
+        panel_layout.addWidget(title)
+
+        desc = QLabel(
+            "Các tùy chọn này dùng ADB screencap mặc định và chỉ điều khiển cửa sổ debug."
+        )
+        desc.setObjectName("subtitle")
+        desc.setWordWrap(True)
+        panel_layout.addWidget(desc)
+
+        self.debug_mode_cb = QCheckBox("Bật debug template")
+        self.debug_mode_cb.setToolTip("Bật cửa sổ Template Matching Debug / Gesture Debug.")
+        debug_mode = bool(self.automation.get_ui_setting("debug_mode", self.automation.is_debug))
+        debug_fail = bool(self.automation.get_ui_setting("debug_fail_mode", self.automation.is_debug_fail))
+        self.debug_mode_cb.setChecked(debug_mode)
+        self.debug_mode_cb.toggled.connect(self._cb_debug_mode_toggled)
+        panel_layout.addWidget(self.debug_mode_cb)
+
+        self.debug_fail_cb = QCheckBox("Debug cả template fail")
+        self.debug_fail_cb.setToolTip("Khi bật, chế độ 'Mọi capture / cả fail' sẽ vẽ box đỏ cho best candidate.")
+        self.debug_fail_cb.setChecked(debug_fail)
+        self.debug_fail_cb.toggled.connect(self._cb_debug_fail_toggled)
+        panel_layout.addWidget(self.debug_fail_cb)
+        self.automation.set_debug_mode(debug_mode, debug_fail)
+
+        hint = QLabel("Bật debug template để vẽ box xanh khi match. Bật debug fail để vẽ box đỏ cho best candidate.")
+        hint.setObjectName("settingHint")
+        hint.setWordWrap(True)
+        panel_layout.addWidget(hint)
+
+        layout.addWidget(panel)
+        layout.addStretch(1)
+        return page
 
     def _build_table_tab(self, acts: List[Activity], kind: str) -> QWidget:
         page = QWidget()
@@ -1045,6 +1107,16 @@ class GameAutomationWindow(QMainWindow):
         input_box.setText(self._format_setting_value(value))
         return value
 
+    def _cb_debug_mode_toggled(self, checked: bool) -> None:
+        fail_mode = self.debug_fail_cb.isChecked() if hasattr(self, "debug_fail_cb") else self.automation.is_debug_fail
+        self.automation.set_debug_mode(bool(checked), bool(fail_mode))
+        self.automation.set_ui_setting("debug_mode", bool(checked))
+
+    def _cb_debug_fail_toggled(self, checked: bool) -> None:
+        debug_mode = self.debug_mode_cb.isChecked() if hasattr(self, "debug_mode_cb") else self.automation.is_debug
+        self.automation.set_debug_mode(bool(debug_mode), bool(checked))
+        self.automation.set_ui_setting("debug_fail_mode", bool(checked))
+
     def _commit_settings_interval(self) -> None:
         panel = getattr(self, "_active_settings_panel", None)
         activity_id = getattr(self, "_active_settings_activity_id", None)
@@ -1232,9 +1304,25 @@ class GameAutomationWindow(QMainWindow):
         sb.setSizeGripEnabled(False)
         self.setStatusBar(sb)
         self.sb_activity = QLabel("Idle")
-        self.sb_device = QLabel("Dev: --")
+        self.sb_device_label = QLabel("Device")
+
+        self.device_combo = QComboBox()
+        self.device_combo.setObjectName("deviceCombo")
+        self.device_combo.setToolTip("Select ADB device")
+        self.device_combo.setEnabled(False)
+        self.device_combo.activated.connect(self._cb_device_selected)
+
+        self.btn_refresh = QPushButton("↻")
+        self.btn_refresh.setObjectName("btnDevice")
+        self.btn_refresh.setToolTip("Refresh / scan devices")
+        self.btn_refresh.setFixedSize(22, 20)
+        self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_refresh.clicked.connect(self._cb_refresh_devices)
+
         sb.addWidget(self.sb_activity, 1)
-        sb.addPermanentWidget(self.sb_device)
+        sb.addPermanentWidget(self.sb_device_label)
+        sb.addPermanentWidget(self.device_combo)
+        sb.addPermanentWidget(self.btn_refresh)
 
     @staticmethod
     def _center(w: QWidget) -> QWidget:
@@ -1314,13 +1402,7 @@ class GameAutomationWindow(QMainWindow):
         for act in self._activities:
             row = (self._bg_rows if act.background else self._seq_rows).get(act.id)
             if row:
-                # Background activity checkboxes are always enabled (master
-                # toggle handles start/stop of all); sequential ones are only
-                # editable when the loop is not running.
-                if act.background:
-                    row["checkbox"].setEnabled(True)
-                else:
-                    row["checkbox"].setEnabled(not self._is_running)
+                row["checkbox"].setEnabled(True)
 
         solo_active = bool(self._single_run_thread and self._single_run_thread.is_alive())
         run_ok = (not self._is_running) and (not solo_active)
@@ -1610,9 +1692,13 @@ class GameAutomationWindow(QMainWindow):
         if s.get("connected"):
             self._device_status_serial = s.get("device_id")
             label = s.get("device_name") or s.get("device_id") or "OK"
-            self.sb_device.setText(f"Dev: {label}")
+            if not self.device_combo.count():
+                self.device_combo.addItem(label, s.get("device_id"))
+                self.device_combo.setEnabled(True)
         else:
-            self.sb_device.setText("Dev: --")
+            if not self.device_combo.count():
+                self.device_combo.addItem("No device", "")
+                self.device_combo.setEnabled(False)
         self.btn_refresh.setEnabled(True)
 
     def _connect_saved_device(self) -> None:
@@ -1698,9 +1784,24 @@ class GameAutomationWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self._closing = True
+        event.accept()
+        try:
+            self._timer.stop()
+        except Exception:
+            pass
+        try:
+            self.elapsed_timer.stop()
+        except Exception:
+            pass
         try:
             if self._is_running:
-                self.automation.stop()
+                self.automation.running = False
+                self.automation._paused = False
+                try:
+                    self.automation._pause_event.set()
+                except Exception:
+                    pass
+                self.automation.stop_continuous_capture()
         except Exception:
             pass
         try:
@@ -1709,10 +1810,25 @@ class GameAutomationWindow(QMainWindow):
         except Exception:
             pass
         try:
+            self.automation.visualizer.close()
+        except Exception:
+            pass
+        try:
+            self.automation._executor.shutdown(wait=False)
+        except Exception:
+            pass
+        try:
             remove_log_subscriber(self._on_log_bus)
         except Exception:
             pass
-        super().closeEvent(event)
+        try:
+            QApplication.quit()
+        except Exception:
+            pass
+        try:
+            super().closeEvent(event)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------

@@ -109,7 +109,7 @@ class ADBGameAutomation:
                     if screen is not None:
                         with self.screen_lock:
                             self.latest_screen = screen
-                time.sleep(self.capture_interval)
+                    time.sleep(self.capture_interval)
             except Exception as e:
                 log_error(f"Error in capture thread: {e}")
                 time.sleep(self.capture_interval)
@@ -130,7 +130,7 @@ class ADBGameAutomation:
         if self.capture_running:
             self.capture_running = False
             if self.capture_thread and self.capture_thread.is_alive():
-                self.capture_thread.join(timeout=2.0)
+                self.capture_thread.join(timeout=0.5)
             log_info("Continuous screen capture stopped")
     
     def get_latest_screen(self) -> Optional[np.ndarray]:
@@ -243,6 +243,9 @@ class ADBGameAutomation:
         """
         start = time.time()
         while time.time() - start < timeout:
+            if not getattr(self, "running", True):
+                log_info(f"[OCR] Interrupted waiting for '{needle}'")
+                return False
             if self.region_contains_text(
                 needle, region=region,
                 case_sensitive=case_sensitive, whitelist=whitelist,
@@ -394,8 +397,7 @@ class ADBGameAutomation:
                 self.metrics.update_match_time(match_time)
             
             center_x, center_y, confidence, scale = result
-            
-            # Visualize if debug enabled
+
             if self.is_debug:
                 self.visualizer.show_template_match(
                     screen, (center_x - int(template.shape[1] * scale) // 2,
@@ -403,15 +405,13 @@ class ADBGameAutomation:
                     template.shape[:2], scale, confidence,
                     os.path.basename(template_path), is_match=True
                 )
-            
+
             return (center_x, center_y, confidence)
         else:
             if self.metrics:
                 self.metrics.update_failure()
-            
+
             if self.is_debug and self.is_debug_fail:
-                # Re-run with threshold=0 to find best (sub-threshold) match
-                # for visualization, so users can see where matching is going wrong.
                 best = self.matcher.match(
                     screen, template, threshold=0.0,
                     use_grayscale=use_grayscale, multi_scale=multi_scale, scales=scales,
@@ -458,6 +458,9 @@ class ADBGameAutomation:
         attempts = 0
         
         while time.time() - start_time < timeout:
+            if not getattr(self, "running", True):
+                log_info(f"[WAIT TEMPLATE] Interrupted: {template_name}")
+                return None
             attempts += 1
             result = self.find_template(template_name, threshold=threshold)
             
@@ -492,6 +495,9 @@ class ADBGameAutomation:
         log_info(f"Waiting for any of {len(template_names)} templates (timeout: {timeout}s)")
         
         while time.time() - start_time < timeout:
+            if not getattr(self, "running", True):
+                log_info("Interrupted while waiting for any template")
+                return None
             for template_name in template_names:
                 result = self.find_template(template_name, threshold=threshold)
                 if result:

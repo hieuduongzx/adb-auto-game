@@ -122,6 +122,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         # Persisted per-activity settings
         self._settings_dir = Path("data") / "settings"
         self._settings_file: Optional[Path] = None
+        self._ui_settings: Dict[str, Any] = {}
 
         # Initialize activities
         self._initialize_activities()
@@ -598,6 +599,15 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         self._save_activity_settings()
         return ok
 
+    def get_ui_setting(self, key: str, default: Any = None) -> Any:
+        """Return a persisted UI-level setting for this game."""
+        return self._ui_settings.get(key, default)
+
+    def set_ui_setting(self, key: str, value: Any) -> None:
+        """Persist a UI-level setting for this game."""
+        self._ui_settings[key] = value
+        self._save_activity_settings()
+
     def _load_activity_settings(self) -> List[Dict[str, Any]]:
         """Load persisted activity settings for this game, if any.
 
@@ -615,6 +625,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
 
         # New format: dict with "ocr_backend" + "activities".
         if isinstance(data, dict):
+            self._ui_settings = data.get("ui_settings", {}) or {}
             backend = data.get("ocr_backend")
             if backend and backend != self.ocr.backend_name:
                 # Only auto-restore when the caller didn't already pin a
@@ -635,6 +646,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             self._settings_dir.mkdir(parents=True, exist_ok=True)
             payload = {
                 "ocr_backend": self.ocr.backend_name if self.ocr.available else None,
+                "ui_settings": self._ui_settings,
                 "activities": [
                     act.to_settings_dict() for act in self._activities
                 ],
@@ -718,7 +730,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             thread.start()
         return True
     
-    def _stop_background_activity(self, activity: Activity, join_timeout: float = 2.0) -> None:
+    def _stop_background_activity(self, activity: Activity, join_timeout: float = 0.5) -> None:
         """Signal a background worker to stop and wait briefly for it."""
         with self._background_lock:
             stop_event = self._background_stop_events.pop(activity.id, None)
@@ -727,18 +739,24 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             stop_event.set()
         if thread is not None and thread.is_alive():
             thread.join(timeout=join_timeout)
-    
+
     def _start_all_background_activities(self) -> None:
         """Start workers for every enabled background activity."""
         for activity in self._activities:
             if activity.background and activity.enabled:
                 self._start_background_activity(activity)
-    
+
     def _stop_all_background_activities(self) -> None:
-        """Signal every background worker to stop."""
-        for activity in list(self._activities):
-            if activity.background:
-                self._stop_background_activity(activity)
+        """Signal every background worker to stop, then join once."""
+        with self._background_lock:
+            for activity_id, stop_event in self._background_stop_events.items():
+                stop_event.set()
+            threads = list(self._background_threads.values())
+            self._background_stop_events.clear()
+            self._background_threads.clear()
+        for thread in threads:
+            if thread.is_alive():
+                thread.join(timeout=0.5)
     
     def is_background_running(self, activity_id: str) -> bool:
         """Whether a given background activity currently has a live worker."""
