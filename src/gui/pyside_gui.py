@@ -66,6 +66,7 @@ from src.utils import (
     add_log_subscriber,
     log_error,
     log_info,
+    log_success,
     log_warning,
     remove_log_subscriber,
 )
@@ -461,6 +462,7 @@ class GameAutomationWindow(QMainWindow):
 
         self._is_running = False
         self._is_paused = False
+        self._bg_master_running = False
         self._activities: List[Activity] = self.automation.get_activities()
 
         self._seq_rows: Dict[str, Dict[str, Any]] = {}
@@ -566,31 +568,51 @@ class GameAutomationWindow(QMainWindow):
         outer.setContentsMargins(10, 8, 10, 6)
         outer.setSpacing(4)
 
-        # Row 1: Title + Status
-        r1 = QHBoxLayout()
-        r1.setSpacing(6)
-        t = QLabel(self.title)
-        t.setObjectName("title")
-        r1.addWidget(t)
-        r1.addStretch(1)
+        # Row 1: Device selector (alone on its own line)
+        r_dev = QHBoxLayout()
+        r_dev.setSpacing(6)
+        dev_lbl = QLabel("Device")
+        dev_lbl.setStyleSheet(f"color:{C.TEXT_DIM}; font-weight:600; font-size:11px;")
+        r_dev.addWidget(dev_lbl)
+
+        self.device_combo = QComboBox()
+        self.device_combo.setObjectName("deviceCombo")
+        self.device_combo.setToolTip("Select ADB device")
+        self.device_combo.setEnabled(False)
+        self.device_combo.activated.connect(self._cb_device_selected)
+        r_dev.addWidget(self.device_combo, 1)
+
+        self.btn_refresh = QPushButton("🔄")
+        self.btn_refresh.setObjectName("btnDevice")
+        self.btn_refresh.setToolTip("Refresh / scan devices")
+        self.btn_refresh.setFixedSize(22, 22)
+        self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_refresh.clicked.connect(self._cb_refresh_devices)
+        r_dev.addWidget(self.btn_refresh)
 
         self.status_value = QLabel("READY")
-        self.status_value.setStyleSheet(f"color:{C.TEXT_DIM}; font-weight:600; font-size:12px;")
-        r1.addWidget(self.status_value)
-        outer.addLayout(r1)
+        self.status_value.setStyleSheet(f"color:{C.TEXT_DIM}; font-weight:600; font-size:11px;")
+        r_dev.addStretch(1)
+        r_dev.addWidget(self.status_value)
+        outer.addLayout(r_dev)
 
-        # Row 2: Progress + Elapsed
+        # Row 2: Title + Progress + Elapsed
         r2 = QHBoxLayout()
         r2.setSpacing(6)
+        t = QLabel(self.title)
+        t.setObjectName("title")
+        r2.addWidget(t)
+        r2.addStretch(1)
+
         self.header_progress_count = QLabel("0/0")
         self.header_progress_count.setStyleSheet(f"color:{C.TEXT_DIM}; font-weight:600; font-size:11px;")
+        r2.addWidget(self.header_progress_count)
         self.header_progress = QProgressBar()
         self.header_progress.setObjectName("headerProgress")
         self.header_progress.setRange(0, 100)
         self.header_progress.setValue(0)
         self.header_progress.setTextVisible(False)
         self.header_progress.setFixedHeight(6)
-        r2.addWidget(self.header_progress_count)
         r2.addWidget(self.header_progress, 1)
 
         self.elapsed_timer = ElapsedTimer()
@@ -601,40 +623,48 @@ class GameAutomationWindow(QMainWindow):
         r2.addWidget(self.elapsed_timer)
         outer.addLayout(r2)
 
-        # Row 3: Buttons + device
+        # Row 3: Buttons (sequential + background toggle)
         r3 = QHBoxLayout()
         r3.setSpacing(6)
 
-        self.btn_start = QPushButton("Start")
+        # Sequential controls
+        self.btn_start = QPushButton("▶ Start")
         self.btn_start.setObjectName("btnStart")
+        self.btn_start.setToolTip("Run sequential activities")
         self.btn_start.clicked.connect(self._cb_start)
-        self.btn_pause = QPushButton("Pause")
+        self.btn_pause = QPushButton("⏸ Pause")
         self.btn_pause.setObjectName("btnPause")
         self.btn_pause.clicked.connect(self._cb_pause)
-        self.btn_stop = QPushButton("Stop")
+        self.btn_stop = QPushButton("⏹ Stop")
         self.btn_stop.setObjectName("btnStop")
+        self.btn_stop.setToolTip("Stop sequential activities")
         self.btn_stop.clicked.connect(self._cb_stop)
 
         r3.addWidget(self.btn_start)
         r3.addWidget(self.btn_pause)
         r3.addWidget(self.btn_stop)
+
+        # Separator
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setStyleSheet(f"color:{C.BORDER};")
+        sep.setFixedWidth(1)
+        r3.addWidget(sep)
+
+        # Background master toggle
+        self.bg_master_cb = QCheckBox("Background")
+        self.bg_master_cb.setToolTip(
+            "Start/stop all enabled background tasks.\n"
+            "Uncheck to pause background, check to resume."
+        )
+        self.bg_master_cb.setStyleSheet(
+            f"QCheckBox {{ color:{C.TEXT}; font-weight:600; font-size:12px; spacing:4px; }}"
+            f"QCheckBox::indicator {{ width:16px; height:16px; }}"
+        )
+        self.bg_master_cb.toggled.connect(self._cb_toggle_background_master)
+        r3.addWidget(self.bg_master_cb)
+
         r3.addStretch(1)
-
-        # Device selector combo + scan/refresh
-        self.device_combo = QComboBox()
-        self.device_combo.setObjectName("deviceCombo")
-        self.device_combo.setToolTip("Select ADB device")
-        self.device_combo.setEnabled(False)
-        self.device_combo.activated.connect(self._cb_device_selected)
-        r3.addWidget(self.device_combo)
-
-        self.btn_refresh = QPushButton("🔄")
-        self.btn_refresh.setObjectName("btnDevice")
-        self.btn_refresh.setToolTip("Refresh / scan devices")
-        self.btn_refresh.setFixedSize(22, 22)
-        self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_refresh.clicked.connect(self._cb_refresh_devices)
-        r3.addWidget(self.btn_refresh)
         outer.addLayout(r3)
 
         return panel
@@ -764,7 +794,8 @@ class GameAutomationWindow(QMainWindow):
             btn_layout.addWidget(play_btn, 0, Qt.AlignmentFlag.AlignCenter)
 
             settings_btn = None
-            if act.background:
+            has_settings = bool(act.custom_settings) or act.background
+            if has_settings:
                 settings_btn = QPushButton("⚙")
                 settings_btn.setObjectName("btnSettings")
                 settings_btn.setToolTip(f"Settings: {act.name}")
@@ -822,60 +853,26 @@ class GameAutomationWindow(QMainWindow):
         header.addWidget(self._settings_title, 1)
         layout.addLayout(header)
 
-        desc = QLabel("Adjust poll interval for this background task.")
-        desc.setObjectName("subtitle")
-        desc.setWordWrap(True)
-        layout.addWidget(desc)
+        # Description label (updated per activity when shown).
+        self._settings_desc = QLabel("")
+        self._settings_desc.setObjectName("subtitle")
+        self._settings_desc.setWordWrap(True)
+        layout.addWidget(self._settings_desc)
 
-        edit_row = QHBoxLayout()
-        edit_row.setSpacing(6)
-        lbl = QLabel("Interval:")
-        lbl.setObjectName("settingLabel")
-        edit_row.addWidget(lbl)
-
-        slider = QSlider(Qt.Orientation.Horizontal)
-        slider.setObjectName("intervalSlider")
-        slider.setMinimum(1)
-        slider.setMaximum(len(self._PRESETS) - 1)
-        slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        slider.setTickInterval(1)
-        edit_row.addWidget(slider, 1)
-
-        spin = QDoubleSpinBox()
-        spin.setObjectName("intervalSpin")
-        spin.setRange(0.05, 60.0)
-        spin.setDecimals(2)
-        spin.setSingleStep(0.1)
-        spin.setSuffix(" s")
-        spin.setFixedWidth(70)
-        edit_row.addWidget(spin)
-        layout.addLayout(edit_row)
-
-        preset_row = QHBoxLayout()
-        preset_row.setSpacing(4)
-        for value in self._PRESETS:
-            btn = QPushButton(f"{value:g}s")
-            btn.setProperty("class", "smallBtn")
-            btn.setFixedHeight(22)
-            btn.clicked.connect(lambda _checked=False, v=value, s=spin, sl=slider: self._apply_interval_preset(v, s, sl))
-            preset_row.addWidget(btn)
-        preset_row.addStretch(1)
-        layout.addLayout(preset_row)
-
-        info = QLabel("Lower interval = faster reaction, higher CPU/battery usage.")
-        info.setObjectName("subtitle")
-        info.setWordWrap(True)
-        layout.addWidget(info)
-        layout.addStretch(1)
+        # Container for per-activity widgets. Rebuilt each time a different
+        # activity is selected, because the custom settings differ.
+        self._settings_body = QVBoxLayout()
+        self._settings_body.setContentsMargins(0, 0, 0, 0)
+        self._settings_body.setSpacing(8)
+        layout.addLayout(self._settings_body, 1)
 
         # Store references for the active activity later
-        panel._slider = slider
-        panel._spin = spin
         panel._kind = kind
         panel._rows = rows
-
-        slider.valueChanged.connect(lambda idx, s=spin, sl=slider: self._on_settings_slider_changed(idx, s, sl))
-        spin.valueChanged.connect(lambda value, s=spin, sl=slider: self._on_settings_spin_changed(value, s, sl))
+        # Per-activity widget refs populated in _cb_show_activity_settings:
+        #   { "interval_spin": spin, "interval_slider": slider,
+        #     "custom": { key: {"spin": spin, "slider": slider} } }
+        panel._active_widgets: Dict[str, Any] = {}
 
         return panel
 
@@ -922,7 +919,11 @@ class GameAutomationWindow(QMainWindow):
         activity_id = getattr(self, "_active_settings_activity_id", None)
         if not panel or not activity_id:
             return
-        interval = panel._spin.value()
+        widgets = getattr(panel, "_active_widgets", {})
+        spin = widgets.get("interval_spin")
+        if spin is None:
+            return
+        interval = spin.value()
         if self.automation.set_activity_poll_interval(activity_id, interval):
             rows = panel._rows
             row = rows.get(activity_id)
@@ -935,7 +936,7 @@ class GameAutomationWindow(QMainWindow):
     def _cb_show_activity_settings(self, activity_id: str, kind: str) -> None:
         rows = self._bg_rows if kind == "bg" else self._seq_rows
         row = rows.get(activity_id)
-        if not row or not row.get("background"):
+        if not row:
             return
         act = self.automation.get_activity(activity_id)
         if not act:
@@ -953,7 +954,138 @@ class GameAutomationWindow(QMainWindow):
         panel._rows = rows
 
         self._settings_title.setText(f"Settings: {act.name}")
-        self._apply_interval_preset(act.poll_interval, panel._spin, panel._slider)
+        self._settings_desc.setText(act.description or "")
+
+        # Clear previous body widgets.
+        self._clear_layout(self._settings_body)
+        widgets: Dict[str, Any] = {}
+
+        # --- Poll interval (only for background activities) ---
+        if act.background:
+            self._build_interval_section(self._settings_body, act, widgets)
+
+        # --- Custom settings (sliders / spin boxes) ---
+        for spec in act.custom_settings:
+            self._build_custom_setting(self._settings_body, activity_id, spec, widgets)
+
+        panel._active_widgets = widgets
+
+        # Re-add stretch at the bottom.
+        self._settings_body.addStretch(1)
+
+    def _build_interval_section(
+        self, body: QVBoxLayout, act: Activity, widgets: Dict[str, Any]
+    ) -> None:
+        """Build the poll-interval slider + spin box (one row, no presets)."""
+        lbl = QLabel("Interval:")
+        lbl.setObjectName("settingLabel")
+        lbl.setMinimumWidth(50)
+
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setObjectName("intervalSlider")
+        slider.setMinimum(1)
+        slider.setMaximum(len(self._PRESETS) - 1)
+        slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        slider.setTickInterval(1)
+
+        spin = QDoubleSpinBox()
+        spin.setObjectName("intervalSpin")
+        spin.setRange(0.05, 999999.0)
+        spin.setDecimals(2)
+        spin.setSingleStep(0.1)
+        spin.setSuffix(" s")
+        spin.setFixedWidth(80)
+
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        row.addWidget(lbl)
+        row.addWidget(slider, 1)
+        row.addWidget(spin)
+        body.addLayout(row)
+
+        slider.valueChanged.connect(lambda idx, s=spin, sl=slider: self._on_settings_slider_changed(idx, s, sl))
+        spin.valueChanged.connect(lambda value, s=spin, sl=slider: self._on_settings_spin_changed(value, s, sl))
+
+        widgets["interval_spin"] = spin
+        widgets["interval_slider"] = slider
+
+        self._apply_interval_preset(act.poll_interval, spin, slider)
+
+    def _build_custom_setting(
+        self, body: QVBoxLayout, activity_id: str, spec: Dict[str, Any], widgets: Dict[str, Any]
+    ) -> None:
+        """Build a single custom setting (label + slider + spin on one row)."""
+        key = spec.get("key")
+        label_text = spec.get("label", key)
+        min_v = float(spec.get("min", 0.0))
+        max_v = float(spec.get("max", 100.0))
+        step = float(spec.get("step", 1.0))
+        suffix = spec.get("suffix", "")
+
+        act = self.automation.get_activity(activity_id)
+        current = float(act.custom_values.get(key, spec.get("default", min_v))) if act else float(spec.get("default", min_v))
+
+        lbl = QLabel(f"{label_text}:")
+        lbl.setObjectName("settingLabel")
+        lbl.setMinimumWidth(50)
+
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setObjectName("intervalSlider")
+        slider.setRange(int(min_v * 100), int(max_v * 100))
+        slider.setValue(int(current * 100))
+        slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        slider.setTickInterval(int(step * 100))
+
+        spin = QDoubleSpinBox()
+        spin.setObjectName("intervalSpin")
+        spin.setRange(min_v, max_v)
+        spin.setDecimals(2)
+        spin.setSingleStep(step)
+        if suffix:
+            spin.setSuffix(suffix)
+        spin.setFixedWidth(80)
+        spin.setValue(current)
+
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        row.addWidget(lbl)
+        row.addWidget(slider, 1)
+        row.addWidget(spin)
+        body.addLayout(row)
+
+        def _on_slider(val: int) -> None:
+            spin.blockSignals(True)
+            spin.setValue(val / 100.0)
+            spin.blockSignals(False)
+            _commit(val / 100.0)
+
+        def _on_spin(val: float) -> None:
+            v = max(min_v, min(val, max_v))
+            slider.blockSignals(True)
+            slider.setValue(int(v * 100))
+            slider.blockSignals(False)
+            _commit(v)
+
+        def _commit(v: float) -> None:
+            self.automation.set_custom_setting(activity_id, key, v)
+
+        slider.valueChanged.connect(_on_slider)
+        spin.valueChanged.connect(_on_spin)
+
+        widgets.setdefault("custom", {})[key] = {"spin": spin, "slider": slider}
+
+    @staticmethod
+    def _clear_layout(layout: QVBoxLayout) -> None:
+        """Remove all widgets/sub-layouts from ``layout``."""
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+            else:
+                sub = item.layout()
+                if sub is not None:
+                    GameAutomationWindow._clear_layout(sub)
 
     def _cb_hide_activity_settings(self, kind: str) -> None:
         panel = self.bg_settings_panel if kind == "bg" else self.seq_settings_panel
@@ -1077,11 +1209,11 @@ class GameAutomationWindow(QMainWindow):
 
     def _refresh_button_state(self) -> None:
         self.btn_start.setEnabled(not self._is_running)
-        self.btn_pause.setEnabled(self._is_running)
+        self.btn_pause.setEnabled(self._is_running or self._bg_master_running)
         self.btn_stop.setEnabled(self._is_running)
-        self.btn_pause.setText("Resume" if self._is_paused else "Pause")
+        self.btn_pause.setText("⏸ Resume" if self._is_paused else "⏸ Pause")
 
-        if not self._is_running:
+        if not self._is_running and not self._bg_master_running:
             self._set_status("READY")
         elif self._is_paused:
             self._set_status("PAUSED")
@@ -1091,7 +1223,13 @@ class GameAutomationWindow(QMainWindow):
         for act in self._activities:
             row = (self._bg_rows if act.background else self._seq_rows).get(act.id)
             if row:
-                row["checkbox"].setEnabled((not self._is_running) or act.background)
+                # Background activity checkboxes are always enabled (master
+                # toggle handles start/stop of all); sequential ones are only
+                # editable when the loop is not running.
+                if act.background:
+                    row["checkbox"].setEnabled(True)
+                else:
+                    row["checkbox"].setEnabled(not self._is_running)
 
         solo_active = bool(self._single_run_thread and self._single_run_thread.is_alive())
         run_ok = (not self._is_running) and (not solo_active)
@@ -1125,8 +1263,31 @@ class GameAutomationWindow(QMainWindow):
         except Exception as e:
             log_error(f"Start error: {e}")
 
+    def _cb_toggle_background_master(self, checked: bool) -> None:
+        """Enable/disable all background activities at once."""
+        if checked == self._bg_master_running:
+            return
+        try:
+            if checked:
+                # Ensure ADB + capture are ready for background workers.
+                self.automation._ensure_runtime_ready()
+                self.automation._start_all_background_activities()
+                self._bg_master_running = True
+                self._is_paused = False
+                log_success("Background tasks started")
+            else:
+                self.automation._stop_all_background_activities()
+                self._bg_master_running = False
+                log_info("Background tasks stopped")
+            self._refresh_button_state()
+        except Exception as e:
+            log_error(f"Background toggle error: {e}")
+            self.bg_master_cb.blockSignals(True)
+            self.bg_master_cb.setChecked(self._bg_master_running)
+            self.bg_master_cb.blockSignals(False)
+
     def _cb_pause(self) -> None:
-        if not self._is_running:
+        if not self._is_running and not self._bg_master_running:
             return
         try:
             if self._is_paused:
@@ -1143,7 +1304,7 @@ class GameAutomationWindow(QMainWindow):
         if not self._is_running:
             return
         try:
-            self.automation.stop()
+            self.automation.stop_sequential()
         except Exception as e:
             log_error(f"Stop error: {e}")
 
@@ -1251,18 +1412,18 @@ class GameAutomationWindow(QMainWindow):
     # ----- signal slots -----------------------------------------------------
 
     @Slot()
+    def _on_automation_stop(self) -> None:
+        self._is_running = False
+        self._is_paused = False
+        self.elapsed_timer.stop()
+        self._refresh_button_state()
+
+    @Slot()
     def _on_automation_start(self) -> None:
         self._is_running = True
         self._is_paused = False
         self.elapsed_timer.reset()
         self.elapsed_timer.start()
-        self._refresh_button_state()
-
-    @Slot()
-    def _on_automation_stop(self) -> None:
-        self._is_running = False
-        self._is_paused = False
-        self.elapsed_timer.stop()
         self._refresh_button_state()
 
     @Slot(dict)
@@ -1449,6 +1610,11 @@ class GameAutomationWindow(QMainWindow):
         try:
             if self._is_running:
                 self.automation.stop()
+        except Exception:
+            pass
+        try:
+            if self._bg_master_running:
+                self.automation._stop_all_background_activities()
         except Exception:
             pass
         try:

@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, List
 
 from src.games.base_game import Activity, BaseGameAutomation
 from src.games.echocalypse.frida_speedhack import FridaSpeedhackManager
@@ -7,9 +7,9 @@ from src.utils import log_error, log_info, log_success, log_warning
 # Package name of Echocalypse on the device (used by _ensure_app_foreground).
 ECHOPOCALYPSE_PACKAGE = "com.yoozoo.jgame.us"
 
-# Desired game speed while the automation is running. 1.0 = normal speed.
-# Higher values speed up animations but may make the game unstable.
-DEFAULT_SPEEDHACK_SCALE = 3.0
+# Bounds for the in-GUI speed slider.
+SPEEDHACK_MIN = 0.5
+SPEEDHACK_MAX = 5.0
 
 
 class Echocalypse(BaseGameAutomation):
@@ -25,10 +25,8 @@ class Echocalypse(BaseGameAutomation):
         self.max_workers = 10
         self.package_name = self.PACKAGE_NAME
 
-        # Optional Unity time-scale speedhack. Disabled by default until the
-        # user enables it in the activity list. It uses frida-inject on the
-        # device, so the device must be rooted and the right binary must exist
-        # in vendor/frida/.
+        # Frida-based speedhack (frida-inject on device). Disabled until the
+        # user enables the "speedhack" background activity.
         self.speedhack = FridaSpeedhackManager(
             package=self.PACKAGE_NAME,
             time_scale=1.0,
@@ -52,7 +50,6 @@ class Echocalypse(BaseGameAutomation):
 
     def define_activities(self) -> List[Activity]:
         return [
-            # ---- Background (poll while the main loop is alive) ----
             Activity(
                 id="auto_skip_dialog",
                 name="Tự Động Bỏ Qua Hội Thoại",
@@ -61,20 +58,62 @@ class Echocalypse(BaseGameAutomation):
                 background=True,
                 poll_interval=1.0,
             ),
-            # ---- Sequential (run once, in order) ----
+            Activity(
+                id="speedhack",
+                name="Speedhack",
+                description="Tăng tốc game bằng Frida (cần root + frida-inject). Tự động tắt khi dừng.",
+                enabled=False,
+                background=True,
+                poll_interval=999999.0,
+                custom_settings=[
+                    {
+                        "key": "speed",
+                        "type": "slider",
+                        "label": "Speed",
+                        "min": SPEEDHACK_MIN,
+                        "max": SPEEDHACK_MAX,
+                        "step": 0.1,
+                        "default": 1.0,
+                        "suffix": "x",
+                    },
+                ],
+            ),
             Activity(
                 id="expedition",
                 name="Expedition",
                 description="Chạy expedition: chọn next target, tấn công, chờ kết thúc battle",
                 enabled=True,
             ),
-            Activity(
-                id="speedhack",
-                name="Speedhack",
-                description="Tăng tốc game bằng Frida (cần root + frida-server). Tự động tắt khi dừng.",
-                enabled=False,
-            ),
         ]
+
+    # ==================== Speedhack helpers ====================
+
+    @property
+    def speedhack_scale(self) -> float:
+        """Current speed multiplier, read from the persisted custom setting."""
+        act = self._activity_map.get("speedhack")
+        if act:
+            v = act.custom_values.get("speed")
+            if v is not None:
+                return float(v)
+        return 1.0
+
+    def apply_custom_setting(self, activity_id: str, key: str, value: Any) -> None:
+        """Apply a custom setting change immediately (called by base_game)."""
+        if activity_id == "speedhack" and key == "speed":
+            if self.speedhack_enabled and self.speedhack.available:
+                log_info(f"[speedhack] applying new scale {value}")
+                self.speedhack.set_scale(float(value))
+
+    def set_activity_enabled(self, activity_id: str, enabled: bool):
+        """Reset the speedhack when its background task is disabled."""
+        super().set_activity_enabled(activity_id, enabled)
+        if activity_id == "speedhack":
+            if enabled:
+                self.speedhack_enabled = True
+            else:
+                self.speedhack_enabled = False
+                self._disable_speedhack()
 
     # ==================== Main loop entry ====================
 
@@ -83,7 +122,6 @@ class Echocalypse(BaseGameAutomation):
         if not self._ensure_app_foreground():
             log_error("Aborting: Echocalypse app could not be started")
             return
-        self._apply_speedhack()
         super().process_game_actions()
 
     # ==================== Background handlers ====================
@@ -93,7 +131,6 @@ class Echocalypse(BaseGameAutomation):
         if not skip_tpl or not accept_tpl:
             return False
 
-        # 1. Look for the skip button on the current frame.
         result = self.find_template(skip_tpl, last_screen=True)
         if not result:
             return False
@@ -102,7 +139,6 @@ class Echocalypse(BaseGameAutomation):
         if not self.tap(sx, sy):
             return False
 
-        # 2. Nếu có confirm popup thì accept; nếu không thì cũng coi như đã skip xong.
         accept_result = self.wait_and_tap(accept_tpl, timeout=3)
         if accept_result:
             log_success("[bg-skip_dialog] accept tapped")
@@ -119,7 +155,6 @@ class Echocalypse(BaseGameAutomation):
             log_error("[expedition] missing templates")
             return False
 
-        # 1. Tìm next_target rồi tap thấp hơn nó 20px.
         result = self.find_template(next_target)
         if not result:
             log_warning("[expedition] next_target not found")
@@ -130,12 +165,10 @@ class Echocalypse(BaseGameAutomation):
         if not self.tap(target_x, target_y):
             return False
 
-        # 2. Đợi nút attack xuất hiện; nếu không thấy mà thấy end-battle luôn thì bỏ qua bước attack.
         attack_result = self.wait_and_tap(bt_attack, timeout=5)
         if attack_result:
             log_success("[expedition] attack started")
         else:
-            # Có thể battle kết thúc ngay (auto-resolve). Kiểm tra nhanh end screen.
             end_result = self.find_template(check_end_battle, last_screen=True)
             if end_result:
                 log_info("[expedition] no attack button, battle already ended")
@@ -143,7 +176,6 @@ class Echocalypse(BaseGameAutomation):
                 log_warning("[expedition] bt_attack did not appear and battle not ended")
                 return False
 
-        # 3. Chờ màn hình kết thúc battle rồi click 2 lần tọa độ cố định.
         if not self.wait_for_template(check_end_battle, timeout=60):
             log_warning("[expedition] check_end_battle did not appear")
             return False
@@ -161,7 +193,6 @@ class Echocalypse(BaseGameAutomation):
         consecutive_empty = 0
         while self.running:
             if not self._expedition_loop():
-                # Nếu không tìm thấy target thì đếm; quá 3 lần thì thoát vòng lặp.
                 consecutive_empty += 1
                 log_warning(f"[expedition] loop failed ({consecutive_empty}/3)")
                 if consecutive_empty >= 3:
@@ -171,30 +202,28 @@ class Echocalypse(BaseGameAutomation):
             consecutive_empty = 0
         return True
 
+    # ==================== Speedhack handlers ====================
     def handle_activity_speedhack(self) -> bool:
-        """Enable or refresh the Frida time-scale speedhack."""
+        """Background one-shot: inject once, skip if already active."""
+        if self.speedhack.active:
+            return True
         self.speedhack_enabled = True
         return self._apply_speedhack()
 
     def _apply_speedhack(self) -> bool:
-        """Apply the configured time scale when the speedhack is enabled."""
         if not self.speedhack_enabled:
             return False
         if not self.speedhack.available:
-            log_warning(
-                "[speedhack] frida not installed; install with: "
-                "pip install frida frida-tools"
-            )
+            log_warning("[speedhack] frida-inject binary not found in vendor/frida/")
             return False
-        ok = self.speedhack.set_scale(DEFAULT_SPEEDHACK_SCALE)
+        ok = self.speedhack.set_scale(self.speedhack_scale)
         if ok:
-            log_success(f"[speedhack] enabled at {DEFAULT_SPEEDHACK_SCALE}x")
+            log_success(f"[speedhack] enabled at {self.speedhack_scale}x")
         else:
             log_warning("[speedhack] could not set time scale")
         return ok
 
     def _disable_speedhack(self) -> None:
-        """Restore normal game speed and detach Frida."""
         try:
             if self.speedhack.active:
                 self.speedhack.set_scale(1.0)
@@ -205,7 +234,6 @@ class Echocalypse(BaseGameAutomation):
             log_info("[speedhack] disabled / restored normal speed")
 
     def stop(self) -> None:
-        """Stop automation and make sure the speedhack is cleaned up."""
         self._disable_speedhack()
         super().stop()
 

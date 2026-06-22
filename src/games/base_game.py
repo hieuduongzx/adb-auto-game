@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Callable, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from enum import Enum
 
 import cv2
@@ -41,6 +41,15 @@ class Activity:
       thread, polling every ``poll_interval`` seconds, and can be toggled on
       and off at runtime via :meth:`BaseGameAutomation.set_activity_enabled`
       while the main loop is running.
+
+    ``custom_settings`` lets a subclass declare extra per-activity UI widgets
+    (sliders, spin boxes) beyond the built-in ``poll_interval``. Each entry is
+    a dict like::
+
+        {"key": "speed", "type": "slider", "label": "Speed",
+         "min": 0.5, "max": 5.0, "step": 0.1, "default": 1.0, "suffix": "x"}
+
+    Supported types: ``"slider"`` (float), ``"spin"`` (float).
     """
     id: str
     name: str
@@ -54,22 +63,30 @@ class Activity:
     # Background execution support
     background: bool = False
     poll_interval: float = 1.0
+    # Extra per-activity UI settings declared by the game subclass.
+    custom_settings: List[Dict[str, Any]] = field(default_factory=list)
+    # Current values for the custom settings (populated from defaults /
+    # persisted settings). Keys match ``custom_settings[i]["key"]``.
+    custom_values: Dict[str, Any] = field(default_factory=dict)
 
     def to_settings_dict(self) -> Dict[str, Any]:
         """Export only user-tweakable settings for persistence."""
-        return {
+        d: Dict[str, Any] = {
             "id": self.id,
             "enabled": self.enabled,
             "poll_interval": self.poll_interval,
         }
+        if self.custom_values:
+            d["custom"] = dict(self.custom_values)
+        return d
 
     @classmethod
     def from_settings_dict(cls, data: Dict[str, Any], defaults: Optional["Activity"] = None) -> Optional["Activity"]:
         """Build a fresh Activity applying persisted settings over ``defaults``.
 
         If ``defaults`` is provided, its non-persisted fields are kept and only
-        ``enabled`` / ``poll_interval`` are overwritten. Returns ``None`` if no
-        ID is present in ``data``.
+        ``enabled`` / ``poll_interval`` / ``custom_values`` are overwritten.
+        Returns ``None`` if no ID is present in ``data``.
         """
         if not data or not data.get("id"):
             return None
@@ -86,6 +103,11 @@ class Activity:
         # Apply persisted values over the hard-coded defaults.
         defaults.enabled = bool(data.get("enabled", defaults.enabled))
         defaults.poll_interval = float(data.get("poll_interval", defaults.poll_interval))
+        # Merge persisted custom values over declared defaults.
+        persisted_custom = data.get("custom", {})
+        if isinstance(persisted_custom, dict):
+            for k, v in persisted_custom.items():
+                defaults.custom_values[k] = v
         return defaults
 
     def reset(self):
@@ -242,6 +264,16 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
 
         self._activities = activities
         self._activity_map = {act.id: act for act in activities}
+        # Seed custom_values from declared defaults for any activity whose
+        # custom_values are still empty (e.g. a freshly added custom setting).
+        for act in activities:
+            if not act.custom_settings:
+                continue
+            for spec in act.custom_settings:
+                k = spec.get("key")
+                if k is None or k in act.custom_values:
+                    continue
+                act.custom_values[k] = spec.get("default")
         # Only sequential, enabled activities go into the run order. Background
         # activities are managed separately via worker threads.
         self._activity_order = [
@@ -601,6 +633,35 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         log_info(f"[bg] '{activity_id}' poll interval set to {activity.poll_interval:.2f}s")
         self._save_activity_settings()
         return True
+
+    def set_custom_setting(self, activity_id: str, key: str, value: Any) -> bool:
+        """Update a custom per-activity setting declared via ``custom_settings``.
+
+        Stores the value in ``activity.custom_values`` and persists it. The
+        game subclass is expected to override :meth:`apply_custom_setting` (or
+        react in its handler) to actually apply the new value at runtime.
+        Returns ``True`` if the activity + key exist.
+        """
+        activity = self._activity_map.get(activity_id)
+        if not activity:
+            return False
+        declared = [s.get("key") for s in activity.custom_settings]
+        if key not in declared:
+            return False
+        activity.custom_values[key] = value
+        self._save_activity_settings()
+        try:
+            self.apply_custom_setting(activity_id, key, value)
+        except Exception as e:
+            log_warning(f"[settings] apply_custom_setting('{key}') failed: {e}")
+        return True
+
+    def apply_custom_setting(self, activity_id: str, key: str, value: Any) -> None:
+        """Hook for subclasses to react to a custom setting change.
+
+        Default implementation is a no-op. Override to apply the new value
+        immediately (e.g. re-inject the speedhack with the new multiplier).
+        """
 
     def set_activity_order(self, order: List[str]):
         """Set the execution order of activities"""
@@ -1041,6 +1102,21 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         
         self._trigger_callback('on_stop')
         log_success("Automation stopped")
+
+    def stop_sequential(self):
+        """Stop only the sequential automation loop, leaving background workers running.
+
+        Unlike :meth:`stop`, this does **not** tear down background
+        activities, continuous capture, or the executor. It simply signals
+        the main loop (``self.running = False``) so ``process_game_actions``
+        exits after the current activity finishes.
+        """
+        log_info("Stopping sequential automation...")
+        self.running = False
+        self._paused = False
+        self._pause_event.set()
+        self._trigger_callback('on_stop')
+        log_success("Sequential automation stopped")
     
     # ==================== Main Process ====================
     

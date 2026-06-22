@@ -4,7 +4,7 @@
     {
       "id": "auto_skip_dialog",
       "enabled": true,
-      "poll_interval": 0.2
+      "poll_interval": 999999.0
     },
     {
       "id": "expedition",
@@ -14,7 +14,10 @@
     {
       "id": "speedhack",
       "enabled": true,
-      "poll_interval": 1.0
+      "poll_interval": 999999.0,
+      "custom": {
+        "speed": 4.0
+      }
     }
   ]
 }

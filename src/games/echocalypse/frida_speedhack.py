@@ -242,9 +242,6 @@ function setScale(scale) {
 
 log('script loaded, target=' + TARGET_SCALE);
 setScale(TARGET_SCALE);
-setInterval(function() {
-    log('active scale: ' + currentScale);
-}, 1000);
 log('script finished');
 """
 
@@ -285,6 +282,11 @@ class FridaSpeedhackManager:
             return True
         bundled = self._bundled_inject_path()
         return bundled is not None and bundled.is_file()
+
+    @property
+    def active(self) -> bool:
+        """Whether the speedhack is currently running (scale != 1.0)."""
+        return self._current_scale != 1.0
 
     @staticmethod
     def _bundled_inject_path() -> Optional[Path]:
