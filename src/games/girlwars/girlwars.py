@@ -116,8 +116,8 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
     # ==================== Main loop entry ====================
 
     def before_process_game_actions(self) -> bool:
-        if self._ensure_app_foreground():
-            return True
+      #  if self._ensure_app_foreground():
+        return True
         log_error("Aborting: GirlWars app could not be started")
         return False
 

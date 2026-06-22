@@ -4,17 +4,17 @@
     {
       "id": "auto_skip_dialog",
       "enabled": true,
-      "poll_interval": 0.5
+      "poll_interval": 0.2
     },
     {
       "id": "auto_skip_battle",
       "enabled": true,
-      "poll_interval": 0.5
+      "poll_interval": 0.2
     },
     {
       "id": "auto_tap_to_continue",
-      "enabled": true,
-      "poll_interval": 1.0
+      "enabled": false,
+      "poll_interval": 0.2
     },
     {
       "id": "main_story",
@@ -28,12 +28,12 @@
     },
     {
       "id": "main_story_elite_battle",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 1.0
     },
     {
       "id": "speedhack",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 999999.0,
       "custom": {
         "speed": 1.5

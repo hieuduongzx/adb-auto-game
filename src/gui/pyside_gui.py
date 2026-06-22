@@ -77,41 +77,49 @@ from src.utils import (
 # ---------------------------------------------------------------------------
 
 class C:
-    BG          = "#f0f0f0"
+    BG          = "#eceff3"
     PANEL       = "#ffffff"
-    PANEL_ALT   = "#f5f5f5"
-    BORDER      = "#dcdcdc"
+    PANEL_ALT   = "#f3f5f9"
+    SURFACE     = "#f7f9fc"
+    BORDER      = "#dde2e9"
+    LINE        = "#e9edf2"
 
-    TEXT        = "#1a1a1a"
-    TEXT_DIM    = "#555555"
-    TEXT_MUTED  = "#888888"
+    TEXT        = "#16202c"
+    TEXT_DIM    = "#48535f"
+    TEXT_MUTED  = "#69737e"
 
-    ACCENT      = "#3b82f6"
-    ACCENT_BG   = "#eff6ff"
+    ACCENT      = "#2f6fed"
+    ACCENT_HOVER = "#2a63d4"
+    ACCENT_BG   = "#e9f1ff"
 
-    OK          = "#16a34a"
-    OK_BG       = "#dcfce7"
-    WARN        = "#ea580c"
-    WARN_BG     = "#fff7ed"
-    ERR         = "#dc2626"
-    ERR_BG      = "#fef2f2"
-    INFO        = "#2563eb"
-    INFO_BG     = "#eff6ff"
+    OK          = "#15924e"
+    OK_HOVER    = "#127a41"
+    OK_BG       = "#e4f6ec"
+    WARN        = "#c2620f"
+    WARN_BG     = "#fdf0e1"
+    ERR         = "#c92a2a"
+    ERR_BG      = "#fdeaea"
+    INFO        = "#2f6fed"
+    INFO_BG     = "#e9f1ff"
+
+    LOG_BG      = "#181c22"
+    LOG_TEXT    = "#d6dbe2"
+    LOG_MUTED   = "#8a95a1"
 
 
 _STATUS_PILL: Dict[str, tuple] = {
-    "pending":   ("#edf7ff", "#222222", "Chưa làm"),
-    "running":   ("#fff6d9", "#8a4b00", "Đang chạy"),
-    "completed": ("#e7f8e7", "#106b21", "Xong"),
-    "failed":    ("#ffe8e8", "#b00000", "Lỗi"),
-    "skipped":   ("#f3f3f3", "#666666", "Bỏ qua"),
+    "pending":   ("#eef2f7", "#3f4b58", "#dde4ec", "Chưa làm"),
+    "running":   ("#fff4d6", "#8a5300", "#f1dca6", "Đang chạy"),
+    "completed": ("#e4f6ec", "#0f7a3d", "#c5ebd5", "Xong"),
+    "failed":    ("#fdeaea", "#b42424", "#f4cccc", "Lỗi"),
+    "skipped":   ("#eef1f4", "#5b6670", "#dee3e8", "Bỏ qua"),
 }
 
 _LOG_COLORS: Dict[str, str] = {
-    "info":    C.INFO,
-    "success": C.OK,
-    "warning": C.WARN,
-    "error":   C.ERR,
+    "info":    "#6fb3ff",
+    "success": "#5fd28a",
+    "warning": "#f2b65a",
+    "error":   "#ff7b72",
 }
 
 
@@ -156,7 +164,7 @@ class ElapsedTimer(QLabel):
 
 QSS = f"""
 QMainWindow {{
-    background-color: #d4d0c8;
+    background-color: {C.BG};
 }}
 
 QWidget {{
@@ -167,208 +175,314 @@ QWidget {{
 
 QToolTip {{
     background-color: {C.TEXT};
-    color: white;
+    color: #ffffff;
     border: none;
-    padding: 4px 8px;
-    border-radius: 2px;
+    padding: 5px 9px;
+    border-radius: 5px;
     font-size: 11px;
 }}
 
 QFrame#panel {{
     background-color: {C.PANEL};
-    border: 1px solid #8f8f8f;
+    border: 1px solid {C.BORDER};
+    border-radius: 8px;
 }}
 
 QLabel#title {{
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
     color: {C.TEXT};
 }}
 QLabel#subtitle {{
-    color: {C.TEXT_MUTED};
+    color: {C.TEXT_DIM};
     font-size: 11px;
 }}
 
 QPushButton {{
-    background-color: #f3f3f3;
+    background-color: {C.SURFACE};
     color: {C.TEXT};
-    border: 1px solid #8f8f8f;
-    border-top-color: #ffffff;
-    border-left-color: #ffffff;
-    padding: 3px 10px;
-    font-weight: 500;
+    border: 1px solid {C.BORDER};
+    border-radius: 6px;
+    padding: 4px 11px;
+    font-weight: 600;
     font-size: 12px;
 }}
-QPushButton:hover    {{ background-color: #ffffff; }}
-QPushButton:pressed  {{ background-color: #dcdcdc; border-color: #707070; }}
-QPushButton:disabled {{ color: {C.TEXT_MUTED}; background-color: #eeeeee; }}
+QPushButton:hover    {{ background-color: {C.PANEL_ALT}; border-color: #cdd4dd; }}
+QPushButton:focus    {{ border-color: {C.ACCENT}; }}
+QPushButton:pressed  {{ background-color: {C.LINE}; }}
+QPushButton:disabled {{ color: {C.TEXT_MUTED}; background-color: {C.PANEL_ALT}; border-color: {C.LINE}; }}
 
 QPushButton#btnStart {{
     background-color: {C.OK};
-    color: white;
+    color: #ffffff;
     border: 1px solid {C.OK};
-    padding: 4px 14px;
-    font-weight: 600;
+    padding: 5px 14px;
+    font-weight: 700;
 }}
-QPushButton#btnStart:hover    {{ background-color: #15803d; }}
-QPushButton#btnStart:pressed  {{ background-color: #166534; }}
-QPushButton#btnStart:disabled {{ background-color: #bbf7d0; color: #86efac; }}
+QPushButton#btnStart:hover    {{ background-color: {C.OK_HOVER}; border-color: {C.OK_HOVER}; }}
+QPushButton#btnStart:pressed  {{ background-color: #0f6837; border-color: #0f6837; }}
+QPushButton#btnStart:disabled {{ background-color: #b9e3c8; color: #eafaf0; border-color: #b9e3c8; }}
 
 QPushButton#btnPause {{
     background-color: {C.WARN_BG};
     color: {C.WARN};
-    border: 1px solid {C.WARN_BG};
-    padding: 4px 14px;
-    font-weight: 600;
+    border: 1px solid #f1dcc1;
+    padding: 5px 14px;
+    font-weight: 700;
 }}
-QPushButton#btnPause:hover    {{ background-color: #fed7aa; }}
-QPushButton#btnPause:pressed  {{ background-color: #fdba74; }}
-QPushButton#btnPause:disabled {{ background-color: {C.WARN_BG}; color: #fdba74; }}
+QPushButton#btnPause:hover    {{ background-color: #fae3c8; border-color: #e9cba6; }}
+QPushButton#btnPause:pressed  {{ background-color: #f5d4ad; }}
+QPushButton#btnPause:disabled {{ background-color: {C.PANEL_ALT}; color: #d9b48a; border-color: {C.LINE}; }}
 
 QPushButton#btnStop {{
     background-color: {C.ERR_BG};
     color: {C.ERR};
-    border: 1px solid {C.ERR_BG};
-    padding: 4px 14px;
+    border: 1px solid #f3cccc;
+    padding: 5px 14px;
+    font-weight: 700;
+}}
+QPushButton#btnStop:hover    {{ background-color: #fbdcdc; border-color: #edbcbc; }}
+QPushButton#btnStop:pressed  {{ background-color: #f7caca; }}
+QPushButton#btnStop:disabled {{ background-color: {C.PANEL_ALT}; color: #e2a3a3; border-color: {C.LINE}; }}
+
+QPushButton#btnBack {{
+    background-color: {C.SURFACE};
+    color: {C.TEXT_DIM};
+    border: 1px solid {C.BORDER};
+    border-radius: 6px;
+    padding: 4px 12px;
     font-weight: 600;
 }}
-QPushButton#btnStop:hover    {{ background-color: #fecaca; }}
-QPushButton#btnStop:pressed  {{ background-color: #fca5a5; }}
-QPushButton#btnStop:disabled {{ background-color: {C.ERR_BG}; color: #fca5a5; }}
+QPushButton#btnBack:hover {{ background-color: {C.PANEL_ALT}; color: {C.TEXT}; }}
 
 QPushButton.smallBtn {{
-    background-color: transparent;
+    background-color: {C.SURFACE};
     border: 1px solid {C.BORDER};
+    border-radius: 5px;
     color: {C.TEXT_DIM};
-    padding: 2px 6px;
+    padding: 2px 9px;
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
 }}
-QPushButton.smallBtn:hover {{ background-color: #e8e8e8; color: {C.TEXT}; }}
+QPushButton.smallBtn:hover {{ background-color: {C.ACCENT_BG}; color: {C.ACCENT}; border-color: #bcd4ff; }}
 QPushButton.smallBtn:disabled {{ color: {C.TEXT_MUTED}; }}
 
 QPushButton#btnPlay {{
     background-color: transparent;
     color: {C.OK};
     border: none;
+    border-radius: 5px;
     padding: 0px;
     font-size: 13px;
 }}
-QPushButton#btnPlay:hover {{ color: #15803d; }}
-QPushButton#btnPlay:disabled {{ color: #86efac; }}
+QPushButton#btnPlay:hover {{ background-color: {C.OK_BG}; color: {C.OK_HOVER}; }}
+QPushButton#btnPlay:disabled {{ color: #a7d6ba; background-color: transparent; }}
 
 QPushButton#btnSettings {{
     background-color: transparent;
-    color: {C.TEXT_DIM};
+    color: {C.TEXT_MUTED};
     border: none;
+    border-radius: 5px;
     padding: 0px;
     font-size: 13px;
 }}
-QPushButton#btnSettings:hover {{ color: {C.TEXT}; }}
-QPushButton#btnSettings:disabled {{ color: {C.TEXT_MUTED}; }}
+QPushButton#btnSettings:hover {{ background-color: {C.PANEL_ALT}; color: {C.TEXT}; }}
+QPushButton#btnSettings:disabled {{ color: {C.TEXT_MUTED}; background-color: transparent; }}
 
 QPushButton#btnDevice {{
     background-color: transparent;
     color: {C.TEXT_DIM};
     border: none;
+    border-radius: 5px;
     padding: 0px;
     font-size: 13px;
 }}
-QPushButton#btnDevice:hover {{ color: {C.TEXT}; }}
+QPushButton#btnDevice:hover {{ background-color: {C.PANEL_ALT}; color: {C.TEXT}; }}
+QPushButton#btnDevice:disabled {{ color: {C.TEXT_MUTED}; background-color: transparent; }}
 
 QComboBox#deviceCombo {{
     background-color: {C.PANEL};
     color: {C.TEXT};
     border: 1px solid {C.BORDER};
-    padding: 2px 6px;
+    border-radius: 6px;
+    padding: 3px 26px 3px 8px;
     font-size: 11px;
     min-width: 120px;
+    min-height: 20px;
 }}
+QComboBox#deviceCombo:hover {{ border-color: #c6cfda; }}
+QComboBox#deviceCombo:focus {{ border-color: {C.ACCENT}; }}
+QComboBox#deviceCombo:disabled {{ color: {C.TEXT_MUTED}; background-color: {C.PANEL_ALT}; }}
+
 QComboBox#deviceCombo::drop-down {{
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
     border: none;
-    width: 18px;
+    border-left: 1px solid {C.BORDER};
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    background-color: transparent;
 }}
+QComboBox#deviceCombo::drop-down:hover {{
+    background-color: {C.PANEL_ALT};
+}}
+QComboBox#deviceCombo::down-arrow {{
+    image: none;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid {C.TEXT_DIM};
+    width: 0;
+    height: 0;
+}}
+QComboBox#deviceCombo::down-arrow:hover {{
+    border-top-color: {C.ACCENT};
+}}
+QComboBox#deviceCombo:disabled::down-arrow {{
+    border-top-color: {C.TEXT_MUTED};
+}}
+
 QComboBox#deviceCombo QAbstractItemView {{
     background-color: {C.PANEL};
+    color: {C.TEXT};
     border: 1px solid {C.BORDER};
+    border-radius: 6px;
+    padding: 4px;
+    outline: none;
     selection-background-color: {C.ACCENT_BG};
+    selection-color: {C.ACCENT};
+    font-size: 11px;
+}}
+QComboBox#deviceCombo QAbstractItemView::item {{
+    padding: 4px 8px;
+    min-height: 22px;
+    border-radius: 4px;
+}}
+QComboBox#deviceCombo QAbstractItemView::item:hover {{
+    background-color: {C.PANEL_ALT};
+}}
+QComboBox#deviceCombo QAbstractItemView::item:selected {{
+    background-color: {C.ACCENT_BG};
+    color: {C.ACCENT};
 }}
 
 QTableWidget {{
     background-color: {C.PANEL};
-    alternate-background-color: {C.PANEL};
+    alternate-background-color: {C.SURFACE};
     gridline-color: transparent;
-    border: 1px solid #b8b8b8;
+    border: none;
     font-size: 12px;
     outline: none;
 }}
 QTableWidget::item {{
     border: none;
+    border-bottom: 1px solid {C.LINE};
     padding: 0px;
 }}
 QHeaderView::section {{
-    background-color: #e6e6e6;
+    background-color: {C.SURFACE};
     color: {C.TEXT_DIM};
     padding: 3px 6px;
     border: none;
-    border-bottom: 1px solid #b8b8b8;
-    font-weight: 600;
+    border-bottom: 1px solid {C.BORDER};
+    font-weight: 700;
     font-size: 11px;
 }}
 
+QCheckBox {{
+    color: {C.TEXT};
+    font-weight: 600;
+    spacing: 6px;
+}}
+QCheckBox::indicator {{
+    width: 15px;
+    height: 15px;
+    border: 1px solid {C.BORDER};
+    border-radius: 4px;
+    background-color: {C.PANEL};
+}}
+QCheckBox::indicator:hover {{
+    border-color: {C.ACCENT};
+    background-color: {C.ACCENT_BG};
+}}
+QCheckBox::indicator:checked {{
+    background-color: {C.ACCENT};
+    border-color: {C.ACCENT};
+    image: none;
+}}
+QCheckBox::indicator:disabled {{
+    background-color: {C.PANEL_ALT};
+    border-color: {C.LINE};
+}}
+
 QProgressBar {{
-    background-color: #e0e0e0;
+    background-color: {C.LINE};
     border: none;
+    border-radius: 4px;
     text-align: center;
     color: transparent;
-    height: 6px;
-    max-height: 6px;
+    height: 7px;
+    max-height: 7px;
 }}
 QProgressBar::chunk {{
     background-color: {C.ACCENT};
+    border-radius: 4px;
+}}
+QProgressBar#headerProgress {{
+    background-color: #d7e6d9;
 }}
 QProgressBar#headerProgress::chunk {{
     background-color: {C.OK};
+    border-radius: 4px;
 }}
 QProgressBar#rowProgress {{
-    background-color: #ececec;
-    border: 1px solid #d0d0d0;
+    background-color: {C.LINE};
+    border: none;
+    border-radius: 3px;
     height: 6px;
     max-height: 6px;
 }}
 QProgressBar#rowProgress::chunk {{
-    background-color: #77b7ff;
+    background-color: {C.ACCENT};
+    border-radius: 3px;
 }}
 
 QPlainTextEdit#logView {{
-    background-color: #1e1e1e;
-    color: #d4d4d4;
-    border: 1px solid #333;
-    font-family: "Consolas", "Courier New", monospace;
+    background-color: {C.LOG_BG};
+    color: {C.LOG_TEXT};
+    border: 1px solid #2a2f37;
+    border-radius: 6px;
+    font-family: "Cascadia Mono", "Consolas", "Courier New", monospace;
     font-size: 11px;
-    padding: 4px 6px;
+    padding: 5px 7px;
+    selection-background-color: #2f4360;
+    selection-color: #ffffff;
 }}
 
 QTabWidget::pane {{
-    border: 1px solid #b8b8b8;
+    border: 1px solid {C.BORDER};
+    border-radius: 8px;
     background: {C.PANEL};
     top: -1px;
 }}
+QTabBar {{
+    qproperty-drawBase: 0;
+}}
 QTabBar::tab {{
-    background: #efefef;
-    color: #24415f;
+    background: transparent;
+    color: {C.TEXT_DIM};
     border: none;
-    padding: 5px 8px 4px 8px;
+    border-bottom: 2px solid transparent;
+    padding: 6px 12px 5px 12px;
     margin-right: 2px;
     font-weight: 700;
     font-size: 12px;
 }}
 QTabBar::tab:selected {{
-    background: {C.PANEL};
-    color: #d9271c;
-    border-bottom: 2px solid #d9271c;
+    color: {C.ACCENT};
+    border-bottom: 2px solid {C.ACCENT};
 }}
-QTabBar::tab:hover:!selected {{ background: #ffffff; color: #0f3f7f; }}
+QTabBar::tab:hover:!selected {{ color: {C.TEXT}; }}
 
 QDialog#settingsDialog {{
     background-color: {C.PANEL};
@@ -381,19 +495,23 @@ QLabel#settingLabel {{
 }}
 
 QLineEdit#settingInput {{
-    background-color: #ffffff;
+    background-color: {C.PANEL};
     color: {C.TEXT};
-    border: 1px solid #7f9db9;
-    padding: 3px 6px;
+    border: 1px solid {C.BORDER};
+    border-radius: 6px;
+    padding: 4px 8px;
     font-size: 12px;
-    selection-background-color: #316ac5;
+    selection-background-color: {C.ACCENT};
     selection-color: #ffffff;
 }}
+QLineEdit#settingInput:hover {{
+    border: 1px solid #c6cfda;
+}}
 QLineEdit#settingInput:focus {{
-    border: 1px solid #316ac5;
+    border: 1px solid {C.ACCENT};
 }}
 QLineEdit#settingInput:disabled {{
-    background-color: #eeeeee;
+    background-color: {C.PANEL_ALT};
     color: {C.TEXT_MUTED};
 }}
 QLabel#settingHint {{
@@ -413,19 +531,22 @@ QStatusBar QLabel {{ color: {C.TEXT_DIM}; padding: 0 4px; }}
 
 QScrollBar:vertical {{
     background: transparent;
-    width: 6px;
+    width: 8px;
     margin: 0px;
 }}
 QScrollBar::handle:vertical {{
-    background: #c0c0c0;
-    min-height: 14px;
+    background: #c4ccd6;
+    border-radius: 4px;
+    min-height: 18px;
 }}
-QScrollBar::handle:vertical:hover {{ background: #a0a0a0; }}
+QScrollBar::handle:vertical:hover {{ background: #aab4c0; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
-QScrollBar:horizontal {{ height: 6px; background: transparent; margin: 0px; }}
-QScrollBar::handle:horizontal {{ background: #c0c0c0; min-width: 14px; }}
-QScrollBar::handle:horizontal:hover {{ background: #a0a0a0; }}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
+QScrollBar:horizontal {{ height: 8px; background: transparent; margin: 0px; }}
+QScrollBar::handle:horizontal {{ background: #c4ccd6; border-radius: 4px; min-width: 18px; }}
+QScrollBar::handle:horizontal:hover {{ background: #aab4c0; }}
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background: transparent; }}
 """
 
 
@@ -557,13 +678,15 @@ class GameAutomationWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         self.setWindowTitle(self.title)
-        self.setFixedSize(420, 820)
+        self.setFixedWidth(420)
+        self.setMinimumHeight(640)
+        self.resize(420, 820)
 
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
-        root.setContentsMargins(6, 4, 6, 2)
-        root.setSpacing(4)
+        root.setContentsMargins(8, 8, 8, 4)
+        root.setSpacing(8)
 
         root.addWidget(self._build_header())
         root.addWidget(self._build_tabs(), 3)
@@ -666,10 +789,6 @@ class GameAutomationWindow(QMainWindow):
             "Start/stop all enabled background tasks.\n"
             "Uncheck to pause background, check to resume."
         )
-        self.bg_master_cb.setStyleSheet(
-            f"QCheckBox {{ color:{C.TEXT}; font-weight:600; font-size:12px; spacing:4px; }}"
-            f"QCheckBox::indicator {{ width:16px; height:16px; }}"
-        )
         self.bg_master_cb.toggled.connect(self._cb_toggle_background_master)
         r3.addWidget(self.bg_master_cb)
 
@@ -720,8 +839,8 @@ class GameAutomationWindow(QMainWindow):
             none_btn.clicked.connect(lambda: self._cb_select_all_bg(False))
 
         if not acts:
-            empty = QLabel("None")
-            empty.setStyleSheet(f"color:{C.TEXT_MUTED}; font-size:10px; padding: 10px;")
+            empty = QLabel("No tasks in this list")
+            empty.setStyleSheet(f"color:{C.TEXT_MUTED}; font-size:11px; padding: 16px;")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(empty)
             layout.addStretch(1)
@@ -858,29 +977,26 @@ class GameAutomationWindow(QMainWindow):
         back_btn.clicked.connect(lambda _checked=False, k=kind: self._cb_hide_activity_settings(k))
         header.addWidget(back_btn)
 
-        self._settings_title = QLabel("Settings")
-        self._settings_title.setObjectName("title")
-        header.addWidget(self._settings_title, 1)
+        title = QLabel("Settings")
+        title.setObjectName("title")
+        header.addWidget(title, 1)
         layout.addLayout(header)
 
-        # Description label (updated per activity when shown).
-        self._settings_desc = QLabel("")
-        self._settings_desc.setObjectName("subtitle")
-        self._settings_desc.setWordWrap(True)
-        layout.addWidget(self._settings_desc)
+        desc = QLabel("")
+        desc.setObjectName("subtitle")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
 
-        # Container for per-activity widgets. Rebuilt each time a different
-        # activity is selected, because the custom settings differ.
-        self._settings_body = QVBoxLayout()
-        self._settings_body.setContentsMargins(0, 0, 0, 0)
-        self._settings_body.setSpacing(8)
-        layout.addLayout(self._settings_body, 1)
+        body = QVBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(8)
+        layout.addLayout(body, 1)
 
-        # Store references for the active activity later
         panel._kind = kind
         panel._rows = rows
-        # Per-activity widget refs populated in _cb_show_activity_settings:
-        #   { "interval_input": input, "custom": { key: {"input": input} } }
+        panel._title = title
+        panel._desc = desc
+        panel._body = body
         panel._active_widgets: Dict[str, Any] = {}
 
         return panel
@@ -969,20 +1085,21 @@ class GameAutomationWindow(QMainWindow):
         self._active_settings_activity_id = activity_id
         panel._rows = rows
 
-        self._settings_title.setText(f"Settings: {act.name}")
-        self._settings_desc.setText(act.description or "")
+        panel._title.setText(f"Settings: {act.name}")
+        panel._desc.setText(act.description or "")
 
-        self._clear_layout(self._settings_body)
+        body = panel._body
+        self._clear_layout(body)
         widgets: Dict[str, Any] = {}
         panel._active_widgets = widgets
 
         if act.background:
-            self._build_interval_section(self._settings_body, act, widgets)
+            self._build_interval_section(body, act, widgets)
 
         for spec in act.custom_settings:
-            self._build_custom_setting(self._settings_body, activity_id, spec, widgets)
+            self._build_custom_setting(body, activity_id, spec, widgets)
 
-        self._settings_body.addStretch(1)
+        body.addStretch(1)
 
     def _build_interval_section(
         self, body: QVBoxLayout, act: Activity, widgets: Dict[str, Any]
@@ -1138,12 +1255,12 @@ class GameAutomationWindow(QMainWindow):
 
     def _render_line(self, ts: str, level: str, msg: str) -> None:
         pfx = {"info": "INF", "success": "OK ", "warning": "WRN", "error": "ERR"}.get(level, "INF")
-        c = _LOG_COLORS.get(level, C.INFO)
+        c = _LOG_COLORS.get(level, _LOG_COLORS["info"])
         safe = msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         html = (
-            f'<span style="color:{C.TEXT_MUTED};">[{ts}]</span> '
+            f'<span style="color:{C.LOG_MUTED};">[{ts}]</span> '
             f'<span style="color:{c};font-weight:700;">{pfx}</span> '
-            f'<span>{safe}</span>'
+            f'<span style="color:{C.LOG_TEXT};">{safe}</span>'
         )
         self.log_view.appendHtml(html)
         self.log_view.verticalScrollBar().setValue(
@@ -1154,12 +1271,12 @@ class GameAutomationWindow(QMainWindow):
 
     @staticmethod
     def _apply_pill(pill: QLabel, status: str) -> None:
-        bg, fg, text = _STATUS_PILL.get(status, _STATUS_PILL["pending"])
+        bg, fg, border, text = _STATUS_PILL.get(status, _STATUS_PILL["pending"])
         pill.setText(text)
         pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pill.setStyleSheet(
-            f"background-color:{bg}; color:{fg};"
-            "border:1px solid #e6eef5; padding:2px 6px; font-weight:500; font-size:11px;"
+            f"background-color:{bg}; color:{fg}; border:1px solid {border};"
+            "border-radius:9px; padding:2px 8px; font-weight:600; font-size:11px;"
         )
 
     def _set_status(self, label: str) -> None:
