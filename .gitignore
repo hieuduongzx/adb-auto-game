@@ -57,10 +57,9 @@ Thumbs.db
 desktop.ini
 
 # Large vendor binaries (exceed GitHub's 100 MB limit; fetch manually)
-vendor/frida/frida-server
-vendor/frida/frida-inject-17.15.1-android-x86_64
-vendor/frida/frida-server-17.15.1-android-x86_64.xz
-vendor/frida/*.xz
+# Ignore the whole frida/ dir - both frida-server and frida-inject exceed
+# GitHub's limit and must be downloaded separately into vendor/frida/.
+vendor/frida/
 
 # Distribution / packaging
 .Python
