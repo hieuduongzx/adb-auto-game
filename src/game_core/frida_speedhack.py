@@ -4,11 +4,17 @@ Runtime speedhack helper for Unity/IL2CPP (and Mono) games using Frida inject.
 This manager pushes a JavaScript payload to the Android device and runs
 ``frida-inject`` against the target process. It avoids needing a persistent
 ``frida-server`` connection, which is fragile on some emulators (e.g.
-LDPlayer). The injected script tries two strategies:
+LDPlayer). The injected script tries, in order:
 
 1. Call ``UnityEngine.Time.set_timeScale`` if the IL2CPP symbol is visible.
-2. Hook ``clock_gettime`` in ``libc.so`` to scale monotonic time for
-   the whole process (works for Mono and stripped IL2CPP binaries).
+2. Hook ``clock_gettime`` in ``libc.so`` with a native CModule to scale
+   monotonic time for the whole process (works for Mono and stripped IL2CPP).
+3. Same hook implemented in plain JS as a last-resort fallback.
+
+Once injected, the script stays alive and polls a system property for the
+desired scale, so the host can change speed LIVE (just ``setprop``) without
+re-injecting -- this keeps slider drags smooth and avoids resetting the
+monotonic-time base on every change.
 
 Usage in a game class::
 
@@ -29,6 +35,7 @@ NOTE: This is a best-effort helper. Actual hook success depends on the
 device being rooted and supporting Frida. Anti-cheat/integrity checks may
 detect the injection and lead to bans.
 """
+import hashlib
 import shlex
 import subprocess
 import tempfile
@@ -41,20 +48,25 @@ from src.utils import log_error, log_info, log_success, log_warning
 
 
 _INJECT_SCRIPT = """
-// Clean up any interceptors left by a previous injection into this process.
-try { Interceptor.detachAll(); } catch(e) {}
+// Speedhack agent. Applies a time scale and supports LIVE changes via a system
+// property, so the host can adjust speed without re-injecting.
+
+// Drop any interceptors left behind by a previous injection into this process.
+try { Interceptor.detachAll(); } catch (e) {}
 
 var currentScale = 1.0;
-var timeHookInstalled = false;
-var clockGettimeOriginal = null;
-var readingOriginalClock = false;
-var baseByClock = {};
+var hookMode = 'none';        // 'timescale' | 'clock-cmodule' | 'clock-js'
+var clockScaleBuf = null;     // Memory(8) holding the live scale for the CModule
+var timeScaleSetter = null;   // NativeFunction(UnityEngine.Time.set_timeScale)
+var jsHookInstalled = false;
+var baseByClock = {};         // state for the JS fallback hook
 
 function log(msg) {
     send(msg);
     try { console.log(msg); } catch (e) {}
 }
 
+/* ----------------- IL2CPP / Unity Time.timeScale resolution ----------------- */
 function findIl2CppModule() {
     const modules = Process.enumerateModules();
     const names = ['libil2cpp.so', 'libunity.so'];
@@ -129,34 +141,117 @@ function resolveTimeScale() {
     return { setter: setter };
 }
 
-function installTimeScaleHook(scale) {
-    const ts = resolveTimeScale();
-    if (!ts || !ts.setter) return false;
+function installTimeScale(scale) {
+    if (!timeScaleSetter) {
+        const ts = resolveTimeScale();
+        if (!ts || !ts.setter) return false;
+        try {
+            timeScaleSetter = new NativeFunction(ts.setter, 'void', ['float']);
+        } catch (e) {
+            log('timeScale NativeFunction failed: ' + e.message);
+            return false;
+        }
+    }
     try {
-        const setScale = new NativeFunction(ts.setter, 'void', ['float']);
-        setScale(scale);
+        timeScaleSetter(scale);
         currentScale = scale;
-        log('Time.timeScale hook applied: ' + scale);
+        hookMode = 'timescale';
+        log('Time.timeScale applied: ' + scale);
         return true;
     } catch (e) {
-        log('Time.timeScale hook failed: ' + e.message);
+        log('Time.timeScale failed: ' + e.message);
         return false;
     }
 }
 
-function readClockMs(clockId) {
-    if (!clockGettimeOriginal) return null;
-    const tmp = Memory.alloc(16);
-    readingOriginalClock = true;
+/* --------------- Native clock_gettime hook (CModule, no JS bridge) ----------
+ * clock_gettime is on the hot path (millions of calls/sec). Running the scaling
+ * logic in compiled C via Interceptor.attach(addr, cmodule) keeps every call
+ * native -- no JS-bridge crossing, no per-call allocation -- so it stays smooth
+ * even at high scales. g_scale is a shared double the host updates live.
+ */
+var CLOCK_HOOK_C = `
+#include <gum/guminterceptor.h>
+#include <stdint.h>
+
+extern double g_scale;
+
+typedef struct { int64_t tv_sec; int64_t tv_nsec; } timespec64;
+typedef struct { int clock_id; void * tv; } HookState;
+
+static double real_base[16];
+static double scaled_base[16];
+static int has_base[16];
+
+void
+onEnter (GumInvocationContext * ic)
+{
+  HookState * s = gum_invocation_context_get_listener_invocation_data (ic, sizeof (HookState));
+  s->clock_id = (int) (size_t) gum_invocation_context_get_nth_argument (ic, 0);
+  s->tv = gum_invocation_context_get_nth_argument (ic, 1);
+}
+
+void
+onLeave (GumInvocationContext * ic)
+{
+  if ((size_t) gum_invocation_context_get_return_value (ic) != 0)
+    return;
+
+  HookState * s = gum_invocation_context_get_listener_invocation_data (ic, sizeof (HookState));
+  int clk = s->clock_id;
+  /* Scale ONLY CLOCK_MONOTONIC (1). Leaving CLOCK_BOOTTIME (7) real avoids the
+   * classic SystemClock.elapsedRealtime() speedhack detection, and leaving the
+   * CPU-time clocks (2,3) real avoids upsetting the ART GC / watchdog. */
+  if (clk != 1)
+    return;
+
+  timespec64 * ts = (timespec64 *) s->tv;
+  if (ts == 0)
+    return;
+
+  double scale = g_scale;
+  double real_ms = (double) ts->tv_sec * 1000.0 + (double) ts->tv_nsec / 1000000.0;
+  double scaled_ms;
+  if (!has_base[clk]) {
+    has_base[clk] = 1;
+    real_base[clk] = real_ms;
+    scaled_base[clk] = real_ms;
+    scaled_ms = real_ms;
+  } else {
+    double delta = real_ms - real_base[clk];
+    scaled_base[clk] += delta * scale;
+    real_base[clk] = real_ms;
+    scaled_ms = scaled_base[clk];
+  }
+
+  int64_t sec = (int64_t) (scaled_ms / 1000.0);
+  int64_t nsec = (int64_t) ((scaled_ms - (double) sec * 1000.0) * 1000000.0);
+  ts->tv_sec = sec;
+  ts->tv_nsec = nsec;
+}
+`;
+
+function installClockCModule(scale) {
     try {
-        const ret = clockGettimeOriginal(clockId, tmp);
-        if (ret !== 0) return null;
-        return tmp.readLong() * 1000 + tmp.add(8).readLong() / 1000000;
-    } finally {
-        readingOriginalClock = false;
+        const libc = Process.findModuleByName('libc.so');
+        if (!libc) { log('libc.so not found'); return false; }
+        const cgAddr = libc.getExportByName('clock_gettime');
+        if (!cgAddr) { log('clock_gettime not found'); return false; }
+        clockScaleBuf = Memory.alloc(8);
+        clockScaleBuf.writeDouble(scale);
+        const cm = new CModule(CLOCK_HOOK_C, { g_scale: clockScaleBuf });
+        Interceptor.attach(cgAddr, cm);
+        currentScale = scale;
+        hookMode = 'clock-cmodule';
+        log('clock hook installed (CModule native): scale=' + scale);
+        return true;
+    } catch (e) {
+        log('CModule clock hook unavailable: ' + e.message);
+        return false;
     }
 }
 
+/* ----------------- JS fallback clock hook (no per-call alloc) ---------------- */
 function scaledClockMs(clockId, realMs) {
     const key = String(clockId);
     let base = baseByClock[key];
@@ -178,68 +273,104 @@ function writeTimespec(tv, ms) {
     tv.add(8).writeLong(nsec);
 }
 
-function installTimeHack(scale) {
+function installClockJs(scale) {
     try {
         const libc = Process.findModuleByName('libc.so');
-        if (!libc) {
-            log('libc.so not found');
-            return false;
-        }
+        if (!libc) { log('libc.so not found'); return false; }
         const cgAddr = libc.getExportByName('clock_gettime');
-        if (!cgAddr) {
-            log('clock_gettime not found');
-            return false;
-        }
-        clockGettimeOriginal = new NativeFunction(cgAddr, 'int', ['int', 'pointer']);
-
-        if (!timeHookInstalled) {
+        if (!cgAddr) { log('clock_gettime not found'); return false; }
+        if (!jsHookInstalled) {
+            // Read the real time straight from the output buffer the original
+            // call just filled in -- no Memory.alloc, no second syscall.
             Interceptor.attach(cgAddr, {
                 onEnter: function(args) { this.tv = args[1]; this.clock = args[0].toInt32(); },
                 onLeave: function(retval) {
-                    if (readingOriginalClock) return;
                     if (currentScale === 1.0) return;
                     if (retval.toInt32() !== 0) return;
                     if (!this.tv || this.tv.isNull()) return;
-                    if (this.clock === 0) return;
-                    const realMs = readClockMs(this.clock);
-                    if (realMs === null) return;
+                    if (this.clock !== 1) return;  // only scale CLOCK_MONOTONIC
+                    const realMs = this.tv.readLong().toNumber() * 1000 +
+                                   this.tv.add(8).readLong().toNumber() / 1000000;
                     writeTimespec(this.tv, scaledClockMs(this.clock, realMs));
                 }
             });
+            jsHookInstalled = true;
         }
-
-        timeHookInstalled = true;
         currentScale = scale;
-        log('Time-hack fallback installed: scale=' + scale);
+        hookMode = 'clock-js';
+        log('clock hook installed (JS fallback): scale=' + scale);
         return true;
     } catch (e) {
-        log('Time-hack fallback failed: ' + e.message);
+        log('JS clock hook failed: ' + e.message);
         return false;
     }
 }
 
-function setScale(scale) {
-    log('setScale called: ' + scale);
-    currentScale = scale;
-    if (installTimeScaleHook(scale)) {
-        log('success: Time.timeScale applied');
-        return true;
-    }
-    if (scale === 1.0) {
-        log('success: normal scale requested');
-        return true;
-    }
-    if (installTimeHack(scale)) {
-        log('success: Time-hack fallback applied');
-        return true;
-    }
+/* ----------------------- strategy selection + live update ------------------- */
+function initHook(scale) {
+    if (installTimeScale(scale)) return true;
+    if (scale === 1.0) { currentScale = 1.0; return true; }
+    if (USE_CMODULE && installClockCModule(scale)) return true;
+    if (installClockJs(scale)) return true;
     log('error: no speedhack strategy available');
     return false;
 }
 
+function applyScale(scale) {
+    currentScale = scale;
+    if (hookMode === 'clock-cmodule' && clockScaleBuf) {
+        clockScaleBuf.writeDouble(scale);            // native hook reads it live
+    } else if (hookMode === 'timescale' && timeScaleSetter) {
+        try { timeScaleSetter(scale); } catch (e) { log('re-apply timeScale failed: ' + e.message); }
+    } else if (hookMode === 'clock-js') {
+        /* currentScale is read live inside the JS hook */
+    } else {
+        initHook(scale);                              // not set up yet -> install now
+    }
+}
+
+/* ------------------- live scale channel: poll a system property ------------- */
+var getPropFn = null;
+(function() {
+    const libc = Process.findModuleByName('libc.so');
+    if (!libc) return;
+    let addr = null;
+    try { addr = libc.findExportByName('__system_property_get'); } catch (e) {}
+    if (!addr) { try { addr = libc.getExportByName('__system_property_get'); } catch (e) {} }
+    if (addr) getPropFn = new NativeFunction(addr, 'int', ['pointer', 'pointer']);
+})();
+var propName = Memory.allocUtf8String('SCALE_PROP_NAME');
+var propBuf = Memory.alloc(96);
+
+function readLiveScale() {
+    if (!getPropFn) return null;
+    try {
+        const len = getPropFn(propName, propBuf);
+        if (len <= 0) return null;
+        const v = parseFloat(propBuf.readUtf8String());
+        if (isNaN(v) || v <= 0) return null;
+        return v;
+    } catch (e) {
+        return null;
+    }
+}
+
 log('script loaded, target=' + TARGET_SCALE);
-const speedhackOk = setScale(TARGET_SCALE);
+var speedhackOk = initHook(TARGET_SCALE);
 log('script finished: ' + (speedhackOk ? 'success' : 'failed'));
+
+if (getPropFn) {
+    setInterval(function() {
+        const v = readLiveScale();
+        if (v !== null && Math.abs(v - currentScale) > 1e-6) {
+            log('live scale change: ' + currentScale + ' -> ' + v);
+            applyScale(v);
+        }
+    }, 250);
+    log('live scale poller active (SCALE_PROP_NAME)');
+} else {
+    log('live scale channel unavailable (__system_property_get missing)');
+}
 """
 
 
@@ -250,10 +381,20 @@ class FridaSpeedhackManager:
     Args:
         package: Android package name of the target game.
         time_scale: Desired initial time scale (default 1.0 = normal speed).
-        frida_inject_path: Absolute device path to ``frida-inject``.
+        frida_inject_path: Base device path for ``frida-inject`` (an
+            architecture suffix is appended automatically).
         local_inject_binary: Optional local path to a ``frida-inject`` binary
             that will be pushed to the device when not present.
     """
+
+    # Map Android ``ro.product.cpu.abi`` values to Frida's binary arch suffix.
+    _ABI_TO_FRIDA = {
+        "x86_64": "x86_64",
+        "x86": "x86",
+        "arm64-v8a": "arm64",
+        "armeabi-v7a": "arm",
+        "armeabi": "arm",
+    }
 
     def __init__(
         self,
@@ -262,8 +403,12 @@ class FridaSpeedhackManager:
         frida_inject_path: str = "/data/local/tmp/frida-inject",
         local_inject_binary: Optional[str] = None,
         device_id: Optional[str] = None,
+        use_cmodule: bool = False,
     ):
         self.package = package
+        # The native CModule clock hook is faster but appears to upset some
+        # protected games; default to the proven JS hook and let callers opt in.
+        self._use_cmodule = use_cmodule
         self._target_scale = float(time_scale)
         self._current_scale: float = 1.0
         self._frida_inject_path = frida_inject_path
@@ -271,12 +416,21 @@ class FridaSpeedhackManager:
         self._device_id = device_id
 
         self._device_script_path = "/data/local/tmp/speedhack.js"
+        # Per-package system property used as the live-scale channel. Kept short
+        # and under the ``debug.`` prefix so it is readable by the game process
+        # (a different uid than the injector) without SELinux trouble.
+        self._scale_prop = "debug.speedhack." + hashlib.md5(
+            package.encode("utf-8")
+        ).hexdigest()[:6]
         self._lock = threading.RLock()
         self._inject_proc: Optional[subprocess.Popen] = None
+        # Once the property channel round-trips we trust it and skip the
+        # read-back verification on subsequent live updates (snappier slider).
+        self._live_verified = False
 
     @property
     def available(self) -> bool:
-        """Whether the bundled ``frida-inject`` binary exists locally."""
+        """Whether any bundled ``frida-inject`` binary exists locally."""
         if self._local_inject_binary and Path(self._local_inject_binary).is_file():
             return True
         bundled = self._bundled_inject_path()
@@ -297,12 +451,32 @@ class FridaSpeedhackManager:
         return current.parents[2]
 
     @staticmethod
-    def _bundled_inject_path() -> Optional[Path]:
-        root = FridaSpeedhackManager._project_root()
+    def _bundled_inject_path(arch: Optional[str] = None) -> Optional[Path]:
+        """Locate a bundled ``frida-inject`` binary, preferring ``arch``.
+
+        When ``arch`` is given we only return a binary matching that exact
+        architecture (so an ``x86`` device never gets the ``x86_64`` binary).
+        Without ``arch`` we return the first binary found -- enough for the
+        cheap ``available`` check.
+        """
+        frida_dir = FridaSpeedhackManager._project_root() / "vendor" / "frida"
+        if not frida_dir.is_dir():
+            return None
+
+        if arch:
+            # Exact-arch match. The glob is anchored on the full filename, so
+            # ``-android-x86`` does not match ``-android-x86_64``.
+            for m in sorted(frida_dir.glob(f"frida-inject-*-android-{arch}")):
+                if m.is_file():
+                    return m
+            exact = frida_dir / f"frida-inject-android-{arch}"
+            return exact if exact.is_file() else None
+
         candidates = [
-            root / "vendor" / "frida" / "frida-inject-17.15.1-android-x86_64",
-            root / "vendor" / "frida" / "frida-inject",
+            frida_dir / "frida-inject-17.15.1-android-x86_64",
+            frida_dir / "frida-inject",
         ]
+        candidates += sorted(frida_dir.glob("frida-inject-*-android-*"))
         for c in candidates:
             if c.is_file():
                 return c
@@ -360,34 +534,77 @@ class FridaSpeedhackManager:
             log_warning(f"[speedhack] adb command failed: {e}")
             return ""
 
+    def _device_abi(self) -> str:
+        """Return the device's primary ABI (e.g. ``arm64-v8a``)."""
+        out = self._run_adb("getprop ro.product.cpu.abi").strip()
+        return out.splitlines()[0].strip() if out else ""
+
+    def _frida_arch(self) -> Optional[str]:
+        """Map the device ABI to a Frida arch suffix (None if unknown)."""
+        abi = self._device_abi()
+        if not abi:
+            return None
+        arch = self._ABI_TO_FRIDA.get(abi)
+        if not arch:
+            log_warning(f"[speedhack] unknown device ABI '{abi}'")
+        return arch
+
     def _push_inject_if_needed(self) -> bool:
-        """Ensure ``frida-inject`` exists on the device."""
-        local = self._local_inject_binary or self._bundled_inject_path()
-        if not local:
+        """Ensure an arch-matched ``frida-inject`` exists on the device.
+
+        Picks the binary that matches the device's ABI and pushes it to an
+        arch-specific device path, so switching between an x86_64 emulator and
+        an arm64 device never reuses the wrong binary.
+        """
+        arch = self._frida_arch()
+
+        if self._local_inject_binary:
+            local = Path(self._local_inject_binary)
+        elif arch:
+            local = self._bundled_inject_path(arch)
+            if not local:
+                log_error(
+                    f"[speedhack] no frida-inject for device arch '{arch}'. "
+                    f"Download 'frida-inject-<version>-android-{arch}' and place "
+                    f"it in vendor/frida/"
+                )
+                return False
+        else:
+            local = self._bundled_inject_path()
+
+        if not local or not Path(local).is_file():
             log_error(
                 "[speedhack] no local frida-inject binary. "
                 "Download frida-inject for your device architecture and place it in vendor/frida/"
             )
             return False
 
-        # Use ``test -f`` and check its exit code instead of parsing ``ls``
-        # output: ``ls`` echoes the path back in its own "No such file" error,
-        # so a naive substring check always falsely reports the file as present.
-        inject_path = shlex.quote(self._frida_inject_path)
+        # Use an arch-specific device path so a stale binary from a different
+        # device architecture is never reused.
+        device_path = (
+            f"/data/local/tmp/frida-inject-{arch}" if arch else self._frida_inject_path
+        )
+        inject_path = shlex.quote(device_path)
+
+        # ``test -f`` exit code instead of parsing ``ls`` output: ``ls`` echoes
+        # the path back in its own "No such file" error, so a naive substring
+        # check always falsely reports the file as present.
         check = self._run_adb(f"test -f {inject_path} && echo OK || echo MISSING")
         if "OK" in check:
+            self._frida_inject_path = device_path
             return True
 
-        log_info("[speedhack] pushing frida-inject to device...")
+        log_info(f"[speedhack] pushing frida-inject ({arch or 'default'}) to device...")
         try:
             subprocess.run(
-                self._adb_prefix() + ["push", str(local), self._frida_inject_path],
+                self._adb_prefix() + ["push", str(local), device_path],
                 check=True,
                 capture_output=True,
                 text=True,
                 timeout=120,
             )
             self._run_adb(f"chmod 755 {inject_path}")
+            self._frida_inject_path = device_path
             return True
         except Exception as e:
             log_error(f"[speedhack] failed to push frida-inject: {e}")
@@ -412,7 +629,12 @@ class FridaSpeedhackManager:
 
     def _push_script(self, scale: float) -> bool:
         """Write the JS payload locally and push it to the device."""
-        source = _INJECT_SCRIPT.replace("TARGET_SCALE", f"{scale:.6f}")
+        source = (
+            _INJECT_SCRIPT
+            .replace("TARGET_SCALE", f"{scale:.6f}")
+            .replace("SCALE_PROP_NAME", self._scale_prop)
+            .replace("USE_CMODULE", "true" if self._use_cmodule else "false")
+        )
         local_path = Path(tempfile.gettempdir()) / f"speedhack_{scale:.2f}.js"
         try:
             local_path.write_text(source, encoding="utf-8")
@@ -433,6 +655,29 @@ class FridaSpeedhackManager:
             except Exception:
                 pass
 
+    def _set_device_scale_prop(self, scale: float) -> None:
+        """Set the live-scale system property on the device."""
+        cmd = f"setprop {self._scale_prop} {scale:.6f}"
+        self._run_adb(f"su -c {shlex.quote(cmd)}")
+
+    def _set_live_scale(self, scale: float) -> bool:
+        """Update the running injection's scale via the system property.
+
+        Returns True only when the property round-trips (read back matches),
+        so a blocked ``setprop`` cleanly falls back to a full re-injection.
+        """
+        self._set_device_scale_prop(scale)
+        if self._live_verified:
+            return True
+        check = self._run_adb(f"getprop {self._scale_prop}").strip()
+        try:
+            ok = abs(float(check.split()[0]) - scale) < 1e-3
+        except Exception:
+            ok = False
+        if ok:
+            self._live_verified = True
+        return ok
+
     def _stop_inject_proc(self) -> None:
         proc = self._inject_proc
         self._inject_proc = None
@@ -449,8 +694,15 @@ class FridaSpeedhackManager:
                 log_warning(f"[speedhack] error stopping inject proc: {e}")
 
     def _kill_device_frida(self) -> None:
-        """Kill any running frida-inject processes on the device to avoid stacked hooks."""
-        self._run_adb("su -c 'pkill -f frida-inject 2>/dev/null; sleep 0.3' &")
+        """Kill any frida-inject still running on the device.
+
+        Each leftover frida-inject keeps its own ``clock_gettime`` interceptor
+        alive. Two of them stack and time scales by ``scale^2``, which spirals
+        the engine's frame delta and freezes the game -- so clear them out
+        before every fresh injection (and on detach). Runs synchronously so the
+        kill completes before we inject again.
+        """
+        self._run_adb("su -c 'pkill -f frida-inject' 2>/dev/null")
 
     def _inject_scale_locked(self, scale: float, keep_alive: bool) -> bool:
         self._kill_device_frida()
@@ -464,6 +716,10 @@ class FridaSpeedhackManager:
 
         if not self._push_script(scale):
             return False
+
+        # Seed the live-scale property so the script's poller agrees with the
+        # value baked into TARGET_SCALE and does not immediately override it.
+        self._set_device_scale_prop(scale)
 
         log_info(f"[speedhack] injecting into {self.package} (pid {pid})...")
         proc = None
@@ -544,13 +800,16 @@ class FridaSpeedhackManager:
                         pass
 
     def set_scale(self, scale: float) -> bool:
-        """Inject a script that sets the in-game/app time scale to ``scale``."""
+        """Set the in-game/app time scale to ``scale``.
+
+        If an injection is already alive, the change is pushed live via the
+        system property (no re-injection -- smooth, no time-base reset).
+        Otherwise a fresh injection is performed.
+        """
         scale = float(scale)
         log_info(f"[speedhack] requesting time scale = {scale}")
 
         with self._lock:
-            self._stop_inject_proc()
-
             if not self.available:
                 log_warning("[speedhack] frida-inject binary not available")
                 if scale == 1.0:
@@ -558,6 +817,17 @@ class FridaSpeedhackManager:
                     self._target_scale = 1.0
                 return scale == 1.0
 
+            # Fast path: a live injection is running -> just update the shared
+            # scale property. No process spawn, no monotonic-base reset.
+            proc_alive = self._inject_proc is not None and self._inject_proc.poll() is None
+            if proc_alive and self._set_live_scale(scale):
+                self._current_scale = scale
+                self._target_scale = scale
+                log_success(f"[speedhack] time scale set to {scale} (live)")
+                return True
+
+            # Full (re)injection path.
+            self._stop_inject_proc()
             ok = self._inject_scale_locked(scale, keep_alive=scale != 1.0)
             if not ok:
                 if scale != 1.0:
@@ -585,6 +855,7 @@ class FridaSpeedhackManager:
         with self._lock:
             self._stop_inject_proc()
             self._kill_device_frida()
+            self._set_device_scale_prop(1.0)
             self._current_scale = 1.0
             self._target_scale = 1.0
             self._run_adb(f"rm -f {shlex.quote(self._device_script_path)}")

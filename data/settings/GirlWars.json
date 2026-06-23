@@ -1,6 +1,9 @@
 {
   "ocr_backend": "tesseract",
-  "ui_settings": {},
+  "ui_settings": {
+    "debug_mode": false,
+    "debug_fail_mode": false
+  },
   "activities": [
     {
       "id": "auto_skip_dialog",
@@ -14,8 +17,8 @@
     },
     {
       "id": "auto_tap_to_continue",
-      "enabled": true,
-      "poll_interval": 0.2
+      "enabled": false,
+      "poll_interval": 1.0
     },
     {
       "id": "main_story",
@@ -37,7 +40,7 @@
       "enabled": true,
       "poll_interval": 999999.0,
       "custom": {
-        "speed": 1.5
+        "speed": 2.0
       }
     }
   ]
