@@ -119,15 +119,14 @@ def _run_cli(game_class: Type) -> None:
 
 
 def _run_gui(game_class: Type, title: str) -> None:
-    # Import lazily so the launcher works in CLI-only environments.
-    from src.gui.pyside_gui import run_with_pyside
-    run_with_pyside(game_class, title)
+    from src.gui.pywebview_gui import run_with_pywebview
+    run_with_pywebview(game_class, title)
 
 
-def run_game(game_class: Type, title: str, gui: bool) -> None:
+def run_game(game_class: Type, title: str, gui: bool, webview: bool = False) -> None:
     try:
-        if gui:
-            log_success(f"Starting {title} with PySide6 GUI...")
+        if gui or webview:
+            log_success(f"Starting {title} with PyWebView GUI...")
             _run_gui(game_class, title)
         else:
             log_success(f"Starting {title} (CLI). Press 'q' to stop.")
@@ -178,7 +177,8 @@ def _print_games_panel(names: List[str], games: Dict[str, Dict[str, str]]) -> No
 def _print_usage_legend() -> None:
     _section_header("USAGE")
     _hint_row("1", "select game by number")
-    _hint_row("1g", "launch with GUI (append 'g')")
+    _hint_row("1g", "launch with PySide6 GUI (append 'g')")
+    _hint_row("1w", "launch with PyWebView GUI (append 'w')")
     _hint_row("0", "exit")
 
 
@@ -213,8 +213,9 @@ def interactive_menu(games: Dict[str, Dict[str, str]]) -> None:
             log_info("Exiting...")
             return
 
-        gui = choice.lower().endswith("g")
-        if gui:
+        gui     = choice.lower().endswith("g")
+        webview = choice.lower().endswith("w")
+        if gui or webview:
             choice = choice[:-1]
 
         try:
@@ -231,7 +232,7 @@ def interactive_menu(games: Dict[str, Dict[str, str]]) -> None:
         if game_class is None:
             log_error(f"Failed to load {info['display_name']}")
             continue
-        run_game(game_class, f"{info['display_name']} Automation", gui)
+        run_game(game_class, f"{info['display_name']} Automation", gui, webview)
 
 
 def main() -> int:
@@ -248,6 +249,7 @@ def main() -> int:
     )
     parser.add_argument("game", nargs="?", help="Name of the game to run")
     parser.add_argument("--gui", action="store_true", help="Run with the PySide6 GUI")
+    parser.add_argument("--webview", action="store_true", help="Run with the PyWebView GUI")
     parser.add_argument("--list", "-l", action="store_true", help="List available games")
     args = parser.parse_args()
 
@@ -272,7 +274,7 @@ def main() -> int:
     game_class = load_game_class(info)
     if game_class is None:
         return 1
-    run_game(game_class, f"{info['display_name']} Automation", args.gui)
+    run_game(game_class, f"{info['display_name']} Automation", args.gui, args.webview)
     return 0
 
 

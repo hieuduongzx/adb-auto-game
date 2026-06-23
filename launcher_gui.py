@@ -1,278 +1,189 @@
 """
-GUI Game Launcher — Select a game and launch its PySide6 or C++ Qt GUI automation.
+GUI Game Launcher — PyWebView-based game selector.
 
 Usage::
 
     python launcher_gui.py
 
-A compact dialog lists all discovered games.  Double-click or press the
-launch button to open the full automation window for the selected game.
-
-If ``adb-auto-game.exe`` (C++ Qt build) exists in the project root it will
-be used; otherwise falls back to the PySide6 GUI.
+A compact window lists all discovered games.  Click a game to open its
+automation window.
 """
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
-# ---------------------------------------------------------------------------
-# Project root setup (mirrors launcher.py)
-# ---------------------------------------------------------------------------
+import webview
+
 _PROJECT_ROOT = Path(__file__).resolve().parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from PySide6.QtCore import QMargins, Qt
-from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import (
-    QApplication,
-    QDialog,
-    QFrame,
-    QHBoxLayout,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QMessageBox,
-    QPushButton,
-    QVBoxLayout,
-)
-
 from launcher import load_game_class, scan_games
-from src.gui.pyside_gui import C, QSS, run_with_pyside
 from src.utils import log_error, log_info
 
 
 # ---------------------------------------------------------------------------
-# Dialog
+# API bridge
 # ---------------------------------------------------------------------------
 
-class GameLauncherDialog(QDialog):
-    """Modal dialog that lets the user pick a game and launch its GUI.
-
-    After the user confirms, the chosen game info is available via
-    :attr:`selected_info` and :attr:`selected_display`.
-    """
-
-    def __init__(self, games: Dict[str, Dict[str, str]], parent=None) -> None:
-        super().__init__(parent)
+class LauncherAPI:
+    def __init__(self, games: Dict[str, Dict[str, str]]) -> None:
         self._games = games
-        self._names = list(games.keys())
-        self.selected_info: Dict[str, str] | None = None
-        self.selected_display: str = ""
-        self._build_ui()
+        self._window: Optional[webview.Window] = None
 
-    # -- UI construction -------------------------------------------------------
+    def _attach(self, window: webview.Window) -> None:
+        self._window = window
 
-    def _build_ui(self) -> None:
-        self.setWindowTitle("ADB Game Automation — Launcher")
-        self.setFixedSize(380, 440)
-        self.setWindowFlags(
-            self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint
-        )
+    def get_games(self) -> list:
+        return [
+            {"name": k, "display": v["display_name"]}
+            for k, v in self._games.items()
+        ]
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(10)
-
-        # ---- header ----------------------------------------------------------
-        header = QFrame()
-        header.setObjectName("panel")
-        hl = QVBoxLayout(header)
-        hl.setContentsMargins(12, 10, 12, 10)
-        hl.setSpacing(2)
-
-        title = QLabel("Select a Game")
-        title.setObjectName("title")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hl.addWidget(title)
-
-        sub = QLabel("Choose a game to launch its automation GUI")
-        sub.setObjectName("subtitle")
-        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hl.addWidget(sub)
-
-        root.addWidget(header)
-
-        # ---- game list -------------------------------------------------------
-        self._list = QListWidget()
-        self._list.setFrameShape(QFrame.Shape.NoFrame)
-        self._list.setAlternatingRowColors(True)
-        self._list.setSpacing(1)
-        self._list.doubleClicked.connect(self._on_launch)
-
-        for name in self._names:
-            display = self._games[name]["display_name"]
-            item = QListWidgetItem(f"  {display}")
-            item.setData(Qt.ItemDataRole.UserRole, name)
-            item.setSizeHint(item.sizeHint().grownBy(QMargins(0, 0, 0, 6)))
-            self._list.addItem(item)
-
-        if self._names:
-            self._list.setCurrentRow(0)
-
-        root.addWidget(self._list, 1)
-
-        # ---- buttons ---------------------------------------------------------
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(8)
-
-        self._launch_btn = QPushButton("Launch with GUI")
-        self._launch_btn.setObjectName("btnStart")
-        self._launch_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._launch_btn.clicked.connect(self._on_launch)
-
-        exit_btn = QPushButton("Exit")
-        exit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        exit_btn.clicked.connect(self.reject)
-
-        btn_row.addStretch(1)
-        btn_row.addWidget(self._launch_btn)
-        btn_row.addWidget(exit_btn)
-        root.addLayout(btn_row)
-
-    # -- actions ---------------------------------------------------------------
-
-    def _on_launch(self) -> None:
-        item = self._list.currentItem()
-        if item is None:
-            return
-
-        name: str = item.data(Qt.ItemDataRole.UserRole)
-        info = self._games[name]
+    def launch(self, game_name: str) -> bool:
+        info = self._games.get(game_name)
+        if not info:
+            return False
         game_class = load_game_class(info)
-        if game_class is None:
-            log_error(f"Failed to load {info['display_name']}")
-            QMessageBox.critical(
-                self, "Error",
-                f"Could not load game module for:\n{info['display_name']}",
-            )
-            return
+        if not game_class:
+            log_error(f"Could not load {info['display_name']}")
+            return False
+        title = f"{info['display_name']} Automation"
+        log_info(f"Launching {title}")
+        # Create game window in the same webview session, then close launcher.
+        from src.gui.pywebview_gui import create_pywebview_window
+        create_pywebview_window(game_class, title)
+        if self._window:
+            self._window.destroy()
+        return True
 
-        # Stash selection so main() can launch the game *after* the dialog
-        # loop exits.  We must NOT launch inside the dialog handler because
-        # run_with_pyside calls app.exec() and we'd be re-entering the event
-        # loop from within the dialog's own event-handling stack.
-        self.selected_info = info
-        self.selected_display = f"{info['display_name']} Automation"
-        self.accept()
+
+# ---------------------------------------------------------------------------
+# Launcher HTML (fully self-contained, no external resources)
+# ---------------------------------------------------------------------------
+
+def _launcher_html(games: Dict[str, Dict[str, str]]) -> str:
+    items = "\n".join(
+        f'<button class="game-btn" onclick="launch(\'{name}\')">'
+        f'<span class="game-name">{info["display_name"]}</span>'
+        f'<svg class="arrow" viewBox="0 0 16 16" fill="none">'
+        f'<path d="M5 3l6 5-6 5" stroke="currentColor" stroke-width="1.8"'
+        f' stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        f'</button>'
+        for name, info in games.items()
+    )
+
+    return f"""<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ADB Game Automation</title>
+<style>
+*,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
+:root{{
+  --bg:#eef0f3;--panel:#ffffff;--surface:#f7f9fc;--border:#e4e7ec;
+  --ink:#19222e;--dim:#5a6573;--muted:#9aa3ae;
+  --accent:#2f6fed;--accent-bg:#e8f1ff;
+  --r:10px;
+  --sans:"Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}}
+html,body{{height:100%;background:var(--bg);font-family:var(--sans);
+  font-size:13px;color:var(--ink);-webkit-font-smoothing:antialiased;
+  user-select:none;overflow:hidden;}}
+#app{{
+  height:100%;display:flex;flex-direction:column;
+  padding:14px 10px 10px;gap:10px;
+}}
+.header{{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:var(--r);padding:14px 16px;
+}}
+.title{{font-size:16px;font-weight:700;color:var(--ink);line-height:1.1;}}
+.subtitle{{font-size:11px;color:var(--muted);margin-top:3px;}}
+.section-label{{
+  font-size:10.5px;font-weight:700;letter-spacing:.06em;
+  color:var(--muted);text-transform:uppercase;padding:0 2px;
+}}
+.game-list{{
+  flex:1;min-height:0;overflow-y:auto;
+  display:flex;flex-direction:column;gap:4px;
+}}
+::-webkit-scrollbar{{width:5px}}
+::-webkit-scrollbar-thumb{{background:#d3d9e0;border-radius:3px}}
+.game-btn{{
+  width:100%;display:flex;align-items:center;gap:10px;
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:var(--r);padding:11px 13px;
+  cursor:pointer;font-family:var(--sans);
+  text-align:left;transition:background .12s,border-color .12s,transform .1s;
+}}
+.game-btn:hover{{background:var(--surface);border-color:#d0d6de;transform:translateY(-1px);}}
+.game-btn:active{{transform:translateY(0);background:#eef0f3;}}
+.game-btn.launching{{opacity:.6;pointer-events:none;}}
+.game-name{{flex:1;font-size:13px;font-weight:600;color:var(--ink);}}
+.arrow{{width:16px;height:16px;flex-shrink:0;color:var(--muted);
+  transition:color .12s,transform .12s;}}
+.game-btn:hover .arrow{{color:var(--accent);transform:translateX(2px);}}
+#status{{
+  font-size:11px;color:var(--muted);text-align:center;padding:2px 0;
+  min-height:18px;
+}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="title">ADB Game Automation</div>
+    <div class="subtitle">Chọn game để mở giao diện tự động hoá</div>
+  </div>
+  <div class="section-label">GAME</div>
+  <div class="game-list" id="game-list">
+    {items}
+  </div>
+  <div id="status"></div>
+</div>
+<script>
+async function launch(name) {{
+  document.querySelectorAll('.game-btn').forEach(b => b.classList.add('launching'));
+  document.getElementById('status').textContent = 'Đang mở...';
+  try {{
+    await window.pywebview.api.launch(name);
+  }} catch(e) {{
+    document.getElementById('status').textContent = 'Lỗi: ' + e;
+    document.querySelectorAll('.game-btn').forEach(b => b.classList.remove('launching'));
+  }}
+}}
+</script>
+</body>
+</html>"""
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
-def _launch_cpp_gui(exe_path: Path, info: Dict[str, str], dialog: GameLauncherDialog) -> None:
-    """Spawn the C++ Qt GUI executable as a separate process."""
-    python_exe = sys.executable
-    module_path = info["module_path"]
-    title = dialog.selected_display
-
-    cmd = [
-        str(exe_path),
-        "--game", module_path,
-        "--title", title,
-        "--python", python_exe,
-    ]
-    log_info(f"Launching C++ GUI: {' '.join(cmd)}")
-    try:
-        subprocess.Popen(cmd, cwd=str(_PROJECT_ROOT), creationflags=subprocess.CREATE_NO_WINDOW)
-    except Exception as e:
-        log_error(f"Failed to launch C++ GUI: {e}")
-        QMessageBox.critical(
-            dialog, "Launch Error",
-            f"Could not start C++ GUI:\n{e}\n\n"
-            "Falling back to PySide6 GUI."
-        )
-        game_class = load_game_class(info)
-        if game_class:
-            _launch_pyside(game_class, dialog)
-
-
-def _launch_pyside(game_class, dialog: GameLauncherDialog) -> None:
-    """Fallback: launch the PySide6 GUI in-process."""
-    run_with_pyside(game_class, dialog.selected_display)
-
-
-def _apply_theme(app: QApplication) -> None:
-    """Mirror the palette + stylesheet from pyside_gui."""
-    app.setStyle("Fusion")
-
-    palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor(C.BG))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor(C.TEXT))
-    palette.setColor(QPalette.ColorRole.Base, QColor(C.PANEL))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(C.PANEL_ALT))
-    palette.setColor(QPalette.ColorRole.Text, QColor(C.TEXT))
-    palette.setColor(QPalette.ColorRole.Button, QColor(C.PANEL))
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor(C.TEXT))
-    palette.setColor(QPalette.ColorRole.Highlight, QColor(C.ACCENT_BG))
-    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(C.TEXT))
-    app.setPalette(palette)
-
-    # Reuse the main QSS but add a couple of launcher-specific tweaks.
-    launcher_qss = QSS + f"""
-    QListWidget {{
-        background-color: {C.PANEL};
-        border: 1px solid {C.BORDER};
-        border-radius: 6px;
-        font-size: 13px;
-        padding: 4px;
-    }}
-    QListWidget::item {{
-        padding: 6px 8px;
-        border-radius: 4px;
-        color: {C.TEXT};
-    }}
-    QListWidget::item:selected {{
-        background-color: {C.ACCENT_BG};
-        color: {C.ACCENT};
-        font-weight: 600;
-    }}
-    QListWidget::item:hover {{
-        background-color: {C.PANEL_ALT};
-    }}
-    QListWidget::item:alternate {{
-        background-color: {C.PANEL_ALT};
-    }}
-    """
-    app.setStyleSheet(launcher_qss)
-
-
 def main() -> int:
-    app = QApplication.instance() or QApplication(sys.argv)
-    _apply_theme(app)
-
     games = scan_games()
     if not games:
-        QMessageBox.warning(
-            None, "No Games Found",
-            "No game directories were detected under src/games/.\n\n"
-            "Add a game directory with a matching Python module and try again.",
-        )
+        log_error("No games found in src/games/")
         return 1
 
-    dialog = GameLauncherDialog(games)
-    if dialog.exec() != QDialog.DialogCode.Accepted:
-        return 0
-
-    # Dialog accepted — launch the selected game GUI.
-    info = dialog.selected_info
-    if info is None:
-        return 0
-
-    game_class = load_game_class(info)
-    if game_class is None:
-        return 1
-
-    # Launch: prefer C++ Qt GUI exe, fall back to PySide6
-    exe_path = _PROJECT_ROOT / "adb-auto-game.exe"
-    if exe_path.exists():
-        _launch_cpp_gui(exe_path, info, dialog)
-    else:
-        _launch_pyside(game_class, dialog)
+    api = LauncherAPI(games)
+    window = webview.create_window(
+        "ADB Game Automation — Launcher",
+        html=_launcher_html(games),
+        js_api=api,
+        width=340,
+        height=min(160 + len(games) * 54, 560),
+        resizable=False,
+        background_color="#eef0f3",
+    )
+    window.events.loaded += lambda: api._attach(window)
+    webview.start(debug=False, private_mode=False)
     return 0
 
 

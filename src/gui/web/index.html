@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Game Automation</title>
+<style>
+/* ── Reset & tokens ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #eef0f3;
+  --panel:     #ffffff;
+  --surface:   #f7f9fc;
+  --alt:       #f3f5f9;
+  --border:    #e4e7ec;
+  --line:      #f1f3f6;
+
+  --ink:       #19222e;
+  --dim:       #5a6573;
+  --muted:     #9aa3ae;
+
+  --accent:    #2f6fed;
+  --accent-bg: #e8f1ff;
+
+  --ok:        #1f9254;
+  --ok-bg:     #e8f5ed;
+  --ok-bd:     #cfead9;
+  --warn:      #9c6c12;
+  --warn-bg:   #fdf6e9;
+  --warn-bd:   #ecd9b8;
+  --err:       #bb3a33;
+  --err-bg:    #fcefee;
+  --err-bd:    #eecdca;
+
+  --log-bg:    #fbfcfd;
+  --log-ink:   #41505f;
+  --log-muted: #b3bbc4;
+
+  --sans: "IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono: "IBM Plex Mono","Cascadia Code","Consolas",monospace;
+
+  --r-sm: 7px;
+  --r-md: 10px;
+  --r-lg: 12px;
+
+  --ease-out: cubic-bezier(0.16,1,0.3,1);
+
+  color-scheme: light;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+button {
+  font-family: var(--sans);
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  line-height: 1;
+  color: inherit;
+}
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+input {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 5px 8px;
+}
+input:focus { outline: none; border-color: var(--accent); }
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d3d9e0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #b8c1cc; }
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+#app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 8px 4px;
+  gap: 7px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+/* ── Header card ────────────────────────────────────────────────────────── */
+#header-card {
+  padding: 13px 14px 12px;
+  flex-shrink: 0;
+}
+
+.header-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.header-title-block { flex: 1; min-width: 0; }
+.app-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.app-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Status pill */
+#status-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+  border: 1px solid transparent;
+}
+#status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+#status-text {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* Progress row */
+.header-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+#prog-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+}
+.prog-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 6px;
+  background: #d4e9d9;
+  overflow: hidden;
+}
+#header-prog-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: var(--ok);
+  transition: width 0.4s var(--ease-out);
+  width: 0%;
+}
+#elapsed {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Control buttons */
+.header-btns {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 12.5px;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  border: 1px solid transparent;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btn-start {
+  flex: 2;
+  background: var(--ok);
+  color: #fff;
+  border-color: var(--ok);
+}
+.btn-start:hover:not(:disabled) { background: var(--ok-hover, #1b8049); }
+.btn-start:active:not(:disabled) { background: #166e3b; }
+
+.btn-pause {
+  flex: 1;
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: var(--warn-bd);
+}
+.btn-pause:hover:not(:disabled) { background: #fbefd6; }
+
+.btn-stop {
+  width: 38px;
+  flex-shrink: 0;
+  background: var(--err-bg);
+  color: var(--err);
+  border-color: var(--err-bd);
+}
+.btn-stop:hover:not(:disabled) { background: #fae2e0; }
+
+/* SVG icons */
+.icon { fill: currentColor; flex-shrink: 0; }
+
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
+#tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tab-btn {
+  position: relative;
+  padding: 8px 11px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: color 0.15s;
+}
+.tab-btn::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+.tab-btn.active { color: var(--accent); }
+.tab-btn.active::after { background: var(--accent); }
+.tab-btn:hover:not(.active) { color: var(--dim); }
+
+/* ── Tab content ────────────────────────────────────────────────────────── */
+.tab-pane { display: none; flex-direction: column; min-height: 0; overflow: hidden; }
+.tab-pane.active { display: flex; }
+
+#tab-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Task list ──────────────────────────────────────────────────────────── */
+.pane-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 4px 2px;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.list-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  text-transform: uppercase;
+  flex: 1;
+}
+.btn-sel {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: var(--accent);
+  transition: background 0.1s;
+}
+.btn-sel:hover { background: var(--accent-bg); }
+.btn-sel.none { color: var(--muted); }
+.btn-sel.none:hover { background: var(--line); color: var(--dim); }
+
+/* scrollable task list */
+.task-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+/* Activity row */
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.1s;
+}
+.task-row:last-child { border-bottom: none; }
+.task-row:hover { background: var(--surface); }
+
+/* Custom checkbox */
+.cb {
+  width: 17px; height: 17px;
+  border-radius: 5px;
+  border: 1.5px solid #cfd5dd;
+  background: var(--panel);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, border-color 0.12s;
+}
+.cb.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.cb svg { opacity: 0; transition: opacity 0.1s; }
+.cb.checked svg { opacity: 1; }
+
+/* Name + progress block */
+.task-name-block {
+  flex: 1;
+  min-width: 0;
+}
+.task-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s;
+}
+.task-name.dim { color: var(--muted); }
+.task-meta {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.row-prog-track {
+  height: 4px;
+  border-radius: 4px;
+  background: #eaedf1;
+  overflow: hidden;
+  margin-top: 5px;
+}
+.row-prog-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.35s var(--ease-out);
+  width: 0%;
+}
+.row-prog-fill.ok  { background: var(--ok); }
+.row-prog-fill.err { background: var(--err); }
+
+/* Status pill */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  transition: background 0.2s, color 0.2s;
+}
+
+/* Task action buttons */
+.task-btns {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.btn-icon {
+  width: 26px; height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+}
+.btn-play  { color: var(--ok); }
+.btn-play:hover:not(:disabled) { background: var(--ok-bg); }
+.btn-play:disabled { color: #aad6be; cursor: not-allowed; }
+.btn-gear  { color: var(--muted); }
+.btn-gear.active { color: var(--accent); }
+.btn-gear:hover { background: var(--alt); color: var(--dim); }
+
+/* ── Background tab ─────────────────────────────────────────────────────── */
+#bg-master-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 11px 13px;
+  flex-shrink: 0;
+  margin: 6px 4px 0;
+}
+.master-text { flex: 1; }
+.master-title { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.master-desc  { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* Inline settings expansion */
+.task-settings {
+  padding: 0 10px 10px 37px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.setting-label {
+  font-size: 11.5px;
+  color: var(--dim);
+  font-weight: 500;
+  min-width: 64px;
+}
+.setting-unit { font-size: 11px; color: var(--muted); }
+.setting-input { width: 70px; text-align: right; }
+
+/* ── Settings tab ───────────────────────────────────────────────────────── */
+#tab-settings .pane-inner { overflow-y: auto; }
+.settings-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-section-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.toggle-text { flex: 1; }
+.toggle-name { font-size: 12.5px; font-weight: 500; color: var(--ink); }
+.toggle-hint { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* Toggle switch */
+.toggle {
+  width: 40px; height: 23px;
+  border-radius: 999px;
+  background: #d3d9e0;
+  flex-shrink: 0;
+  position: relative;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.toggle.on { background: var(--accent); }
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 19px; height: 19px;
+  border-radius: 50%;
+  background: #fff;
+  top: 2px; left: 2px;
+  transition: left 0.2s var(--ease-out);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+.toggle.on::after { left: 19px; }
+
+/* ── Log panel ──────────────────────────────────────────────────────────── */
+#log-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 140px;
+  max-height: 200px;
+}
+
+.log-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.log-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.log-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+#log-search {
+  width: 80px;
+  font-family: var(--sans);
+  font-size: 11px;
+  background: transparent;
+  border: none;
+  color: var(--dim);
+  padding: 0;
+}
+#log-search::placeholder { color: var(--muted); }
+#log-search:focus { outline: none; }
+.btn-log-clear {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.1s;
+}
+.btn-log-clear:hover { color: var(--dim); }
+
+.log-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 7px 10px;
+  background: var(--log-bg);
+  border-radius: 0 0 var(--r-md) var(--r-md);
+}
+.log-line {
+  display: flex;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.75;
+  white-space: nowrap;
+}
+.log-line.hidden { display: none; }
+.log-ts  { color: var(--log-muted); flex-shrink: 0; }
+.log-tag { font-weight: 700; flex-shrink: 0; }
+.log-msg { color: var(--log-ink); white-space: normal; }
+
+/* ── Footer / status bar ────────────────────────────────────────────────── */
+#footer {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 6px 4px;
+  flex-shrink: 0;
+}
+#dev-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+#dev-dot.connected { background: var(--ok); }
+#dev-label {
+  font-size: 11px;
+  color: var(--dim);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#device-select {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 3px 8px;
+  max-width: 160px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239aa3ae'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  padding-right: 22px;
+}
+#device-select:focus { outline: none; border-color: var(--accent); }
+#device-select option { background: var(--panel); }
+.btn-refresh {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.1s;
+}
+.btn-refresh:hover { background: var(--alt); }
+.btn-refresh.spinning svg { animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Pill states ────────────────────────────────────────────────────────── */
+.pill-pending   { background: #f1f3f6; color: #697481; border-color: #e6e9ee; }
+.pill-running   { background: #fdf6e9; color: #9c6c12; border-color: #f0e1c2; }
+.pill-completed { background: #e8f5ed; color: #1c7a44; border-color: #cfead9; }
+.pill-failed    { background: #fcefee; color: #b23a33; border-color: #f3d4d1; }
+.pill-skipped   { background: #f1f3f6; color: #697481; border-color: #e6e9ee; }
+
+/* ── Status pill states ─────────────────────────────────────────────────── */
+.status-ready   { background: #f1f3f6; border-color: #e6e9ee; }
+.status-running { background: #e8f5ed; border-color: #cfead9; }
+.status-paused  { background: #fdf6e9; border-color: #f0e1c2; }
+.status-stopped { background: #fcefee; border-color: #f3d4d1; }
+
+.status-ready   #status-dot { background: #9aa3ae; }
+.status-ready   #status-text { color: #697481; }
+.status-running #status-dot { background: #1f9254; }
+.status-running #status-text { color: #1f9254; }
+.status-paused  #status-dot { background: #9c6c12; }
+.status-paused  #status-text { color: #9c6c12; }
+.status-stopped #status-dot { background: #bb3a33; }
+.status-stopped #status-text { color: #bb3a33; }
+
+/* ── Log level colors ───────────────────────────────────────────────────── */
+.log-info    { color: #5b86c9; }
+.log-success { color: #2fa55a; }
+.log-warning { color: #c08a1e; }
+.log-error   { color: #cf4b43; }
+
+/* ── Animations ─────────────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeInUp 0.2s var(--ease-out) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Header card ─────────────────────────────────────────────────── -->
+  <div id="header-card" class="card">
+    <div class="header-top">
+      <div class="header-title-block">
+        <div class="app-title" id="app-title">Automation</div>
+        <div class="app-subtitle">Tự động hoá nhiệm vụ</div>
+      </div>
+      <div id="status-pill" class="status-ready">
+        <div id="status-dot"></div>
+        <div id="status-text">SẴN SÀNG</div>
+      </div>
+    </div>
+
+    <div class="header-progress">
+      <span id="prog-count">0/0</span>
+      <div class="prog-track"><div id="header-prog-fill"></div></div>
+      <span id="elapsed">00:00:00</span>
+    </div>
+
+    <div class="header-btns">
+      <button class="btn btn-start" id="btn-start" onclick="onStart()">
+        <svg class="icon" width="10" height="11" viewBox="0 0 10 11">
+          <path d="M1 1.5v8l8-4z"/>
+        </svg>
+        Bắt đầu
+      </button>
+      <button class="btn btn-pause" id="btn-pause" onclick="onPause()" disabled>
+        Tạm dừng
+      </button>
+      <button class="btn btn-stop" id="btn-stop" onclick="onStop()" disabled>
+        <svg class="icon" width="10" height="10" viewBox="0 0 10 10">
+          <rect x="1" y="1" width="8" height="8" rx="1.5"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Tabs ────────────────────────────────────────────────────────── -->
+  <div id="tabs-bar">
+    <button class="tab-btn active" data-tab="seq"      onclick="switchTab('seq')">Một lần</button>
+    <button class="tab-btn"        data-tab="bg"       onclick="switchTab('bg')">Chạy nền</button>
+    <button class="tab-btn"        data-tab="settings" onclick="switchTab('settings')">Cài đặt</button>
+  </div>
+
+  <!-- ── Tab wrapper ─────────────────────────────────────────────────── -->
+  <div id="tab-wrapper">
+
+    <!-- Sequential tab -->
+    <div class="tab-pane active" id="tab-seq">
+      <div class="pane-inner">
+        <div class="list-header">
+          <span class="list-label">TÁC VỤ MỘT LẦN</span>
+          <button class="btn-sel"      onclick="selectAll(true)">Chọn tất cả</button>
+          <button class="btn-sel none" onclick="selectAll(false)">Bỏ chọn</button>
+        </div>
+        <div class="task-list" id="seq-list">
+          <!-- populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Background tab -->
+    <div class="tab-pane" id="tab-bg">
+      <div id="bg-master-card">
+        <div class="master-text">
+          <div class="master-title">Tác vụ chạy nền</div>
+          <div class="master-desc">Chạy song song, lặp lại liên tục</div>
+        </div>
+        <div class="toggle" id="bg-toggle" onclick="onBgMaster()" role="switch"
+             aria-checked="false" aria-label="Bật/tắt tác vụ nền"></div>
+      </div>
+      <div class="pane-inner" style="margin-top:0;padding-top:4px;">
+        <div class="task-list" id="bg-list">
+          <!-- populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings tab -->
+    <div class="tab-pane" id="tab-settings">
+      <div class="pane-inner">
+        <div class="settings-card">
+          <div class="settings-section-title">GỠ LỖI</div>
+          <div class="toggle-row">
+            <div class="toggle" id="toggle-debug" onclick="onToggleDebug()"
+                 role="switch" aria-checked="false"></div>
+            <div class="toggle-text">
+              <div class="toggle-name">Debug template</div>
+              <div class="toggle-hint">Hiện vùng nhận diện trên màn hình</div>
+            </div>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle" id="toggle-fail" onclick="onToggleFail()"
+                 role="switch" aria-checked="false"></div>
+            <div class="toggle-text">
+              <div class="toggle-name">Debug template lỗi</div>
+              <div class="toggle-hint">Lưu ảnh khi không tìm thấy mẫu</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-wrapper -->
+
+  <!-- ── Log panel ───────────────────────────────────────────────────── -->
+  <div id="log-card" class="card">
+    <div class="log-header">
+      <span class="log-label">NHẬT KÝ</span>
+      <div style="flex:1"></div>
+      <div class="log-search-wrap">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+             stroke="#9aa3ae" stroke-width="2.2" stroke-linecap="round">
+          <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+        </svg>
+        <input id="log-search" type="text" placeholder="Tìm kiếm"
+               oninput="filterLog(this.value)">
+      </div>
+      <button class="btn-log-clear" onclick="onClearLog()">Xoá</button>
+    </div>
+    <div class="log-body" id="log-body">
+      <!-- log lines added dynamically -->
+    </div>
+  </div>
+
+  <!-- ── Footer ──────────────────────────────────────────────────────── -->
+  <div id="footer">
+    <div id="dev-dot"></div>
+    <span id="dev-label">Đang kết nối…</span>
+    <select id="device-select" onchange="onDeviceChange(this.value)">
+      <option value="">Không có thiết bị</option>
+    </select>
+    <button class="btn-refresh" id="btn-refresh" onclick="onRefresh()"
+            title="Làm mới thiết bị">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round"
+           stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+        <path d="M21 3v6h-6"/>
+      </svg>
+    </button>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const S = {
+  title:           "Automation",
+  activities:      [],
+  running:         false,
+  paused:          false,
+  bgRunning:       false,
+  debugMode:       false,
+  debugFail:       false,
+  activeTab:       "seq",
+  expandedId:      null,
+  devices:         [],
+  connected:       false,
+  connectedSerial: null,
+  deviceName:      "",
+  singleRunning:   null,
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const PILL_TEXT = {
+  pending: "Chưa làm", running: "Đang chạy",
+  completed: "Xong",   failed: "Lỗi", skipped: "Bỏ qua",
+};
+const LOG_TAG = { info: "INF", success: "OK ", warning: "WRN", error: "ERR" };
+
+// ── Elapsed timer ──────────────────────────────────────────────────────────
+let _elStart = null, _elTimer = null;
+function startElapsed() {
+  _elStart = Date.now();
+  clearInterval(_elTimer);
+  _elTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - _elStart) / 1000);
+    $("elapsed").textContent =
+      String(Math.floor(s / 3600)).padStart(2,"0") + ":" +
+      String(Math.floor((s % 3600) / 60)).padStart(2,"0") + ":" +
+      String(s % 60).padStart(2,"0");
+  }, 1000);
+}
+function stopElapsed()  { clearInterval(_elTimer); _elStart = null; }
+function resetElapsed() { stopElapsed(); $("elapsed").textContent = "00:00:00"; }
+
+// ── Status pill ────────────────────────────────────────────────────────────
+function setStatusPill(key) {
+  const pill = $("status-pill");
+  pill.className = "";
+  if (key === "running") {
+    pill.classList.add("status-running");
+    $("status-text").textContent = "ĐANG CHẠY";
+  } else if (key === "paused") {
+    pill.classList.add("status-paused");
+    $("status-text").textContent = "TẠM DỪNG";
+  } else if (key === "stopped") {
+    pill.classList.add("status-stopped");
+    $("status-text").textContent = "ĐÃ DỪNG";
+  } else {
+    pill.classList.add("status-ready");
+    $("status-text").textContent = "SẴN SÀNG";
+  }
+}
+
+// ── Button states ──────────────────────────────────────────────────────────
+function refreshButtons() {
+  const running = S.running, paused = S.paused, bg = S.bgRunning;
+  const solo = !!S.singleRunning;
+
+  $("btn-start").disabled  = running;
+  $("btn-pause").disabled  = !running && !bg;
+  $("btn-stop").disabled   = !running;
+  $("btn-pause").textContent = paused ? "Tiếp tục" : "Tạm dừng";
+
+  setStatusPill(running ? (paused ? "paused" : "running") :
+                bg ? "running" : "ready");
+
+  // play buttons: only seq tasks, disabled when running or solo
+  document.querySelectorAll(".btn-play").forEach(b => {
+    b.disabled = running || solo;
+  });
+}
+
+// ── Progress bar ───────────────────────────────────────────────────────────
+function updateHeaderProgress() {
+  const seq = S.activities.filter(a => !a.background);
+  if (!seq.length) { $("prog-count").textContent = "0/0"; $("header-prog-fill").style.width = "0%"; return; }
+  const done = seq.filter(a => a.status === "completed" || a.status === "skipped").length;
+  $("prog-count").textContent = `${done}/${seq.length}`;
+  $("header-prog-fill").style.width = `${Math.round(done / seq.length * 100)}%`;
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  S.activeTab = tab;
+  document.querySelectorAll(".tab-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.tab === tab);
+  });
+  document.querySelectorAll(".tab-pane").forEach(p => {
+    p.classList.toggle("active", p.id === "tab-" + tab);
+  });
+}
+
+// ── Build activity rows ────────────────────────────────────────────────────
+function buildRow(act) {
+  const isBg = act.background;
+  const row = document.createElement("div");
+  row.className = "task-row";
+  row.dataset.id = act.id;
+
+  // checkbox
+  const cb = document.createElement("button");
+  cb.className = "cb" + (act.enabled ? " checked" : "");
+  cb.innerHTML = `<svg class="icon" width="9" height="9" viewBox="0 0 12 12"
+    fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"
+    stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>`;
+  cb.onclick = () => {
+    const nowChecked = !cb.classList.contains("checked");
+    cb.classList.toggle("checked", nowChecked);
+    const name = row.querySelector(".task-name");
+    if (name) name.classList.toggle("dim", !nowChecked);
+    window.pywebview.api.toggle_activity(act.id, nowChecked);
+    act.enabled = nowChecked;
+  };
+
+  // name block
+  const nameBlock = document.createElement("div");
+  nameBlock.className = "task-name-block";
+
+  const nameEl = document.createElement("div");
+  nameEl.className = "task-name" + (!act.enabled ? " dim" : "");
+  nameEl.textContent = act.name;
+  nameBlock.appendChild(nameEl);
+
+  if (isBg) {
+    const meta = document.createElement("div");
+    meta.className = "task-meta";
+    meta.dataset.meta = "1";
+    meta.textContent = _bgMeta(act);
+    nameBlock.appendChild(meta);
+  } else {
+    const pt = document.createElement("div");
+    pt.className = "row-prog-track";
+    const pf = document.createElement("div");
+    pf.className = "row-prog-fill" + _progClass(act.status);
+    pf.style.width = act.progress + "%";
+    pt.appendChild(pf);
+    nameBlock.appendChild(pt);
+  }
+
+  // pill
+  const pill = document.createElement("span");
+  pill.className = "pill pill-" + act.status;
+  pill.textContent = PILL_TEXT[act.status] || act.status;
+
+  // action buttons
+  const btns = document.createElement("div");
+  btns.className = "task-btns";
+
+  if (!isBg) {
+    const play = document.createElement("button");
+    play.className = "btn-icon btn-play";
+    play.title = "Chạy";
+    play.disabled = S.running || !!S.singleRunning;
+    play.innerHTML = `<svg class="icon" width="10" height="11" viewBox="0 0 10 11">
+      <path d="M1 1.5v8l8-4z"/></svg>`;
+    play.onclick = () => onRunSingle(act.id);
+    btns.appendChild(play);
+  }
+
+  const hasSettings = (act.customSettings && act.customSettings.length) || isBg;
+  if (hasSettings) {
+    const gear = document.createElement("button");
+    gear.className = "btn-icon btn-gear";
+    gear.title = "Cài đặt";
+    gear.dataset.gear = act.id;
+    gear.innerHTML = `<svg class="icon" width="13" height="13" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06
+               a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09
+               A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83
+               l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
+               A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83
+               l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
+               a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83
+               l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
+               a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>`;
+    gear.onclick = () => toggleSettings(act.id);
+    btns.appendChild(gear);
+  }
+
+  row.appendChild(cb);
+  row.appendChild(nameBlock);
+  row.appendChild(pill);
+  row.appendChild(btns);
+
+  return row;
+}
+
+function _bgMeta(act) {
+  const speed = act.customValues && act.customValues["speed_multiplier"];
+  if (speed !== undefined) return `Frida · tốc độ ${speed}x`;
+  return `Đóng popup · mỗi ${act.pollInterval}s`;
+}
+
+function _progClass(status) {
+  if (status === "completed") return " ok";
+  if (status === "failed")    return " err";
+  return "";
+}
+
+// ── Settings panel (inline expansion) ─────────────────────────────────────
+function buildSettingsPanel(act) {
+  const panel = document.createElement("div");
+  panel.className = "task-settings";
+  panel.dataset.settingsFor = act.id;
+
+  if (act.background) {
+    const row = document.createElement("div");
+    row.className = "setting-row";
+    row.style.paddingTop = "10px";
+    row.innerHTML = `<span class="setting-label">Chu kỳ</span>`;
+    const inp = document.createElement("input");
+    inp.type = "number"; inp.className = "setting-input";
+    inp.min = 0.05; inp.max = 999999; inp.step = 0.5;
+    inp.value = act.pollInterval;
+    inp.onchange = () => {
+      const v = Math.max(0.05, parseFloat(inp.value) || act.pollInterval);
+      inp.value = v;
+      window.pywebview.api.set_interval(act.id, v);
+      // update meta text in row
+      const meta = document.querySelector(`[data-id="${act.id}"] [data-meta]`);
+      if (meta) meta.textContent = _bgMeta({...act, pollInterval: v});
+    };
+    const unit = document.createElement("span");
+    unit.className = "setting-unit"; unit.textContent = "giây";
+    row.appendChild(inp); row.appendChild(unit);
+    panel.appendChild(row);
+  }
+
+  (act.customSettings || []).forEach(spec => {
+    const key = spec.key;
+    const curVal = (act.customValues || {})[key] ?? spec.default ?? spec.min ?? 0;
+    const row = document.createElement("div");
+    row.className = "setting-row"; row.style.paddingTop = "8px";
+    const lbl = document.createElement("span");
+    lbl.className = "setting-label"; lbl.textContent = spec.label || key;
+    const inp = document.createElement("input");
+    inp.type = "number"; inp.className = "setting-input";
+    inp.min = spec.min ?? 0; inp.max = spec.max ?? 100;
+    inp.step = spec.step ?? 0.1; inp.value = curVal;
+    inp.onchange = () => {
+      const v = Math.min(inp.max, Math.max(inp.min, parseFloat(inp.value) || curVal));
+      inp.value = v;
+      window.pywebview.api.set_custom(act.id, key, v);
+    };
+    const unit = document.createElement("span");
+    unit.className = "setting-unit"; unit.textContent = spec.suffix || "";
+    row.appendChild(lbl); row.appendChild(inp); row.appendChild(unit);
+    panel.appendChild(row);
+  });
+
+  return panel;
+}
+
+function toggleSettings(actId) {
+  const list = actId && S.activities.find(a => a.background)
+    ? $("bg-list") : $("seq-list");
+
+  const existingPanel = list.querySelector(`[data-settings-for="${actId}"]`);
+  const row           = list.querySelector(`[data-id="${actId}"]`);
+  const gear          = row && row.querySelector(`[data-gear]`);
+
+  if (existingPanel) {
+    existingPanel.remove();
+    if (gear) gear.classList.remove("active");
+    S.expandedId = null;
+    return;
+  }
+
+  // close any previously open panel
+  list.querySelectorAll("[data-settings-for]").forEach(p => p.remove());
+  list.querySelectorAll(".btn-gear.active").forEach(g => g.classList.remove("active"));
+
+  if (gear) gear.classList.add("active");
+  S.expandedId = actId;
+
+  const act = S.activities.find(a => a.id === actId);
+  if (!act) return;
+  const panel = buildSettingsPanel(act);
+  if (row && row.nextSibling) {
+    list.insertBefore(panel, row.nextSibling);
+  } else if (row) {
+    list.appendChild(panel);
+  }
+}
+
+// ── Populate lists ─────────────────────────────────────────────────────────
+function populateLists() {
+  const seqList = $("seq-list");
+  const bgList  = $("bg-list");
+  seqList.innerHTML = "";
+  bgList.innerHTML  = "";
+
+  S.activities.forEach(act => {
+    const row = buildRow(act);
+    (act.background ? bgList : seqList).appendChild(row);
+  });
+
+  // hide bg-master-card if no bg tasks
+  const hasBg = S.activities.some(a => a.background);
+  $("bg-master-card").style.display = hasBg ? "" : "none";
+}
+
+// ── Update single activity ─────────────────────────────────────────────────
+function updateActivity(id, changes) {
+  const act = S.activities.find(a => a.id === id);
+  if (!act) return;
+  Object.assign(act, changes);
+
+  const row = document.querySelector(`.task-row[data-id="${id}"]`);
+  if (!row) return;
+
+  if (changes.status !== undefined) {
+    const pill = row.querySelector(".pill");
+    if (pill) {
+      pill.className = `pill pill-${act.status}`;
+      pill.textContent = PILL_TEXT[act.status] || act.status;
+    }
+    if (!act.background) {
+      const fill = row.querySelector(".row-prog-fill");
+      if (fill) {
+        fill.className = "row-prog-fill" + _progClass(act.status);
+        if (act.status === "completed") fill.style.width = "100%";
+        else if (act.status === "pending" || act.status === "failed") fill.style.width = "0%";
+      }
+    }
+  }
+
+  if (changes.progress !== undefined && !act.background) {
+    const fill = row.querySelector(".row-prog-fill");
+    if (fill && act.status === "running") fill.style.width = act.progress + "%";
+  }
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────
+function appendLogEntry(entry) {
+  const body  = $("log-body");
+  const query = $("log-search").value.trim().toLowerCase();
+
+  const line = document.createElement("div");
+  line.className = "log-line fade-in";
+  if (query && !entry.msg.toLowerCase().includes(query)) line.classList.add("hidden");
+
+  line.innerHTML =
+    `<span class="log-ts">[${entry.ts}]</span>` +
+    `<span class="log-tag log-${entry.level}">${LOG_TAG[entry.level] || "INF"}</span>` +
+    `<span class="log-msg">${escHtml(entry.msg)}</span>`;
+
+  body.appendChild(line);
+  // trim to 500 rendered lines
+  while (body.children.length > 500) body.removeChild(body.firstChild);
+  body.scrollTop = body.scrollHeight;
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function filterLog(query) {
+  const q = query.trim().toLowerCase();
+  $("log-body").querySelectorAll(".log-line").forEach(line => {
+    const msg = line.querySelector(".log-msg").textContent;
+    line.classList.toggle("hidden", !!q && !msg.toLowerCase().includes(q));
+  });
+}
+
+// ── Device selector ────────────────────────────────────────────────────────
+function rebuildDeviceSelect(devices, connectedSerial, selectedSerial) {
+  const sel = $("device-select");
+  const prev = sel.value;
+  sel.innerHTML = "";
+
+  if (!devices || !devices.length) {
+    const opt = document.createElement("option");
+    opt.value = ""; opt.textContent = "Không có thiết bị";
+    sel.appendChild(opt);
+    sel.disabled = true;
+    return;
+  }
+
+  sel.disabled = false;
+  devices.forEach(d => {
+    const opt = document.createElement("option");
+    opt.value = d.serial || "";
+    const label = d.name || d.serial || "Thiết bị";
+    opt.textContent = d.serial ? `${label} (${d.serial})` : label;
+    sel.appendChild(opt);
+  });
+
+  // Pick selection: connected > selected > previous > first
+  const pick = connectedSerial || selectedSerial || prev || (devices[0] && devices[0].serial) || "";
+  sel.value = pick;
+}
+
+// ── Event dispatch from Python ─────────────────────────────────────────────
+window.__recv = function(raw) {
+  let ev;
+  try { ev = JSON.parse(raw); } catch { return; }
+  const { type, data } = ev;
+
+  if (type === "running_state") {
+    const wasRunning = S.running;
+    S.running  = data.running;
+    S.paused   = data.paused;
+    S.bgRunning = data.bgRunning;
+
+    const bgToggle = $("bg-toggle");
+    bgToggle.classList.toggle("on", S.bgRunning);
+    bgToggle.setAttribute("aria-checked", String(S.bgRunning));
+
+    if (!wasRunning && S.running) { resetElapsed(); startElapsed(); }
+    else if (!S.running) stopElapsed();
+    refreshButtons();
+    return;
+  }
+
+  if (type === "activity_update") {
+    updateActivity(data.id, data);
+    updateHeaderProgress();
+    return;
+  }
+
+  if (type === "progress") {
+    updateActivity(data.id, { progress: data.progress });
+    return;
+  }
+
+  if (type === "log") {
+    appendLogEntry(data);
+    return;
+  }
+
+  if (type === "log_cleared") {
+    $("log-body").innerHTML = "";
+    appendLogEntry({ ts: new Date().toTimeString().slice(0,8), level: "info", msg: "Đã xoá nhật ký" });
+    return;
+  }
+
+  if (type === "automation_start") {
+    S.running = true; S.paused = false;
+    resetElapsed(); startElapsed();
+    refreshButtons();
+    // Reset all seq pills to pending
+    S.activities.filter(a => !a.background).forEach(a => {
+      updateActivity(a.id, { status: "pending", progress: 0 });
+    });
+    updateHeaderProgress();
+    return;
+  }
+
+  if (type === "automation_stop") {
+    S.running = false; S.paused = false;
+    stopElapsed();
+    refreshButtons();
+    return;
+  }
+
+  if (type === "single_start") {
+    S.singleRunning = data.id;
+    refreshButtons();
+    return;
+  }
+
+  if (type === "single_done") {
+    S.singleRunning = null;
+    refreshButtons();
+    updateHeaderProgress();
+    return;
+  }
+
+  if (type === "devices_update") {
+    S.connected       = data.connected;
+    S.connectedSerial = data.serial;
+    S.deviceName      = data.name;
+    S.devices         = data.devices || [];
+
+    const dot = $("dev-dot");
+    dot.classList.toggle("connected", data.connected);
+    $("dev-label").textContent = data.connected
+      ? `Đã kết nối · ${data.name || data.serial || "OK"}`
+      : "Không kết nối";
+
+    rebuildDeviceSelect(S.devices, S.connectedSerial, S.connectedSerial);
+    $("btn-refresh").classList.remove("spinning");
+    return;
+  }
+
+  if (type === "device_status") {
+    S.connected       = data.connected;
+    S.connectedSerial = data.serial;
+    S.deviceName      = data.name;
+    const dot = $("dev-dot");
+    dot.classList.toggle("connected", data.connected);
+    $("dev-label").textContent = data.connected
+      ? `Đã kết nối · ${data.name || data.serial || ""}`
+      : "Không kết nối";
+    return;
+  }
+};
+
+// ── Button handlers ────────────────────────────────────────────────────────
+async function onStart() {
+  $("btn-start").disabled = true;
+  await window.pywebview.api.start();
+}
+
+async function onStop() {
+  await window.pywebview.api.stop();
+}
+
+async function onPause() {
+  const r = await window.pywebview.api.pause();
+  S.paused = r && r.paused;
+  refreshButtons();
+}
+
+async function onRunSingle(id) {
+  await window.pywebview.api.run_single(id);
+}
+
+async function onBgMaster() {
+  const now = !S.bgRunning;
+  await window.pywebview.api.toggle_background(now);
+}
+
+async function selectAll(enabled) {
+  S.activities.filter(a => !a.background).forEach(act => {
+    const row = document.querySelector(`.task-row[data-id="${act.id}"]`);
+    if (!row) return;
+    const cb = row.querySelector(".cb");
+    if (cb) cb.classList.toggle("checked", enabled);
+    const nm = row.querySelector(".task-name");
+    if (nm) nm.classList.toggle("dim", !enabled);
+    window.pywebview.api.toggle_activity(act.id, enabled);
+    act.enabled = enabled;
+  });
+}
+
+async function onToggleDebug() {
+  S.debugMode = !S.debugMode;
+  const t = $("toggle-debug");
+  t.classList.toggle("on", S.debugMode);
+  t.setAttribute("aria-checked", String(S.debugMode));
+  await window.pywebview.api.set_debug(S.debugMode, S.debugFail);
+}
+
+async function onToggleFail() {
+  S.debugFail = !S.debugFail;
+  const t = $("toggle-fail");
+  t.classList.toggle("on", S.debugFail);
+  t.setAttribute("aria-checked", String(S.debugFail));
+  await window.pywebview.api.set_debug(S.debugMode, S.debugFail);
+}
+
+async function onClearLog() {
+  await window.pywebview.api.clear_log();
+}
+
+async function onDeviceChange(serial) {
+  if (serial) await window.pywebview.api.select_device(serial);
+}
+
+async function onRefresh() {
+  $("btn-refresh").classList.add("spinning");
+  await window.pywebview.api.refresh_devices();
+}
+
+// ── Initialise ────────────────────────────────────────────────────────────
+async function init() {
+  // pywebview may not be injected yet — wait
+  let tries = 0;
+  while (!(window.pywebview && window.pywebview.api) && tries < 40) {
+    await new Promise(r => setTimeout(r, 100));
+    tries++;
+  }
+  if (!window.pywebview || !window.pywebview.api) {
+    $("dev-label").textContent = "⚠ pywebview không khả dụng";
+    return;
+  }
+
+  const state = await window.pywebview.api.get_state();
+
+  // Apply title
+  document.title = state.title || "Game Automation";
+  $("app-title").textContent = state.title || "Game Automation";
+
+  // Hydrate activities
+  S.activities = state.activities || [];
+  populateLists();
+  updateHeaderProgress();
+
+  // Update tab labels with counts
+  const seq = S.activities.filter(a => !a.background).length;
+  const bg  = S.activities.filter(a => a.background).length;
+  document.querySelector('[data-tab="seq"]').textContent = `Một lần (${seq})`;
+  document.querySelector('[data-tab="bg"]').textContent  = `Chạy nền (${bg})`;
+
+  // Running state
+  S.running   = state.running;
+  S.paused    = state.paused;
+  S.bgRunning = state.bgRunning;
+  if (S.running) startElapsed();
+  refreshButtons();
+  $("bg-toggle").classList.toggle("on", S.bgRunning);
+
+  // Debug toggles
+  S.debugMode = !!state.debugMode;
+  S.debugFail = !!state.debugFail;
+  $("toggle-debug").classList.toggle("on", S.debugMode);
+  $("toggle-debug").setAttribute("aria-checked", String(S.debugMode));
+  $("toggle-fail").classList.toggle("on", S.debugFail);
+  $("toggle-fail").setAttribute("aria-checked", String(S.debugFail));
+
+  // Replay historical log
+  (state.log || []).forEach(appendLogEntry);
+
+  // Status line
+  $("dev-label").textContent = "Đang kết nối…";
+}
+
+// Run on DOM ready (pywebview fires DOMContentLoaded before injection sometimes)
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>
