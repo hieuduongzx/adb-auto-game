@@ -62,4 +62,4 @@ def get_adb_path() -> str:
     # this file: <root>/src/core/adb/constants.py -> up 3 levels to root
     current_dir = os.path.dirname(os.path.abspath(__file__))
     root_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-    return os.path.join(root_dir, "bin", "adb.exe")
+    return os.path.join(root_dir, "vendor", "adb", "adb.exe")

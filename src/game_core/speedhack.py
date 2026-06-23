@@ -41,6 +41,8 @@ class SpeedhackMixin:
             package=package_name,
             time_scale=time_scale,
         )
+        # Allow the manager to read the selected ADB device dynamically.
+        self.speedhack.adb_controller = getattr(self, "adb", None)
         self.speedhack_enabled = False
 
     def speedhack_activity(

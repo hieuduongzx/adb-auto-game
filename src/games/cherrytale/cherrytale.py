@@ -392,8 +392,9 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         # Step 1.5: if VTGK is already finished for the day, stop early
         if self._is_vtgk_finished():
             log_info("VTGK already completed for today, finishing activity")
-            # Best-effort: exit VTGK screen and return to in-game home so
-            # the next activity starts from a known state.
+            # Best-effort: claim the weekly reward slot 1 if available, then
+            # exit VTGK screen and return to in-game home.
+            self.wait_and_tap(self.combat['vtgk_reward_1'], timeout=5)
             self.wait_and_tap(self.combat['vtgk_exit'], timeout=5)
             self.wait_and_tap(self.templates['home'], timeout=10)
             self.update_activity_progress(100.0)

@@ -264,12 +264,14 @@ class FridaSpeedhackManager:
         time_scale: float = 1.0,
         frida_inject_path: str = "/data/local/tmp/frida-inject",
         local_inject_binary: Optional[str] = None,
+        device_id: Optional[str] = None,
     ):
         self.package = package
         self._target_scale = float(time_scale)
         self._current_scale: float = 1.0
         self._frida_inject_path = frida_inject_path
         self._local_inject_binary = local_inject_binary
+        self._device_id = device_id
 
         self._device_script_path = "/data/local/tmp/speedhack.js"
         self._lock = threading.Lock()
@@ -329,12 +331,28 @@ class FridaSpeedhackManager:
                 continue
         return candidates[0]
 
+    def _adb_prefix(self) -> list:
+        """Return the ADB command prefix including -s device_id when known.
+
+        ``device_id`` passed at construction wins, but if none was provided we
+        also accept a late-bound ``self.adb_controller`` reference so callers
+        can set the target device after construction.
+        """
+        adb = self._adb_path()
+        device_id = self._device_id
+        if not device_id:
+            ctrl = getattr(self, "adb_controller", None)
+            if ctrl is not None:
+                device_id = getattr(ctrl, "device_id", None) or getattr(ctrl, "device", None)
+        if device_id:
+            return [adb, "-s", device_id]
+        return [adb]
+
     def _run_adb(self, command: str) -> str:
         """Run an ADB shell command and return stdout+stderr; empty on failure."""
-        adb = self._adb_path()
         try:
             result = subprocess.run(
-                [adb, "shell", command],
+                self._adb_prefix() + ["shell", command],
                 shell=False,
                 capture_output=True,
                 text=True,
@@ -365,7 +383,7 @@ class FridaSpeedhackManager:
         log_info("[speedhack] pushing frida-inject to device...")
         try:
             subprocess.run(
-                [self._adb_path(), "push", str(local), self._frida_inject_path],
+                self._adb_prefix() + ["push", str(local), self._frida_inject_path],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -401,7 +419,7 @@ class FridaSpeedhackManager:
         try:
             local_path.write_text(source, encoding="utf-8")
             subprocess.run(
-                [self._adb_path(), "push", str(local_path), self._device_script_path],
+                self._adb_prefix() + ["push", str(local_path), self._device_script_path],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -436,8 +454,8 @@ class FridaSpeedhackManager:
             log_info(f"[speedhack] injecting into {self.package} (pid {pid})...")
             try:
                 proc = subprocess.Popen(
-                    [
-                        self._adb_path(),
+                    self._adb_prefix()
+                    + [
                         "shell",
                         f"su -c '{self._frida_inject_path} -p {pid} -s {self._device_script_path}'",
                     ],
