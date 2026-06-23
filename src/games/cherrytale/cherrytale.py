@@ -79,8 +79,11 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             'vtgk_point_tim': f"{self.templates_dir}/combat/vong_tron_gia_kim/point_tim.png",
             'vtgk_point_dau': f"{self.templates_dir}/combat/vong_tron_gia_kim/point_dau.png",
             'vtgk_end': f"{self.templates_dir}/combat/vong_tron_gia_kim/end.png",
-            'vtgk_end_2': f"{self.templates_dir}/combat/vong_tron_gia_kim/end_2.png",
             'vtgk_exit': f"{self.templates_dir}/combat/vong_tron_gia_kim/exit.png",
+            'vtgk_reward_1': f"{self.templates_dir}/combat/vong_tron_gia_kim/reward_1.png",
+            'vtgk_reward_2': f"{self.templates_dir}/combat/vong_tron_gia_kim/reward_2.png",
+            'vtgk_reward_3': f"{self.templates_dir}/combat/vong_tron_gia_kim/reward_3.png",
+
 
             'arena_icon': f"{self.templates_dir}/combat/arena/icon.png",
             'arena_check': f"{self.templates_dir}/combat/arena/check.png",
@@ -136,18 +139,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
     # ==================== Activity Handlers ====================
 
     def handle_activity_auto_phuc_loi(self) -> bool:
-        """
-        Claim daily welfare (phúc lợi).
-
-        Flow:
-            1. Open Phúc Lợi panel
-            2. Switch to Bữa Tiệc tab
-            3. Tap "Invite All" to invite all friends
-            4. Tap "Bắt Đầu" to start the banquet
-            5. Return to home (in-game) screen
-        """
         log_info("Starting Phuc Loi activity...")
-
         # Step 1: open welfare panel
         self.update_activity_progress(10.0)
         if not self.wait_and_tap(self.main_menu['phuc_loi'], timeout=10):
@@ -224,12 +216,12 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             log_info("Already inside Friend panel, skipping navigation")
             self.update_activity_progress(20.0)
         else:
-            log_info("Not in Friend panel, navigating from main menu...")
+            log_info("Not in Friend panel, returning to main menu...")
 
-            # Try to return to in-game home first (best-effort)
+            # Return to the main menu first (best path to a known state)
             self.update_activity_progress(5.0)
-            if not self.wait_and_tap(self.templates['home'], timeout=5):
-                log_info("Home button not visible, continuing without it")
+            if not self.back_to_menu(timeout=30):
+                return False
 
             # Open friends panel
             self.update_activity_progress(10.0)
@@ -288,22 +280,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         return True
 
     def handle_activity_auto_thu(self) -> bool:
-        """
-        Nhận tất cả thư trong hòm thư.
-
-        Flow:
-            1. Check if we are already inside the Mail panel (via
-               thu_checking marker)
-               - If yes: skip navigation, jump straight to take loop
-               - If no:  press Home (best-effort) then tap thu icon
-            2. Loop until no more mail:
-               a. Tap "Take All" to claim mail rewards
-               b. Wait for "nhan_vao_bat_ky_dau" prompt and tap it to dismiss
-               c. Check if "Take All" is still visible -> repeat; otherwise stop
-            3. Tap Home to return to the in-game home screen
-        """
         log_info("Starting Thu (Mail) activity...")
-
         # Step 1: detect whether we are already on the Mail panel
         self.update_activity_progress(2.0)
         already_in_thu = self.wait_for_template(
@@ -313,14 +290,11 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             log_info("Already inside Mail panel, skipping navigation")
             self.update_activity_progress(20.0)
         else:
-            log_info("Not in Mail panel, navigating from main menu...")
-
-            # Try to return to in-game home first (best-effort)
+            log_info("Not in Mail panel, returning to main menu...")
             self.update_activity_progress(5.0)
-            if not self.wait_and_tap(self.templates['close'], timeout=5):
-                log_info("Close button not visible, continuing without it")
+            if not self.back_to_menu(timeout=30):
+                return False
 
-            # Open mail panel
             self.update_activity_progress(10.0)
             if not self.wait_and_tap(self.thu['thu_icon'], timeout=10):
                 log_warning("Could not find Thu icon")
@@ -381,22 +355,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         return True
 
     def handle_activity_auto_combat_vtgk(self) -> bool:
-        """
-        Run "Vòng Tròn Giả Kim" combat 5 times.
-
-        Flow:
-            1. Check if we are already inside VTGK (via vtgk_check marker)
-               - If yes: jump straight to the fight loop
-               - If no:  press Home (best-effort) then tap Combat -> VTGK icon
-            2. Loop 5 times:
-               a. Tap "tim" (heart) to enter the fight
-               b. Tap "Bắt Đầu" to start
-               c. Wait until "stats" screen appears
-               d. Tap "Exit" to go back to the heart screen
-            3. Return to in-game home screen (best-effort)
-        """
         log_info("Starting Combat - Vong Tron Gia Kim activity...")
-
         # Step 1: detect whether we are already on the VTGK screen
         self.update_activity_progress(2.0)
         already_in_vtgk = self.wait_for_template(
@@ -406,12 +365,11 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             log_info("Already inside VTGK, skipping navigation")
             self.update_activity_progress(15.0)
         else:
-            log_info("Not in VTGK, navigating from main menu...")
+            log_info("Not in VTGK, returning to main menu...")
 
-            # Try to return to in-game home first (best-effort, don't fail if missing)
             self.update_activity_progress(5.0)
-            if not self.wait_and_tap(self.templates['home'], timeout=5):
-                log_info("Home button not visible, continuing without it")
+            if not self.back_to_menu(timeout=30):
+                return False
 
             # Open combat from main menu
             self.update_activity_progress(8.0)
@@ -532,12 +490,11 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             log_info("Already inside Arena, skipping navigation")
             self.update_activity_progress(15.0)
         else:
-            log_info("Not in Arena, navigating from main menu...")
+            log_info("Not in Arena, returning to main menu...")
 
-            # Try to return to in-game home first (best-effort)
             self.update_activity_progress(5.0)
-            if not self.wait_and_tap(self.templates['home'], timeout=5):
-                log_info("Home button not visible, continuing without it")
+            if not self.back_to_menu(timeout=30):
+                return False
 
             # Open combat from main menu
             self.update_activity_progress(8.0)
@@ -640,12 +597,11 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             log_info("Already inside TMDQ, skipping navigation")
             self.update_activity_progress(15.0)
         else:
-            log_info("Not in TMDQ, navigating from main menu...")
+            log_info("Not in TMDQ, returning to main menu...")
 
-            # Try to return to in-game home first (best-effort)
             self.update_activity_progress(5.0)
-            if not self.wait_and_tap(self.templates['home'], timeout=5):
-                log_info("Home button not visible, continuing without it")
+            if not self.back_to_menu(timeout=30):
+                return False
 
             # Open combat from main menu
             self.update_activity_progress(8.0)
@@ -758,12 +714,11 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             log_info("Already inside DVQ, skipping navigation")
             self.update_activity_progress(15.0)
         else:
-            log_info("Not in DVQ, navigating from main menu...")
+            log_info("Not in DVQ, returning to main menu...")
 
-            # Try to return to in-game home first (best-effort)
             self.update_activity_progress(5.0)
-            if not self.wait_and_tap(self.templates['home'], timeout=5):
-                log_info("Home button not visible, continuing without it")
+            if not self.back_to_menu(timeout=30):
+                return False
 
             # Open combat from main menu
             self.update_activity_progress(8.0)
@@ -888,34 +843,40 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
     # When the counter reads "0/5" all daily attempts have been used.
     _VTGK_COUNTER_REGION = (1530, 927, 273, 71)
 
-    def _is_vtgk_finished(self, timeout: float = 1.0,
-                         threshold: float = 0.85) -> bool:
-        """Return True if VTGK is finished for the day.
+    def back_to_menu(self, timeout: float = 30.0, threshold: float = 0.85) -> bool:
+        log_info("Returning to main menu...")
+        start_time = time.time()
+        back_templates = [
+            self.templates['close'],
+            self.templates['exit'],
+            self.templates['home'],
+        ]
 
-        Uses two strategies in order:
+        while time.time() - start_time < timeout:
+            if self.find_template(self.main_menu['phuc_loi'], threshold=threshold):
+                log_success("Main menu detected")
+                return True
 
-        1. **OCR check (preferred)** - read the attempts counter at
-           ``_VTGK_COUNTER_REGION`` and look for ``"0/5"``. Skipped when
-           Tesseract is unavailable.
-        2. **Template fallback** - look for ``vtgk_end`` / ``vtgk_end_2``
-           markers anywhere on screen.
-        """
-        # Strategy 1: OCR with a digits + '/' whitelist so Tesseract can't
-        # hallucinate letters in tiny labels.
-        if self.region_has_text(
-            "0/5", region=self._VTGK_COUNTER_REGION,
-            whitelist="0123456789/",
-        ):
+            tapped = False
+            for template in back_templates:
+                result = self.find_template(template, threshold=threshold)
+                if not result:
+                    continue
+                x, y, _ = result
+                if self.tap(x, y):
+                    tapped = True
+                    time.sleep(1.0)
+                    break
+
+            if not tapped:
+                time.sleep(0.5)
+
+        log_warning("Could not return to main menu")
+        return False
+
+    def _is_vtgk_finished(self, timeout: float = 1.0, threshold: float = 0.85) -> bool:
+        if self.region_has_text("0/5", region=self._VTGK_COUNTER_REGION,whitelist="0123456789/",):
             return True
-
-        # Strategy 2: legacy template-based check.
-        templates = [self.combat[k] for k in ('vtgk_end', 'vtgk_end_2')
-                     if self.combat.get(k)]
-        if not templates:
-            return False
-        return self.wait_for_any_template(
-            templates, timeout=timeout, threshold=threshold
-        ) is not None
 
     def _find_end_tap_exit(self, timeout: float = 10.0,
                            threshold: float = 0.85) -> bool:
@@ -941,7 +902,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
         time.sleep(0.5)
         return True
-
+    
 
 
 if __name__ == "__main__":

@@ -977,9 +977,15 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         self._update_progress(activity_id, 0.0)
 
         log_info(f"Running single activity: {activity.name}")
+        # Mark the runtime as running so wait_* helpers don't treat the idle
+        # main loop (self.running == False) as an interruption and bail out
+        # immediately.
+        previous_running = self.running
+        self.running = True
         try:
             return self._execute_activity(activity)
         finally:
+            self.running = previous_running
             log_info(f"Single activity finished: {activity.name}")
 
     def pause(self):
