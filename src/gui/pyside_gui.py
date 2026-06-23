@@ -22,13 +22,16 @@ Layout::
 from __future__ import annotations
 
 import sys
+import tempfile
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import (
     QObject,
+    QSize,
     Qt,
     QTimer,
     Signal,
@@ -38,8 +41,11 @@ from PySide6.QtGui import (
     QColor,
     QDoubleValidator,
     QFontDatabase,
+    QIcon,
     QPalette,
 )
+
+import qtawesome as qta
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -121,6 +127,44 @@ _LOG_COLORS: Dict[str, str] = {
     "warning": "#f2b65a",
     "error":   "#ff7b72",
 }
+
+
+# ---------------------------------------------------------------------------
+# Icons
+# ---------------------------------------------------------------------------
+
+_ICON_SIZE = QSize(14, 14)
+_ICON_MAP = {
+    "play": "fa5s.play",
+    "pause": "fa5s.pause",
+    "stop": "fa5s.stop",
+    "settings": "fa5s.cog",
+    "refresh": "fa5s.sync-alt",
+    "back": "fa5s.chevron-left",
+}
+_ICON_CACHE: Dict[tuple, QIcon] = {}
+
+
+def _make_icon(name: str, color: str) -> QIcon:
+    key = (name, color)
+    cached = _ICON_CACHE.get(key)
+    if cached is not None:
+        return cached
+    icon = qta.icon(_ICON_MAP[name], color=color)
+    _ICON_CACHE[key] = icon
+    return icon
+
+
+def _set_button_icon(btn: QPushButton, name: str, color: str, size: QSize = _ICON_SIZE) -> None:
+    btn.setIcon(_make_icon(name, color))
+    btn.setIconSize(size)
+
+
+def _check_icon_path() -> str:
+    path = Path(tempfile.gettempdir()) / "adb_auto_game_check.png"
+    if not path.exists():
+        qta.icon("fa5s.check", color="#ffffff").pixmap(QSize(11, 11)).save(str(path), "PNG")
+    return str(path).replace("\\", "/")
 
 
 # ---------------------------------------------------------------------------
@@ -441,12 +485,12 @@ QCheckBox::indicator {{
 }}
 QCheckBox::indicator:hover {{
     border-color: {C.ACCENT};
-    background-color: {C.ACCENT_BG};
+    background-color: {C.SURFACE};
 }}
 QCheckBox::indicator:checked {{
     background-color: {C.ACCENT};
     border-color: {C.ACCENT};
-    margin: 1px;
+    image: url("__CHECK_ICON__");
 }}
 QCheckBox::indicator:disabled {{
     background-color: {C.PANEL_ALT};
@@ -774,16 +818,19 @@ class GameAutomationWindow(QMainWindow):
         r3.setSpacing(6)
 
         # Sequential controls
-        self.btn_start = QPushButton("▶ Start")
+        self.btn_start = QPushButton("Start")
         self.btn_start.setObjectName("btnStart")
-        self.btn_start.setToolTip("Run sequential activities")
+        self.btn_start.setToolTip("Start")
+        _set_button_icon(self.btn_start, "play", "#ffffff")
         self.btn_start.clicked.connect(self._cb_start)
-        self.btn_pause = QPushButton("⏸ Pause")
+        self.btn_pause = QPushButton("Pause")
         self.btn_pause.setObjectName("btnPause")
+        _set_button_icon(self.btn_pause, "pause", C.WARN)
         self.btn_pause.clicked.connect(self._cb_pause)
-        self.btn_stop = QPushButton("⏹ Stop")
+        self.btn_stop = QPushButton("Stop")
         self.btn_stop.setObjectName("btnStop")
-        self.btn_stop.setToolTip("Stop sequential activities")
+        self.btn_stop.setToolTip("Stop")
+        _set_button_icon(self.btn_stop, "stop", C.ERR)
         self.btn_stop.clicked.connect(self._cb_stop)
 
         r3.addWidget(self.btn_start)
@@ -799,10 +846,7 @@ class GameAutomationWindow(QMainWindow):
 
         # Background master toggle
         self.bg_master_cb = QCheckBox("Background")
-        self.bg_master_cb.setToolTip(
-            "Start/stop all enabled background tasks.\n"
-            "Uncheck to pause background, check to resume."
-        )
+        self.bg_master_cb.setToolTip("Background tasks")
         self.bg_master_cb.toggled.connect(self._cb_toggle_background_master)
         r3.addWidget(self.bg_master_cb)
 
@@ -835,36 +879,22 @@ class GameAutomationWindow(QMainWindow):
         panel_layout.setContentsMargins(10, 10, 10, 10)
         panel_layout.setSpacing(8)
 
-        title = QLabel("Debug Capture")
+        title = QLabel("Debug")
         title.setObjectName("title")
         panel_layout.addWidget(title)
 
-        desc = QLabel(
-            "Các tùy chọn này dùng ADB screencap mặc định và chỉ điều khiển cửa sổ debug."
-        )
-        desc.setObjectName("subtitle")
-        desc.setWordWrap(True)
-        panel_layout.addWidget(desc)
-
-        self.debug_mode_cb = QCheckBox("Bật debug template")
-        self.debug_mode_cb.setToolTip("Bật cửa sổ Template Matching Debug / Gesture Debug.")
+        self.debug_mode_cb = QCheckBox("Debug template")
         debug_mode = bool(self.automation.get_ui_setting("debug_mode", self.automation.is_debug))
         debug_fail = bool(self.automation.get_ui_setting("debug_fail_mode", self.automation.is_debug_fail))
         self.debug_mode_cb.setChecked(debug_mode)
         self.debug_mode_cb.toggled.connect(self._cb_debug_mode_toggled)
         panel_layout.addWidget(self.debug_mode_cb)
 
-        self.debug_fail_cb = QCheckBox("Debug cả template fail")
-        self.debug_fail_cb.setToolTip("Khi bật, chế độ 'Mọi capture / cả fail' sẽ vẽ box đỏ cho best candidate.")
+        self.debug_fail_cb = QCheckBox("Debug template fail")
         self.debug_fail_cb.setChecked(debug_fail)
         self.debug_fail_cb.toggled.connect(self._cb_debug_fail_toggled)
         panel_layout.addWidget(self.debug_fail_cb)
         self.automation.set_debug_mode(debug_mode, debug_fail)
-
-        hint = QLabel("Bật debug template để vẽ box xanh khi match. Bật debug fail để vẽ box đỏ cho best candidate.")
-        hint.setObjectName("settingHint")
-        hint.setWordWrap(True)
-        panel_layout.addWidget(hint)
 
         layout.addWidget(panel)
         layout.addStretch(1)
@@ -974,10 +1004,11 @@ class GameAutomationWindow(QMainWindow):
             btn_layout.setContentsMargins(0, 0, 0, 0)
             btn_layout.setSpacing(2)
 
-            play_btn = QPushButton("▶")
+            play_btn = QPushButton()
             play_btn.setObjectName("btnPlay")
-            play_btn.setToolTip(f"Run only: {act.name}")
+            play_btn.setToolTip("Run")
             play_btn.setFixedSize(20, 20)
+            _set_button_icon(play_btn, "play", C.OK, QSize(13, 13))
             play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             play_btn.clicked.connect(
                 lambda _checked=False, aid=act.id: self._cb_run_single(aid)
@@ -987,10 +1018,11 @@ class GameAutomationWindow(QMainWindow):
             settings_btn = None
             has_settings = bool(act.custom_settings) or act.background
             if has_settings:
-                settings_btn = QPushButton("⚙")
+                settings_btn = QPushButton()
                 settings_btn.setObjectName("btnSettings")
-                settings_btn.setToolTip(f"Settings: {act.name}")
+                settings_btn.setToolTip("Settings")
                 settings_btn.setFixedSize(20, 20)
+                _set_button_icon(settings_btn, "settings", C.TEXT_MUTED, QSize(13, 13))
                 settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 settings_btn.clicked.connect(
                     lambda _checked=False, aid=act.id, k=kind: self._cb_show_activity_settings(aid, k)
@@ -1034,8 +1066,9 @@ class GameAutomationWindow(QMainWindow):
         header = QHBoxLayout()
         header.setSpacing(6)
 
-        back_btn = QPushButton("← Back")
+        back_btn = QPushButton("Back")
         back_btn.setObjectName("btnBack")
+        _set_button_icon(back_btn, "back", C.TEXT_DIM, QSize(13, 13))
         back_btn.clicked.connect(lambda _checked=False, k=kind: self._cb_hide_activity_settings(k))
         header.addWidget(back_btn)
 
@@ -1043,11 +1076,6 @@ class GameAutomationWindow(QMainWindow):
         title.setObjectName("title")
         header.addWidget(title, 1)
         layout.addLayout(header)
-
-        desc = QLabel("")
-        desc.setObjectName("subtitle")
-        desc.setWordWrap(True)
-        layout.addWidget(desc)
 
         body = QVBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
@@ -1057,7 +1085,6 @@ class GameAutomationWindow(QMainWindow):
         panel._kind = kind
         panel._rows = rows
         panel._title = title
-        panel._desc = desc
         panel._body = body
         panel._active_widgets: Dict[str, Any] = {}
 
@@ -1157,8 +1184,7 @@ class GameAutomationWindow(QMainWindow):
         self._active_settings_activity_id = activity_id
         panel._rows = rows
 
-        panel._title.setText(f"Settings: {act.name}")
-        panel._desc.setText(act.description or "")
+        panel._title.setText(act.name)
 
         body = panel._body
         self._clear_layout(body)
@@ -1308,14 +1334,15 @@ class GameAutomationWindow(QMainWindow):
 
         self.device_combo = QComboBox()
         self.device_combo.setObjectName("deviceCombo")
-        self.device_combo.setToolTip("Select ADB device")
+        self.device_combo.setToolTip("Device")
         self.device_combo.setEnabled(False)
         self.device_combo.activated.connect(self._cb_device_selected)
 
-        self.btn_refresh = QPushButton("↻")
+        self.btn_refresh = QPushButton()
         self.btn_refresh.setObjectName("btnDevice")
-        self.btn_refresh.setToolTip("Refresh / scan devices")
+        self.btn_refresh.setToolTip("Refresh")
         self.btn_refresh.setFixedSize(22, 20)
+        _set_button_icon(self.btn_refresh, "refresh", C.TEXT_DIM, QSize(14, 14))
         self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_refresh.clicked.connect(self._cb_refresh_devices)
 
@@ -1390,7 +1417,8 @@ class GameAutomationWindow(QMainWindow):
         self.btn_start.setEnabled(not self._is_running)
         self.btn_pause.setEnabled(self._is_running or self._bg_master_running)
         self.btn_stop.setEnabled(self._is_running)
-        self.btn_pause.setText("⏸ Resume" if self._is_paused else "⏸ Pause")
+        self.btn_pause.setText("Resume" if self._is_paused else "Pause")
+        _set_button_icon(self.btn_pause, "play" if self._is_paused else "pause", C.WARN)
 
         if not self._is_running and not self._bg_master_running:
             self._set_status("READY")
@@ -1849,7 +1877,7 @@ def run_with_pyside(game_class, title: str = "Game Automation") -> None:
     palette.setColor(QPalette.ColorRole.Highlight, QColor(C.ACCENT_BG))
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(C.TEXT))
     app.setPalette(palette)
-    app.setStyleSheet(QSS)
+    app.setStyleSheet(QSS.replace("__CHECK_ICON__", _check_icon_path()))
 
     game = game_class()
     window = GameAutomationWindow(game, title)
