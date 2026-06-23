@@ -460,7 +460,7 @@ input:focus { outline: none; border-color: var(--accent); }
 
 /* Inline settings expansion */
 .task-settings {
-  padding: 0 10px 10px 37px;
+  padding: 0 11px 11px 37px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1013,6 +1013,7 @@ function buildRow(act) {
   btns.className = "task-btns";
 
   if (!isBg) {
+    // Seq tasks: play button + optional gear for custom settings
     const play = document.createElement("button");
     play.className = "btn-icon btn-play";
     play.title = "Chạy";
@@ -1021,27 +1022,15 @@ function buildRow(act) {
       <path d="M1 1.5v8l8-4z"/></svg>`;
     play.onclick = () => onRunSingle(act.id);
     btns.appendChild(play);
-  }
 
-  const hasSettings = (act.customSettings && act.customSettings.length) || isBg;
-  if (hasSettings) {
-    const gear = document.createElement("button");
-    gear.className = "btn-icon btn-gear";
-    gear.title = "Cài đặt";
-    gear.dataset.gear = act.id;
-    gear.innerHTML = `<svg class="icon" width="13" height="13" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06
-               a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09
-               A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83
-               l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
-               A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83
-               l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
-               a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83
-               l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
-               a1.65 1.65 0 0 0-1.51 1z"/>
-    </svg>`;
+    if (act.customSettings && act.customSettings.length) {
+      const gear = _gearButton(act.id);
+      gear.onclick = () => toggleSettings(act.id);
+      btns.appendChild(gear);
+    }
+  } else {
+    // Bg tasks: gear button only (no play)
+    const gear = _gearButton(act.id);
     gear.onclick = () => toggleSettings(act.id);
     btns.appendChild(gear);
   }
@@ -1054,10 +1043,31 @@ function buildRow(act) {
   return row;
 }
 
+function _gearButton(actId) {
+  const gear = document.createElement("button");
+  gear.className = "btn-icon btn-gear";
+  gear.title = "Cài đặt";
+  gear.dataset.gear = actId;
+  gear.innerHTML = `<svg class="icon" width="13" height="13" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06
+             a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09
+             A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83
+             l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
+             A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83
+             l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
+             a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83
+             l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
+             a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>`;
+  return gear;
+}
+
 function _bgMeta(act) {
   const speed = act.customValues && act.customValues["speed_multiplier"];
   if (speed !== undefined) return `Frida · tốc độ ${speed}x`;
-  return `Đóng popup · mỗi ${act.pollInterval}s`;
+  return `Làm mới mỗi ${act.pollInterval}s`;
 }
 
 function _progClass(status) {
@@ -1121,8 +1131,8 @@ function buildSettingsPanel(act) {
 }
 
 function toggleSettings(actId) {
-  const list = actId && S.activities.find(a => a.background)
-    ? $("bg-list") : $("seq-list");
+  const _act = S.activities.find(a => a.id === actId);
+  const list = (_act && _act.background) ? $("bg-list") : $("seq-list");
 
   const existingPanel = list.querySelector(`[data-settings-for="${actId}"]`);
   const row           = list.querySelector(`[data-id="${actId}"]`);

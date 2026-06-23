@@ -7,9 +7,8 @@ This manager pushes a JavaScript payload to the Android device and runs
 LDPlayer). The injected script tries two strategies:
 
 1. Call ``UnityEngine.Time.set_timeScale`` if the IL2CPP symbol is visible.
-2. Hook ``clock_gettime`` / ``gettimeofday`` in ``libc.so`` to scale
-   monotonic/real time for the whole process (works for Mono and stripped
-   IL2CPP binaries).
+2. Hook ``clock_gettime`` in ``libc.so`` to scale monotonic time for
+   the whole process (works for Mono and stripped IL2CPP binaries).
 
 Usage in a game class::
 
@@ -30,7 +29,7 @@ NOTE: This is a best-effort helper. Actual hook success depends on the
 device being rooted and supporting Frida. Anti-cheat/integrity checks may
 detect the injection and lead to bans.
 """
-import os
+import shlex
 import subprocess
 import tempfile
 import threading
@@ -42,11 +41,14 @@ from src.utils import log_error, log_info, log_success, log_warning
 
 
 _INJECT_SCRIPT = """
+// Clean up any interceptors left by a previous injection into this process.
+try { Interceptor.detachAll(); } catch(e) {}
+
 var currentScale = 1.0;
 var timeHookInstalled = false;
-var baseReal = null;
-var baseScaled = null;
-var logFd = null;
+var clockGettimeOriginal = null;
+var readingOriginalClock = false;
+var baseByClock = {};
 
 function log(msg) {
     send(msg);
@@ -101,22 +103,17 @@ function resolveTimeScale() {
         'UnityEngine_Time_set_timeScale',
         'set_timeScale',
     ];
-    const candidateGetters = [
-        '_ZN11UnityEngine4Time9timeScaleE',
-        '_ZN11UnityEngine4Time12get_timeScaleE',
-        'get_timeScale@UnityEngine.Time@@SAMXZ',
-        '?get_timeScale@Time@UnityEngine@@SAMXZ',
-        'UnityEngine.Time.get_timeScale',
-        'UnityEngine_Time_get_timeScale',
-        'get_timeScale',
-    ];
 
     let setter = findExport(candidateSetters);
-    let getter = findExport(candidateGetters);
-
     const m = findIl2CppModule();
     if (m) {
-        const symbols = Module.enumerateExports(m.name);
+        let symbols;
+        try {
+            symbols = m.enumerateExports();
+        } catch (e) {
+            symbols = [];
+            log('enumerate exports failed: ' + e.message);
+        }
         if (!setter) {
             for (let i = 0; i < symbols.length; i++) {
                 const s = symbols[i];
@@ -127,19 +124,9 @@ function resolveTimeScale() {
                 }
             }
         }
-        if (!getter) {
-            for (let i = 0; i < symbols.length; i++) {
-                const s = symbols[i];
-                if (s.type !== 'function' || !s.name) continue;
-                const lower = s.name.toLowerCase();
-                if (lower.indexOf('get_timescale') !== -1 || lower.indexOf('get_time_scale') !== -1) {
-                    getter = s.address; break;
-                }
-            }
-        }
     }
 
-    return { setter: setter, getter: getter };
+    return { setter: setter };
 }
 
 function installTimeScaleHook(scale) {
@@ -157,12 +144,31 @@ function installTimeScaleHook(scale) {
     }
 }
 
-function nowMs() {
+function readClockMs(clockId) {
+    if (!clockGettimeOriginal) return null;
     const tmp = Memory.alloc(16);
-    const libc = Process.findModuleByName('libc.so');
-    const fn = new NativeFunction(libc.getExportByName('clock_gettime'), 'int', ['int', 'pointer']);
-    fn(1, tmp);
-    return tmp.readLong() * 1000 + tmp.add(8).readLong() / 1000000;
+    readingOriginalClock = true;
+    try {
+        const ret = clockGettimeOriginal(clockId, tmp);
+        if (ret !== 0) return null;
+        return tmp.readLong() * 1000 + tmp.add(8).readLong() / 1000000;
+    } finally {
+        readingOriginalClock = false;
+    }
+}
+
+function scaledClockMs(clockId, realMs) {
+    const key = String(clockId);
+    let base = baseByClock[key];
+    if (!base) {
+        base = { real: realMs, scaled: realMs };
+        baseByClock[key] = base;
+        return realMs;
+    }
+    const delta = realMs - base.real;
+    base.scaled += delta * currentScale;
+    base.real = realMs;
+    return base.scaled;
 }
 
 function writeTimespec(tv, ms) {
@@ -170,13 +176,6 @@ function writeTimespec(tv, ms) {
     const nsec = Math.floor((ms % 1000) * 1000000);
     tv.writeLong(sec);
     tv.add(8).writeLong(nsec);
-}
-
-function writeTimeval(tv, ms) {
-    const sec = Math.floor(ms / 1000);
-    const usec = Math.floor((ms % 1000) * 1000);
-    tv.writeLong(sec);
-    tv.add(8).writeLong(usec);
 }
 
 function installTimeHack(scale) {
@@ -187,37 +186,24 @@ function installTimeHack(scale) {
             return false;
         }
         const cgAddr = libc.getExportByName('clock_gettime');
-        const gtAddr = libc.getExportByName('gettimeofday');
+        if (!cgAddr) {
+            log('clock_gettime not found');
+            return false;
+        }
+        clockGettimeOriginal = new NativeFunction(cgAddr, 'int', ['int', 'pointer']);
 
-        if (cgAddr && !timeHookInstalled) {
+        if (!timeHookInstalled) {
             Interceptor.attach(cgAddr, {
                 onEnter: function(args) { this.tv = args[1]; this.clock = args[0].toInt32(); },
                 onLeave: function(retval) {
+                    if (readingOriginalClock) return;
                     if (currentScale === 1.0) return;
+                    if (retval.toInt32() !== 0) return;
                     if (!this.tv || this.tv.isNull()) return;
                     if (this.clock === 0) return;
-                    if (baseReal === null) { baseReal = nowMs(); baseScaled = baseReal; }
-                    const realMs = nowMs();
-                    const delta = realMs - baseReal;
-                    baseScaled += delta * currentScale;
-                    baseReal = realMs;
-                    writeTimespec(this.tv, baseScaled);
-                }
-            });
-        }
-
-        if (gtAddr && !timeHookInstalled) {
-            Interceptor.attach(gtAddr, {
-                onEnter: function(args) { this.tv = args[0]; },
-                onLeave: function(retval) {
-                    if (currentScale === 1.0) return;
-                    if (!this.tv || this.tv.isNull()) return;
-                    if (baseReal === null) { baseReal = nowMs(); baseScaled = baseReal; }
-                    const realMs = nowMs();
-                    const delta = realMs - baseReal;
-                    baseScaled += delta * currentScale;
-                    baseReal = realMs;
-                    writeTimeval(this.tv, baseScaled);
+                    const realMs = readClockMs(this.clock);
+                    if (realMs === null) return;
+                    writeTimespec(this.tv, scaledClockMs(this.clock, realMs));
                 }
             });
         }
@@ -235,14 +221,25 @@ function installTimeHack(scale) {
 function setScale(scale) {
     log('setScale called: ' + scale);
     currentScale = scale;
-    if (installTimeScaleHook(scale)) return;
-    if (installTimeHack(scale)) return;
+    if (installTimeScaleHook(scale)) {
+        log('success: Time.timeScale applied');
+        return true;
+    }
+    if (scale === 1.0) {
+        log('success: normal scale requested');
+        return true;
+    }
+    if (installTimeHack(scale)) {
+        log('success: Time-hack fallback applied');
+        return true;
+    }
     log('error: no speedhack strategy available');
+    return false;
 }
 
 log('script loaded, target=' + TARGET_SCALE);
-setScale(TARGET_SCALE);
-log('script finished');
+const speedhackOk = setScale(TARGET_SCALE);
+log('script finished: ' + (speedhackOk ? 'success' : 'failed'));
 """
 
 
@@ -274,7 +271,7 @@ class FridaSpeedhackManager:
         self._device_id = device_id
 
         self._device_script_path = "/data/local/tmp/speedhack.js"
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._inject_proc: Optional[subprocess.Popen] = None
 
     @property
@@ -316,7 +313,7 @@ class FridaSpeedhackManager:
         """Return a usable ADB binary path."""
         candidates = []
         root = FridaSpeedhackManager._project_root()
-        bundled = root / "bin" / "adb.exe"
+        bundled = root / "vendor" / "adb" / "adb.exe"
         if bundled.is_file():
             candidates.append(str(bundled))
         candidates.append("adb")
@@ -376,7 +373,8 @@ class FridaSpeedhackManager:
         # Use ``test -f`` and check its exit code instead of parsing ``ls``
         # output: ``ls`` echoes the path back in its own "No such file" error,
         # so a naive substring check always falsely reports the file as present.
-        check = self._run_adb(f"test -f {self._frida_inject_path} && echo OK || echo MISSING")
+        inject_path = shlex.quote(self._frida_inject_path)
+        check = self._run_adb(f"test -f {inject_path} && echo OK || echo MISSING")
         if "OK" in check:
             return True
 
@@ -389,7 +387,7 @@ class FridaSpeedhackManager:
                 text=True,
                 timeout=120,
             )
-            self._run_adb(f"chmod 755 {self._frida_inject_path}")
+            self._run_adb(f"chmod 755 {inject_path}")
             return True
         except Exception as e:
             log_error(f"[speedhack] failed to push frida-inject: {e}")
@@ -397,12 +395,12 @@ class FridaSpeedhackManager:
 
     def _find_pid(self) -> Optional[int]:
         """Find the PID of the target package."""
-        out = self._run_adb(f"pidof {self.package}")
+        package = shlex.quote(self.package)
+        out = self._run_adb(f"pidof {package}")
         pid = out.strip().split()
         if pid and pid[0].isdigit():
             return int(pid[0])
-        # Fallback: ps
-        out = self._run_adb(f"ps -A | grep -F {self.package}")
+        out = self._run_adb(f"ps -A | grep -F -- {package}")
         for line in out.splitlines():
             parts = line.split()
             if self.package in line and len(parts) >= 2:
@@ -429,75 +427,150 @@ class FridaSpeedhackManager:
         except Exception as e:
             log_error(f"[speedhack] failed to push script: {e}")
             return False
+        finally:
+            try:
+                local_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+    def _stop_inject_proc(self) -> None:
+        proc = self._inject_proc
+        self._inject_proc = None
+        if proc is None or proc.poll() is not None:
+            return
+        try:
+            proc.terminate()
+            proc.wait(timeout=2)
+        except Exception:
+            try:
+                proc.kill()
+                proc.wait(timeout=2)
+            except Exception as e:
+                log_warning(f"[speedhack] error stopping inject proc: {e}")
+
+    def _kill_device_frida(self) -> None:
+        """Kill any running frida-inject processes on the device to avoid stacked hooks."""
+        self._run_adb("su -c 'pkill -f frida-inject 2>/dev/null; sleep 0.3' &")
+
+    def _inject_scale_locked(self, scale: float, keep_alive: bool) -> bool:
+        self._kill_device_frida()
+        if not self._push_inject_if_needed():
+            return False
+
+        pid = self._find_pid()
+        if pid is None:
+            log_error(f"[speedhack] cannot find pid for {self.package}")
+            return False
+
+        if not self._push_script(scale):
+            return False
+
+        log_info(f"[speedhack] injecting into {self.package} (pid {pid})...")
+        proc = None
+        try:
+            proc = subprocess.Popen(
+                self._adb_prefix()
+                + [
+                    "shell",
+                    f"su -c {shlex.quote(f'{self._frida_inject_path} -p {pid} -s {self._device_script_path}')}",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            if keep_alive:
+                self._inject_proc = proc
+            status = {"success": False, "error": False}
+
+            def _reader(pipe, label):
+                if pipe is None:
+                    return
+                try:
+                    for line in iter(pipe.readline, ""):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        lower = line.lower()
+                        if "success:" in lower or "script finished: success" in lower:
+                            status["success"] = True
+                        if "error:" in lower or "script finished: failed" in lower:
+                            status["error"] = True
+                        if label == "stdout":
+                            log_info(f"[speedhack] {line}")
+                        else:
+                            log_warning(f"[speedhack] {line}")
+                except Exception:
+                    pass
+
+            threads = [
+                threading.Thread(target=_reader, args=(proc.stdout, "stdout"), daemon=True),
+                threading.Thread(target=_reader, args=(proc.stderr, "stderr"), daemon=True),
+            ]
+            for thread in threads:
+                thread.start()
+
+            deadline = time.monotonic() + 8
+            while time.monotonic() < deadline and proc.poll() is None:
+                if status["success"] or status["error"]:
+                    break
+                time.sleep(0.05)
+
+            if proc.poll() is not None:
+                for thread in threads:
+                    thread.join(timeout=0.2)
+
+            if status["error"] or (proc.poll() not in (None, 0) and not status["success"]):
+                log_error("[speedhack] injection script reported failure")
+                return False
+
+            if not status["success"]:
+                log_warning("[speedhack] injection result not confirmed")
+
+            return True
+        except Exception as e:
+            log_error(f"[speedhack] failed to inject: {e}")
+            return False
+        finally:
+            if not keep_alive and proc is not None:
+                try:
+                    if proc.poll() is None:
+                        proc.terminate()
+                        proc.wait(timeout=2)
+                except Exception:
+                    try:
+                        proc.kill()
+                        proc.wait(timeout=2)
+                    except Exception:
+                        pass
 
     def set_scale(self, scale: float) -> bool:
         """Inject a script that sets the in-game/app time scale to ``scale``."""
         scale = float(scale)
         log_info(f"[speedhack] requesting time scale = {scale}")
 
-        if not self.available:
-            log_warning("[speedhack] frida-inject binary not available")
-            return False
-
         with self._lock:
-            if not self._push_inject_if_needed():
+            self._stop_inject_proc()
+
+            if not self.available:
+                log_warning("[speedhack] frida-inject binary not available")
+                if scale == 1.0:
+                    self._current_scale = 1.0
+                    self._target_scale = 1.0
+                return scale == 1.0
+
+            ok = self._inject_scale_locked(scale, keep_alive=scale != 1.0)
+            if not ok:
+                if scale != 1.0:
+                    self._stop_inject_proc()
                 return False
 
-            pid = self._find_pid()
-            if pid is None:
-                log_error(f"[speedhack] cannot find pid for {self.package}")
-                return False
-
-            if not self._push_script(scale):
-                return False
-
-            log_info(f"[speedhack] injecting into {self.package} (pid {pid})...")
-            try:
-                proc = subprocess.Popen(
-                    self._adb_prefix()
-                    + [
-                        "shell",
-                        f"su -c '{self._frida_inject_path} -p {pid} -s {self._device_script_path}'",
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
-                self._inject_proc = proc
-
-                # Stream logs in a background thread so we can see Frida send() messages.
-                def _reader(pipe, label):
-                    try:
-                        for line in iter(pipe.readline, ""):
-                            line = line.strip()
-                            if not line:
-                                continue
-                            if label == "stdout":
-                                log_info(f"[speedhack] {line}")
-                            else:
-                                log_warning(f"[speedhack] {line}")
-                    except Exception:
-                        pass
-
-                import threading
-                threading.Thread(target=_reader, args=(proc.stdout, "stdout"), daemon=True).start()
-                threading.Thread(target=_reader, args=(proc.stderr, "stderr"), daemon=True).start()
-
-                # Wait for injection. frida-inject may stay alive as an agent;
-                # we don't want to block forever, but we do want to see initial output.
-                try:
-                    proc.wait(timeout=8)
-                except subprocess.TimeoutExpired:
-                    pass
-
-                # If we never saw an error, treat as success. The agent keeps running.
-                self._current_scale = scale
-                self._target_scale = scale
+            self._current_scale = scale
+            self._target_scale = scale
+            if scale == 1.0:
+                log_success("[speedhack] time scale reset to 1.0")
+            else:
                 log_success(f"[speedhack] time scale set to {scale}")
-                return True
-            except Exception as e:
-                log_error(f"[speedhack] failed to inject: {e}")
-                return False
+            return True
 
     def get_scale(self) -> Optional[float]:
         """Return the last requested time scale."""
@@ -510,15 +583,11 @@ class FridaSpeedhackManager:
     def detach(self) -> None:
         """Restore normal speed and clean up."""
         with self._lock:
-            self.set_scale(1.0)
-            try:
-                if self._inject_proc is not None:
-                    self._inject_proc.terminate()
-                    self._inject_proc.wait(timeout=2)
-            except Exception as e:
-                log_warning(f"[speedhack] error stopping inject proc: {e}")
-            finally:
-                self._inject_proc = None
+            self._stop_inject_proc()
+            self._kill_device_frida()
+            self._current_scale = 1.0
+            self._target_scale = 1.0
+            self._run_adb(f"rm -f {shlex.quote(self._device_script_path)}")
         log_info("[speedhack] detached")
 
 

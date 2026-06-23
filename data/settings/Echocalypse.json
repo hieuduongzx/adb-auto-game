@@ -1,5 +1,9 @@
 {
   "ocr_backend": "tesseract",
+  "ui_settings": {
+    "debug_mode": false,
+    "debug_fail_mode": false
+  },
   "activities": [
     {
       "id": "auto_skip_dialog",
@@ -17,6 +21,14 @@
       "poll_interval": 999999.0,
       "custom": {
         "speed": 2.0
+      }
+    },
+    {
+      "id": "case_fight",
+      "enabled": true,
+      "poll_interval": 1.0,
+      "custom": {
+        "fight_count": 5
       }
     }
   ]

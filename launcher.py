@@ -1,280 +1,197 @@
+"""
+ADB Game Automation — GUI Launcher (PyWebView)
+
+Usage::
+
+    python launcher.py
+
+Opens a game picker window.  Click a game to launch its automation GUI.
+``scan_games`` and ``load_game_class`` are also importable by other modules.
+"""
 from __future__ import annotations
 
-import argparse
 import importlib
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Type
+from typing import Dict, Optional, Type
 
-from colorama import Fore, Style
+import webview
 
-# Make ``src/`` importable when running this script directly.
 _PROJECT_ROOT = Path(__file__).resolve().parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from src.utils import log_error, log_info, log_success, log_warning  # noqa: E402
+from src.utils import log_error, log_info  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Console UI helpers
-# ---------------------------------------------------------------------------
-
-# Accent colours used across the launcher UI.
-_C_TITLE = Fore.CYAN          # banner title
-_C_ACCENT = Fore.MAGENTA      # headings / prompt
-_C_LABEL = Fore.YELLOW        # inline labels / numbers
-_C_DIM = Fore.WHITE           # secondary text / rules
-_C_HINT = Fore.GREEN          # usage hints / keys
-
-
-def _banner(title: str, subtitle: str = "") -> None:
-    """Render a double-line banner box.
-
-    The box auto-sizes to the longest line so it always looks balanced.
-    """
-    inner = [title]
-    if subtitle:
-        inner.append("")
-        inner.append(subtitle)
-
-    width = max(len(line) for line in inner) + 4
-
-    top = "╔" + "═" * width + "╗"
-    bot = "╚" + "═" * width + "╝"
-
-    print()
-    print(f"{_C_TITLE}{top}{Style.RESET_ALL}")
-    for line in inner:
-        pad = (width - len(line)) // 2
-        centered = " " * pad + line + " " * (width - len(line) - pad)
-        print(f"{_C_TITLE}║{centered}║{Style.RESET_ALL}")
-    print(f"{_C_TITLE}{bot}{Style.RESET_ALL}")
-
-
-def _rule(width: int = 52) -> None:
-    print(_C_DIM + ("─" * width) + Style.RESET_ALL)
-
-
-def _section_header(label: str) -> None:
-    """A small uppercase section label with an underline rule."""
-    print()
-    print(f"{_C_ACCENT}{label}{Style.RESET_ALL}")
-    _rule(max(len(label), 40))
-
-
-def _hint_row(key: str, desc: str) -> None:
-    """A two-column hint line: highlighted key + dim description."""
-    print(f"    {_C_HINT}{key:<18}{Style.RESET_ALL}{_C_DIM}{desc}{Style.RESET_ALL}")
-
-
-# ---------------------------------------------------------------------------
-# Game discovery / loading
+# Shared game-discovery utilities (imported by run.py and other callers)
 # ---------------------------------------------------------------------------
 
 def scan_games() -> Dict[str, Dict[str, str]]:
-    """Discover available games under ``src/games``.
+    """Discover games under ``src/games/``.
 
     A game is any directory ``src/games/<name>/`` that contains a
-    ``<name>.py`` module file. The ``template`` directory is skipped.
+    ``<name>.py`` module.  Directories starting with ``__`` are skipped.
     """
     games_dir = _PROJECT_ROOT / "src" / "games"
     games: Dict[str, Dict[str, str]] = {}
     if not games_dir.exists():
         log_error(f"Games directory not found: {games_dir}")
         return games
-
     for item in sorted(games_dir.iterdir()):
         if not item.is_dir() or item.name.startswith("__"):
             continue
-        game_file = item / f"{item.name}.py"
-        if not game_file.exists():
+        if not (item / f"{item.name}.py").exists():
             continue
         games[item.name] = {
-            "module_path": f"src.games.{item.name}.{item.name}",
+            "module_path":  f"src.games.{item.name}.{item.name}",
             "display_name": item.name.upper(),
         }
     return games
 
 
 def load_game_class(game_info: Dict[str, str]) -> Optional[Type]:
-    """Load the game class named after the game directory (case-insensitive)."""
+    """Import and return the game class for *game_info*."""
     try:
         module = importlib.import_module(game_info["module_path"])
     except Exception as e:
         log_error(f"Could not import {game_info['module_path']}: {e}", exc_info=True)
         return None
-
     target = game_info["display_name"].lower()
     for attr in dir(module):
         if attr.lower() == target:
             return getattr(module, attr)
-    log_error(f"No class matching '{target}' found in {game_info['module_path']}")
+    log_error(f"No class matching '{target}' in {game_info['module_path']}")
     return None
 
 
-def _run_cli(game_class: Type) -> None:
-    game = game_class()
-    game.start()
-
-
-def _run_gui(game_class: Type, title: str) -> None:
-    from src.gui.pywebview_gui import run_with_pywebview
-    run_with_pywebview(game_class, title)
-
-
-def run_game(game_class: Type, title: str, gui: bool, webview: bool = False) -> None:
-    try:
-        if gui or webview:
-            log_success(f"Starting {title} with PyWebView GUI...")
-            _run_gui(game_class, title)
-        else:
-            log_success(f"Starting {title} (CLI). Press 'q' to stop.")
-            _run_cli(game_class)
-    except KeyboardInterrupt:
-        log_info("Stopped by user")
-    except Exception as e:
-        log_error(f"Error running automation: {e}", exc_info=True)
-    finally:
-        log_info("Automation ended")
-
-
 # ---------------------------------------------------------------------------
-# Presentation
+# PyWebView launcher
 # ---------------------------------------------------------------------------
 
-def list_games(games: Dict[str, Dict[str, str]]) -> None:
-    """Compact one-shot game listing (used by ``--list``)."""
-    _section_header("AVAILABLE GAMES")
-    if not games:
-        print(f"  {_C_DIM}(none){Style.RESET_ALL}")
-        return
-    for name, info in games.items():
-        print(
-            f"  {_C_LABEL}{name:<16}{Style.RESET_ALL}"
-            f"{_C_DIM}→{Style.RESET_ALL} {_C_TITLE}{info['display_name']}{Style.RESET_ALL}"
-        )
+class _LauncherAPI:
+    def __init__(self, games: Dict[str, Dict[str, str]]) -> None:
+        self._games = games
+        self._window: Optional[webview.Window] = None
 
+    def _attach(self, window: webview.Window) -> None:
+        self._window = window
 
-def _print_games_panel(names: List[str], games: Dict[str, Dict[str, str]]) -> None:
-    """Render the numbered games panel for the interactive menu."""
-    _section_header("GAMES")
-    if not names:
-        print(f"  {_C_DIM}No games detected in src/games/{Style.RESET_ALL}")
-        return
+    def get_games(self) -> list:
+        return [{"name": k, "display": v["display_name"]} for k, v in self._games.items()]
 
-    # Width of the number column so rows align.
-    num_w = len(str(len(names)))
-
-    for idx, name in enumerate(names, 1):
-        display = games[name]["display_name"]
-        print(
-            f"  {_C_LABEL}{idx:>{num_w}}.{Style.RESET_ALL}  "
-            f"{_C_TITLE}{display}{Style.RESET_ALL}"
-        )
-
-
-def _print_usage_legend() -> None:
-    _section_header("USAGE")
-    _hint_row("1", "select game by number")
-    _hint_row("1g", "launch with PySide6 GUI (append 'g')")
-    _hint_row("1w", "launch with PyWebView GUI (append 'w')")
-    _hint_row("0", "exit")
-
-
-def interactive_menu(games: Dict[str, Dict[str, str]]) -> None:
-    if not games:
-        log_error("No games found in src/games. Add a game directory and try again.")
-        return
-
-    while True:
-        _banner("ADB GAME AUTOMATION", "Control ADB games from your terminal")
-
-        names = list(games.keys())
-        _print_games_panel(names, games)
-        _print_usage_legend()
-
-        # Coloured prompt.
-        prompt = (
-            f"\n  {_C_ACCENT}❯{Style.RESET_ALL} "
-            f"{_C_DIM}Select a game:{Style.RESET_ALL} "
-        )
-        try:
-            choice = input(prompt).strip()
-        except (KeyboardInterrupt, EOFError):
-            print()
-            log_info("Exiting...")
-            return
-
-        if choice == "":
-            continue
-
-        if choice == "0":
-            log_info("Exiting...")
-            return
-
-        gui     = choice.lower().endswith("g")
-        webview = choice.lower().endswith("w")
-        if gui or webview:
-            choice = choice[:-1]
-
-        try:
-            idx = int(choice) - 1
-        except ValueError:
-            log_warning("Please enter a valid number.")
-            continue
-        if not 0 <= idx < len(names):
-            log_warning("Invalid choice. Please try again.")
-            continue
-
-        info = games[names[idx]]
+    def launch(self, game_name: str) -> bool:
+        info = self._games.get(game_name)
+        if not info:
+            return False
         game_class = load_game_class(info)
-        if game_class is None:
-            log_error(f"Failed to load {info['display_name']}")
-            continue
-        run_game(game_class, f"{info['display_name']} Automation", gui, webview)
+        if not game_class:
+            log_error(f"Could not load {info['display_name']}")
+            return False
+        title = f"{info['display_name']} Automation"
+        log_info(f"Launching {title}")
+        from src.gui.pywebview_gui import create_pywebview_window
+        create_pywebview_window(game_class, title)
+        if self._window:
+            self._window.destroy()
+        return True
+
+
+def _build_html(games: Dict[str, Dict[str, str]]) -> str:
+    items = "\n".join(
+        f'<button class="game-btn" onclick="launch(\'{name}\')">'
+        f'<span class="game-name">{info["display_name"]}</span>'
+        f'<svg class="arrow" viewBox="0 0 16 16" fill="none">'
+        f'<path d="M5 3l6 5-6 5" stroke="currentColor" stroke-width="1.8"'
+        f' stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        f'</button>'
+        for name, info in games.items()
+    )
+    return f"""<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ADB Game Automation</title>
+<style>
+*,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
+:root{{
+  --bg:#eef0f3;--panel:#fff;--surface:#f7f9fc;--border:#e4e7ec;
+  --ink:#19222e;--muted:#9aa3ae;--accent:#2f6fed;
+  --r:10px;--sans:"Segoe UI",system-ui,sans-serif;color-scheme:light;
+}}
+html,body{{height:100%;background:var(--bg);font-family:var(--sans);
+  font-size:13px;color:var(--ink);-webkit-font-smoothing:antialiased;
+  user-select:none;overflow:hidden;}}
+#app{{height:100%;display:flex;flex-direction:column;padding:12px 10px 8px;gap:8px;}}
+.header{{background:var(--panel);border:1px solid var(--border);
+  border-radius:var(--r);padding:13px 15px;}}
+.title{{font-size:15px;font-weight:700;}}
+.subtitle{{font-size:11px;color:var(--muted);margin-top:2px;}}
+.label{{font-size:10px;font-weight:700;letter-spacing:.06em;
+  color:var(--muted);text-transform:uppercase;padding:0 2px;}}
+.list{{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;}}
+::-webkit-scrollbar{{width:5px}}
+::-webkit-scrollbar-thumb{{background:#d3d9e0;border-radius:3px}}
+.game-btn{{width:100%;display:flex;align-items:center;gap:10px;
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--r);
+  padding:11px 13px;cursor:pointer;font-family:var(--sans);text-align:left;
+  transition:background .12s,border-color .12s,transform .1s;}}
+.game-btn:hover{{background:var(--surface);border-color:#d0d6de;transform:translateY(-1px);}}
+.game-btn:active{{transform:translateY(0);}}
+.game-btn.busy{{opacity:.55;pointer-events:none;}}
+.game-name{{flex:1;font-size:13px;font-weight:600;}}
+.arrow{{width:15px;height:15px;flex-shrink:0;color:var(--muted);
+  transition:color .12s,transform .12s;}}
+.game-btn:hover .arrow{{color:var(--accent);transform:translateX(2px);}}
+#status{{font-size:11px;color:var(--muted);text-align:center;min-height:16px;}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="title">ADB Game Automation</div>
+    <div class="subtitle">Chọn game để mở giao diện tự động hoá</div>
+  </div>
+  <div class="label">GAME</div>
+  <div class="list">{items}</div>
+  <div id="status"></div>
+</div>
+<script>
+async function launch(name) {{
+  document.querySelectorAll('.game-btn').forEach(b => b.classList.add('busy'));
+  document.getElementById('status').textContent = 'Đang mở...';
+  try {{
+    await window.pywebview.api.launch(name);
+  }} catch(e) {{
+    document.getElementById('status').textContent = 'Lỗi: ' + e;
+    document.querySelectorAll('.game-btn').forEach(b => b.classList.remove('busy'));
+  }}
+}}
+</script>
+</body>
+</html>"""
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Game Automation Launcher",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            "Examples:\n"
-            "  python launcher.py                  # Interactive menu\n"
-            "  python launcher.py --list           # List games\n"
-            "  python launcher.py bd2              # Run BD2 in CLI mode\n"
-            "  python launcher.py bd2 --gui        # Run BD2 with GUI\n"
-        ),
-    )
-    parser.add_argument("game", nargs="?", help="Name of the game to run")
-    parser.add_argument("--gui", action="store_true", help="Run with the PySide6 GUI")
-    parser.add_argument("--webview", action="store_true", help="Run with the PyWebView GUI")
-    parser.add_argument("--list", "-l", action="store_true", help="List available games")
-    args = parser.parse_args()
-
     games = scan_games()
-
-    if args.list:
-        list_games(games)
-        return 0
-
-    if not args.game:
-        # No game specified: interactive menu.
-        interactive_menu(games)
-        return 0
-
-    name = args.game.lower()
-    if name not in games:
-        log_error(f"Unknown game '{args.game}'.")
-        list_games(games)
+    if not games:
+        log_error("No games found in src/games/")
         return 1
 
-    info = games[name]
-    game_class = load_game_class(info)
-    if game_class is None:
-        return 1
-    run_game(game_class, f"{info['display_name']} Automation", args.gui, args.webview)
+    api = _LauncherAPI(games)
+    window = webview.create_window(
+        "ADB Game Automation",
+        html=_build_html(games),
+        js_api=api,
+        width=340,
+        height=min(148 + len(games) * 52, 540),
+        resizable=False,
+        background_color="#eef0f3",
+    )
+    window.events.loaded += lambda: api._attach(window)
+    webview.start(debug=False, private_mode=False)
     return 0
 
 

@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ADB Auto-Game · Dev Helper</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #eef0f3;
+  --panel:     #ffffff;
+  --surface:   #f7f9fc;
+  --alt:       #f3f5f9;
+  --border:    #e4e7ec;
+  --border2:   #dde2e8;
+  --line:      #f1f3f6;
+  --ink:       #19222e;
+  --ink2:      #41505f;
+  --dim:       #5a6573;
+  --muted:     #9aa3ae;
+  --accent:    #2f6fed;
+  --accent-bg: #eef5ff;
+  --accent-bd: #d6e4f5;
+  --ok:        #1f9254;
+  --ok-bg:     #e8f5ed;
+  --ok-bd:     #cfead9;
+  --warn:      #9c6c12;
+  --warn-bg:   #fdf6e9;
+  --err:       #bb3a33;
+  --err-bg:    #fcefee;
+  --err-bd:    #eecdca;
+  --log-bg:    #fbfcfd;
+  --log-ink:   #41505f;
+  --log-muted: #b3bbc4;
+  --sans: "IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono: "IBM Plex Mono","Cascadia Code","Consolas",monospace;
+  --r-sm: 7px; --r-md: 10px;
+  --ease: cubic-bezier(0.16,1,0.3,1);
+  color-scheme: light;
+}
+
+html, body { height: 100%; background: var(--bg); font-family: var(--sans);
+  font-size: 13px; color: var(--ink); -webkit-font-smoothing: antialiased; }
+body { display: flex; flex-direction: column; overflow: hidden; user-select: none; }
+
+button { font-family: var(--sans); font-size: inherit; cursor: pointer;
+  border: none; background: none; padding: 0; line-height: 1; color: inherit; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+input, select { font-family: var(--mono); font-size: 11.5px; background: var(--panel);
+  color: var(--ink); border: 1px solid var(--border2);
+  border-radius: var(--r-sm); padding: 5px 8px; }
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d3d9e0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #b8c1cc; }
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+#app { flex: 1; display: flex; flex-direction: column; gap: 7px;
+  padding: 8px 8px 4px; overflow: hidden; min-height: 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); }
+
+/* ── Toolbar ────────────────────────────────────────────────────────────── */
+#toolbar { padding: 7px 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.tb-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+  color: var(--muted); text-transform: uppercase; }
+
+.device-wrap { display: flex; align-items: center; gap: 7px; min-width: 250px;
+  padding: 5px 10px; border: 1px solid var(--border2); border-radius: 8px; background: var(--panel); }
+#device-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
+  flex-shrink: 0; transition: background .2s; }
+#device-dot.connected { background: #2fa55a; }
+#device-select { flex: 1; min-width: 0; border: none; background: transparent;
+  font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--dim);
+  cursor: pointer; -webkit-appearance: none; appearance: none; padding: 0; }
+#device-select:focus { outline: none; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 30px; border-radius: 8px; font-weight: 600; font-size: 11.5px;
+  transition: background .15s, opacity .15s;
+  border: 1px solid var(--border); background: var(--panel); color: var(--dim);
+  padding: 0 11px; flex-shrink: 0; }
+.btn:hover  { background: var(--alt); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.accent:hover { background: #2559c7; }
+.btn.ok  { background: var(--ok);  color: #fff; border-color: var(--ok);
+  box-shadow: 0 1px 2px rgba(31,146,84,.3); font-size: 12px; font-weight: 700; }
+.btn.ok:hover  { background: #1b8049; }
+.btn.err { border: 1px solid var(--err-bd); background: var(--err-bg); color: var(--err); }
+.btn.err:hover { background: #fae2e0; }
+.btn.sm  { height: 26px; padding: 0 9px;  font-size: 11px; }
+.btn.h30 { height: 30px; padding: 0 12px; }
+
+/* Inline icon button */
+.icon-btn { width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--border2);
+  background: transparent; color: var(--muted); display: inline-flex; align-items: center;
+  justify-content: center; flex-shrink: 0; transition: background .1s, color .1s; }
+.icon-btn:hover { background: var(--alt); color: var(--ink); }
+.icon-btn.flash { color: var(--ok) !important; }
+
+.hz-wrap { display: flex; align-items: center; gap: 4px; }
+#hz-spin  { width: 54px; height: 30px; text-align: right; padding: 0 8px; }
+.hz-unit  { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
+.pill-wrap { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+#auto-cb { width: 36px; height: 21px; border-radius: 999px; background: #d3d9e0;
+  position: relative; transition: background .2s; flex-shrink: 0; display: block; }
+#auto-cb.on { background: var(--accent); }
+#auto-thumb { position: absolute; top: 2px; left: 2px; width: 17px; height: 17px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: left .2s; }
+#auto-cb.on #auto-thumb { left: 17px; }
+.pill-label { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+.spacer { flex: 1; }
+
+/* ── Main split ──────────────────────────────────────────────────────────── */
+#main { flex: 1; display: flex; gap: 7px; min-height: 0; overflow: hidden; }
+
+/* Preview */
+#preview-card { flex: 1; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--r-md); overflow: hidden; min-width: 0; }
+.preview-hdr { display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+#size-label  { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+#res-label   { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.ph-hint     { font-size: 11px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
+.ph-hint .dot{ width: 8px; height: 8px; border-radius: 2px; background: #06b6d4; }
+#zoom-level  { font-family: var(--mono); font-size: 10.5px; color: var(--muted); min-width: 36px; text-align: right; }
+#preview-wrap { flex: 1; position: relative; background: var(--bg); overflow: hidden; min-height: 0; }
+#preview-canvas { display: block; position: absolute; inset: 0;
+  width: 100%; height: 100%; cursor: crosshair; }
+
+/* Tools panel */
+#tools-card { width: 410px; min-width: 320px; flex-shrink: 0;
+  display: flex; flex-direction: column; background: var(--panel);
+  border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+
+/* Tabs */
+#tabs-bar { display: flex; align-items: center; gap: 1px; padding: 0 2px;
+  border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.tab-btn { position: relative; padding: 8px 12px 9px; font-size: 12px; font-weight: 600;
+  color: var(--muted); transition: color .15s; }
+.tab-btn::after { content:''; position: absolute; left:0; right:0; bottom:-1px;
+  height: 2px; border-radius: 2px; background: transparent; transition: background .15s; }
+.tab-btn.active { color: var(--accent); }
+.tab-btn.active::after { background: var(--accent); }
+.tab-btn:hover:not(.active) { color: var(--dim); }
+
+.tab-pane { display: none; flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
+.tab-pane.active { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── Collapsible groups ──────────────────────────────────────────────────── */
+.group { border: 1px solid #e9ecf1; border-radius: var(--r-md); overflow: hidden; }
+
+.grp-hdr { display: flex; align-items: center; gap: 7px; padding: 8px 11px;
+  cursor: pointer; user-select: none; transition: background .1s; }
+.grp-hdr:hover { background: var(--alt); }
+
+.grp-title { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+  color: var(--muted); text-transform: uppercase; }
+
+.grp-chevron { margin-left: auto; color: var(--muted); flex-shrink: 0;
+  transition: transform .15s; }
+.group.closed .grp-chevron { transform: rotate(-90deg); }
+
+.grp-body { display: flex; flex-direction: column; gap: 7px;
+  padding: 0 11px 10px; }
+.group.closed .grp-body { display: none; }
+
+/* Row inside group */
+.row { display: flex; align-items: center; gap: 6px; }
+.lbl { font-size: 11.5px; color: var(--dim); font-weight: 500; min-width: 52px; flex-shrink: 0; }
+.lbl.n { min-width: 38px; }
+.row > input { flex: 1; min-width: 0; }
+.btns { display: flex; flex-wrap: wrap; gap: 5px; }
+.btns .btn { flex: 1; min-width: 60px; }
+
+/* Readout & swatch */
+#color-swatch, #cc-swatch { width: 28px; height: 26px; border-radius: 6px;
+  border: 1px solid var(--border); flex-shrink: 0; background: #eee; }
+
+/* Badges */
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px;
+  font-weight: 600; border-radius: 999px; padding: 2px 7px; }
+.badge.cyan { color: #0e8aa3; background: #e3f7fb; border: 1px solid #c4ecf3; }
+.badge.cyan .bd { width: 6px; height: 6px; border-radius: 2px; background: #06b6d4; }
+
+#ocr-engine { font-size: 10px; font-weight: 600; color: #1c7a44;
+  background: var(--ok-bg); border: 1px solid var(--ok-bd); border-radius: 999px; padding: 2px 7px; }
+#ocr-engine.unavailable { color: var(--warn); background: var(--warn-bg); border-color: #e7d5a4; }
+
+/* Checkboxes */
+.cb-line { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+.cb { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid #cfd5dd;
+  background: var(--panel); flex-shrink: 0; display: flex; align-items: center;
+  justify-content: center; transition: background .12s, border-color .12s; }
+.cb.checked { background: var(--accent); border-color: var(--accent); }
+.cb svg { opacity: 0; transition: opacity .1s; }
+.cb.checked svg { opacity: 1; }
+
+/* Template result */
+.tpl-result { font-family: var(--mono); font-size: 11.5px; color: #1c7a44;
+  background: #f1faf4; border: 1px solid #d7eede; border-radius: var(--r-sm); padding: 8px 10px; }
+.tpl-result.empty { font-family: var(--sans); color: var(--muted);
+  background: var(--surface); border-color: var(--border); }
+
+/* Color check */
+.cc-result { padding: 7px 9px; border-radius: var(--r-sm); font-size: 11.5px; display: none; }
+.cc-result.ok  { background: var(--ok-bg);  border: 1px solid var(--ok-bd);  color: #1c7a44; }
+.cc-result.bad { background: var(--err-bg); border: 1px solid var(--err-bd); color: var(--err); }
+
+/* Key strip */
+.key-strip { display: flex; flex-wrap: wrap; gap: 5px; }
+.key-strip .btn { flex: none; height: 26px; padding: 0 9px; font-size: 10.5px; font-weight: 600; }
+
+/* Device info */
+.info-grid { display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; }
+.info-grid .k { font-size: 11.5px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.info-grid .v { font-size: 11.5px; color: var(--ink); word-break: break-word;
+  user-select: text; font-family: var(--mono); }
+
+/* Asset library */
+.asset-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(88px,1fr)); gap: 7px; }
+.asset-card { display: flex; flex-direction: column; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  transition: border-color .12s, box-shadow .12s; }
+.asset-card:hover  { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,111,237,.12); }
+.asset-card.active { border-color: var(--accent); }
+.asset-thumb { width: 100%; height: 66px; object-fit: contain; background: #1a1d21; display: block; }
+.asset-name  { font-size: 9.5px; color: var(--dim); padding: 3px 5px 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Log ─────────────────────────────────────────────────────────────────── */
+#log-card { flex-shrink: 0; display: flex; flex-direction: column; min-height: 100px; max-height: 155px; }
+.log-hdr  { display: flex; align-items: center; gap: 6px; padding: 7px 12px;
+  border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.log-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+  color: var(--muted); text-transform: uppercase; }
+.btn-log-clear { font-size: 11px; font-weight: 600; color: var(--muted);
+  padding: 2px 4px; border-radius: 4px; transition: color .1s; }
+.btn-log-clear:hover { color: var(--dim); }
+.log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px;
+  background: var(--log-bg); border-radius: 0 0 var(--r-md) var(--r-md); }
+.log-line { display: flex; gap: 7px; font-family: var(--mono); font-size: 10.5px;
+  line-height: 1.75; white-space: nowrap; }
+.log-ts  { color: var(--log-muted); flex-shrink: 0; }
+.log-tag { font-weight: 700; flex-shrink: 0; }
+.log-msg { color: var(--log-ink); white-space: normal; }
+.log-info    { color: #5b86c9; } .log-success { color: #2fa55a; }
+.log-warning { color: #c08a1e; } .log-error   { color: #cf4b43; }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+#footer { display: flex; align-items: center; gap: 6px; padding: 2px 5px 3px; flex-shrink: 0; }
+#footer-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
+  flex-shrink: 0; transition: background .2s; }
+#footer-dot.connected { background: #2fa55a; }
+#status-text { font-size: 11px; color: var(--dim); font-weight: 500;
+  flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hover-pos  { font-family: var(--mono); font-size: 10.5px; color: var(--muted); min-width: 88px; text-align: right; }
+#footer-out { font-size: 11px; color: var(--log-muted); font-family: var(--mono); }
+
+@keyframes fadeInUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+.fade-in { animation: fadeInUp .2s var(--ease) both; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ── Toolbar ──────────────────────────────────────────────────────────── -->
+<div id="toolbar" class="card">
+  <span class="tb-label">Thiết bị</span>
+  <div class="device-wrap">
+    <span id="device-dot"></span>
+    <select id="device-select" onchange="onDeviceChange(this.value)">
+      <option value="">Đang quét…</option>
+    </select>
+    <svg width="10" height="6" viewBox="0 0 12 7" fill="#9aa3ae" style="flex-shrink:0;pointer-events:none;"><path d="M0 0l6 7 6-7z"/></svg>
+  </div>
+  <button class="btn" onclick="onRefreshDevices()">Làm mới</button>
+  <button class="btn" onclick="onScanPorts()">Quét cổng</button>
+  <button class="btn" onclick="onRestartAdb()">Khởi động lại ADB</button>
+  <span class="spacer"></span>
+  <div class="hz-wrap">
+    <input id="hz-spin" type="number" min="0.2" max="30" step="0.5" value="5" onchange="onHzChange(this.value)">
+    <span class="hz-unit">Hz</span>
+  </div>
+  <button class="pill-wrap" onclick="onToggleAuto()">
+    <span id="auto-cb"><span id="auto-thumb"></span></span>
+    <span class="pill-label">Tự động</span>
+  </button>
+  <button class="btn ok" onclick="onCapture()">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    Chụp <span style="opacity:.65;font-weight:500;font-family:var(--mono);font-size:10px;">F5</span>
+  </button>
+</div>
+
+<!-- ── Main split ────────────────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- Preview -->
+  <div id="preview-card">
+    <div class="preview-hdr">
+      <span id="size-label">Xem trước</span>
+      <span id="res-label"></span>
+      <span class="spacer"></span>
+      <span class="ph-hint"><span class="dot"></span>bấm=điểm · kéo=vùng · chuột phải=tap · scroll=zoom</span>
+      <span id="zoom-level" style="margin-left:6px;">100%</span>
+      <button class="icon-btn" onclick="resetZoom()" title="Đặt lại zoom (Ctrl+0)" style="margin-left:4px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+    </div>
+    <div id="preview-wrap"><canvas id="preview-canvas"></canvas></div>
+  </div>
+
+  <!-- Tools -->
+  <div id="tools-card">
+    <div id="tabs-bar">
+      <button class="tab-btn active" data-tab="inspect"  onclick="switchTab('inspect')">Kiểm tra</button>
+      <button class="tab-btn"        data-tab="template" onclick="switchTab('template')">Khớp mẫu</button>
+      <button class="tab-btn"        data-tab="device"   onclick="switchTab('device')">Thiết bị</button>
+      <button class="tab-btn"        data-tab="library"  onclick="switchTab('library')">Thư viện</button>
+    </div>
+
+    <!-- ── Kiểm tra ──────────────────────────────────────────────────── -->
+    <div class="tab-pane active" id="tab-inspect">
+
+      <!-- Ảnh chụp -->
+      <div class="group">
+        <div class="grp-hdr" onclick="toggleGrp(this)">
+          <span class="grp-title">Ảnh chụp</span>
+          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+        </div>
+        <div class="grp-body">
+          <div class="btns">
+            <button class="btn sm" onclick="onSaveFull()">Lưu toàn bộ</button>
+            <button class="btn sm" onclick="onLoadFile()">Mở tệp…</button>
+          </div>
+          <div class="row"><span class="lbl">Tên</span>
+            <input id="full-name" type="text" placeholder="tên tệp (tuỳ chọn)"></div>
+        </div>
+      </div>
+
+      <!-- Điểm & Màu -->
+      <div class="group">
+        <div class="grp-hdr" onclick="toggleGrp(this)">
+          <span class="grp-title">Điểm &amp; Màu</span>
+          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+        </div>
+        <div class="grp-body">
+          <div class="row">
+            <span class="lbl">Điểm</span>
+            <input id="pt-x" type="text" readonly style="text-align:center;">
+            <input id="pt-y" type="text" readonly style="text-align:center;">
+            <button class="icon-btn" onclick="copyText($('pt-x').value+', '+$('pt-y').value, this)" title="Sao chép x,y">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+          <div class="row">
+            <span class="lbl">Màu</span>
+            <input id="pt-hex" type="text" readonly>
+            <button class="icon-btn" onclick="copyEl('pt-hex', this)" title="Sao chép HEX">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+            <div id="color-swatch"></div>
+          </div>
+          <div class="row">
+            <span class="lbl">RGB</span>
+            <input id="pt-rgb" type="text" readonly>
+            <button class="icon-btn" onclick="copyEl('pt-rgb', this)" title="Sao chép RGB">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+          <div class="row" style="justify-content:flex-end;">
+            <button class="btn sm accent" onclick="onTapPoint()">Chạm điểm</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kiểm tra màu (collapsed by default) -->
+      <div class="group closed">
+        <div class="grp-hdr" onclick="toggleGrp(this)">
+          <span class="grp-title">Kiểm tra màu</span>
+          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+        </div>
+        <div class="grp-body">
+          <div class="row">
+            <span class="lbl">Điểm</span>
+            <input id="cc-x" type="number" min="0" value="0" style="text-align:center;">
+            <input id="cc-y" type="number" min="0" value="0" style="text-align:center;">
+          </div>
+          <div class="row">
+            <span class="lbl">Màu mẫu</span>
+            <input id="cc-hex" type="text" placeholder="#RRGGBB" oninput="$('cc-swatch').style.background=this.value">
+            <div id="cc-swatch"></div>
+          </div>
+          <div class="row">
+            <span class="lbl">Tolerance</span>
+            <input id="cc-tol" type="number" min="0" max="255" value="10"
+                   style="width:56px;flex:none;text-align:right;">
+            <span class="hz-unit">≤ max(ΔR,ΔG,ΔB)</span>
+            <button class="btn sm accent" style="margin-left:auto;" onclick="onCheckColor()">Kiểm tra</button>
+          </div>
+          <div id="cc-result" class="cc-result"></div>
+        </div>
+      </div>
+
+      <!-- Vùng chọn -->
+      <div class="group">
+        <div class="grp-hdr" onclick="toggleGrp(this)">
+          <span class="grp-title">Vùng chọn</span>
+          <span class="badge cyan" id="region-badge" style="display:none;">
+            <span class="bd"></span>đang chọn</span>
+          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+        </div>
+        <div class="grp-body">
+          <div class="row">
+            <span class="lbl">Vị trí</span>
+            <input id="rg-x" type="number" min="0" value="0" style="text-align:center;">
+            <input id="rg-y" type="number" min="0" value="0" style="text-align:center;">
+            <button class="icon-btn" onclick="copyText($('rg-x').value+', '+$('rg-y').value+', '+$('rg-w').value+', '+$('rg-h').value, this)" title="Sao chép x,y,w,h">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+          <div class="row">
+            <span class="lbl">Kích thước</span>
+            <input id="rg-w" type="number" min="0" value="0" style="text-align:center;">
+            <input id="rg-h" type="number" min="0" value="0" style="text-align:center;">
+          </div>
+          <div class="row"><span class="lbl">Tên</span>
+            <input id="crop-name" type="text" placeholder="tên vùng (tuỳ chọn)"></div>
+          <div class="btns">
+            <button class="btn sm" onclick="onApplyRegion()">Áp dụng</button>
+            <button class="btn sm" onclick="onSaveCropDialog()">Lưu vùng…</button>
+            <button class="btn sm ok" onclick="onQuickCrop()">Cắt nhanh</button>
+            <button class="btn sm err" onclick="onClearRegion()">Xoá</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- OCR -->
+      <div class="group">
+        <div class="grp-hdr" onclick="toggleGrp(this)">
+          <span class="grp-title">Đọc chữ (OCR)</span>
+          <span id="ocr-engine" style="margin-left:4px;">not loaded</span>
+          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+        </div>
+        <div class="grp-body">
+          <div class="row"><span class="lbl">Bộ máy</span>
+            <select id="ocr-backend" onchange="onOcrBackendChange(this.value)" style="flex:1;min-width:0;"></select></div>
+          <div class="row">
+            <input id="ocr-result" type="text" readonly placeholder="(chưa đọc)"
+                   style="flex:1;background:var(--surface);font-size:13px;">
+            <button class="icon-btn" onclick="copyEl('ocr-result', this)" title="Sao chép kết quả">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+          <div class="row" style="gap:5px;">
+            <input id="ocr-wl" type="text" placeholder="Whitelist vd: 0-9/" style="flex:1;min-width:0;font-size:11px;">
+            <button class="btn h30 accent" onclick="onReadText()">Đọc</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thao tác -->
+      <div class="group">
+        <div class="grp-hdr" onclick="toggleGrp(this)">
+          <span class="grp-title">Thao tác</span>
+          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+        </div>
+        <div class="grp-body">
+          <div class="row" style="gap:5px;">
+            <span class="lbl n" style="font-weight:600;">Chạm</span>
+            <input id="tap-x" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+            <input id="tap-y" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+            <button class="btn sm" onclick="onSendTap()">Gửi</button>
+          </div>
+          <div class="row" style="gap:5px;">
+            <span class="lbl n" style="font-weight:600;">Giữ</span>
+            <input id="lp-x"   type="number" min="0"   value="0"   style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+            <input id="lp-y"   type="number" min="0"   value="0"   style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+            <input id="lp-dur" type="number" min="100" value="800" step="100" style="width:56px;flex:none;text-align:right;padding:5px 3px;font-size:11px;">
+            <span class="hz-unit">ms</span>
+            <button class="btn sm" onclick="onSendLongPress()">Gửi</button>
+          </div>
+          <div class="row" style="gap:5px;">
+            <span class="lbl n" style="font-weight:600;">Vuốt</span>
+            <input id="sw-x1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+            <input id="sw-y1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+            <span style="font-size:13px;color:var(--muted);">→</span>
+            <input id="sw-x2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+            <input id="sw-y2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+            <button class="btn sm" onclick="onSendSwipe()">Gửi</button>
+          </div>
+          <div class="row" style="gap:5px;">
+            <span class="lbl n" style="font-weight:600;">T.lượng</span>
+            <input id="sw-dur" type="number" min="50" max="100000" step="50" value="300"
+                   style="width:72px;flex:none;text-align:right;">
+            <span class="hz-unit">ms</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phím & Text (collapsed by default) -->
+      <div class="group closed">
+        <div class="grp-hdr" onclick="toggleGrp(this)">
+          <span class="grp-title">Phím &amp; Text</span>
+          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+        </div>
+        <div class="grp-body">
+          <div class="key-strip">
+            <button class="btn" onclick="api().send_key('BACK')">Back</button>
+            <button class="btn" onclick="api().send_key('HOME')">Home</button>
+            <button class="btn" onclick="api().send_key('ENTER')">Enter</button>
+            <button class="btn" onclick="api().send_key('APP_SWITCH')">Recents</button>
+            <button class="btn" onclick="api().send_key('VOLUME_UP')">Vol +</button>
+            <button class="btn" onclick="api().send_key('VOLUME_DOWN')">Vol −</button>
+            <button class="btn" onclick="api().send_key('POWER')">Power</button>
+          </div>
+          <div class="row" style="gap:5px;">
+            <span class="lbl n" style="font-weight:600;">Custom</span>
+            <input id="key-custom" type="text" placeholder="KEYCODE hoặc số" style="flex:1;min-width:0;">
+            <button class="btn sm" onclick="api().send_key($('key-custom').value.trim())">Gửi</button>
+          </div>
+          <div class="row" style="gap:5px;">
+            <span class="lbl n" style="font-weight:600;">Text</span>
+            <input id="inp-text" type="text" placeholder="Nhập văn bản…" style="flex:1;min-width:0;">
+            <button class="btn sm" onclick="onSendText()">Gửi</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /tab-inspect -->
+
+    <!-- ── Khớp mẫu ──────────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-template">
+      <div class="group">
+        <div class="grp-hdr" onclick="toggleGrp(this)">
+          <span class="grp-title">Khớp mẫu</span>
+          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+        </div>
+        <div class="grp-body">
+          <p style="font-size:11.5px;color:var(--dim);line-height:1.5;">Chọn ảnh mẫu PNG rồi chạy khớp trên ảnh chụp hiện tại.</p>
+          <div class="row" style="gap:6px;">
+            <input id="tpl-path" type="text" placeholder="Đường dẫn template PNG" style="flex:1;min-width:0;font-size:11px;">
+            <button class="btn h30" onclick="onBrowseTpl()">Chọn…</button>
+          </div>
+          <div class="row"><span class="lbl" style="min-width:64px;">Ngưỡng</span>
+            <input id="tpl-thr" type="number" min="0.1" max="0.999" step="0.05" value="0.85"
+                   style="width:80px;flex:none;text-align:right;"></div>
+          <label class="cb-line" onclick="$('cb-gray').classList.toggle('checked')">
+            <span class="cb" id="cb-gray"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg></span>
+            Thang xám</label>
+          <label class="cb-line" onclick="$('cb-multiscale').classList.toggle('checked')">
+            <span class="cb" id="cb-multiscale"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg></span>
+            Đa tỉ lệ (0.8 .. 1.2)</label>
+          <div class="btns">
+            <button class="btn h30 accent" onclick="onRunMatch(false)">Tìm khớp tốt nhất</button>
+            <button class="btn h30" onclick="onRunMatch(true)">Tìm tất cả</button>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button class="btn sm" onclick="onClearOverlay()">Xoá lớp phủ</button>
+          </div>
+          <div class="tpl-result empty" id="tpl-result">Chưa có kết quả.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Thiết bị ───────────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-device">
+      <div class="group">
+        <div class="grp-hdr" onclick="toggleGrp(this)">
+          <span class="grp-title">Thông tin thiết bị</span>
+          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+        </div>
+        <div class="grp-body">
+          <div class="info-grid">
+            <span class="k">Trạng thái</span><span class="v" id="i-status">-</span>
+            <span class="k">Serial</span>      <span class="v" id="i-serial">-</span>
+            <span class="k">Model</span>       <span class="v" id="i-model">-</span>
+            <span class="k">Hãng</span>        <span class="v" id="i-brand">-</span>
+            <span class="k">Android</span>    <span class="v" id="i-android">-</span>
+            <span class="k">ABI</span>         <span class="v" id="i-abi">-</span>
+            <span class="k">Độ phân giải</span><span class="v" id="i-screen">-</span>
+            <span class="k">Mật độ</span>     <span class="v" id="i-density">-</span>
+            <span class="k">Pin</span>         <span class="v" id="i-battery">-</span>
+            <span class="k">IP</span>          <span class="v" id="i-ip">-</span>
+            <span class="k">Uptime</span>      <span class="v" id="i-uptime">-</span>
+            <span class="k">Ứng dụng</span>   <span class="v" id="i-app">-</span>
+          </div>
+          <div class="btns">
+            <button class="btn sm" onclick="onRefreshInfo()">Làm mới</button>
+            <button class="btn sm" onclick="onCopyInfo()">Sao chép</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Thư viện ───────────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-library">
+      <div style="display:flex;align-items:center;gap:7px;padding:0 1px 2px;">
+        <span style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">./out/</span>
+        <span class="spacer"></span>
+        <button class="btn sm" onclick="onRefreshAssets()">Làm mới</button>
+        <button class="btn sm err" id="btn-del-asset" style="display:none;" onclick="onDeleteAsset()">Xoá</button>
+      </div>
+      <div class="asset-grid" id="asset-grid">
+        <div style="font-size:11.5px;color:var(--muted);padding:4px 0;">Chưa có ảnh.</div>
+      </div>
+    </div>
+  </div><!-- /tools-card -->
+</div><!-- /main -->
+
+<!-- ── Log ──────────────────────────────────────────────────────────────── -->
+<div id="log-card" class="card">
+  <div class="log-hdr">
+    <span class="log-label">Nhật ký</span>
+    <span class="spacer"></span>
+    <button class="btn-log-clear" onclick="onClearLog()">Xoá</button>
+  </div>
+  <div class="log-body" id="log-body"></div>
+</div>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────── -->
+<div id="footer">
+  <span id="footer-dot"></span>
+  <span id="status-text">Ready</span>
+  <span class="spacer"></span>
+  <span id="hover-pos">—</span>
+  <span style="color:var(--border);margin:0 3px;">·</span>
+  <span id="footer-out">crops → ./out/</span>
+</div>
+
+</div><!-- /app -->
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+const S = {
+  imgW:0, imgH:0, img:null,
+  scale:1, ox:0, oy:0,
+  zoomLevel:1, panX:0, panY:0,
+  dragging:false, dragStart:null, dragEnd:null,
+  panning:false,  panStart:null, panBase:null,
+  point:null, region:null, overlay:[],
+  autoRefresh:true, devices:[], connectedSerial:null,
+  selectedAsset:null,
+};
+const $ = id => document.getElementById(id);
+const LOG_TAG = {info:"INF",success:"OK ",warning:"WRN",error:"ERR"};
+const INFO_DOM = {
+  status:"i-status",serial:"i-serial",model:"i-model",brand:"i-brand",
+  android:"i-android",abi:"i-abi",screen_size:"i-screen",
+  screen_density:"i-density",app:"i-app",battery:"i-battery",
+  ip:"i-ip",uptime:"i-uptime",
+};
+const INFO_KEYS = Object.keys(INFO_DOM);
+
+const canvas = $("preview-canvas");
+const ctx    = canvas.getContext("2d");
+
+// ── Canvas layout ─────────────────────────────────────────────────────────
+function resizeCanvas(){
+  const w=$("preview-wrap");
+  canvas.width=w.clientWidth; canvas.height=w.clientHeight;
+  recomputeLayout(); draw();
+}
+window.addEventListener("resize", resizeCanvas);
+
+function recomputeLayout(){
+  if(!S.img||!S.imgW){S.scale=1;S.ox=0;S.oy=0;return;}
+  const cw=Math.max(1,canvas.width), ch=Math.max(1,canvas.height);
+  S.scale=Math.min(cw/S.imgW, ch/S.imgH);
+  const ef=S.scale*S.zoomLevel;
+  S.ox=(cw-S.imgW*ef)/2+S.panX;
+  S.oy=(ch-S.imgH*ef)/2+S.panY;
+}
+function imgToCanvas(x,y){ const ef=S.scale*S.zoomLevel; return[S.ox+x*ef,S.oy+y*ef]; }
+function canvasToImg(cx,cy){
+  const ef=S.scale*S.zoomLevel; if(!ef) return null;
+  const ix=Math.round((cx-S.ox)/ef), iy=Math.round((cy-S.oy)/ef);
+  if(ix<0||iy<0||ix>=S.imgW||iy>=S.imgH) return null;
+  return [ix,iy];
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!S.img){
+    ctx.fillStyle="#9aa3ae"; ctx.font="13px IBM Plex Sans,Segoe UI,sans-serif";
+    ctx.textAlign="center";
+    ctx.fillText("Chưa có ảnh chụp. Nhấn Chụp (F5).",canvas.width/2,canvas.height/2);
+    return;
+  }
+  const [x0,y0]=imgToCanvas(0,0), [x1,y1]=imgToCanvas(S.imgW,S.imgH);
+  ctx.fillStyle="#121316"; ctx.fillRect(x0,y0,x1-x0,y1-y0);
+  ctx.imageSmoothingEnabled=true; ctx.drawImage(S.img,x0,y0,x1-x0,y1-y0);
+
+  ctx.strokeStyle="#dc2626"; ctx.lineWidth=2;
+  ctx.fillStyle="#dc2626"; ctx.font="11px IBM Plex Mono,monospace"; ctx.textAlign="left";
+  for(const[rx,ry,rw,rh,conf] of S.overlay){
+    const[cx,cy]=imgToCanvas(rx,ry),[cx2,cy2]=imgToCanvas(rx+rw,ry+rh);
+    ctx.strokeRect(cx,cy,cx2-cx,cy2-cy);
+    ctx.fillText(conf.toFixed(2),cx+2,cy-4);
+  }
+  if(S.region){
+    const[x,y,w,h]=S.region;
+    const[cx,cy]=imgToCanvas(x,y),[cx2,cy2]=imgToCanvas(x+w,y+h);
+    ctx.strokeStyle="#06b6d4"; ctx.lineWidth=2; ctx.strokeRect(cx,cy,cx2-cx,cy2-cy);
+  }
+  if(S.point){
+    const[cx,cy]=imgToCanvas(S.point[0],S.point[1]);
+    ctx.strokeStyle="#eab308"; ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(cx-8,cy); ctx.lineTo(cx+8,cy);
+    ctx.moveTo(cx,cy-8); ctx.lineTo(cx,cy+8);
+    ctx.stroke();
+  }
+  if(S.dragging&&S.dragStart&&S.dragEnd){
+    const r=normRect(S.dragStart,S.dragEnd);
+    ctx.strokeStyle="rgba(6,182,212,.8)"; ctx.lineWidth=1;
+    ctx.strokeRect(r.x,r.y,r.w,r.h);
+  }
+}
+function normRect(a,b){
+  return{x:Math.min(a[0],b[0]),y:Math.min(a[1],b[1]),w:Math.abs(a[0]-b[0]),h:Math.abs(a[1]-b[1])};
+}
+
+// ── Canvas events ──────────────────────────────────────────────────────────
+function canvasPos(e){ const r=canvas.getBoundingClientRect(); return[e.clientX-r.left,e.clientY-r.top]; }
+
+canvas.onmousedown = e => {
+  if(e.button===1){e.preventDefault();S.panning=true;S.panStart=canvasPos(e);S.panBase=[S.panX,S.panY];canvas.style.cursor="grab";return;}
+  if(!S.img||e.button!==0) return;
+  S.dragging=true; S.dragStart=canvasPos(e); S.dragEnd=S.dragStart.slice();
+};
+canvas.onmousemove = e => {
+  const[cx,cy]=canvasPos(e);
+  if(S.panning){S.panX=S.panBase[0]+cx-S.panStart[0];S.panY=S.panBase[1]+cy-S.panStart[1];recomputeLayout();draw();return;}
+  const p=canvasToImg(cx,cy);
+  $("hover-pos").textContent=p?`${p[0]}, ${p[1]}`:"—";
+  if(S.dragging){S.dragEnd=[cx,cy];draw();}
+};
+canvas.onmouseup = async e => {
+  if(e.button===1){S.panning=false;canvas.style.cursor="crosshair";return;}
+  if(e.button!==0||!S.dragging){S.dragging=false;return;}
+  S.dragging=false;
+  const start=S.dragStart, end=S.dragEnd=canvasPos(e);
+  S.dragStart=S.dragEnd=null;
+  const dx=Math.abs(end[0]-start[0]),dy=Math.abs(end[1]-start[1]);
+  if(dx+dy<5){
+    const p=canvasToImg(end[0],end[1]); if(!p){draw();return;}
+    S.point=p; S.region=null; setRegionBadge(false);
+    const r=await api().set_point(p[0],p[1]);
+    $("pt-x").value=r.x; $("pt-y").value=r.y;
+    $("tap-x").value=r.x; $("tap-y").value=r.y;
+    $("lp-x").value=r.x;  $("lp-y").value=r.y;
+    $("cc-x").value=r.x;  $("cc-y").value=r.y;
+    if(r.hex){
+      $("pt-hex").value=r.hex; $("pt-rgb").value=r.rgb;
+      $("color-swatch").style.background=r.hex;
+      $("cc-hex").value=r.hex; $("cc-swatch").style.background=r.hex;
+    }
+    setStatus(`Đã chọn (${r.x}, ${r.y})`);
+  } else {
+    const p1=canvasToImg(start[0],start[1]),p2=canvasToImg(end[0],end[1]);
+    if(!p1||!p2){draw();return;}
+    const x=Math.min(p1[0],p2[0]),y=Math.min(p1[1],p2[1]);
+    const w=Math.abs(p2[0]-p1[0]),h=Math.abs(p2[1]-p1[1]);
+    if(w<=1||h<=1){draw();return;}
+    S.region=[x,y,w,h]; S.point=null; setRegionBadge(true);
+    const r=await api().set_region(x,y,w,h);
+    $("rg-x").value=r.x; $("rg-y").value=r.y; $("rg-w").value=r.w; $("rg-h").value=r.h;
+    $("tap-x").value=r.centerX; $("tap-y").value=r.centerY;
+    $("lp-x").value=r.centerX;  $("lp-y").value=r.centerY;
+    $("pt-x").value=r.centerX;  $("pt-y").value=r.centerY;
+    $("cc-x").value=r.centerX;  $("cc-y").value=r.centerY;
+    if(r.hex){
+      $("pt-hex").value=r.hex; $("pt-rgb").value=r.rgb;
+      $("color-swatch").style.background=r.hex;
+      $("cc-hex").value=r.hex; $("cc-swatch").style.background=r.hex;
+    }
+    setStatus(`Vùng ${x},${y} · ${w}×${h} — chạm=(${r.centerX},${r.centerY})`);
+  }
+  draw();
+};
+canvas.onmouseleave = () => {
+  if(S.dragging){S.dragging=false;draw();}
+  if(S.panning){S.panning=false;canvas.style.cursor="crosshair";}
+  $("hover-pos").textContent="—";
+};
+
+// Right-click → tap
+canvas.addEventListener("contextmenu", async e => {
+  e.preventDefault();
+  const p=canvasToImg(...canvasPos(e)); if(!p) return;
+  await api().tap(p[0],p[1]);
+  setStatus(`Tap → (${p[0]}, ${p[1]})`);
+});
+
+// Scroll → zoom
+canvas.addEventListener("wheel", e => {
+  if(!S.img) return; e.preventDefault();
+  const[mx,my]=canvasPos(e);
+  const ef0=S.scale*S.zoomLevel, ix=(mx-S.ox)/ef0, iy=(my-S.oy)/ef0;
+  S.zoomLevel=Math.max(.3,Math.min(10,S.zoomLevel*(e.deltaY<0?1.15:1/1.15)));
+  const ef1=S.scale*S.zoomLevel;
+  const bx=(canvas.width-S.imgW*ef1)/2+S.panX, by=(canvas.height-S.imgH*ef1)/2+S.panY;
+  S.panX+=mx-(bx+ix*ef1); S.panY+=my-(by+iy*ef1);
+  recomputeLayout();
+  $("zoom-level").textContent=Math.round(S.zoomLevel*100)+"%";
+  draw();
+},{passive:false});
+
+canvas.addEventListener("dblclick", resetZoom);
+
+// ── Keyboard ──────────────────────────────────────────────────────────────
+window.addEventListener("keydown", e => {
+  if(e.key==="F5"){e.preventDefault();onCapture();}
+  if(e.key==="Escape") onClearLog();
+  if(e.key==="0"&&(e.ctrlKey||e.metaKey)){e.preventDefault();resetZoom();}
+});
+
+// ── Zoom / pan ─────────────────────────────────────────────────────────────
+function resetZoom(){
+  S.zoomLevel=1;S.panX=0;S.panY=0;recomputeLayout();
+  $("zoom-level").textContent="100%"; draw();
+}
+
+// ── Groups collapsible ────────────────────────────────────────────────────
+function toggleGrp(hdr){
+  if(hdr.target && hdr.target.closest("button,.badge")) return;
+  hdr.closest(".group").classList.toggle("closed");
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+function switchTab(tab){
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+  document.querySelectorAll(".tab-pane").forEach(p=>p.classList.toggle("active",p.id==="tab-"+tab));
+  if(tab==="library") onRefreshAssets();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function setStatus(msg){ $("status-text").textContent=msg; }
+function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function api(){ return window.pywebview.api; }
+function setRegionBadge(on){ $("region-badge").style.display=on?"inline-flex":"none"; }
+function setConnected(on){ $("device-dot").className=$("footer-dot").className=on?"connected":""; }
+
+function copyText(text, btn){
+  navigator.clipboard.writeText(text);
+  if(btn){ btn.classList.add("flash"); setTimeout(()=>btn.classList.remove("flash"),700); }
+}
+function copyEl(id, btn){ copyText($(id).value, btn); }
+
+function rebuildDeviceSelect(devices, connected, selected){
+  const sel=$("device-select"), prev=sel.value;
+  sel.innerHTML="";
+  if(!devices||!devices.length){
+    const o=document.createElement("option"); o.value=""; o.textContent="Không có thiết bị";
+    sel.appendChild(o); sel.disabled=true; return;
+  }
+  sel.disabled=false;
+  devices.forEach(d=>{
+    const o=document.createElement("option");
+    o.value=d.serial||"";
+    o.textContent=(d.name||d.serial)+(d.serial?` (${d.serial})`:"");
+    sel.appendChild(o);
+  });
+  sel.value=connected||selected||prev||(devices[0]&&devices[0].serial)||"";
+}
+
+function appendLog(entry){
+  const body=$("log-body"), line=document.createElement("div");
+  line.className="log-line fade-in";
+  line.innerHTML=`<span class="log-ts">${entry.ts}</span>`+
+    `<span class="log-tag log-${entry.level}">${LOG_TAG[entry.level]||"INF"}</span>`+
+    `<span class="log-msg">${escHtml(entry.msg)}</span>`;
+  body.appendChild(line);
+  while(body.children.length>500) body.removeChild(body.firstChild);
+  body.scrollTop=body.scrollHeight;
+}
+
+// ── Python events ─────────────────────────────────────────────────────────
+window.__recv = function(raw){
+  let ev; try{ev=JSON.parse(raw);}catch{return;}
+  const{type,data}=ev;
+  if(type==="log"){appendLog(data);return;}
+  if(type==="log_cleared"){$("log-body").innerHTML="";return;}
+  if(type==="devices_update"){S.devices=data.devices||[];rebuildDeviceSelect(S.devices,S.connectedSerial,null);return;}
+  if(type==="device_status"){S.connectedSerial=data.serial||null;setConnected(!!data.connected);rebuildDeviceSelect(S.devices,data.serial,data.serial);return;}
+  if(type==="device_info"){INFO_KEYS.forEach(k=>{if(INFO_DOM[k])$(INFO_DOM[k]).textContent=data[k]||"-";});return;}
+  if(type==="capture_failed"){setStatus(`Chụp thất bại: ${data.error}`);return;}
+  if(type==="captured"){$("res-label").textContent=`${data.w} × ${data.h}`;return;}
+  if(type==="overlay"){S.overlay=data.rects||[];draw();return;}
+  if(type==="selection_cleared"){S.region=null;S.point=null;S.overlay=[];setRegionBadge(false);draw();return;}
+  if(type==="copy_device_info"){
+    navigator.clipboard.writeText(INFO_KEYS.map(k=>`${k}: ${$(INFO_DOM[k]).textContent}`).join("\n"));
+    setStatus("Đã sao chép thông tin thiết bị"); return;
+  }
+};
+window.__recvFrame = function(dataUrl,w,h){
+  const img=new Image();
+  img.onload=()=>{S.img=img;S.imgW=w;S.imgH=h;recomputeLayout();draw();};
+  img.src=dataUrl;
+};
+
+// ── Handlers ──────────────────────────────────────────────────────────────
+async function onCapture(){ await api().capture(); }
+async function onRefreshDevices(){ await api().refresh_devices(); }
+async function onScanPorts(){ await api().scan_ports(); }
+async function onRestartAdb(){ await api().restart_adb(); }
+async function onDeviceChange(serial){ if(serial){S.connectedSerial=serial;await api().select_device(serial);} }
+function onHzChange(v){ api().set_refresh_hz(parseFloat(v)||5); }
+function onToggleAuto(){
+  const cb=$("auto-cb"); cb.classList.toggle("on");
+  S.autoRefresh=cb.classList.contains("on"); api().set_auto_refresh(S.autoRefresh);
+}
+
+async function onSaveFull(){ await api().save_full($("full-name").value); }
+async function onLoadFile(){ const p=prompt("Đường dẫn ảnh (PNG/JPG):"); if(p) await api().save_full(""); }
+async function onTapPoint(){ await api().tap(parseInt($("pt-x").value||"0"),parseInt($("pt-y").value||"0")); }
+
+async function onCheckColor(){
+  const r=await api().check_color(parseInt($("cc-x").value||"0"),parseInt($("cc-y").value||"0"),$("cc-hex").value.trim(),parseInt($("cc-tol").value||"10"));
+  const el=$("cc-result"); el.style.display="block";
+  if(r.error){el.className="cc-result bad";el.textContent=r.error;return;}
+  el.className="cc-result "+(r.match?"ok":"bad");
+  el.innerHTML=r.match
+    ?`✓ Khớp &nbsp;·&nbsp; thực tế: <b>${escHtml(r.actual)}</b> &nbsp;·&nbsp; Δ${r.dist}`
+    :`✗ Không khớp &nbsp;·&nbsp; thực tế: <b>${escHtml(r.actual)}</b> &nbsp;·&nbsp; Δ${r.dist}`;
+}
+
+async function onApplyRegion(){
+  const x=parseInt($("rg-x").value||"0"),y=parseInt($("rg-y").value||"0");
+  const w=parseInt($("rg-w").value||"0"),h=parseInt($("rg-h").value||"0");
+  if(w>0&&h>0){await api().set_region(x,y,w,h);S.region=[x,y,w,h];S.point=null;setRegionBadge(true);draw();setStatus(`Vùng ${x},${y} · ${w}×${h}`);}
+}
+async function onSaveCropDialog(){ await api().save_crop_dialog($("crop-name").value); }
+async function onQuickCrop(){ const ok=await api().quick_crop($("crop-name").value); if(ok) onRefreshAssets(); }
+async function onClearRegion(){
+  $("rg-x").value=$("rg-y").value=$("rg-w").value=$("rg-h").value=0;
+  await api().clear_selection(); setRegionBadge(false); draw();
+}
+async function onOcrBackendChange(name){
+  const r=await api().set_ocr_backend(name);
+  const el=$("ocr-engine");
+  el.textContent=r.engine+(r.available?" · sẵn sàng":" · không khả dụng");
+  el.className=r.available?"":"unavailable";
+}
+async function onReadText(){ $("ocr-result").value=await api().read_text($("ocr-wl").value); }
+async function onSendTap(){ await api().tap(parseInt($("tap-x").value||"0"),parseInt($("tap-y").value||"0")); }
+async function onSendLongPress(){ await api().long_press(parseInt($("lp-x").value||"0"),parseInt($("lp-y").value||"0"),parseInt($("lp-dur").value||"800")); }
+async function onSendSwipe(){ await api().swipe(parseInt($("sw-x1").value||"0"),parseInt($("sw-y1").value||"0"),parseInt($("sw-x2").value||"0"),parseInt($("sw-y2").value||"0"),parseInt($("sw-dur").value||"300")); }
+async function onSendText(){ const t=$("inp-text").value; if(t){await api().input_text(t);$("inp-text").value="";} }
+
+async function onBrowseTpl(){ const p=prompt("Đường dẫn template PNG:"); if(p) $("tpl-path").value=p; }
+async function onRunMatch(all){
+  const r=await api().match_template($("tpl-path").value,parseFloat($("tpl-thr").value||".85"),$("cb-gray").classList.contains("checked"),$("cb-multiscale").classList.contains("checked"),all);
+  const el=$("tpl-result");
+  if(r.error){el.textContent=r.error;el.className="tpl-result empty";return;}
+  el.textContent=r.summary;el.className="tpl-result";S.overlay=r.rects||[];draw();
+}
+async function onClearOverlay(){ await api().clear_overlay(); S.overlay=[]; draw(); }
+async function onRefreshInfo(){ await api().refresh_info(); }
+async function onCopyInfo(){ await api().copy_info(); }
+async function onClearLog(){ await api().clear_log(); }
+
+// ── Asset library ──────────────────────────────────────────────────────────
+async function onRefreshAssets(){
+  const list=await api().list_assets();
+  const grid=$("asset-grid"); S.selectedAsset=null; $("btn-del-asset").style.display="none";
+  grid.innerHTML="";
+  if(!list.length){grid.innerHTML='<div style="font-size:11.5px;color:var(--muted);padding:4px 0;">Chưa có ảnh.</div>';return;}
+  for(const a of list){
+    const card=document.createElement("div"); card.className="asset-card"; card.dataset.path=a.path;
+    const thumb=document.createElement("img"); thumb.className="asset-thumb"; thumb.alt=a.name;
+    const name=document.createElement("div"); name.className="asset-name"; name.textContent=a.name;
+    card.appendChild(thumb); card.appendChild(name);
+    card.onclick=()=>{
+      document.querySelectorAll(".asset-card").forEach(c=>c.classList.remove("active"));
+      card.classList.add("active"); S.selectedAsset=a.path;
+      $("btn-del-asset").style.display=""; $("tpl-path").value=a.path;
+    };
+    card.ondblclick=()=>switchTab("template");
+    grid.appendChild(card);
+    api().get_asset_thumbnail(a.path).then(src=>{if(src)thumb.src=src;});
+  }
+}
+async function onDeleteAsset(){
+  if(!S.selectedAsset||!confirm(`Xoá ${S.selectedAsset.split("/").pop()}?`)) return;
+  try{await api().delete_asset(S.selectedAsset);}catch{}
+  onRefreshAssets();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+async function init(){
+  let tries=0;
+  while(!(window.pywebview&&window.pywebview.api)&&tries<40)
+    await new Promise(r=>setTimeout(r,100)),tries++;
+  if(!window.pywebview||!window.pywebview.api){setStatus("⚠ pywebview không khả dụng");return;}
+  const state=await api().get_state();
+  const sel=$("ocr-backend");
+  (state.ocrBackends||[]).forEach(b=>{const o=document.createElement("option");o.value=o.textContent=b;sel.appendChild(o);});
+  if(sel.options.length){
+    const r=await api().set_ocr_backend(sel.value);
+    const el=$("ocr-engine");
+    el.textContent=r.engine+(r.available?" · sẵn sàng":" · không khả dụng");
+    el.className=r.available?"":"unavailable";
+  }
+  S.autoRefresh=!!state.autoRefresh;
+  $("auto-cb").classList.toggle("on",S.autoRefresh);
+  $("hz-spin").value=state.refreshHz;
+  (state.log||[]).forEach(appendLog);
+  resizeCanvas(); setStatus("Sẵn sàng");
+}
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+</script>
+</body>
+</html>
