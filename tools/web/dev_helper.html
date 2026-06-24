@@ -954,7 +954,7 @@ async function onSendLongPress(){ await api().long_press(parseInt($("lp-x").valu
 async function onSendSwipe(){ await api().swipe(parseInt($("sw-x1").value||"0"),parseInt($("sw-y1").value||"0"),parseInt($("sw-x2").value||"0"),parseInt($("sw-y2").value||"0"),parseInt($("sw-dur").value||"300")); }
 async function onSendText(){ const t=$("inp-text").value; if(t){await api().input_text(t);$("inp-text").value="";} }
 
-async function onBrowseTpl(){ const p=prompt("Đường dẫn template PNG:"); if(p) $("tpl-path").value=p; }
+async function onBrowseTpl(){ const p=await api().pick_template(); if(p) $("tpl-path").value=p; }
 async function onRunMatch(all){
   const r=await api().match_template($("tpl-path").value,parseFloat($("tpl-thr").value||".85"),$("cb-gray").classList.contains("checked"),$("cb-multiscale").classList.contains("checked"),all);
   const el=$("tpl-result");

@@ -660,6 +660,29 @@ class DevHelperAPI:
 
     # ── Template matching ────────────────────────────────────────────────────
 
+    def pick_template(self) -> str:
+        """Open a native Open-file dialog and return the chosen path (or "")."""
+        try:
+            wins = webview.windows
+            win = wins[0] if wins else None
+            if win is None:
+                log_warning("No window available for file dialog")
+                return ""
+            start_dir = DEFAULT_OUT_DIR if os.path.isdir(DEFAULT_OUT_DIR) else _PROJECT_ROOT
+            paths = win.create_file_dialog(
+                webview.OPEN_DIALOG,
+                directory=start_dir,
+                allow_multiple=False,
+                file_types=("Images (*.png;*.jpg;*.jpeg;*.bmp)", "All files (*.*)"),
+            )
+        except Exception as exc:
+            log_warning(f"Dialog error: {exc}")
+            return ""
+        if not paths:
+            return ""
+        path = paths[0] if isinstance(paths, (list, tuple)) else paths
+        return str(path)
+
     def match_template(
         self, template_path: str, threshold: float,
         grayscale: bool, multiscale: bool, all_matches: bool,

@@ -54,7 +54,6 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             'close' : f"{self.templates_dir}/close.png",
 
         }
-
         # Welfare (phúc lợi) flow templates
         self.tpl_welfare = {
             'bua_tiec': f"{self.templates_dir}/phuc_loi/bua_tiec.png",
@@ -103,6 +102,14 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             'dvq_is_full': f"{self.templates_dir}/combat/dvq/is_full.png",
 
         }
+        self.tpl_phieu_luu = {
+            "icon": f"{self.templates_dir}/phieu_luu/icon.png",
+            "check": f"{self.templates_dir}/phieu_luu/check.png",
+        }
+        self.tpl_phieu_luu_nguyen_lieu = {
+            "icon": f"{self.templates_dir}/phieu_luu/nguyen_lieu/icon.png",
+            "check": f"{self.templates_dir}/phieu_luu/nguyen_lieu/check.png",
+        }
 
     def define_activities(self) -> List[Activity]:
         return [
@@ -113,6 +120,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             Activity(id="auto_combat_arena",name="Đấu Trường",description="Chạy combat Thử Thách Đấu Trường 5 lần",enabled=True,max_retries=1,),
             Activity(id="auto_combat_tmdq",name="Thiên Mệnh Đối Quyết",description="Chạy combat Thiên Mệnh Đối Quyết",enabled=True,max_retries=1,),
             Activity(id="auto_combat_dvq",name="Đỉnh Vinh Quang",description="Chạy combat Đỉnh Vinh Quang",enabled=True,max_retries=1,),
+            Activity(id="auto_phieu_luu_nguyen_lieu",name="Phiêu Lưu Nguyên Liệu",description="Farm nguyên liệu trong phiêu lưu",enabled=True,max_retries=1,),
             # Background activity: runs in its own thread alongside the
             # sequential ones above. Can be toggled on/off in the UI even
             # while automation is running.
@@ -814,6 +822,53 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
         self.update_activity_progress(100.0)
         log_success("Combat DVQ completed (5 runs)")
+        return True
+
+    def handle_activity_auto_phieu_luu_nguyen_lieu(self) -> bool:
+        log_info("Starting Phieu Luu Nguyen Lieu activity...")
+
+        # Step 1: check if already on phieu luu screen
+        self.update_activity_progress(5.0)
+        already_in_phieu_luu = self.wait_for_template(
+            self.tpl_phieu_luu['check'], timeout=5, threshold=0.85
+        ) is not None
+
+        if already_in_phieu_luu:
+            log_info("Already inside Phieu Luu, skipping navigation")
+            self.update_activity_progress(25.0)
+        else:
+            self.update_activity_progress(10.0)
+            if not self.back_to_menu(timeout=30):
+                return False
+
+            self.update_activity_progress(20.0)
+            if not self.wait_and_tap(self.tpl_phieu_luu['icon'], timeout=10):
+                log_warning("Could not find Phieu Luu icon")
+                return False
+
+            if not self.wait_for_template(self.tpl_phieu_luu['check'], timeout=10):
+                log_warning("Phieu Luu screen did not appear after navigation")
+                return False
+            self.update_activity_progress(25.0)
+
+        # Step 2: tap Nguyen Lieu tab
+        self.update_activity_progress(40.0)
+        if not self.wait_and_tap(self.tpl_phieu_luu_nguyen_lieu['icon'], timeout=10):
+            log_warning("Could not find Phieu Luu Nguyen Lieu icon")
+            return False
+
+        if not self.wait_for_template(self.tpl_phieu_luu_nguyen_lieu['check'], timeout=10):
+            log_warning("Nguyen Lieu screen did not appear")
+            return False
+        self.update_activity_progress(60.0)
+
+        # Step 3: tap the farm button at fixed coordinates
+        if not self.tap(85, 736):
+            log_warning("Failed to tap Nguyen Lieu farm button")
+            return False
+
+        self.update_activity_progress(100.0)
+        log_success("Phieu Luu Nguyen Lieu completed")
         return True
 
     # ==================== Background Handlers ====================
