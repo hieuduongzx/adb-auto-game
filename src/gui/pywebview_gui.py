@@ -51,20 +51,17 @@ class AutomationAPI:
         a.register_callback("on_stop",   lambda: self._on_auto_stop())
         a.register_callback("on_activity_start",
             lambda act: self._push("activity_update", {
-                "id": act.id, "status": "running", "progress": 0,
+                "id": act.id, "status": "running",
             }))
         a.register_callback("on_activity_complete",
             lambda act, ok: self._push("activity_update", {
                 "id": act.id,
                 "status": "completed" if ok else "failed",
-                "progress": 100 if ok else 0,
             }))
         a.register_callback("on_activity_failed",
             lambda act, _err: self._push("activity_update", {
-                "id": act.id, "status": "failed", "progress": 0,
+                "id": act.id, "status": "failed",
             }))
-        a.register_callback("on_progress",
-            lambda aid, p: self._push("progress", {"id": aid, "progress": round(float(p), 1)}))
         a.register_callback("on_status_change",
             lambda s: self._sync_pause(bool(s.get("paused", False))))
         # Kick device refresh
@@ -149,7 +146,6 @@ class AutomationAPI:
             "name":           act.name,
             "enabled":        act.enabled,
             "status":         act.status.value,
-            "progress":       float(act.progress),
             "background":     act.background,
             "pollInterval":   act.poll_interval,
             "customSettings": act.custom_settings or [],
@@ -165,7 +161,7 @@ class AutomationAPI:
             for act in self.automation.get_activities():
                 if not act.background:
                     self._push("activity_update",
-                               {"id": act.id, "status": "pending", "progress": 0})
+                               {"id": act.id, "status": "pending"})
             self._auto_thread = threading.Thread(
                 target=self.automation.start, daemon=True)
             self._auto_thread.start()

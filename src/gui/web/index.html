@@ -160,42 +160,6 @@ input:focus { outline: none; border-color: var(--accent); }
   white-space: nowrap;
 }
 
-/* Progress row */
-.header-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-#prog-count {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--dim);
-  font-variant-numeric: tabular-nums;
-  min-width: 28px;
-}
-.prog-track {
-  flex: 1;
-  height: 6px;
-  border-radius: 6px;
-  background: #d4e9d9;
-  overflow: hidden;
-}
-#header-prog-fill {
-  height: 100%;
-  border-radius: 6px;
-  background: var(--ok);
-  transition: width 0.4s var(--ease-out);
-  width: 0%;
-}
-#elapsed {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--dim);
-  font-variant-numeric: tabular-nums;
-}
-
 /* Control buttons */
 .header-btns {
   display: flex;
@@ -367,7 +331,7 @@ input:focus { outline: none; border-color: var(--accent); }
 .cb svg { opacity: 0; transition: opacity 0.1s; }
 .cb.checked svg { opacity: 1; }
 
-/* Name + progress block */
+/* Name block */
 .task-name-block {
   flex: 1;
   min-width: 0;
@@ -387,23 +351,6 @@ input:focus { outline: none; border-color: var(--accent); }
   color: var(--muted);
   margin-top: 1px;
 }
-.row-prog-track {
-  height: 4px;
-  border-radius: 4px;
-  background: #eaedf1;
-  overflow: hidden;
-  margin-top: 5px;
-}
-.row-prog-fill {
-  height: 100%;
-  border-radius: 4px;
-  background: var(--accent);
-  transition: width 0.35s var(--ease-out);
-  width: 0%;
-}
-.row-prog-fill.ok  { background: var(--ok); }
-.row-prog-fill.err { background: var(--err); }
-
 /* Status pill */
 .pill {
   display: inline-flex;
@@ -757,12 +704,6 @@ input:focus { outline: none; border-color: var(--accent); }
       </div>
     </div>
 
-    <div class="header-progress">
-      <span id="prog-count">0/0</span>
-      <div class="prog-track"><div id="header-prog-fill"></div></div>
-      <span id="elapsed">00:00:00</span>
-    </div>
-
     <div class="header-btns">
       <button class="btn btn-start" id="btn-start" onclick="onStart()">
         <svg class="icon" width="10" height="11" viewBox="0 0 10 11">
@@ -927,22 +868,6 @@ const PILL_TEXT = {
 };
 const LOG_TAG = { info: "INF", success: "OK ", warning: "WRN", error: "ERR" };
 
-// ── Elapsed timer ──────────────────────────────────────────────────────────
-let _elStart = null, _elTimer = null;
-function startElapsed() {
-  _elStart = Date.now();
-  clearInterval(_elTimer);
-  _elTimer = setInterval(() => {
-    const s = Math.floor((Date.now() - _elStart) / 1000);
-    $("elapsed").textContent =
-      String(Math.floor(s / 3600)).padStart(2,"0") + ":" +
-      String(Math.floor((s % 3600) / 60)).padStart(2,"0") + ":" +
-      String(s % 60).padStart(2,"0");
-  }, 1000);
-}
-function stopElapsed()  { clearInterval(_elTimer); _elStart = null; }
-function resetElapsed() { stopElapsed(); $("elapsed").textContent = "00:00:00"; }
-
 // ── Status pill ────────────────────────────────────────────────────────────
 function setStatusPill(key) {
   const pill = $("status-pill");
@@ -979,15 +904,6 @@ function refreshButtons() {
   document.querySelectorAll(".btn-play").forEach(b => {
     b.disabled = running || solo;
   });
-}
-
-// ── Progress bar ───────────────────────────────────────────────────────────
-function updateHeaderProgress() {
-  const seq = S.activities.filter(a => !a.background);
-  if (!seq.length) { $("prog-count").textContent = "0/0"; $("header-prog-fill").style.width = "0%"; return; }
-  const done = seq.filter(a => a.status === "completed" || a.status === "skipped").length;
-  $("prog-count").textContent = `${done}/${seq.length}`;
-  $("header-prog-fill").style.width = `${Math.round(done / seq.length * 100)}%`;
 }
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
@@ -1038,14 +954,6 @@ function buildRow(act) {
     meta.dataset.meta = "1";
     meta.textContent = _bgMeta(act);
     nameBlock.appendChild(meta);
-  } else {
-    const pt = document.createElement("div");
-    pt.className = "row-prog-track";
-    const pf = document.createElement("div");
-    pf.className = "row-prog-fill" + _progClass(act.status);
-    pf.style.width = act.progress + "%";
-    pt.appendChild(pf);
-    nameBlock.appendChild(pt);
   }
 
   // pill
@@ -1113,12 +1021,6 @@ function _bgMeta(act) {
   const speed = act.customValues && act.customValues["speed_multiplier"];
   if (speed !== undefined) return `Frida · tốc độ ${speed}x`;
   return `Làm mới mỗi ${act.pollInterval}s`;
-}
-
-function _progClass(status) {
-  if (status === "completed") return " ok";
-  if (status === "failed")    return " err";
-  return "";
 }
 
 // ── Settings panel (inline expansion) ─────────────────────────────────────
@@ -1239,19 +1141,6 @@ function updateActivity(id, changes) {
       pill.className = `pill pill-${act.status}`;
       pill.textContent = PILL_TEXT[act.status] || act.status;
     }
-    if (!act.background) {
-      const fill = row.querySelector(".row-prog-fill");
-      if (fill) {
-        fill.className = "row-prog-fill" + _progClass(act.status);
-        if (act.status === "completed") fill.style.width = "100%";
-        else if (act.status === "pending" || act.status === "failed") fill.style.width = "0%";
-      }
-    }
-  }
-
-  if (changes.progress !== undefined && !act.background) {
-    const fill = row.querySelector(".row-prog-fill");
-    if (fill && act.status === "running") fill.style.width = act.progress + "%";
   }
 }
 
@@ -1360,20 +1249,14 @@ window.__recv = function(raw) {
     bgToggle.classList.toggle("on", S.bgRunning);
     bgToggle.setAttribute("aria-checked", String(S.bgRunning));
 
-    if (!wasRunning && S.running) { resetElapsed(); startElapsed(); }
-    else if (!S.running) stopElapsed();
+    if (!wasRunning && S.running) { /* started */ }
+    else if (!S.running) { /* stopped */ }
     refreshButtons();
     return;
   }
 
   if (type === "activity_update") {
     updateActivity(data.id, data);
-    updateHeaderProgress();
-    return;
-  }
-
-  if (type === "progress") {
-    updateActivity(data.id, { progress: data.progress });
     return;
   }
 
@@ -1390,19 +1273,16 @@ window.__recv = function(raw) {
 
   if (type === "automation_start") {
     S.running = true; S.paused = false;
-    resetElapsed(); startElapsed();
     refreshButtons();
     // Reset all seq pills to pending
     S.activities.filter(a => !a.background).forEach(a => {
-      updateActivity(a.id, { status: "pending", progress: 0 });
+      updateActivity(a.id, { status: "pending" });
     });
-    updateHeaderProgress();
     return;
   }
 
   if (type === "automation_stop") {
     S.running = false; S.paused = false;
-    stopElapsed();
     refreshButtons();
     return;
   }
@@ -1416,7 +1296,6 @@ window.__recv = function(raw) {
   if (type === "single_done") {
     S.singleRunning = null;
     refreshButtons();
-    updateHeaderProgress();
     return;
   }
 
@@ -1552,7 +1431,6 @@ async function init() {
   // Hydrate activities
   S.activities = state.activities || [];
   populateLists();
-  updateHeaderProgress();
 
   // Update tab labels with counts
   const seq = S.activities.filter(a => !a.background).length;
@@ -1564,7 +1442,6 @@ async function init() {
   S.running   = state.running;
   S.paused    = state.paused;
   S.bgRunning = state.bgRunning;
-  if (S.running) startElapsed();
   refreshButtons();
   $("bg-toggle").classList.toggle("on", S.bgRunning);
 

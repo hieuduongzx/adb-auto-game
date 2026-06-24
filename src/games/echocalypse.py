@@ -228,10 +228,6 @@ class Echocalypse(SpeedhackMixin, BaseGameAutomation):
                 log_warning("[case_fight] end battle screen did not appear")
                 return False
 
-            activity = self.get_activity("case_fight")
-            if activity:
-                activity.progress = min(100.0, (i + 1) / runs * 100.0)
-
         return True
 
     def _ensure_case_fight_screen(

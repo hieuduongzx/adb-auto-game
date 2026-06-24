@@ -26,19 +26,14 @@ class ExampleGame(BaseGameAutomation):
     def handle_activity_login(self) -> bool:
         """Handle login activity."""
         if self.wait_and_tap(self.get_template_path("login_button.png"), timeout=10):
-            self.update_activity_progress(50.0)
             if self.wait_for_template(self.get_template_path("main_screen.png"), timeout=15):
-                self.update_activity_progress(100.0)
                 return True
         return False
 
     def handle_activity_daily(self) -> bool:
         """Handle daily quests activity."""
-        self.update_activity_progress(0.0)
         if not self.find_and_tap(self.get_template_path("daily_menu.png")):
             return False
-        self.update_activity_progress(25.0)
-        self.update_activity_progress(100.0)
         return True
 
     def handle_activity_farm(self) -> bool:

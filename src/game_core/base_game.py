@@ -103,7 +103,6 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
             'on_activity_start': [],
             'on_activity_complete': [],
             'on_activity_failed': [],
-            'on_progress': [],
             'on_error': [],
             'on_status_change': [],
         }
@@ -420,7 +419,6 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
         
         # Trigger callbacks
         self._trigger_callback('on_activity_start', activity)
-        self._update_progress(activity.id, 0.0)
         
         try:
             log_info(f"Starting activity: {activity.name} ({activity.id})")
@@ -433,7 +431,6 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
             
             if result:
                 activity.status = ActivityStatus.COMPLETED
-                activity.progress = 100.0
                 log_success(f"Completed activity: {activity.name}")
                 self._trigger_callback('on_activity_complete', activity, True)
                 return True
@@ -465,7 +462,6 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
             - 'on_activity_start': Called when an activity starts (activity)
             - 'on_activity_complete': Called when activity completes (activity, success)
             - 'on_activity_failed': Called when activity fails (activity, error)
-            - 'on_progress': Called when progress updates (activity_id, progress)
             - 'on_error': Called on error (error)
             - 'on_status_change': Called on status change (status_dict)
         """
@@ -487,19 +483,6 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
                 callback(*args, **kwargs)
             except Exception as e:
                 log_error(f"Error in callback for {event}: {e}")
-    
-    def _update_progress(self, activity_id: str, progress: float):
-        """Update progress for an activity"""
-        activity = self._activity_map.get(activity_id)
-        if activity:
-            activity.progress = progress
-        self._trigger_callback('on_progress', activity_id, progress)
-    
-    def update_activity_progress(self, progress: float):
-        """Update progress for current activity (call from handlers)"""
-        if self._current_activity:
-            self._current_activity.progress = progress
-            self._trigger_callback('on_progress', self._current_activity.id, progress)
     
     # ==================== Control Methods ====================
 
@@ -608,7 +591,6 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
 
         # Reset the activity's state so the UI reflects a fresh run.
         activity.reset()
-        self._update_progress(activity_id, 0.0)
 
         log_info(f"Running single activity: {activity.name}")
         self._stop_event.clear()
@@ -804,7 +786,6 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
                     'id': act.id,
                     'name': act.name,
                     'status': act.status.value,
-                    'progress': act.progress,
                     'enabled': act.enabled,
                     'background': act.background,
                     'background_running': self.is_background_running(act.id) if act.background else False,

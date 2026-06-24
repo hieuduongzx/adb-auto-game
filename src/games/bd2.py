@@ -61,12 +61,10 @@ class BD2(BaseGameAutomation):
         log_info("Starting daily draw activity...")
         
         # Step 1: Find and tap draw button
-        self.update_activity_progress(10.0)
         if not self.wait_and_tap(self.templates['draw'], timeout=5):
             log_warning("Could not find draw button")
             return False
         
-        self.update_activity_progress(30.0)
         
         # Step 2: Wait for draw menu to appear
         if not self.wait_for_template(self.templates['is_draw_menu'], timeout=5):
@@ -74,14 +72,12 @@ class BD2(BaseGameAutomation):
             return False
         
         log_info("In draw menu, performing daily draw actions...")
-        self.update_activity_progress(50.0)
         
         # Step 3: Perform draw (add more logic here as needed)
         # Example: Find and tap free draw button
         # if self.find_and_tap(f"{self.templates_dir}/free_draw.png"):
         #     log_success("Daily draw completed")
         
-        self.update_activity_progress(100.0)
         log_success("Daily draw activity completed")
         return True
     

@@ -19,7 +19,6 @@ class GUIBase:
         self.automation.register_callback("on_activity_start", self.on_activity_start)
         self.automation.register_callback("on_activity_complete", self.on_activity_complete)
         self.automation.register_callback("on_activity_failed", self.on_activity_failed)
-        self.automation.register_callback("on_progress", self.on_progress_update)
         self.automation.register_callback("on_error", self.on_error)
         self.automation.register_callback("on_status_change", self.on_status_change)
 
@@ -41,10 +40,6 @@ class GUIBase:
 
     def on_activity_failed(self, activity: Activity, error: Exception):
         """Called when an activity fails."""
-        pass
-
-    def on_progress_update(self, activity_id: str, progress: float):
-        """Called when progress updates."""
         pass
 
     def on_error(self, error: Exception):

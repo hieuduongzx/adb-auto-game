@@ -37,7 +37,6 @@ class Activity:
     description: str = ""
     enabled: bool = True
     status: ActivityStatus = ActivityStatus.PENDING
-    progress: float = 0.0
     error_message: Optional[str] = None
     execution_count: int = 0
     max_retries: int = 3
@@ -88,5 +87,4 @@ class Activity:
     def reset(self):
         """Reset runtime state before a retry or fresh run."""
         self.status = ActivityStatus.PENDING
-        self.progress = 0.0
         self.error_message = None
