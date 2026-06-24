@@ -124,6 +124,18 @@ def log_error(message: str, exc_info: bool = False) -> None:
     _notify_subscribers("error", message)
 
 
+def log_debug(message: str) -> None:
+    """Record a diagnostic message at DEBUG level.
+
+    Unlike the other helpers this does NOT print to the console (to avoid
+    spamming during normal operation) and does NOT fan out to GUI subscribers.
+    It only reaches the standard logging tree, so it surfaces when a handler is
+    configured at DEBUG level. Use for otherwise-swallowed exceptions whose
+    detail is useful only when actively debugging.
+    """
+    _root_logger.debug(message)
+
+
 def log_warning(message: str) -> None:
     log_with_time(message, Fore.YELLOW)
     _notify_subscribers("warning", message)
@@ -165,6 +177,7 @@ __all__ = [
     "log_warning",
     "log_success",
     "log_info",
+    "log_debug",
     "log_state",
     "log_quest",
     "log_normal",

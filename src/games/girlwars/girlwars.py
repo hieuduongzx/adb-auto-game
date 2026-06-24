@@ -11,6 +11,10 @@ GIRLWARS_PACKAGE = "com.y2sgames.girlwarsbignewen"
 
 
 class GirlWars(SpeedhackMixin, BaseGameAutomation):
+    """Girl Wars automation: skip dialogs/battles + main-story/dungeon runs.
+
+    Mixes in :class:`SpeedhackMixin` for the optional Frida time-scale speedup.
+    """
 
     # App identity
     PACKAGE_NAME = GIRLWARS_PACKAGE

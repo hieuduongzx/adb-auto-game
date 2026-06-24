@@ -60,6 +60,7 @@ var clockScaleBuf = null;     // Memory(8) holding the live scale for the CModul
 var timeScaleSetter = null;   // NativeFunction(UnityEngine.Time.set_timeScale)
 var jsHookInstalled = false;
 var baseByClock = {};         // state for the JS fallback hook
+var lastScaledMs = 0;         // monotonic floor: scaled CLOCK_MONOTONIC never decreases
 
 function log(msg) {
     send(msg);
@@ -182,6 +183,12 @@ typedef struct { int clock_id; void * tv; } HookState;
 static double real_base[16];
 static double scaled_base[16];
 static int has_base[16];
+/* Global floor: the scaled CLOCK_MONOTONIC we return must never decrease, even
+ * across threads/cores. POSIX only guarantees per-core ordering, so two
+ * back-to-back calls landing on different cores can see real time dip slightly;
+ * without a floor that dip is multiplied by the scale and handed to callers as
+ * time going backwards -- which hangs pthread_cond_timedwait / GC / netcode. */
+static double last_out = 0.0;
 
 void
 onEnter (GumInvocationContext * ic)
@@ -218,11 +225,29 @@ onLeave (GumInvocationContext * ic)
     scaled_base[clk] = real_ms;
     scaled_ms = real_ms;
   } else {
+    /* Clamp the per-call gap: a scene load stalls the caller for hundreds of
+     * ms (real), and multiplying that whole gap by the scale injects a huge
+     * time jump that detonates Unity's FixedUpdate accumulator (spiral of
+     * death -> freeze). Scale only up to MAX_STEP_MS; let the overflow pass
+     * through at 1x so big stalls don't get amplified and wall-clock stays
+     * close to real. */
     double delta = real_ms - real_base[clk];
-    scaled_base[clk] += delta * scale;
+    /* Cross-core dips would otherwise be amplified into a backward jump. */
+    if (delta < 0.0)
+      delta = 0.0;
+    double MAX_STEP_MS = 100.0;
+    if (delta > MAX_STEP_MS)
+      scaled_base[clk] += MAX_STEP_MS * scale + (delta - MAX_STEP_MS);
+    else
+      scaled_base[clk] += delta * scale;
     real_base[clk] = real_ms;
     scaled_ms = scaled_base[clk];
   }
+
+  /* Never hand back a value below the last one we returned (monotonic floor). */
+  if (scaled_ms < last_out)
+    scaled_ms = last_out;
+  last_out = scaled_ms;
 
   int64_t sec = (int64_t) (scaled_ms / 1000.0);
   int64_t nsec = (int64_t) ((scaled_ms - (double) sec * 1000.0) * 1000000.0);
@@ -258,11 +283,27 @@ function scaledClockMs(clockId, realMs) {
     if (!base) {
         base = { real: realMs, scaled: realMs };
         baseByClock[key] = base;
+        if (realMs > lastScaledMs) lastScaledMs = realMs;
         return realMs;
     }
-    const delta = realMs - base.real;
-    base.scaled += delta * currentScale;
+    // Clamp the per-call gap so a scene-load stall (hundreds of ms real) is not
+    // multiplied by the scale into a huge time jump that triggers Unity's
+    // FixedUpdate spiral of death (freeze). Scale only up to MAX_STEP_MS; let
+    // the overflow pass through at 1x.
+    let delta = realMs - base.real;
+    // CLOCK_MONOTONIC can dip a few us across cores; without this the dip is
+    // multiplied by the scale and handed back as time going backwards.
+    if (delta < 0) delta = 0;
+    const MAX_STEP_MS = 100.0;
+    if (delta > MAX_STEP_MS) {
+        base.scaled += MAX_STEP_MS * currentScale + (delta - MAX_STEP_MS);
+    } else {
+        base.scaled += delta * currentScale;
+    }
     base.real = realMs;
+    // Monotonic floor: never return less than the last value we handed out.
+    if (base.scaled < lastScaledMs) base.scaled = lastScaledMs;
+    lastScaledMs = base.scaled;
     return base.scaled;
 }
 
@@ -406,8 +447,11 @@ class FridaSpeedhackManager:
         use_cmodule: bool = False,
     ):
         self.package = package
-        # The native CModule clock hook is faster but appears to upset some
-        # protected games; default to the proven JS hook and let callers opt in.
+        # Default to the JS clock hook. The native CModule hook is faster (no
+        # JS-bridge crossing) BUT it compiles a fresh executable page with
+        # TinyCC, which protected titles (e.g. yoozoo's) detect and crash on at
+        # inject time. The JS hook survives on those games; opt into CModule only
+        # for titles proven to tolerate it.
         self._use_cmodule = use_cmodule
         self._target_scale = float(time_scale)
         self._current_scale: float = 1.0

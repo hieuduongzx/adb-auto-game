@@ -77,8 +77,11 @@ class AutomationAPI:
         self._push_running()
 
     def _on_auto_stop(self) -> None:
+        # on_stop fires only on an explicit stop() (which tears down background
+        # too), so clear the background flag here as well.
         self._is_running = False
         self._is_paused = False
+        self._bg_running = False
         self._push_running()
 
     def _sync_pause(self, paused: bool) -> None:
@@ -175,10 +178,12 @@ class AutomationAPI:
             return False
 
     def stop(self) -> bool:
-        if not self._is_running:
+        # Unified stop: ends the sequential queue AND background workers.
+        # Available whenever a session is active (sequential or background).
+        if not self._is_running and not self._bg_running:
             return False
         try:
-            self.automation.stop_sequential()
+            self.automation.stop()  # fires on_stop -> clears flags + pushes
             return True
         except Exception as e:
             log_error(f"Stop error: {e}")
@@ -202,14 +207,11 @@ class AutomationAPI:
         if bool(enabled) == self._bg_running:
             return True
         try:
+            self.automation.set_background_enabled(bool(enabled))
+            self._bg_running = bool(enabled)
             if enabled:
-                self.automation._ensure_runtime_ready()
-                self.automation._start_all_background_activities()
-                self._bg_running = True
                 log_success("Tác vụ nền đã bắt đầu")
             else:
-                self.automation._stop_all_background_activities()
-                self._bg_running = False
                 log_info("Tác vụ nền đã dừng")
             self._push_running()
             return True
@@ -354,30 +356,15 @@ class AutomationAPI:
     # ── Teardown ─────────────────────────────────────────────────────────────
 
     def _close(self) -> None:
+        # ``_closing`` is set first so any callback fired during teardown (e.g.
+        # ``on_stop``) finds ``_push`` a no-op and never touches the dying
+        # window. ``stop()`` does the full, idempotent teardown — capture
+        # thread, background workers, executor, visualizer (and speedhack
+        # reset, for games that mix it in) — so we no longer poke internals.
         self._closing = True
         remove_log_subscriber(self._on_log)
         try:
-            if self._is_running:
-                self.automation.running = False
-                self.automation._paused = False
-                try:
-                    self.automation._pause_event.set()
-                except Exception:
-                    pass
-                self.automation.stop_continuous_capture()
-        except Exception:
-            pass
-        try:
-            if self._bg_running:
-                self.automation._stop_all_background_activities()
-        except Exception:
-            pass
-        try:
-            self.automation.visualizer.close()
-        except Exception:
-            pass
-        try:
-            self.automation._executor.shutdown(wait=False)
+            self.automation.stop()
         except Exception:
             pass
 
@@ -401,10 +388,9 @@ def create_pywebview_window(game_class, title: str = "Game Automation") -> webvi
         title=title,
         url=url,
         js_api=api,
-        width=460,
+        width=420,
         height=860,
-        resizable=True,
-        min_size=(420, 600),
+        resizable=False,
         background_color="#eef0f3",
     )
     window.events.loaded += lambda: api._attach(window)

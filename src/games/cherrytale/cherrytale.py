@@ -35,11 +35,11 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         self.setup_speedhack()
 
         # Template paths
-        self.main_menu = {
+        self.tpl_main_menu = {
             'phuc_loi': f"{self.templates_dir}/main_menu/phuc_loi.png",
             'combat': f"{self.templates_dir}/main_menu/combat.png",
         }
-        self.templates = {
+        self.tpl_common = {
             'icon': f"{self.templates_dir}/icon.png",
             'huy_bo': f"{self.templates_dir}/huy_bo.png",
             'home': f"{self.templates_dir}/home.png",
@@ -56,24 +56,24 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         }
 
         # Welfare (phúc lợi) flow templates
-        self.phuc_loi = {
+        self.tpl_welfare = {
             'bua_tiec': f"{self.templates_dir}/phuc_loi/bua_tiec.png",
             'invite_all': f"{self.templates_dir}/phuc_loi/invite_all.png",
             
         }
-        self.friend = {
+        self.tpl_friend = {
             'friend_icon': f"{self.templates_dir}/friend/icon.png",
             'friend_checking': f"{self.templates_dir}/friend/checking.png",
             'friend_take_all': f"{self.templates_dir}/friend/take_all.png",
             'friend_send_all': f"{self.templates_dir}/friend/send_all.png",
             'friend_check_done': f"{self.templates_dir}/friend/check_done.png",
         }
-        self.thu = {
+        self.tpl_mail = {
             'thu_icon': f"{self.templates_dir}/thu/icon.png",
             'thu_checking': f"{self.templates_dir}/thu/checking.png",
             'thu_take_all': f"{self.templates_dir}/thu/take_all.png",
         }
-        self.combat = {
+        self.tpl_combat = {
             'vtgk_icon': f"{self.templates_dir}/combat/vong_tron_gia_kim/icon.png",
             'vtgk_check': f"{self.templates_dir}/combat/vong_tron_gia_kim/check.png",
             'vtgk_point_tim': f"{self.templates_dir}/combat/vong_tron_gia_kim/point_tim.png",
@@ -142,13 +142,13 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         log_info("Starting Phuc Loi activity...")
         # Step 1: open welfare panel
         self.update_activity_progress(10.0)
-        if not self.wait_and_tap(self.main_menu['phuc_loi'], timeout=10):
+        if not self.wait_and_tap(self.tpl_main_menu['phuc_loi'], timeout=10):
             log_warning("Could not find Phuc Loi button")
             return False
 
         # Step 2: switch to banquet tab
         self.update_activity_progress(30.0)
-        if not self.wait_and_tap(self.phuc_loi['bua_tiec'], timeout=10):
+        if not self.wait_and_tap(self.tpl_welfare['bua_tiec'], timeout=10):
             log_warning("Could not find Bua Tiec tab")
             return False
 
@@ -156,9 +156,9 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         # If the Invite All button is missing, it means the banquet is not
         # ready to be claimed yet (cooldown). Treat that as success and exit.
         self.update_activity_progress(50.0)
-        if not self.wait_and_tap(self.phuc_loi['invite_all'], timeout=10):
+        if not self.wait_and_tap(self.tpl_welfare['invite_all'], timeout=10):
             log_info("Invite All button not visible, banquet not ready yet")
-            self.wait_and_tap(self.templates['home'], timeout=5)  # best-effort return home
+            self.wait_and_tap(self.tpl_common['home'], timeout=5)  # best-effort return home
             self.update_activity_progress(100.0)
             log_success("Phuc Loi skipped (not ready)")
             return True
@@ -168,19 +168,19 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
         # Step 4: start the banquet
         self.update_activity_progress(70.0)
-        if not self.wait_and_tap(self.templates['bat_dau'], timeout=10):
+        if not self.wait_and_tap(self.tpl_common['bat_dau'], timeout=10):
             log_warning("Could not find Bat Dau button")
             return False
         
         # Wait for the banquet to start (detect via the "done" marker)
-        if not self.wait_and_tap(self.templates['nhan_vao_bat_ky_dau'], timeout=30):
+        if not self.wait_and_tap(self.tpl_common['nhan_vao_bat_ky_dau'], timeout=30):
             log_warning("Phuc Loi banquet did not start (Done marker not found)")
             return False
         
         time.sleep(1.0)  # Let the screen settle after starting the banquet
         # Step 5: return to home screen inside the game
         self.update_activity_progress(90.0)
-        if not self.wait_and_tap(self.templates['home'], timeout=10):
+        if not self.wait_and_tap(self.tpl_common['home'], timeout=10):
             log_warning("Could not find Home button after Phuc Loi")
             # Not fatal: the banquet was already started
             return True
@@ -210,7 +210,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         # Step 1: detect whether we are already on the Friend panel
         self.update_activity_progress(2.0)
         already_in_friend = self.wait_for_template(
-            self.friend['friend_checking'], timeout=5, threshold=0.85
+            self.tpl_friend['friend_checking'], timeout=5, threshold=0.85
         ) is not None
         if already_in_friend:
             log_info("Already inside Friend panel, skipping navigation")
@@ -225,12 +225,12 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
             # Open friends panel
             self.update_activity_progress(10.0)
-            if not self.wait_and_tap(self.friend['friend_icon'], timeout=10):
+            if not self.wait_and_tap(self.tpl_friend['friend_icon'], timeout=10):
                 log_warning("Could not find Friend icon")
                 return False
 
             # Confirm we actually landed on the Friend panel
-            if not self.wait_for_template(self.friend['friend_checking'], timeout=10):
+            if not self.wait_for_template(self.tpl_friend['friend_checking'], timeout=10):
                 log_warning("Friend panel did not appear after navigation")
                 return False
             self.update_activity_progress(20.0)
@@ -239,31 +239,31 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         # check_done is rendered as soon as the panel finishes opening.
         self.update_activity_progress(25.0)
         already_done = self.wait_for_template(
-            self.friend['friend_check_done'], timeout=5, threshold=0.85
+            self.tpl_friend['friend_check_done'], timeout=5, threshold=0.85
         ) is not None
         if already_done:
             log_info("Friend actions already completed for today")
-            self.wait_and_tap(self.templates['home'], timeout=5)  # best-effort
+            self.wait_and_tap(self.tpl_common['home'], timeout=5)  # best-effort
             self.update_activity_progress(100.0)
             log_success("Friend activity skipped (already done)")
             return True
 
         # Step 3: send energy to all friends (best-effort)
         self.update_activity_progress(40.0)
-        if not self.wait_and_tap(self.friend['friend_send_all'], timeout=10):
+        if not self.wait_and_tap(self.tpl_friend['friend_send_all'], timeout=10):
             log_info("Send All button not visible, continuing")
         else:
             time.sleep(0.5)  # small pause for the send animation
 
         # Step 4: take energy from all friends
         self.update_activity_progress(60.0)
-        if not self.wait_and_tap(self.friend['friend_take_all'], timeout=10):
+        if not self.wait_and_tap(self.tpl_friend['friend_take_all'], timeout=10):
             log_warning("Could not find Take All button")
             return False
 
         # Step 5: wait for the "tap anywhere" prompt and dismiss it
         self.update_activity_progress(80.0)
-        if not self.wait_and_tap(self.templates['nhan_vao_bat_ky_dau'], timeout=30):
+        if not self.wait_and_tap(self.tpl_common['nhan_vao_bat_ky_dau'], timeout=30):
             log_warning("Did not detect tap-anywhere prompt after Take All")
             # Not fatal: energy may already be claimed
         else:
@@ -271,7 +271,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
         # Step 6: return to in-game home
         self.update_activity_progress(95.0)
-        if not self.wait_and_tap(self.templates['close'], timeout=10):
+        if not self.wait_and_tap(self.tpl_common['close'], timeout=10):
             log_warning("Could not find Close button after Friend activity")
             return True
 
@@ -284,7 +284,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         # Step 1: detect whether we are already on the Mail panel
         self.update_activity_progress(2.0)
         already_in_thu = self.wait_for_template(
-            self.thu['thu_checking'], timeout=5, threshold=0.85
+            self.tpl_mail['thu_checking'], timeout=5, threshold=0.85
         ) is not None
         if already_in_thu:
             log_info("Already inside Mail panel, skipping navigation")
@@ -296,12 +296,12 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
                 return False
 
             self.update_activity_progress(10.0)
-            if not self.wait_and_tap(self.thu['thu_icon'], timeout=10):
+            if not self.wait_and_tap(self.tpl_mail['thu_icon'], timeout=10):
                 log_warning("Could not find Thu icon")
                 return False
 
             # Confirm we actually landed on the Mail panel
-            if not self.wait_for_template(self.thu['thu_checking'], timeout=10):
+            if not self.wait_for_template(self.tpl_mail['thu_checking'], timeout=10):
                 log_warning("Mail panel did not appear after navigation")
                 return False
             self.update_activity_progress(20.0)
@@ -314,7 +314,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         for i in range(max_iterations):
             # 2a: only tap Take All when it is in its active (colored) state
             active = self.find_active_template(
-                self.thu['thu_take_all'], timeout=5, threshold=0.85,
+                self.tpl_mail['thu_take_all'], timeout=5, threshold=0.85,
             )
             if not active:
                 if claimed == 0:
@@ -332,7 +332,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             log_info(f"Mail take-all iteration {claimed}")
 
             # 2b: wait for the "tap anywhere" prompt and dismiss it
-            if not self.wait_and_tap(self.templates['nhan_vao_bat_ky_dau'], timeout=15):
+            if not self.wait_and_tap(self.tpl_common['nhan_vao_bat_ky_dau'], timeout=15):
                 log_warning("Did not detect tap-anywhere prompt after Take All")
                 # Not fatal: continue and let the next loop iteration check
             else:
@@ -346,7 +346,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
         # Step 3: return to in-game home
         self.update_activity_progress(95.0)
-        if not self.wait_and_tap(self.templates['close'], timeout=10):
+        if not self.wait_and_tap(self.tpl_common['close'], timeout=10):
             log_warning("Could not find Close button after Thu activity")
             return True
 
@@ -359,7 +359,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         # Step 1: detect whether we are already on the VTGK screen
         self.update_activity_progress(2.0)
         already_in_vtgk = self.wait_for_template(
-            self.combat['vtgk_check'], timeout=5, threshold=0.85
+            self.tpl_combat['vtgk_check'], timeout=5, threshold=0.85
         ) is not None
         if already_in_vtgk:
             log_info("Already inside VTGK, skipping navigation")
@@ -373,18 +373,18 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
             # Open combat from main menu
             self.update_activity_progress(8.0)
-            if not self.wait_and_tap(self.main_menu['combat'], timeout=10):
+            if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
                 log_warning("Could not find Combat button on main menu")
                 return False
 
             # Enter VTGK
             self.update_activity_progress(12.0)
-            if not self.wait_and_tap(self.combat['vtgk_icon'], timeout=10):
+            if not self.wait_and_tap(self.tpl_combat['vtgk_icon'], timeout=10):
                 log_warning("Could not find VTGK icon")
                 return False
 
             # Confirm we actually landed on the VTGK screen
-            if not self.wait_for_template(self.combat['vtgk_check'], timeout=10):
+            if not self.wait_for_template(self.tpl_combat['vtgk_check'], timeout=10):
                 log_warning("VTGK screen did not appear after navigation")
                 return False
             self.update_activity_progress(15.0)
@@ -394,9 +394,9 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             log_info("VTGK already completed for today, finishing activity")
             # Best-effort: claim the weekly reward slot 1 if available, then
             # exit VTGK screen and return to in-game home.
-            self.wait_and_tap(self.combat['vtgk_reward_1'], timeout=5)
-            self.wait_and_tap(self.combat['vtgk_exit'], timeout=5)
-            self.wait_and_tap(self.templates['home'], timeout=10)
+            self.wait_and_tap(self.tpl_combat['vtgk_reward_1'], timeout=5)
+            self.wait_and_tap(self.tpl_combat['vtgk_exit'], timeout=5)
+            self.wait_and_tap(self.tpl_common['home'], timeout=10)
             self.update_activity_progress(100.0)
             log_success("Combat VTGK already completed")
             return True
@@ -418,8 +418,8 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             # single wait_for_any_template instead of chaining two 15s
             # waits - that way a missing template never costs us 30s.
             heart_templates = [
-                self.combat['vtgk_point_tim'],
-                self.combat['vtgk_point_dau'],
+                self.tpl_combat['vtgk_point_tim'],
+                self.tpl_combat['vtgk_point_dau'],
             ]
             heart_match = self.wait_for_any_template(
                 heart_templates, timeout=15, threshold=0.85,
@@ -434,7 +434,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             self.update_activity_progress(base_progress + progress_step * 0.25)
 
             # 2b: tap start
-            if not self.wait_and_tap(self.templates['bat_dau'], timeout=10):
+            if not self.wait_and_tap(self.tpl_common['bat_dau'], timeout=10):
                 log_warning(f"Could not find Bat Dau on run {run_no}")
                 return False
             self.update_activity_progress(base_progress + progress_step * 0.50)
@@ -442,7 +442,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             # 2c+2d: wait for the stats screen and tap Exit in one shot.
             # Previously we did wait_for_template(exit) + wait_and_tap(exit),
             # which polls the screen twice for the same template.
-            if not self.wait_and_tap(self.templates['exit'], timeout=300):
+            if not self.wait_and_tap(self.tpl_common['exit'], timeout=300):
                 log_warning(f"Stats screen did not appear / Exit not tapped on run {run_no}")
                 return False
             self.update_activity_progress(base_progress + progress_step * 0.75)
@@ -458,7 +458,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
         # Step 3: return home (best-effort)
         self.update_activity_progress(97.0)
-        if not self.wait_and_tap(self.templates['home'], timeout=10):
+        if not self.wait_and_tap(self.tpl_common['home'], timeout=10):
             log_warning("Could not find Home button after VTGK (continuing)")
 
         self.update_activity_progress(100.0)
@@ -484,7 +484,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         # Step 1: detect whether we are already on the Arena screen
         self.update_activity_progress(2.0)
         already_in_arena = self.wait_for_template(
-            self.combat['arena_check'], timeout=5, threshold=0.85
+            self.tpl_combat['arena_check'], timeout=5, threshold=0.85
         ) is not None
 
         if already_in_arena:
@@ -499,18 +499,18 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
             # Open combat from main menu
             self.update_activity_progress(8.0)
-            if not self.wait_and_tap(self.main_menu['combat'], timeout=10):
+            if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
                 log_warning("Could not find Combat button on main menu")
                 return False
 
             # Enter Arena
             self.update_activity_progress(12.0)
-            if not self.wait_and_tap(self.combat['arena_icon'], timeout=10):
+            if not self.wait_and_tap(self.tpl_combat['arena_icon'], timeout=10):
                 log_warning("Could not find Arena icon")
                 return False
 
             # Confirm we actually landed on the Arena screen
-            if not self.wait_for_template(self.combat['arena_check'], timeout=10):
+            if not self.wait_for_template(self.tpl_combat['arena_check'], timeout=10):
                 log_warning("Arena screen did not appear after navigation")
                 return False
             self.update_activity_progress(15.0)
@@ -528,14 +528,14 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             base_progress = progress_start + progress_step * i
 
             # 2a: tap thu thach to start a fight
-            if not self.wait_and_tap(self.combat['arena_thu_thach'], timeout=15):
+            if not self.wait_and_tap(self.tpl_combat['arena_thu_thach'], timeout=15):
                 log_warning(f"Could not find Thu Thach on run {run_no}")
                 return False
             self.update_activity_progress(base_progress + progress_step * 0.25)
 
 
             # 2b: tap start
-            if not self.wait_and_tap(self.templates['bat_dau'], timeout=10):
+            if not self.wait_and_tap(self.tpl_common['bat_dau'], timeout=10):
                 log_warning(f"Could not find Bat Dau on run {run_no}")
                 return False
             self.update_activity_progress(base_progress + progress_step * 0.50)
@@ -543,11 +543,11 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             # 2b.1: if Arena is already full, stop the activity early (success)
             # Probe with a short timeout: the "full" banner appears within
             # ~1s after Bat Dau, so 10s wastes time on the common case.
-            is_full = self.wait_for_template(self.combat['arena_is_full'], timeout=5) is not None
+            is_full = self.wait_for_template(self.tpl_combat['arena_is_full'], timeout=5) is not None
             if is_full:
                 log_info("Arena is full, ending Arena activity early")
-                self.wait_and_tap(self.templates['huy_bo'], timeout=10)  # Tap cancel to exit out of the full screen
-                self.wait_and_tap(self.templates['home'], timeout=10)  # Try to return home
+                self.wait_and_tap(self.tpl_common['huy_bo'], timeout=10)  # Tap cancel to exit out of the full screen
+                self.wait_and_tap(self.tpl_common['home'], timeout=10)  # Try to return home
                 self.update_activity_progress(100.0)
                 log_success(f"Combat Arena finished (full at run {run_no})")
                 return True
@@ -562,7 +562,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
         # Step 3: return home (best-effort)
         self.update_activity_progress(97.0)
-        if not self.wait_and_tap(self.templates['home'], timeout=10):
+        if not self.wait_and_tap(self.tpl_common['home'], timeout=10):
             log_warning("Could not find Home button after Arena (continuing)")
 
         self.update_activity_progress(100.0)
@@ -591,7 +591,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         # Step 1: detect whether we are already on the TMDQ screen
         self.update_activity_progress(2.0)
         already_in_tmdq = self.wait_for_template(
-            self.combat['tmdq_check'], timeout=5, threshold=0.85
+            self.tpl_combat['tmdq_check'], timeout=5, threshold=0.85
         ) is not None
 
         if already_in_tmdq:
@@ -606,24 +606,24 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
             # Open combat from main menu
             self.update_activity_progress(8.0)
-            if not self.wait_and_tap(self.main_menu['combat'], timeout=10):
+            if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
                 log_warning("Could not find Combat button on main menu")
                 return False
 
             # Enter TMDQ
             self.update_activity_progress(12.0)
-            if not self.wait_and_tap(self.combat['tmdq_icon'], timeout=10):
+            if not self.wait_and_tap(self.tpl_combat['tmdq_icon'], timeout=10):
                 log_warning("Could not find TMDQ icon")
                 return False
 
             # Confirm we actually landed on the TMDQ screen
-            if not self.wait_for_template(self.combat['tmdq_check'], timeout=10):
+            if not self.wait_for_template(self.tpl_combat['tmdq_check'], timeout=10):
                 log_warning("TMDQ screen did not appear after navigation")
                 return False
             self.update_activity_progress(15.0)
 
         # Step 2: tap "Ra Tran" once to enter the Thu Thach screen
-        if not self.wait_and_tap(self.templates['ra_tran'], timeout=10):
+        if not self.wait_and_tap(self.tpl_common['ra_tran'], timeout=10):
             log_warning("Could not find Ra Tran button")
             return False
         self.update_activity_progress(20.0)
@@ -641,31 +641,31 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             base_progress = progress_start + progress_step * i
 
             # 3a: tap "Thu Thach"
-            if not self.wait_and_tap(self.templates['thu_thach'], timeout=15):
+            if not self.wait_and_tap(self.tpl_common['thu_thach'], timeout=15):
                 log_warning(f"Could not find TMDQ Thu Thach on run {run_no}")
                 return False
             self.update_activity_progress(base_progress + progress_step * 0.20)
 
             # 3b: tap "Bat Dau"
-            if not self.wait_and_tap(self.templates['bat_dau'], timeout=10):
+            if not self.wait_and_tap(self.tpl_common['bat_dau'], timeout=10):
                 log_warning(f"Could not find Bat Dau on run {run_no}")
                 return False
             self.update_activity_progress(base_progress + progress_step * 0.40)
 
             # 3b.1: if TMDQ is already full, stop the activity early (success)
             # Short probe - the full banner appears immediately after Bat Dau.
-            is_full = self.wait_for_template(self.combat['tmdq_is_full'], timeout=5) is not None
+            is_full = self.wait_for_template(self.tpl_combat['tmdq_is_full'], timeout=5) is not None
             if is_full:
                 log_info("TMDQ is full, ending TMDQ activity early")
-                self.wait_and_tap(self.templates['huy_bo'], timeout=10)  # Tap cancel to exit out of the full screen
-                self.wait_and_tap(self.templates['home'], timeout=10)  # Try to return home
+                self.wait_and_tap(self.tpl_common['huy_bo'], timeout=10)  # Tap cancel to exit out of the full screen
+                self.wait_and_tap(self.tpl_common['home'], timeout=10)  # Try to return home
                 self.update_activity_progress(100.0)
                 log_success(f"Combat TMDQ finished (full at run {run_no})")
                 return True
 
             # 3c: tap "Skip" (best-effort). Short probe: when present the
             # button appears almost immediately after Bat Dau.
-            if not self.wait_and_tap(self.templates['skip'], timeout=5):
+            if not self.wait_and_tap(self.tpl_common['skip'], timeout=5):
                 log_info(f"Skip button not visible on run {run_no}, continuing")
             self.update_activity_progress(base_progress + progress_step * 0.60)
 
@@ -681,7 +681,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
         # Step 4: return home (best-effort)
         self.update_activity_progress(97.0)
-        if not self.wait_and_tap(self.templates['home'], timeout=10):
+        if not self.wait_and_tap(self.tpl_common['home'], timeout=10):
             log_warning("Could not find Home button after TMDQ (continuing)")
 
         self.update_activity_progress(100.0)
@@ -708,7 +708,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         # Step 1: detect whether we are already on the DVQ screen
         self.update_activity_progress(2.0)
         already_in_dvq = self.wait_for_template(
-            self.combat['dvq_check'], timeout=5, threshold=0.85
+            self.tpl_combat['dvq_check'], timeout=5, threshold=0.85
         ) is not None
 
         if already_in_dvq:
@@ -723,18 +723,18 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
             # Open combat from main menu
             self.update_activity_progress(8.0)
-            if not self.wait_and_tap(self.main_menu['combat'], timeout=10):
+            if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
                 log_warning("Could not find Combat button on main menu")
                 return False
 
             # Enter DVQ
             self.update_activity_progress(12.0)
-            if not self.wait_and_tap(self.combat['dvq_icon'], timeout=10):
+            if not self.wait_and_tap(self.tpl_combat['dvq_icon'], timeout=10):
                 log_warning("Could not find DVQ icon")
                 return False
 
             # Confirm we actually landed on the DVQ screen
-            if not self.wait_for_template(self.combat['dvq_check'], timeout=10):
+            if not self.wait_for_template(self.tpl_combat['dvq_check'], timeout=10):
                 log_warning("DVQ screen did not appear after navigation")
                 return False
             self.update_activity_progress(15.0)
@@ -752,18 +752,18 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             base_progress = progress_start + progress_step * i
 
             # 2a: tap "Thu Thach"
-            if not self.wait_and_tap(self.combat['dvq_thu_thach'], timeout=15):
+            if not self.wait_and_tap(self.tpl_combat['dvq_thu_thach'], timeout=15):
                 log_warning(f"Could not find DVQ Thu Thach on run {run_no}")
                 return False
             self.update_activity_progress(base_progress + progress_step * 0.20)
 
             # 2a.1: if DVQ is already full, stop the activity early (success)
             # Short probe - full banner shows up immediately after Thu Thach.
-            is_full = self.wait_for_template(self.combat['dvq_is_full'], timeout=5) is not None
+            is_full = self.wait_for_template(self.tpl_combat['dvq_is_full'], timeout=5) is not None
             if is_full:
                 log_info("DVQ is full, ending DVQ activity early")
-                self.wait_and_tap(self.templates['huy_bo'], timeout=10)  # Tap cancel to exit out of the full screen
-                self.wait_and_tap(self.templates['home'], timeout=10)  # Try to return home
+                self.wait_and_tap(self.tpl_common['huy_bo'], timeout=10)  # Tap cancel to exit out of the full screen
+                self.wait_and_tap(self.tpl_common['home'], timeout=10)  # Try to return home
                 self.update_activity_progress(100.0)
                 log_success(f"Combat DVQ finished (full at run {run_no})")
                 return True
@@ -775,24 +775,24 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             # be - then loop only when the prompt actually appears so we
             # don't burn 3s on the common case.
             if self.wait_for_template(
-                self.combat['dvq_doi_tiep_theo'], timeout=5, threshold=0.85
+                self.tpl_combat['dvq_doi_tiep_theo'], timeout=5, threshold=0.85
             ):
                 for swap in range(3):
                     if not self.wait_and_tap(
-                        self.combat['dvq_doi_tiep_theo'], timeout=5
+                        self.tpl_combat['dvq_doi_tiep_theo'], timeout=5
                     ):
                         break
                     log_info(f"DVQ Doi Tiep Theo tapped ({swap + 1})")
                     time.sleep(0.5)
 
             # 2b: tap "Tim Kiem Doi Thu"
-            if not self.wait_and_tap(self.combat['dvq_tim_kiem_doi_thu'], timeout=10):
+            if not self.wait_and_tap(self.tpl_combat['dvq_tim_kiem_doi_thu'], timeout=10):
                 log_warning(f"Could not find Tim Kiem Doi Thu on run {run_no}")
                 return False
             self.update_activity_progress(base_progress + progress_step * 0.40)
 
             # 2c: wait for "Tap to Continue" and tap it
-            if not self.wait_and_tap(self.combat['dvq_tap_to_continue'], timeout=300):
+            if not self.wait_and_tap(self.tpl_combat['dvq_tap_to_continue'], timeout=300):
                 log_warning(f"Could not find Tap to Continue on run {run_no}")
                 return False
             self.update_activity_progress(base_progress + progress_step * 0.70)
@@ -809,7 +809,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
         # Step 3: return home (best-effort)
         self.update_activity_progress(97.0)
-        if not self.wait_and_tap(self.templates['home'], timeout=10):
+        if not self.wait_and_tap(self.tpl_common['home'], timeout=10):
             log_warning("Could not find Home button after DVQ (continuing)")
 
         self.update_activity_progress(100.0)
@@ -829,7 +829,7 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         Returns True if a dialog was found and tapped this tick. The return
         value is informational only; the background loop ignores it.
         """
-        template = self.templates.get('skip_dialog')
+        template = self.tpl_common.get('skip_dialog')
         if not template:
             return False
         result = self.find_template(template, last_screen=True)
@@ -848,13 +848,13 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         log_info("Returning to main menu...")
         start_time = time.time()
         back_templates = [
-            self.templates['close'],
-            self.templates['exit'],
-            self.templates['home'],
+            self.tpl_common['close'],
+            self.tpl_common['exit'],
+            self.tpl_common['home'],
         ]
 
         while time.time() - start_time < timeout:
-            if self.find_template(self.main_menu['phuc_loi'], threshold=threshold):
+            if self.find_template(self.tpl_main_menu['phuc_loi'], threshold=threshold):
                 log_success("Main menu detected")
                 return True
 
@@ -876,8 +876,9 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         return False
 
     def _is_vtgk_finished(self, timeout: float = 1.0, threshold: float = 0.85) -> bool:
-        if self.region_has_text("0/5", region=self._VTGK_COUNTER_REGION,whitelist="0123456789/",):
-            return True
+        return self.region_has_text(
+            "0/5", region=self._VTGK_COUNTER_REGION, whitelist="0123456789/",
+        )
 
     def _find_end_tap_exit(self, timeout: float = 10.0,
                            threshold: float = 0.85) -> bool:
@@ -886,8 +887,8 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         Both templates are polled in parallel via ``wait_for_any_template`` so
         whichever appears first will be tapped.
         """
-        templates = [self.templates[k] for k in ('exit', 'exit_2')
-                     if self.templates.get(k)]
+        templates = [self.tpl_common[k] for k in ('exit', 'exit_2')
+                     if self.tpl_common.get(k)]
         if not templates:
             return False
 

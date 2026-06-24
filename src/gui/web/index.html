@@ -924,7 +924,7 @@ function refreshButtons() {
 
   $("btn-start").disabled  = running;
   $("btn-pause").disabled  = !running && !bg;
-  $("btn-stop").disabled   = !running;
+  $("btn-stop").disabled   = !running && !bg;
   $("btn-pause").textContent = paused ? "Tiếp tục" : "Tạm dừng";
 
   setStatusPill(running ? (paused ? "paused" : "running") :

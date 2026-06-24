@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple, Set
 from ppadb.client import Client as AdbClient
 
 from .constants import ALL_EMULATOR_PORTS, EMULATOR_PORT_RANGES, get_adb_path
-from src.utils import log_error, log_info, log_success, log_warning, log_normal
+from src.utils import log_error, log_info, log_success, log_warning, log_normal, log_debug
 
 
 class DeviceScanner:
@@ -67,9 +67,12 @@ class DeviceScanner:
                 
         except subprocess.TimeoutExpired:
             return None
-        except Exception:
+        except Exception as e:
+            # Most port probes during a scan miss; keep this at debug level so a
+            # full scan doesn't spam the console, but the reason is recoverable.
+            log_debug(f"connect probe to {host} failed: {e}")
             return None
-        
+
         return None
     
     def scan_ports(

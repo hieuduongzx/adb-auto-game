@@ -2,25 +2,25 @@
 Base game automation class for easy tool development with GUI support.
 This class provides a structured framework for creating game automation tools.
 """
-import json
-import os
 import time
 import threading
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from typing import Dict, List, Callable, Optional, Any, Tuple
-
-import cv2
 
 from src.core import ADBGameAutomation
 from src.core.adb.auto.config import Config
 from src.game_core.activity import Activity, ActivityStatus
+from src.game_core.ocr_helpers import OCRHelperMixin
+from src.game_core.vision_helpers import VisionHelperMixin
+from src.game_core.settings_store import SettingsStore
+from src.game_core.background_workers import BackgroundWorkerManager
+from src.game_core.activity_manager import ActivityManager
 from src.game_core.gui_base import GUIBase
 from src.utils import log_error, log_warning, log_success, log_info
 
 
-class BaseGameAutomation(ADBGameAutomation, ABC):
+class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, ABC):
     """
     Base class for game automation with GUI support and activity management.
     
@@ -85,12 +85,11 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         self.templates_dir: str = ""
         self.logs_dir: str = "logs"
         
-        # Activity management
-        self._activities: List[Activity] = []
-        self._activity_map: Dict[str, Activity] = {}
-        self._current_activity: Optional[Activity] = None
-        self._activity_order: List[str] = []
-        
+        # Activity management. State lives in the manager; the ``_activity_*``
+        # properties below forward to it so existing internal accesses (and
+        # SpeedhackMixin) keep working unchanged.
+        self._activities_mgr = ActivityManager()
+
         # Optional thread pool subclasses can use for parallel sub-tasks.
         # Lazily created via :meth:`get_executor` so we don't spin up threads
         # for games that don't need them.
@@ -114,19 +113,60 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         self._pause_event = threading.Event()
         self._pause_event.set()  # Not paused by default
         
-        # Background activity management
-        self._background_threads: Dict[str, threading.Thread] = {}
-        self._background_stop_events: Dict[str, threading.Event] = {}
-        self._background_lock = threading.Lock()
+        # Background activity management. The manager owns the worker threads
+        # and collaborates only through these injected callables.
+        self._bg = BackgroundWorkerManager(
+            handler_resolver=self._get_activity_handler,
+            is_paused=lambda: self._paused,
+            ensure_ready=self._ensure_runtime_ready,
+        )
 
-        # Persisted per-activity settings
-        self._settings_dir = Path("data") / "settings"
-        self._settings_file: Optional[Path] = None
+        # Persisted per-activity settings. Each concrete game keeps its own
+        # file keyed by class name, so settings never collide between games.
+        self._settings = SettingsStore(self.__class__.__name__)
         self._ui_settings: Dict[str, Any] = {}
 
         # Initialize activities
         self._initialize_activities()
-    
+
+    # ==================== Activity state (delegates to manager) ============
+    #
+    # These forward to ``self._activities_mgr`` so all existing internal
+    # accesses — and SpeedhackMixin's ``self._activity_map`` read — work
+    # unchanged after the state moved into ActivityManager.
+
+    @property
+    def _activities(self) -> List[Activity]:
+        return self._activities_mgr.activities
+
+    @_activities.setter
+    def _activities(self, value: List[Activity]) -> None:
+        self._activities_mgr.activities = value
+
+    @property
+    def _activity_map(self) -> Dict[str, Activity]:
+        return self._activities_mgr.activity_map
+
+    @_activity_map.setter
+    def _activity_map(self, value: Dict[str, Activity]) -> None:
+        self._activities_mgr.activity_map = value
+
+    @property
+    def _activity_order(self) -> List[str]:
+        return self._activities_mgr.activity_order
+
+    @_activity_order.setter
+    def _activity_order(self, value: List[str]) -> None:
+        self._activities_mgr.activity_order = value
+
+    @property
+    def _current_activity(self) -> Optional[Activity]:
+        return self._activities_mgr.current_activity
+
+    @_current_activity.setter
+    def _current_activity(self, value: Optional[Activity]) -> None:
+        self._activities_mgr.current_activity = value
+
     # ==================== Abstract Methods ====================
     
     @abstractmethod
@@ -145,12 +185,6 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
     def _initialize_activities(self):
         """Initialize activities from define_activities() and apply saved settings."""
         activities = self.define_activities()
-
-        # Build a settings key from the concrete game class name so each game
-        # keeps its own independent activity settings.
-        settings_key = self.__class__.__name__
-        self._settings_dir = Path("data") / "settings"
-        self._settings_file = self._settings_dir / f"{settings_key}.json"
         saved = self._load_activity_settings()
 
         if saved:
@@ -166,25 +200,10 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             # Append any new activities that weren't saved yet.
             activities = merged + list(by_id.values())
 
-        self._activities = activities
-        self._activity_map = {act.id: act for act in activities}
-        # Seed custom_values from declared defaults for any activity whose
-        # custom_values are still empty (e.g. a freshly added custom setting).
-        for act in activities:
-            if not act.custom_settings:
-                continue
-            for spec in act.custom_settings:
-                k = spec.get("key")
-                if k is None or k in act.custom_values:
-                    continue
-                act.custom_values[k] = spec.get("default")
-        # Only sequential, enabled activities go into the run order. Background
-        # activities are managed separately via worker threads.
-        self._activity_order = [
-            act.id for act in activities
-            if act.enabled and not act.background
-        ]
-        
+        # Install into the manager: seeds custom defaults, builds the id map,
+        # and computes the sequential (enabled, non-background) run order.
+        self._activities_mgr.set_activities(activities)
+
         log_info(
             f"Initialized {len(activities)} activities "
             f"(sequential: {self._activity_order}, "
@@ -197,296 +216,6 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             self._executor = ThreadPoolExecutor(max_workers=self.max_workers)
         return self._executor
     
-    # ==================== Template / Region Helpers ====================
-    
-    def get_template_path(self, template_name: str) -> str:
-        """Get full path to a template image"""
-        return os.path.join(self.templates_dir, template_name)
-    
-    def template_exists(self, template_name: str) -> bool:
-        """Check if a template file exists"""
-        return os.path.exists(self.get_template_path(template_name))
-
-    @staticmethod
-    def region_center(region: "BaseGameAutomation.Region") -> Tuple[int, int]:
-        """Return the ``(cx, cy)`` center of a ``(x, y, w, h)`` region."""
-        x, y, w, h = region
-        return (x + w // 2, y + h // 2)
-    
-    def ensure_templates_exist(self, template_names: List[str]) -> bool:
-        """Ensure all required templates exist"""
-        missing = []
-        for name in template_names:
-            if not self.template_exists(name):
-                missing.append(name)
-        
-        if missing:
-            log_error(f"Missing templates: {missing}")
-            return False
-        return True
-
-    # ==================== Color / Active-State Helpers ====================
-    #
-    # ``cv2.matchTemplate`` only compares shape/structure, so a button that's
-    # been desaturated to indicate "already used / disabled" still matches
-    # its colored template with very high confidence. These helpers add a
-    # post-match color check.
-    #
-    # We use a *colored-pixel ratio* metric rather than mean saturation:
-    # count how many strongly-saturated pixels exist in the template, then
-    # how many exist in the matched ROI, and compare. A disabled (grayed
-    # out) button loses almost every strongly-saturated pixel, so the
-    # ratio collapses to near-zero, while an active button stays close to
-    # 1.0. This separation is much sharper than mean saturation, which
-    # gets diluted by neutral background pixels inside the button bbox.
-
-    # Pixels with HSV saturation >= this value are treated as "colored".
-    # 80 keeps us comfortably above noisy near-gray pixels (typically <40)
-    # while still catching pastel UI elements.
-    _COLORED_PIXEL_SAT_THRESHOLD = 80
-
-    @staticmethod
-    def _colored_pixel_count(img_bgr, sat_threshold: int) -> int:
-        """Count pixels in a BGR image whose HSV saturation is >= threshold."""
-        if img_bgr is None or len(img_bgr.shape) < 3:
-            return 0
-        hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
-        return int((hsv[:, :, 1] >= sat_threshold).sum())
-
-    def is_button_active(
-        self,
-        template_path: str,
-        center: Tuple[int, int],
-        min_color_ratio: float = 0.4,
-        sat_threshold: Optional[int] = None,
-    ) -> bool:
-        """Check whether the matched button is in its active (colored) state.
-
-        Counts strongly-saturated pixels in both the template and the
-        matched ROI, then compares::
-
-            ratio = colored_pixels(roi) / colored_pixels(template)
-
-        ``ratio`` near ``1.0`` means the ROI carries roughly as much color
-        as the template (active). Disabled / grayed-out buttons collapse
-        to ``~0`` because almost no pixel survives the saturation cutoff.
-
-        Args:
-            template_path: Template that was matched. Used to size the ROI
-                *and* to read the reference colored-pixel count.
-            center: ``(cx, cy)`` returned by ``find_template``.
-            min_color_ratio: ROI must reach at least this fraction of the
-                template's colored-pixel count to count as active. ``0.4``
-                is a comfortable default; lower it for buttons whose
-                disabled state still keeps a few colored accents.
-            sat_threshold: Optional override for the saturation cutoff
-                that defines a "colored" pixel. Defaults to
-                ``_COLORED_PIXEL_SAT_THRESHOLD`` (80).
-
-        Returns:
-            ``True`` if the region looks colored, ``False`` if it looks gray
-            or the check could not be performed (caller should treat that as
-            "don't tap" to be safe).
-        """
-        screen = self.get_latest_screen()
-        if screen is None or len(screen.shape) < 3:
-            return False
-
-        template = cv2.imread(template_path, cv2.IMREAD_COLOR)
-        if template is None:
-            return False
-
-        th, tw = template.shape[:2]
-        cx, cy = center
-        x1 = max(cx - tw // 2, 0)
-        y1 = max(cy - th // 2, 0)
-        x2 = min(x1 + tw, screen.shape[1])
-        y2 = min(y1 + th, screen.shape[0])
-        if x2 <= x1 or y2 <= y1:
-            return False
-
-        sat_thr = sat_threshold if sat_threshold is not None else self._COLORED_PIXEL_SAT_THRESHOLD
-
-        roi = screen[y1:y2, x1:x2]
-        roi_colored = self._colored_pixel_count(roi, sat_thr)
-        tpl_colored = self._colored_pixel_count(template, sat_thr)
-
-        # If the template itself has almost no colored pixels (e.g. a pure
-        # white-on-dark icon), the metric is meaningless. Fail open so the
-        # caller can fall back to a different strategy.
-        if tpl_colored < 50:
-            log_warning(
-                f"[ACTIVE CHECK] {os.path.basename(template_path)} has too "
-                f"few colored pixels ({tpl_colored}); skipping active check"
-            )
-            return True
-
-        ratio = roi_colored / tpl_colored
-        passed = ratio >= min_color_ratio
-
-        log_info(
-            f"[ACTIVE CHECK] {os.path.basename(template_path)} "
-            f"roi_colored={roi_colored} tpl_colored={tpl_colored} "
-            f"ratio={ratio:.2f} (min_ratio={min_color_ratio}, "
-            f"sat_thr={sat_thr}) -> {'ACTIVE' if passed else 'DISABLED'}"
-        )
-        return passed
-
-    def find_active_template(
-        self,
-        template_path: str,
-        timeout: float = 5.0,
-        threshold: float = 0.85,
-        min_color_ratio: float = 0.4,
-        sat_threshold: Optional[int] = None,
-    ) -> Optional[Tuple[int, int, float]]:
-        """Find a template only if the matched region is in its colored state.
-
-        Wraps ``wait_for_template`` + :meth:`is_button_active` so callers
-        can replace ``wait_and_tap`` with a two-step "find then tap" flow
-        whenever a disabled-button false positive would be a problem::
-
-            active = self.find_active_template(self.tpl['take_all'], timeout=5)
-            if active:
-                x, y, _ = active
-                self.tap(x, y)
-
-        Returns the same ``(x, y, conf)`` tuple as ``find_template`` when
-        the button is active, ``None`` otherwise (template missing, not
-        visible, or visible but grayed out).
-        """
-        result = self.wait_for_template(
-            template_path, timeout=timeout, threshold=threshold
-        )
-        if not result:
-            return None
-        x, y, _ = result
-        if not self.is_button_active(
-            template_path, (x, y),
-            min_color_ratio=min_color_ratio,
-            sat_threshold=sat_threshold,
-        ):
-            return None
-        return result
-
-    def wait_and_tap_active(
-        self,
-        template_path: str,
-        timeout: float = 5.0,
-        threshold: float = 0.85,
-        min_color_ratio: float = 0.4,
-        sat_threshold: Optional[int] = None,
-        offset: Tuple[int, int] = (0, 0),
-    ) -> bool:
-        """Like ``wait_and_tap`` but only taps when the button is colored.
-
-        Convenience wrapper around :meth:`find_active_template` that performs
-        the tap in a single call. Returns ``True`` only when an active match
-        was found and the tap succeeded.
-        """
-        result = self.find_active_template(
-            template_path, timeout=timeout, threshold=threshold,
-            min_color_ratio=min_color_ratio,
-            sat_threshold=sat_threshold,
-        )
-        if not result:
-            return False
-        x, y, _ = result
-        return self.tap(x + offset[0], y + offset[1])
-
-    # ==================== OCR Helpers ====================
-    #
-    # Thin wrappers over the OCR methods on ``ADBGameAutomation`` that add
-    # consistent ``[OCR]`` logging and a fast-path "OCR not installed"
-    # check. They're meant to be the primary OCR entry points for game
-    # subclasses, mirroring the convenience tier of ``wait_and_tap`` /
-    # ``find_and_tap`` over the lower-level ``find_template``.
-
-    Region = Tuple[int, int, int, int]
-
-    def region_has_text(
-        self,
-        needle: str,
-        region: "BaseGameAutomation.Region",
-        whitelist: Optional[str] = None,
-        case_sensitive: bool = False,
-        last_screen: bool = True,
-    ) -> bool:
-        """Return ``True`` if ``needle`` appears in OCR output of ``region``.
-
-        Convenience wrapper around :meth:`ADBGameAutomation.region_contains_text`
-        with logging tuned for game flows. Returns ``False`` immediately
-        when the OCR engine isn't available, so callers can chain it
-        before falling back to template checks::
-
-            if self.region_has_text("0/5", region=COUNTER_REGION,
-                                    whitelist="0123456789/"):
-                return True
-            # template fallback...
-
-        Args:
-            needle: Substring to look for. Whitespace is ignored.
-            region: ``(x, y, w, h)`` in device pixels.
-            whitelist: Optional char whitelist (e.g. ``"0123456789/"``
-                for digit-only labels).
-            case_sensitive: Default ``False``.
-            last_screen: Use the most recent capture instead of forcing
-                a fresh ``capture_screen()``. Default ``True``.
-        """
-        if not getattr(self.ocr, "available", False):
-            return False
-
-        text = self.read_text(
-            region=region, whitelist=whitelist, last_screen=last_screen,
-        )
-        if not text:
-            return False
-
-        # Reuse the lower-level method so case/whitespace rules stay in
-        # one place. We've already logged the raw read.
-        return self.region_contains_text(
-            needle, region=region,
-            whitelist=whitelist, case_sensitive=case_sensitive,
-            last_screen=last_screen,
-        )
-
-    def wait_region_has_text(
-        self,
-        needle: str,
-        region: "BaseGameAutomation.Region",
-        timeout: float = 10.0,
-        interval: float = 0.5,
-        whitelist: Optional[str] = None,
-        case_sensitive: bool = False,
-    ) -> bool:
-        """Poll ``region`` until ``needle`` is recognised or timeout.
-
-        Pause-aware: while the automation is paused the poll skips reads
-        and just sleeps, so a long ``wait_region_has_text`` won't burn
-        ADB during a Pause.
-        """
-        if not getattr(self.ocr, "available", False):
-            log_warning(
-                f"[OCR] '{needle}' wait skipped - OCR unavailable"
-            )
-            return False
-
-        start = time.time()
-        while time.time() - start < timeout:
-            self._pause_event.wait()
-            if self.region_has_text(
-                needle, region=region,
-                whitelist=whitelist, case_sensitive=case_sensitive,
-            ):
-                elapsed = time.time() - start
-                log_success(
-                    f"[OCR] Found '{needle}' in {region} after {elapsed:.2f}s"
-                )
-                return True
-            time.sleep(interval)
-        log_warning(f"[OCR] Timeout waiting for '{needle}' in {region}")
-        return False
-
     # ==================== Activity Management ====================
     
     def get_activities(self) -> List[Activity]:
@@ -516,10 +245,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             else:
                 self._stop_background_activity(activity)
         else:
-            if enabled and activity_id not in self._activity_order:
-                self._activity_order.append(activity_id)
-            elif not enabled and activity_id in self._activity_order:
-                self._activity_order.remove(activity_id)
+            self._activities_mgr.enable_in_order(activity_id, enabled)
         log_info(f"Activity '{activity_id}' {'enabled' if enabled else 'disabled'}")
         self._save_activity_settings()
 
@@ -569,19 +295,15 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
 
     def set_activity_order(self, order: List[str]):
         """Set the execution order of activities"""
-        # Validate all IDs exist
-        invalid = [aid for aid in order if aid not in self._activity_map]
-        if invalid:
+        if not self._activities_mgr.set_order(order):
+            invalid = [aid for aid in order if aid not in self._activity_map]
             log_warning(f"Invalid activity IDs in order: {invalid}")
             return
-        
-        self._activity_order = order
         log_info(f"Activity order updated: {order}")
-    
+
     def reset_activities(self):
         """Reset all activities to pending state"""
-        for activity in self._activities:
-            activity.reset()
+        self._activities_mgr.reset_all()
         log_info("All activities reset")
     
     def get_current_activity(self) -> Optional[Activity]:
@@ -614,154 +336,66 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         Also restores the OCR backend when present in the settings file.
         Returns the activity list (possibly empty).
         """
-        if not self._settings_file or not self._settings_file.exists():
-            return []
-        try:
-            with self._settings_file.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception as e:
-            log_warning(f"Could not load activity settings: {e}")
-            return []
-
-        # New format: dict with "ocr_backend" + "activities".
-        if isinstance(data, dict):
-            self._ui_settings = data.get("ui_settings", {}) or {}
-            backend = data.get("ocr_backend")
-            if backend and backend != self.ocr.backend_name:
-                # Only auto-restore when the caller didn't already pin a
-                # backend at construction time (construction-time choice
-                # has already been applied and wins).
-                super().set_ocr_backend(backend)
-            return data.get("activities", [])
-        # Legacy format: bare list.
-        if isinstance(data, list):
-            return data
-        return []
+        activities, ui_settings, backend = self._settings.load()
+        self._ui_settings = ui_settings
+        if backend and backend != self.ocr.backend_name:
+            # Only auto-restore when the caller didn't already pin a backend at
+            # construction time (construction-time choice has already been
+            # applied and wins). This OCR side effect stays here, not in the
+            # store, to keep persistence free of OCR coupling.
+            super().set_ocr_backend(backend)
+        return activities
 
     def _save_activity_settings(self) -> None:
         """Persist current enabled/poll_interval state + OCR backend."""
-        if not self._settings_file:
-            return
-        try:
-            self._settings_dir.mkdir(parents=True, exist_ok=True)
-            payload = {
-                "ocr_backend": self.ocr.backend_name if self.ocr.available else None,
-                "ui_settings": self._ui_settings,
-                "activities": [
-                    act.to_settings_dict() for act in self._activities
-                ],
-            }
-            with self._settings_file.open("w", encoding="utf-8") as f:
-                json.dump(payload, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            log_warning(f"Could not save activity settings: {e}")
+        self._settings.save(
+            activities=[act.to_settings_dict() for act in self._activities],
+            ui_settings=self._ui_settings,
+            ocr_backend=self.ocr.backend_name if self.ocr.available else None,
+        )
 
     # ==================== Background Activity Management ====================
-    
-    def _background_worker(self, activity: Activity, stop_event: threading.Event):
-        """Worker loop for a single background activity.
+    #
+    # Worker threads live in ``self._bg`` (BackgroundWorkerManager). These thin
+    # wrappers keep the historical method names that the GUI and
+    # ``set_activity_enabled`` call.
 
-        Calls ``handle_activity_<id>`` repeatedly every ``poll_interval``
-        seconds until ``stop_event`` is set.
-
-        The handler return value is treated as a tick result rather than a
-        completion: the loop keeps going regardless. Exceptions are caught
-        and logged so a buggy handler cannot kill the worker thread.
-
-        Background workers run independently of the sequential automation
-        loop: a user can toggle them on/off even when ``self.running`` is
-        ``False`` (e.g. before the main automation has been started).
-        """
-        handler = self._get_activity_handler(activity.id)
-        if handler is None:
-            log_error(
-                f"Background activity '{activity.id}' has no handler "
-                f"(expected method 'handle_activity_{activity.id}'); aborting"
-            )
-            return
-        log_info(f"[bg] Background activity started: {activity.name}")
-        activity.status = ActivityStatus.RUNNING
-        try:
-            while not stop_event.is_set():
-                # Honour pause: skip ticks while the main loop is paused.
-                if not self._paused:
-                    try:
-                        handler()
-                        activity.execution_count += 1
-                    except Exception as e:
-                        # Swallow errors so a bug in one tick does not kill
-                        # the whole background loop.
-                        log_error(f"[bg] Error in background '{activity.id}': {e}")
-                # Sleep on the stop event so we wake immediately on disable.
-                if stop_event.wait(timeout=max(0.05, activity.poll_interval)):
-                    break
-        finally:
-            activity.status = ActivityStatus.PENDING
-            log_info(f"[bg] Background activity stopped: {activity.name}")
-    
     def _start_background_activity(self, activity: Activity) -> bool:
-        """Start a background activity worker thread.
+        """Start a worker thread for a background activity (idempotent)."""
+        # Starting work clears any prior stop request so the worker's wait_*
+        # calls don't immediately abort.
+        self._stop_event.clear()
+        return self._bg.start(activity)
 
-        Idempotent: returns ``True`` if a worker is now running for the
-        activity, ``False`` if the activity is not actually a background one.
-
-        Ensures ADB connection and continuous screen capture are running
-        first so the worker has frames to look at, even if the main
-        automation loop hasn't been started yet.
-        """
-        if not activity.background:
-            return False
-        # Make sure ADB and capture are alive before kicking off the worker.
-        # This is a no-op when the main automation loop is already running.
-        self._ensure_runtime_ready()
-        with self._background_lock:
-            existing = self._background_threads.get(activity.id)
-            if existing is not None and existing.is_alive():
-                return True
-            stop_event = threading.Event()
-            thread = threading.Thread(
-                target=self._background_worker,
-                args=(activity, stop_event),
-                name=f"bg-{activity.id}",
-                daemon=True,
-            )
-            self._background_stop_events[activity.id] = stop_event
-            self._background_threads[activity.id] = thread
-            thread.start()
-        return True
-    
     def _stop_background_activity(self, activity: Activity, join_timeout: float = 0.5) -> None:
-        """Signal a background worker to stop and wait briefly for it."""
-        with self._background_lock:
-            stop_event = self._background_stop_events.pop(activity.id, None)
-            thread = self._background_threads.pop(activity.id, None)
-        if stop_event is not None:
-            stop_event.set()
-        if thread is not None and thread.is_alive():
-            thread.join(timeout=join_timeout)
+        """Signal a single background worker to stop and wait briefly for it."""
+        self._bg.stop(activity, join_timeout=join_timeout)
 
     def _start_all_background_activities(self) -> None:
         """Start workers for every enabled background activity."""
-        for activity in self._activities:
-            if activity.background and activity.enabled:
-                self._start_background_activity(activity)
+        self._bg.start_all(self._activities)
 
     def _stop_all_background_activities(self) -> None:
         """Signal every background worker to stop, then join once."""
-        with self._background_lock:
-            for activity_id, stop_event in self._background_stop_events.items():
-                stop_event.set()
-            threads = list(self._background_threads.values())
-            self._background_stop_events.clear()
-            self._background_threads.clear()
-        for thread in threads:
-            if thread.is_alive():
-                thread.join(timeout=0.5)
-    
+        self._bg.stop_all()
+
     def is_background_running(self, activity_id: str) -> bool:
         """Whether a given background activity currently has a live worker."""
-        thread = self._background_threads.get(activity_id)
-        return thread is not None and thread.is_alive()
+        return self._bg.is_running(activity_id)
+
+    def set_background_enabled(self, enabled: bool) -> None:
+        """Start or stop all enabled background activities as a group.
+
+        Public entry point for the GUI's background toggle. When enabling,
+        ensures ADB + continuous capture are alive first (a no-op when the main
+        automation loop is already running).
+        """
+        if enabled:
+            self._stop_event.clear()
+            self._ensure_runtime_ready()
+            self._start_all_background_activities()
+        else:
+            self._stop_all_background_activities()
     
     # ==================== Activity Handlers ====================
     
@@ -977,9 +611,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         self._update_progress(activity_id, 0.0)
 
         log_info(f"Running single activity: {activity.name}")
-        # Mark the runtime as running so wait_* helpers don't treat the idle
-        # main loop (self.running == False) as an interruption and bail out
-        # immediately.
+        self._stop_event.clear()
         previous_running = self.running
         self.running = True
         try:
@@ -1007,8 +639,9 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         return self._paused
     
     def stop(self):
-        """Stop automation gracefully"""
+        """Stop everything: sequential queue + background workers + cleanup."""
         log_info("Stopping automation...")
+        self._stop_event.set()
         self.running = False
         self._paused = False
         self._pause_event.set()
@@ -1039,6 +672,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         exits after the current activity finishes.
         """
         log_info("Stopping sequential automation...")
+        self._stop_event.set()
         self.running = False
         self._paused = False
         self._pause_event.set()
@@ -1062,6 +696,7 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         Main automation loop - processes activities in order.
         Override this method only if you need custom flow control.
         """
+        self._stop_event.clear()
         if not self.before_process_game_actions():
             self.running = False
             return
@@ -1133,9 +768,11 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
             log_error(f"Error in automation loop: {e}")
             self._trigger_callback('on_error', e)
         finally:
-            # Always tear down background workers when the main loop exits,
-            # even on error or KeyboardInterrupt.
-            self._stop_all_background_activities()
+            # Tear down background workers only on an explicit global stop;
+            # a natural sequential completion leaves independently-enabled
+            # background activities running (they're owned by their toggles).
+            if self._stop_event.is_set():
+                self._stop_all_background_activities()
             self.after_process_game_actions()
     
     # ==================== Utility Methods ====================
@@ -1146,9 +783,13 @@ class BaseGameAutomation(ADBGameAutomation, ABC):
         time.sleep(timeout)
     
     def safe_sleep(self, seconds: float):
-        """Sleep that can be interrupted by stop/pause"""
+        """Sleep that can be interrupted by stop, and freezes while paused.
+
+        Uses the global stop signal (not ``running``) so background handlers can
+        sleep even when the sequential queue isn't active.
+        """
         end_time = time.time() + seconds
-        while time.time() < end_time and self.running:
+        while time.time() < end_time and not self._stop_event.is_set():
             self._pause_event.wait()
             time.sleep(0.1)
     

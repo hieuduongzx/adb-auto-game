@@ -10,6 +10,10 @@ ECHOPOCALYPSE_PACKAGE = "com.yoozoo.jgame.us"
 
 
 class Echocalypse(SpeedhackMixin, BaseGameAutomation):
+    """Echocalypse automation: dialog skip, expedition, and case-fight runs.
+
+    Mixes in :class:`SpeedhackMixin` for the optional Frida time-scale speedup.
+    """
 
     # App identity
     PACKAGE_NAME = ECHOPOCALYPSE_PACKAGE

@@ -13,7 +13,7 @@ from .constants import (
 )
 from .cache import get_cache
 from .scanner import DeviceScanner
-from src.utils import log_error, log_success, log_warning, log_normal
+from src.utils import log_error, log_success, log_warning, log_normal, log_debug
 
 
 def _extract_package_from_focus_line(line: str) -> Optional[str]:
@@ -96,8 +96,8 @@ class ADBController:
             result = device.shell("getprop ro.product.model")
             if result.strip():
                 return result.strip()
-        except Exception:
-            pass
+        except Exception as e:
+            log_debug(f"getprop ro.product.model failed for {device.serial}: {e}")
         return device.serial or "Unknown Device"
     
     def list_devices(self) -> List[Dict[str, str]]:
@@ -111,13 +111,14 @@ class ADBController:
             for device in self.client.devices():
                 try:
                     device_name = self._get_device_name_for_device(device)
-                except Exception:
+                except Exception as e:
+                    log_debug(f"device name lookup failed for {device.serial}: {e}")
                     device_name = device.serial or "Unknown Device"
                 current_app = ""
                 try:
                     current_app = self._get_current_app_for_device(device) or ""
-                except Exception:
-                    pass
+                except Exception as e:
+                    log_debug(f"current-app lookup failed for {device.serial}: {e}")
                 entry = {
                     "serial": device.serial,
                     "name": device_name,
@@ -214,21 +215,21 @@ class ADBController:
     
     def _prompt_device_selection(self, devices: List) -> bool:
         """Prompt user to select a device from list"""
-        print("\nMultiple devices found:")
+        log_normal("\nMultiple devices found:")
         for i, device in enumerate(devices):
             device_name = self._get_device_name_for_device(device)
-            print(f"  {i + 1}. {device.serial} ({device_name})")
-        print(f"  0. Scan for more devices")
-        
+            log_normal(f"  {i + 1}. {device.serial} ({device_name})")
+        log_normal("  0. Scan for more devices")
+
         while True:
             try:
                 choice = input(f"\nSelect device (1-{len(devices)}) or 0 to scan: ").strip()
-                
+
                 if choice == "0":
                     if self.scan_device():
                         return True
                     continue
-                
+
                 device_index = int(choice) - 1
                 if 0 <= device_index < len(devices):
                     self.device = devices[device_index]
@@ -237,10 +238,10 @@ class ADBController:
                     log_success(f"Connected to device: {self.device_id} ({device_name})")
                     return True
                 else:
-                    print(f"Invalid choice. Please enter 0-{len(devices)}")
-                    
+                    log_warning(f"Invalid choice. Please enter 0-{len(devices)}")
+
             except ValueError:
-                print("Invalid input. Please enter a number.")
+                log_warning("Invalid input. Please enter a number.")
             except KeyboardInterrupt:
                 log_error("User cancelled device selection")
                 raise Exception("Device selection cancelled")
@@ -298,7 +299,14 @@ class ADBController:
         )
     
     def get_screen_size(self) -> Tuple[int, int]:
-        """Get screen dimensions"""
+        """Get screen dimensions, or ``(0, 0)`` if unavailable.
+
+        Callers must treat ``(0, 0)`` as "unknown" (it flows into
+        center/random-point math), so we guard the no-device case explicitly
+        rather than letting ``self.device`` be ``None`` raise inside the parse.
+        """
+        if self.device is None:
+            return (0, 0)
         try:
             result = self.device.shell("wm size")
             size = result.strip().split()[-1].split("x")
@@ -461,7 +469,8 @@ class ADBController:
                 return False
             self.device.shell(f"am start -n {component}")
             return True
-        except Exception:
+        except Exception as e:
+            log_debug(f"am start failed for {package}: {e}")
             return False
 
     @staticmethod
@@ -495,16 +504,12 @@ class ADBController:
         return ""
     
     def get_device_name(self) -> str:
-        """Get device name"""
+        """Get device name (cached)."""
         def _fetch_name():
-            try:
-                result = self.device.shell("getprop ro.product.model")
-                if result.strip():
-                    return result.strip()
-            except Exception:
-                pass
-            return self.device_id or "Unknown Device"
-        
+            if self.device is None:
+                return self.device_id or "Unknown Device"
+            return self._get_device_name_for_device(self.device)
+
         return self._cache.get(self.device_id or "default", "device_name", _fetch_name)
     
     def get_app_name(self, package_name: str) -> str:
@@ -522,7 +527,8 @@ class ADBController:
             # than re-running the full check_adb_connection flow.
             self.device.shell("echo ok")
             return True
-        except Exception:
+        except Exception as e:
+            log_debug(f"is_connected probe failed; dropping device: {e}")
             self.device = None
             return False
 
@@ -551,7 +557,8 @@ class ADBController:
                 self.device_id = target.serial
             self.device = target
             return True
-        except Exception:
+        except Exception as e:
+            log_debug(f"quick_refresh failed: {e}")
             self.device = None
             return False
 
@@ -575,11 +582,13 @@ class ADBController:
             }
         try:
             device_name = self._get_device_name_for_device(self.device)
-        except Exception:
+        except Exception as e:
+            log_debug(f"status_summary device-name lookup failed: {e}")
             device_name = self.device_id
         try:
             app_pkg = _detect_current_app(self.device)
-        except Exception:
+        except Exception as e:
+            log_debug(f"status_summary current-app lookup failed: {e}")
             app_pkg = None
         app_name = self._get_app_name_for_package(app_pkg) if app_pkg else None
         return {

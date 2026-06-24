@@ -7,12 +7,12 @@
   "activities": [
     {
       "id": "auto_skip_dialog",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 0.2
     },
     {
       "id": "auto_skip_battle",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 0.2
     },
     {
@@ -40,7 +40,7 @@
       "enabled": true,
       "poll_interval": 999999.0,
       "custom": {
-        "speed": 2.0
+        "speed": 1.5
       }
     }
   ]

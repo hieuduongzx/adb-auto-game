@@ -51,12 +51,13 @@ from __future__ import annotations
 import os
 import re
 import shutil
+from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
 
-from src.utils import log_error, log_info, log_warning
+from src.utils import log_debug, log_error, log_info, log_warning
 
 
 # Type alias: (x, y, width, height) in image (device) pixel space.
@@ -174,6 +175,227 @@ def _list_available_backends() -> List[str]:
     return avail
 
 
+# English language-code map shared by the neural backends. EasyOCR and
+# PaddleOCR both use ``"en"``; Tesseract uses ``"eng"``.
+_EN_LANG = {"eng": "en", "en": "en"}
+
+
+def _apply_whitelist(text: str, whitelist: Optional[str]) -> str:
+    """Filter ``text`` to ``whitelist`` chars (plus whitespace), if given.
+
+    The neural backends have no native whitelist, so we post-filter.
+    """
+    if not whitelist:
+        return text
+    allowed = set(whitelist)
+    return "".join(ch for ch in text if ch in allowed or ch.isspace())
+
+
+# --- Backends -------------------------------------------------------------
+
+
+class OCRBackend(ABC):
+    """One pluggable OCR engine.
+
+    ``init`` probes/constructs the engine and returns whether it is usable.
+    ``read`` runs OCR on an already-cropped, already-preprocessed image (the
+    shared crop/preprocess lives on :class:`OCRReader`). ``teardown`` releases
+    any heavy resources (e.g. a Torch model) before switching backends.
+    """
+
+    name = "base"
+
+    def __init__(self, default_lang: str = "eng") -> None:
+        self.default_lang = default_lang
+        self.available = False
+
+    @abstractmethod
+    def init(self) -> bool:
+        """Probe / construct the engine. Returns ``True`` when usable."""
+
+    @abstractmethod
+    def read(
+        self, crop, *, lang=None, whitelist=None, config=None, psm=None,
+    ) -> str:
+        """Run OCR on a preprocessed ``crop`` and return recognised text."""
+
+    def teardown(self) -> None:
+        self.available = False
+
+
+class TesseractBackend(OCRBackend):
+    """``pytesseract`` wrapper. Fast and light; the default backend."""
+
+    name = "tesseract"
+
+    def __init__(
+        self,
+        default_lang: str = "eng",
+        tesseract_cmd: Optional[str] = None,
+        default_config: str = DEFAULT_TESSERACT_CONFIG,
+    ) -> None:
+        super().__init__(default_lang)
+        self._tesseract_cmd = tesseract_cmd
+        self._default_config = default_config
+        self._pytesseract = None
+
+    def init(self) -> bool:
+        try:
+            import pytesseract  # type: ignore
+        except ImportError:
+            return False
+
+        cmd = self._tesseract_cmd or _try_locate_tesseract_binary()
+        if cmd:
+            pytesseract.pytesseract.tesseract_cmd = cmd
+
+        try:
+            pytesseract.get_tesseract_version()
+        except Exception as e:
+            # Binding present but the binary is missing/unreachable -> stay
+            # unavailable. Surface the reason for anyone debugging "OCR off".
+            log_debug(f"tesseract version probe failed: {e}")
+            return False
+
+        self._pytesseract = pytesseract
+        self.available = True
+        return True
+
+    def read(self, crop, *, lang=None, whitelist=None, config=None, psm=None) -> str:
+        if config is None:
+            mode = psm if psm is not None else 7
+            cfg = f"--oem 3 --psm {mode}"
+        else:
+            cfg = config
+        if whitelist:
+            cfg = f"{cfg} -c tessedit_char_whitelist={whitelist}"
+        return self._pytesseract.image_to_string(
+            crop, lang=lang or self.default_lang, config=cfg,
+        )
+
+    def teardown(self) -> None:
+        self._pytesseract = None
+        self.available = False
+
+
+class EasyOCRBackend(OCRBackend):
+    """Neural OCR via ``easyocr``. Better with stylised fonts; heavier (Torch)."""
+
+    name = "easyocr"
+
+    def __init__(self, default_lang: str = "eng") -> None:
+        super().__init__(default_lang)
+        self._reader = None
+
+    def init(self) -> bool:
+        try:
+            import easyocr  # type: ignore
+        except ImportError:
+            return False
+        langs = [_EN_LANG.get(self.default_lang or "eng", "en")]
+        try:
+            self._reader = easyocr.Reader(langs, gpu=False, verbose=False)
+            self.available = True
+            return True
+        except Exception as e:
+            log_error(f"OCR (easyocr) init failed: {e}")
+            self._reader = None
+            self.available = False
+            return False
+
+    def read(self, crop, *, lang=None, whitelist=None, config=None, psm=None) -> str:
+        if self._reader is None:
+            return ""
+        if lang:
+            easy_lang = _EN_LANG.get(lang, "en")
+            if easy_lang not in self._reader.lang_list:
+                self._reader.setLanguage([easy_lang])
+        # EasyOCR expects RGB.
+        rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB) if len(crop.shape) == 3 else crop
+        results = self._reader.readtext(rgb, detail=0, paragraph=True)
+        return _apply_whitelist(" ".join(str(r) for r in results), whitelist)
+
+    def teardown(self) -> None:
+        self._reader = None
+        self.available = False
+
+
+class PaddleOCRBackend(OCRBackend):
+    """Neural OCR via ``paddleocr``. Strong accuracy; pulls ``paddlepaddle``."""
+
+    name = "paddleocr"
+
+    def __init__(self, default_lang: str = "eng") -> None:
+        super().__init__(default_lang)
+        self._reader = None
+
+    def init(self) -> bool:
+        try:
+            from paddleocr import PaddleOCR  # type: ignore
+        except ImportError:
+            return False
+        try:
+            # mkldnn oneDNN path crashes on Windows with paddle 3.3.x
+            # (NotImplementedError: ConvertPirAttribute2RuntimeAttribute).
+            # Disable it for portability across Windows installs.
+            self._reader = PaddleOCR(
+                lang=_EN_LANG.get(self.default_lang or "eng", "en"),
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
+                enable_mkldnn=False,
+            )
+            self.available = True
+            return True
+        except Exception as e:
+            log_error(f"OCR (paddleocr) init failed: {e}")
+            self._reader = None
+            self.available = False
+            return False
+
+    def read(self, crop, *, lang=None, whitelist=None, config=None, psm=None) -> str:
+        if self._reader is None:
+            return ""
+        # PaddleOCR expects 3-channel BGR; our shared preprocessor returns
+        # grayscale, so convert back here.
+        if len(crop.shape) == 2:
+            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
+        results = self._reader.predict(crop)
+        if not results:
+            return ""
+        # ``predict`` returns one OCRResult dict per image; we pass a single crop.
+        first = results[0]
+        if hasattr(first, "get") or isinstance(first, dict):
+            texts = first.get("rec_texts", []) or []
+        else:
+            texts = []
+        return _apply_whitelist(" ".join(str(t) for t in texts), whitelist)
+
+    def teardown(self) -> None:
+        self._reader = None
+        self.available = False
+
+
+def create_backend(
+    name: str,
+    *,
+    default_lang: str = "eng",
+    tesseract_cmd: Optional[str] = None,
+    default_config: str = DEFAULT_TESSERACT_CONFIG,
+) -> Optional[OCRBackend]:
+    """Construct (but do not ``init``) the backend named ``name``.
+
+    Returns ``None`` for an unknown name so the caller can degrade gracefully.
+    """
+    if name == "tesseract":
+        return TesseractBackend(default_lang, tesseract_cmd, default_config)
+    if name == "easyocr":
+        return EasyOCRBackend(default_lang)
+    if name == "paddleocr":
+        return PaddleOCRBackend(default_lang)
+    return None
+
+
 # --- Public facade --------------------------------------------------------
 
 
@@ -226,11 +448,7 @@ class OCRReader:
 
         self._backend_name: str = requested
         self._available: bool = False
-
-        # Lazy backend handles.
-        self._pytesseract = None
-        self._easyocr_reader = None
-        self._paddleocr_reader = None
+        self._backend: Optional[OCRBackend] = None
 
         self._init_backend()
 
@@ -249,33 +467,24 @@ class OCRReader:
     # ----- backend lifecycle ----------------------------------------------
 
     def _init_backend(self) -> None:
-        """Probe / construct the active backend."""
-        name = self._backend_name
-        if name == "tesseract":
-            self._init_tesseract()
-        elif name == "easyocr":
-            self._init_easyocr()
-        elif name == "paddleocr":
-            self._init_paddleocr()
-        else:
-            log_warning(f"Unknown OCR backend '{name}'")
+        """Construct + probe the active backend via the factory."""
+        self._backend = create_backend(
+            self._backend_name,
+            default_lang=self.default_lang,
+            tesseract_cmd=self._tesseract_cmd,
+            default_config=self._default_config,
+        )
+        if self._backend is None:
+            log_warning(f"Unknown OCR backend '{self._backend_name}'")
             self._available = False
+            return
+        self._available = self._backend.init()
 
     def _teardown_backend(self) -> None:
         """Release resources held by the active backend."""
-        if self._easyocr_reader is not None:
-            try:
-                del self._easyocr_reader
-            except Exception:
-                pass
-            self._easyocr_reader = None
-        if self._paddleocr_reader is not None:
-            try:
-                del self._paddleocr_reader
-            except Exception:
-                pass
-            self._paddleocr_reader = None
-        self._pytesseract = None
+        if self._backend is not None:
+            self._backend.teardown()
+        self._backend = None
         self._available = False
 
     def set_backend(self, backend: str) -> bool:
@@ -306,83 +515,6 @@ class OCRReader:
             "OCR helpers will return empty results"
         )
         return False
-
-    # ----- tesseract backend ----------------------------------------------
-
-    def _init_tesseract(self) -> None:
-        try:
-            import pytesseract  # type: ignore
-        except ImportError:
-            return
-
-        cmd = self._tesseract_cmd or _try_locate_tesseract_binary()
-        if cmd:
-            pytesseract.pytesseract.tesseract_cmd = cmd
-
-        try:
-            pytesseract.get_tesseract_version()
-        except Exception:
-            return
-
-        self._pytesseract = pytesseract
-        self._available = True
-
-    # ----- easyocr backend ------------------------------------------------
-
-    def _init_easyocr(self) -> None:
-        try:
-            import easyocr  # type: ignore
-        except ImportError:
-            return
-        # Translate tesseract-style lang ("eng") to EasyOCR code ("en").
-        easy_langs = self._easyocr_langs()
-        try:
-            self._easyocr_reader = easyocr.Reader(
-                easy_langs, gpu=False, verbose=False,
-            )
-            self._available = True
-        except Exception as e:
-            log_error(f"OCR (easyocr) init failed: {e}")
-            self._easyocr_reader = None
-            self._available = False
-
-    def _easyocr_langs(self) -> List[str]:
-        """Map :attr:`default_lang` to EasyOCR language codes."""
-        lang = self.default_lang or "eng"
-        # EasyOCR uses 'en'; Tesseract uses 'eng'.
-        mapping = {"eng": "en", "en": "en"}
-        return [mapping.get(lang, "en")]
-
-    # ----- paddleocr backend ----------------------------------------------
-
-    def _paddleocr_lang(self) -> str:
-        """Map :attr:`default_lang` to PaddleOCR language codes."""
-        lang = self.default_lang or "eng"
-        # PaddleOCR uses 'en'; Tesseract uses 'eng'.
-        mapping = {"eng": "en", "en": "en"}
-        return mapping.get(lang, "en")
-
-    def _init_paddleocr(self) -> None:
-        try:
-            from paddleocr import PaddleOCR  # type: ignore
-        except ImportError:
-            return
-        try:
-            # mkldnn oneDNN path crashes on Windows with paddle 3.3.x
-            # (NotImplementedError: ConvertPirAttribute2RuntimeAttribute).
-            # Disable it for portability across Windows installs.
-            self._paddleocr_reader = PaddleOCR(
-                lang=self._paddleocr_lang(),
-                use_doc_orientation_classify=False,
-                use_doc_unwarping=False,
-                use_textline_orientation=False,
-                enable_mkldnn=False,
-            )
-            self._available = True
-        except Exception as e:
-            log_error(f"OCR (paddleocr) init failed: {e}")
-            self._paddleocr_reader = None
-            self._available = False
 
     # ----- public API ------------------------------------------------------
 
@@ -437,91 +569,14 @@ class OCRReader:
             crop = self._preprocess(crop)
 
         try:
-            if self._backend_name == "tesseract":
-                text = self._read_tesseract(crop, lang, config, psm, whitelist)
-            elif self._backend_name == "easyocr":
-                text = self._read_easyocr(crop, lang, whitelist)
-            elif self._backend_name == "paddleocr":
-                text = self._read_paddleocr(crop, lang, whitelist)
-            else:
-                text = ""
+            text = self._backend.read(
+                crop, lang=lang, whitelist=whitelist, config=config, psm=psm,
+            )
         except Exception as e:  # pragma: no cover - runtime OCR errors
             log_error(f"OCR ({self._backend_name}) error: {e}")
             return ""
 
         return (text or "").strip()
-
-    def _read_tesseract(
-        self, crop, lang, config, psm, whitelist,
-    ) -> str:
-        if config is None:
-            mode = psm if psm is not None else 7
-            cfg = f"--oem 3 --psm {mode}"
-        else:
-            cfg = config
-        if whitelist:
-            cfg = f"{cfg} -c tessedit_char_whitelist={whitelist}"
-        return self._pytesseract.image_to_string(
-            crop, lang=lang or self.default_lang, config=cfg,
-        )
-
-    def _read_easyocr(
-        self, crop, lang, whitelist,
-    ) -> str:
-        if self._easyocr_reader is None:
-            return ""
-        # Translate tesseract-style lang if needed.
-        if lang:
-            mapping = {"eng": "en", "en": "en"}
-            easy_lang = mapping.get(lang, "en")
-        else:
-            easy_lang = None
-        # Reconfigure languages if the caller asked for a different one.
-        if easy_lang and easy_lang not in self._easyocr_reader.lang_list:
-            self._easyocr_reader.setLanguage([easy_lang])
-
-        # EasyOCR expects RGB.
-        if len(crop.shape) == 3:
-            rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-        else:
-            rgb = crop
-        results = self._easyocr_reader.readtext(rgb, detail=0, paragraph=True)
-        text = " ".join(str(r) for r in results)
-
-        if whitelist:
-            # EasyOCR has no native whitelist; filter at character level.
-            allowed = set(whitelist)
-            text = "".join(ch for ch in text if ch in allowed or ch.isspace())
-        return text
-
-    def _read_paddleocr(
-        self, crop, lang, whitelist,
-    ) -> str:
-        if self._paddleocr_reader is None:
-            return ""
-        # PaddleOCR expects a 3-channel BGR image. Our shared preprocessor
-        # returns grayscale (single channel), so convert back here.
-        if len(crop.shape) == 2:
-            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
-        # PaddleOCR 3.x accepts an ndarray or a file path. Passing an
-        # ndarray avoids disk I/O and works for the preprocessed crop.
-        results = self._paddleocr_reader.predict(crop)
-        if not results:
-            return ""
-        # ``predict`` returns a list of OCRResult dicts (one per image).
-        # We run on a single crop, so take the first.
-        first = results[0]
-        # OCRResult behaves like a dict; rec_texts is a list[str].
-        texts = []
-        if hasattr(first, "get"):
-            texts = first.get("rec_texts", []) or []
-        elif isinstance(first, dict):
-            texts = first.get("rec_texts", []) or []
-        text = " ".join(str(t) for t in texts)
-        if whitelist:
-            allowed = set(whitelist)
-            text = "".join(ch for ch in text if ch in allowed or ch.isspace())
-        return text
 
     def contains_text(
         self,
