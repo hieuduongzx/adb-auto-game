@@ -609,11 +609,45 @@ input:focus { outline: none; border-color: var(--accent); }
 /* ── Footer / status bar ────────────────────────────────────────────────── */
 #footer {
   display: flex;
-  align-items: center;
-  gap: 7px;
+  flex-direction: column;
+  gap: 4px;
   padding: 3px 6px 4px;
   flex-shrink: 0;
 }
+.footer-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Running-app indicator row */
+#app-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+#app-row.has-app {
+  background: var(--accent-bg);
+  border-color: #cfe0ff;
+  color: var(--accent);
+}
+#app-icon { flex-shrink: 0; }
+#app-label {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+#app-row.has-app #app-label { color: var(--ink); }
 #dev-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
@@ -837,20 +871,31 @@ input:focus { outline: none; border-color: var(--accent); }
 
   <!-- ── Footer ──────────────────────────────────────────────────────── -->
   <div id="footer">
-    <div id="dev-dot"></div>
-    <span id="dev-label">Đang kết nối…</span>
-    <select id="device-select" onchange="onDeviceChange(this.value)">
-      <option value="">Không có thiết bị</option>
-    </select>
-    <button class="btn-refresh" id="btn-refresh" onclick="onRefresh()"
-            title="Làm mới thiết bị">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    <div class="footer-row">
+      <div id="dev-dot"></div>
+      <span id="dev-label">Đang kết nối…</span>
+      <select id="device-select" onchange="onDeviceChange(this.value)">
+        <option value="">Không có thiết bị</option>
+      </select>
+      <button class="btn-refresh" id="btn-refresh" onclick="onRefresh()"
+              title="Làm mới thiết bị">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+          <path d="M21 3v6h-6"/>
+        </svg>
+      </button>
+    </div>
+    <div id="app-row">
+      <svg id="app-icon" width="12" height="12" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="2" stroke-linecap="round"
            stroke-linejoin="round">
-        <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
-        <path d="M21 3v6h-6"/>
+        <rect x="5" y="2" width="14" height="20" rx="2.5"/>
+        <path d="M12 18h.01"/>
       </svg>
-    </button>
+      <span id="app-label">Chưa chọn thiết bị</span>
+    </div>
   </div>
 
 </div><!-- /app -->
@@ -1270,6 +1315,35 @@ function rebuildDeviceSelect(devices, connectedSerial, selectedSerial) {
   sel.value = pick;
 }
 
+// ── Running-app indicator ───────────────────────────────────────────────────
+function setAppRow(appName, pkg) {
+  const row = $("app-row");
+  const lbl = $("app-label");
+  if (appName || pkg) {
+    lbl.textContent = appName || pkg;
+    lbl.title = pkg || "";
+    row.classList.add("has-app");
+  } else {
+    lbl.textContent = "Không có ứng dụng đang chạy";
+    lbl.title = "";
+    row.classList.remove("has-app");
+  }
+}
+
+// Reflect the running app for the device currently chosen in the dropdown,
+// using the cached per-device info from the last devices scan.
+function showAppForSerial(serial) {
+  if (!serial) {
+    const lbl = $("app-label");
+    lbl.textContent = "Chưa chọn thiết bị";
+    lbl.title = "";
+    $("app-row").classList.remove("has-app");
+    return;
+  }
+  const d = (S.devices || []).find(x => x.serial === serial);
+  setAppRow(d && d.app_name, d && d.current_app);
+}
+
 // ── Event dispatch from Python ─────────────────────────────────────────────
 window.__recv = function(raw) {
   let ev;
@@ -1359,6 +1433,7 @@ window.__recv = function(raw) {
       : "Không kết nối";
 
     rebuildDeviceSelect(S.devices, S.connectedSerial, S.connectedSerial);
+    showAppForSerial($("device-select").value);
     $("btn-refresh").classList.remove("spinning");
     return;
   }
@@ -1372,6 +1447,17 @@ window.__recv = function(raw) {
     $("dev-label").textContent = data.connected
       ? `Đã kết nối · ${data.name || data.serial || ""}`
       : "Không kết nối";
+
+    // Cache the fresh app reading on the matching device entry so a later
+    // dropdown change still reflects it, then show it for the chosen device.
+    const d = (S.devices || []).find(x => x.serial === data.serial);
+    if (d) {
+      if (data.current_app !== undefined) d.current_app = data.current_app;
+      if (data.app_name !== undefined)    d.app_name    = data.app_name;
+    }
+    if (data.serial && data.serial === $("device-select").value) {
+      setAppRow(data.app_name, data.current_app);
+    }
     return;
   }
 };
@@ -1435,6 +1521,7 @@ async function onClearLog() {
 }
 
 async function onDeviceChange(serial) {
+  showAppForSerial(serial);  // optimistic from cached scan; refined on connect
   if (serial) await window.pywebview.api.select_device(serial);
 }
 

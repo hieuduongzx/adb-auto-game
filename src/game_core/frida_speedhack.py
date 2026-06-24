@@ -6,10 +6,20 @@ This manager pushes a JavaScript payload to the Android device and runs
 ``frida-server`` connection, which is fragile on some emulators (e.g.
 LDPlayer). The injected script tries, in order:
 
-1. Call ``UnityEngine.Time.set_timeScale`` if the IL2CPP symbol is visible.
-2. Hook ``clock_gettime`` in ``libc.so`` with a native CModule to scale
-   monotonic time for the whole process (works for Mono and stripped IL2CPP).
-3. Same hook implemented in plain JS as a last-resort fallback.
+1. Drive ``UnityEngine.Time.timeScale`` through the ``il2cpp_*`` C API: resolve
+   the NATIVE set_timeScale pointer (``il2cpp_resolve_icall`` or
+   ``il2cpp_method_get_pointer``) and call it directly -- never via
+   ``il2cpp_runtime_invoke`` (which stalls on GC safepoints during scene
+   loads). This is the preferred path: it hooks nothing on the hot path, so
+   scene loads stay smooth, and it does not allocate executable pages that
+   protected titles crash on. A 50ms ticker re-asserts the scale after the game
+   resets it on scene changes.
+2. Call ``UnityEngine.Time.set_timeScale`` if an IL2CPP symbol is exported.
+3. Hook ``clock_gettime`` in ``libc.so`` with a native CModule (opt-in via
+   ``use_cmodule``) to scale monotonic time process-wide.
+4. Same ``clock_gettime`` hook in plain JS as a last-resort fallback. NOTE:
+   this funnels a hot-path syscall through Frida's JS lock and can stall the
+   game during scene-load thread storms -- only used when nothing else works.
 
 Once injected, the script stays alive and polls a system property for the
 desired scale, so the host can change speed LIVE (just ``setprop``) without
@@ -55,12 +65,16 @@ _INJECT_SCRIPT = """
 try { Interceptor.detachAll(); } catch (e) {}
 
 var currentScale = 1.0;
-var hookMode = 'none';        // 'timescale' | 'clock-cmodule' | 'clock-js'
+var hookMode = 'none';        // 'il2cpp-timescale' | 'timescale' | 'clock-cmodule' | 'clock-js'
 var clockScaleBuf = null;     // Memory(8) holding the live scale for the CModule
 var timeScaleSetter = null;   // NativeFunction(UnityEngine.Time.set_timeScale)
 var jsHookInstalled = false;
 var baseByClock = {};         // state for the JS fallback hook
 var lastScaledMs = 0;         // monotonic floor: scaled CLOCK_MONOTONIC never decreases
+
+// IL2CPP Time.timeScale state (preferred strategy: no hot-path hook at all).
+// The resolved native set_timeScale pointer is stored in timeScaleSetter above.
+var il2cpp = {};                 // resolved il2cpp_* NativeFunctions
 
 function log(msg) {
     send(msg);
@@ -105,6 +119,127 @@ function findExport(symbols) {
         }
     }
     return null;
+}
+
+/* ============ Preferred strategy: UnityEngine.Time.timeScale via il2cpp ======
+ * Instead of faking clock_gettime (a hot-path syscall that either freezes the
+ * game through Frida's JS lock or crashes protected titles when hooked with a
+ * native CModule), drive the engine's own time multiplier.
+ *
+ * CRUCIAL: we resolve the NATIVE function pointer of set_timeScale and call it
+ * directly -- we do NOT use il2cpp_runtime_invoke. runtime_invoke performs a
+ * thread-state transition + a GC safepoint on every call and boxes return
+ * values; calling it repeatedly from Frida's (GC-unregistered) thread while a
+ * scene load is running GC stalls the process == the freeze we kept hitting.
+ * set_timeScale's native impl is a trivial static-field write with no GC
+ * interaction, so calling its pointer directly is safe from any thread and
+ * costs nothing. This mirrors the proven C++ BaseUnity reference (resolve via
+ * il2cpp_resolve_icall / il2cpp_method_get_pointer, then call the ptr). */
+function resolveIl2cppApi() {
+    const mod = Process.findModuleByName('libil2cpp.so');
+    if (!mod) { log('libil2cpp.so not present'); return false; }
+    function imp(name, ret, args, required) {
+        let addr = null;
+        try { addr = mod.findExportByName(name); } catch (e) {}
+        if (!addr) { if (required) log('il2cpp export missing: ' + name); return false; }
+        try { il2cpp[name] = new NativeFunction(addr, ret, args); return true; }
+        catch (e) { log('il2cpp NativeFunction ' + name + ' failed: ' + e.message); return false; }
+    }
+    // Fast path: resolve_icall hands back the native pointer directly.
+    imp('il2cpp_resolve_icall', 'pointer', ['pointer'], false);
+    // Slow path: walk assemblies -> class -> method -> native pointer.
+    const slow =
+        imp('il2cpp_domain_get', 'pointer', [], true) &&
+        imp('il2cpp_domain_get_assemblies', 'pointer', ['pointer', 'pointer'], true) &&
+        imp('il2cpp_assembly_get_image', 'pointer', ['pointer'], true) &&
+        imp('il2cpp_class_from_name', 'pointer', ['pointer', 'pointer', 'pointer'], true) &&
+        imp('il2cpp_class_get_method_from_name', 'pointer', ['pointer', 'pointer', 'int'], true);
+    imp('il2cpp_method_get_pointer', 'pointer', ['pointer'], false);
+    imp('il2cpp_thread_attach', 'pointer', ['pointer'], false);
+    if (!il2cpp['il2cpp_resolve_icall'] && !slow) {
+        log('no usable il2cpp resolution path');
+        return false;
+    }
+    return true;
+}
+
+// Walk the loaded assemblies for UnityEngine.Time::<methodName> and return its
+// MethodInfo*, then convert that to the JIT-compiled native code pointer.
+function findTimeMethodPointer(methodName, argCount) {
+    if (!il2cpp['il2cpp_domain_get']) return null;
+    const domain = il2cpp['il2cpp_domain_get']();
+    if (!domain || domain.isNull()) return null;
+    try { if (il2cpp['il2cpp_thread_attach']) il2cpp['il2cpp_thread_attach'](domain); } catch (e) {}
+
+    const sizePtr = Memory.alloc(Process.pointerSize);
+    const assemblies = il2cpp['il2cpp_domain_get_assemblies'](domain, sizePtr);
+    const count = sizePtr.readUInt();
+    const nsBuf = Memory.allocUtf8String('UnityEngine');
+    const nameBuf = Memory.allocUtf8String('Time');
+    const mNameBuf = Memory.allocUtf8String(methodName);
+    for (let i = 0; i < count; i++) {
+        const asm = assemblies.add(i * Process.pointerSize).readPointer();
+        if (asm.isNull()) continue;
+        const image = il2cpp['il2cpp_assembly_get_image'](asm);
+        if (image.isNull()) continue;
+        const klass = il2cpp['il2cpp_class_from_name'](image, nsBuf, nameBuf);
+        if (klass.isNull()) continue;
+        const method = il2cpp['il2cpp_class_get_method_from_name'](klass, mNameBuf, argCount);
+        if (!method || method.isNull()) continue;
+        if (il2cpp['il2cpp_method_get_pointer']) {
+            const p = il2cpp['il2cpp_method_get_pointer'](method);
+            if (p && !p.isNull()) return p;
+        }
+        // Fallback: the JIT code pointer is the first field of MethodInfo.
+        try {
+            const p = method.readPointer();
+            if (p && !p.isNull()) return p;
+        } catch (e) {}
+    }
+    return null;
+}
+
+function resolveSetTimeScaleAddr() {
+    // Fast path first.
+    if (il2cpp['il2cpp_resolve_icall']) {
+        try {
+            const namePtr = Memory.allocUtf8String('UnityEngine.Time::set_timeScale');
+            const addr = il2cpp['il2cpp_resolve_icall'](namePtr);
+            if (addr && !addr.isNull()) { log('set_timeScale via resolve_icall'); return addr; }
+        } catch (e) {}
+    }
+    const addr = findTimeMethodPointer('set_timeScale', 1);
+    if (addr) log('set_timeScale via domain walk');
+    return addr;
+}
+
+function installIl2cppTimeScale(scale) {
+    try {
+        if (!timeScaleSetter) {
+            if (!resolveIl2cppApi()) return false;
+            const addr = resolveSetTimeScaleAddr();
+            if (!addr) { log('il2cpp: UnityEngine.Time::set_timeScale not found'); return false; }
+            // Direct native call. Frida routes 'float' through the correct FP
+            // register per ABI, so no SIMD-register marshalling worries.
+            timeScaleSetter = new NativeFunction(addr, 'void', ['float']);
+        }
+        timeScaleSetter(scale);
+        currentScale = scale;
+        hookMode = 'il2cpp-timescale';
+        log('il2cpp Time.timeScale applied: ' + scale);
+        return true;
+    } catch (e) {
+        log('il2cpp timeScale failed: ' + e.message);
+        return false;
+    }
+}
+
+// The game resets Time.timeScale to 1.0 on scene changes; re-assert our value
+// every tick. The setter is a cheap static-field write (no GC, no read-back, no
+// boxing), so calling it unconditionally is fine and needs no get_timeScale.
+function reapplyTimeScaleIfReset() {
+    if (currentScale === 1.0 || !timeScaleSetter) return;
+    try { timeScaleSetter(currentScale); } catch (e) {}
 }
 
 function resolveTimeScale() {
@@ -349,7 +484,8 @@ function installClockJs(scale) {
 
 /* ----------------------- strategy selection + live update ------------------- */
 function initHook(scale) {
-    if (installTimeScale(scale)) return true;
+    if (installIl2cppTimeScale(scale)) return true;   // preferred: no hot-path hook
+    if (installTimeScale(scale)) return true;          // exported set_timeScale (rare)
     if (scale === 1.0) { currentScale = 1.0; return true; }
     if (USE_CMODULE && installClockCModule(scale)) return true;
     if (installClockJs(scale)) return true;
@@ -359,7 +495,9 @@ function initHook(scale) {
 
 function applyScale(scale) {
     currentScale = scale;
-    if (hookMode === 'clock-cmodule' && clockScaleBuf) {
+    if (hookMode === 'il2cpp-timescale' && timeScaleSetter) {
+        try { timeScaleSetter(scale); } catch (e) { log('re-apply il2cpp timeScale failed: ' + e.message); }
+    } else if (hookMode === 'clock-cmodule' && clockScaleBuf) {
         clockScaleBuf.writeDouble(scale);            // native hook reads it live
     } else if (hookMode === 'timescale' && timeScaleSetter) {
         try { timeScaleSetter(scale); } catch (e) { log('re-apply timeScale failed: ' + e.message); }
@@ -400,6 +538,7 @@ log('script loaded, target=' + TARGET_SCALE);
 var speedhackOk = initHook(TARGET_SCALE);
 log('script finished: ' + (speedhackOk ? 'success' : 'failed'));
 
+// Live-scale channel poll (heavier: reads a system property). 250ms is plenty.
 if (getPropFn) {
     setInterval(function() {
         const v = readLiveScale();
@@ -412,6 +551,14 @@ if (getPropFn) {
 } else {
     log('live scale channel unavailable (__system_property_get missing)');
 }
+
+// Dedicated fast restore ticker for il2cpp mode. The game zeroes/resets
+// Time.timeScale on every scene change; re-asserting at 50ms makes the speed
+// snap back almost instantly after a load (the setter is a trivial native
+// write, so this is essentially free).
+setInterval(function() {
+    if (hookMode === 'il2cpp-timescale') reapplyTimeScaleIfReset();
+}, 50);
 """
 
 

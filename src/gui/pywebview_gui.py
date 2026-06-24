@@ -307,9 +307,11 @@ class AutomationAPI:
             s = self.automation.adb.get_status_summary()
             self._connected_serial = s.get("device_id") if s.get("connected") else None
             self._push("device_status", {
-                "connected": bool(s.get("connected")),
-                "serial":    s.get("device_id"),
-                "name":      s.get("device_name") or serial,
+                "connected":   bool(s.get("connected")),
+                "serial":      s.get("device_id"),
+                "name":        s.get("device_name") or serial,
+                "current_app": s.get("app_package"),
+                "app_name":    s.get("app_name"),
             })
         except Exception as e:
             log_error(f"Connect device error: {e}")
@@ -337,10 +339,12 @@ class AutomationAPI:
                 s = self.automation.adb.get_status_summary()
                 self._connected_serial = s.get("device_id") if s.get("connected") else None
                 self._push("devices_update", {
-                    "devices":   devices,
-                    "connected": bool(s.get("connected")),
-                    "serial":    s.get("device_id"),
-                    "name":      s.get("device_name") or s.get("device_id") or "",
+                    "devices":     devices,
+                    "connected":   bool(s.get("connected")),
+                    "serial":      s.get("device_id"),
+                    "name":        s.get("device_name") or s.get("device_id") or "",
+                    "current_app": s.get("app_package"),
+                    "app_name":    s.get("app_name"),
                 })
             except Exception:
                 self._push("devices_update", {
