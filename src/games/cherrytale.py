@@ -150,119 +150,77 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
     def handle_activity_auto_phuc_loi(self) -> bool:
         log_info("Starting Phuc Loi activity...")
-        # Step 1: open welfare panel
+        if not self.back_to_menu(timeout=30):
+            return False
+
         if not self.wait_and_tap(self.tpl_main_menu['phuc_loi'], timeout=10):
             log_warning("Could not find Phuc Loi button")
             return False
 
-        # Step 2: switch to banquet tab
         if not self.wait_and_tap(self.tpl_welfare['bua_tiec'], timeout=10):
             log_warning("Could not find Bua Tiec tab")
             return False
 
-        # Step 3: invite all friends
-        # If the Invite All button is missing, it means the banquet is not
-        # ready to be claimed yet (cooldown). Treat that as success and exit.
         if not self.wait_and_tap(self.tpl_welfare['invite_all'], timeout=10):
             log_info("Invite All button not visible, banquet not ready yet")
-            self.wait_and_tap(self.tpl_common['home'], timeout=5)  # best-effort return home
+            self.wait_and_tap(self.tpl_common['home'], timeout=5)
             log_success("Phuc Loi skipped (not ready)")
             return True
 
-        # Small pause for the invite popup/animation to settle
         time.sleep(0.5)
 
-        # Step 4: start the banquet
         if not self.wait_and_tap(self.tpl_common['bat_dau'], timeout=10):
             log_warning("Could not find Bat Dau button")
             return False
-        
-        # Wait for the banquet to start (detect via the "done" marker)
+
         if not self.wait_and_tap(self.tpl_common['nhan_vao_bat_ky_dau'], timeout=30):
             log_warning("Phuc Loi banquet did not start (Done marker not found)")
             return False
-        
-        time.sleep(1.0)  # Let the screen settle after starting the banquet
-        # Step 5: return to home screen inside the game
+
+        time.sleep(1.0)
         if not self.wait_and_tap(self.tpl_common['home'], timeout=10):
             log_warning("Could not find Home button after Phuc Loi")
-            # Not fatal: the banquet was already started
             return True
 
         log_success("Phuc Loi completed")
         return True
 
     def handle_activity_auto_friend(self) -> bool:
-        """
-        Tặng và nhận năng lượng từ bạn bè.
-
-        Flow:
-            1. Check if we are already inside the Friends panel (via
-               friend_checking marker)
-               - If yes: skip navigation, jump straight to send/take
-               - If no:  press Home (best-effort) then tap friend icon
-            2. If "check_done" marker is already on screen, today's friend
-               actions are already done -> return home and exit successfully
-            3. Tap "Send All" to gift energy to all friends
-            4. Tap "Take All" to claim energy from all friends
-            5. Wait for the "nhan_vao_bat_ky_dau" prompt and tap it to dismiss
-            6. Tap Home to return to the in-game home screen
-        """
         log_info("Starting Friend activity...")
+        if not self.back_to_menu(timeout=30):
+            return False
 
-        # Step 1: detect whether we are already on the Friend panel
-        already_in_friend = self.wait_for_template(
-            self.tpl_friend['friend_checking'], timeout=5, threshold=0.85
-        ) is not None
-        if already_in_friend:
-            log_info("Already inside Friend panel, skipping navigation")
-        else:
-            log_info("Not in Friend panel, returning to main menu...")
+        if not self.wait_and_tap(self.tpl_friend['friend_icon'], timeout=10):
+            log_warning("Could not find Friend icon")
+            return False
 
-            # Return to the main menu first (best path to a known state)
-            if not self.back_to_menu(timeout=30):
-                return False
+        if not self.wait_for_template(self.tpl_friend['friend_checking'], timeout=10):
+            log_warning("Friend panel did not appear after navigation")
+            return False
 
-            # Open friends panel
-            if not self.wait_and_tap(self.tpl_friend['friend_icon'], timeout=10):
-                log_warning("Could not find Friend icon")
-                return False
-
-            # Confirm we actually landed on the Friend panel
-            if not self.wait_for_template(self.tpl_friend['friend_checking'], timeout=10):
-                log_warning("Friend panel did not appear after navigation")
-                return False
-
-        # Step 2: if already done for today, exit early. Short probe -
-        # check_done is rendered as soon as the panel finishes opening.
         already_done = self.wait_for_template(
             self.tpl_friend['friend_check_done'], timeout=5, threshold=0.85
         ) is not None
         if already_done:
             log_info("Friend actions already completed for today")
-            self.wait_and_tap(self.tpl_common['home'], timeout=5)  # best-effort
+            self.wait_and_tap(self.tpl_common['home'], timeout=5)
             log_success("Friend activity skipped (already done)")
             return True
 
-        # Step 3: send energy to all friends (best-effort)
         if not self.wait_and_tap(self.tpl_friend['friend_send_all'], timeout=10):
             log_info("Send All button not visible, continuing")
         else:
-            time.sleep(0.5)  # small pause for the send animation
+            time.sleep(0.5)
 
-        # Step 4: take energy from all friends
         if not self.wait_and_tap(self.tpl_friend['friend_take_all'], timeout=10):
             log_warning("Could not find Take All button")
             return False
 
-        # Step 5: wait for the "tap anywhere" prompt and dismiss it
         if not self.wait_and_tap(self.tpl_common['nhan_vao_bat_ky_dau'], timeout=30):
             log_warning("Did not detect tap-anywhere prompt after Take All")
-            # Not fatal: energy may already be claimed
         else:
             time.sleep(0.5)
 
-        # Step 6: return to in-game home
         if not self.wait_and_tap(self.tpl_common['close'], timeout=10):
             log_warning("Could not find Close button after Friend activity")
             return True
@@ -272,33 +230,20 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
     def handle_activity_auto_thu(self) -> bool:
         log_info("Starting Thu (Mail) activity...")
-        # Step 1: detect whether we are already on the Mail panel
-        already_in_thu = self.wait_for_template(
-            self.tpl_mail['thu_checking'], timeout=5, threshold=0.85
-        ) is not None
-        if already_in_thu:
-            log_info("Already inside Mail panel, skipping navigation")
-        else:
-            log_info("Not in Mail panel, returning to main menu...")
-            if not self.back_to_menu(timeout=30):
-                return False
+        if not self.back_to_menu(timeout=30):
+            return False
 
-            if not self.wait_and_tap(self.tpl_mail['thu_icon'], timeout=10):
-                log_warning("Could not find Thu icon")
-                return False
+        if not self.wait_and_tap(self.tpl_mail['thu_icon'], timeout=10):
+            log_warning("Could not find Thu icon")
+            return False
 
-            # Confirm we actually landed on the Mail panel
-            if not self.wait_for_template(self.tpl_mail['thu_checking'], timeout=10):
-                log_warning("Mail panel did not appear after navigation")
-                return False
+        if not self.wait_for_template(self.tpl_mail['thu_checking'], timeout=10):
+            log_warning("Mail panel did not appear after navigation")
+            return False
 
-        # Step 2: loop take_all -> nhan_vao_bat_ky_dau until no more mail
-        # Use find_active_template so a grayed-out (already-claimed) Take All
-        # button doesn't trigger another tap loop.
-        max_iterations = 10  # safety cap to avoid infinite loops
+        max_iterations = 10
         claimed = 0
         for i in range(max_iterations):
-            # 2a: only tap Take All when it is in its active (colored) state
             active = self.find_active_template(
                 self.tpl_mail['thu_take_all'], timeout=5, threshold=0.85,
             )
@@ -317,19 +262,13 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
             claimed += 1
             log_info(f"Mail take-all iteration {claimed}")
 
-            # 2b: wait for the "tap anywhere" prompt and dismiss it
             if not self.wait_and_tap(self.tpl_common['nhan_vao_bat_ky_dau'], timeout=15):
                 log_warning("Did not detect tap-anywhere prompt after Take All")
-                # Not fatal: continue and let the next loop iteration check
             else:
-                time.sleep(0.5)  # let the screen settle
-
-            # Progress: scale within 20% -> 90%
-            progress = 20.0 + min((i + 1) / max_iterations, 1.0) * 70.0
+                time.sleep(0.5)
         else:
             log_warning(f"Reached max iterations ({max_iterations}) for mail take-all")
 
-        # Step 3: return to in-game home
         if not self.wait_and_tap(self.tpl_common['close'], timeout=10):
             log_warning("Could not find Close button after Thu activity")
             return True
@@ -339,436 +278,244 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
 
     def handle_activity_auto_combat_vtgk(self) -> bool:
         log_info("Starting Combat - Vong Tron Gia Kim activity...")
-        # Step 1: detect whether we are already on the VTGK screen
-        already_in_vtgk = self.wait_for_template(
-            self.tpl_combat['vtgk_check'], timeout=5, threshold=0.85
-        ) is not None
-        if already_in_vtgk:
-            log_info("Already inside VTGK, skipping navigation")
-        else:
-            log_info("Not in VTGK, returning to main menu...")
+        if not self.back_to_menu(timeout=30):
+            return False
 
-            if not self.back_to_menu(timeout=30):
-                return False
+        if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
+            log_warning("Could not find Combat button on main menu")
+            return False
 
-            # Open combat from main menu
-            if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
-                log_warning("Could not find Combat button on main menu")
-                return False
+        if not self.wait_and_tap(self.tpl_combat['vtgk_icon'], timeout=10):
+            log_warning("Could not find VTGK icon")
+            return False
 
-            # Enter VTGK
-            if not self.wait_and_tap(self.tpl_combat['vtgk_icon'], timeout=10):
-                log_warning("Could not find VTGK icon")
-                return False
+        if not self.wait_for_template(self.tpl_combat['vtgk_check'], timeout=10):
+            log_warning("VTGK screen did not appear after navigation")
+            return False
 
-            # Confirm we actually landed on the VTGK screen
-            if not self.wait_for_template(self.tpl_combat['vtgk_check'], timeout=10):
-                log_warning("VTGK screen did not appear after navigation")
-                return False
-
-        # Step 1.5: if VTGK is already finished for the day, stop early
         if self._is_vtgk_finished():
             log_info("VTGK already completed for today, finishing activity")
-            # Best-effort: claim the weekly reward slot 1 if available, then
-            # exit VTGK screen and return to in-game home.
             self.wait_and_tap(self.tpl_combat['vtgk_reward_1'], timeout=5)
             self.wait_and_tap(self.tpl_combat['vtgk_exit'], timeout=5)
             self.wait_and_tap(self.tpl_common['home'], timeout=10)
             log_success("Combat VTGK already completed")
             return True
 
-        # Step 2: run the heart-fight loop 5 times
         total_runs = 5
-        progress_start = 20.0
-        progress_end = 95.0
-        progress_step = (progress_end - progress_start) / total_runs
-
         for i in range(total_runs):
             run_no = i + 1
             log_info(f"VTGK run {run_no}/{total_runs}")
 
-            base_progress = progress_start + progress_step * i
-
-            # 2a: tap heart to start a fight. Either point_tim or point_dau
-            # appears (depending on the day's stage), so race them with a
-            # single wait_for_any_template instead of chaining two 15s
-            # waits - that way a missing template never costs us 30s.
-            heart_templates = [
-                self.tpl_combat['vtgk_point_tim'],
-                self.tpl_combat['vtgk_point_dau'],
-            ]
             heart_match = self.wait_for_any_template(
-                heart_templates, timeout=15, threshold=0.85,
+                [self.tpl_combat['vtgk_point_tim'], self.tpl_combat['vtgk_point_dau']],
+                timeout=15, threshold=0.85,
             )
             if not heart_match:
-                log_warning(f"Could not find VTGK heart or start button on run {run_no}")
+                log_warning(f"Could not find VTGK heart on run {run_no}")
                 return False
             _, hx, hy, _ = heart_match
             if not self.tap(hx, hy):
                 log_warning(f"Failed to tap VTGK heart on run {run_no}")
                 return False
 
-            # 2b: tap start
             if not self.wait_and_tap(self.tpl_common['bat_dau'], timeout=10):
                 log_warning(f"Could not find Bat Dau on run {run_no}")
                 return False
 
-            # 2c+2d: wait for the stats screen and tap Exit in one shot.
-            # Previously we did wait_for_template(exit) + wait_and_tap(exit),
-            # which polls the screen twice for the same template.
             if not self.wait_and_tap(self.tpl_common['exit'], timeout=300):
-                log_warning(f"Stats screen did not appear / Exit not tapped on run {run_no}")
+                log_warning(f"Exit not tapped on run {run_no}")
                 return False
 
-            # Small pause to let the screen transition back to the heart view
             time.sleep(1.0)
             log_success(f"VTGK run {run_no}/{total_runs} done")
 
-            # 2e: after each run, check if VTGK is finished (no more attempts)
             if self._is_vtgk_finished():
-                log_info(f"VTGK end marker detected after run {run_no}, finishing early")
+                log_info(f"VTGK finished early after run {run_no}")
                 break
 
-        # Step 3: return home (best-effort)
         if not self.wait_and_tap(self.tpl_common['home'], timeout=10):
             log_warning("Could not find Home button after VTGK (continuing)")
 
-        log_success("Combat VTGK completed (5 runs)")
+        log_success("Combat VTGK completed")
         return True
 
     def handle_activity_auto_combat_arena(self) -> bool:
-        """
-        Run "Arena" thu thach combat up to 5 times.
-
-        Flow:
-            1. Check if we are already inside Arena (via arena_check marker)
-               - If yes: jump straight to the fight loop
-               - If no:  press Home (best-effort) -> Combat -> tap Arena icon
-            2. Loop 5 times:
-               a. Tap "Thu Thach" to enter the fight
-               b. Tap "Bắt Đầu" to start
-               c. Wait until "stats" screen appears
-               d. Tap "Exit" to go back to the Arena screen
-            3. Return to in-game home screen (best-effort)
-        """
         log_info("Starting Combat - Arena activity...")
-        # Step 1: detect whether we are already on the Arena screen
-        already_in_arena = self.wait_for_template(
-            self.tpl_combat['arena_check'], timeout=5, threshold=0.85
-        ) is not None
+        if not self.back_to_menu(timeout=30):
+            return False
 
-        if already_in_arena:
-            log_info("Already inside Arena, skipping navigation")
-        else:
-            log_info("Not in Arena, returning to main menu...")
+        if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
+            log_warning("Could not find Combat button on main menu")
+            return False
 
-            if not self.back_to_menu(timeout=30):
-                return False
+        if not self.wait_and_tap(self.tpl_combat['arena_icon'], timeout=10):
+            log_warning("Could not find Arena icon")
+            return False
 
-            # Open combat from main menu
-            if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
-                log_warning("Could not find Combat button on main menu")
-                return False
+        if not self.wait_for_template(self.tpl_combat['arena_check'], timeout=10):
+            log_warning("Arena screen did not appear after navigation")
+            return False
 
-            # Enter Arena
-            if not self.wait_and_tap(self.tpl_combat['arena_icon'], timeout=10):
-                log_warning("Could not find Arena icon")
-                return False
-
-            # Confirm we actually landed on the Arena screen
-            if not self.wait_for_template(self.tpl_combat['arena_check'], timeout=10):
-                log_warning("Arena screen did not appear after navigation")
-                return False
-
-        # Step 2: run the thu thach combat loop up to 5 times
         total_runs = 5
-        progress_start = 20.0
-        progress_end = 95.0
-        progress_step = (progress_end - progress_start) / total_runs
-
         for i in range(total_runs):
             run_no = i + 1
             log_info(f"Arena run {run_no}/{total_runs}")
 
-            base_progress = progress_start + progress_step * i
-
-            # 2a: tap thu thach to start a fight
             if not self.wait_and_tap(self.tpl_combat['arena_thu_thach'], timeout=15):
                 log_warning(f"Could not find Thu Thach on run {run_no}")
                 return False
 
-
-            # 2b: tap start
             if not self.wait_and_tap(self.tpl_common['bat_dau'], timeout=10):
                 log_warning(f"Could not find Bat Dau on run {run_no}")
                 return False
 
-            # 2b.1: if Arena is already full, stop the activity early (success)
-            # Probe with a short timeout: the "full" banner appears within
-            # ~1s after Bat Dau, so 10s wastes time on the common case.
-            is_full = self.wait_for_template(self.tpl_combat['arena_is_full'], timeout=5) is not None
-            if is_full:
-                log_info("Arena is full, ending Arena activity early")
-                self.wait_and_tap(self.tpl_common['huy_bo'], timeout=10)  # Tap cancel to exit out of the full screen
-                self.wait_and_tap(self.tpl_common['home'], timeout=10)  # Try to return home
+            if self.wait_for_template(self.tpl_combat['arena_is_full'], timeout=5) is not None:
+                log_info("Arena is full, ending early")
+                self.wait_and_tap(self.tpl_common['huy_bo'], timeout=10)
+                self.wait_and_tap(self.tpl_common['home'], timeout=10)
                 log_success(f"Combat Arena finished (full at run {run_no})")
                 return True
-            
-            # 2c: wait for the stats/result screen
-            self._find_end_tap_exit(timeout=300)  # Wait up to 5 minutes for the fight to finish
 
-            # Small pause for the transition back
+            self._find_end_tap_exit(timeout=300)
             time.sleep(1.0)
             log_success(f"Arena run {run_no}/{total_runs} done")
 
-        # Step 3: return home (best-effort)
         if not self.wait_and_tap(self.tpl_common['home'], timeout=10):
             log_warning("Could not find Home button after Arena (continuing)")
 
-        log_success("Combat Arena completed (5 runs)")
+        log_success("Combat Arena completed")
         return True
 
     def handle_activity_auto_combat_tmdq(self) -> bool:
-        """
-        Run "Thien Menh Doi Quyet" (TMDQ) combat 5 times.
-
-        Flow:
-            1. Check if we are already inside TMDQ (via tmdq_check marker)
-               - If yes: skip navigation
-               - If no:  press Home (best-effort) -> Combat -> tap TMDQ icon
-            2. Tap "Ra Tran" (once)
-            3. Loop 5 times:
-               a. Tap "Thu Thach"
-               b. Tap "Bat Dau"
-               c. Tap "Skip" (best-effort)
-               d. Wait for end marker (exit/exit_2), then tap it
-               After tapping exit we're back on the Thu Thach screen
-            4. Return to in-game home (best-effort)
-        """
         log_info("Starting Combat - TMDQ activity...")
+        if not self.back_to_menu(timeout=30):
+            return False
 
-        # Step 1: detect whether we are already on the TMDQ screen
-        already_in_tmdq = self.wait_for_template(
-            self.tpl_combat['tmdq_check'], timeout=5, threshold=0.85
-        ) is not None
+        if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
+            log_warning("Could not find Combat button on main menu")
+            return False
 
-        if already_in_tmdq:
-            log_info("Already inside TMDQ, skipping navigation")
-        else:
-            log_info("Not in TMDQ, returning to main menu...")
+        if not self.wait_and_tap(self.tpl_combat['tmdq_icon'], timeout=10):
+            log_warning("Could not find TMDQ icon")
+            return False
 
-            if not self.back_to_menu(timeout=30):
-                return False
+        if not self.wait_for_template(self.tpl_combat['tmdq_check'], timeout=10):
+            log_warning("TMDQ screen did not appear after navigation")
+            return False
 
-            # Open combat from main menu
-            if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
-                log_warning("Could not find Combat button on main menu")
-                return False
-
-            # Enter TMDQ
-            if not self.wait_and_tap(self.tpl_combat['tmdq_icon'], timeout=10):
-                log_warning("Could not find TMDQ icon")
-                return False
-
-            # Confirm we actually landed on the TMDQ screen
-            if not self.wait_for_template(self.tpl_combat['tmdq_check'], timeout=10):
-                log_warning("TMDQ screen did not appear after navigation")
-                return False
-
-        # Step 2: tap "Ra Tran" once to enter the Thu Thach screen
         if not self.wait_and_tap(self.tpl_common['ra_tran'], timeout=10):
             log_warning("Could not find Ra Tran button")
             return False
 
-        # Step 3: run the Thu Thach combat loop 5 times
         total_runs = 5
-        progress_start = 25.0
-        progress_end = 95.0
-        progress_step = (progress_end - progress_start) / total_runs
-
         for i in range(total_runs):
             run_no = i + 1
             log_info(f"TMDQ run {run_no}/{total_runs}")
 
-            base_progress = progress_start + progress_step * i
-
-            # 3a: tap "Thu Thach"
             if not self.wait_and_tap(self.tpl_common['thu_thach'], timeout=15):
                 log_warning(f"Could not find TMDQ Thu Thach on run {run_no}")
                 return False
 
-            # 3b: tap "Bat Dau"
             if not self.wait_and_tap(self.tpl_common['bat_dau'], timeout=10):
                 log_warning(f"Could not find Bat Dau on run {run_no}")
                 return False
 
-            # 3b.1: if TMDQ is already full, stop the activity early (success)
-            # Short probe - the full banner appears immediately after Bat Dau.
-            is_full = self.wait_for_template(self.tpl_combat['tmdq_is_full'], timeout=5) is not None
-            if is_full:
-                log_info("TMDQ is full, ending TMDQ activity early")
-                self.wait_and_tap(self.tpl_common['huy_bo'], timeout=10)  # Tap cancel to exit out of the full screen
-                self.wait_and_tap(self.tpl_common['home'], timeout=10)  # Try to return home
+            if self.wait_for_template(self.tpl_combat['tmdq_is_full'], timeout=5) is not None:
+                log_info("TMDQ is full, ending early")
+                self.wait_and_tap(self.tpl_common['huy_bo'], timeout=10)
+                self.wait_and_tap(self.tpl_common['home'], timeout=10)
                 log_success(f"Combat TMDQ finished (full at run {run_no})")
                 return True
 
-            # 3c: tap "Skip" (best-effort). Short probe: when present the
-            # button appears almost immediately after Bat Dau.
             if not self.wait_and_tap(self.tpl_common['skip'], timeout=5):
                 log_info(f"Skip button not visible on run {run_no}, continuing")
 
-            # 3d: wait for end marker and tap exit
             if not self._find_end_tap_exit(timeout=300):
                 log_warning(f"Did not detect end marker on run {run_no}")
                 return False
 
-            # Small pause to let the screen transition back to Thu Thach
             time.sleep(1.0)
             log_success(f"TMDQ run {run_no}/{total_runs} done")
 
-        # Step 4: return home (best-effort)
         if not self.wait_and_tap(self.tpl_common['home'], timeout=10):
             log_warning("Could not find Home button after TMDQ (continuing)")
 
-        log_success("Combat TMDQ completed (5 runs)")
+        log_success("Combat TMDQ completed")
         return True
 
     def handle_activity_auto_combat_dvq(self) -> bool:
-        """
-        Run "Dinh Vinh Quang" (DVQ) combat 5 times.
-
-        Flow:
-            1. Check if we are already inside DVQ (via dvq_check marker)
-               - If yes: skip navigation
-               - If no:  press Home (best-effort) -> Combat -> tap DVQ icon
-            2. Loop 5 times:
-               a. Tap "Thu Thach"
-               b. Tap "Tim Kiem Doi Thu"
-               c. Wait for end marker (tap_to_continue), then tap it
-               d. Wait for and tap "Exit" to return to the Thu Thach screen
-            3. Return to in-game home (best-effort)
-        """
         log_info("Starting Combat - DVQ activity...")
+        if not self.back_to_menu(timeout=30):
+            return False
 
-        # Step 1: detect whether we are already on the DVQ screen
-        already_in_dvq = self.wait_for_template(
-            self.tpl_combat['dvq_check'], timeout=5, threshold=0.85
-        ) is not None
+        if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
+            log_warning("Could not find Combat button on main menu")
+            return False
 
-        if already_in_dvq:
-            log_info("Already inside DVQ, skipping navigation")
-        else:
-            log_info("Not in DVQ, returning to main menu...")
+        if not self.wait_and_tap(self.tpl_combat['dvq_icon'], timeout=10):
+            log_warning("Could not find DVQ icon")
+            return False
 
-            if not self.back_to_menu(timeout=30):
-                return False
+        if not self.wait_for_template(self.tpl_combat['dvq_check'], timeout=10):
+            log_warning("DVQ screen did not appear after navigation")
+            return False
 
-            # Open combat from main menu
-            if not self.wait_and_tap(self.tpl_main_menu['combat'], timeout=10):
-                log_warning("Could not find Combat button on main menu")
-                return False
-
-            # Enter DVQ
-            if not self.wait_and_tap(self.tpl_combat['dvq_icon'], timeout=10):
-                log_warning("Could not find DVQ icon")
-                return False
-
-            # Confirm we actually landed on the DVQ screen
-            if not self.wait_for_template(self.tpl_combat['dvq_check'], timeout=10):
-                log_warning("DVQ screen did not appear after navigation")
-                return False
-
-        # Step 2: run the Thu Thach combat loop 5 times
         total_runs = 5
-        progress_start = 20.0
-        progress_end = 95.0
-        progress_step = (progress_end - progress_start) / total_runs
-
         for i in range(total_runs):
             run_no = i + 1
             log_info(f"DVQ run {run_no}/{total_runs}")
 
-            base_progress = progress_start + progress_step * i
-
-            # 2a: tap "Thu Thach"
             if not self.wait_and_tap(self.tpl_combat['dvq_thu_thach'], timeout=15):
                 log_warning(f"Could not find DVQ Thu Thach on run {run_no}")
                 return False
 
-            # 2a.1: if DVQ is already full, stop the activity early (success)
-            # Short probe - full banner shows up immediately after Thu Thach.
-            is_full = self.wait_for_template(self.tpl_combat['dvq_is_full'], timeout=5) is not None
-            if is_full:
-                log_info("DVQ is full, ending DVQ activity early")
-                self.wait_and_tap(self.tpl_common['huy_bo'], timeout=10)  # Tap cancel to exit out of the full screen
-                self.wait_and_tap(self.tpl_common['home'], timeout=10)  # Try to return home
+            if self.wait_for_template(self.tpl_combat['dvq_is_full'], timeout=5) is not None:
+                log_info("DVQ is full, ending early")
+                self.wait_and_tap(self.tpl_common['huy_bo'], timeout=10)
+                self.wait_and_tap(self.tpl_common['home'], timeout=10)
                 log_success(f"Combat DVQ finished (full at run {run_no})")
                 return True
 
-            # 2a.2: optionally cycle past "Đối Tiếp Theo" prompts. After
-            # entering Thu Thach the game can show this button up to 3
-            # times before letting us search for an opponent. Probe once
-            # with a short timeout - if it isn't there now it never will
-            # be - then loop only when the prompt actually appears so we
-            # don't burn 3s on the common case.
-            if self.wait_for_template(
-                self.tpl_combat['dvq_doi_tiep_theo'], timeout=5, threshold=0.85
-            ):
+            if self.wait_for_template(self.tpl_combat['dvq_doi_tiep_theo'], timeout=5, threshold=0.85):
                 for swap in range(3):
-                    if not self.wait_and_tap(
-                        self.tpl_combat['dvq_doi_tiep_theo'], timeout=5
-                    ):
+                    if not self.wait_and_tap(self.tpl_combat['dvq_doi_tiep_theo'], timeout=5):
                         break
                     log_info(f"DVQ Doi Tiep Theo tapped ({swap + 1})")
                     time.sleep(0.5)
 
-            # 2b: tap "Tim Kiem Doi Thu"
             if not self.wait_and_tap(self.tpl_combat['dvq_tim_kiem_doi_thu'], timeout=10):
                 log_warning(f"Could not find Tim Kiem Doi Thu on run {run_no}")
                 return False
 
-            # 2c: wait for "Tap to Continue" and tap it
             if not self.wait_and_tap(self.tpl_combat['dvq_tap_to_continue'], timeout=300):
                 log_warning(f"Could not find Tap to Continue on run {run_no}")
                 return False
 
-            # 2d: wait for end marker and tap exit
             if not self._find_end_tap_exit(timeout=30):
                 log_warning(f"Did not detect end marker on run {run_no}")
                 return False
 
-            # Small pause to let the screen transition back to Thu Thach
             time.sleep(1.0)
             log_success(f"DVQ run {run_no}/{total_runs} done")
 
-        # Step 3: return home (best-effort)
         if not self.wait_and_tap(self.tpl_common['home'], timeout=10):
             log_warning("Could not find Home button after DVQ (continuing)")
 
-        log_success("Combat DVQ completed (5 runs)")
+        log_success("Combat DVQ completed")
         return True
 
     def handle_activity_auto_phieu_luu_nguyen_lieu(self) -> bool:
         log_info("Starting Phieu Luu Nguyen Lieu activity...")
+        if not self.back_to_menu(timeout=30):
+            return False
 
-        # Step 1: check if already on phieu luu screen
-        already_in_phieu_luu = self.wait_for_template(
-            self.tpl_phieu_luu['check'], timeout=5, threshold=0.85
-        ) is not None
+        if not self.wait_and_tap(self.tpl_phieu_luu['icon'], timeout=10):
+            log_warning("Could not find Phieu Luu icon")
+            return False
 
-        if already_in_phieu_luu:
-            log_info("Already inside Phieu Luu, skipping navigation")
-        else:
-            if not self.back_to_menu(timeout=30):
-                return False
-
-            if not self.wait_and_tap(self.tpl_phieu_luu['icon'], timeout=10):
-                log_warning("Could not find Phieu Luu icon")
-                return False
-
-            if not self.wait_for_template(self.tpl_phieu_luu['check'], timeout=10):
-                log_warning("Phieu Luu screen did not appear after navigation")
-                return False
+        if not self.wait_for_template(self.tpl_phieu_luu['check'], timeout=10):
+            log_warning("Phieu Luu screen did not appear after navigation")
+            return False
 
         # Step 2: tap Nguyen Lieu tab
         if not self.wait_and_tap(self.tpl_phieu_luu_nguyen_lieu['icon'], timeout=10):
