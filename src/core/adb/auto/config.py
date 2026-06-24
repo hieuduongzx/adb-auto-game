@@ -48,7 +48,7 @@ class Config:
     """Configuration for ADB automation"""
     
     # Screen capture settings
-    capture_interval: float = 0.2
+    capture_interval: float = 0.1
     
     # Template matching settings
     default_threshold: float = 0.7

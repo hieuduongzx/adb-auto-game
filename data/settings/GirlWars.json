@@ -7,12 +7,12 @@
   "activities": [
     {
       "id": "auto_skip_dialog",
-      "enabled": false,
+      "enabled": true,
       "poll_interval": 0.2
     },
     {
       "id": "auto_skip_battle",
-      "enabled": false,
+      "enabled": true,
       "poll_interval": 0.2
     },
     {

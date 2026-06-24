@@ -117,6 +117,7 @@ class DevHelperAPI:
         self.matcher = TemplateMatcher(cache_size=64)
 
         self._ocr_reader: Optional[OCRReader] = None
+        self._out_dir: str = DEFAULT_OUT_DIR
 
         self._window: Optional[webview.Window] = None
         self._closing = False
@@ -213,6 +214,7 @@ class DevHelperAPI:
             "maxHz": self.AUTO_REFRESH_MAX_HZ,
             "connectedSerial": self._connected_serial,
             "selectedSerial": self._selected_serial,
+            "outDir": self._out_dir,
             "log": self._log_buffer[-300:],
         }
 
@@ -586,20 +588,22 @@ class DevHelperAPI:
         default = (f"{clean}_{w}x{h}.png" if clean else f"region_{_ts()}_{w}x{h}.png")
         dialog_ok = True
         paths = None
+        out_dir = self._out_dir
+        os.makedirs(out_dir, exist_ok=True)
         try:
             wins = webview.windows
             win = wins[0] if wins else None
             if win:
                 paths = win.create_file_dialog(
                     webview.SAVE_DIALOG,
-                    directory=_ensure_out_dir(),
+                    directory=out_dir,
                     save_filename=default,
                     file_types=("PNG (*.png)", "JPEG (*.jpg;*.jpeg)", "All files (*.*)")
                 )
             else:
                 dialog_ok = False
         except Exception as exc:
-            log_warning(f"Dialog error: {exc} — saving to ./out/ instead")
+            log_warning(f"Dialog error: {exc} — saving to output folder instead")
             dialog_ok = False
 
         if dialog_ok:
@@ -609,8 +613,8 @@ class DevHelperAPI:
                 return False
             path = paths[0] if isinstance(paths, (list, tuple)) else paths
         else:
-            # No window available — fall back silently to ./out/
-            path = os.path.join(_ensure_out_dir(), default)
+            # No window available — fall back silently to output folder
+            path = os.path.join(out_dir, default)
 
         if not path.lower().endswith((".png", ".jpg", ".jpeg")):
             path += ".png"
@@ -632,7 +636,8 @@ class DevHelperAPI:
             return False
         x, y, w, h = region
         crop = self._screen[y:y + h, x:x + w].copy()
-        out_dir = _ensure_out_dir()
+        out_dir = self._out_dir
+        os.makedirs(out_dir, exist_ok=True)
         clean = _sanitize_name(name)
         fname = (f"{clean}_{_ts()}_{w}x{h}.png" if clean
                  else f"crop_{_ts()}_{w}x{h}.png")
@@ -644,19 +649,46 @@ class DevHelperAPI:
         return False
 
     def save_full(self, name: str = "") -> bool:
-        """Save the full screenshot to ./out/ (no dialog)."""
+        """Save the full screenshot to the current output folder (no dialog)."""
         if self._screen is None:
             log_warning("Capture a screenshot first")
             return False
+        out_dir = self._out_dir
+        os.makedirs(out_dir, exist_ok=True)
         clean = _sanitize_name(name)
         fname = (f"{clean}_{_ts()}.png" if clean
                  else f"screenshot_{_ts()}.png")
-        path = os.path.join(_ensure_out_dir(), fname)
+        path = os.path.join(out_dir, fname)
         if cv2.imwrite(path, self._screen):
             log_success(f"Saved screenshot: {path}")
             return True
         log_error(f"Failed to write {path}")
         return False
+
+    def pick_out_dir(self) -> str:
+        """Open a native folder-picker dialog to change the output directory."""
+        try:
+            wins = webview.windows
+            win = wins[0] if wins else None
+            if win is None:
+                log_warning("No window available for folder dialog")
+                return self._out_dir
+            paths = win.create_file_dialog(
+                webview.OPEN_FOLDER_DIALOG,
+                directory=self._out_dir,
+            )
+        except Exception as exc:
+            log_warning(f"Folder dialog error: {exc}")
+            return self._out_dir
+        if not paths:
+            return self._out_dir
+        path = paths[0] if isinstance(paths, (list, tuple)) else paths
+        if path and os.path.isdir(str(path)):
+            self._out_dir = str(path)
+            os.makedirs(self._out_dir, exist_ok=True)
+            self._push("out_dir", {"path": self._out_dir})
+            log_info(f"Output folder: {self._out_dir}")
+        return self._out_dir
 
     # ── Template matching ────────────────────────────────────────────────────
 
@@ -668,7 +700,7 @@ class DevHelperAPI:
             if win is None:
                 log_warning("No window available for file dialog")
                 return ""
-            start_dir = DEFAULT_OUT_DIR if os.path.isdir(DEFAULT_OUT_DIR) else _PROJECT_ROOT
+            start_dir = self._out_dir if os.path.isdir(self._out_dir) else _PROJECT_ROOT
             paths = win.create_file_dialog(
                 webview.OPEN_DIALOG,
                 directory=start_dir,
@@ -864,7 +896,7 @@ class DevHelperAPI:
     # ── Asset library ────────────────────────────────────────────────────────
 
     def list_assets(self) -> list:
-        out_dir = DEFAULT_OUT_DIR
+        out_dir = self._out_dir
         if not os.path.exists(out_dir):
             return []
         try:
