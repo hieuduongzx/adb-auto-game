@@ -27,10 +27,6 @@ class SpeedhackMixin:
     SPEEDHACK_MAX = 5.0
     SPEEDHACK_DEFAULT = 1.0
     SPEEDHACK_POLL_INTERVAL = 999999.0
-    # Universal (non-Unity) fallback uses the native CModule clock hook by
-    # default (smoothest). Set False on a game class if that game crashes on
-    # inject (rare, protected titles) to use the JS clock hook instead.
-    SPEEDHACK_USE_CMODULE = True
 
     def setup_speedhack(
         self,
@@ -44,7 +40,6 @@ class SpeedhackMixin:
         self.speedhack = FridaSpeedhackManager(
             package=package_name,
             time_scale=time_scale,
-            use_cmodule=self.SPEEDHACK_USE_CMODULE,
         )
         # Allow the manager to read the selected ADB device dynamically.
         self.speedhack.adb_controller = getattr(self, "adb", None)
