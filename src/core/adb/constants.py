@@ -30,10 +30,15 @@ EMULATOR_PORT_RANGES: Dict[str, List[str]] = {
     "general": [f"127.0.0.1:{port}" for port in range(5555, 5580)],  # General emulators
 }
 
-# All emulator ports combined
+# All emulator ports combined (deduplicated, order preserved)
+_seen: set = set()
 ALL_EMULATOR_PORTS = []
 for ports in EMULATOR_PORT_RANGES.values():
-    ALL_EMULATOR_PORTS.extend(ports)
+    for p in ports:
+        if p not in _seen:
+            _seen.add(p)
+            ALL_EMULATOR_PORTS.append(p)
+del _seen
 
 # Common app mappings
 COMMON_APPS = {

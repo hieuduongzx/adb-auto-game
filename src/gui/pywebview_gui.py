@@ -64,8 +64,9 @@ class AutomationAPI:
             }))
         a.register_callback("on_status_change",
             lambda s: self._sync_pause(bool(s.get("paused", False))))
-        # Kick device refresh
-        threading.Thread(target=self._device_worker, daemon=True).start()
+        # Kick device refresh — full scan on startup so all running emulators
+        # (MuMu, LDPlayer, …) are connected to ADB before first list.
+        threading.Thread(target=self._device_worker, args=(True,), daemon=True).start()
         threading.Thread(target=self._device_poll, daemon=True).start()
 
     def _on_auto_start(self) -> None:
@@ -74,11 +75,8 @@ class AutomationAPI:
         self._push_running()
 
     def _on_auto_stop(self) -> None:
-        # on_stop fires only on an explicit stop() (which tears down background
-        # too), so clear the background flag here as well.
         self._is_running = False
         self._is_paused = False
-        self._bg_running = False
         self._push_running()
 
     def _sync_pause(self, paused: bool) -> None:
@@ -174,12 +172,10 @@ class AutomationAPI:
             return False
 
     def stop(self) -> bool:
-        # Unified stop: ends the sequential queue AND background workers.
-        # Available whenever a session is active (sequential or background).
-        if not self._is_running and not self._bg_running:
+        if not self._is_running:
             return False
         try:
-            self.automation.stop()  # fires on_stop -> clears flags + pushes
+            self.automation.stop_sequential()  # fires on_stop -> clears _is_running
             return True
         except Exception as e:
             log_error(f"Stop error: {e}")
@@ -275,7 +271,7 @@ class AutomationAPI:
             return False
 
     def refresh_devices(self) -> None:
-        threading.Thread(target=self._device_worker, daemon=True).start()
+        threading.Thread(target=self._device_worker, args=(True,), daemon=True).start()
 
     def select_device(self, serial: str) -> bool:
         try:
@@ -312,9 +308,19 @@ class AutomationAPI:
         except Exception as e:
             log_error(f"Connect device error: {e}")
 
-    def _device_worker(self) -> None:
+    def _device_worker(self, force_scan: bool = False) -> None:
         with self._device_lock:
             try:
+                if force_scan:
+                    # Only do a full port scan when no devices are already
+                    # connected — avoids a 10-second scan on every startup.
+                    try:
+                        existing = self.automation.adb.list_devices() or []
+                        if not existing:
+                            self.automation.adb.scan_all_devices()
+                    except Exception:
+                        pass
+
                 devices = self.automation.adb.list_devices() or []
                 if devices and not self._selected_serial:
                     first = devices[0].get("serial")
@@ -351,7 +357,7 @@ class AutomationAPI:
         while not self._closing:
             time.sleep(5)
             if not self._closing:
-                self._device_worker()
+                self._device_worker(force_scan=False)
 
     # ── Teardown ─────────────────────────────────────────────────────────────
 

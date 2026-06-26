@@ -674,7 +674,7 @@ class DevHelperAPI:
                 log_warning("No window available for folder dialog")
                 return self._out_dir
             paths = win.create_file_dialog(
-                webview.OPEN_FOLDER_DIALOG,
+                webview.FOLDER_DIALOG,
                 directory=self._out_dir,
             )
         except Exception as exc:

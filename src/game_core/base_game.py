@@ -685,9 +685,6 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
 
         log_info(f"Starting automation with activities: {self._activity_order}")
         self._trigger_callback('on_start')
-        # Spin up any background activities that are enabled. They will run
-        # alongside the sequential activities below.
-        self._start_all_background_activities()
         
         try:
             for activity_id in self._activity_order:
@@ -721,28 +718,7 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
                     time.sleep(0.5)
             
             log_success("All activities completed")
-
-            # If there are no enabled background activities to keep the
-            # session alive, mark as not running so the outer start() loop
-            # exits instead of immediately re-running every activity again.
-            has_bg = any(
-                a.background and a.enabled and self.is_background_running(a.id)
-                for a in self._activities
-            )
-            if has_bg:
-                # Background workers are alive - keep the session running
-                # until the user explicitly stops via ``stop()``. ``running``
-                # stays True so the outer ``while self.running`` loop in
-                # ``start()`` idles without re-running sequential activities.
-                log_info(
-                    "Sequential activities done; keeping background "
-                    "workers alive. Press Stop to end."
-                )
-                while self.running:
-                    self._pause_event.wait()
-                    time.sleep(0.5)
-            else:
-                self.running = False
+            self.running = False
             
         except KeyboardInterrupt:
             log_info("Automation interrupted by user")
@@ -750,11 +726,6 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
             log_error(f"Error in automation loop: {e}")
             self._trigger_callback('on_error', e)
         finally:
-            # Tear down background workers only on an explicit global stop;
-            # a natural sequential completion leaves independently-enabled
-            # background activities running (they're owned by their toggles).
-            if self._stop_event.is_set():
-                self._stop_all_background_activities()
             self.after_process_game_actions()
     
     # ==================== Utility Methods ====================

@@ -1,0 +1,14 @@
+{
+  "ocr_backend": "tesseract",
+  "ui_settings": {},
+  "activities": [
+    {
+      "id": "speedhack",
+      "enabled": true,
+      "poll_interval": 999999.0,
+      "custom": {
+        "speed": 2.0
+      }
+    }
+  ]
+}

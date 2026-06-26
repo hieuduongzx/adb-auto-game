@@ -51,7 +51,7 @@ class Config:
     capture_interval: float = 0.1
     
     # Template matching settings
-    default_threshold: float = 0.7
+    default_threshold: float = 0.8
     template_cache_size: int = 100
     
     # Retry settings
@@ -68,6 +68,6 @@ class Config:
     
     # Template matching scales
     portrait_scales: tuple = (1.0, 1.1, 1.2, 1.3, 1.4, 1.5)
-    landscape_scales: tuple = (0.8, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25)
+    landscape_scales: tuple = (1.0,)
     portrait_threshold_adjustment: float = 0.1
     min_threshold: float = 0.6

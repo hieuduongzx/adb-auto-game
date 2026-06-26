@@ -50,6 +50,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
             "back_button":  f"{self.assets_path}/back_button.png",
             "skip_dialog":  f"{self.assets_path}/skip_dialog.png",
             "skip_battle":  f"{self.assets_path}/skip_battle.png",
+            "tap_to_continue": f"{self.assets_path}/tap_to_continue.png",
         }
         self.tpl_main_story = {
             "is_main_story":   f"{self.assets_path}/main_story/is_main_story.png",
@@ -152,16 +153,16 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
         return self.tap(x, y)
 
     def handle_activity_auto_tap_to_continue(self) -> bool:
-        """Tap the 'Tap to continue' region if the text is detected."""
-        if self.region_has_text(
-            "Tap to continue",
-            region=self.REGION_TAP_TO_CONTINUE,
-            last_screen=True,
-        ):
-            cx, cy = self.region_center(self.REGION_TAP_TO_CONTINUE)
-            log_success(f"[bg-tap_continue] tap {cx},{cy}")
-            return self.tap(cx, cy)
-        return False
+        """Tap 'Tap to continue' button if the template is found on screen."""
+        tpl = self.tpl_common.get("tap_to_continue")
+        if not tpl:
+            return False
+        result = self.find_template(tpl, last_screen=True)
+        if not result:
+            return False
+        x, y, _conf = result
+        log_success(f"[bg-tap_continue] tap {x},{y}")
+        return self.tap(x, y)
 
     # ==================== Sequential handlers ====================
 

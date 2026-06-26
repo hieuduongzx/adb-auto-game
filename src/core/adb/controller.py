@@ -246,6 +246,16 @@ class ADBController:
                 log_error("User cancelled device selection")
                 raise Exception("Device selection cancelled")
     
+    def scan_all_devices(self) -> None:
+        """Scan all emulator ports and connect every device found.
+
+        Intended for the GUI refresh flow where the user wants to see all
+        running emulators.  Each found device is connected to the ADB server
+        via ``adb connect``; a subsequent ``list_devices()`` call will return
+        all of them.
+        """
+        self.scanner.scan_all(stop_on_first=False)
+
     def scan_device(self) -> bool:
         """Scan for devices on emulator ports and connect to first found"""
         found_devices = self.scanner.scan_all(stop_on_first=True)

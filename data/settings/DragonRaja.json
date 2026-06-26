@@ -1,0 +1,42 @@
+{
+  "ocr_backend": "tesseract",
+  "ui_settings": {
+    "debug_mode": false,
+    "debug_fail_mode": false
+  },
+  "activities": [
+    {
+      "id": "auto_skip_dialog",
+      "enabled": false,
+      "poll_interval": 0.2
+    },
+    {
+      "id": "speedhack",
+      "enabled": true,
+      "poll_interval": 999999.0,
+      "custom": {
+        "speed": 2.0
+      }
+    },
+    {
+      "id": "auto_skip_battle",
+      "enabled": true,
+      "poll_interval": 0.2
+    },
+    {
+      "id": "end_combat",
+      "enabled": false,
+      "poll_interval": 0.5
+    },
+    {
+      "id": "main_story",
+      "enabled": true,
+      "poll_interval": 1.0
+    },
+    {
+      "id": "hien_da_luan_hoi",
+      "enabled": true,
+      "poll_interval": 1.0
+    }
+  ]
+}

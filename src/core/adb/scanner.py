@@ -20,7 +20,7 @@ class DeviceScanner:
         self.port = port
         self.adb_path = get_adb_path()
     
-    def _is_port_open(self, host: str, port: int, timeout: float = 0.3) -> bool:
+    def _is_port_open(self, host: str, port: int, timeout: float = 1.0) -> bool:
         """Quickly check if a port is open"""
         try:
             with socket.create_connection((host, port), timeout=timeout):
@@ -34,7 +34,7 @@ class DeviceScanner:
             # First, quickly check if port is open
             host_ip, port_str = host.split(":")
             port = int(port_str)
-            if not self._is_port_open(host_ip, port, timeout=0.3):
+            if not self._is_port_open(host_ip, port, timeout=1.0):
                 return None
             
             # Try ADB connect with shorter timeout
@@ -50,20 +50,11 @@ class DeviceScanner:
             if "connected" not in stdout and "already connected" not in stdout:
                 return None
             
-            # Small delay to ensure connection is established
-            time.sleep(0.1)
-            
-            # Check if devices are available
-            client = AdbClient(host=self.host, port=self.port)
-            devices = client.devices()
-            
-            if devices:
-                # Return first matching device
-                for device in devices:
-                    if device.serial == host:
-                        return device.serial
-                # If no specific match, return first device
-                return devices[0].serial
+            # adb connect succeeded — the serial IS the host string.
+            # Do not fall back to devices[0]: under parallel scanning multiple
+            # threads may query ADB simultaneously, and the first-registered
+            # device would mask every other port's result.
+            return host
                 
         except subprocess.TimeoutExpired:
             return None
@@ -78,7 +69,7 @@ class DeviceScanner:
     def scan_ports(
         self,
         ports: List[str],
-        max_workers: int = 30,
+        max_workers: int = 100,
         stop_on_first: bool = False
     ) -> List[Tuple[str, str]]:
         """

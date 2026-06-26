@@ -1,9 +1,9 @@
 import time
 from typing import List, Optional, Tuple
+from src.utils import log_error, log_info, log_success, log_warning
 
 from src.game_core.base_game import Activity, BaseGameAutomation
 from src.game_core.speedhack import SpeedhackMixin
-from src.utils import log_error, log_info, log_success, log_warning
 
 # Package name of Echocalypse on the device (used by _ensure_app_foreground).
 ECHOPOCALYPSE_PACKAGE = "com.yoozoo.jgame.us"
