@@ -15,11 +15,20 @@ LDPlayer). The injected script tries, in order:
    protected titles crash on. A 50ms ticker re-asserts the scale after the game
    resets it on scene changes.
 2. Call ``UnityEngine.Time.set_timeScale`` if an IL2CPP symbol is exported.
-3. Hook ``clock_gettime`` in ``libc.so`` with a native CModule (opt-in via
-   ``use_cmodule``) to scale monotonic time process-wide.
-4. Same ``clock_gettime`` hook in plain JS as a last-resort fallback. NOTE:
-   this funnels a hot-path syscall through Frida's JS lock and can stall the
-   game during scene-load thread storms -- only used when nothing else works.
+3. Universal (GameGuardian-style) path for ANY engine, used when the Unity
+   strategies above are unavailable (Cocos2d, Godot, native, etc.): scale
+   ``CLOCK_MONOTONIC`` / ``CLOCK_MONOTONIC_RAW`` in ``libc.so`` AND shorten
+   ``nanosleep`` / ``clock_nanosleep`` (the frame limiter). The clock hook runs
+   as a native CModule by default (``use_cmodule=True``) -- compiled C, no
+   JS-bridge crossing, smooth even under scene-load thread storms.
+4. Same ``clock_gettime`` hook in plain JS as a last-resort fallback (when the
+   CModule executable page is rejected by a protected title). NOTE: this funnels
+   a hot-path syscall through Frida's JS lock; the sub-millisecond throttle keeps
+   it usable but the CModule path is preferred.
+
+   ``CLOCK_REALTIME`` and ``CLOCK_BOOTTIME`` are deliberately left real to keep
+   network/TLS timestamps valid and to dodge the ``elapsedRealtime`` speedhack
+   detection.
 
 Once injected, the script stays alive and polls a system property for the
 desired scale, so the host can change speed LIVE (just ``setprop``) without
@@ -68,6 +77,7 @@ var currentScale = 1.0;
 var hookMode = 'none';        // 'il2cpp-timescale' | 'timescale' | 'clock-cmodule' | 'clock-js'
 var clockScaleBuf = null;     // Memory(8) holding the live scale for the CModule
 var timeScaleSetter = null;   // NativeFunction(UnityEngine.Time.set_timeScale)
+var timeScaleGetter = null;   // NativeFunction(UnityEngine.Time.get_timeScale) — optional
 var jsHookInstalled = false;
 var baseByClock = {};         // state for the JS fallback hook
 var lastScaledMs = 0;         // monotonic floor: scaled CLOCK_MONOTONIC never decreases
@@ -237,6 +247,24 @@ function installIl2cppTimeScale(scale) {
             // Direct native call. Frida routes 'float' through the correct FP
             // register per ABI, so no SIMD-register marshalling worries.
             timeScaleSetter = new NativeFunction(addr, 'void', ['float']);
+            // Resolve getter so reapplyTimeScaleIfReset can skip the setter
+            // when Unity has NOT reset the scale (avoids unnecessary native calls).
+            try {
+                let getAddr = null;
+                if (il2cpp['il2cpp_resolve_icall']) {
+                    const n1 = Memory.allocUtf8String('UnityEngine.Time::get_timeScale()');
+                    getAddr = il2cpp['il2cpp_resolve_icall'](n1);
+                    if (!getAddr || getAddr.isNull()) {
+                        const n2 = Memory.allocUtf8String('UnityEngine.Time::get_timeScale');
+                        getAddr = il2cpp['il2cpp_resolve_icall'](n2);
+                    }
+                }
+                if (!getAddr || getAddr.isNull()) getAddr = findTimeMethodPointer('get_timeScale', 0);
+                if (getAddr && !getAddr.isNull()) {
+                    timeScaleGetter = new NativeFunction(getAddr, 'float', []);
+                    log('il2cpp Time.get_timeScale resolved');
+                }
+            } catch (e) { log('get_timeScale resolution failed (non-fatal): ' + e.message); }
         }
         timeScaleSetter(scale);
         currentScale = scale;
@@ -249,12 +277,18 @@ function installIl2cppTimeScale(scale) {
     }
 }
 
-// The game resets Time.timeScale to 1.0 on scene changes; re-assert our value
-// every tick. The setter is a cheap static-field write (no GC, no read-back, no
-// boxing), so calling it unconditionally is fine and needs no get_timeScale.
+// Re-assert our time scale only when Unity has actually reset it (e.g. scene change).
+// Using get_timeScale to check first avoids a native call every tick when
+// the value is already correct, which was causing micro-freezes at 50ms intervals.
 function reapplyTimeScaleIfReset() {
     if (currentScale === 1.0 || !timeScaleSetter) return;
-    try { timeScaleSetter(currentScale); } catch (e) {}
+    try {
+        if (timeScaleGetter) {
+            var actual = timeScaleGetter();
+            if (Math.abs(actual - currentScale) < 0.01) return;  // already correct, skip
+        }
+        timeScaleSetter(currentScale);
+    } catch (e) {}
 }
 
 function resolveTimeScale() {
@@ -356,10 +390,12 @@ onLeave (GumInvocationContext * ic)
 
   HookState * s = gum_invocation_context_get_listener_invocation_data (ic, sizeof (HookState));
   int clk = s->clock_id;
-  /* Scale ONLY CLOCK_MONOTONIC (1). Leaving CLOCK_BOOTTIME (7) real avoids the
-   * classic SystemClock.elapsedRealtime() speedhack detection, and leaving the
-   * CPU-time clocks (2,3) real avoids upsetting the ART GC / watchdog. */
-  if (clk != 1)
+  /* Scale CLOCK_MONOTONIC (1) and CLOCK_MONOTONIC_RAW (4): the two clocks most
+   * game loops use for delta time. Leaving CLOCK_BOOTTIME (7) real avoids the
+   * classic SystemClock.elapsedRealtime() speedhack detection, leaving
+   * CLOCK_REALTIME (0) real keeps TLS/cert/network timestamps valid, and
+   * leaving the CPU-time clocks (2,3) real avoids upsetting the ART GC. */
+  if (clk != 1 && clk != 4)
     return;
 
   timespec64 * ts = (timespec64 *) s->tv;
@@ -444,6 +480,10 @@ function scaledClockMs(clockId, realMs) {
     // CLOCK_MONOTONIC can dip a few us across cores; without this the dip is
     // multiplied by the scale and handed back as time going backwards.
     if (delta < 0) delta = 0;
+    // Throttle: sub-millisecond calls (tight loops, system threads) go through
+    // Frida's JS lock millions of times/sec and stall the game. For these, advance
+    // base.real to avoid delta accumulation but return the cached scaled value.
+    if (delta < 1.0) { if (delta > 0) base.real = realMs; return base.scaled; }
     const MAX_STEP_MS = 100.0;
     if (delta > MAX_STEP_MS) {
         base.scaled += MAX_STEP_MS * currentScale + (delta - MAX_STEP_MS);
@@ -479,7 +519,7 @@ function installClockJs(scale) {
                     if (currentScale === 1.0) return;
                     if (retval.toInt32() !== 0) return;
                     if (!this.tv || this.tv.isNull()) return;
-                    if (this.clock !== 1) return;  // only scale CLOCK_MONOTONIC
+                    if (this.clock !== 1 && this.clock !== 4) return;  // CLOCK_MONOTONIC + _RAW
                     const realMs = this.tv.readLong().toNumber() * 1000 +
                                    this.tv.add(8).readLong().toNumber() / 1000000;
                     writeTimespec(this.tv, scaledClockMs(this.clock, realMs));
@@ -497,13 +537,69 @@ function installClockJs(scale) {
     }
 }
 
+/* ------------------- sleep shortening (universal, non-Unity) ----------------
+ * GameGuardian-style: most non-Unity engines cap their loop with nanosleep /
+ * clock_nanosleep (frame limiter). Scaling clock_gettime alone only speeds up
+ * delta-time math; shortening the actual sleep is what makes a frame-limited
+ * loop iterate faster. Sleeps fire at most ~frame-rate frequency (not a hot
+ * path), so handling them in JS is cheap and won't stall the game. */
+var sleepHooksInstalled = false;
+function patchSleepReq(reqPtr) {
+    // Divide a relative timespec duration by currentScale (>1 shortens, <1 lengthens).
+    if (reqPtr.isNull()) return;
+    var sec = reqPtr.readLong().toNumber();
+    var nsec = reqPtr.add(8).readLong().toNumber();
+    var total = sec * 1e9 + nsec;
+    if (total <= 0) return;
+    var scaled = total / currentScale;
+    reqPtr.writeLong(Math.floor(scaled / 1e9));
+    reqPtr.add(8).writeLong(Math.floor(scaled % 1e9));
+}
+function installSleepHooks() {
+    if (sleepHooksInstalled) return;
+    var libc = Process.findModuleByName('libc.so');
+    if (!libc) return;
+    // nanosleep(const timespec* req, timespec* rem): always relative.
+    try {
+        var nano = libc.getExportByName('nanosleep');
+        if (nano) {
+            Interceptor.attach(nano, {
+                onEnter: function(args) {
+                    if (currentScale === 1.0) return;
+                    patchSleepReq(args[0]);
+                }
+            });
+        }
+    } catch (e) { log('nanosleep hook failed: ' + e.message); }
+    // clock_nanosleep(clockid, flags, req, rem): only patch RELATIVE sleeps.
+    // TIMER_ABSTIME (flags==1) passes an absolute deadline — scaling it would
+    // teleport the wait far into past/future, so skip it.
+    try {
+        var cnano = libc.getExportByName('clock_nanosleep');
+        if (cnano) {
+            Interceptor.attach(cnano, {
+                onEnter: function(args) {
+                    if (currentScale === 1.0) return;
+                    if (args[1].toInt32() !== 0) return;  // skip TIMER_ABSTIME
+                    patchSleepReq(args[2]);
+                }
+            });
+        }
+    } catch (e) { log('clock_nanosleep hook failed: ' + e.message); }
+    sleepHooksInstalled = true;
+    log('sleep-shortening hooks installed (nanosleep / clock_nanosleep)');
+}
+
 /* ----------------------- strategy selection + live update ------------------- */
 function initHook(scale) {
     if (installIl2cppTimeScale(scale)) return true;   // preferred: no hot-path hook
     if (installTimeScale(scale)) return true;          // exported set_timeScale (rare)
     if (scale === 1.0) { currentScale = 1.0; return true; }
-    if (USE_CMODULE && installClockCModule(scale)) return true;
-    if (installClockJs(scale)) return true;
+    // Universal (GameGuardian-style) path for ANY engine: scale the monotonic
+    // clock + shorten frame-limiter sleeps. Native CModule first (smoothest),
+    // JS as the last resort. Sleep hooks ride along with whichever clock hook wins.
+    if (USE_CMODULE && installClockCModule(scale)) { installSleepHooks(); return true; }
+    if (installClockJs(scale)) { installSleepHooks(); return true; }
     log('error: no speedhack strategy available');
     return false;
 }
@@ -561,19 +657,18 @@ if (getPropFn) {
             log('live scale change: ' + currentScale + ' -> ' + v);
             applyScale(v);
         }
-    }, 250);
+    }, 500);
     log('live scale poller active (SCALE_PROP_NAME)');
 } else {
     log('live scale channel unavailable (__system_property_get missing)');
 }
 
-// Dedicated fast restore ticker for il2cpp mode. The game zeroes/resets
-// Time.timeScale on every scene change; re-asserting at 50ms makes the speed
-// snap back almost instantly after a load (the setter is a trivial native
-// write, so this is essentially free).
+// Restore ticker for il2cpp mode: re-assert after scene-change resets.
+// 200ms is fast enough to snap back before the player notices, and reduces
+// Frida-to-native crossing overhead by 4x vs the previous 50ms interval.
 setInterval(function() {
     if (hookMode === 'il2cpp-timescale') reapplyTimeScaleIfReset();
-}, 50);
+}, 200);
 """
 
 
@@ -606,14 +701,18 @@ class FridaSpeedhackManager:
         frida_inject_path: str = "/data/local/tmp/frida-inject",
         local_inject_binary: Optional[str] = None,
         device_id: Optional[str] = None,
-        use_cmodule: bool = False,
+        use_cmodule: bool = True,
     ):
         self.package = package
-        # Default to the JS clock hook. The native CModule hook is faster (no
-        # JS-bridge crossing) BUT it compiles a fresh executable page with
-        # TinyCC, which protected titles (e.g. yoozoo's) detect and crash on at
-        # inject time. The JS hook survives on those games; opt into CModule only
-        # for titles proven to tolerate it.
+        # Default to the native CModule clock hook for the universal (non-Unity)
+        # path: it runs every clock_gettime call in compiled C with no JS-bridge
+        # crossing, so it stays smooth even under scene-load thread storms. This
+        # path is ONLY reached when the il2cpp Time.timeScale strategy fails
+        # (i.e. non-Unity engines), so the protected-Unity-title concern below
+        # almost never applies. The tradeoff: CModule compiles a fresh executable
+        # page with TinyCC, which a few protected titles detect and crash on at
+        # inject time -- if a specific game crashes on inject, set
+        # SPEEDHACK_USE_CMODULE = False on its class to fall back to the JS hook.
         self._use_cmodule = use_cmodule
         self._target_scale = float(time_scale)
         self._current_scale: float = 1.0

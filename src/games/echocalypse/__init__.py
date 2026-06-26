@@ -19,6 +19,9 @@ class Echocalypse(SpeedhackMixin, BaseGameAutomation):
     # App identity
     PACKAGE_NAME = ECHOPOCALYPSE_PACKAGE
     DEFAULT_OCR_BACKEND = "tesseract"
+    # yoozoo's integrity check crashes the game when TinyCC allocates the
+    # CModule executable page at inject time; force the JS clock fallback.
+    SPEEDHACK_USE_CMODULE = False
 
     def __init__(self):
         super().__init__()
