@@ -29,88 +29,87 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
     def __init__(self):
         super().__init__()
         self.assets_path = "assets/cherrytale"
-        self.templates_dir = f"{self.assets_path}/templates"
         self.max_workers = 3
         self.package_name = self.PACKAGE_NAME
         self.setup_speedhack()
 
         # Template paths
         self.tpl_main_menu = {
-            'phuc_loi': f"{self.templates_dir}/main_menu/phuc_loi.png",
-            'combat': f"{self.templates_dir}/main_menu/combat.png",
+            'phuc_loi': f"{self.assets_path}/main_menu/phuc_loi.png",
+            'combat': f"{self.assets_path}/main_menu/combat.png",
         }
         self.tpl_common = {
-            'icon': f"{self.templates_dir}/icon.png",
-            'huy_bo': f"{self.templates_dir}/huy_bo.png",
-            'home': f"{self.templates_dir}/home.png",
-            'ra_tran': f"{self.templates_dir}/ra_tran.png",
-            'skip': f"{self.templates_dir}/skip.png",
-            'bat_dau': f"{self.templates_dir}/bat_dau.png",
-            'thu_thach': f"{self.templates_dir}/thu_thach.png",
-            'exit': f"{self.templates_dir}/exit.png",
-            'exit_2': f"{self.templates_dir}/exit_2.png",
-            'skip_dialog': f"{self.templates_dir}/skip_dialog.png",
-            'nhan_vao_bat_ky_dau': f"{self.templates_dir}/nhan_vao_bat_ky_dau.png",
-            'close' : f"{self.templates_dir}/close.png",
-            'quet' : f"{self.templates_dir}/quet.png",
-            'quet_5': f"{self.templates_dir}/quet_5.png",
-            'quet_5_again': f"{self.templates_dir}/quet_5_again.png"
+            'icon': f"{self.assets_path}/icon.png",
+            'huy_bo': f"{self.assets_path}/huy_bo.png",
+            'home': f"{self.assets_path}/home.png",
+            'ra_tran': f"{self.assets_path}/ra_tran.png",
+            'skip': f"{self.assets_path}/skip.png",
+            'bat_dau': f"{self.assets_path}/bat_dau.png",
+            'thu_thach': f"{self.assets_path}/thu_thach.png",
+            'exit': f"{self.assets_path}/exit.png",
+            'exit_2': f"{self.assets_path}/exit_2.png",
+            'skip_dialog': f"{self.assets_path}/skip_dialog.png",
+            'nhan_vao_bat_ky_dau': f"{self.assets_path}/nhan_vao_bat_ky_dau.png",
+            'close' : f"{self.assets_path}/close.png",
+            'quet' : f"{self.assets_path}/quet.png",
+            'quet_5': f"{self.assets_path}/quet_5.png",
+            'quet_5_again': f"{self.assets_path}/quet_5_again.png"
         }
         # Welfare (phúc lợi) flow templates
         self.tpl_welfare = {
-            'bua_tiec': f"{self.templates_dir}/phuc_loi/bua_tiec.png",
-            'invite_all': f"{self.templates_dir}/phuc_loi/invite_all.png",
+            'bua_tiec': f"{self.assets_path}/phuc_loi/bua_tiec.png",
+            'invite_all': f"{self.assets_path}/phuc_loi/invite_all.png",
             
         }
         self.tpl_friend = {
-            'friend_icon': f"{self.templates_dir}/friend/icon.png",
-            'friend_checking': f"{self.templates_dir}/friend/checking.png",
-            'friend_take_all': f"{self.templates_dir}/friend/take_all.png",
-            'friend_send_all': f"{self.templates_dir}/friend/send_all.png",
-            'friend_check_done': f"{self.templates_dir}/friend/check_done.png",
+            'friend_icon': f"{self.assets_path}/friend/icon.png",
+            'friend_checking': f"{self.assets_path}/friend/checking.png",
+            'friend_take_all': f"{self.assets_path}/friend/take_all.png",
+            'friend_send_all': f"{self.assets_path}/friend/send_all.png",
+            'friend_check_done': f"{self.assets_path}/friend/check_done.png",
         }
         self.tpl_mail = {
-            'thu_icon': f"{self.templates_dir}/thu/icon.png",
-            'thu_checking': f"{self.templates_dir}/thu/checking.png",
-            'thu_take_all': f"{self.templates_dir}/thu/take_all.png",
+            'thu_icon': f"{self.assets_path}/thu/icon.png",
+            'thu_checking': f"{self.assets_path}/thu/checking.png",
+            'thu_take_all': f"{self.assets_path}/thu/take_all.png",
         }
         self.tpl_combat = {
-            'vtgk_icon': f"{self.templates_dir}/combat/vong_tron_gia_kim/icon.png",
-            'vtgk_check': f"{self.templates_dir}/combat/vong_tron_gia_kim/check.png",
-            'vtgk_point_tim': f"{self.templates_dir}/combat/vong_tron_gia_kim/point_tim.png",
-            'vtgk_point_dau': f"{self.templates_dir}/combat/vong_tron_gia_kim/point_dau.png",
-            'vtgk_end': f"{self.templates_dir}/combat/vong_tron_gia_kim/end.png",
-            'vtgk_exit': f"{self.templates_dir}/combat/vong_tron_gia_kim/exit.png",
-            'vtgk_reward_1': f"{self.templates_dir}/combat/vong_tron_gia_kim/reward_1.png",
-            'vtgk_reward_2': f"{self.templates_dir}/combat/vong_tron_gia_kim/reward_2.png",
-            'vtgk_reward_3': f"{self.templates_dir}/combat/vong_tron_gia_kim/reward_3.png",
+            'vtgk_icon': f"{self.assets_path}/combat/vong_tron_gia_kim/icon.png",
+            'vtgk_check': f"{self.assets_path}/combat/vong_tron_gia_kim/check.png",
+            'vtgk_point_tim': f"{self.assets_path}/combat/vong_tron_gia_kim/point_tim.png",
+            'vtgk_point_dau': f"{self.assets_path}/combat/vong_tron_gia_kim/point_dau.png",
+            'vtgk_end': f"{self.assets_path}/combat/vong_tron_gia_kim/end.png",
+            'vtgk_exit': f"{self.assets_path}/combat/vong_tron_gia_kim/exit.png",
+            'vtgk_reward_1': f"{self.assets_path}/combat/vong_tron_gia_kim/reward_1.png",
+            'vtgk_reward_2': f"{self.assets_path}/combat/vong_tron_gia_kim/reward_2.png",
+            'vtgk_reward_3': f"{self.assets_path}/combat/vong_tron_gia_kim/reward_3.png",
 
 
-            'arena_icon': f"{self.templates_dir}/combat/arena/icon.png",
-            'arena_check': f"{self.templates_dir}/combat/arena/check.png",
-            'arena_thu_thach': f"{self.templates_dir}/combat/arena/thu_thach.png",
-            'arena_is_full': f"{self.templates_dir}/combat/arena/is_full.png",
+            'arena_icon': f"{self.assets_path}/combat/arena/icon.png",
+            'arena_check': f"{self.assets_path}/combat/arena/check.png",
+            'arena_thu_thach': f"{self.assets_path}/combat/arena/thu_thach.png",
+            'arena_is_full': f"{self.assets_path}/combat/arena/is_full.png",
 
-            'tmdq_icon': f"{self.templates_dir}/combat/tmdq/icon.png",
-            'tmdq_check': f"{self.templates_dir}/combat/tmdq/check.png",
-            'tmdq_is_full': f"{self.templates_dir}/combat/tmdq/is_full.png",
+            'tmdq_icon': f"{self.assets_path}/combat/tmdq/icon.png",
+            'tmdq_check': f"{self.assets_path}/combat/tmdq/check.png",
+            'tmdq_is_full': f"{self.assets_path}/combat/tmdq/is_full.png",
 
-            'dvq_icon': f"{self.templates_dir}/combat/dvq/icon.png",
-            'dvq_check': f"{self.templates_dir}/combat/dvq/check.png",
-            'dvq_thu_thach': f"{self.templates_dir}/combat/dvq/thu_thach.png",
-            'dvq_doi_tiep_theo' : f"{self.templates_dir}/combat/dvq/doi_tiep_theo.png",
-            'dvq_tim_kiem_doi_thu': f"{self.templates_dir}/combat/dvq/tim_kiem_doi_thu.png",
-            'dvq_tap_to_continue': f"{self.templates_dir}/combat/dvq/tap_to_continue.png",
-            'dvq_is_full': f"{self.templates_dir}/combat/dvq/is_full.png",
+            'dvq_icon': f"{self.assets_path}/combat/dvq/icon.png",
+            'dvq_check': f"{self.assets_path}/combat/dvq/check.png",
+            'dvq_thu_thach': f"{self.assets_path}/combat/dvq/thu_thach.png",
+            'dvq_doi_tiep_theo' : f"{self.assets_path}/combat/dvq/doi_tiep_theo.png",
+            'dvq_tim_kiem_doi_thu': f"{self.assets_path}/combat/dvq/tim_kiem_doi_thu.png",
+            'dvq_tap_to_continue': f"{self.assets_path}/combat/dvq/tap_to_continue.png",
+            'dvq_is_full': f"{self.assets_path}/combat/dvq/is_full.png",
 
         }
         self.tpl_phieu_luu = {
-            "icon": f"{self.templates_dir}/phieu_luu/icon.png",
-            "check": f"{self.templates_dir}/phieu_luu/check.png",
+            "icon": f"{self.assets_path}/phieu_luu/icon.png",
+            "check": f"{self.assets_path}/phieu_luu/check.png",
         }
         self.tpl_phieu_luu_nguyen_lieu = {
-            "icon": f"{self.templates_dir}/phieu_luu/nguyen_lieu/icon.png",
-            "check": f"{self.templates_dir}/phieu_luu/nguyen_lieu/check.png",
+            "icon": f"{self.assets_path}/phieu_luu/nguyen_lieu/icon.png",
+            "check": f"{self.assets_path}/phieu_luu/nguyen_lieu/check.png",
         }
 
     def define_activities(self) -> List[Activity]:

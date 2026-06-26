@@ -5,28 +5,28 @@
     "hide_scrcpy_window": true,
     "template_box_mode": "all",
     "show_adb_capture_window": false,
-    "debug_mode": false,
+    "debug_mode": true,
     "debug_fail_mode": false
   },
   "activities": [
     {
       "id": "auto_phuc_loi",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 1.0
     },
     {
       "id": "auto_friend",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 1.0
     },
     {
       "id": "auto_thu",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 1.0
     },
     {
       "id": "auto_combat_vtgk",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 1.0
     },
     {
@@ -56,6 +56,11 @@
       "custom": {
         "speed": 2.0
       }
+    },
+    {
+      "id": "auto_phieu_luu_nguyen_lieu",
+      "enabled": true,
+      "poll_interval": 1.0
     }
   ]
 }

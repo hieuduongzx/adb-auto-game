@@ -35,7 +35,7 @@
     },
     {
       "id": "hien_da_luan_hoi",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 1.0
     }
   ]
