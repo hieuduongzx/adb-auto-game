@@ -2,6 +2,7 @@
 BD2 (Đấu La Đại Lục 2) Game Automation
 Refactored to use BaseGameAutomation for better structure and GUI support.
 """
+import os
 from typing import List
 
 from src.game_core.base_game import BaseGameAutomation, Activity
@@ -19,8 +20,7 @@ class BD2(BaseGameAutomation):
     
     def __init__(self):
         super().__init__()
-        self.assets_path = "assets/bd2"
-        self.templates_dir = f"{self.assets_path}/templates"
+        self.templates_dir = os.path.join(os.path.dirname(__file__), "templates")
         self.max_workers = 3
         
         # Template paths (organized by category)

@@ -40,11 +40,13 @@ def scan_games() -> Dict[str, Dict[str, str]]:
         log_error(f"Games directory not found: {games_dir}")
         return games
     for item in sorted(games_dir.iterdir()):
-        if not item.is_file() or item.suffix != ".py" or item.stem.startswith("__"):
+        if not item.is_dir() or item.name.startswith("__"):
             continue
-        games[item.stem] = {
-            "module_path":  f"src.games.{item.stem}",
-            "display_name": item.stem.upper(),
+        if not (item / "__init__.py").exists():
+            continue
+        games[item.name] = {
+            "module_path":  f"src.games.{item.name}",
+            "display_name": item.name.upper(),
         }
     return games
 

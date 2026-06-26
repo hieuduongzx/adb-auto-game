@@ -1,3 +1,4 @@
+import os
 import time
 from typing import List, Optional, Tuple
 from src.utils import log_error, log_info, log_success, log_warning
@@ -21,8 +22,7 @@ class Echocalypse(SpeedhackMixin, BaseGameAutomation):
 
     def __init__(self):
         super().__init__()
-        self.templates_dir = "assets/echocalypse"
-        self.templates_dir = f"{self.templates_dir}/templates"
+        self.templates_dir = os.path.join(os.path.dirname(__file__), "templates")
         self.max_workers = 10
         self.package_name = self.PACKAGE_NAME
 

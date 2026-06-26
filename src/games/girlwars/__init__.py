@@ -1,3 +1,4 @@
+import os
 import time
 from typing import List
 
@@ -38,8 +39,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
 
     def __init__(self):
         super().__init__()
-        self.templates_dir = "assets/girlwars"
-        self.templates_dir = f"{self.templates_dir}/templates"
+        self.templates_dir = os.path.join(os.path.dirname(__file__), "templates")
         self.max_workers = 10
         self.package_name = self.PACKAGE_NAME
 

@@ -1,3 +1,4 @@
+import os
 from typing import List
 
 from src.game_core.base_game import Activity, BaseGameAutomation
@@ -15,8 +16,7 @@ class Attackontime(SpeedhackMixin, BaseGameAutomation):
 
     def __init__(self):
         super().__init__()
-        self.assets_path = "assets/attackontime"
-        self.templates_dir = f"{self.assets_path}/templates"
+        self.templates_dir = os.path.join(os.path.dirname(__file__), "templates")
         self.package_name = self.PACKAGE_NAME
 
         self.setup_speedhack()

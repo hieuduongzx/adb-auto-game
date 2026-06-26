@@ -1,3 +1,4 @@
+import os
 import time
 from typing import List, Optional, Tuple
 from src.utils import log_error, log_info, log_success, log_warning
@@ -17,8 +18,7 @@ class Dragonraja(SpeedhackMixin, BaseGameAutomation):
 
     def __init__(self):
         super().__init__()
-        self.assets_path = "assets/dragonraja"
-        self.templates_dir = f"{self.assets_path}/templates"
+        self.templates_dir = os.path.join(os.path.dirname(__file__), "templates")
         self.package_name = self.PACKAGE_NAME
 
         self.setup_speedhack()
