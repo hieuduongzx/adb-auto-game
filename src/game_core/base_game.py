@@ -467,7 +467,6 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
         """
         if event in self._callbacks:
             self._callbacks[event].append(callback)
-            log_info(f"Registered callback for '{event}'")
         else:
             log_warning(f"Unknown event type: {event}")
     

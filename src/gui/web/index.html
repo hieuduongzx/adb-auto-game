@@ -573,23 +573,25 @@ input:focus { outline: none; border-color: var(--accent); }
 #app-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: 8px;
+  padding: 6px 10px;
   border-radius: 7px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: #f7f9fc;
+  border: 1px solid #eaedf1;
+}
+#app-icon { flex-shrink: 0; color: var(--muted); }
+#app-open-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   color: var(--muted);
-  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  text-transform: uppercase;
+  flex-shrink: 0;
 }
-#app-row.has-app {
-  background: var(--accent-bg);
-  border-color: #cfe0ff;
-  color: var(--accent);
-}
-#app-icon { flex-shrink: 0; }
 #app-label {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 500;
+  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -688,6 +690,88 @@ input:focus { outline: none; border-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* ── Progress bar (header) ──────────────────────────────────────────────── */
+#header-progress {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 13px;
+}
+.prog-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+  flex-shrink: 0;
+}
+.prog-bar-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 6px;
+  background: #eaedf1;
+  overflow: hidden;
+}
+.prog-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: var(--ok);
+  width: 0%;
+  transition: width 0.4s ease;
+}
+.prog-elapsed {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ── Running task accent ────────────────────────────────────────────────── */
+.task-row.task-running {
+  background: #fffdf6 !important;
+  box-shadow: inset 3px 0 0 #e3b341;
+}
+
+/* ── Live indicator ─────────────────────────────────────────────────────── */
+@keyframes appPing {
+  0%       { transform: scale(0.8); opacity: 0.35; }
+  80%,100% { transform: scale(1.9); opacity: 0; }
+}
+#live-indicator {
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.live-dot-wrap {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+}
+.live-dot {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #2fa55a;
+}
+.live-dot-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: #2fa55a;
+  opacity: 0.22;
+  animation: appPing 1.8s ease-out infinite;
+}
+.live-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #2fa55a;
+  text-transform: uppercase;
+}
 </style>
 </head>
 <body>
@@ -704,6 +788,14 @@ input:focus { outline: none; border-color: var(--accent); }
         <div id="status-dot"></div>
         <div id="status-text">SẴN SÀNG</div>
       </div>
+    </div>
+
+    <div id="header-progress" style="display:none">
+      <span class="prog-count" id="prog-count">0/0</span>
+      <div class="prog-bar-track">
+        <div class="prog-bar-fill" id="prog-bar"></div>
+      </div>
+      <span class="prog-elapsed" id="elapsed">00:00:00</span>
     </div>
 
     <div class="header-btns">
@@ -840,7 +932,15 @@ input:focus { outline: none; border-color: var(--accent); }
         <rect x="5" y="2" width="14" height="20" rx="2.5"/>
         <path d="M12 18h.01"/>
       </svg>
+      <span id="app-open-label">Đang mở</span>
       <span id="app-label">Chưa chọn thiết bị</span>
+      <div id="live-indicator" style="display:none">
+        <div class="live-dot-wrap">
+          <span class="live-dot"></span>
+          <span class="live-dot-ring"></span>
+        </div>
+        <span class="live-label">Live</span>
+      </div>
     </div>
   </div>
 
@@ -864,6 +964,35 @@ const S = {
   deviceName:      "",
   singleRunning:   null,
 };
+
+// ── Elapsed timer ──────────────────────────────────────────────────────────
+let _elapsedTimer = null;
+let _elapsedStart = 0;
+
+function startElapsedTimer() {
+  _elapsedStart = Date.now();
+  if (_elapsedTimer) clearInterval(_elapsedTimer);
+  _elapsedTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - _elapsedStart) / 1000);
+    const h = Math.floor(s / 3600).toString().padStart(2, '0');
+    const m = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
+    const ss = (s % 60).toString().padStart(2, '0');
+    $('elapsed').textContent = `${h}:${m}:${ss}`;
+  }, 1000);
+}
+
+function stopElapsedTimer() {
+  if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
+  $('elapsed').textContent = '00:00:00';
+}
+
+function updateProgress() {
+  const seq = S.activities.filter(a => !a.background);
+  const done = seq.filter(a => a.status === 'completed' || a.status === 'failed' || a.status === 'skipped').length;
+  const total = seq.length;
+  $('prog-count').textContent = `${done}/${total}`;
+  $('prog-bar').style.width = total ? `${Math.round(done / total * 100)}%` : '0%';
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -1145,6 +1274,8 @@ function updateActivity(id, changes) {
       pill.className = `pill pill-${act.status}`;
       pill.textContent = PILL_TEXT[act.status] || act.status;
     }
+    row.classList.toggle('task-running', act.status === 'running');
+    if (!act.background) updateProgress();
   }
 }
 
@@ -1212,25 +1343,30 @@ function rebuildDeviceSelect(devices, connectedSerial, selectedSerial) {
 function setAppRow(appName, pkg) {
   const row = $("app-row");
   const lbl = $("app-label");
+  const live = $("live-indicator");
   if (appName || pkg) {
     lbl.textContent = appName || pkg;
     lbl.title = pkg || "";
     row.classList.add("has-app");
+    live.style.display = 'flex';
   } else {
     lbl.textContent = "Không có ứng dụng đang chạy";
     lbl.title = "";
     row.classList.remove("has-app");
+    live.style.display = 'none';
   }
 }
 
 // Reflect the running app for the device currently chosen in the dropdown,
 // using the cached per-device info from the last devices scan.
 function showAppForSerial(serial) {
+  const lbl = $("app-label");
+  const live = $("live-indicator");
   if (!serial) {
-    const lbl = $("app-label");
     lbl.textContent = "Chưa chọn thiết bị";
     lbl.title = "";
     $("app-row").classList.remove("has-app");
+    live.style.display = 'none';
     return;
   }
   const d = (S.devices || []).find(x => x.serial === serial);
@@ -1282,12 +1418,16 @@ window.__recv = function(raw) {
     S.activities.filter(a => !a.background).forEach(a => {
       updateActivity(a.id, { status: "pending" });
     });
+    $('header-progress').style.display = 'flex';
+    startElapsedTimer();
+    updateProgress();
     return;
   }
 
   if (type === "automation_stop") {
     S.running = false; S.paused = false;
     refreshButtons();
+    stopElapsedTimer();
     return;
   }
 

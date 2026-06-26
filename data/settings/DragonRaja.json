@@ -7,7 +7,7 @@
   "activities": [
     {
       "id": "auto_skip_dialog",
-      "enabled": false,
+      "enabled": true,
       "poll_interval": 0.2
     },
     {

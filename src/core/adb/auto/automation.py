@@ -467,24 +467,22 @@ class ADBGameAutomation:
 
         while time.time() - start_time < timeout:
             if self._stop_event.is_set():
-                log_info(f"[WAIT TEMPLATE] Interrupted: {template_name}")
+                log_info(f"[WAIT TEMPLATE] Interrupted: {os.path.basename(template_name)}")
                 return None
             attempts += 1
             result = self.find_template(template_name, threshold=threshold)
             if result:
                 elapsed = time.time() - start_time
-                log_normal(
-                    f"[WAIT TEMPLATE] {template_name} found after {elapsed:.2f}s ({attempts} attempts)"
-                )
+                log_normal(f"[WAIT TEMPLATE] {os.path.basename(template_name)} found after {elapsed:.2f}s ({attempts} attempts)")
                 return result
 
             elapsed = time.time() - start_time
             if elapsed >= next_log:
-                log_info(f"[WAIT TEMPLATE] Still waiting for {template_name}... ({elapsed:.1f}s)")
+                log_info(f"[WAIT TEMPLATE] Still waiting for {os.path.basename(template_name)}... ({elapsed:.1f}s)")
                 next_log += 5.0
             time.sleep(interval)
 
-        log_warning(f"[WAIT TEMPLATE] Timeout waiting for {template_name}")
+        log_warning(f"[WAIT TEMPLATE] Timeout waiting for {os.path.basename(template_name)}")
         return None
     
     def wait_for_any_template(

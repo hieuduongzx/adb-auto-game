@@ -38,33 +38,33 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
 
     def __init__(self):
         super().__init__()
-        self.assets_path = "assets/girlwars"
-        self.templates_dir = f"{self.assets_path}/templates"
+        self.templates_dir = "assets/girlwars"
+        self.templates_dir = f"{self.templates_dir}/templates"
         self.max_workers = 10
         self.package_name = self.PACKAGE_NAME
 
         self.setup_speedhack()
 
         self.tpl_common = {
-            "is_home":      f"{self.assets_path}/is_home.png",
-            "back_button":  f"{self.assets_path}/back_button.png",
-            "skip_dialog":  f"{self.assets_path}/skip_dialog.png",
-            "skip_battle":  f"{self.assets_path}/skip_battle.png",
-            "tap_to_continue": f"{self.assets_path}/tap_to_continue.png",
+            "is_home":      f"{self.templates_dir}/is_home.png",
+            "back_button":  f"{self.templates_dir}/back_button.png",
+            "skip_dialog":  f"{self.templates_dir}/skip_dialog.png",
+            "skip_battle":  f"{self.templates_dir}/skip_battle.png",
+            "tap_to_continue": f"{self.templates_dir}/tap_to_continue.png",
         }
         self.tpl_main_story = {
-            "is_main_story":   f"{self.assets_path}/main_story/is_main_story.png",
-            "challenge_button": f"{self.assets_path}/main_story/challenge_button.png",
-            "icon_elite_mode": f"{self.assets_path}/main_story/icon_elite_mode.png",
-            "battle_button":   f"{self.assets_path}/main_story/battle_button.png",
+            "is_main_story":   f"{self.templates_dir}/main_story/is_main_story.png",
+            "challenge_button": f"{self.templates_dir}/main_story/challenge_button.png",
+            "icon_elite_mode": f"{self.templates_dir}/main_story/icon_elite_mode.png",
+            "battle_button":   f"{self.templates_dir}/main_story/battle_button.png",
         }
         self.tpl_adventure = {
-            "icon_adventure":  f"{self.assets_path}/adventure/icon_adventure.png",
-            "is_adventure":    f"{self.assets_path}/adventure/is_adventure.png",
-            "icon_dungeon":    f"{self.assets_path}/adventure/dungeon/icon_dungeon.png",
-            "is_dungeon":      f"{self.assets_path}/adventure/dungeon/is_dungeon.png",
-            "continue_battle": f"{self.assets_path}/adventure/dungeon/continue_battle.png",
-            "next_floor":      f"{self.assets_path}/adventure/dungeon/next_floor.png",
+            "icon_adventure":  f"{self.templates_dir}/adventure/icon_adventure.png",
+            "is_adventure":    f"{self.templates_dir}/adventure/is_adventure.png",
+            "icon_dungeon":    f"{self.templates_dir}/adventure/dungeon/icon_dungeon.png",
+            "is_dungeon":      f"{self.templates_dir}/adventure/dungeon/is_dungeon.png",
+            "continue_battle": f"{self.templates_dir}/adventure/dungeon/continue_battle.png",
+            "next_floor":      f"{self.templates_dir}/adventure/dungeon/next_floor.png",
         }
 
     # ==================== Activity registry ====================

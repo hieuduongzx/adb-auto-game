@@ -137,7 +137,15 @@ function findExport(symbols) {
  * il2cpp_resolve_icall / il2cpp_method_get_pointer, then call the ptr). */
 function resolveIl2cppApi() {
     const mod = Process.findModuleByName('libil2cpp.so');
-    if (!mod) { log('libil2cpp.so not present'); return false; }
+    if (!mod) {
+        // On x86_64 emulators (MuMuPlayer 12, LDPlayer 9) running ARM64 APKs via native
+        // bridge (libnb.so), libil2cpp.so is loaded under the translated realm and is
+        // invisible to Process.enumerateModules(). frida --realm=emulated is rejected on
+        // these hosts ("process is not using emulation"). il2cpp strategy unavailable here;
+        // will fall back to clock_gettime hook.
+        log('libil2cpp.so not found in module list (if on x86_64 emulator + ARM64 APK, native-bridge hides it from Frida)');
+        return false;
+    }
     function imp(name, ret, args, required) {
         let addr = null;
         try { addr = mod.findExportByName(name); } catch (e) {}
@@ -203,9 +211,16 @@ function resolveSetTimeScaleAddr() {
     // Fast path first.
     if (il2cpp['il2cpp_resolve_icall']) {
         try {
-            const namePtr = Memory.allocUtf8String('UnityEngine.Time::set_timeScale');
+            // Include parameter type — resolve_icall requires the full icall name with
+            // signature on most Unity IL2CPP builds; bare name fails when the icall table
+            // is keyed by the full descriptor.
+            const namePtr = Memory.allocUtf8String('UnityEngine.Time::set_timeScale(System.Single)');
             const addr = il2cpp['il2cpp_resolve_icall'](namePtr);
             if (addr && !addr.isNull()) { log('set_timeScale via resolve_icall'); return addr; }
+            // Fallback: some Unity versions store the icall without parameter suffix.
+            const namePtrBare = Memory.allocUtf8String('UnityEngine.Time::set_timeScale');
+            const addrBare = il2cpp['il2cpp_resolve_icall'](namePtrBare);
+            if (addrBare && !addrBare.isNull()) { log('set_timeScale via resolve_icall (bare name)'); return addrBare; }
         } catch (e) {}
     }
     const addr = findTimeMethodPointer('set_timeScale', 1);

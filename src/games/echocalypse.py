@@ -21,38 +21,38 @@ class Echocalypse(SpeedhackMixin, BaseGameAutomation):
 
     def __init__(self):
         super().__init__()
-        self.assets_path = "assets/echocalypse"
-        self.templates_dir = f"{self.assets_path}/templates"
+        self.templates_dir = "assets/echocalypse"
+        self.templates_dir = f"{self.templates_dir}/templates"
         self.max_workers = 10
         self.package_name = self.PACKAGE_NAME
 
         self.setup_speedhack()
 
         self.tpl_common = {
-            "bt_skip_dialog":        f"{self.assets_path}/bt_skip_dialog.png",
-            "bt_accept_skip_dialog": f"{self.assets_path}/bt_accept_skip_dialog.png",
-            "bt_home": f"{self.assets_path}/bt_home.png",
-            "bt_back": f"{self.assets_path}/bt_back.png",
+            "bt_skip_dialog":        f"{self.templates_dir}/bt_skip_dialog.png",
+            "bt_accept_skip_dialog": f"{self.templates_dir}/bt_accept_skip_dialog.png",
+            "bt_home": f"{self.templates_dir}/bt_home.png",
+            "bt_back": f"{self.templates_dir}/bt_back.png",
         }
         self.tpl_home = {
-            'is_home': f"{self.assets_path}/home/is_home.png",
-            'bt_patrol': f"{self.assets_path}/home/bt_patrol.png",
-            'bt_expedition': f"{self.assets_path}/home/bt_expedition.png",
+            'is_home': f"{self.templates_dir}/home/is_home.png",
+            'bt_patrol': f"{self.templates_dir}/home/bt_patrol.png",
+            'bt_expedition': f"{self.templates_dir}/home/bt_expedition.png",
         }
         self.tpl_expedition = {
-            "is_expedition": f"{self.assets_path}/expedition/is_expedition.png",
-            "next_target": f"{self.assets_path}/expedition/next_target.png",
-            "bt_attack": f"{self.assets_path}/expedition/bt_attack.png",
+            "is_expedition": f"{self.templates_dir}/expedition/is_expedition.png",
+            "next_target": f"{self.templates_dir}/expedition/next_target.png",
+            "bt_attack": f"{self.templates_dir}/expedition/bt_attack.png",
         }
         self.tpl_battle = {
-            "check_end_battle": f"{self.assets_path}/battle/check_end_battle.png",
-            "check_challenge_rewards": f"{self.assets_path}/battle/check_challenge_rewards.png",
+            "check_end_battle": f"{self.templates_dir}/battle/check_end_battle.png",
+            "check_challenge_rewards": f"{self.templates_dir}/battle/check_challenge_rewards.png",
         }
         self.tpl_patrol = {
-            "is_patrol": f"{self.assets_path}/patrol/is_patrol.png",
-            "icon_case_fight": f"{self.assets_path}/patrol/icon_case_fight.png",
-            "is_case_fight": f"{self.assets_path}/patrol/is_case_fight.png",
-            'bt_start_fight': f"{self.assets_path}/patrol/bt_start_fight.png",
+            "is_patrol": f"{self.templates_dir}/patrol/is_patrol.png",
+            "icon_case_fight": f"{self.templates_dir}/patrol/icon_case_fight.png",
+            "is_case_fight": f"{self.templates_dir}/patrol/is_case_fight.png",
+            'bt_start_fight': f"{self.templates_dir}/patrol/bt_start_fight.png",
         }
 
     # ==================== Activity registry ====================
