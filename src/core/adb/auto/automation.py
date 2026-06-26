@@ -155,7 +155,7 @@ class ADBGameAutomation:
     def crop_region(
         self,
         region: Region,
-        last_screen: bool = True,
+        last_screen: bool = False,
     ) -> Optional[np.ndarray]:
         """Return ``screen[y:y+h, x:x+w]`` as a BGR ndarray, or ``None``.
 
@@ -172,7 +172,7 @@ class ADBGameAutomation:
     def read_text(
         self,
         region: Optional[Region] = None,
-        last_screen: bool = True,
+        last_screen: bool = False,
         lang: Optional[str] = None,
         config: Optional[str] = None,
         whitelist: Optional[str] = None,
@@ -198,7 +198,7 @@ class ADBGameAutomation:
         self,
         needle: str,
         region: Optional[Region] = None,
-        last_screen: bool = True,
+        last_screen: bool = False,
         case_sensitive: bool = False,
         normalize_whitespace: bool = True,
         **kwargs,
@@ -363,7 +363,7 @@ class ADBGameAutomation:
         threshold: Optional[float] = None,
         use_grayscale: bool = False,
         multi_scale: Optional[bool] = None,
-        last_screen: bool = True,
+        last_screen: bool = False,
     ) -> Optional[Tuple[int, int, float]]:
         """Find template in screen with performance tracking"""
         start_time = time.time()

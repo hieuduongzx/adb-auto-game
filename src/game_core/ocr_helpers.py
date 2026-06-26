@@ -21,7 +21,7 @@ class OCRHelperMixin:
         region: Region,
         whitelist: Optional[str] = None,
         case_sensitive: bool = False,
-        last_screen: bool = True,
+        last_screen: bool = False,
     ) -> bool:
         """Return ``True`` if ``needle`` appears in OCR output of ``region``.
 

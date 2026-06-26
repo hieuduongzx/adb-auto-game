@@ -133,7 +133,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
         tpl = self.tpl_common.get("skip_dialog")
         if not tpl:
             return False
-        result = self.find_template(tpl, last_screen=True)
+        result = self.find_template(tpl, last_screen=False)
         if not result:
             return False
         x, y, _conf = result
@@ -145,7 +145,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
         tpl = self.tpl_common.get("skip_battle")
         if not tpl:
             return False
-        result = self.find_template(tpl, last_screen=True)
+        result = self.find_template(tpl, last_screen=False)
         if not result:
             return False
         x, y, _conf = result
@@ -157,7 +157,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
         tpl = self.tpl_common.get("tap_to_continue")
         if not tpl:
             return False
-        result = self.find_template(tpl, last_screen=True)
+        result = self.find_template(tpl, last_screen=False)
         if not result:
             return False
         x, y, _conf = result
@@ -339,7 +339,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
         is_home_tpl = self.tpl_common["is_home"]
         back_button_tpl = self.tpl_common["back_button"]
 
-        if self.find_template(is_home_tpl, last_screen=True):
+        if self.find_template(is_home_tpl, last_screen=False):
             return True
 
         for _ in range(max_attempts):
@@ -348,7 +348,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
             if not self.find_and_tap(back_button_tpl):
                 return False
             self.safe_sleep(3.0)
-            if self.find_template(is_home_tpl, last_screen=True):
+            if self.find_template(is_home_tpl, last_screen=False):
                 return True
         return False
 
@@ -356,7 +356,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
         self, is_home_tpl: str, back_button_tpl: str,
     ) -> bool:
         """Walk back from a finished story stage to the home screen."""
-        while not self.find_template(is_home_tpl, last_screen=True):
+        while not self.find_template(is_home_tpl, last_screen=False):
             if not self.running:
                 return False
             if not self.find_and_tap(back_button_tpl):
@@ -387,10 +387,10 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
         while self.running and time.time() - start < timeout:
             # Preparation already shown -> no challenge button needed.
             if self.region_has_text(
-                "Preparation", region=self.REGION_PREPARATION, last_screen=True,
+                "Preparation", region=self.REGION_PREPARATION, last_screen=False,
             ):
                 return "preparation"
-            if self.find_template(challenge_tpl, last_screen=True):
+            if self.find_template(challenge_tpl, last_screen=False):
                 return "challenge"
             self.safe_sleep(0.5)
         return ""

@@ -108,7 +108,7 @@ class Echocalypse(SpeedhackMixin, BaseGameAutomation):
         if not skip_tpl or not accept_tpl:
             return False
 
-        result = self.find_template(skip_tpl, last_screen=True)
+        result = self.find_template(skip_tpl, last_screen=False)
         if not result:
             return False
         sx, sy, _conf = result
@@ -293,7 +293,7 @@ class Echocalypse(SpeedhackMixin, BaseGameAutomation):
         check_end_battle = self.tpl_battle.get("check_end_battle")
         if not check_end_battle:
             return None
-        return self.find_template(check_end_battle, threshold=threshold, last_screen=True)
+        return self.find_template(check_end_battle, threshold=threshold, last_screen=False)
 
     def _tap_end_battle(self) -> bool:
         """Tap 2 lần tại vị trí post-battle cố định để đóng màn hình kết thúc."""
