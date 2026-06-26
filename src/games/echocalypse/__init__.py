@@ -166,7 +166,7 @@ class Echocalypse(SpeedhackMixin, BaseGameAutomation):
                 log_warning(f"[expedition] loop failed ({consecutive_empty}/3)")
                 if consecutive_empty >= 3:
                     break
-                self.safe_sleep(1.0)
+                self.sleep(1.0)
                 continue
             consecutive_empty = 0
         return True
@@ -214,7 +214,7 @@ class Echocalypse(SpeedhackMixin, BaseGameAutomation):
                 log_warning("[case_fight] no remaining attempts left")
                 break
 
-            self.safe_sleep(1.5)
+            self.sleep(1.5)
             log_info("[case_fight] tapping case position 1573,366")
             if not self.tap(1573, 366):
                 return False
@@ -302,7 +302,7 @@ class Echocalypse(SpeedhackMixin, BaseGameAutomation):
                 return False
             log_info(f"[end_battle] post-battle tap #{i + 1} at 1080,897")
             if i == 0:
-                self.safe_sleep(2.0)
+                self.sleep(2.0)
 
         # Một số màn hình kết thúc battle hiện thêm "challenge rewards" cần click để đóng.
         challenge_rewards = self.tpl_battle.get("check_challenge_rewards")
@@ -320,7 +320,7 @@ class Echocalypse(SpeedhackMixin, BaseGameAutomation):
             if self._find_end_battle_screen():
                 log_success("[end_battle] battle ended")
                 return self._tap_end_battle()
-            self.safe_sleep(0.5)
+            self.sleep(0.5)
         log_warning("[end_battle] check_end_battle did not appear")
         return False
 
@@ -350,11 +350,11 @@ class Echocalypse(SpeedhackMixin, BaseGameAutomation):
                 x, y, _ = result
                 if self.tap(x, y):
                     tapped = True
-                    self.safe_sleep(1.0)
+                    self.sleep(1.0)
                     break
 
             if not tapped:
-                self.safe_sleep(0.5)
+                self.sleep(0.5)
 
         log_warning("Could not return to main menu")
         return False

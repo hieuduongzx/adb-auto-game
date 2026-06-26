@@ -1,0 +1,28 @@
+{
+  "ocr_backend": "tesseract",
+  "ui_settings": {
+    "debug_mode": false,
+    "debug_fail_mode": false
+  },
+  "activities": [
+    {
+      "id": "main_story",
+      "enabled": true,
+      "poll_interval": 1.0
+    },
+    {
+      "id": "auto_skip_dialog",
+      "enabled": true,
+      "poll_interval": 0.55
+    },
+    {
+      "id": "speedhack",
+      "enabled": false,
+      "poll_interval": 999999.0,
+      "custom": {
+        "speed": 1.0,
+        "method": "auto"
+      }
+    }
+  ]
+}

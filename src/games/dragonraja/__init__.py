@@ -183,12 +183,12 @@ class Dragonraja(SpeedhackMixin, BaseGameAutomation):
             log_warning("[hien_da_luan_hoi] không tìm thấy nút Khiêu Chiến")
             return False
 
-        self.safe_sleep(1.0)
+        self.sleep(1.0)
         while self.running:
             if not self.wait_and_tap(bt_khieu_chien_2_tpl, timeout=10):
                 log_warning("[hien_da_luan_hoi] không tìm thấy nút Khiêu Chiến 2")
                 break
-            self.safe_sleep(1.0)
+            self.sleep(1.0)
             result = self.wait_for_any_template(
                 [ai_sau_tpl, tro_ve_tpl], timeout=120
             )
@@ -199,19 +199,19 @@ class Dragonraja(SpeedhackMixin, BaseGameAutomation):
             self.tap(x, y)
             if tpl_found == ai_sau_tpl:
                 log_success("[hien_da_luan_hoi] đã khiêu chiến, chờ vòng tiếp theo")
-                self.safe_sleep(1.0)
+                self.sleep(1.0)
             else:
                 log_success("[hien_da_luan_hoi] trở về, kiểm tra màn hình chúc mừng")
-                self.safe_sleep(1.0)
+                self.sleep(1.0)
                 chuc_mung_chan_tpl = self.tpl_nibelungen.get("chuc_mung_chan")
                 if self.wait_for_template(chuc_mung_chan_tpl, timeout=5):
                     log_success("[hien_da_luan_hoi] thấy bảng chúc mừng, ấn để tiếp tục")
                     self.tap(957, 804)
-                    self.safe_sleep(1.0)
+                    self.sleep(1.0)
                 if not self.wait_and_tap(bt_khieu_chien_tpl, timeout=10):
                     log_warning("[hien_da_luan_hoi] không tìm thấy nút Khiêu Chiến sau trở về")
                     break
-                self.safe_sleep(1.0)
+                self.sleep(1.0)
         return True
 
 #===HELPER===
@@ -247,11 +247,11 @@ class Dragonraja(SpeedhackMixin, BaseGameAutomation):
                 x, y, _ = result
                 if self.tap(x, y):
                     tapped = True
-                    self.safe_sleep(1.0)
+                    self.sleep(1.0)
                     break
 
             if not tapped:
-                self.safe_sleep(0.5)
+                self.sleep(0.5)
 
         log_warning("Could not return to main menu")
         return False

@@ -97,23 +97,45 @@ class gianghochimong(SpeedhackMixin, BaseGameAutomation):
         self.wait_and_tap(self.tpl_main_story['current_map'], timeout=10)
 
         while True:
-            if not self.wait_for_template(self.tpl_battle['is_before_battle'], timeout=10):
+            current_map =  self.wait_for_template(self.tpl_main_story['current_map'], timeout=10)
+            if current_map:
+                x, y, _ = current_map
+                self.tap(x, y)
+
+            if not self.wait_for_template(self.tpl_battle['is_before_battle'], timeout=30):
                 log_error("Không vào được màn hình trước trận đấu")
                 return False
             self.wait_and_tap(self.tpl_battle['start_battle'], timeout=10)
             self.wait_for_template(self.tpl_battle['is_end_battle'], timeout=180)
-            next_map = self.wait_for_template(self.tpl_main_story['next_map'])
+            next_map = self.wait_for_template(self.tpl_main_story['next_map'], timeout=5)
             if next_map:
                 x, y, _ = next_map
                 self.tap(x, y)
                 time.sleep(1.0)
             else:
-                break
+                self.tap(1369, 1015)
+                time.sleep(1.0)
         return True
 
 
     # ==================== Handler NỀN ====================
 
+    def handle_activity_auto_skip_dialog(self) -> bool:
+        skip_tpl = self.tpl_common.get("skip_dialog")
+        accept_tpl = self.tpl_common.get("accept_skip_dialog")
+        if not skip_tpl or not accept_tpl:
+            return False
+
+        result = self.find_template(skip_tpl, last_screen=False)
+        if not result:
+            return False
+        sx, sy, _conf = result
+        log_success(f"[bg-skip_dialog] skip button at {sx},{sy}")
+        if not self.tap(sx, sy):
+            return False
+        self.sleep(1)
+        self.tap(1189, 818)
+        return True
 
 
     # ====================================================================

@@ -257,7 +257,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
             
         if self.wait_and_tap(next_floor_tpl, timeout=10):
             log_info("[dungeon] next_floor found, tapping to enter next floor")
-            self.safe_sleep(2.0)
+            self.sleep(2.0)
 
         # 3. Start the first battle and reach Preparation.
         if not self._start_dungeon_battle():
@@ -272,7 +272,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
             # No continue button -> battle ended; wait for the dungeon
             # screen to settle, then start the next battle.
             self.wait_for_template(is_dungeon_tpl, timeout=self.BATTLE_ENTRY_TIMEOUT)
-            self.safe_sleep(3.5)
+            self.sleep(3.5)
             if not self._start_dungeon_battle():
                 return False
 
@@ -332,7 +332,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
         if not self.wait_and_tap(icon_elite_tpl, timeout=10):
             log_warning("[elite] icon_elite_mode not found")
             return False
-        self.safe_sleep(1.0)
+        self.sleep(1.0)
         # 3. Loop: wait for the battle button to reappear, then push through.
         while self.running:
             if not self.wait_and_tap(battle_button_tpl, timeout=300):
@@ -390,7 +390,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
                 return False
             if not self.find_and_tap(back_button_tpl):
                 return False
-            self.safe_sleep(3.0)
+            self.sleep(3.0)
             if self.find_template(is_home_tpl, last_screen=False):
                 return True
         return False
@@ -435,7 +435,7 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
                 return "preparation"
             if self.find_template(challenge_tpl, last_screen=False):
                 return "challenge"
-            self.safe_sleep(0.5)
+            self.sleep(0.5)
         return ""
 
     def _start_dungeon_battle(self) -> bool:

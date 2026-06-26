@@ -21,10 +21,25 @@ class gianghochimong(SpeedhackMixin, BaseGameAutomation):
         self.package_name = self.PACKAGE_NAME
         self.setup_speedhack()
         self.tpl_common = {
-            'back':        f"{self.templates_dir}/back.png",       # nút Về trang chủ
+            'back':        f"{self.templates_dir}/back.png",
+            "skip_dialog": f"{self.templates_dir}/skip_dialog.png",
+            "accept_skip_dialog": f"{self.templates_dir}/accept_skip_dialog.png",       # nút Về trang chủ
         }
         self.tpl_home = {
             "is_home": f"{self.templates_dir}/home/is_home.png",
+            "icon_main_story": f"{self.templates_dir}/home/icon_main_story.png",
+        }
+        self.tpl_main_story = {
+            "is_main_story": f"{self.templates_dir}/main_story/is_main_story.png",
+            "current_chapter": f"{self.templates_dir}/main_story/current_chapter.png",
+            "is_current_chapter": f"{self.templates_dir}/main_story/is_current_chapter.png",
+            "current_map": f"{self.templates_dir}/main_story/current_map.png",
+            "next_map": f"{self.templates_dir}/main_story/next_map.png",
+        }
+        self.tpl_battle = {
+            "is_before_battle": f"{self.templates_dir}/battle/is_before_battle.png",
+            "start_battle": f"{self.templates_dir}/battle/start_battle.png",
+            "is_end_battle": f"{self.templates_dir}/battle/is_end_battle.png",
         }
 
     # ====================================================================
@@ -69,9 +84,31 @@ class gianghochimong(SpeedhackMixin, BaseGameAutomation):
     # ====================================================================
     def handle_activity_main_story(self) -> bool:
         log_info("Starting Main Story activity...")
-        if not self.back_to_menu(timeout=30):
+        if not self.back_to_menu(timeout=30): return False
+        self.wait_and_tap(self.tpl_home['icon_main_story'], timeout=10)
+        if not self.wait_for_template(self.tpl_main_story['is_main_story'], timeout=10):
+            log_error("Không vào được màn hình Nhiệm vụ chính tuyến")
             return False
+        log_info("Đang làm nhiệm vụ chính tuyến...")
+        self.wait_and_tap(self.tpl_main_story['current_chapter'], timeout=10)
+        if not self.wait_for_template(self.tpl_main_story['is_current_chapter'], timeout=10):
+            log_error("Không vào được chapter hiện tại")
+            return False
+        self.wait_and_tap(self.tpl_main_story['current_map'], timeout=10)
 
+        while True:
+            if not self.wait_for_template(self.tpl_battle['is_before_battle'], timeout=30):
+                log_error("Không vào được màn hình trước trận đấu")
+                return False
+            self.wait_and_tap(self.tpl_battle['start_battle'], timeout=10)
+            self.wait_for_template(self.tpl_battle['is_end_battle'], timeout=180)
+            next_map = self.wait_for_template(self.tpl_main_story['next_map'])
+            if next_map:
+                x, y, _ = next_map
+                self.tap(x, y)
+                time.sleep(1.0)
+            else:
+                break
         return True
 
 
@@ -91,13 +128,12 @@ class gianghochimong(SpeedhackMixin, BaseGameAutomation):
         if not self.tap(sx, sy):
             return False
 
-        accept_result = self.wait_and_tap(accept_tpl, timeout=3)
+        accept_result = self.wait_and_tap(accept_tpl, timeout=5)
         if accept_result:
             log_success("[bg-skip_dialog] accept tapped")
         else:
             log_info("[bg-skip_dialog] no confirm popup; skip succeeded")
         return True
-
 
 
     # ====================================================================

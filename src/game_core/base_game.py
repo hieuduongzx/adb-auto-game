@@ -545,7 +545,7 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
             if current == package:
                 log_success(f"[app] {package} is in foreground")
                 return True
-            self.safe_sleep(2.0)
+            self.sleep(2.0)
         log_error(f"[app] {package} did not come to foreground")
         return False
 
@@ -730,16 +730,11 @@ class BaseGameAutomation(OCRHelperMixin, VisionHelperMixin, ADBGameAutomation, A
     # ==================== Utility Methods ====================
     
     def wait_and_check_pause(self, timeout: float = 0.1):
-        """Wait while checking for pause state"""
         self._pause_event.wait()
         time.sleep(timeout)
     
-    def safe_sleep(self, seconds: float):
-        """Sleep that can be interrupted by stop, and freezes while paused.
-
-        Uses the global stop signal (not ``running``) so background handlers can
-        sleep even when the sequential queue isn't active.
-        """
+    def sleep(self, seconds: float):
+        log_info(f"Sleeping for {seconds}s")
         end_time = time.time() + seconds
         while time.time() < end_time and not self._stop_event.is_set():
             self._pause_event.wait()
