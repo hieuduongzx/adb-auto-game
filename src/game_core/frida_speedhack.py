@@ -498,7 +498,30 @@ function installClockJs(scale) {
 }
 
 /* ----------------------- strategy selection + live update ------------------- */
+// SPEEDHACK_METHOD is replaced by the host: 'auto' | 'unity' | 'clock'.
+//   auto  -> try Unity timeScale first, fall back to the clock hook (default).
+//   unity -> ONLY drive UnityEngine.Time.timeScale (smoothest; Unity-only).
+//   clock -> ONLY hook libc clock_gettime (universal / GameGuardian-style).
 function initHook(scale) {
+    var method = 'SPEEDHACK_METHOD';
+
+    if (method === 'unity') {
+        if (installIl2cppTimeScale(scale)) return true;
+        if (installTimeScale(scale)) return true;
+        if (scale === 1.0) { currentScale = 1.0; return true; }
+        log('error: Unity timeScale method unavailable for this game (not Unity / il2cpp hidden)');
+        return false;
+    }
+
+    if (method === 'clock') {
+        if (scale === 1.0) { currentScale = 1.0; return true; }
+        if (USE_CMODULE && installClockCModule(scale)) return true;
+        if (installClockJs(scale)) return true;
+        log('error: clock hook unavailable');
+        return false;
+    }
+
+    // auto (default): preferred Unity path, then the universal clock fallback.
     if (installIl2cppTimeScale(scale)) return true;   // preferred: no hot-path hook
     if (installTimeScale(scale)) return true;          // exported set_timeScale (rare)
     if (scale === 1.0) { currentScale = 1.0; return true; }
@@ -607,6 +630,7 @@ class FridaSpeedhackManager:
         local_inject_binary: Optional[str] = None,
         device_id: Optional[str] = None,
         use_cmodule: bool = False,
+        method: str = "auto",
     ):
         self.package = package
         # Default to the JS clock hook. The native CModule hook is faster (no
@@ -615,6 +639,9 @@ class FridaSpeedhackManager:
         # inject time. The JS hook survives on those games; opt into CModule only
         # for titles proven to tolerate it.
         self._use_cmodule = use_cmodule
+        # Strategy selector baked into the injected script: 'auto' | 'unity' |
+        # 'clock'. Changing it requires a re-injection (see set_method).
+        self._method = str(method or "auto")
         self._target_scale = float(time_scale)
         self._current_scale: float = 1.0
         self._frida_inject_path = frida_inject_path
@@ -840,6 +867,7 @@ class FridaSpeedhackManager:
             .replace("TARGET_SCALE", f"{scale:.6f}")
             .replace("SCALE_PROP_NAME", self._scale_prop)
             .replace("USE_CMODULE", "true" if self._use_cmodule else "false")
+            .replace("SPEEDHACK_METHOD", self._method)
         )
         local_path = Path(tempfile.gettempdir()) / f"speedhack_{scale:.2f}.js"
         try:
@@ -1046,6 +1074,27 @@ class FridaSpeedhackManager:
                 log_success("[speedhack] time scale reset to 1.0")
             else:
                 log_success(f"[speedhack] time scale set to {scale}")
+            return True
+
+    def set_method(self, method: str) -> bool:
+        """Select the speedhack strategy ('auto' | 'unity' | 'clock').
+
+        The strategy is baked into the injected script, so if an injection is
+        already live we restart it (at the current scale) for the new method to
+        take effect. No-op when the method is unchanged.
+        """
+        method = str(method or "auto")
+        with self._lock:
+            if method == self._method:
+                return True
+            self._method = method
+            log_info(f"[speedhack] method = {method}")
+            proc_alive = self._inject_proc is not None and self._inject_proc.poll() is None
+            if proc_alive and self._current_scale != 1.0:
+                scale = self._current_scale
+                self._stop_inject_proc()
+                # Re-inject with the new strategy at the same scale.
+                return self._inject_scale_locked(scale, keep_alive=True)
             return True
 
     def get_scale(self) -> Optional[float]:

@@ -576,24 +576,18 @@ class CherryTale(SpeedhackMixin, BaseGameAutomation):
         ]
 
         while time.time() - start_time < timeout:
-            if self.find_template(self.tpl_main_menu['phuc_loi'], threshold=threshold, last_screen=False):
+            if self.find_template(self.tpl_main_menu['phuc_loi']):
                 log_success("Main menu detected")
                 return True
 
-            tapped = False
             for template in back_templates:
-                result = self.find_template(template, threshold=threshold, last_screen=False)
+                result = self.find_template(template)
                 if not result:
                     continue
                 x, y, _ = result
                 if self.tap(x, y):
-                    tapped = True
                     time.sleep(1.0)
                     break
-
-            if not tapped:
-                time.sleep(0.5)
-
         log_warning("Could not return to main menu")
         return False
 

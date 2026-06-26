@@ -252,10 +252,19 @@ class AutomationAPI:
             log_error(f"Interval error: {e}")
             return False
 
-    def set_custom(self, activity_id: str, key: str, value: float) -> bool:
+    def set_custom(self, activity_id: str, key: str, value) -> bool:
         try:
+            # Numeric widgets send numbers; select widgets send a string option
+            # (e.g. the speedhack method). Coerce to float when possible, but
+            # keep non-numeric strings as-is.
+            coerced = value
+            if isinstance(value, str):
+                try:
+                    coerced = float(value)
+                except ValueError:
+                    coerced = value
             return bool(self.automation.set_custom_setting(
-                activity_id, key, float(value)))
+                activity_id, key, coerced))
         except Exception as e:
             log_error(f"Custom setting error: {e}")
             return False

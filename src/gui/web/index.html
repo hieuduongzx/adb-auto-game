@@ -1192,6 +1192,26 @@ function buildSettingsPanel(act) {
     row.className = "setting-row"; row.style.paddingTop = "8px";
     const lbl = document.createElement("span");
     lbl.className = "setting-label"; lbl.textContent = spec.label || key;
+    row.appendChild(lbl);
+
+    // Dropdown selector (e.g. speedhack method)
+    if (spec.type === "select") {
+      const sel = document.createElement("select");
+      sel.className = "setting-input";
+      sel.style.width = "auto";
+      (spec.options || []).forEach(opt => {
+        const o = document.createElement("option");
+        o.value = opt.value;
+        o.textContent = opt.label || opt.value;
+        if (String(opt.value) === String(curVal)) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = () => window.pywebview.api.set_custom(act.id, key, sel.value);
+      row.appendChild(sel);
+      panel.appendChild(row);
+      return;
+    }
+
     const inp = document.createElement("input");
     inp.type = "number"; inp.className = "setting-input";
     inp.min = spec.min ?? 0; inp.max = spec.max ?? 100;
@@ -1203,7 +1223,7 @@ function buildSettingsPanel(act) {
     };
     const unit = document.createElement("span");
     unit.className = "setting-unit"; unit.textContent = spec.suffix || "";
-    row.appendChild(lbl); row.appendChild(inp); row.appendChild(unit);
+    row.appendChild(inp); row.appendChild(unit);
     panel.appendChild(row);
   });
 
