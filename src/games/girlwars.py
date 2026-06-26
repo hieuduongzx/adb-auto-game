@@ -65,6 +65,16 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
             "is_dungeon":      f"{self.templates_dir}/adventure/dungeon/is_dungeon.png",
             "continue_battle": f"{self.templates_dir}/adventure/dungeon/continue_battle.png",
             "next_floor":      f"{self.templates_dir}/adventure/dungeon/next_floor.png",
+            "claim_reward":   f"{self.templates_dir}/adventure/dungeon/claim_reward.png",
+
+            "icon_luxurious_trip": f"{self.templates_dir}/adventure/luxurious_trip/icon_luxurious_trip.png",
+            "is_luxurious_trip":   f"{self.templates_dir}/adventure/luxurious_trip/is_luxurious_trip.png",
+            "toggle_auto_trip": f"{self.templates_dir}/adventure/luxurious_trip/toggle_auto_trip.png",
+            "bt_start_trip": f"{self.templates_dir}/adventure/luxurious_trip/bt_start_trip.png",
+            "bt_comfirm_trip": f"{self.templates_dir}/adventure/luxurious_trip/bt_confirm_trip.png",
+
+
+
         }
 
     # ==================== Activity registry ====================
@@ -108,6 +118,12 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
                 id="dungeon",
                 name="Auto Dungeon",
                 description="Tự động vào Adventure -> Dungeon",
+                enabled=True,
+            ),
+            Activity(
+                id="luxurious_trip",
+                name="Auto Luxurious Trip",
+                description="Tự động vào Adventure -> Luxurious Trip",
                 enabled=True,
             ),
             Activity(
@@ -206,20 +222,23 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
 
     # ----- Adventure -> Dungeon -----
     def handle_activity_dungeon(self) -> bool:
-        """Enter Adventure -> Dungeon and loop battles until cleared."""
-        is_home_tpl = self.tpl_common["is_home"]
-        back_button_tpl = self.tpl_common["back_button"]
         is_adventure_tpl = self.tpl_adventure["is_adventure"]
         icon_adventure_tpl = self.tpl_adventure["icon_adventure"]
         icon_dungeon_tpl = self.tpl_adventure["icon_dungeon"]
         is_dungeon_tpl = self.tpl_adventure["is_dungeon"]
         next_floor_tpl = self.tpl_adventure["next_floor"]
         continue_battle_tpl = self.tpl_adventure["continue_battle"]
-
-        # 1. Reach the Adventure screen.
-        if not self._enter_adventure(
-            is_adventure_tpl, icon_adventure_tpl, back_button_tpl,
-        ):
+        claim_reward_tpl = self.tpl_adventure["claim_reward"]
+        
+        # 1. Reach Home -> Adventure
+        if not self._back_to_home():
+            log_warning("[adventure] could not reach home screen")
+            return False
+        if not self.wait_and_tap(icon_adventure_tpl, timeout=5):
+            log_warning("[adventure] icon_adventure not found")
+            return False
+        if not self.wait_for_template(is_adventure_tpl, timeout=15):
+            log_warning("[adventure] is_adventure not reached")
             return False
 
         # 2. Open the Dungeon.
@@ -230,6 +249,12 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
             log_warning("[dungeon] is_dungeon not reached")
             return False
         # 2.1. Optional next-floor popup.
+        claim_reward = self.find_template(claim_reward_tpl, last_screen=False)
+        if claim_reward:
+            log_info("[dungeon] claim_reward found, tapping to claim")
+            self.tap(*claim_reward[:2])
+            self._tap_to_continue()
+            
         if self.wait_and_tap(next_floor_tpl, timeout=10):
             log_info("[dungeon] next_floor found, tapping to enter next floor")
             self.safe_sleep(2.0)
@@ -252,6 +277,44 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
                 return False
 
         return False
+    # ----- Adventure -> Luxurious Trip
+    def handle_activity_luxurious_trip(self) -> bool:
+        is_adventure_tpl = self.tpl_adventure["is_adventure"]
+        icon_adventure_tpl = self.tpl_adventure["icon_adventure"]
+        icon_luxurious_trip_tpl = self.tpl_adventure["icon_luxurious_trip"]
+        is_luxurious_trip_tpl = self.tpl_adventure["is_luxurious_trip"]
+
+        # 1. Reach Home -> Adventure
+        if not self._back_to_home():
+            log_warning("[adventure] could not reach home screen")
+            return False
+        if not self.wait_and_tap(icon_adventure_tpl, timeout=5):
+            log_warning("[adventure] icon_adventure not found")
+            return False
+        if not self.wait_for_template(is_adventure_tpl, timeout=15):
+            log_warning("[adventure] is_adventure not reached")
+            return False
+
+        #2. Open the Luxurious Trip.
+        if not self.wait_and_tap(icon_luxurious_trip_tpl, timeout=5):
+            log_warning("[luxurious_trip] icon_luxurious_trip not found")
+            return False
+        if not self.wait_for_template(is_luxurious_trip_tpl, timeout=15):
+            log_warning("[luxurious_trip] is_luxurious_trip not reached")
+            return False
+        
+        #3. Toggle auto trip and start the trip.
+        if not self.wait_and_tap(self.tpl_adventure["toggle_auto_trip"], timeout=5):
+            log_warning("[luxurious_trip] toggle_auto_trip not found")
+            return False
+        if not self.wait_and_tap(self.tpl_adventure["bt_start_trip"], timeout=5):
+            log_warning("[luxurious_trip] bt_start_trip not found")
+            return False
+        if not self.wait_and_tap(self.tpl_adventure["bt_comfirm_trip"], timeout=20):
+            log_warning("[luxurious_trip] bt_comfirm_trip not found")
+            return False
+
+
 
     # ----- Main Story Elite Battle -----
     def handle_activity_main_story_elite_battle(self) -> bool:
@@ -270,16 +333,17 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
             log_warning("[elite] icon_elite_mode not found")
             return False
         self.safe_sleep(1.0)
-        if not self._start_elite_battle(battle_button_tpl):
-            return False
-
         # 3. Loop: wait for the battle button to reappear, then push through.
         while self.running:
-            if not self.wait_and_tap(battle_button_tpl, timeout=self.BATTLE_ENTRY_TIMEOUT):
+            if not self.wait_and_tap(battle_button_tpl, timeout=300):
+                log_warning("[elite] battle_button not found")
                 return False
-            if not self._start_elite_battle(battle_button_tpl):
+            if not self.wait_region_has_text(
+                "Restraining Enemy Hero",
+                region=self.REGION_ELITE_CHECK, timeout=15,
+            ):
                 return False
-
+            self.tap(*self.TAP_PREPARATION_CONTINUE)
         return False
 
     # ==================== Private helpers ====================
@@ -306,27 +370,6 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
         return self.wait_for_template(
             is_main_story_tpl, timeout=5,
         )
-
-    def _enter_adventure(
-        self, is_adventure_tpl: str, icon_adventure_tpl: str, back_button_tpl: str,
-    ) -> bool:
-        """Make sure we are on the Adventure screen.
-
-        Taps Back -> Home -> Adventure icon if we aren't already there.
-        """
-        if self.wait_for_template(is_adventure_tpl, timeout=5):
-            return True
-        log_warning("[adventure] is_adventure not found, recovering")
-        if not self._back_to_home():
-            log_warning("[adventure] could not reach home screen")
-            return False
-        if not self.wait_and_tap(icon_adventure_tpl, timeout=5):
-            log_warning("[adventure] icon_adventure not found")
-            return False
-        if not self.wait_for_template(is_adventure_tpl, timeout=15):
-            log_warning("[adventure] is_adventure not reached")
-            return False
-        return True
 
     def _back_to_home(self, max_attempts: int = None) -> bool:
         """Tap Back repeatedly until the home screen is reached.
@@ -401,18 +444,6 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
             return False
         return self._wait_preparation_and_continue()
 
-    def _start_elite_battle(self, battle_button_tpl: str) -> bool:
-        """Tap the battle button, wait for the elite check, and continue."""
-        if not self.wait_and_tap(battle_button_tpl, timeout=10):
-            log_warning("[elite] battle_button not found")
-            return False
-        if not self.wait_region_has_text(
-            "Restraining Enemy Hero",
-            region=self.REGION_ELITE_CHECK, timeout=15,
-        ):
-            return False
-        return self.tap(*self.TAP_PREPARATION_CONTINUE)
-
     def _wait_preparation_and_continue(self) -> bool:
         """Wait for the Preparation screen, then tap 'Tap to continue'."""
         if not self.wait_region_has_text(
@@ -421,6 +452,11 @@ class GirlWars(SpeedhackMixin, BaseGameAutomation):
             return False
         return self.tap(*self.TAP_PREPARATION_CONTINUE)
 
-
+    def _tap_to_continue(self) -> bool:
+        tpl = self.tpl_common.get("tap_to_continue")
+        result = self.wait_and_tap(tpl,5)
+        if result:
+            log_success(f"[tap_to_continue] tapped {tpl}")
+        return result
 if __name__ == "__main__":
     GirlWars().start()

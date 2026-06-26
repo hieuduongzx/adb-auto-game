@@ -42,6 +42,11 @@
       "custom": {
         "speed": 2.0
       }
+    },
+    {
+      "id": "luxurious_trip",
+      "enabled": false,
+      "poll_interval": 1.0
     }
   ]
 }
