@@ -27,9 +27,6 @@ class SpeedhackMixin:
     SPEEDHACK_MAX = 5.0
     SPEEDHACK_DEFAULT = 1.0
     SPEEDHACK_POLL_INTERVAL = 999999.0
-    # Default strategy: 'auto' (Unity timeScale → clock fallback) | 'unity' |
-    # 'clock'. The user can override this per-run via the method dropdown.
-    SPEEDHACK_DEFAULT_METHOD = "auto"
 
     def setup_speedhack(
         self,
@@ -77,17 +74,6 @@ class SpeedhackMixin:
                     "default": default_value,
                     "suffix": "x",
                 },
-                {
-                    "key": "method",
-                    "type": "select",
-                    "label": "Phương pháp",
-                    "default": self.SPEEDHACK_DEFAULT_METHOD,
-                    "options": [
-                        {"value": "auto",  "label": "Tự động (khuyên dùng)"},
-                        {"value": "unity", "label": "Unity (timeScale)"},
-                        {"value": "clock", "label": "Clock (mọi engine)"},
-                    ],
-                },
             ],
         )
 
@@ -102,17 +88,6 @@ class SpeedhackMixin:
                 return float(value)
         return self.SPEEDHACK_DEFAULT
 
-    @property
-    def speedhack_method(self) -> str:
-        """Selected strategy ('auto'|'unity'|'clock'), from the custom setting."""
-        activity_map = getattr(self, "_activity_map", {})
-        activity = activity_map.get(self.SPEEDHACK_ACTIVITY_ID)
-        if activity:
-            value = activity.custom_values.get("method")
-            if value:
-                return str(value)
-        return self.SPEEDHACK_DEFAULT_METHOD
-
     def apply_custom_setting(self, activity_id: str, key: str, value: Any) -> None:
         """Apply speed changes immediately while the speedhack is active."""
         super().apply_custom_setting(activity_id, key, value)
@@ -122,10 +97,6 @@ class SpeedhackMixin:
             if getattr(self, "speedhack_enabled", False) and self.speedhack.available:
                 log_info(f"[speedhack] applying new scale {value}")
                 self.speedhack.set_scale(float(value))
-        elif key == "method":
-            # Re-injects with the new strategy if the speedhack is already live.
-            log_info(f"[speedhack] applying method {value}")
-            self.speedhack.set_method(str(value))
 
     def set_activity_enabled(self, activity_id: str, enabled: bool):
         """Reset the speedhack when its background task is disabled."""
@@ -151,9 +122,6 @@ class SpeedhackMixin:
         if not self.speedhack.available:
             log_warning("[speedhack] frida-inject binary not found in vendor/frida/")
             return False
-        # Apply the persisted method before injecting so the right strategy is
-        # baked into the very first script push (set_method is a no-op if equal).
-        self.speedhack.set_method(self.speedhack_method)
         ok = self.speedhack.set_scale(self.speedhack_scale)
         if ok:
             log_success(f"[speedhack] enabled at {self.speedhack_scale}x")

@@ -1,0 +1,497 @@
+{
+  "name": "My Workflow",
+  "version": 2,
+  "templatesDir": "out",
+  "functions": [
+    {
+      "id": "fn_1b8p7",
+      "name": "GoHome",
+      "graph": {
+        "nodes": [
+          {
+            "id": "nnbl1xyh",
+            "type": "start",
+            "x": 60,
+            "y": 70,
+            "params": {}
+          },
+          {
+            "id": "nf26ye60",
+            "type": "loop",
+            "x": 300,
+            "y": 60,
+            "params": {
+              "count": 3
+            }
+          },
+          {
+            "id": "n0bhk1f7",
+            "type": "if_image",
+            "x": 480,
+            "y": 60,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\home\\is_home.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nnzj3c3q",
+            "type": "end",
+            "x": 680,
+            "y": 60,
+            "params": {}
+          },
+          {
+            "id": "n8wxb1pk",
+            "type": "tap_image",
+            "x": 680,
+            "y": 120,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\bt_home.png",
+              "threshold": 0.85,
+              "timeout": 5
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nnbl1xyh",
+            "fromPort": "out",
+            "to": "nf26ye60"
+          },
+          {
+            "from": "nf26ye60",
+            "fromPort": "body",
+            "to": "n0bhk1f7"
+          },
+          {
+            "from": "n0bhk1f7",
+            "fromPort": "true",
+            "to": "nnzj3c3q"
+          },
+          {
+            "from": "n0bhk1f7",
+            "fromPort": "false",
+            "to": "n8wxb1pk"
+          },
+          {
+            "from": "n8wxb1pk",
+            "fromPort": "true",
+            "to": "nf26ye60"
+          }
+        ]
+      }
+    },
+    {
+      "id": "fn_51z6t",
+      "name": "HandleBattle",
+      "graph": {
+        "nodes": [
+          {
+            "id": "hb_start",
+            "type": "start",
+            "x": 40,
+            "y": 160,
+            "params": {}
+          },
+          {
+            "id": "hb_tap",
+            "type": "tap",
+            "x": 800,
+            "y": 200,
+            "params": {
+              "target": "pos",
+              "x": 1014,
+              "y": 1043
+            }
+          },
+          {
+            "id": "nlvgier2",
+            "type": "parallel",
+            "x": 260,
+            "y": 160,
+            "params": {}
+          },
+          {
+            "id": "nhvckkm8",
+            "type": "wait_image",
+            "x": 600,
+            "y": 200,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\battle\\check_end_battle.png",
+              "threshold": 0.85,
+              "timeout": 180,
+              "delay": 3
+            }
+          },
+          {
+            "id": "n4x4gov3",
+            "type": "end",
+            "x": 620,
+            "y": 420,
+            "params": {}
+          },
+          {
+            "id": "n402w8vf",
+            "type": "wait_image",
+            "x": 600,
+            "y": 40,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\bt_skip_dialog.png",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 10
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "hb_start",
+            "fromPort": "out",
+            "to": "nlvgier2"
+          },
+          {
+            "from": "nhvckkm8",
+            "fromPort": "true",
+            "to": "hb_tap"
+          },
+          {
+            "from": "nlvgier2",
+            "fromPort": "2",
+            "to": "nhvckkm8"
+          },
+          {
+            "from": "nlvgier2",
+            "fromPort": "done",
+            "to": "n4x4gov3"
+          },
+          {
+            "from": "nlvgier2",
+            "fromPort": "1",
+            "to": "n402w8vf"
+          }
+        ]
+      }
+    }
+  ],
+  "activities": [
+    {
+      "id": "sequence_xkc1",
+      "name": "Hoạt động 1",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "n8zaamqp",
+            "type": "start",
+            "x": 60,
+            "y": 60,
+            "params": {}
+          },
+          {
+            "id": "nw56tlaf",
+            "type": "call",
+            "x": 240,
+            "y": 60,
+            "params": {
+              "fn": "fn_1b8p7"
+            }
+          },
+          {
+            "id": "nbtktklt",
+            "type": "tap_image",
+            "x": 440,
+            "y": 60,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\home\\bt_patrol.png",
+              "threshold": 0.85,
+              "timeout": 5
+            }
+          },
+          {
+            "id": "nw5evhqs",
+            "type": "tap_image",
+            "x": 440,
+            "y": 180,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\patrol\\euphoria_city\\icon_20260627_162221_334x56.png",
+              "threshold": 0.85,
+              "timeout": 5
+            },
+            "note": "ICON"
+          },
+          {
+            "id": "nwqhjkej",
+            "type": "tap_image",
+            "x": 440,
+            "y": 300,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\patrol\\euphoria_city\\icon_20260627_162341_135x69.png",
+              "threshold": 0.85,
+              "timeout": 5
+            }
+          },
+          {
+            "id": "nntahch3",
+            "type": "tap_image",
+            "x": 440,
+            "y": 440,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\patrol\\euphoria_city\\icon_20260627_162353_102x39.png",
+              "threshold": 0.85,
+              "timeout": 5
+            }
+          },
+          {
+            "id": "nvrwjwxu",
+            "type": "tap",
+            "x": 620,
+            "y": 120,
+            "params": {
+              "target": "pos",
+              "x": 976,
+              "y": 975
+            },
+            "stackParent": "npadkj8u",
+            "stackPort": "out"
+          },
+          {
+            "id": "n0ayfcvd",
+            "type": "tap_image",
+            "x": 800,
+            "y": 60,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\patrol\\euphoria_city\\icon_20260627_162554_40x45.png",
+              "threshold": 0.85,
+              "timeout": 5
+            },
+            "showPreview": true
+          },
+          {
+            "id": "nrlk3r72",
+            "type": "tap_image",
+            "x": 980,
+            "y": 60,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\patrol\\euphoria_city\\icon_20260627_162810_113x119.png",
+              "threshold": 0.85,
+              "timeout": 5
+            }
+          },
+          {
+            "id": "nw51gs55",
+            "type": "tap_image",
+            "x": 1160,
+            "y": 240,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\patrol\\euphoria_city\\icon_20260627_162839_144x46.png",
+              "threshold": 0.85,
+              "timeout": 10,
+              "taps": "2"
+            }
+          },
+          {
+            "id": "npadkj8u",
+            "type": "wait",
+            "x": 620,
+            "y": 60,
+            "params": {
+              "seconds": 2
+            }
+          },
+          {
+            "id": "nrdygykt",
+            "type": "loop",
+            "x": 980,
+            "y": 240,
+            "params": {
+              "count": 999
+            }
+          },
+          {
+            "id": "n4ox2mjt",
+            "type": "call",
+            "x": 1520,
+            "y": 300,
+            "params": {
+              "fn": "fn_51z6t"
+            }
+          },
+          {
+            "id": "nbu24xh7",
+            "type": "if_image",
+            "x": 1340,
+            "y": 240,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\patrol\\euphoria_city\\icon_20260627_162839_144x46.png",
+              "threshold": 0.85,
+              "negate": false
+            },
+            "showPreview": true
+          },
+          {
+            "id": "n0a1aqiv",
+            "type": "tap",
+            "x": 1520,
+            "y": 240,
+            "params": {
+              "target": "found",
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": "n2p1c7xe",
+            "type": "wait_image",
+            "x": 1520,
+            "y": 340,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\src\\games\\echocalypse\\templates\\patrol\\euphoria_city\\icon_20260627_162839_144x46.png",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "n8zaamqp",
+            "fromPort": "out",
+            "to": "nw56tlaf"
+          },
+          {
+            "from": "nw56tlaf",
+            "fromPort": "out",
+            "to": "nbtktklt"
+          },
+          {
+            "from": "nbtktklt",
+            "fromPort": "true",
+            "to": "nw5evhqs"
+          },
+          {
+            "from": "nw5evhqs",
+            "fromPort": "true",
+            "to": "nwqhjkej"
+          },
+          {
+            "from": "nwqhjkej",
+            "fromPort": "true",
+            "to": "nntahch3"
+          },
+          {
+            "from": "n0ayfcvd",
+            "fromPort": "true",
+            "to": "nrlk3r72"
+          },
+          {
+            "from": "nrlk3r72",
+            "fromPort": "true",
+            "to": "nrdygykt"
+          },
+          {
+            "from": "nrdygykt",
+            "fromPort": "body",
+            "to": "nw51gs55"
+          },
+          {
+            "from": "nntahch3",
+            "fromPort": "true",
+            "to": "npadkj8u"
+          },
+          {
+            "from": "nw51gs55",
+            "fromPort": "true",
+            "to": "nbu24xh7"
+          },
+          {
+            "from": "nbu24xh7",
+            "fromPort": "true",
+            "to": "n0a1aqiv"
+          },
+          {
+            "from": "n0a1aqiv",
+            "fromPort": "out",
+            "to": "n4ox2mjt"
+          },
+          {
+            "from": "n4ox2mjt",
+            "fromPort": "out",
+            "to": "n2p1c7xe"
+          },
+          {
+            "from": "n2p1c7xe",
+            "fromPort": "true",
+            "to": "nrdygykt"
+          },
+          {
+            "from": "npadkj8u",
+            "fromPort": "out",
+            "to": "nvrwjwxu"
+          },
+          {
+            "from": "nvrwjwxu",
+            "fromPort": "out",
+            "to": "n0ayfcvd"
+          }
+        ]
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_xru6",
+      "name": "Hoạt động 2",
+      "type": "sequence",
+      "enabled": false,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nujo11f2",
+            "type": "start",
+            "x": 60,
+            "y": 70,
+            "params": {}
+          },
+          {
+            "id": "nl1uxpmx",
+            "type": "wait",
+            "x": 300,
+            "y": 60,
+            "params": {
+              "seconds": 5
+            }
+          },
+          {
+            "id": "nm4lafbq",
+            "type": "tap_random",
+            "x": 500,
+            "y": 60,
+            "params": {
+              "x": 0,
+              "y": 0,
+              "w": 100,
+              "h": 100
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nujo11f2",
+            "fromPort": "out",
+            "to": "nl1uxpmx"
+          },
+          {
+            "from": "nl1uxpmx",
+            "fromPort": "out",
+            "to": "nm4lafbq"
+          }
+        ]
+      },
+      "maxRetries": 1
+    }
+  ]
+}

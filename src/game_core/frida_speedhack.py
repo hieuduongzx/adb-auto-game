@@ -1,25 +1,22 @@
 """
-Runtime speedhack helper for Unity/IL2CPP (and Mono) games using Frida inject.
+Runtime speedhack helper for Android games using Frida inject.
 
 This manager pushes a JavaScript payload to the Android device and runs
 ``frida-inject`` against the target process. It avoids needing a persistent
 ``frida-server`` connection, which is fragile on some emulators (e.g.
-LDPlayer). The injected script tries, in order:
+LDPlayer). The injected script scales game time by hooking ``clock_gettime``
+in ``libc.so`` to stretch ``CLOCK_MONOTONIC`` process-wide:
 
-1. Drive ``UnityEngine.Time.timeScale`` through the ``il2cpp_*`` C API: resolve
-   the NATIVE set_timeScale pointer (``il2cpp_resolve_icall`` or
-   ``il2cpp_method_get_pointer``) and call it directly -- never via
-   ``il2cpp_runtime_invoke`` (which stalls on GC safepoints during scene
-   loads). This is the preferred path: it hooks nothing on the hot path, so
-   scene loads stay smooth, and it does not allocate executable pages that
-   protected titles crash on. A 50ms ticker re-asserts the scale after the game
-   resets it on scene changes.
-2. Call ``UnityEngine.Time.set_timeScale`` if an IL2CPP symbol is exported.
-3. Hook ``clock_gettime`` in ``libc.so`` with a native CModule (opt-in via
-   ``use_cmodule``) to scale monotonic time process-wide.
-4. Same ``clock_gettime`` hook in plain JS as a last-resort fallback. NOTE:
-   this funnels a hot-path syscall through Frida's JS lock and can stall the
-   game during scene-load thread storms -- only used when nothing else works.
+1. A native CModule hook (opt-in via ``use_cmodule``) — every call stays in
+   compiled C, so it is smooth even at high scales. NOTE: it compiles a fresh
+   executable page with TinyCC, which some protected titles detect and crash
+   on at inject time.
+2. A plain-JS hook as the default / fallback. This funnels a hot-path syscall
+   through Frida's JS lock, but survives on protected titles where the CModule
+   path crashes.
+
+This engine-agnostic approach (GameGuardian-style) works regardless of whether
+the title is Unity, Mono, or native.
 
 Once injected, the script stays alive and polls a system property for the
 desired scale, so the host can change speed LIVE (just ``setprop``) without
@@ -65,254 +62,15 @@ _INJECT_SCRIPT = """
 try { Interceptor.detachAll(); } catch (e) {}
 
 var currentScale = 1.0;
-var hookMode = 'none';        // 'il2cpp-timescale' | 'timescale' | 'clock-cmodule' | 'clock-js'
+var hookMode = 'none';        // 'clock-cmodule' | 'clock-js'
 var clockScaleBuf = null;     // Memory(8) holding the live scale for the CModule
-var timeScaleSetter = null;   // NativeFunction(UnityEngine.Time.set_timeScale)
 var jsHookInstalled = false;
 var baseByClock = {};         // state for the JS fallback hook
 var lastScaledMs = 0;         // monotonic floor: scaled CLOCK_MONOTONIC never decreases
 
-// IL2CPP Time.timeScale state (preferred strategy: no hot-path hook at all).
-// The resolved native set_timeScale pointer is stored in timeScaleSetter above.
-var il2cpp = {};                 // resolved il2cpp_* NativeFunctions
-
 function log(msg) {
     send(msg);
     try { console.log(msg); } catch (e) {}
-}
-
-/* ----------------- IL2CPP / Unity Time.timeScale resolution ----------------- */
-function findIl2CppModule() {
-    const modules = Process.enumerateModules();
-    const names = ['libil2cpp.so', 'libunity.so'];
-    for (let i = 0; i < names.length; i++) {
-        const m = modules.find(function(mod) { return mod.name === names[i]; });
-        if (m) return m;
-    }
-    return modules.find(function(mod) {
-        return mod.name.indexOf('libil2cpp') !== -1 ||
-               mod.name.indexOf('libunity') !== -1;
-    });
-}
-
-function findExport(symbols) {
-    const modules = Process.enumerateModules();
-    for (let i = 0; i < modules.length; i++) {
-        const mod = modules[i];
-        const name = mod.name || mod.path;
-        if (!name) continue;
-        let exports;
-        try {
-            exports = mod.enumerateExports();
-        } catch (e) {
-            continue;
-        }
-        for (let j = 0; j < exports.length; j++) {
-            const exp = exports[j];
-            if (exp.type !== 'function' || !exp.name) continue;
-            for (let k = 0; k < symbols.length; k++) {
-                if (exp.name === symbols[k] || exp.name.toLowerCase() === symbols[k].toLowerCase()) {
-                    log('resolved ' + exp.name + ' in ' + name + ' at ' + exp.address);
-                    return exp.address;
-                }
-            }
-        }
-    }
-    return null;
-}
-
-/* ============ Preferred strategy: UnityEngine.Time.timeScale via il2cpp ======
- * Instead of faking clock_gettime (a hot-path syscall that either freezes the
- * game through Frida's JS lock or crashes protected titles when hooked with a
- * native CModule), drive the engine's own time multiplier.
- *
- * CRUCIAL: we resolve the NATIVE function pointer of set_timeScale and call it
- * directly -- we do NOT use il2cpp_runtime_invoke. runtime_invoke performs a
- * thread-state transition + a GC safepoint on every call and boxes return
- * values; calling it repeatedly from Frida's (GC-unregistered) thread while a
- * scene load is running GC stalls the process == the freeze we kept hitting.
- * set_timeScale's native impl is a trivial static-field write with no GC
- * interaction, so calling its pointer directly is safe from any thread and
- * costs nothing. This mirrors the proven C++ BaseUnity reference (resolve via
- * il2cpp_resolve_icall / il2cpp_method_get_pointer, then call the ptr). */
-function resolveIl2cppApi() {
-    const mod = Process.findModuleByName('libil2cpp.so');
-    if (!mod) {
-        // On x86_64 emulators (MuMuPlayer 12, LDPlayer 9) running ARM64 APKs via native
-        // bridge (libnb.so), libil2cpp.so is loaded under the translated realm and is
-        // invisible to Process.enumerateModules(). frida --realm=emulated is rejected on
-        // these hosts ("process is not using emulation"). il2cpp strategy unavailable here;
-        // will fall back to clock_gettime hook.
-        log('libil2cpp.so not found in module list (if on x86_64 emulator + ARM64 APK, native-bridge hides it from Frida)');
-        return false;
-    }
-    function imp(name, ret, args, required) {
-        let addr = null;
-        try { addr = mod.findExportByName(name); } catch (e) {}
-        if (!addr) { if (required) log('il2cpp export missing: ' + name); return false; }
-        try { il2cpp[name] = new NativeFunction(addr, ret, args); return true; }
-        catch (e) { log('il2cpp NativeFunction ' + name + ' failed: ' + e.message); return false; }
-    }
-    // Fast path: resolve_icall hands back the native pointer directly.
-    imp('il2cpp_resolve_icall', 'pointer', ['pointer'], false);
-    // Slow path: walk assemblies -> class -> method -> native pointer.
-    const slow =
-        imp('il2cpp_domain_get', 'pointer', [], true) &&
-        imp('il2cpp_domain_get_assemblies', 'pointer', ['pointer', 'pointer'], true) &&
-        imp('il2cpp_assembly_get_image', 'pointer', ['pointer'], true) &&
-        imp('il2cpp_class_from_name', 'pointer', ['pointer', 'pointer', 'pointer'], true) &&
-        imp('il2cpp_class_get_method_from_name', 'pointer', ['pointer', 'pointer', 'int'], true);
-    imp('il2cpp_method_get_pointer', 'pointer', ['pointer'], false);
-    imp('il2cpp_thread_attach', 'pointer', ['pointer'], false);
-    if (!il2cpp['il2cpp_resolve_icall'] && !slow) {
-        log('no usable il2cpp resolution path');
-        return false;
-    }
-    return true;
-}
-
-// Walk the loaded assemblies for UnityEngine.Time::<methodName> and return its
-// MethodInfo*, then convert that to the JIT-compiled native code pointer.
-function findTimeMethodPointer(methodName, argCount) {
-    if (!il2cpp['il2cpp_domain_get']) return null;
-    const domain = il2cpp['il2cpp_domain_get']();
-    if (!domain || domain.isNull()) return null;
-    try { if (il2cpp['il2cpp_thread_attach']) il2cpp['il2cpp_thread_attach'](domain); } catch (e) {}
-
-    const sizePtr = Memory.alloc(Process.pointerSize);
-    const assemblies = il2cpp['il2cpp_domain_get_assemblies'](domain, sizePtr);
-    const count = sizePtr.readUInt();
-    const nsBuf = Memory.allocUtf8String('UnityEngine');
-    const nameBuf = Memory.allocUtf8String('Time');
-    const mNameBuf = Memory.allocUtf8String(methodName);
-    for (let i = 0; i < count; i++) {
-        const asm = assemblies.add(i * Process.pointerSize).readPointer();
-        if (asm.isNull()) continue;
-        const image = il2cpp['il2cpp_assembly_get_image'](asm);
-        if (image.isNull()) continue;
-        const klass = il2cpp['il2cpp_class_from_name'](image, nsBuf, nameBuf);
-        if (klass.isNull()) continue;
-        const method = il2cpp['il2cpp_class_get_method_from_name'](klass, mNameBuf, argCount);
-        if (!method || method.isNull()) continue;
-        if (il2cpp['il2cpp_method_get_pointer']) {
-            const p = il2cpp['il2cpp_method_get_pointer'](method);
-            if (p && !p.isNull()) return p;
-        }
-        // Fallback: the JIT code pointer is the first field of MethodInfo.
-        try {
-            const p = method.readPointer();
-            if (p && !p.isNull()) return p;
-        } catch (e) {}
-    }
-    return null;
-}
-
-function resolveSetTimeScaleAddr() {
-    // Fast path first.
-    if (il2cpp['il2cpp_resolve_icall']) {
-        try {
-            // Include parameter type — resolve_icall requires the full icall name with
-            // signature on most Unity IL2CPP builds; bare name fails when the icall table
-            // is keyed by the full descriptor.
-            const namePtr = Memory.allocUtf8String('UnityEngine.Time::set_timeScale(System.Single)');
-            const addr = il2cpp['il2cpp_resolve_icall'](namePtr);
-            if (addr && !addr.isNull()) { log('set_timeScale via resolve_icall'); return addr; }
-            // Fallback: some Unity versions store the icall without parameter suffix.
-            const namePtrBare = Memory.allocUtf8String('UnityEngine.Time::set_timeScale');
-            const addrBare = il2cpp['il2cpp_resolve_icall'](namePtrBare);
-            if (addrBare && !addrBare.isNull()) { log('set_timeScale via resolve_icall (bare name)'); return addrBare; }
-        } catch (e) {}
-    }
-    const addr = findTimeMethodPointer('set_timeScale', 1);
-    if (addr) log('set_timeScale via domain walk');
-    return addr;
-}
-
-function installIl2cppTimeScale(scale) {
-    try {
-        if (!timeScaleSetter) {
-            if (!resolveIl2cppApi()) return false;
-            const addr = resolveSetTimeScaleAddr();
-            if (!addr) { log('il2cpp: UnityEngine.Time::set_timeScale not found'); return false; }
-            // Direct native call. Frida routes 'float' through the correct FP
-            // register per ABI, so no SIMD-register marshalling worries.
-            timeScaleSetter = new NativeFunction(addr, 'void', ['float']);
-        }
-        timeScaleSetter(scale);
-        currentScale = scale;
-        hookMode = 'il2cpp-timescale';
-        log('il2cpp Time.timeScale applied: ' + scale);
-        return true;
-    } catch (e) {
-        log('il2cpp timeScale failed: ' + e.message);
-        return false;
-    }
-}
-
-// The game resets Time.timeScale to 1.0 on scene changes; re-assert our value
-// every tick. The setter is a cheap static-field write (no GC, no read-back, no
-// boxing), so calling it unconditionally is fine and needs no get_timeScale.
-function reapplyTimeScaleIfReset() {
-    if (currentScale === 1.0 || !timeScaleSetter) return;
-    try { timeScaleSetter(currentScale); } catch (e) {}
-}
-
-function resolveTimeScale() {
-    const candidateSetters = [
-        '_ZN11UnityEngine4Time12set_timeScaleEf',
-        'set_timeScale@UnityEngine.Time@@SAXM',
-        '?set_timeScale@Time@UnityEngine@@SAXM@Z',
-        'UnityEngine.Time.set_timeScale',
-        'UnityEngine_Time_set_timeScale',
-        'set_timeScale',
-    ];
-
-    let setter = findExport(candidateSetters);
-    const m = findIl2CppModule();
-    if (m) {
-        let symbols;
-        try {
-            symbols = m.enumerateExports();
-        } catch (e) {
-            symbols = [];
-            log('enumerate exports failed: ' + e.message);
-        }
-        if (!setter) {
-            for (let i = 0; i < symbols.length; i++) {
-                const s = symbols[i];
-                if (s.type !== 'function' || !s.name) continue;
-                const lower = s.name.toLowerCase();
-                if (lower.indexOf('set_timescale') !== -1 || lower.indexOf('set_time_scale') !== -1) {
-                    setter = s.address; break;
-                }
-            }
-        }
-    }
-
-    return { setter: setter };
-}
-
-function installTimeScale(scale) {
-    if (!timeScaleSetter) {
-        const ts = resolveTimeScale();
-        if (!ts || !ts.setter) return false;
-        try {
-            timeScaleSetter = new NativeFunction(ts.setter, 'void', ['float']);
-        } catch (e) {
-            log('timeScale NativeFunction failed: ' + e.message);
-            return false;
-        }
-    }
-    try {
-        timeScaleSetter(scale);
-        currentScale = scale;
-        hookMode = 'timescale';
-        log('Time.timeScale applied: ' + scale);
-        return true;
-    } catch (e) {
-        log('Time.timeScale failed: ' + e.message);
-        return false;
-    }
 }
 
 /* --------------- Native clock_gettime hook (CModule, no JS bridge) ----------
@@ -498,47 +256,20 @@ function installClockJs(scale) {
 }
 
 /* ----------------------- strategy selection + live update ------------------- */
-// SPEEDHACK_METHOD is replaced by the host: 'auto' | 'unity' | 'clock'.
-//   auto  -> try Unity timeScale first, fall back to the clock hook (default).
-//   unity -> ONLY drive UnityEngine.Time.timeScale (smoothest; Unity-only).
-//   clock -> ONLY hook libc clock_gettime (universal / GameGuardian-style).
+// Hook libc clock_gettime to scale CLOCK_MONOTONIC (universal / GameGuardian-
+// style). Native CModule first when enabled, else the JS fallback.
 function initHook(scale) {
-    var method = 'SPEEDHACK_METHOD';
-
-    if (method === 'unity') {
-        if (installIl2cppTimeScale(scale)) return true;
-        if (installTimeScale(scale)) return true;
-        if (scale === 1.0) { currentScale = 1.0; return true; }
-        log('error: Unity timeScale method unavailable for this game (not Unity / il2cpp hidden)');
-        return false;
-    }
-
-    if (method === 'clock') {
-        if (scale === 1.0) { currentScale = 1.0; return true; }
-        if (USE_CMODULE && installClockCModule(scale)) return true;
-        if (installClockJs(scale)) return true;
-        log('error: clock hook unavailable');
-        return false;
-    }
-
-    // auto (default): preferred Unity path, then the universal clock fallback.
-    if (installIl2cppTimeScale(scale)) return true;   // preferred: no hot-path hook
-    if (installTimeScale(scale)) return true;          // exported set_timeScale (rare)
     if (scale === 1.0) { currentScale = 1.0; return true; }
     if (USE_CMODULE && installClockCModule(scale)) return true;
     if (installClockJs(scale)) return true;
-    log('error: no speedhack strategy available');
+    log('error: clock hook unavailable');
     return false;
 }
 
 function applyScale(scale) {
     currentScale = scale;
-    if (hookMode === 'il2cpp-timescale' && timeScaleSetter) {
-        try { timeScaleSetter(scale); } catch (e) { log('re-apply il2cpp timeScale failed: ' + e.message); }
-    } else if (hookMode === 'clock-cmodule' && clockScaleBuf) {
+    if (hookMode === 'clock-cmodule' && clockScaleBuf) {
         clockScaleBuf.writeDouble(scale);            // native hook reads it live
-    } else if (hookMode === 'timescale' && timeScaleSetter) {
-        try { timeScaleSetter(scale); } catch (e) { log('re-apply timeScale failed: ' + e.message); }
     } else if (hookMode === 'clock-js') {
         /* currentScale is read live inside the JS hook */
     } else {
@@ -589,20 +320,12 @@ if (getPropFn) {
 } else {
     log('live scale channel unavailable (__system_property_get missing)');
 }
-
-// Dedicated fast restore ticker for il2cpp mode. The game zeroes/resets
-// Time.timeScale on every scene change; re-asserting at 50ms makes the speed
-// snap back almost instantly after a load (the setter is a trivial native
-// write, so this is essentially free).
-setInterval(function() {
-    if (hookMode === 'il2cpp-timescale') reapplyTimeScaleIfReset();
-}, 50);
 """
 
 
 class FridaSpeedhackManager:
     """
-    Best-effort manager for a Frida-based Unity time-scale speedhack.
+    Best-effort manager for a Frida-based clock_gettime time-scale speedhack.
 
     Args:
         package: Android package name of the target game.
@@ -630,7 +353,6 @@ class FridaSpeedhackManager:
         local_inject_binary: Optional[str] = None,
         device_id: Optional[str] = None,
         use_cmodule: bool = False,
-        method: str = "auto",
     ):
         self.package = package
         # Default to the JS clock hook. The native CModule hook is faster (no
@@ -639,9 +361,6 @@ class FridaSpeedhackManager:
         # inject time. The JS hook survives on those games; opt into CModule only
         # for titles proven to tolerate it.
         self._use_cmodule = use_cmodule
-        # Strategy selector baked into the injected script: 'auto' | 'unity' |
-        # 'clock'. Changing it requires a re-injection (see set_method).
-        self._method = str(method or "auto")
         self._target_scale = float(time_scale)
         self._current_scale: float = 1.0
         self._frida_inject_path = frida_inject_path
@@ -867,7 +586,6 @@ class FridaSpeedhackManager:
             .replace("TARGET_SCALE", f"{scale:.6f}")
             .replace("SCALE_PROP_NAME", self._scale_prop)
             .replace("USE_CMODULE", "true" if self._use_cmodule else "false")
-            .replace("SPEEDHACK_METHOD", self._method)
         )
         local_path = Path(tempfile.gettempdir()) / f"speedhack_{scale:.2f}.js"
         try:
@@ -1074,27 +792,6 @@ class FridaSpeedhackManager:
                 log_success("[speedhack] time scale reset to 1.0")
             else:
                 log_success(f"[speedhack] time scale set to {scale}")
-            return True
-
-    def set_method(self, method: str) -> bool:
-        """Select the speedhack strategy ('auto' | 'unity' | 'clock').
-
-        The strategy is baked into the injected script, so if an injection is
-        already live we restart it (at the current scale) for the new method to
-        take effect. No-op when the method is unchanged.
-        """
-        method = str(method or "auto")
-        with self._lock:
-            if method == self._method:
-                return True
-            self._method = method
-            log_info(f"[speedhack] method = {method}")
-            proc_alive = self._inject_proc is not None and self._inject_proc.poll() is None
-            if proc_alive and self._current_scale != 1.0:
-                scale = self._current_scale
-                self._stop_inject_proc()
-                # Re-inject with the new strategy at the same scale.
-                return self._inject_scale_locked(scale, keep_alive=True)
             return True
 
     def get_scale(self) -> Optional[float]:

@@ -119,6 +119,10 @@ class DevHelperAPI:
         self._ocr_reader: Optional[OCRReader] = None
         self._out_dir: str = DEFAULT_OUT_DIR
 
+        # Last directory a file dialog landed in, so dialogs reopen there instead
+        # of always defaulting to ./out.
+        self._last_dir: Optional[str] = None
+
         self._window: Optional[webview.Window] = None
         self._closing = False
         self._log_buffer: List[Dict] = []
@@ -690,6 +694,22 @@ class DevHelperAPI:
             log_info(f"Output folder: {self._out_dir}")
         return self._out_dir
 
+    # ── Dialog directory memory ────────────────────────────────────────────────
+
+    def _start_dir(self, fallback: str) -> str:
+        """Reopen dialogs in the last-used folder, else a sensible fallback."""
+        if self._last_dir and os.path.isdir(self._last_dir):
+            return self._last_dir
+        return fallback
+
+    def _remember_dir(self, path: str) -> None:
+        try:
+            d = os.path.dirname(str(path))
+            if d and os.path.isdir(d):
+                self._last_dir = d
+        except Exception:
+            pass
+
     # ── Template matching ────────────────────────────────────────────────────
 
     def pick_template(self) -> str:
@@ -700,7 +720,8 @@ class DevHelperAPI:
             if win is None:
                 log_warning("No window available for file dialog")
                 return ""
-            start_dir = self._out_dir if os.path.isdir(self._out_dir) else _PROJECT_ROOT
+            start_dir = self._start_dir(
+                self._out_dir if os.path.isdir(self._out_dir) else _PROJECT_ROOT)
             paths = win.create_file_dialog(
                 webview.OPEN_DIALOG,
                 directory=start_dir,
@@ -713,6 +734,7 @@ class DevHelperAPI:
         if not paths:
             return ""
         path = paths[0] if isinstance(paths, (list, tuple)) else paths
+        self._remember_dir(path)
         return str(path)
 
     def match_template(

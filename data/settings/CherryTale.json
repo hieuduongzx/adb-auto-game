@@ -11,27 +11,27 @@
   "activities": [
     {
       "id": "auto_phuc_loi",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 1.0
     },
     {
       "id": "auto_friend",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 1.0
     },
     {
       "id": "auto_thu",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 1.0
     },
     {
       "id": "auto_combat_vtgk",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 1.0
     },
     {
       "id": "auto_combat_arena",
-      "enabled": true,
+      "enabled": false,
       "poll_interval": 1.0
     },
     {
@@ -54,7 +54,8 @@
       "enabled": false,
       "poll_interval": 999999.0,
       "custom": {
-        "speed": 2.0
+        "speed": 2.0,
+        "method": "auto"
       }
     },
     {

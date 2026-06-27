@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workflow Runner</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root{
+  --bg:#eef0f3; --panel:#fff; --surface:#f7f9fc; --alt:#f3f5f9;
+  --border:#e4e7ec; --border2:#dde2e8; --line:#f1f3f6;
+  --ink:#19222e; --ink2:#41505f; --dim:#5a6573; --muted:#9aa3ae;
+  --accent:#2f6fed; --accent-bg:#eef5ff; --accent-bd:#d6e4f5;
+  --ok:#1f9254; --ok-bg:#e8f5ed; --ok-bd:#cfead9;
+  --warn:#9c6c12; --warn-bg:#fdf6e9; --err:#bb3a33; --err-bg:#fcefee; --err-bd:#eecdca;
+  --log-bg:#fbfcfd; --log-ink:#41505f; --log-muted:#b3bbc4;
+  --sans:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono","Cascadia Code","Consolas",monospace;
+  --r-sm:7px; --r-md:10px; color-scheme:light;
+}
+html,body{ height:100%; background:var(--bg); font-family:var(--sans); font-size:13px; color:var(--ink); -webkit-font-smoothing:antialiased; }
+body{ display:flex; flex-direction:column; overflow:hidden; user-select:none; }
+button{ font-family:var(--sans); font-size:inherit; cursor:pointer; border:none; background:none; padding:0; line-height:1; color:inherit; }
+input,select{ font-family:var(--sans); font-size:12px; background:var(--panel); color:var(--ink); border:1px solid var(--border2); border-radius:var(--r-sm); padding:6px 9px; }
+input:focus,select:focus{ outline:none; border-color:var(--accent); }
+::-webkit-scrollbar{ width:6px; height:6px; } ::-webkit-scrollbar-thumb{ background:#d3d9e0; border-radius:3px; }
+
+#app{ flex:1; display:flex; flex-direction:column; gap:8px; padding:9px; overflow:hidden; min-height:0; }
+.card{ background:var(--panel); border:1px solid var(--border); border-radius:var(--r-md); }
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:5px; height:30px; border-radius:8px;
+  font-weight:600; font-size:11.5px; transition:background .15s,opacity .15s; border:1px solid var(--border);
+  background:var(--panel); color:var(--dim); padding:0 11px; flex-shrink:0; }
+.btn:hover{ background:var(--alt); } .btn:disabled{ opacity:.5; cursor:not-allowed; }
+.btn.accent{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.btn.ok{ background:var(--ok); color:#fff; border-color:var(--ok); font-weight:700; }
+.btn.ok:hover{ background:#1b8049; }
+.btn.err{ border:1px solid var(--err-bd); background:var(--err-bg); color:var(--err); }
+.btn.err:hover{ background:#fae2e0; }
+.btn.sm{ height:26px; padding:0 9px; font-size:11px; }
+.spacer{ flex:1; }
+
+/* Header */
+#hdr{ padding:8px 10px; display:flex; align-items:center; gap:7px; }
+.device-wrap{ display:flex; align-items:center; gap:7px; flex:1; min-width:0; padding:5px 10px;
+  border:1px solid var(--border2); border-radius:8px; }
+#device-dot{ width:7px; height:7px; border-radius:50%; background:#d3d9e0; flex-shrink:0; transition:background .2s; }
+#device-dot.connected{ background:#2fa55a; }
+#device-select{ flex:1; min-width:0; border:none; background:transparent; font-weight:500; color:var(--dim); cursor:pointer; padding:0; }
+
+/* Flow bar */
+#flowbar{ padding:8px 10px; display:flex; align-items:center; gap:7px; }
+#flow-name{ font-size:13px; font-weight:700; color:var(--ink); flex:1; min-width:0; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+#flow-name.empty{ color:var(--muted); font-weight:500; }
+
+/* Controls */
+#ctrl{ padding:8px 10px; display:flex; align-items:center; gap:6px; }
+#ctrl .btn{ flex:1; }
+
+/* Activities */
+#acts-card{ flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+.acts-hdr{ display:flex; align-items:center; padding:8px 11px; border-bottom:1px solid var(--line); }
+.acts-hdr .t{ font-size:10.5px; font-weight:700; letter-spacing:.05em; color:var(--muted); text-transform:uppercase; }
+#acts-body{ flex:1; min-height:0; overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:8px; }
+.sec-label{ font-size:10px; font-weight:700; letter-spacing:.05em; color:var(--muted); text-transform:uppercase; margin:2px 0; }
+
+.act{ border:1px solid var(--border); border-radius:8px; padding:8px 10px; display:flex; flex-direction:column; gap:8px; }
+.act-hdr{ display:flex; align-items:center; gap:9px; }
+.act-vars{ display:none; flex-direction:column; gap:6px; padding-top:8px; border-top:1px solid var(--line); }
+.act.open .act-vars{ display:flex; }
+.act-gear{ width:26px; height:26px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--border2); border-radius:6px; background:var(--panel); color:var(--muted); cursor:pointer; }
+.act-gear:hover{ background:var(--alt); color:var(--ink); }
+.act-gear.active{ color:var(--accent); border-color:var(--accent-bd); background:var(--accent-bg); }
+.act-var{ display:flex; align-items:center; gap:8px; }
+.act-var-name{ flex:1; min-width:0; }
+.act-var-title{ font-size:12px; color:var(--ink); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.act-var-sub{ font-size:10px; color:var(--muted); font-family:var(--mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.act-var input[type=number],.act-var input[type=text]{ width:80px; text-align:right; padding:4px 6px; font-size:11px; }
+.act-var .cb{ width:18px; height:18px; border-radius:5px; border:1.5px solid #cfd5dd; background:var(--panel); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.act-var .cb.checked{ background:var(--accent); border-color:var(--accent); }
+.act-var .cb svg{ opacity:0; } .act-var .cb.checked svg{ opacity:1; }
+.act .cb{ width:18px; height:18px; border-radius:5px; border:1.5px solid #cfd5dd; background:var(--panel);
+  flex-shrink:0; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .12s,border-color .12s; }
+.act .cb.checked{ background:var(--accent); border-color:var(--accent); }
+.act .cb svg{ opacity:0; } .act .cb.checked svg{ opacity:1; }
+.act-status{ width:8px; height:8px; border-radius:50%; background:#d3d9e0; flex-shrink:0; }
+.act-status.running{ background:var(--accent); animation:pulse 1s infinite; }
+.act-status.completed{ background:var(--ok); } .act-status.failed{ background:var(--err); }
+@keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
+.act-main{ flex:1; min-width:0; }
+.act-name{ font-size:12.5px; font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.act-meta{ font-size:10.5px; color:var(--muted); font-family:var(--mono); margin-top:1px; }
+.act-int{ width:58px; text-align:right; padding:4px 6px; font-size:11px; font-family:var(--mono); }
+.empty-note{ font-size:12px; color:var(--muted); text-align:center; padding:24px 8px; line-height:1.6; }
+
+/* Log */
+#log-card{ flex-shrink:0; display:flex; flex-direction:column; height:170px; }
+.log-hdr{ display:flex; align-items:center; gap:6px; padding:7px 11px; border-bottom:1px solid var(--border); }
+.log-label{ font-size:10.5px; font-weight:700; letter-spacing:.05em; color:var(--muted); text-transform:uppercase; }
+.log-clear{ font-size:11px; font-weight:600; color:var(--muted); padding:2px 4px; }
+.log-clear:hover{ color:var(--dim); }
+.log-body{ flex:1; min-height:0; overflow-y:auto; padding:7px 10px; background:var(--log-bg); border-radius:0 0 var(--r-md) var(--r-md); }
+.log-line{ display:flex; gap:7px; font-family:var(--mono); font-size:10.5px; line-height:1.7; }
+.log-ts{ color:var(--log-muted); flex-shrink:0; } .log-tag{ font-weight:700; flex-shrink:0; }
+.log-msg{ color:var(--log-ink); white-space:normal; word-break:break-word; }
+.log-info{ color:#5b86c9; } .log-success{ color:#2fa55a; } .log-warning{ color:#c08a1e; } .log-error{ color:#cf4b43; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="hdr" class="card">
+    <div class="device-wrap">
+      <span id="device-dot"></span>
+      <select id="device-select" onchange="onDeviceChange(this.value)"><option value="">Đang quét…</option></select>
+    </div>
+    <button class="btn sm" onclick="api().refresh_devices()">Làm mới</button>
+  </div>
+
+  <div id="flowbar" class="card">
+    <span id="flow-name" class="empty">Chưa tải workflow</span>
+    <button class="btn sm accent" onclick="onLoadJson()">Load JSON</button>
+  </div>
+
+  <div id="ctrl" class="card">
+    <button class="btn ok"  id="btn-start" onclick="onStart()">Bắt đầu</button>
+    <button class="btn"     id="btn-pause" onclick="onPause()" disabled>Tạm dừng</button>
+    <button class="btn err" id="btn-stop"  onclick="onStop()" disabled>Dừng</button>
+  </div>
+
+  <div id="acts-card" class="card">
+    <div class="acts-hdr"><span class="t">Hoạt động</span></div>
+    <div id="acts-body">
+      <div class="empty-note">Nhấn <b>Load JSON</b> để tải một workflow đã xuất từ Dev Helper.</div>
+    </div>
+  </div>
+
+  <div id="log-card" class="card">
+    <div class="log-hdr">
+      <span class="log-label">Nhật ký</span><span class="spacer"></span>
+      <button class="log-clear" onclick="api().clear_log()">Xoá</button>
+    </div>
+    <div class="log-body" id="log-body"></div>
+  </div>
+
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const api=()=>window.pywebview.api;
+const LOG_TAG={info:"INF",success:"OK ",warning:"WRN",error:"ERR"};
+const S={ activities:[], running:false, paused:false, devices:[], connectedSerial:null };
+
+function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function setConnected(on){ $("device-dot").className=on?"connected":""; }
+
+function appendLog(e){
+  const body=$("log-body"), line=document.createElement("div");
+  line.className="log-line";
+  line.innerHTML=`<span class="log-ts">${e.ts}</span><span class="log-tag log-${e.level}">${LOG_TAG[e.level]||"INF"}</span><span class="log-msg">${escHtml(e.msg)}</span>`;
+  body.appendChild(line);
+  while(body.children.length>500) body.removeChild(body.firstChild);
+  body.scrollTop=body.scrollHeight;
+}
+
+function rebuildDevices(devices,connected){
+  const sel=$("device-select"); sel.innerHTML="";
+  if(!devices||!devices.length){
+    const o=document.createElement("option"); o.value=""; o.textContent="Không có thiết bị";
+    sel.appendChild(o); sel.disabled=true; return;
+  }
+  sel.disabled=false;
+  devices.forEach(d=>{ const o=document.createElement("option"); o.value=d.serial||"";
+    o.textContent=(d.name||d.serial)+(d.serial?` (${d.serial})`:""); sel.appendChild(o); });
+  sel.value=connected||S.connectedSerial||(devices[0]&&devices[0].serial)||"";
+}
+
+function renderActivities(){
+  const body=$("acts-body"); body.innerHTML="";
+  if(!S.activities.length){
+    body.innerHTML='<div class="empty-note">Nhấn <b>Load JSON</b> để tải một workflow đã xuất từ Dev Helper.</div>';
+    return;
+  }
+  const seq=S.activities.filter(a=>a.type!=="background");
+  const bg=S.activities.filter(a=>a.type==="background");
+  if(seq.length){ body.appendChild(label("Tuần tự")); seq.forEach(a=>body.appendChild(actEl(a))); }
+  if(bg.length){ body.appendChild(label("Chạy nền")); bg.forEach(a=>body.appendChild(actEl(a))); }
+}
+function label(t){ const d=document.createElement("div"); d.className="sec-label"; d.textContent=t; return d; }
+
+function actEl(a){
+  const el=document.createElement("div"); el.className="act"; el.dataset.id=a.id;
+  const check=`<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>`;
+  const meta = a.type==="background" ? `${a.nodeCount} node · mỗi ${a.pollInterval}s` : `${a.nodeCount} node · thử ${a.maxRetries}×`;
+  const hdr=document.createElement("div"); hdr.className="act-hdr";
+  hdr.innerHTML=
+    `<span class="cb ${a.enabled?"checked":""}" title="Bật/tắt">${check}</span>
+     <span class="act-status" data-status></span>
+     <div class="act-main"><div class="act-name">${escHtml(a.name)}</div><div class="act-meta">${meta}</div></div>`;
+  hdr.querySelector(".cb").onclick=()=>{ a.enabled=!a.enabled; hdr.querySelector(".cb").classList.toggle("checked",a.enabled); api().toggle_activity(a.id,a.enabled); };
+  if(a.type==="background"){
+    const inp=document.createElement("input"); inp.className="act-int"; inp.type="number"; inp.min="0.05"; inp.step="0.5"; inp.value=a.pollInterval;
+    inp.onchange=()=>{ a.pollInterval=parseFloat(inp.value)||1; api().set_interval(a.id,a.pollInterval); hdr.querySelector(".act-meta").textContent=`${a.nodeCount} node · mỗi ${a.pollInterval}s`; };
+    hdr.appendChild(inp);
+  }
+  if(a.vars && a.vars.length){
+    const gear=document.createElement("button"); gear.className="act-gear"; gear.title="Cài đặt";
+    gear.innerHTML=`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+    gear.onclick=()=>{ el.classList.toggle("open"); gear.classList.toggle("active",el.classList.contains("open")); };
+    hdr.appendChild(gear);
+  }
+  el.appendChild(hdr);
+  if(a.vars && a.vars.length) el.appendChild(actVars(a));
+  return el;
+}
+function actVars(a){
+  const box=document.createElement("div"); box.className="act-vars";
+  const check=`<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>`;
+  a.vars.forEach(v=>{
+    const row=document.createElement("div"); row.className="act-var";
+    const info=document.createElement("div"); info.className="act-var-name";
+    info.innerHTML=`<div class="act-var-title">${escHtml(v.label||v.name)}</div>`+
+      (v.label?`<div class="act-var-sub">${escHtml(v.name)}</div>`:"");
+    row.appendChild(info);
+    if((v.type||"bool")==="bool"){
+      const cb=document.createElement("span"); cb.className="cb"+(v.value?" checked":""); cb.innerHTML=check;
+      cb.onclick=()=>{ v.value=!v.value; cb.classList.toggle("checked",v.value); api().set_activity_var(a.id,v.name,v.value); };
+      row.appendChild(cb);
+    } else if(v.type==="select"){
+      const sel=document.createElement("select");
+      (v.options||[]).forEach(o=>{ const op=document.createElement("option"); op.value=op.textContent=o; if(String(v.value)===String(o))op.selected=true; sel.appendChild(op); });
+      sel.onchange=()=>{ v.value=sel.value; api().set_activity_var(a.id,v.name,sel.value); };
+      row.appendChild(sel);
+    } else {
+      const inp=document.createElement("input"); inp.type=v.type==="number"?"number":"text"; inp.value=(v.value!=null?v.value:"");
+      inp.onchange=()=>{ const val=v.type==="number"?(parseFloat(inp.value)||0):inp.value; v.value=val; api().set_activity_var(a.id,v.name,val); };
+      row.appendChild(inp);
+    }
+    box.appendChild(row);
+  });
+  return box;
+}
+function setActStatus(id,status){
+  const el=document.querySelector(`.act[data-id="${id}"] [data-status]`);
+  if(el) el.className="act-status "+(status||"");
+}
+
+function setRunning(running,paused){
+  S.running=running; S.paused=paused;
+  $("btn-start").disabled=running;
+  $("btn-stop").disabled=!running;
+  $("btn-pause").disabled=!running;
+  $("btn-pause").textContent=paused?"Tiếp tục":"Tạm dừng";
+}
+
+// ── Python events ──────────────────────────────────────────────────────────
+window.__recv=function(raw){
+  let ev; try{ev=JSON.parse(raw);}catch{return;}
+  const {type,data}=ev;
+  if(type==="log"){ appendLog(data); return; }
+  if(type==="log_cleared"){ $("log-body").innerHTML=""; return; }
+  if(type==="devices_update"){ S.devices=data.devices||[]; S.connectedSerial=data.serial||null; setConnected(!!data.connected); rebuildDevices(S.devices,data.serial); return; }
+  if(type==="device_status"){ S.connectedSerial=data.serial||null; setConnected(!!data.connected); rebuildDevices(S.devices,data.serial); return; }
+  if(type==="flow_loaded"){ applyFlow(data); return; }
+  if(type==="running_state"){ setRunning(!!data.running,!!data.paused); return; }
+  if(type==="activity_update"){ setActStatus(data.id,data.status); return; }
+};
+
+function applyFlow(data){
+  S.activities=data.activities||[];
+  const nm=$("flow-name");
+  nm.textContent=data.name||"(không tên)"; nm.classList.remove("empty");
+  renderActivities();
+}
+
+// ── Handlers ───────────────────────────────────────────────────────────────
+async function onLoadJson(){ const r=await api().load_json(); if(r&&r.ok) applyFlow(r); }
+async function onStart(){ await api().start(); }
+async function onStop(){ await api().stop(); }
+async function onPause(){ const r=await api().pause(); setRunning(S.running,!!r.paused); }
+async function onDeviceChange(serial){ if(serial){ S.connectedSerial=serial; await api().select_device(serial); } }
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init(){
+  let tries=0;
+  while(!(window.pywebview&&window.pywebview.api)&&tries<40){ await new Promise(r=>setTimeout(r,100)); tries++; }
+  if(!window.pywebview||!window.pywebview.api) return;
+  const st=await api().get_state();
+  S.connectedSerial=st.connectedSerial||null;
+  if(st.loaded) applyFlow({name:st.name,activities:st.activities});
+  setRunning(!!st.running,!!st.paused);
+  (st.log||[]).forEach(appendLog);
+}
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+</script>
+</body>
+</html>

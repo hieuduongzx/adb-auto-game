@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ADB Auto-Game · Workflow Designer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #eef0f3;
+  --panel:     #ffffff;
+  --surface:   #f7f9fc;
+  --alt:       #f3f5f9;
+  --border:    #e4e7ec;
+  --border2:   #dde2e8;
+  --line:      #f1f3f6;
+  --ink:       #19222e;
+  --ink2:      #41505f;
+  --dim:       #5a6573;
+  --muted:     #9aa3ae;
+  --accent:    #2f6fed;
+  --accent-bg: #eef5ff;
+  --accent-bd: #d6e4f5;
+  --ok:        #1f9254;
+  --ok-bg:     #e8f5ed;
+  --ok-bd:     #cfead9;
+  --warn:      #9c6c12;
+  --warn-bg:   #fdf6e9;
+  --err:       #bb3a33;
+  --err-bg:    #fcefee;
+  --err-bd:    #eecdca;
+  --log-bg:    #fbfcfd;
+  --log-ink:   #41505f;
+  --log-muted: #b3bbc4;
+  --sans: "IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono: "IBM Plex Mono","Cascadia Code","Consolas",monospace;
+  --r-sm: 7px; --r-md: 10px;
+  --ease: cubic-bezier(0.16,1,0.3,1);
+  color-scheme: light;
+}
+
+html, body { height: 100%; background: var(--bg); font-family: var(--sans);
+  font-size: 13px; color: var(--ink); -webkit-font-smoothing: antialiased; }
+body { display: flex; flex-direction: column; overflow: hidden; user-select: none; }
+
+button { font-family: var(--sans); font-size: inherit; cursor: pointer;
+  border: none; background: none; padding: 0; line-height: 1; color: inherit; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+input, select { font-family: var(--mono); font-size: 11.5px; background: var(--panel);
+  color: var(--ink); border: 1px solid var(--border2);
+  border-radius: var(--r-sm); padding: 5px 8px; }
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d3d9e0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #b8c1cc; }
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+#app { flex: 1; display: flex; flex-direction: column; gap: 7px;
+  padding: 8px 8px 4px; overflow: hidden; min-height: 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); }
+
+/* ── Toolbar ────────────────────────────────────────────────────────────── */
+#toolbar { padding: 7px 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.tb-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+  color: var(--muted); text-transform: uppercase; }
+
+.device-wrap { display: flex; align-items: center; gap: 7px; min-width: 250px;
+  padding: 5px 10px; border: 1px solid var(--border2); border-radius: 8px; background: var(--panel); }
+#device-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
+  flex-shrink: 0; transition: background .2s; }
+#device-dot.connected { background: #2fa55a; }
+#device-select { flex: 1; min-width: 0; border: none; background: transparent;
+  font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--dim);
+  cursor: pointer; -webkit-appearance: none; appearance: none; padding: 0; }
+#device-select:focus { outline: none; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 30px; border-radius: 8px; font-weight: 600; font-size: 11.5px;
+  transition: background .15s, opacity .15s;
+  border: 1px solid var(--border); background: var(--panel); color: var(--dim);
+  padding: 0 11px; flex-shrink: 0; }
+.btn:hover  { background: var(--alt); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.accent:hover { background: #2559c7; }
+.btn.ok  { background: var(--ok);  color: #fff; border-color: var(--ok);
+  box-shadow: 0 1px 2px rgba(31,146,84,.3); font-size: 12px; font-weight: 700; }
+.btn.ok:hover  { background: #1b8049; }
+.btn.err { border: 1px solid var(--err-bd); background: var(--err-bg); color: var(--err); }
+.btn.err:hover { background: #fae2e0; }
+.btn.sm  { height: 26px; padding: 0 9px;  font-size: 11px; }
+.btn.h30 { height: 30px; padding: 0 12px; }
+
+/* Inline icon button */
+.icon-btn { width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--border2);
+  background: transparent; color: var(--muted); display: inline-flex; align-items: center;
+  justify-content: center; flex-shrink: 0; transition: background .1s, color .1s; }
+.icon-btn:hover { background: var(--alt); color: var(--ink); }
+.icon-btn.flash { color: var(--ok) !important; }
+
+.hz-wrap { display: flex; align-items: center; gap: 4px; }
+#hz-spin  { width: 54px; height: 30px; text-align: right; padding: 0 8px; }
+.hz-unit  { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
+.pill-wrap { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+#auto-cb { width: 36px; height: 21px; border-radius: 999px; background: #d3d9e0;
+  position: relative; transition: background .2s; flex-shrink: 0; display: block; }
+#auto-cb.on { background: var(--accent); }
+#auto-thumb { position: absolute; top: 2px; left: 2px; width: 17px; height: 17px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: left .2s; }
+#auto-cb.on #auto-thumb { left: 17px; }
+.pill-label { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+.spacer { flex: 1; }
+
+/* ── Main split ──────────────────────────────────────────────────────────── */
+#main { flex: 1; display: flex; gap: 7px; min-height: 0; overflow: hidden; }
+
+/* Preview */
+#preview-card { flex: 1; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--r-md); overflow: hidden; min-width: 0; }
+.preview-hdr { display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+#size-label  { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+#res-label   { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.ph-hint     { font-size: 11px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
+.ph-hint .dot{ width: 8px; height: 8px; border-radius: 2px; background: #06b6d4; }
+#zoom-level  { font-family: var(--mono); font-size: 10.5px; color: var(--muted); min-width: 36px; text-align: right; }
+#preview-wrap { flex: 1; position: relative; background: var(--bg); overflow: hidden; min-height: 0; }
+#preview-canvas { display: block; position: absolute; inset: 0;
+  width: 100%; height: 100%; cursor: crosshair; }
+
+/* Tools panel */
+#tools-card { width: 410px; min-width: 320px; flex-shrink: 0;
+  display: flex; flex-direction: column; background: var(--panel);
+  border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+
+/* Tabs */
+#tabs-bar { display: flex; align-items: center; gap: 1px; padding: 0 2px;
+  border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.tab-btn { position: relative; padding: 8px 12px 9px; font-size: 12px; font-weight: 600;
+  color: var(--muted); transition: color .15s; }
+.tab-btn::after { content:''; position: absolute; left:0; right:0; bottom:-1px;
+  height: 2px; border-radius: 2px; background: transparent; transition: background .15s; }
+.tab-btn.active { color: var(--accent); }
+.tab-btn.active::after { background: var(--accent); }
+.tab-btn:hover:not(.active) { color: var(--dim); }
+
+.tab-pane { display: none; flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
+.tab-pane.active { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── Collapsible groups ──────────────────────────────────────────────────── */
+.group { border: 1px solid #e9ecf1; border-radius: var(--r-md); overflow: hidden; }
+
+.grp-hdr { display: flex; align-items: center; gap: 7px; padding: 8px 11px;
+  cursor: pointer; user-select: none; transition: background .1s; }
+.grp-hdr:hover { background: var(--alt); }
+
+.grp-title { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+  color: var(--muted); text-transform: uppercase; }
+
+.grp-chevron { margin-left: auto; color: var(--muted); flex-shrink: 0;
+  transition: transform .15s; }
+.group.closed .grp-chevron { transform: rotate(-90deg); }
+
+.grp-body { display: flex; flex-direction: column; gap: 7px;
+  padding: 0 11px 10px; }
+.group.closed .grp-body { display: none; }
+
+/* Row inside group */
+.row { display: flex; align-items: center; gap: 6px; }
+.lbl { font-size: 11.5px; color: var(--dim); font-weight: 500; min-width: 52px; flex-shrink: 0; }
+.lbl.n { min-width: 38px; }
+.row > input { flex: 1; min-width: 0; }
+.btns { display: flex; flex-wrap: wrap; gap: 5px; }
+.btns .btn { flex: 1; min-width: 60px; }
+
+/* Readout & swatch */
+#color-swatch, #cc-swatch { width: 28px; height: 26px; border-radius: 6px;
+  border: 1px solid var(--border); flex-shrink: 0; background: #eee; }
+
+/* Badges */
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px;
+  font-weight: 600; border-radius: 999px; padding: 2px 7px; }
+.badge.cyan { color: #0e8aa3; background: #e3f7fb; border: 1px solid #c4ecf3; }
+.badge.cyan .bd { width: 6px; height: 6px; border-radius: 2px; background: #06b6d4; }
+
+#ocr-engine { font-size: 10px; font-weight: 600; color: #1c7a44;
+  background: var(--ok-bg); border: 1px solid var(--ok-bd); border-radius: 999px; padding: 2px 7px; }
+#ocr-engine.unavailable { color: var(--warn); background: var(--warn-bg); border-color: #e7d5a4; }
+
+/* Checkboxes */
+.cb-line { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+.cb { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid #cfd5dd;
+  background: var(--panel); flex-shrink: 0; display: flex; align-items: center;
+  justify-content: center; transition: background .12s, border-color .12s; }
+.cb.checked { background: var(--accent); border-color: var(--accent); }
+.cb svg { opacity: 0; transition: opacity .1s; }
+.cb.checked svg { opacity: 1; }
+
+/* Template result */
+.tpl-result { font-family: var(--mono); font-size: 11.5px; color: #1c7a44;
+  background: #f1faf4; border: 1px solid #d7eede; border-radius: var(--r-sm); padding: 8px 10px; }
+.tpl-result.empty { font-family: var(--sans); color: var(--muted);
+  background: var(--surface); border-color: var(--border); }
+
+/* Color check */
+.cc-result { padding: 7px 9px; border-radius: var(--r-sm); font-size: 11.5px; display: none; }
+.cc-result.ok  { background: var(--ok-bg);  border: 1px solid var(--ok-bd);  color: #1c7a44; }
+.cc-result.bad { background: var(--err-bg); border: 1px solid var(--err-bd); color: var(--err); }
+
+/* Key strip */
+.key-strip { display: flex; flex-wrap: wrap; gap: 5px; }
+.key-strip .btn { flex: none; height: 26px; padding: 0 9px; font-size: 10.5px; font-weight: 600; }
+
+/* Device info */
+.info-grid { display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; }
+.info-grid .k { font-size: 11.5px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.info-grid .v { font-size: 11.5px; color: var(--ink); word-break: break-word;
+  user-select: text; font-family: var(--mono); }
+
+/* Asset library */
+.asset-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(88px,1fr)); gap: 7px; }
+.asset-card { display: flex; flex-direction: column; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  transition: border-color .12s, box-shadow .12s; }
+.asset-card:hover  { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,111,237,.12); }
+.asset-card.active { border-color: var(--accent); }
+.asset-thumb { width: 100%; height: 66px; object-fit: contain; background: #1a1d21; display: block; }
+.asset-name  { font-size: 9.5px; color: var(--dim); padding: 3px 5px 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Log ─────────────────────────────────────────────────────────────────── */
+#log-card { flex-shrink: 0; display: flex; flex-direction: column; min-height: 100px; max-height: 155px; }
+.log-hdr  { display: flex; align-items: center; gap: 6px; padding: 7px 12px;
+  border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.log-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+  color: var(--muted); text-transform: uppercase; }
+.btn-log-clear { font-size: 11px; font-weight: 600; color: var(--muted);
+  padding: 2px 4px; border-radius: 4px; transition: color .1s; }
+.btn-log-clear:hover { color: var(--dim); }
+.log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px;
+  background: var(--log-bg); border-radius: 0 0 var(--r-md) var(--r-md); }
+.log-line { display: flex; gap: 7px; font-family: var(--mono); font-size: 10.5px;
+  line-height: 1.75; white-space: nowrap; }
+.log-ts  { color: var(--log-muted); flex-shrink: 0; }
+.log-tag { font-weight: 700; flex-shrink: 0; }
+.log-msg { color: var(--log-ink); white-space: normal; }
+.log-info    { color: #5b86c9; } .log-success { color: #2fa55a; }
+.log-warning { color: #c08a1e; } .log-error   { color: #cf4b43; }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+#footer { display: flex; align-items: center; gap: 6px; padding: 2px 5px 3px; flex-shrink: 0; }
+#footer-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
+  flex-shrink: 0; transition: background .2s; }
+#footer-dot.connected { background: #2fa55a; }
+#status-text { font-size: 11px; color: var(--dim); font-weight: 500;
+  flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hover-pos  { font-family: var(--mono); font-size: 10.5px; color: var(--muted); min-width: 88px; text-align: right; }
+#footer-out { font-size: 11px; color: var(--log-muted); font-family: var(--mono); }
+
+@keyframes fadeInUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+.fade-in { animation: fadeInUp .2s var(--ease) both; }
+
+/* ── Workflow designer (node-graph view) ───────────────────────────────────── */
+#mode-tabs { display:flex; gap:2px; background:var(--alt); border-radius:8px; padding:3px; }
+.mode-btn { padding:5px 14px; border-radius:6px; font-size:12px; font-weight:700; color:var(--dim); transition:background .15s, color .15s; }
+.mode-btn:hover:not(.active) { color:var(--ink); }
+.mode-btn.active { background:var(--panel); color:var(--accent); box-shadow:0 1px 2px rgba(0,0,0,.06); }
+.tb-divider { width:1px; height:20px; background:var(--border2); flex-shrink:0; }
+
+#workflow-view { flex:1; display:flex; gap:7px; min-height:0; overflow:hidden; }
+
+/* Left sidebar: activities + palette */
+#wf-side { width:212px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
+.wf-side-sec { display:flex; flex-direction:column; min-height:0; }
+.wf-side-sec + .wf-side-sec { border-top:1px solid var(--line); }
+.wf-side-hdr { display:flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; letter-spacing:.05em;
+  color:var(--muted); text-transform:uppercase; padding:9px 11px 5px; }
+.wf-side-hdr .btn { text-transform:none; letter-spacing:0; }
+.wf-side-hint { font-size:10px; color:var(--muted); line-height:1.5; padding:0 11px 7px; }
+#wf-activities { padding:0 9px 8px; display:flex; flex-direction:column; gap:4px; max-height:230px; overflow-y:auto; }
+#wf-side .wf-palette { padding:0 9px 10px; overflow-y:auto; }
+
+.wf-act { display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--border);
+  border-radius:7px; cursor:pointer; transition:border-color .1s, background .1s; }
+.wf-act:hover { background:var(--alt); }
+.wf-act.sel { border-color:var(--accent); background:var(--accent-bg); }
+.wf-badge { font-size:8.5px; font-weight:700; letter-spacing:.03em; border-radius:4px; padding:2px 4px; flex-shrink:0; }
+.wf-badge.seq { color:#2559c7; background:#eef5ff; border:1px solid var(--accent-bd); }
+.wf-badge.bg  { color:#9c6c12; background:var(--warn-bg); border:1px solid #e7d5a4; }
+.wf-act-name { font-size:11.5px; font-weight:600; color:var(--ink); flex:1; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-act-cb { width:15px; height:15px; border-radius:4px; border:1.5px solid #cfd5dd; background:var(--panel);
+  flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.wf-act-cb.checked { background:var(--accent); border-color:var(--accent); }
+.wf-act-cb svg { opacity:0; } .wf-act-cb.checked svg { opacity:1; }
+.wf-act-del { color:var(--muted); font-size:14px; line-height:1; padding:0 3px; border-radius:4px; flex-shrink:0; }
+.wf-act-del:hover { color:var(--err); background:var(--err-bg); }
+
+.wf-palette { display:flex; flex-direction:column; gap:3px; }
+.wf-pal-cat { font-size:9px; font-weight:700; letter-spacing:.05em; color:var(--muted); text-transform:uppercase; margin:5px 0 1px; }
+.wf-pal-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.wf-fn { cursor:pointer; }
+.wf-badge.fn { color:#7c3aed; background:#f3eefe; border:1px solid #e0d4fb; font-size:11px; padding:1px 6px; }
+.wf-chip { display:flex; align-items:center; gap:5px; padding:6px 7px; border:1px solid var(--border2);
+  border-radius:7px; background:var(--panel); cursor:grab; font-size:10.5px; font-weight:600; color:var(--ink2);
+  transition:border-color .1s, background .1s; user-select:none; }
+.wf-chip:hover { border-color:var(--accent); background:var(--accent-bg); }
+.wf-chip:active { cursor:grabbing; }
+.wf-chip .ico { font-size:12px; }
+
+/* Center: canvas */
+#wf-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+#wf-bar { display:flex; align-items:center; gap:9px; padding:9px 12px; border-bottom:1px solid var(--line); flex-shrink:0; }
+#wf-bar > input { font-family:var(--sans); font-size:13px; font-weight:700; width:200px; }
+.wf-cur-act { font-size:11.5px; font-weight:600; color:var(--accent); }
+.wf-hint { font-size:10px; color:var(--muted); }
+.wf-zoom { display:inline-flex; align-items:center; gap:4px; }
+.wf-zoom .btn { width:24px; padding:0; font-size:14px; }
+#wf-zoom-lbl { font-size:11px; font-family:var(--mono); color:var(--dim); min-width:38px; text-align:center; cursor:pointer; }
+#wf-zoom-lbl:hover { color:var(--accent); }
+#wf-canvas { flex:1; min-height:0; position:relative; overflow:hidden;
+  background:var(--bg) radial-gradient(circle, #d9dee6 1px, transparent 1px); background-size:20px 20px;
+  cursor:grab; }
+#wf-canvas.panning { cursor:grabbing; }
+#wf-world { position:absolute; left:0; top:0; width:4000px; height:3000px; transform:translate(0px,0px); transform-origin:0 0; }
+#wf-wires { position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+#wf-wires path.wire { fill:none; stroke:#9aa9bd; stroke-width:2.4; pointer-events:stroke; cursor:pointer; }
+#wf-wires path.wire:hover { stroke:var(--err); }
+#wf-wires path.wire.t { stroke:#2fa55a; } #wf-wires path.wire.f { stroke:#cf6b43; }
+#wf-wires path.wire.stack { stroke:#b6c0cc; stroke-width:3; }
+#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:2.4; stroke-dasharray:5 4; pointer-events:none; }
+#wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  color:var(--muted); font-size:12px; pointer-events:none; }
+
+/* Node */
+.wf-node { position:absolute; width:158px; border:1px solid var(--border2); border-radius:9px; background:var(--panel);
+  box-shadow:0 2px 6px rgba(20,30,45,.10); user-select:none; }
+.wf-node.sel { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-bd), 0 2px 8px rgba(20,30,45,.14); }
+.wf-node.start .wf-node-hd { background:var(--ok-bg); border-color:var(--ok-bd); }
+.wf-node.end   .wf-node-hd { background:var(--err-bg); }
+.wf-node.stop  .wf-node-hd { background:var(--err-bg); }
+.wf-node.condition .wf-node-hd { background:#f3eefe; }
+.wf-node.loop  .wf-node-hd { background:var(--warn-bg); }
+.wf-node.call  .wf-node-hd { background:#f3eefe; }
+.wf-node.call .ico { color:#7c3aed; font-style:italic; font-weight:700; }
+.wf-node.conn-target { box-shadow:0 0 0 2px var(--ok); }
+/* Merged ('out'-stacked) blocks read as one unit: square the touching edges. */
+.wf-node.merge-parent { border-bottom-left-radius:0; border-bottom-right-radius:0; border-bottom:none; }
+.wf-node.merge-child  { border-top-left-radius:0; border-top-right-radius:0; border-top:none; }
+.wf-node.merge-parent, .wf-node.merge-child { border-left:3px solid #b69cf0; }
+.wf-node.merge-child > .wf-node-hd { border-radius:0; border-top:1px dashed var(--border2); }
+.wf-node.merge-parent.sel, .wf-node.merge-child.sel { box-shadow:0 0 0 2px var(--accent-bd); }
+/* Context menu */
+#wf-ctxmenu { position:fixed; z-index:50; display:none; min-width:140px; background:var(--panel);
+  border:1px solid var(--border2); border-radius:8px; box-shadow:0 6px 22px rgba(20,30,45,.18); padding:4px; }
+.wf-ctx-item { padding:7px 10px; font-size:12px; color:var(--ink); border-radius:5px; cursor:pointer; white-space:nowrap; }
+.wf-ctx-item:hover { background:var(--accent-bg); color:var(--accent); }
+.wf-node.running { border-color:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.35), 0 0 14px rgba(245,158,11,.55); animation:wfRun 1s ease-in-out infinite; }
+.wf-node-eye { color:var(--muted); font-size:12px; line-height:1; padding:0 2px; border-radius:4px; flex-shrink:0; cursor:pointer; }
+.wf-node-eye:hover { color:var(--accent); background:var(--accent-bg); }
+.wf-node-eye.on { color:var(--accent); }
+.wf-node-thumb { display:block; width:100%; max-height:120px; object-fit:contain; background:#1a1d21;
+  border-top:1px solid var(--line); border-radius:0 0 9px 9px; }
+.wf-tpl-preview { display:block; max-width:100%; max-height:150px; object-fit:contain; margin-top:6px;
+  border:1px solid var(--border2); border-radius:6px; background:#1a1d21; }
+.wf-tpl-empty { font-size:10px; color:var(--muted); margin-top:5px; font-style:italic; }
+.wf-var-card { border:1px solid var(--border2); border-radius:7px; padding:6px; margin-top:6px; background:var(--panel); display:flex; flex-direction:column; gap:5px; }
+.wf-var-row { display:flex; align-items:center; gap:5px; }
+.wf-var-chip { cursor:grab; font-size:13px; flex-shrink:0; padding:2px; border:1px solid var(--border2); border-radius:5px; background:var(--panel); }
+.wf-var-chip:hover { border-color:var(--accent); background:var(--accent-bg); }
+.wf-var-chip:active { cursor:grabbing; }
+.wf-var-row select { font-size:11px; padding:3px 4px; }
+.wf-var-row .cb { width:17px; height:17px; border-radius:5px; border:1.5px solid #cfd5dd; background:var(--panel); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+.wf-var-row .cb.checked { background:var(--accent); border-color:var(--accent); }
+.wf-var-row .cb svg { opacity:0; } .wf-var-row .cb.checked svg { opacity:1; }
+@keyframes wfRun { 0%,100%{ box-shadow:0 0 0 3px rgba(245,158,11,.30), 0 0 10px rgba(245,158,11,.45);} 50%{ box-shadow:0 0 0 3px rgba(245,158,11,.55), 0 0 20px rgba(245,158,11,.8);} }
+.wf-node.note { width:170px; border-color:#e7d5a4; background:#fdf6e9; }
+.wf-node.note .wf-node-hd { background:transparent; border-bottom:1px dashed #e7d5a4; }
+.wf-node.note .wf-node-sum { white-space:normal; color:#7a5b12; font-family:var(--sans); font-size:11px; }
+.wf-selbox { position:absolute; border:1px solid var(--accent); background:rgba(47,111,237,.10); z-index:1; pointer-events:none; border-radius:2px; }
+.wf-node { cursor:grab; }
+.wf-node:active { cursor:grabbing; }
+.wf-node-hd { display:flex; align-items:center; gap:6px; padding:7px 9px; border-bottom:1px solid var(--line);
+  border-radius:9px 9px 0 0; }
+.wf-node.collapsed .wf-node-hd { border-bottom:none; border-radius:9px; }
+.wf-node .ico { font-size:13px; flex-shrink:0; }
+.wf-node-title { font-size:11.5px; font-weight:700; color:var(--ink); flex:1; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-node-del { color:var(--muted); font-size:14px; line-height:1; padding:0 2px; border-radius:4px; flex-shrink:0; cursor:pointer; }
+.wf-node-del:hover { color:var(--err); background:var(--err-bg); }
+.wf-node-sum { font-family:var(--mono); font-size:9.5px; color:var(--muted); padding:5px 9px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-node-note { font-size:9.5px; font-style:italic; color:#7c6f55; background:#fdf9ee;
+  border-top:1px dashed var(--line); border-radius:0 0 9px 9px; padding:4px 9px; white-space:normal; word-break:break-word; }
+.wf-node-note::before { content:"📝 "; font-style:normal; }
+
+/* Ports */
+.wf-port { position:absolute; width:13px; height:13px; border-radius:50%; background:var(--panel);
+  border:2px solid var(--muted); cursor:crosshair; z-index:2; }
+.wf-port:hover { border-color:var(--accent); background:var(--accent-bg); }
+.wf-port.in  { left:-7px; top:9px; }
+.wf-port.out { right:-7px; }
+.wf-port-row { position:absolute; right:-7px; display:flex; align-items:center; }
+.wf-port-lbl { position:absolute; right:14px; font-size:8.5px; font-weight:700; color:var(--muted); white-space:nowrap; }
+.wf-port.out.t { border-color:#2fa55a; } .wf-port.out.f { border-color:#cf6b43; }
+
+/* Right inspector */
+#wf-inspector { width:236px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
+#wf-insp-body { flex:1; min-height:0; overflow-y:auto; padding:4px 12px 12px; display:flex; flex-direction:column; gap:8px; }
+.wf-insp-empty { font-size:11.5px; color:var(--muted); line-height:1.6; padding-top:6px; }
+.wf-field { display:flex; align-items:center; gap:6px; }
+.wf-field > label { font-size:10.5px; color:var(--dim); font-weight:600; min-width:58px; flex-shrink:0; }
+.wf-field > input[type=text], .wf-field > input[type=number] { flex:1; min-width:0; }
+.wf-field .cb { width:17px; height:17px; border-radius:5px; border:1.5px solid #cfd5dd; background:var(--panel);
+  display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+.wf-field .cb.checked { background:var(--accent); border-color:var(--accent); }
+.wf-field .cb svg { opacity:0; } .wf-field .cb.checked svg { opacity:1; }
+.wf-insp-sec { font-size:10px; font-weight:700; letter-spacing:.05em; color:var(--muted); text-transform:uppercase; margin-top:4px; }
+.wf-empty-note { font-size:11.5px; color:var(--muted); padding:6px 2px; text-align:center; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<div id="toolbar" class="card">
+  <span class="tb-label">Thiết bị</span>
+  <div class="device-wrap">
+    <span id="device-dot"></span>
+    <select id="device-select" onchange="onDeviceChange(this.value)">
+      <option value="">Đang quét…</option>
+    </select>
+    <svg width="10" height="6" viewBox="0 0 12 7" fill="#9aa3ae" style="flex-shrink:0;pointer-events:none;"><path d="M0 0l6 7 6-7z"/></svg>
+  </div>
+  <button class="btn" onclick="onRefreshDevices()">Làm mới</button>
+  <button class="btn" onclick="onScanPorts()">Quét cổng</button>
+  <button class="btn" onclick="onRestartAdb()">Khởi động lại ADB</button>
+  <span class="spacer"></span>
+  <button class="btn" onclick="wfNew()" title="Tạo workflow mới (trống)">Mới</button>
+  <button class="btn" onclick="wfImport()" title="Mở workflow từ file JSON">Mở…</button>
+  <button class="btn accent" id="wf-save-btn" onclick="wfSave()" title="Lưu vào file đang mở (Ctrl+S)">Lưu</button>
+  <button class="btn" onclick="wfExport()" title="Lưu thành file JSON mới">Lưu thành…</button>
+  <button class="btn ok" id="wf-run-btn" onclick="wfToggleRun()">Chạy thử</button>
+  <button class="btn" onclick="wfRunGui()" title="Mở Runner GUI với workflow hiện tại">Chạy GUI</button>
+</div>
+
+<div id="workflow-view" style="display:flex;">
+  <!-- Left: activities + node palette -->
+  <div id="wf-side" class="card">
+    <div class="wf-side-sec">
+      <div class="wf-side-hdr">
+        <span>Hoạt động</span><span class="spacer"></span>
+        <button class="btn sm" onclick="wfAddActivity('sequence')" title="Thêm hoạt động tuần tự">+ Tuần tự</button>
+        <button class="btn sm" onclick="wfAddActivity('background')" title="Thêm hoạt động nền">+ Nền</button>
+      </div>
+      <div id="wf-activities"></div>
+    </div>
+    <div class="wf-side-sec">
+      <div class="wf-side-hdr">
+        <span>Function</span><span class="spacer"></span>
+        <button class="btn sm" onclick="wfAddFunction()" title="Tạo function tái sử dụng">+ Function</button>
+      </div>
+      <div id="wf-functions"></div>
+    </div>
+    <div class="wf-side-sec" style="flex:1;min-height:0;display:flex;flex-direction:column;">
+      <div class="wf-side-hdr"><span>Node</span></div>
+      <div class="wf-side-hint">Kéo node vào canvas. Kéo từ cổng phải, thả lên node bất kỳ là tự nối. Phím Delete xoá node đang chọn.</div>
+      <div id="wf-palette" class="wf-palette"></div>
+    </div>
+  </div>
+  <!-- Center: graph canvas -->
+  <div id="wf-main" class="card">
+    <div id="wf-bar">
+      <input id="wf-name" type="text" placeholder="Tên workflow" value="My Workflow">
+      <span class="wf-cur-act" id="wf-cur-act">—</span>
+      <button class="btn sm" id="wf-snap-btn" onclick="wfToggleSnap()" title="Bám node vào lưới khi kéo">Bám lưới: Tắt</button>
+      <button class="btn sm" id="wf-preview-btn" onclick="wfTogglePreview()" title="Hiện ảnh xem trước trên mọi block">Preview ảnh: Tắt</button>
+      <span class="wf-zoom">
+        <button class="btn sm" onclick="wfZoomBy(1/1.1)" title="Thu nhỏ">−</button>
+        <span id="wf-zoom-lbl" onclick="wfZoomReset()" title="Đặt lại 100%">100%</span>
+        <button class="btn sm" onclick="wfZoomBy(1.1)" title="Phóng to">+</button>
+      </span>
+      <span class="spacer"></span>
+      <span class="wf-hint">Cuộn chuột = zoom · Kéo = di chuyển khối · chuột phải = gộp/tách · Space/chuột giữa = kéo nền</span>
+    </div>
+    <div id="wf-canvas">
+      <div id="wf-world">
+        <svg id="wf-wires"></svg>
+      </div>
+      <div id="wf-canvas-empty" class="wf-empty-note">Chọn hoặc thêm một hoạt động để mở canvas.</div>
+    </div>
+  </div>
+  <!-- Right: inspector -->
+  <div id="wf-inspector" class="card">
+    <div class="wf-side-hdr"><span>Thuộc tính</span></div>
+    <div id="wf-insp-body"></div>
+  </div>
+</div>
+<div id="wf-ctxmenu"></div>
+
+
+<div id="log-card" class="card">
+  <div class="log-hdr">
+    <span class="log-label">Nhật ký</span>
+    <span class="spacer"></span>
+    <button class="btn-log-clear" onclick="onClearLog()">Xoá</button>
+  </div>
+  <div class="log-body" id="log-body"></div>
+</div>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────── -->
+
+<div id="footer">
+  <span id="footer-dot"></span>
+  <span id="status-text">Sẵn sàng</span>
+  <span class="spacer"></span>
+  <span id="footer-out" style="font-size:11px;color:var(--log-muted);font-family:var(--mono);">workflow → data/flows/</span>
+</div>
+
+</div><!-- /app -->
+
+<script>
+// ── Base helpers ────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const api = () => window.pywebview.api;
+const LOG_TAG = {info:"INF",success:"OK ",warning:"WRN",error:"ERR"};
+const S = { devices:[], connectedSerial:null };
+function setStatus(msg){ const e=$("status-text"); if(e) e.textContent=msg; }
+function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function setConnected(on){ const a=$("device-dot"),b=$("footer-dot"); if(a)a.className=on?"connected":""; if(b)b.className=on?"connected":""; }
+
+// Load a template thumbnail (data-URL from Python) into an <img>, hide if none.
+async function wfLoadThumb(img, path){
+  if(!img) return;
+  img.style.display="none"; img.removeAttribute("src");
+  if(!path){ return; }
+  try{ const d=await api().image_thumbnail(path); if(d){ img.src=d; img.style.display="block"; } }catch{}
+}
+
+// Highlight the node the engine is currently executing (border glow).
+let wfRunNode=null;
+function wfSetRunningNode(id){
+  wfRunNode=id||null;
+  document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("running", el.dataset.node===wfRunNode));
+}
+
+function appendLog(entry){
+  const body=$("log-body"); if(!body) return;
+  const line=document.createElement("div"); line.className="log-line fade-in";
+  line.innerHTML=`<span class="log-ts">${entry.ts}</span>`+
+    `<span class="log-tag log-${entry.level}">${LOG_TAG[entry.level]||"INF"}</span>`+
+    `<span class="log-msg">${escHtml(entry.msg)}</span>`;
+  body.appendChild(line);
+  while(body.children.length>500) body.removeChild(body.firstChild);
+  body.scrollTop=body.scrollHeight;
+}
+function rebuildDeviceSelect(devices, connected){
+  const sel=$("device-select"), prev=sel.value; sel.innerHTML="";
+  if(!devices||!devices.length){ const o=document.createElement("option"); o.value=""; o.textContent="Không có thiết bị"; sel.appendChild(o); sel.disabled=true; return; }
+  sel.disabled=false;
+  devices.forEach(d=>{ const o=document.createElement("option"); o.value=d.serial||""; o.textContent=(d.name||d.serial)+(d.serial?` (${d.serial})`:""); sel.appendChild(o); });
+  sel.value=connected||S.connectedSerial||prev||(devices[0]&&devices[0].serial)||"";
+}
+
+// ── Python events ───────────────────────────────────────────────────────────
+window.__recv = function(raw){
+  let ev; try{ev=JSON.parse(raw);}catch{return;}
+  const {type,data}=ev;
+  if(type==="log"){ appendLog(data); return; }
+  if(type==="log_cleared"){ const b=$("log-body"); if(b)b.innerHTML=""; return; }
+  if(type==="devices_update"){ S.devices=data.devices||[]; rebuildDeviceSelect(S.devices,S.connectedSerial); return; }
+  if(type==="device_status"){ S.connectedSerial=data.serial||null; setConnected(!!data.connected); rebuildDeviceSelect(S.devices,data.serial); return; }
+  if(type==="workflow_state"){ wfSetRunning(!!data.running); return; }
+  if(type==="node_active"){ wfSetRunningNode(data.id); return; }
+};
+
+// ── Device handlers ─────────────────────────────────────────────────────────
+function onClearLog(){ api().clear_log(); }
+async function onRefreshDevices(){ await api().refresh_devices(); }
+async function onScanPorts(){ await api().scan_ports(); }
+async function onRestartAdb(){ await api().restart_adb(); }
+async function onDeviceChange(serial){ if(serial){ S.connectedSerial=serial; await api().select_device(serial); } }
+
+// New blank workflow.
+async function wfNew(){
+  if((WF.activities.length || WF.functions.length) &&
+     !confirm("Tạo workflow mới? Các thay đổi chưa lưu sẽ mất.")) return;
+  WF.name="My Workflow"; WF.version=2; WF.templatesDir="out";
+  WF.activities=[]; WF.functions=[]; WF.edit={kind:"activity",id:null};
+  WF.sel=[]; WF.selectedNode=null; wfPan={x:0,y:0}; wfZoom=1; wfRunNode=null;
+  const nm=$("wf-name"); if(nm) nm.value=WF.name;
+  try{ await api().workflow_new(); }catch{}
+  wfAddActivity("sequence");   // seed one activity so the canvas isn't empty
+  setStatus("Workflow mới");
+}
+
+// ── Keyboard (workflow shortcuts) ─────────────────────────────────────────────
+window.addEventListener("keydown", e => {
+  const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  if((e.key==="s"||e.key==="S") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); wfSave(); return; }
+  if(typing) return;
+  if(e.key===" "){ wfSpace=true; }
+  if(e.key==="Delete"||e.key==="Backspace"){ if(WF.sel.length){ e.preventDefault(); wfDeleteSelected(); return; } }
+  if((e.key==="a"||e.key==="A") && (e.ctrlKey||e.metaKey)){ const g=wfGraph(); if(g){ e.preventDefault(); WF.sel=g.nodes.map(n=>n.id); WF.selectedNode=null; wfMarkSel(); wfRenderInspector(); return; } }
+  if(e.key==="Escape"){ wfClearSel(); wfMarkSel(); wfRenderInspector(); }
+});
+window.addEventListener("keyup", e => { if(e.key===" ") wfSpace=false; });
+
+// ── Workflow designer (node-graph) ───────────────────────────────────────────
+// Node catalog: UI source of truth (icon, kind, output ports, param fields).
+// Mirrors src/workflow/engine.py NODE_TYPES. kind: start|end|action|condition|loop.
+const WF_NODES = {
+  start:      {label:"Bắt đầu",   ico:"▶", kind:"start", cat:null,    outs:["out"], fields:[]},
+  end:        {label:"Kết thúc",  ico:"■", kind:"end",   cat:"flow",  outs:[],      fields:[]},
+  tap:        {label:"Chạm",      ico:"👆",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Toạ độ"},{v:"found",t:"Ảnh vừa thấy"}],d:"pos"},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>p.target==="found"?"↳ ảnh vừa thấy":`(${p.x}, ${p.y})`},
+  double_tap: {label:"Chạm đúp",  ico:"👆",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Toạ độ"},{v:"found",t:"Ảnh vừa thấy"}],d:"pos"},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>(p.target==="found"?"↳ ảnh vừa thấy":`(${p.x}, ${p.y})`)+" ×2"},
+  tap_random: {label:"Chạm n.nhiên",ico:"🎲",kind:"action",cat:"basic", outs:["out"], fields:[{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:100},{k:"h",t:"num",d:100}], sum:p=>`vùng (${p.x},${p.y}) ${p.w}×${p.h}`},
+  long_press: {label:"Giữ",       ico:"⏺",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Toạ độ"},{v:"found",t:"Ảnh vừa thấy"}],d:"pos"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"duration",t:"num",d:800}], sum:p=>(p.target==="found"?"↳ ảnh vừa thấy":`(${p.x},${p.y})`)+` ${p.duration}ms`},
+  swipe:      {label:"Vuốt",      ico:"↗",kind:"action",cat:"basic", outs:["out"], fields:[{k:"x1",t:"num"},{k:"y1",t:"num"},{k:"x2",t:"num"},{k:"y2",t:"num"},{k:"duration",t:"num",d:300}], sum:p=>`(${p.x1},${p.y1})→(${p.x2},${p.y2})`},
+  swipe_dir:  {label:"Vuốt hướng",ico:"🧭",kind:"action",cat:"basic", outs:["out"], fields:[{k:"direction",t:"select",opts:["up","down","left","right"],d:"up"},{k:"distance",t:"num",d:400},{k:"duration",t:"num",d:300}], sum:p=>`${p.direction} ${p.distance}px`},
+  wait:       {label:"Chờ",       ico:"⏱",kind:"action",cat:"basic", outs:["out"], fields:[{k:"seconds",t:"num",d:1,step:.5}], sum:p=>`${p.seconds}s`},
+  wait_random:{label:"Chờ n.nhiên",ico:"⏳",kind:"action",cat:"basic", outs:["out"], fields:[{k:"min",t:"num",d:.5,step:.5},{k:"max",t:"num",d:2,step:.5}], sum:p=>`${p.min}-${p.max}s`},
+  send_text:  {label:"Nhập text", ico:"⌨",kind:"action",cat:"basic", outs:["out"], fields:[{k:"text",t:"text"}], sum:p=>`"${p.text||""}"`},
+  key:        {label:"Phím",      ico:"🔘",kind:"action",cat:"basic", outs:["out"], fields:[{k:"keycode",t:"text",d:"BACK"}], sum:p=>`${p.keycode}`},
+  back:       {label:"Back",      ico:"◀",kind:"action",cat:"basic", outs:["out"], fields:[], sum:()=>"phím back"},
+  home:       {label:"Home",      ico:"⌂",kind:"action",cat:"basic", outs:["out"], fields:[], sum:()=>"phím home"},
+  tap_image:  {label:"Chạm ảnh",  ico:"🎯",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:5},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+(p.delay?` ·chờ ${p.delay}s`:"")},
+  wait_image: {label:"Chờ ảnh",   ico:"👁",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBase(p.template)+(p.delay?` ·chờ ${p.delay}s`:"")},
+  if_image:   {label:"Nếu ảnh",   ico:"❓",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}thấy ${wfBase(p.template)}`},
+  wait_text:  {label:"Chờ chữ",   ico:"🔤",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10}], sum:p=>`"${p.text||""}"`},
+  if_text:    {label:"Nếu chữ",   ico:"🔡",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}có "${p.text||""}"`},
+  read_var:   {label:"Đọc → biến",ico:"🔎",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`→ ${p.name||"?"}`},
+  loop:       {label:"Lặp lại",   ico:"🔁",kind:"loop", cat:"flow",   outs:["body","done"], fields:[{k:"count",t:"num",d:3},{k:"infinite",t:"bool",d:false}], sum:p=>p.infinite?"∞ vô cực":`${p.count}×`},
+  parallel:   {label:"Song song", ico:"⇉",kind:"parallel",cat:"flow", outs:["1","2","3","done"], fields:[], sum:()=>"chạy 3 nhánh // → chờ gộp ở cổng 'gộp'"},
+  "break":    {label:"Thoát vòng",ico:"⛔",kind:"action",cat:"flow",  outs:["out"], fields:[], sum:()=>"break"},
+  stop:       {label:"Dừng tất cả",ico:"🛑",kind:"stop", cat:"flow",  outs:[],      fields:[], sum:()=>"dừng phiên"},
+  set_var:    {label:"Đặt biến",  ico:"📌",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i"},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name||"?"} = ${p.value}`},
+  calc_var:   {label:"Tính biến", ico:"➗",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i"},{k:"op",t:"select",opts:["+","-","*","/","="],d:"+"},{k:"value",t:"text",d:"1"}], sum:p=>`${p.name} ${p.op}= ${p.value}`},
+  if_var:     {label:"Nếu biến",  ico:"🔢",kind:"condition",cat:"logic",outs:["true","false"], fields:[{k:"name",t:"text",d:"i"},{k:"op",t:"select",opts:["==","!=",">","<",">=","<="],d:"=="},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name} ${p.op} ${p.value}`},
+  launch_app: {label:"Mở app",    ico:"🚀",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"package",t:"text"}], sum:p=>p.package||"(package)"},
+  screenshot: {label:"Chụp",      ico:"📷",kind:"action",cat:"misc",  outs:["out"], fields:[], sum:()=>"chụp màn hình"},
+  log:        {label:"Ghi log",   ico:"📝",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"message",t:"text"}], sum:p=>`"${p.message||""}"`},
+  note:       {label:"Ghi chú",   ico:"💬",kind:"note",  cat:"misc",  outs:[],      fields:[{k:"text",t:"text",d:"ghi chú"}], sum:p=>p.text||""},
+  call:       {label:"Function",  ico:"ƒ", kind:"call",  cat:null,    outs:["out"], fields:[]},
+};
+const WF_CATS = [ {key:"basic",label:"Cơ bản"}, {key:"image",label:"Hình ảnh"}, {key:"ocr",label:"Văn bản (OCR)"}, {key:"flow",label:"Luồng"}, {key:"logic",label:"Biến / Điều kiện"}, {key:"misc",label:"Khác"} ];
+const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"lặp", done:"xong", "1":"1", "2":"2", "3":"3" };
+
+// edit = which graph the canvas is showing: an activity or a function.
+// sel = ids of all selected nodes (multi-select); selectedNode = primary (inspector).
+const WF = { name:"My Workflow", version:2, templatesDir:"out", activities:[], functions:[],
+  edit:{kind:"activity", id:null}, sel:[], selectedNode:null };
+let wfSpace=false;  // space held → pan instead of box-select
+const WF_GRID=20;   // grid step; snapping is opt-in (default off)
+let wfSnapOn=false;
+let wfPreviewAll=false;   // global: show image thumbnail on every image block
+const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
+function wfSaveSettings(){ try{ api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll}); }catch{} }
+function wfSyncToggleBtns(){
+  const s=$("wf-snap-btn"); if(s){ s.textContent="Bám lưới: "+(wfSnapOn?"Bật":"Tắt"); s.classList.toggle("accent",wfSnapOn); }
+  const p=$("wf-preview-btn"); if(p){ p.textContent="Preview ảnh: "+(wfPreviewAll?"Bật":"Tắt"); p.classList.toggle("accent",wfPreviewAll); }
+}
+function wfToggleSnap(){ wfSnapOn=!wfSnapOn; wfSyncToggleBtns(); wfSaveSettings(); }
+function wfTogglePreview(){ wfPreviewAll=!wfPreviewAll; wfSyncToggleBtns(); wfRenderCanvas(); wfSaveSettings(); }
+let wfRunning=false;
+let wfPan={x:0,y:0}; wfZoom=1;
+let wfZoom=1;           // canvas zoom factor
+function wfApplyTransform(){ const w=$("wf-world"); if(w) w.style.transform=`translate(${wfPan.x}px,${wfPan.y}px) scale(${wfZoom})`;
+  const lbl=$("wf-zoom-lbl"); if(lbl) lbl.textContent=Math.round(wfZoom*100)+"%"; }
+function wfSetZoom(z, cx, cy){
+  z=Math.max(0.3, Math.min(2.5, z));
+  const canvas=$("wf-canvas"); if(!canvas) { wfZoom=z; wfApplyTransform(); return; }
+  // Keep the point (cx,cy) — relative to the canvas — fixed while zooming.
+  if(cx===undefined){ const r=canvas.getBoundingClientRect(); cx=r.width/2; cy=r.height/2; }
+  const wx=(cx-wfPan.x)/wfZoom, wy=(cy-wfPan.y)/wfZoom;
+  wfZoom=z;
+  wfPan.x=cx-wx*wfZoom; wfPan.y=cy-wy*wfZoom;
+  wfApplyTransform();
+  const lbl=$("wf-zoom-lbl"); if(lbl) lbl.textContent=Math.round(wfZoom*100)+"%";
+}
+function wfZoomBy(f){ wfSetZoom(wfZoom*f); }
+function wfZoomReset(){ wfSetZoom(1); }
+let wfGesture=null;     // {mode:'pan'|'move'|'connect', ...}
+let wfPaletteDrag=null; // node type being dragged from palette
+let wfCanvasReady=false;
+const wfUid=()=>"n"+Math.random().toString(36).slice(2,9);
+const wfBase=p=>{ if(!p)return"(ảnh)"; const s=String(p).replace(/\\/g,"/").split("/").pop(); return s.length>14?"…"+s.slice(-13):s; };
+
+// Top-level mode switch: Công cụ (helper) ↔ Workflow (node-graph).
+/* (mode switching removed — the designer is its own standalone window) */
+
+function wfDefaults(type){
+  const def=WF_NODES[type]||{fields:[]}; const p={};
+  (def.fields||[]).forEach(f=>{ p[f.k]= f.d!==undefined?f.d : (f.t==="num"?0 : f.t==="bool"?false : ""); });
+  return p;
+}
+
+// ── Edit target (activity or function) ───────────────────────────────────────
+function wfActById(id){ return WF.activities.find(a=>a.id===id)||null; }
+function wfFnById(id){ return WF.functions.find(f=>f.id===id)||null; }
+function wfEditTarget(){ return WF.edit.kind==="function" ? wfFnById(WF.edit.id) : wfActById(WF.edit.id); }
+function wfCurAct(){ return WF.edit.kind==="activity" ? wfActById(WF.edit.id) : null; }
+function wfCurFn(){ return WF.edit.kind==="function" ? wfFnById(WF.edit.id) : null; }
+function wfGraph(){ const t=wfEditTarget(); return t?t.graph:null; }
+function wfNode(id){ const g=wfGraph(); return g?g.nodes.find(n=>n.id===id):null; }
+function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",showPreview:false,stackParent:null,stackPort:null}; }
+function wfNewGraph(){ return { nodes:[{id:wfUid(),type:"start",x:60,y:70,params:{}}], edges:[] }; }
+
+function wfAddActivity(type){
+  const n=WF.activities.filter(a=>a.type===type).length+1;
+  const id=type+"_"+wfUid().slice(1,5);
+  const act={id, name:(type==="background"?"Tác vụ nền ":"Hoạt động ")+n, type,
+    enabled:true, maxRetries:1, pollInterval:1.0, vars:[], graph:wfNewGraph()};
+  WF.activities.push(act); WF.edit={kind:"activity",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+  wfRenderAll();
+}
+function wfDeleteActivity(id,ev){
+  ev&&ev.stopPropagation();
+  const i=WF.activities.findIndex(a=>a.id===id); if(i<0)return;
+  if(!confirm(`Xoá hoạt động "${WF.activities[i].name}"?`))return;
+  WF.activities.splice(i,1);
+  if(WF.edit.kind==="activity"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
+  wfRenderAll();
+}
+function wfSelectActivity(id){ WF.edit={kind:"activity",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1; wfRenderAll(); }
+function wfToggleActivity(id,ev){ ev&&ev.stopPropagation(); const a=wfActById(id); if(a){ a.enabled=!a.enabled; wfRenderActivities(); } }
+
+// ── Functions (reusable subroutines, used via a "call" node) ──────────────────
+function wfAddFunction(){
+  const name=(prompt("Tên function (vd: Về Home):","")||"").trim();
+  if(!name) return;
+  const id="fn_"+wfUid().slice(1,6);
+  WF.functions.push({id,name,graph:wfNewGraph()});
+  WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+  wfRenderAll();
+}
+function wfEditFunction(id,ev){ ev&&ev.stopPropagation(); WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1; wfRenderAll(); }
+function wfDeleteFunction(id,ev){
+  ev&&ev.stopPropagation();
+  const i=WF.functions.findIndex(f=>f.id===id); if(i<0)return;
+  if(!confirm(`Xoá function "${WF.functions[i].name}"? Các node gọi nó sẽ bị vô hiệu.`))return;
+  WF.functions.splice(i,1);
+  if(WF.edit.kind==="function"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
+  wfRenderAll();
+}
+
+// ── Rendering ──────────────────────────────────────────────────────────────
+function wfRenderAll(){
+  wfRenderActivities(); wfRenderFunctions(); wfRenderPalette(); wfRenderCanvas(); wfRenderInspector();
+  const t=wfEditTarget();
+  $("wf-cur-act").textContent = !t ? "—" : (WF.edit.kind==="function" ? "ƒ "+t.name : t.name);
+}
+
+function wfRenderActivities(){
+  const wrap=$("wf-activities"); wrap.innerHTML="";
+  if(!WF.activities.length){ wrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có hoạt động.</div>'; return; }
+  const check=`<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>`;
+  WF.activities.forEach(act=>{
+    const sel = WF.edit.kind==="activity" && act.id===WF.edit.id;
+    const el=document.createElement("div");
+    el.className="wf-act"+(sel?" sel":"");
+    el.innerHTML=
+      `<span class="wf-act-cb ${act.enabled?"checked":""}">${check}</span>
+       <span class="wf-badge ${act.type==="background"?"bg":"seq"}">${act.type==="background"?"NỀN":"TUẦN TỰ"}</span>
+       <span class="wf-act-name">${escHtml(act.name)}</span>
+       <button class="wf-act-del" title="Xoá">×</button>`;
+    el.querySelector(".wf-act-cb").addEventListener("click",e=>wfToggleActivity(act.id,e));
+    el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteActivity(act.id,e));
+    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-cb,.wf-act-del"))return; wfSelectActivity(act.id); });
+    wrap.appendChild(el);
+  });
+}
+
+function wfRenderFunctions(){
+  const wrap=$("wf-functions"); if(!wrap) return; wrap.innerHTML="";
+  if(!WF.functions.length){ wrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có function. Bấm “+ Function”.</div>'; return; }
+  WF.functions.forEach(fn=>{
+    const sel = WF.edit.kind==="function" && fn.id===WF.edit.id;
+    const el=document.createElement("div"); el.className="wf-act wf-fn"+(sel?" sel":"");
+    el.innerHTML=
+      `<span class="wf-badge fn">ƒ</span>
+       <span class="wf-act-name">${escHtml(fn.name)}</span>
+       <button class="wf-act-del" title="Xoá function">×</button>`;
+    el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteFunction(fn.id,e));
+    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-del"))return; wfEditFunction(fn.id); });
+    wrap.appendChild(el);
+  });
+}
+
+function wfRenderPalette(){
+  const pal=$("wf-palette"); pal.innerHTML="";
+  // Node types grouped by category.
+  WF_CATS.forEach(cat=>{
+    const types=Object.keys(WF_NODES).filter(t=>WF_NODES[t].cat===cat.key);
+    if(!types.length) return;
+    const hdr=document.createElement("div"); hdr.className="wf-pal-cat"; hdr.textContent=cat.label; pal.appendChild(hdr);
+    const grid=document.createElement("div"); grid.className="wf-pal-grid";
+    types.forEach(type=>grid.appendChild(wfChip(WF_NODES[type].ico, WF_NODES[type].label, type)));
+    pal.appendChild(grid);
+  });
+  // Function calls.
+  const hdr=document.createElement("div"); hdr.className="wf-pal-cat"; hdr.textContent="Function"; pal.appendChild(hdr);
+  if(!WF.functions.length){ const d=document.createElement("div"); d.className="wf-insp-empty"; d.style.padding="0 0 4px"; d.textContent="Tạo function để dùng lại."; pal.appendChild(d); }
+  else { const grid=document.createElement("div"); grid.className="wf-pal-grid";
+    WF.functions.forEach(fn=>grid.appendChild(wfChip("ƒ", fn.name, "call:"+fn.id)));
+    pal.appendChild(grid);
+  }
+}
+function wfChip(ico,label,dragType){
+  const chip=document.createElement("div"); chip.className="wf-chip"; chip.draggable=true;
+  chip.innerHTML=`<span class="ico">${ico}</span>${escHtml(label)}`;
+  chip.addEventListener("dragstart",e=>{ wfPaletteDrag=dragType; e.dataTransfer.effectAllowed="copy"; try{e.dataTransfer.setData("text/plain",dragType);}catch{} });
+  chip.addEventListener("dragend",()=>{ wfPaletteDrag=null; });
+  return chip;
+}
+
+function wfRenderCanvas(){
+  const world=$("wf-world"), empty=$("wf-canvas-empty"), g=wfGraph();
+  [...world.querySelectorAll(".wf-node")].forEach(n=>n.remove());
+  wfApplyTransform();
+  if(!g){ empty.style.display="flex"; $("wf-wires").innerHTML=""; return; }
+  empty.style.display="none";
+  g.nodes.forEach(n=>world.appendChild(wfNodeEl(n)));
+  wfDrawWires();
+}
+
+function wfNodeEl(n){
+  const def=WF_NODES[n.type]||{label:n.type,ico:"?",kind:"action",outs:["out"],fields:[]};
+  // Linear ('out') stacking renders as one merged block: square the touching
+  // corners and hide the ports between the two halves.
+  const mergeChild  = n.stackParent && n.stackPort==="out";
+  const mergeParent = wfChildrenOf(n.id).some(c=>c.stackPort==="out");
+  const el=document.createElement("div");
+  el.className="wf-node "+def.kind+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"")
+    +(mergeChild?" merge-child":"")+(mergeParent?" merge-parent":"");
+  el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
+  // A call node shows the referenced function's name as its title.
+  let title=def.label, sum="";
+  if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?("ƒ "+fn.name):"ƒ (thiếu)"; }
+  else { try{ sum=def.sum?def.sum(n.params):""; }catch{} }
+  const delBtn = def.kind==="start" ? "" : `<button class="wf-node-del" title="Xoá node">×</button>`;
+  const hasTpl = !!wfTplField(n.type);
+  const showThumb = hasTpl && (wfPreviewAll || n.showPreview);
+  const eyeBtn = hasTpl ? `<button class="wf-node-eye${n.showPreview?" on":""}" title="Xem trước ảnh (block này)">👁</button>` : "";
+  const noteHtml = n.note ? `<div class="wf-node-note">${escHtml(n.note)}</div>` : "";
+  const thumbHtml = showThumb ? `<img class="wf-node-thumb">` : "";
+  el.innerHTML=
+    `<div class="wf-node-hd"><span class="ico">${def.ico}</span><span class="wf-node-title">${escHtml(title)}</span>${eyeBtn}${delBtn}</div>`+
+    (sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"")+noteHtml+thumbHtml;
+  if(!sum && !n.note && !thumbHtml) el.classList.add("collapsed");
+  if(thumbHtml) wfLoadThumb(el.querySelector(".wf-node-thumb"), wfTplOf(n));
+  // input port (start has none; note floats; a merged child's input is hidden)
+  if(def.kind!=="start" && def.kind!=="note" && !mergeChild){ const ip=document.createElement("span"); ip.className="wf-port in"; ip.dataset.node=n.id; ip.dataset.port="in"; el.appendChild(ip); }
+  // output ports (the 'out' port is hidden once a block is merged below it)
+  const outs=def.outs||[];
+  outs.forEach((port,i)=>{
+    if(port==="out" && mergeParent) return;
+    const top = outs.length<=1 ? 9 : 9 + i*19;
+    const op=document.createElement("span");
+    op.className="wf-port out"+(port==="true"?" t":port==="false"?" f":"");
+    op.dataset.node=n.id; op.dataset.port=port; op.style.top=top+"px";
+    el.appendChild(op);
+    // Parallel's "done" port is the JOIN point — wait all branches, then continue.
+    const lblTxt = (n.type==="parallel"&&port==="done") ? "gộp" : WF_PORT_LBL[port];
+    if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+1)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl); }
+  });
+  // interactions — the whole node body is a drag handle (ports/× excluded inside wfStartMove)
+  el.addEventListener("mousedown",e=>wfStartMove(e,n));
+  // Double-click a call node → jump into that function's graph.
+  if(n.type==="call"){ el.addEventListener("dblclick",e=>{ e.stopPropagation(); if(n.params&&n.params.fn&&wfFnById(n.params.fn)) wfEditFunction(n.params.fn); }); }
+  const db=el.querySelector(".wf-node-del");
+  if(db){ db.addEventListener("mousedown",e=>e.stopPropagation()); db.addEventListener("click",e=>{ e.stopPropagation(); wfDeleteNode(n.id); }); }
+  const eye=el.querySelector(".wf-node-eye");
+  if(eye){ eye.addEventListener("mousedown",e=>e.stopPropagation()); eye.addEventListener("click",e=>{ e.stopPropagation(); n.showPreview=!n.showPreview; wfRenderCanvas(); }); }
+  el.querySelectorAll(".wf-port.out").forEach(p=>p.addEventListener("mousedown",e=>wfStartConnect(e,n.id,p.dataset.port)));
+  // Connection completion is handled globally (drop anywhere on a node = connect).
+  return el;
+}
+
+// ── Selection ────────────────────────────────────────────────────────────────
+function wfMarkSel(){ document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("sel",WF.sel.includes(el.dataset.node))); }
+function wfSelectOne(id){ WF.sel=id?[id]:[]; WF.selectedNode=id||null; }
+function wfToggleSel(id){ const i=WF.sel.indexOf(id); if(i>=0)WF.sel.splice(i,1); else WF.sel.push(id); WF.selectedNode=WF.sel.length?id:null; }
+function wfClearSel(){ WF.sel=[]; WF.selectedNode=null; }
+function wfDeleteNode(id){ wfDeleteNodes([id]); }
+function wfDeleteSelected(){ if(WF.sel.length) wfDeleteNodes(WF.sel.slice()); }
+function wfDeleteNodes(ids){
+  const g=wfGraph(); if(!g) return;
+  const del=ids.filter(id=>{ const n=g.nodes.find(x=>x.id===id); return n && n.type!=="start"; });
+  if(!del.length) return;
+  g.nodes=g.nodes.filter(n=>!del.includes(n.id));
+  g.edges=g.edges.filter(e=>!del.includes(e.from)&&!del.includes(e.to));
+  g.nodes.forEach(n=>{ if(n.stackParent&&del.includes(n.stackParent)){ n.stackParent=null; n.stackPort=null; } });
+  WF.sel=WF.sel.filter(id=>!del.includes(id));
+  if(del.includes(WF.selectedNode)) WF.selectedNode=null;
+  wfRenderCanvas(); wfRenderInspector();
+}
+
+// ── Wires ────────────────────────────────────────────────────────────────────
+function wfPortPt(nodeId,port){
+  let el;
+  if(port==="in"){ el=document.querySelector(`.wf-node[data-node="${nodeId}"] .wf-port.in`); }
+  else{
+    el=document.querySelector(`.wf-node[data-node="${nodeId}"] .wf-port.out[data-port="${port}"]`);
+    // Legacy/loose: if that exact out port is gone (e.g. a node that became a
+    // condition), anchor on the node's first output port so the wire still shows.
+    if(!el) el=document.querySelector(`.wf-node[data-node="${nodeId}"] .wf-port.out`);
+  }
+  if(!el) return null;
+  const wr=$("wf-world").getBoundingClientRect(), r=el.getBoundingClientRect();
+  // Wires are drawn inside the (scaled) world → convert screen delta to world units.
+  return { x:(r.left+r.width/2-wr.left)/wfZoom, y:(r.top+r.height/2-wr.top)/wfZoom };
+}
+function wfStackWire(a,b){ const k=16; return `M${a.x},${a.y} C${a.x+k},${a.y+k} ${b.x-k},${b.y-k} ${b.x},${b.y}`; }
+function wfBezier(a,b){
+  // Forward edge (target to the right): smooth horizontal S-curve.
+  if(b.x >= a.x-20){ const dx=Math.max(40,Math.abs(b.x-a.x)*0.5); return `M${a.x},${a.y} C${a.x+dx},${a.y} ${b.x-dx},${b.y} ${b.x},${b.y}`; }
+  // Backward edge (e.g. loop wire-back, target to the left): bow downward so it
+  // arcs around the nodes instead of cutting straight through them.
+  const off=Math.max(50, Math.abs(b.x-a.x)*0.25);
+  const bow=Math.max(70, Math.abs(b.y-a.y)*0.4 + 60);
+  return `M${a.x},${a.y} C${a.x+off},${a.y+bow} ${b.x-off},${b.y+bow} ${b.x},${b.y}`;
+}
+function wfDrawWires(){
+  const svg=$("wf-wires"), g=wfGraph();
+  const temp=svg.querySelector(".temp");
+  svg.innerHTML=""; if(temp) svg.appendChild(temp);
+  if(!g) return;
+  g.edges.forEach(ed=>{
+    const toNode=wfNode(ed.to);
+    // Merged ('out') stack pairs are drawn as one block — no wire between them.
+    if(toNode && toNode.stackParent===ed.from && ed.fromPort==="out") return;
+    const a=wfPortPt(ed.from,ed.fromPort), b=wfPortPt(ed.to,"in");
+    if(!a||!b) return;
+    const isStack = toNode && toNode.stackParent===ed.from;   // branch-stacked pair
+    const p=document.createElementNS("http://www.w3.org/2000/svg","path");
+    p.setAttribute("class","wire"+(ed.fromPort==="true"?" t":ed.fromPort==="false"?" f":"")+(isStack?" stack":""));
+    p.setAttribute("d", isStack ? wfStackWire(a,b) : wfBezier(a,b));
+    p.addEventListener("click",ev=>{ ev.stopPropagation(); const i=g.edges.indexOf(ed); if(i>=0)g.edges.splice(i,1); const tn=wfNode(ed.to); if(tn&&tn.stackParent===ed.from){tn.stackParent=null;tn.stackPort=null;} wfDrawWires(); });
+    svg.appendChild(p);
+  });
+}
+function wfDrawTempWire(mx,my){
+  const a=wfPortPt(wfGesture.from,wfGesture.port); if(!a) return;
+  const wr=$("wf-world").getBoundingClientRect();
+  const b={ x:(mx-wr.left)/wfZoom, y:(my-wr.top)/wfZoom };
+  const svg=$("wf-wires"); let t=svg.querySelector(".temp");
+  if(!t){ t=document.createElementNS("http://www.w3.org/2000/svg","path"); t.setAttribute("class","temp"); svg.appendChild(t); }
+  t.setAttribute("d",wfBezier(a,b));
+}
+function wfClearTemp(){ const t=$("wf-wires").querySelector(".temp"); if(t)t.remove(); }
+
+// ── Gestures (move nodes / connect wire / box-select / pan) ───────────────────
+// ── Stacking (Ctrl-drag to snap blocks into a top→bottom sequence) ────────────
+function wfNodeH(id){ const el=document.querySelector(`.wf-node[data-node="${id}"]`); return el?el.offsetHeight:52; }
+function wfNodeW(id){ const el=document.querySelector(`.wf-node[data-node="${id}"]`); return el?el.offsetWidth:158; }
+function wfOuts(id){ const n=wfNode(id); const def=n&&WF_NODES[n.type]; return (def&&def.outs)||[]; }
+function wfChildrenOf(id){ const g=wfGraph(); return g?g.nodes.filter(n=>n.stackParent===id):[]; }
+// Whole sub-stack under id (id + all descendants across every output port).
+function wfStackDescendants(id){ const out=[], seen=new Set(); (function walk(x){ if(seen.has(x))return; seen.add(x); out.push(x); wfChildrenOf(x).forEach(c=>walk(c.id)); })(id); return out; }
+function wfStackRoot(id){ let cur=wfNode(id); const seen=new Set(); while(cur&&cur.stackParent&&!seen.has(cur.id)){ seen.add(cur.id); const p=wfNode(cur.stackParent); if(!p)break; cur=p; } return cur?cur.id:id; }
+function wfDetach(id){
+  const n=wfNode(id); if(!n||!n.stackParent) return;
+  const g=wfGraph(); if(g) g.edges=g.edges.filter(e=>!(e.from===n.stackParent && e.to===id && e.fromPort===(n.stackPort||"out")));
+  n.stackParent=null; n.stackPort=null;
+}
+// Lay a node's stacked children flush below it; branch children (true/false,
+// body/done) fan out into columns by their port order so they don't overlap.
+function wfRestack(id){
+  const t=wfNode(id); if(!t) return;
+  const outs=wfOuts(id), w=wfNodeW(id)+16, h=wfNodeH(id);
+  wfChildrenOf(id).forEach(c=>{
+    const idx=Math.max(0, outs.indexOf(c.stackPort||"out"));
+    c.x=t.x + idx*w; c.y=t.y + h;
+    const el=document.querySelector(`.wf-node[data-node="${c.id}"]`); if(el){ el.style.left=c.x+"px"; el.style.top=c.y+"px"; }
+    wfRestack(c.id);
+  });
+}
+// ── Merge / unmerge (select blocks → right-click) ─────────────────────────────
+// Merge = chain the selected sequential (single-'out') blocks top→bottom into
+// one stacked unit. Unmerge = break the stack a selected block belongs to.
+function wfMergeable(n){ const d=n&&WF_NODES[n.type]; return !!d && (d.outs||[]).join()==="out"; }
+function wfMergeSelected(){
+  const g=wfGraph(); if(!g) return;
+  const chain=WF.sel.map(id=>wfNode(id)).filter(n=>n&&wfMergeable(n)).sort((a,b)=>a.y-b.y);
+  if(chain.length<2){ alert("Chọn ≥2 khối hành động (1 cổng ra) rồi gộp."); return; }
+  for(let i=0;i<chain.length-1;i++){
+    const top=chain[i], bot=chain[i+1];
+    g.edges=g.edges.filter(e=>!(e.from===top.id && e.fromPort==="out"));  // one wire per out
+    g.edges.push({from:top.id,fromPort:"out",to:bot.id});
+    bot.stackParent=top.id; bot.stackPort="out";
+  }
+  wfRenderCanvas();           // apply merge styling first (changes measured heights)
+  wfRestack(chain[0].id);     // then snap children flush using the merged heights
+  wfDrawWires();
+  wfRenderInspector();
+}
+function wfUnmergeSelected(){
+  const g=wfGraph(); if(!g) return;
+  const roots=new Set(WF.sel.map(id=>wfStackRoot(id)));
+  roots.forEach(root=>{
+    const ids=wfStackDescendants(root);
+    ids.forEach(id=>{ const n=wfNode(id); if(n&&n.stackParent&&n.stackPort==="out"){
+      g.edges=g.edges.filter(e=>!(e.from===n.stackParent&&e.to===id&&e.fromPort==="out"));
+      n.stackParent=null; n.stackPort=null;
+    }});
+    // Spread them out so they no longer overlap.
+    const arr=ids.map(wfNode).filter(Boolean);
+    arr.forEach((n,i)=>{ if(i>0){ n.x=arr[0].x+i*30; n.y=arr[0].y+i*72; } });
+  });
+  wfRenderCanvas(); wfRenderInspector();
+}
+function wfSelHasStack(){ return WF.sel.some(id=>{ const n=wfNode(id); return n && (n.stackParent || wfChildrenOf(id).length); }); }
+
+function wfStartMove(e,n){
+  if(e.button!==0||e.target.closest(".wf-port,.wf-node-del,.wf-node-eye")) return;
+  e.stopPropagation();
+  if(e.shiftKey){ wfToggleSel(n.id); wfMarkSel(); wfRenderInspector(); return; }
+  const ctrl=e.ctrlKey||e.metaKey;
+  let ids;
+  if(!ctrl && WF.sel.length>1 && WF.sel.includes(n.id)){
+    ids=WF.sel.slice();                          // move the multi-selection as-is
+  } else if(ctrl){
+    ids=[n.id]; wfSelectOne(n.id);               // Ctrl = nudge just this node
+  } else {
+    ids=wfStackDescendants(wfStackRoot(n.id));    // plain drag moves the whole merged stack
+    wfSelectOne(n.id);
+  }
+  wfMarkSel(); wfRenderInspector();
+  const g=wfGraph(); if(!g) return;
+  const items=ids.map(id=>{ const nn=g.nodes.find(x=>x.id===id); return nn?{id,ox:nn.x,oy:nn.y}:null; }).filter(Boolean);
+  wfGesture={mode:"move",items,sx:e.clientX,sy:e.clientY,ctrl,dragId:n.id};
+}
+function wfStartConnect(e,nodeId,port){
+  if(e.button!==0) return; e.stopPropagation(); e.preventDefault();
+  wfGesture={mode:"connect",from:nodeId,port};
+}
+// Loose connect: the drop only has to land *anywhere on the target node*, not
+// exactly on its input dot. The node under the pointer becomes the target.
+function wfNodeUnderPointer(x,y){
+  const el=document.elementFromPoint(x,y); if(!el) return null;
+  const node=el.closest(".wf-node"); return node?node.dataset.node:null;
+}
+function wfHighlightTarget(id){
+  document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("conn-target", !!id && el.dataset.node===id));
+}
+function wfConnectTo(toNodeId){
+  const g=wfGraph();
+  if(g && wfGesture && wfGesture.from!==toNodeId){
+    g.edges=g.edges.filter(ed=>!(ed.from===wfGesture.from && ed.fromPort===wfGesture.port)); // one wire per output port
+    g.edges.push({from:wfGesture.from,fromPort:wfGesture.port,to:toNodeId});
+  }
+}
+function wfCanvasMouseDown(e){
+  if(e.target.closest(".wf-node")) return;
+  // Middle mouse, or Space+left → pan. Plain left on empty → rubber-band select.
+  if(e.button===1 || (e.button===0 && wfSpace)){
+    e.preventDefault();
+    $("wf-canvas").classList.add("panning");
+    wfGesture={mode:"pan",sx:e.clientX,sy:e.clientY,ox:wfPan.x,oy:wfPan.y};
+    return;
+  }
+  if(e.button!==0) return;
+  if(!e.shiftKey) wfClearSel();
+  const wr=$("wf-world").getBoundingClientRect();
+  const box=document.createElement("div"); box.id="wf-selbox"; box.className="wf-selbox";
+  $("wf-world").appendChild(box);
+  wfGesture={mode:"box", sx:(e.clientX-wr.left)/wfZoom, sy:(e.clientY-wr.top)/wfZoom, base:WF.sel.slice()};
+  wfMarkSel(); wfRenderInspector();
+}
+// ── Right-click context menu (merge / unmerge / delete) ──────────────────────
+function wfHideMenu(){ const m=$("wf-ctxmenu"); if(m) m.style.display="none"; }
+function wfShowMenu(clientX, clientY){
+  const m=$("wf-ctxmenu"); if(!m) return;
+  const items=[];
+  const mergeCount=WF.sel.map(wfNode).filter(n=>n&&wfMergeable(n)).length;
+  if(mergeCount>=2) items.push({label:"⧉ Gộp khối ("+mergeCount+")", fn:wfMergeSelected});
+  if(wfSelHasStack()) items.push({label:"⊟ Tách khối", fn:wfUnmergeSelected});
+  if(WF.sel.length) items.push({label:"🗑 Xoá ("+WF.sel.length+")", fn:()=>wfDeleteSelected()});
+  if(!items.length){ wfHideMenu(); return; }
+  m.innerHTML="";
+  items.forEach(it=>{ const d=document.createElement("div"); d.className="wf-ctx-item"; d.textContent=it.label;
+    d.onclick=()=>{ wfHideMenu(); it.fn(); }; m.appendChild(d); });
+  const cr=$("wf-canvas").getBoundingClientRect();
+  m.style.left=(clientX)+"px"; m.style.top=(clientY)+"px"; m.style.display="block";
+}
+
+function wfInitCanvas(){
+  if(wfCanvasReady) return; wfCanvasReady=true;
+  const canvas=$("wf-canvas");
+  canvas.addEventListener("mousedown",wfCanvasMouseDown);
+  canvas.addEventListener("contextmenu",e=>{
+    e.preventDefault();
+    const ne=e.target.closest(".wf-node");
+    if(ne && !WF.sel.includes(ne.dataset.node)){ wfSelectOne(ne.dataset.node); wfMarkSel(); wfRenderInspector(); }
+    wfShowMenu(e.clientX, e.clientY);
+  });
+  document.addEventListener("mousedown",e=>{ if(!e.target.closest("#wf-ctxmenu")) wfHideMenu(); }, true);
+  canvas.addEventListener("wheel",e=>{
+    e.preventDefault();
+    const r=canvas.getBoundingClientRect();
+    wfSetZoom(wfZoom*(e.deltaY<0?1.1:1/1.1), e.clientX-r.left, e.clientY-r.top);
+  }, {passive:false});
+  canvas.addEventListener("dragover",e=>{ if(wfPaletteDrag){ e.preventDefault(); e.dataTransfer.dropEffect="copy"; } });
+  canvas.addEventListener("drop",e=>{
+    if(!wfPaletteDrag) return; e.preventDefault();
+    const g=wfGraph(); if(!g){ alert("Chọn hoặc thêm một hoạt động/function trước."); wfPaletteDrag=null; return; }
+    const wr=$("wf-world").getBoundingClientRect();
+    const x=wfSnap((e.clientX-wr.left)/wfZoom-70), y=wfSnap((e.clientY-wr.top)/wfZoom-14);
+    let node;
+    if(wfPaletteDrag.startsWith("call:")){ node=wfNewNode("call",x,y); node.params={fn:wfPaletteDrag.slice(5)}; }
+    else if(wfPaletteDrag.startsWith("var:")){ const p=wfPaletteDrag.split(":"); const vtype=p[1], vname=p.slice(2).join(":");
+      node=wfNewNode("if_var",x,y); node.params={name:vname, op:"==", value: vtype==="bool"?"true":""}; }
+    else node=wfNewNode(wfPaletteDrag,x,y);
+    g.nodes.push(node); wfSelectOne(node.id); wfPaletteDrag=null;
+    wfRenderCanvas(); wfRenderInspector();
+  });
+  document.addEventListener("mousemove",e=>{
+    if(!wfGesture) return;
+    if(wfGesture.mode==="move"){
+      // Snap the lead node, then shift the whole group by the SAME delta so
+      // merged blocks stay perfectly flush (don't snap each node separately).
+      const lead=wfGesture.items.find(it=>it.id===wfGesture.dragId)||wfGesture.items[0];
+      if(!lead) return;
+      const sx=wfSnap(lead.ox+(e.clientX-wfGesture.sx)/wfZoom);
+      const sy=wfSnap(lead.oy+(e.clientY-wfGesture.sy)/wfZoom);
+      const dx=sx-lead.ox, dy=sy-lead.oy;
+      wfGesture.items.forEach(it=>{
+        const n=wfNode(it.id); if(!n) return;
+        n.x=it.ox+dx; n.y=it.oy+dy;
+        const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
+        if(el){ el.style.left=n.x+"px"; el.style.top=n.y+"px"; }
+      });
+      wfDrawWires();
+    } else if(wfGesture.mode==="box"){
+      wfBoxSelectMove(e);
+    } else if(wfGesture.mode==="pan"){
+      wfPan.x=wfGesture.ox+(e.clientX-wfGesture.sx);
+      wfPan.y=wfGesture.oy+(e.clientY-wfGesture.sy);
+      wfApplyTransform();
+    } else if(wfGesture.mode==="connect"){
+      wfDrawTempWire(e.clientX,e.clientY);
+      const tid=wfNodeUnderPointer(e.clientX,e.clientY);
+      wfHighlightTarget(tid && tid!==wfGesture.from ? tid : null);
+    }
+  });
+  document.addEventListener("mouseup",e=>{
+    if(!wfGesture) return;
+    if(wfGesture.mode==="connect"){
+      const tid=wfNodeUnderPointer(e.clientX,e.clientY);
+      if(tid) wfConnectTo(tid);
+      wfClearTemp(); wfHighlightTarget(null); wfDrawWires();
+    } else if(wfGesture.mode==="box"){
+      const box=$("wf-selbox"); if(box) box.remove();
+      WF.selectedNode = WF.sel.length===1 ? WF.sel[0] : null;
+      wfRenderInspector();
+    } else if(wfGesture.mode==="pan"){
+      $("wf-canvas").classList.remove("panning");
+    }
+    wfGesture=null;
+  });
+}
+function wfBoxSelectMove(e){
+  const wr=$("wf-world").getBoundingClientRect();
+  const cx=(e.clientX-wr.left)/wfZoom, cy=(e.clientY-wr.top)/wfZoom;
+  const x=Math.min(cx,wfGesture.sx), y=Math.min(cy,wfGesture.sy);
+  const w=Math.abs(cx-wfGesture.sx), h=Math.abs(cy-wfGesture.sy);
+  const box=$("wf-selbox");
+  if(box){ box.style.left=x+"px"; box.style.top=y+"px"; box.style.width=w+"px"; box.style.height=h+"px"; }
+  const g=wfGraph(); if(!g) return;
+  const hit=[];
+  g.nodes.forEach(n=>{
+    const el=document.querySelector(`.wf-node[data-node="${n.id}"]`); if(!el) return;
+    const nw=el.offsetWidth, nh=el.offsetHeight;
+    if(n.x < x+w && n.x+nw > x && n.y < y+h && n.y+nh > y) hit.push(n.id);
+  });
+  WF.sel = wfGesture.base.concat(hit.filter(id=>!wfGesture.base.includes(id)));
+  wfMarkSel();
+}
+
+// ── Inspector ──────────────────────────────────────────────────────────────
+function wfRenderInspector(){
+  const body=$("wf-insp-body"); body.innerHTML="";
+  // Multi-selection: show a count + bulk delete instead of one node's params.
+  if(WF.sel.length>1){
+    const h=document.createElement("div"); h.className="wf-insp-sec"; h.textContent=`${WF.sel.length} node được chọn`; body.appendChild(h);
+    const btn=document.createElement("button"); btn.className="btn sm err"; btn.textContent="Xoá các node đã chọn";
+    btn.onclick=()=>wfDeleteSelected(); body.appendChild(btn);
+    const tip=document.createElement("div"); tip.className="wf-insp-empty"; tip.textContent="Kéo một node để di chuyển cả nhóm. Phím Delete để xoá."; body.appendChild(tip);
+    return;
+  }
+  const node=wfNode(WF.selectedNode), act=wfCurAct(), fn=wfCurFn();
+  if(node){
+    const def=WF_NODES[node.type]||{label:node.type,fields:[]};
+    const h=document.createElement("div"); h.className="wf-insp-sec"; h.textContent=`${def.ico||""} ${def.label}`; body.appendChild(h);
+    if(node.type==="call"){ body.appendChild(wfCallPicker(node)); }
+    else {
+      if(!(def.fields||[]).length){ const d=document.createElement("div"); d.className="wf-insp-empty"; d.textContent="Node này không có tham số."; body.appendChild(d); }
+      (def.fields||[]).forEach(f=>body.appendChild(wfFieldEl(node,f)));
+    }
+    // A free-text note for any node (the standalone "note" node carries its own text).
+    if(node.type!=="note") body.appendChild(wfNoteField(node));
+    return;
+  }
+  if(fn){
+    const h=document.createElement("div"); h.className="wf-insp-sec"; h.textContent="ƒ Function"; body.appendChild(h);
+    body.appendChild(wfActField("Tên","text",fn.name,v=>{ fn.name=v; wfRenderFunctions(); wfRenderPalette(); $("wf-cur-act").textContent="ƒ "+v; }));
+    const tip=document.createElement("div"); tip.className="wf-insp-empty"; tip.textContent="Xếp node cho function này. Nó dùng được như một node trong mọi hoạt động (kéo từ mục Function)."; body.appendChild(tip);
+    return;
+  }
+  if(act){
+    const h=document.createElement("div"); h.className="wf-insp-sec"; h.textContent=act.type==="background"?"Hoạt động nền":"Hoạt động tuần tự"; body.appendChild(h);
+    body.appendChild(wfActField("Tên","text",act.name,v=>{ act.name=v; wfRenderActivities(); $("wf-cur-act").textContent=v; }));
+    if(act.type==="background") body.appendChild(wfActField("Chu kỳ (s)","num",act.pollInterval,v=>act.pollInterval=parseFloat(v)||1));
+    else body.appendChild(wfActField("Số lần thử","num",act.maxRetries,v=>act.maxRetries=parseInt(v)||1));
+    body.appendChild(wfVarsSection(act));
+    const tip=document.createElement("div"); tip.className="wf-insp-empty"; tip.textContent="Bấm một node trên canvas để sửa tham số của nó."; body.appendChild(tip);
+    return;
+  }
+  body.innerHTML='<div class="wf-insp-empty">Chưa chọn hoạt động.</div>';
+}
+function wfCallPicker(node){
+  const row=document.createElement("div"); row.className="wf-field";
+  const l=document.createElement("label"); l.textContent="function"; row.appendChild(l);
+  const sel=document.createElement("select"); sel.style.flex="1"; sel.style.minWidth="0";
+  if(!WF.functions.length){ const o=document.createElement("option"); o.value=""; o.textContent="(chưa có function)"; sel.appendChild(o); }
+  WF.functions.forEach(fn=>{ const o=document.createElement("option"); o.value=fn.id; o.textContent=fn.name; if(fn.id===node.params.fn)o.selected=true; sel.appendChild(o); });
+  sel.onchange=()=>{ node.params.fn=sel.value; wfRenderCanvas(); };
+  row.appendChild(sel); return row;
+}
+function wfNoteField(node){
+  const wrap=document.createElement("div");
+  const sec=document.createElement("div"); sec.className="wf-insp-sec"; sec.textContent="Ghi chú"; sec.style.marginTop="8px"; wrap.appendChild(sec);
+  const inp=document.createElement("input"); inp.type="text"; inp.placeholder="ghi chú cho node này…"; inp.value=node.note||"";
+  inp.style.width="100%";
+  inp.oninput=()=>{ node.note=inp.value; wfUpdNodeNote(node); };
+  wrap.appendChild(inp); return wrap;
+}
+function wfUpdNodeNote(node){
+  const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
+  let n=el.querySelector(".wf-node-note");
+  if(node.note){
+    if(!n){ n=document.createElement("div"); n.className="wf-node-note"; el.appendChild(n); el.classList.remove("collapsed"); }
+    n.textContent=node.note;
+  } else if(n){ n.remove(); }
+}
+function wfActField(label,t,val,onset){
+  const row=document.createElement("div"); row.className="wf-field";
+  const l=document.createElement("label"); l.textContent=label; row.appendChild(l);
+  const inp=document.createElement("input"); inp.type=t==="num"?"number":"text"; inp.value=val;
+  inp.oninput=()=>onset(inp.value); row.appendChild(inp); return row;
+}
+// Per-activity variables (e.g. a bool "isClaim"). Each is seeded into the
+// engine at activity start; drag a var's chip onto the canvas to make a check.
+function wfVarsSection(act){
+  if(!act.vars) act.vars=[];
+  const wrap=document.createElement("div");
+  const sec=document.createElement("div"); sec.className="wf-insp-sec"; sec.style.marginTop="8px";
+  sec.innerHTML=`Biến <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(kéo vào canvas để kiểm tra)</span>`;
+  wrap.appendChild(sec);
+  act.vars.forEach((v,idx)=>wrap.appendChild(wfVarRow(act,v,idx)));
+  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Biến"; add.style.marginTop="4px";
+  add.onclick=()=>{ const n=act.vars.length+1; act.vars.push({name:"var"+n, label:"Setting "+n, type:"bool", value:false}); wfRenderInspector(); };
+  wrap.appendChild(add);
+  return wrap;
+}
+function wfVarRow(act,v,idx){
+  const card=document.createElement("div"); card.className="wf-var-card";
+  // Line 1: drag-chip + title (display label) + delete.
+  const r1=document.createElement("div"); r1.className="wf-var-row";
+  const chip=document.createElement("span"); chip.className="wf-var-chip"; chip.draggable=true;
+  chip.textContent="🔖"; chip.title="Kéo vào canvas để tạo node kiểm tra";
+  chip.addEventListener("dragstart",e=>{ wfPaletteDrag="var:"+(v.type||"bool")+":"+(v.name||""); e.dataTransfer.effectAllowed="copy"; try{e.dataTransfer.setData("text/plain",v.name||"");}catch{} });
+  chip.addEventListener("dragend",()=>{ wfPaletteDrag=null; });
+  r1.appendChild(chip);
+  const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Tiêu đề (hiện trong settings)"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
+  lbl.oninput=()=>{ v.label=lbl.value; };
+  r1.appendChild(lbl);
+  const del=document.createElement("button"); del.className="wf-act-del"; del.textContent="×"; del.title="Xoá biến";
+  del.onclick=()=>{ act.vars.splice(idx,1); wfRenderInspector(); };
+  r1.appendChild(del);
+  // Line 2: variable name (key) + type + default value.
+  const r2=document.createElement("div"); r2.className="wf-var-row";
+  const nm=document.createElement("input"); nm.type="text"; nm.value=v.name||""; nm.placeholder="biến (vd isClaim)"; nm.style.flex="1"; nm.style.minWidth="0"; nm.style.fontSize="10.5px"; nm.style.fontFamily="var(--mono)";
+  nm.oninput=()=>{ v.name=nm.value; };
+  r2.appendChild(nm);
+  const ty=document.createElement("select");
+  [["bool","bool"],["number","số"],["text","chữ"],["select","chọn"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
+  ty.onchange=()=>{
+    v.type=ty.value;
+    if(ty.value==="select"){ if(!v.options||!v.options.length) v.options=["A","B"]; v.value=v.options[0]; }
+    else v.value = ty.value==="bool"?false : ty.value==="number"?0 : "";
+    wfRenderInspector();
+  };
+  r2.appendChild(ty);
+  r2.appendChild(wfVarValue(v));
+  card.appendChild(r1); card.appendChild(r2);
+  // Line 3 (select only): editable comma-separated option list.
+  if(v.type==="select"){
+    const r3=document.createElement("div"); r3.className="wf-var-row";
+    const opt=document.createElement("input"); opt.type="text"; opt.placeholder="lựa chọn: A, B, C"; opt.value=(v.options||[]).join(", ");
+    opt.style.flex="1"; opt.style.minWidth="0"; opt.style.fontSize="10.5px";
+    opt.onchange=()=>{ v.options=opt.value.split(",").map(s=>s.trim()).filter(Boolean); if(!v.options.includes(v.value)) v.value=v.options[0]||""; wfRenderInspector(); };
+    const l=document.createElement("label"); l.textContent="opts"; l.style.fontSize="10px"; l.style.color="var(--muted)"; l.style.flexShrink="0";
+    r3.appendChild(l); r3.appendChild(opt); card.appendChild(r3);
+  }
+  return card;
+}
+function wfVarValue(v){
+  if((v.type||"bool")==="bool"){
+    const cb=document.createElement("span"); cb.className="cb"+(v.value?" checked":""); cb.title="Giá trị mặc định";
+    cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
+    cb.onclick=()=>{ v.value=!v.value; cb.classList.toggle("checked",v.value); };
+    return cb;
+  }
+  if(v.type==="select"){
+    const sel=document.createElement("select"); sel.style.maxWidth="86px";
+    (v.options||[]).forEach(o=>{ const op=document.createElement("option"); op.value=op.textContent=o; if(String(v.value)===String(o))op.selected=true; sel.appendChild(op); });
+    sel.onchange=()=>{ v.value=sel.value; };
+    return sel;
+  }
+  const inp=document.createElement("input"); inp.type=v.type==="number"?"number":"text";
+  inp.value=v.value!==undefined&&v.value!==null?v.value:""; inp.style.width="58px";
+  inp.oninput=()=>{ v.value = v.type==="number"?(parseFloat(inp.value)||0):inp.value; };
+  return inp;
+}
+function wfFieldEl(node,f){
+  const row=document.createElement("div"); row.className="wf-field";
+  const lab=document.createElement("label"); lab.textContent=f.k; row.appendChild(lab);
+  if(f.t==="bool"){
+    const cb=document.createElement("span"); cb.className="cb"+(node.params[f.k]?" checked":"");
+    cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
+    cb.onclick=()=>{ node.params[f.k]=!node.params[f.k]; cb.classList.toggle("checked",node.params[f.k]); wfUpdNodeSum(node); };
+    row.appendChild(cb); return row;
+  }
+  if(f.t==="select"){
+    const sel=document.createElement("select"); sel.style.flex="1"; sel.style.minWidth="0";
+    (f.opts||[]).forEach(o=>{ const v=(o&&o.v!==undefined)?o.v:o, t=(o&&o.t!==undefined)?o.t:o;
+      const op=document.createElement("option"); op.value=v; op.textContent=t; if(node.params[f.k]===v)op.selected=true; sel.appendChild(op); });
+    sel.onchange=()=>{ node.params[f.k]=sel.value; wfUpdNodeSum(node); };
+    row.appendChild(sel); return row;
+  }
+  const inp=document.createElement("input");
+  inp.type=f.t==="num"?"number":"text"; if(f.t==="num"&&f.step) inp.step=f.step;
+  inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
+  inp.oninput=()=>{ node.params[f.k]= f.t==="num"?(parseFloat(inp.value)||0):inp.value; wfUpdNodeSum(node); };
+  row.appendChild(inp);
+  if(f.t==="tpl"){
+    inp.style.fontSize="10px";
+    const btn=document.createElement("button"); btn.className="btn sm"; btn.textContent="Chọn…";
+    row.appendChild(btn);
+    // Wrap the row + a live preview thumbnail of the chosen image.
+    const wrap=document.createElement("div"); wrap.appendChild(row);
+    const img=document.createElement("img"); img.className="wf-tpl-preview"; wrap.appendChild(img);
+    wfLoadThumb(img, node.params[f.k]);
+    const refresh=v=>{ node.params[f.k]=v; wfUpdNodeSum(node); wfLoadThumb(img,v); wfUpdNodePreview(node); };
+    inp.oninput=()=>refresh(inp.value);
+    btn.onclick=async()=>{ const p=await api().pick_template(); if(p){ inp.value=p; refresh(p); } };
+    return wrap;
+  }
+  return row;
+}
+function wfUpdNodeSum(node){
+  const def=WF_NODES[node.type]; if(!def||!def.sum) return;
+  const el=document.querySelector(`.wf-node[data-node="${node.id}"] .wf-node-sum`);
+  let s=""; try{ s=def.sum(node.params); }catch{}
+  if(el) el.textContent=s;
+}
+// Image-template helpers (which nodes carry a template, and its current path).
+function wfTplField(type){ const def=WF_NODES[type]; return def&&(def.fields||[]).find(f=>f.t==="tpl"); }
+function wfTplOf(node){ const f=wfTplField(node.type); return f?(node.params[f.k]||""):""; }
+function wfUpdNodePreview(node){
+  const img=document.querySelector(`.wf-node[data-node="${node.id}"] .wf-node-thumb`);
+  if(img) wfLoadThumb(img, wfTplOf(node));   // refresh in-node thumbnail if shown
+}
+
+// ── Export / import / run ────────────────────────────────────────────────────
+function wfCleanGraph(g){
+  return {
+    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.showPreview) o.showPreview=true; if(n.stackParent){ o.stackParent=n.stackParent; o.stackPort=n.stackPort||"out"; } return o; }),
+    edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort,to:e.to})),
+  };
+}
+function wfSerialize(){
+  return {
+    name:$("wf-name").value||"workflow", version:2, templatesDir:WF.templatesDir||"out",
+    functions: WF.functions.map(f=>({ id:f.id, name:f.name, graph:wfCleanGraph(f.graph) })),
+    activities: WF.activities.map(a=>{
+      const o={ id:a.id, name:a.name, type:a.type, enabled:a.enabled,
+        vars:(a.vars||[]).map(v=>({name:v.name,label:v.label||"",type:v.type,value:v.value, options:v.type==="select"?(v.options||[]):undefined})), graph:wfCleanGraph(a.graph) };
+      if(a.type==="background") o.pollInterval=a.pollInterval; else o.maxRetries=a.maxRetries;
+      return o;
+    }),
+  };
+}
+function wfHydrateGraph(g){
+  g=g||{nodes:[],edges:[]};
+  let nodes=(g.nodes||[]).map(n=>({id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params:n.params||wfDefaults(n.type),note:n.note||"",showPreview:!!n.showPreview,stackParent:n.stackParent||null,stackPort:n.stackPort||null}));
+  if(!nodes.some(n=>n.type==="start")) nodes.unshift({id:wfUid(),type:"start",x:40,y:40,params:{}});
+  return { nodes, edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort||"out",to:e.to})) };
+}
+function wfHydrate(flow){
+  WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"out";
+  WF.functions=(flow.functions||[]).map(f=>({ id:f.id||("fn_"+wfUid().slice(1,6)), name:f.name||"function", graph:wfHydrateGraph(f.graph) }));
+  WF.activities=(flow.activities||[]).map(a=>({
+    id:a.id||("act_"+wfUid().slice(1,5)), name:a.name||a.id||"activity",
+    type:a.type==="background"?"background":"sequence", enabled:a.enabled!==false,
+    maxRetries:a.maxRetries||1, pollInterval:a.pollInterval||1.0,
+    vars:(a.vars||[]).map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[]})),
+    graph:wfHydrateGraph(a.graph),
+  }));
+  WF.edit={kind:"activity", id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+  $("wf-name").value=WF.name;
+  wfRenderAll();
+}
+
+async function wfExport(){ await api().workflow_export(JSON.stringify(wfSerialize(),null,2), $("wf-name").value); }
+async function wfSave(){
+  const r=await api().workflow_save(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
+  if(r&&r.ok) setStatus("Đã lưu workflow");
+}
+async function wfImport(){
+  const txt=await api().workflow_import(); if(!txt)return;
+  try{ wfHydrate(JSON.parse(txt)); setStatus("Đã nhập workflow"); }
+  catch(e){ alert("JSON không hợp lệ: "+e); }
+}
+function wfSetRunning(on){
+  wfRunning=on; const b=$("wf-run-btn");
+  if(!on) wfSetRunningNode(null);   // clear the active-node glow when stopped
+  if(!b)return;
+  b.textContent= on?"Dừng":"Chạy thử";
+  b.classList.toggle("ok",!on); b.classList.toggle("err",on);
+}
+async function wfToggleRun(){
+  if(wfRunning){ await api().workflow_stop(); wfSetRunning(false); return; }
+  if(!WF.activities.length){ alert("Chưa có hoạt động nào."); return; }
+  const ok=await api().workflow_run(JSON.stringify(wfSerialize()));
+  wfSetRunning(!!ok);
+}
+async function wfRunGui(){
+  if(!WF.activities.length){ alert("Chưa có hoạt động nào."); return; }
+  await api().open_runner(JSON.stringify(wfSerialize()));
+  setStatus("Đã mở Runner GUI");
+}
+
+
+// ── Init ──────────────────────────────────────────────────────────────────
+async function init(){
+  let tries=0;
+  while(!(window.pywebview&&window.pywebview.api)&&tries<40){ await new Promise(r=>setTimeout(r,100)); tries++; }
+  if(!window.pywebview||!window.pywebview.api){ setStatus("⚠ pywebview không khả dụng"); return; }
+  const state=await api().get_state();
+  S.connectedSerial=state.connectedSerial||null;
+  (state.log||[]).forEach(appendLog);
+  try{ const st=await api().get_settings(); wfSnapOn=!!st.snap; wfPreviewAll=!!st.previewAll; }catch{}
+  wfSyncToggleBtns();
+  wfInitCanvas();
+  if(!WF.activities.length) wfAddActivity("sequence");
+  wfRenderAll();
+  setStatus("Sẵn sàng");
+}
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+</script>
+</body>
+</html>

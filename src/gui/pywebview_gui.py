@@ -254,9 +254,8 @@ class AutomationAPI:
 
     def set_custom(self, activity_id: str, key: str, value) -> bool:
         try:
-            # Numeric widgets send numbers; select widgets send a string option
-            # (e.g. the speedhack method). Coerce to float when possible, but
-            # keep non-numeric strings as-is.
+            # Numeric widgets may arrive as strings; coerce to float when
+            # possible, but keep non-numeric strings as-is.
             coerced = value
             if isinstance(value, str):
                 try:
