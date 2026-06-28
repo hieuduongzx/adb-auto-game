@@ -36,6 +36,7 @@
   --sans: "IBM Plex Sans","Segoe UI",system-ui,sans-serif;
   --mono: "IBM Plex Mono","Cascadia Code","Consolas",monospace;
   --r-sm: 7px; --r-md: 10px; --r-lg: 14px;
+  --node-r: 7px;   /* node card corner — rectangular, only lightly rounded */
   /* 4pt spacing scale — every gap/pad pulls from here for consistent rhythm. */
   --s1: 4px; --s2: 6px; --s3: 8px; --s4: 12px; --s5: 16px; --s6: 24px;
   /* Elevation scale — subtle, reinforces hierarchy (sidebar < panel < node < menu). */
@@ -433,12 +434,21 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-node.cat-flow  .wf-node-hd { background:#fdf3e0; } .wf-node.cat-flow  { border-left:3px solid #e0a64b; }
 .wf-node.cat-misc  .wf-node-hd { background:#eef1f5; } .wf-node.cat-misc  { border-left:3px solid #9aa6b4; }
 .wf-node.conn-target { box-shadow:0 0 0 2px var(--ok); }
-/* Merged ('out'-stacked) blocks read as one unit: square the touching edges. */
-.wf-node.merge-parent { border-bottom-left-radius:0; border-bottom-right-radius:0; border-bottom:none; }
-.wf-node.merge-child  { border-top-left-radius:0; border-top-right-radius:0; border-top:none; }
-.wf-node.merge-parent, .wf-node.merge-child { border-left:3px solid #b69cf0; }
-.wf-node.merge-child > .wf-node-hd { border-radius:0; border-top:1px dashed var(--border2); }
-.wf-node.merge-parent.sel, .wf-node.merge-child.sel { box-shadow:0 0 0 2px var(--accent-bd); }
+/* ── Groups (frames) ──────────────────────────────────────────────────────────
+   A named rectangle drawn behind the nodes. Moving its header moves every node
+   inside it. The body is click-through (pointer-events:none) so nodes stay usable;
+   only the header tab + resize handle are interactive. */
+.wf-group { position:absolute; z-index:0; border:1.5px dashed; border-radius:10px; pointer-events:none; }
+.wf-group.sel { border-style:solid; box-shadow:0 0 0 1px currentColor; }
+.wf-group-hd { position:absolute; left:-1.5px; top:-23px; max-width:280px; height:22px; display:flex; align-items:center; gap:6px;
+  padding:0 4px 0 9px; border-radius:8px 8px 0 0; font-size:11px; font-weight:700; color:#fff;
+  pointer-events:auto; cursor:move; white-space:nowrap; }
+.wf-group-name { overflow:hidden; text-overflow:ellipsis; }
+.wf-group-del { color:#fff; opacity:.8; font-size:14px; line-height:1; padding:0 2px; border-radius:4px; flex-shrink:0; cursor:pointer; }
+.wf-group-del:hover { opacity:1; background:rgba(255,255,255,.25); }
+.wf-group-resize { position:absolute; right:-5px; bottom:-5px; width:14px; height:14px; cursor:nwse-resize; pointer-events:auto;
+  border-right:2.5px solid currentColor; border-bottom:2.5px solid currentColor; border-bottom-right-radius:9px; opacity:.6; }
+.wf-group-resize:hover { opacity:1; }
 /* Context menu */
 #wf-ctxmenu { position:fixed; z-index:50; display:none; min-width:140px; background:var(--panel);
   border:1px solid var(--border2); border-radius:8px; box-shadow:0 6px 22px rgba(20,30,45,.18); padding:4px; }
@@ -591,7 +601,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
     </div>
     <div class="wf-side-sec" style="flex:1;min-height:0;display:flex;flex-direction:column;">
       <div class="wf-side-hdr"><span>Node</span></div>
-      <div class="wf-side-hint">Kéo node vào canvas. Kéo từ cổng phải, thả lên node bất kỳ là tự nối. Với node <b>Lặp lại</b>: thả vào cổng <b style="color:#c2841f">lặp</b> (dưới) để nối vòng lại. Ctrl+C/V sao chép/dán · Ctrl+D nhân đôi · Delete xoá.</div>
+      <div class="wf-side-hint">Kéo node vào canvas. Kéo từ cổng phải, thả lên node bất kỳ là tự nối. <b>Nhóm:</b> bấm nút <b>▢</b> trên thanh công cụ rồi kéo để vẽ khung (hoặc chọn vài node rồi bấm) — kéo tiêu đề khung để di chuyển cả nhóm, bấm đúp để đổi tên. Với node <b>Lặp lại</b>: thả vào cổng <b style="color:#c2841f">lặp</b> (dưới) để nối vòng lại. Ctrl+C/V sao chép/dán · Ctrl+D nhân đôi · Delete xoá.</div>
       <div id="wf-palette" class="wf-palette"></div>
     </div>
   </div>
@@ -604,6 +614,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></button>
       <button class="btn sm ico" id="wf-preview-btn" onclick="wfTogglePreview()" title="Preview ảnh: Tắt">
         <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <button class="btn sm ico" id="wf-group-btn" onclick="wfToggleGroupMode()" title="Tạo nhóm: Tắt — bấm rồi kéo để vẽ khung (hoặc chọn vài node trước rồi bấm)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="4 3"/></svg></button>
       <span class="tb-divider"></span>
       <div id="wf-speed-group" class="wf-speed-group" title="Speed hack — tách riêng khỏi Chạy thử">
         <span class="wf-speed-title">Speed hack</span>
@@ -621,7 +633,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
         <button class="btn sm" onclick="wfZoomBy(1.1)" title="Phóng to">+</button>
       </span>
       <span class="spacer"></span>
-      <span class="wf-hint" title="Cuộn chuột = zoom · Kéo = di chuyển khối · Chuột phải = gộp/tách (trên khối) hoặc xoá dây (trên dây nối) · Space hoặc chuột giữa = kéo nền">Cuộn = zoom · Kéo = di chuyển · Chuột phải = gộp/tách · xoá dây · Space = kéo nền</span>
+      <span class="wf-hint" title="Cuộn chuột = zoom · Kéo = di chuyển khối · Chuột phải = menu (tạo nhóm/sao chép/xoá) hoặc xoá dây (trên dây nối) · Space hoặc chuột giữa = kéo nền">Cuộn = zoom · Kéo = di chuyển · Chuột phải = menu · ▢ = nhóm · Space = kéo nền</span>
     </div>
     <div id="wf-canvas">
       <div id="wf-world">
@@ -819,7 +831,7 @@ window.addEventListener("keydown", e => {
   if(e.key===" "){ wfSpace=true; }
   if(e.key==="Delete"||e.key==="Backspace"){ if(WF.sel.length){ e.preventDefault(); wfDeleteSelected(); return; } }
   if((e.key==="a"||e.key==="A") && (e.ctrlKey||e.metaKey)){ const g=wfGraph(); if(g){ e.preventDefault(); WF.sel=g.nodes.map(n=>n.id); WF.selectedNode=null; wfMarkSel(); wfRenderInspector(); return; } }
-  if(e.key==="Escape"){ wfClearSel(); wfMarkSel(); wfRenderInspector(); }
+  if(e.key==="Escape"){ if(wfGroupMode) wfSetGroupMode(false); wfClearSel(); wfMarkSel(); wfRenderInspector(); }
 });
 window.addEventListener("keyup", e => { if(e.key===" ") wfSpace=false; });
 
@@ -983,8 +995,8 @@ function wfCurAct(){ return WF.edit.kind==="activity" ? wfActById(WF.edit.id) : 
 function wfCurFn(){ return WF.edit.kind==="function" ? wfFnById(WF.edit.id) : null; }
 function wfGraph(){ const t=wfEditTarget(); return t?t.graph:null; }
 function wfNode(id){ const g=wfGraph(); return g?g.nodes.find(n=>n.id===id):null; }
-function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",showPreview:false,stackParent:null,stackPort:null}; }
-function wfNewGraph(){ return { nodes:[{id:wfUid(),type:"start",x:60,y:70,params:{}}], edges:[] }; }
+function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",showPreview:false}; }
+function wfNewGraph(){ return { nodes:[{id:wfUid(),type:"start",x:60,y:70,params:{}}], edges:[], groups:[] }; }
 
 function wfAddActivity(type){
   const n=WF.activities.filter(a=>a.type===type).length+1;
@@ -1098,10 +1110,11 @@ function wfChip(ico,label,dragType){
 
 function wfRenderCanvas(){
   const world=$("wf-world"), empty=$("wf-canvas-empty"), g=wfGraph();
-  [...world.querySelectorAll(".wf-node")].forEach(n=>n.remove());
+  [...world.querySelectorAll(".wf-node,.wf-group")].forEach(n=>n.remove());
   wfApplyTransform();
   if(!g){ empty.style.display="flex"; $("wf-wires").innerHTML=""; return; }
   empty.style.display="none";
+  wfRenderGroups();   // frames behind the nodes
   g.nodes.forEach(n=>world.appendChild(wfNodeEl(n)));
   wfDrawWires();
   if(wfRunning) wfReapplyRunViz();   // keep the live run-trail across redraws
@@ -1109,16 +1122,11 @@ function wfRenderCanvas(){
 
 function wfNodeEl(n){
   const def=WF_NODES[n.type]||{label:n.type,ico:"?",kind:"action",outs:["out"],fields:[]};
-  // Linear ('out') stacking renders as one merged block: square the touching
-  // corners and hide the ports between the two halves.
-  const mergeChild  = n.stackParent && n.stackPort==="out";
-  const mergeParent = wfChildrenOf(n.id).some(c=>c.stackPort==="out");
   const el=document.createElement("div");
   // Category tint (only for the bulk action/condition blocks — structural kinds
   // start/end/stop/loop/call/note keep their own distinct styling).
   const catCls = (def.kind==="action"||def.kind==="condition") && def.cat ? " cat-"+def.cat : "";
-  el.className="wf-node "+def.kind+catCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"")
-    +(mergeChild?" merge-child":"")+(mergeParent?" merge-parent":"");
+  el.className="wf-node "+def.kind+catCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"");
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
   // A call node shows the referenced function's name as its title.
   let title=def.label, sum="";
@@ -1136,10 +1144,10 @@ function wfNodeEl(n){
     (sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"")+noteHtml+logHtml+thumbHtml;
   if(!sum && !n.note && !n.log && !thumbHtml) el.classList.add("collapsed");
   if(thumbHtml) wfLoadThumb(el.querySelector(".wf-node-thumb"), wfTplOf(n));
-  // input ports (start has none; note floats; a merged child's input is hidden).
+  // input ports (start has none; note floats).
   // Most nodes have a single 'in'; the loop also exposes a 'loop' (loop-back)
   // input below it so the wire that re-enters the loop lands on its own port.
-  if(def.kind!=="start" && def.kind!=="note" && !mergeChild){
+  if(def.kind!=="start" && def.kind!=="note"){
     const ins=wfIns(n.type);
     ins.forEach((port,i)=>{
       const top = ins.length<=1 ? 9 : 9 + i*21;
@@ -1151,10 +1159,9 @@ function wfNodeEl(n){
         lbl.style.top=(top+1)+"px"; lbl.textContent=WF_IN_LBL[port]||port; el.appendChild(lbl); }
     });
   }
-  // output ports (the 'out' port is hidden once a block is merged below it)
+  // output ports
   const outs=def.outs||[];
   outs.forEach((port,i)=>{
-    if(port==="out" && mergeParent) return;
     const top = outs.length<=1 ? 9 : 9 + i*19;
     const op=document.createElement("span");
     op.className="wf-port out"+(port==="true"?" t":port==="false"?" f":"");
@@ -1190,7 +1197,6 @@ function wfDeleteNodes(ids){
   if(!del.length) return;
   g.nodes=g.nodes.filter(n=>!del.includes(n.id));
   g.edges=g.edges.filter(e=>!del.includes(e.from)&&!del.includes(e.to));
-  g.nodes.forEach(n=>{ if(n.stackParent&&del.includes(n.stackParent)){ n.stackParent=null; n.stackPort=null; } });
   WF.sel=WF.sel.filter(id=>!del.includes(id));
   if(del.includes(WF.selectedNode)) WF.selectedNode=null;
   wfRenderCanvas(); wfRenderInspector();
@@ -1211,9 +1217,7 @@ function wfCopy(){
   const idset=new Set(ids);
   const nodes=ids.map(id=>{ const n=g.nodes.find(x=>x.id===id);
     return { type:n.type, x:n.x, y:n.y, note:n.note||"", log:n.log||"", showPreview:!!n.showPreview,
-      params:JSON.parse(JSON.stringify(n.params||{})),
-      stackParentIdx:(n.stackParent&&idset.has(n.stackParent))?ids.indexOf(n.stackParent):-1,
-      stackPort:n.stackPort||null }; });
+      params:JSON.parse(JSON.stringify(n.params||{})) }; });
   const edges=g.edges.filter(e=>idset.has(e.from)&&idset.has(e.to))
     .map(e=>({fromIdx:ids.indexOf(e.from), fromPort:e.fromPort, toIdx:ids.indexOf(e.to), toPort:e.toPort||"in"}));
   const minX=Math.min(...nodes.map(n=>n.x)), minY=Math.min(...nodes.map(n=>n.y));
@@ -1240,8 +1244,6 @@ function wfPaste(opts){
     node.id=newIds[i];
     node.params=JSON.parse(JSON.stringify(n.params||{}));
     node.note=n.note||""; node.log=n.log||""; node.showPreview=!!n.showPreview;
-    node.stackParent = n.stackParentIdx>=0 ? newIds[n.stackParentIdx] : null;
-    node.stackPort   = node.stackParent ? (n.stackPort||"out") : null;
     g.nodes.push(node);
   });
   clip.edges.forEach(e=>g.edges.push({from:newIds[e.fromIdx], fromPort:e.fromPort, to:newIds[e.toIdx], toPort:e.toPort||"in"}));
@@ -1277,7 +1279,6 @@ const WF_WIRE_DEFS = (function(){
   return "<defs>"+mk("wf-ah","#9aa9bd")+mk("wf-ah-h","#bb3a33")+mk("wf-ah-t","#2fa55a")
     +mk("wf-ah-f","#cf6b43")+mk("wf-ah-loop","#e0a64b")+mk("wf-ah-temp","#2f6fed")+"</defs>";
 })();
-function wfStackWire(a,b){ const k=16; return `M${a.x},${a.y} C${a.x+k},${a.y+k} ${b.x-k},${b.y-k} ${b.x},${b.y}`; }
 function wfBezier(a,b){
   // Forward edge (target to the right): smooth horizontal S-curve.
   if(b.x >= a.x-20){ const dx=Math.max(40,Math.abs(b.x-a.x)*0.5); return `M${a.x},${a.y} C${a.x+dx},${a.y} ${b.x-dx},${b.y} ${b.x},${b.y}`; }
@@ -1293,17 +1294,13 @@ function wfDrawWires(){
   svg.innerHTML=WF_WIRE_DEFS; if(temp) svg.appendChild(temp);
   if(!g) return;
   g.edges.forEach(ed=>{
-    const toNode=wfNode(ed.to);
-    // Merged ('out') stack pairs are drawn as one block — no wire between them.
-    if(toNode && toNode.stackParent===ed.from && ed.fromPort==="out") return;
     const toPort = ed.toPort||"in";
     const a=wfPortPt(ed.from,ed.fromPort), b=wfPortPt(ed.to,toPort);
     if(!a||!b) return;
-    const isStack = toNode && toNode.stackParent===ed.from;   // branch-stacked pair
     const p=document.createElementNS("http://www.w3.org/2000/svg","path");
-    p.setAttribute("class","wire"+(ed.fromPort==="true"?" t":ed.fromPort==="false"?" f":"")+(isStack?" stack":"")+(toPort==="loop"?" loopback":""));
+    p.setAttribute("class","wire"+(ed.fromPort==="true"?" t":ed.fromPort==="false"?" f":"")+(toPort==="loop"?" loopback":""));
     p.dataset.from=ed.from; p.dataset.fromport=ed.fromPort; p.dataset.to=ed.to;  // for run-trail branch colouring
-    p.setAttribute("d", isStack ? wfStackWire(a,b) : wfBezier(a,b));
+    p.setAttribute("d", wfBezier(a,b));
     // Deleting a wire is right-click only (see wfShowMenu) — a plain click used to
     // delete it, which was too easy to trigger by accident.
     p.__edge = ed;
@@ -1314,7 +1311,6 @@ function wfDrawWires(){
 function wfDeleteWire(ed){
   const g=wfGraph(); if(!g||!ed) return;
   const i=g.edges.indexOf(ed); if(i>=0) g.edges.splice(i,1);
-  const tn=wfNode(ed.to); if(tn&&tn.stackParent===ed.from){ tn.stackParent=null; tn.stackPort=null; }
   wfRenderCanvas();
 }
 function wfDrawTempWire(mx,my){
@@ -1327,86 +1323,96 @@ function wfDrawTempWire(mx,my){
 }
 function wfClearTemp(){ const t=$("wf-wires").querySelector(".temp"); if(t)t.remove(); }
 
-// ── Gestures (move nodes / connect wire / box-select / pan) ───────────────────
-// ── Stacking (Ctrl-drag to snap blocks into a top→bottom sequence) ────────────
-function wfNodeH(id){ const el=document.querySelector(`.wf-node[data-node="${id}"]`); return el?el.offsetHeight:52; }
-function wfNodeW(id){ const el=document.querySelector(`.wf-node[data-node="${id}"]`); return el?el.offsetWidth:158; }
-function wfOuts(id){ const n=wfNode(id); const def=n&&WF_NODES[n.type]; return (def&&def.outs)||[]; }
-function wfChildrenOf(id){ const g=wfGraph(); return g?g.nodes.filter(n=>n.stackParent===id):[]; }
-// Whole sub-stack under id (id + all descendants across every output port).
-function wfStackDescendants(id){ const out=[], seen=new Set(); (function walk(x){ if(seen.has(x))return; seen.add(x); out.push(x); wfChildrenOf(x).forEach(c=>walk(c.id)); })(id); return out; }
-function wfStackRoot(id){ let cur=wfNode(id); const seen=new Set(); while(cur&&cur.stackParent&&!seen.has(cur.id)){ seen.add(cur.id); const p=wfNode(cur.stackParent); if(!p)break; cur=p; } return cur?cur.id:id; }
-function wfDetach(id){
-  const n=wfNode(id); if(!n||!n.stackParent) return;
-  const g=wfGraph(); if(g) g.edges=g.edges.filter(e=>!(e.from===n.stackParent && e.to===id && e.fromPort===(n.stackPort||"out")));
-  n.stackParent=null; n.stackPort=null;
-}
-// Lay a node's stacked children flush below it; branch children (true/false,
-// body/done) fan out into columns by their port order so they don't overlap.
-function wfRestack(id){
-  const t=wfNode(id); if(!t) return;
-  const outs=wfOuts(id), w=wfNodeW(id)+16, h=wfNodeH(id);
-  wfChildrenOf(id).forEach(c=>{
-    const idx=Math.max(0, outs.indexOf(c.stackPort||"out"));
-    c.x=t.x + idx*w; c.y=t.y + h;
-    const el=document.querySelector(`.wf-node[data-node="${c.id}"]`); if(el){ el.style.left=c.x+"px"; el.style.top=c.y+"px"; }
-    wfRestack(c.id);
+// ── Groups (frames) ───────────────────────────────────────────────────────────
+// A group is a named rectangle living in the graph (graph.groups). Membership is
+// geometric: a node belongs to a group when its centre is inside the rectangle.
+// Moving the group's header moves every node currently inside it. Groups are
+// purely visual — the engine ignores them (it only runs nodes + edges).
+const WF_GROUP_COLORS = [
+  {b:"#6f9be8", bg:"rgba(111,155,232,.07)"},
+  {b:"#2fb0a3", bg:"rgba(47,176,163,.08)"},
+  {b:"#e0954b", bg:"rgba(224,149,75,.09)"},
+  {b:"#9a78e6", bg:"rgba(154,120,230,.08)"},
+  {b:"#cf6b6b", bg:"rgba(207,107,107,.08)"},
+];
+function wfGroups(){ const t=wfEditTarget(); if(!t) return []; if(!t.graph.groups) t.graph.groups=[]; return t.graph.groups; }
+function wfGroupColor(gr){ return WF_GROUP_COLORS[(gr.color||0) % WF_GROUP_COLORS.length]; }
+function wfNodesInGroup(gr){
+  const g=wfGraph(); if(!g) return [];
+  return g.nodes.filter(n=>{
+    const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
+    const w=el?el.offsetWidth:158, h=el?el.offsetHeight:52;
+    const cx=n.x+w/2, cy=n.y+h/2;
+    return cx>=gr.x && cx<=gr.x+gr.w && cy>=gr.y && cy<=gr.y+gr.h;
   });
 }
-// ── Merge / unmerge (select blocks → right-click) ─────────────────────────────
-// Merge = chain the selected sequential (single-'out') blocks top→bottom into
-// one stacked unit. Unmerge = break the stack a selected block belongs to.
-function wfMergeable(n){ const d=n&&WF_NODES[n.type]; return !!d && (d.outs||[]).join()==="out"; }
-function wfMergeSelected(){
-  const g=wfGraph(); if(!g) return;
-  const chain=WF.sel.map(id=>wfNode(id)).filter(n=>n&&wfMergeable(n)).sort((a,b)=>a.y-b.y);
-  if(chain.length<2){ alert("Chọn ≥2 khối hành động (1 cổng ra) rồi gộp."); return; }
-  for(let i=0;i<chain.length-1;i++){
-    const top=chain[i], bot=chain[i+1];
-    g.edges=g.edges.filter(e=>!(e.from===top.id && e.fromPort==="out"));  // one wire per out
-    g.edges.push({from:top.id,fromPort:"out",to:bot.id});
-    bot.stackParent=top.id; bot.stackPort="out";
-  }
-  wfRenderCanvas();           // apply merge styling first (changes measured heights)
-  wfRestack(chain[0].id);     // then snap children flush using the merged heights
-  wfDrawWires();
-  wfRenderInspector();
+function wfAddGroup(x,y,w,h){
+  const groups=wfGroups();
+  const gr={ id:"g"+wfUid().slice(1), name:"Nhóm "+(groups.length+1),
+    x:Math.round(x), y:Math.round(y), w:Math.round(w), h:Math.round(h), color:groups.length%WF_GROUP_COLORS.length };
+  groups.push(gr); wfRenderCanvas(); setStatus(`Đã tạo "${gr.name}" — kéo tiêu đề để di chuyển cả nhóm`);
+  return gr;
 }
-function wfUnmergeSelected(){
-  const g=wfGraph(); if(!g) return;
-  const roots=new Set(WF.sel.map(id=>wfStackRoot(id)));
-  roots.forEach(root=>{
-    const ids=wfStackDescendants(root);
-    ids.forEach(id=>{ const n=wfNode(id); if(n&&n.stackParent&&n.stackPort==="out"){
-      g.edges=g.edges.filter(e=>!(e.from===n.stackParent&&e.to===id&&e.fromPort==="out"));
-      n.stackParent=null; n.stackPort=null;
-    }});
-    // Spread them out so they no longer overlap.
-    const arr=ids.map(wfNode).filter(Boolean);
-    arr.forEach((n,i)=>{ if(i>0){ n.x=arr[0].x+i*30; n.y=arr[0].y+i*72; } });
+function wfDeleteGroup(id){ const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); } }
+function wfRenameGroup(gr){ const nm=prompt("Tên nhóm:", gr.name||""); if(nm!==null){ gr.name=(nm.trim()||gr.name); wfRenderCanvas(); } }
+// Create a group hugging the current multi-selection (toolbar button shortcut).
+function wfGroupSelection(){
+  const ids=WF.sel.slice(); if(ids.length<1) return false;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  ids.forEach(id=>{ const n=wfNode(id); if(!n) return;
+    const el=document.querySelector(`.wf-node[data-node="${id}"]`);
+    const w=el?el.offsetWidth:158, h=el?el.offsetHeight:52;
+    x0=Math.min(x0,n.x); y0=Math.min(y0,n.y); x1=Math.max(x1,n.x+w); y1=Math.max(y1,n.y+h);
   });
-  wfRenderCanvas(); wfRenderInspector();
+  if(!isFinite(x0)) return false;
+  const pad=22;
+  wfAddGroup(x0-pad, y0-pad-22, (x1-x0)+pad*2, (y1-y0)+pad*2+22);
+  return true;
 }
-function wfSelHasStack(){ return WF.sel.some(id=>{ const n=wfNode(id); return n && (n.stackParent || wfChildrenOf(id).length); }); }
+function wfRenderGroups(){
+  const world=$("wf-world"), svg=$("wf-wires");
+  [...world.querySelectorAll(".wf-group")].forEach(el=>el.remove());
+  wfGroups().forEach(gr=>{
+    const c=wfGroupColor(gr);
+    const el=document.createElement("div"); el.className="wf-group"; el.dataset.group=gr.id;
+    el.style.left=gr.x+"px"; el.style.top=gr.y+"px"; el.style.width=gr.w+"px"; el.style.height=gr.h+"px";
+    el.style.borderColor=c.b; el.style.background=c.bg; el.style.color=c.b;
+    el.innerHTML=`<div class="wf-group-hd" style="background:${c.b}"><span class="wf-group-name">${escHtml(gr.name)}</span><button class="wf-group-del" title="Xoá nhóm (giữ lại các node)">×</button></div><div class="wf-group-resize"></div>`;
+    world.insertBefore(el, svg);   // behind the wires + nodes
+    const hd=el.querySelector(".wf-group-hd");
+    hd.addEventListener("mousedown",e=>wfStartGroupMove(e,gr));
+    hd.addEventListener("dblclick",e=>{ e.stopPropagation(); wfRenameGroup(gr); });
+    const del=el.querySelector(".wf-group-del");
+    del.addEventListener("mousedown",e=>e.stopPropagation());
+    del.addEventListener("click",e=>{ e.stopPropagation(); wfDeleteGroup(gr.id); });
+    el.querySelector(".wf-group-resize").addEventListener("mousedown",e=>wfStartGroupResize(e,gr));
+  });
+}
+function wfStartGroupMove(e,gr){
+  if(e.button!==0 || e.target.closest(".wf-group-del")) return;
+  e.stopPropagation();
+  const members=wfNodesInGroup(gr).map(n=>({id:n.id, ox:n.x, oy:n.y}));
+  wfGesture={mode:"groupmove", gr, gx:gr.x, gy:gr.y, sx:e.clientX, sy:e.clientY, members};
+}
+function wfStartGroupResize(e,gr){
+  if(e.button!==0) return; e.stopPropagation();
+  wfGesture={mode:"groupresize", gr, ow:gr.w, oh:gr.h, sx:e.clientX, sy:e.clientY};
+}
 
 function wfStartMove(e,n){
   if(e.button!==0||e.target.closest(".wf-port,.wf-node-del,.wf-node-eye")) return;
   e.stopPropagation();
   if(e.shiftKey){ wfToggleSel(n.id); wfMarkSel(); wfRenderInspector(); return; }
-  const ctrl=e.ctrlKey||e.metaKey;
   let ids;
-  if(!ctrl && WF.sel.length>1 && WF.sel.includes(n.id)){
-    ids=WF.sel.slice();                          // move the multi-selection as-is
-  } else if(ctrl){
-    ids=[n.id]; wfSelectOne(n.id);               // Ctrl = nudge just this node
+  if(WF.sel.length>1 && WF.sel.includes(n.id)){
+    ids=WF.sel.slice();              // move the whole multi-selection together
   } else {
-    ids=wfStackDescendants(wfStackRoot(n.id));    // plain drag moves the whole merged stack
-    wfSelectOne(n.id);
+    ids=[n.id]; wfSelectOne(n.id);   // single node
   }
   wfMarkSel(); wfRenderInspector();
   const g=wfGraph(); if(!g) return;
   const items=ids.map(id=>{ const nn=g.nodes.find(x=>x.id===id); return nn?{id,ox:nn.x,oy:nn.y}:null; }).filter(Boolean);
-  wfGesture={mode:"move",items,sx:e.clientX,sy:e.clientY,ctrl,dragId:n.id};
+  wfGesture={mode:"move",items,sx:e.clientX,sy:e.clientY,dragId:n.id};
 }
 function wfStartConnect(e,nodeId,port){
   if(e.button!==0) return; e.stopPropagation(); e.preventDefault();
@@ -1441,8 +1447,8 @@ function wfConnectTo(toNodeId, clientX, clientY){
   }
 }
 function wfCanvasMouseDown(e){
-  if(e.target.closest(".wf-node")) return;
-  // Middle mouse, or Space+left → pan. Plain left on empty → rubber-band select.
+  if(e.target.closest(".wf-node")||e.target.closest(".wf-group")) return;
+  // Middle mouse, or Space+left → pan.
   if(e.button===1 || (e.button===0 && wfSpace)){
     e.preventDefault();
     $("wf-canvas").classList.add("panning");
@@ -1450,22 +1456,40 @@ function wfCanvasMouseDown(e){
     return;
   }
   if(e.button!==0) return;
-  if(!e.shiftKey) wfClearSel();
   const wr=$("wf-world").getBoundingClientRect();
+  // Group-draw mode: left-drag on empty canvas draws a new group rectangle.
+  if(wfGroupMode){
+    const box=document.createElement("div"); box.id="wf-selbox"; box.className="wf-selbox";
+    $("wf-world").appendChild(box);
+    wfGesture={mode:"groupdraw", sx:(e.clientX-wr.left)/wfZoom, sy:(e.clientY-wr.top)/wfZoom};
+    return;
+  }
+  // Plain left on empty → rubber-band select.
+  if(!e.shiftKey) wfClearSel();
   const box=document.createElement("div"); box.id="wf-selbox"; box.className="wf-selbox";
   $("wf-world").appendChild(box);
   wfGesture={mode:"box", sx:(e.clientX-wr.left)/wfZoom, sy:(e.clientY-wr.top)/wfZoom, base:WF.sel.slice()};
   wfMarkSel(); wfRenderInspector();
 }
-// ── Right-click context menu (merge / unmerge / delete) ──────────────────────
+// Group-draw arm state (toolbar ⊞ button). One-shot: drawing a group disarms it.
+let wfGroupMode=false;
+function wfSetGroupMode(on){
+  wfGroupMode=!!on;
+  const b=$("wf-group-btn"); if(b){ b.classList.toggle("on",wfGroupMode); b.title="Tạo nhóm: "+(wfGroupMode?"đang bật — kéo để vẽ khung":"Tắt"); }
+  const c=$("wf-canvas"); if(c) c.style.cursor=wfGroupMode?"crosshair":"";
+}
+function wfToggleGroupMode(){
+  // If blocks are selected, wrap them in a group right away; else arm draw mode.
+  if(!wfGroupMode && WF.sel.length>0){ wfGroupSelection(); return; }
+  wfSetGroupMode(!wfGroupMode);
+}
+// ── Right-click context menu (group / copy / delete) ──────────────────────────
 function wfHideMenu(){ const m=$("wf-ctxmenu"); if(m) m.style.display="none"; }
 function wfShowMenu(clientX, clientY){
   const m=$("wf-ctxmenu"); if(!m) return;
   const items=[];
   const copyable=WF.sel.filter(id=>{ const n=wfNode(id); return n && n.type!=="start"; }).length;
-  const mergeCount=WF.sel.map(wfNode).filter(n=>n&&wfMergeable(n)).length;
-  if(mergeCount>=2) items.push({label:"⧉ Gộp khối ("+mergeCount+")", fn:wfMergeSelected});
-  if(wfSelHasStack()) items.push({label:"⊟ Tách khối", fn:wfUnmergeSelected});
+  if(WF.sel.length>=1) items.push({label:"▢ Tạo nhóm quanh ("+WF.sel.length+")", fn:wfGroupSelection});
   if(copyable){ items.push({label:"⎘ Sao chép ("+copyable+")", fn:wfCopy});
     items.push({label:"✂ Cắt ("+copyable+")", fn:wfCut});
     items.push({label:"⧉ Nhân đôi ("+copyable+")", fn:wfDuplicate}); }
@@ -1525,8 +1549,7 @@ function wfInitCanvas(){
   document.addEventListener("mousemove",e=>{
     if(!wfGesture) return;
     if(wfGesture.mode==="move"){
-      // Snap the lead node, then shift the whole group by the SAME delta so
-      // merged blocks stay perfectly flush (don't snap each node separately).
+      // Snap the lead node, then shift the whole selection by the SAME delta.
       const lead=wfGesture.items.find(it=>it.id===wfGesture.dragId)||wfGesture.items[0];
       if(!lead) return;
       const sx=wfSnap(lead.ox+(e.clientX-wfGesture.sx)/wfZoom);
@@ -1539,6 +1562,28 @@ function wfInitCanvas(){
         if(el){ el.style.left=n.x+"px"; el.style.top=n.y+"px"; }
       });
       wfDrawWires();
+    } else if(wfGesture.mode==="groupmove"){
+      // Move the frame + every node that was inside it when the drag began.
+      const gr=wfGesture.gr;
+      const dx=(e.clientX-wfGesture.sx)/wfZoom, dy=(e.clientY-wfGesture.sy)/wfZoom;
+      gr.x=Math.round(wfGesture.gx+dx); gr.y=Math.round(wfGesture.gy+dy);
+      const gel=document.querySelector(`.wf-group[data-group="${gr.id}"]`);
+      if(gel){ gel.style.left=gr.x+"px"; gel.style.top=gr.y+"px"; }
+      wfGesture.members.forEach(m=>{ const n=wfNode(m.id); if(!n) return; n.x=m.ox+dx; n.y=m.oy+dy;
+        const el=document.querySelector(`.wf-node[data-node="${m.id}"]`); if(el){ el.style.left=n.x+"px"; el.style.top=n.y+"px"; } });
+      wfDrawWires();
+    } else if(wfGesture.mode==="groupresize"){
+      const gr=wfGesture.gr;
+      gr.w=Math.max(80, Math.round(wfGesture.ow+(e.clientX-wfGesture.sx)/wfZoom));
+      gr.h=Math.max(60, Math.round(wfGesture.oh+(e.clientY-wfGesture.sy)/wfZoom));
+      const el=document.querySelector(`.wf-group[data-group="${gr.id}"]`);
+      if(el){ el.style.width=gr.w+"px"; el.style.height=gr.h+"px"; }
+    } else if(wfGesture.mode==="groupdraw"){
+      const wr=$("wf-world").getBoundingClientRect();
+      const cx=(e.clientX-wr.left)/wfZoom, cy=(e.clientY-wr.top)/wfZoom;
+      const x=Math.min(cx,wfGesture.sx), y=Math.min(cy,wfGesture.sy);
+      const w=Math.abs(cx-wfGesture.sx), h=Math.abs(cy-wfGesture.sy);
+      const box=$("wf-selbox"); if(box){ box.style.left=x+"px"; box.style.top=y+"px"; box.style.width=w+"px"; box.style.height=h+"px"; }
     } else if(wfGesture.mode==="box"){
       wfBoxSelectMove(e);
     } else if(wfGesture.mode==="pan"){
@@ -1557,6 +1602,16 @@ function wfInitCanvas(){
       const tid=wfNodeUnderPointer(e.clientX,e.clientY);
       if(tid) wfConnectTo(tid, e.clientX, e.clientY);
       wfClearTemp(); wfHighlightTarget(null); wfDrawWires();
+    } else if(wfGesture.mode==="groupresize"){
+      wfRenderCanvas();
+    } else if(wfGesture.mode==="groupdraw"){
+      const box=$("wf-selbox"); const gst=wfGesture;
+      if(box) box.remove();
+      const wr=$("wf-world").getBoundingClientRect();
+      const cx=(e.clientX-wr.left)/wfZoom, cy=(e.clientY-wr.top)/wfZoom;
+      const x=Math.min(cx,gst.sx), y=Math.min(cy,gst.sy), w=Math.abs(cx-gst.sx), h=Math.abs(cy-gst.sy);
+      if(w>40 && h>40) wfAddGroup(x,y,w,h);   // ignore tiny accidental drags
+      wfSetGroupMode(false);
     } else if(wfGesture.mode==="box"){
       const box=$("wf-selbox"); if(box) box.remove();
       WF.selectedNode = WF.sel.length===1 ? WF.sel[0] : null;
@@ -1842,8 +1897,9 @@ function wfUpdNodePreview(node){
 // ── Export / import / run ────────────────────────────────────────────────────
 function wfCleanGraph(g){
   return {
-    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.showPreview) o.showPreview=true; if(n.stackParent){ o.stackParent=n.stackParent; o.stackPort=n.stackPort||"out"; } return o; }),
+    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.showPreview) o.showPreview=true; return o; }),
     edges:(g.edges||[]).map(e=>{ const o={from:e.from,fromPort:e.fromPort,to:e.to}; if(e.toPort&&e.toPort!=="in") o.toPort=e.toPort; return o; }),
+    groups:(g.groups||[]).map(gr=>({id:gr.id,name:gr.name,x:Math.round(gr.x),y:Math.round(gr.y),w:Math.round(gr.w),h:Math.round(gr.h),color:gr.color||0})),
   };
 }
 function wfSerialize(){
@@ -1863,9 +1919,10 @@ function wfSerialize(){
 }
 function wfHydrateGraph(g){
   g=g||{nodes:[],edges:[]};
-  let nodes=(g.nodes||[]).map(n=>({id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params:n.params||wfDefaults(n.type),note:n.note||"",log:n.log||"",showPreview:!!n.showPreview,stackParent:n.stackParent||null,stackPort:n.stackPort||null}));
+  let nodes=(g.nodes||[]).map(n=>({id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params:n.params||wfDefaults(n.type),note:n.note||"",log:n.log||"",showPreview:!!n.showPreview}));
   if(!nodes.some(n=>n.type==="start")) nodes.unshift({id:wfUid(),type:"start",x:40,y:40,params:{}});
-  return { nodes, edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort||"out",to:e.to,toPort:e.toPort||"in"})) };
+  const groups=(g.groups||[]).map(gr=>({id:gr.id||("g"+wfUid().slice(1)),name:gr.name||"Nhóm",x:gr.x||0,y:gr.y||0,w:gr.w||200,h:gr.h||140,color:gr.color||0}));
+  return { nodes, edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort||"out",to:e.to,toPort:e.toPort||"in"})), groups };
 }
 function wfHydrate(flow){
   WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"templates";
@@ -1899,8 +1956,7 @@ const WF_ICO_PLAY = '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 
 const WF_ICO_STOP = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
 function wfSetRunning(on){
   wfRunning=on; const b=$("wf-run-btn");
-  if(on) wfResetRunViz();           // fresh trail for this run
-  else wfSetRunningNode(null);      // clear the active-node glow when stopped (keep trail)
+  if(!on) wfSetRunningNode(null);   // clear the active-node glow when stopped (keep trail)
   if(!b)return;
   b.innerHTML = on?WF_ICO_STOP:WF_ICO_PLAY;
   b.title = on?"Dừng":"Chạy thử";
@@ -1909,6 +1965,7 @@ function wfSetRunning(on){
 async function wfToggleRun(){
   if(wfRunning){ await api().workflow_stop(); wfSetRunning(false); return; }
   if(!WF.activities.length){ alert("Chưa có hoạt động nào."); return; }
+  wfResetRunViz();   // clear last run's colours BEFORE the engine starts emitting
   const ok=await api().workflow_run(JSON.stringify(wfSerialize()));
   wfSetRunning(!!ok);
 }
