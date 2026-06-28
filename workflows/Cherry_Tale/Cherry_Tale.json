@@ -35,8 +35,8 @@
           {
             "id": "nasty5ic",
             "type": "tap_image_any",
-            "x": 600,
-            "y": -20,
+            "x": 700,
+            "y": 40,
             "params": {
               "templates": [
                 "templates/isHome_20260629_020427_37x32.png",
@@ -64,7 +64,7 @@
           {
             "id": "n25sgerm",
             "type": "end",
-            "x": 600,
+            "x": 720,
             "y": 120,
             "params": {}
           }
@@ -664,7 +664,7 @@
       "id": "sequence_h2uf",
       "name": "Hoạt động 4",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -672,7 +672,7 @@
             "id": "nyobzrgd",
             "type": "start",
             "x": 260,
-            "y": -20,
+            "y": 20,
             "params": {}
           },
           {
@@ -750,7 +750,7 @@
             "params": {
               "templates": [
                 "templates/crop_20260629_030344_29x29.png",
-                ""
+                "templates/isHome_20260629_021513_127x83_1.png"
               ],
               "taps": "1",
               "threshold": 0.85,
@@ -811,6 +811,232 @@
             "from": "nyobzrgd",
             "fromPort": "out",
             "to": "ndcwr0a0"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_99fk",
+      "name": "Hoạt động 5",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "ncuyv3uz",
+            "type": "start",
+            "x": 460,
+            "y": -120,
+            "params": {}
+          },
+          {
+            "id": "nr95xq71",
+            "type": "call",
+            "x": 260,
+            "y": 80,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          },
+          {
+            "id": "np7l22z9",
+            "type": "tap_image",
+            "x": 440,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_030947_81x69.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nbd55s6k",
+            "type": "tap_image",
+            "x": 620,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_031027_178x154.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nzrgrxcu",
+            "type": "tap_image",
+            "x": 800,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_031038_53x47.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nhb2qp2a",
+            "type": "tap_image",
+            "x": 980,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_031046_156x25.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nzyzncw1",
+            "type": "tap_image",
+            "x": 1360,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260629_031055_173x29.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n565w5kd",
+            "type": "loop",
+            "x": 1180,
+            "y": 40,
+            "params": {
+              "count": 3,
+              "infinite": false
+            }
+          },
+          {
+            "id": "nmrcw2ws",
+            "type": "wait",
+            "x": 1540,
+            "y": 40,
+            "params": {
+              "seconds": 3
+            }
+          },
+          {
+            "id": "nnzuym8j",
+            "type": "if_image",
+            "x": 1560,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_031437_166x38.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nnr35qh2",
+            "type": "tap_image",
+            "x": 1800,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_031440_29x29.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nj24nb55",
+            "type": "call",
+            "x": 2000,
+            "y": 80,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "np7l22z9",
+            "fromPort": "true",
+            "to": "nbd55s6k"
+          },
+          {
+            "from": "nbd55s6k",
+            "fromPort": "true",
+            "to": "nzrgrxcu"
+          },
+          {
+            "from": "nzrgrxcu",
+            "fromPort": "true",
+            "to": "nhb2qp2a"
+          },
+          {
+            "from": "nhb2qp2a",
+            "fromPort": "true",
+            "to": "n565w5kd"
+          },
+          {
+            "from": "n565w5kd",
+            "fromPort": "body",
+            "to": "nzyzncw1"
+          },
+          {
+            "from": "nzyzncw1",
+            "fromPort": "true",
+            "to": "nmrcw2ws"
+          },
+          {
+            "from": "nmrcw2ws",
+            "fromPort": "out",
+            "to": "n565w5kd",
+            "toPort": "loop"
+          },
+          {
+            "from": "nzyzncw1",
+            "fromPort": "false",
+            "to": "nnzuym8j"
+          },
+          {
+            "from": "nnzuym8j",
+            "fromPort": "true",
+            "to": "nnr35qh2"
+          },
+          {
+            "from": "nr95xq71",
+            "fromPort": "out",
+            "to": "nzrgrxcu"
+          },
+          {
+            "from": "ncuyv3uz",
+            "fromPort": "out",
+            "to": "nzrgrxcu"
+          },
+          {
+            "from": "nhb2qp2a",
+            "fromPort": "false",
+            "to": "nnzuym8j"
+          },
+          {
+            "from": "nnr35qh2",
+            "fromPort": "true",
+            "to": "nj24nb55"
           }
         ],
         "groups": []

@@ -673,8 +673,12 @@ class DevHelperAPI:
         crop = self._screen[y:y + h, x:x + w].copy()
         out_dir = self._pkg_subdir()
         clean = _sanitize_name(name)
-        fname = (f"{clean}_{_ts()}_{w}x{h}.png" if clean
-                 else f"crop_{_ts()}_{w}x{h}.png")
+        if clean:
+            fname = f"{clean}_{w}x{h}.png"
+            if os.path.exists(os.path.join(out_dir, fname)):
+                fname = f"{clean}_{_ts()}_{w}x{h}.png"
+        else:
+            fname = f"crop_{_ts()}_{w}x{h}.png"
         path = os.path.join(out_dir, fname)
         if cv2.imwrite(path, crop):
             log_success(f"QuickCrop: {path}")
