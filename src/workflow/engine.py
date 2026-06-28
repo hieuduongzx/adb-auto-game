@@ -107,7 +107,16 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "if_var":     {"label": "Nếu biến",      "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     "loop":       {"label": "Lặp lại",       "kind": "loop",      "ins": 1, "outs": ["body", "done"]},
     "parallel":   {"label": "Chạy song song","kind": "parallel",  "ins": 1, "outs": ["1", "2", "3", "done"]},
+    # Multi-way branch: each case is its own condition; the first true case routes
+    # to its port "c{i}", else "default". Output ports are dynamic (per the node's
+    # ``cases`` list) so ``outs`` here is only the static fallback hint.
+    "switch":     {"label": "Rẽ nhánh",       "kind": "switch",    "ins": 1, "outs": ["default"]},
 }
+
+# Condition node types a switch case may use — only the *instant* ones (no
+# wait_* timeout blocking, no tap_* side-effect), so evaluating one case never
+# stalls the others. Kept in sync with the designer's case-type dropdown.
+SWITCH_CASE_TYPES = ("if_image", "if_image_any", "if_text", "if_var")
 
 
 class WorkflowEngine:
@@ -481,6 +490,22 @@ class WorkflowEngine:
                 self._run_parallel(nodes, adj, cur, depth)
                 self._emit("on_node_done", nid, "ok", "done")
                 cur = self._next(adj, cur, "done")
+            elif kind == "switch":
+                # Evaluate each case top-to-bottom; first true wins its port "c{i}".
+                taken = "default"
+                for i, case in enumerate(params.get("cases", []) or []):
+                    ctype = case.get("type")
+                    if ctype not in SWITCH_CASE_TYPES:
+                        continue
+                    try:
+                        if self._eval_condition(ctype, case.get("params", {}) or {}):
+                            taken = f"c{i}"
+                            break
+                    except Exception as e:
+                        log_warning(f"[workflow] switch case {i} ({ctype}) lỗi: {e}")
+                self._emit("on_node_done", nid, "ok", taken)
+                nxt = self._next(adj, cur, taken)
+                cur = nxt if nxt is not None else self._next(adj, cur, "default")
             elif kind == "call":
                 fid = params.get("fn")
                 fn = self._functions.get(fid)
@@ -1031,7 +1056,9 @@ class WorkflowEngine:
         hi = float(p.get("max", 2.0))
         if hi < lo:
             lo, hi = hi, lo
-        self._sleep(random.uniform(lo, hi))
+        dur = random.uniform(lo, hi)
+        log_info(f"[workflow] ⏳ Đợi {dur:.1f}s (ngẫu nhiên {lo:g}–{hi:g}s)")
+        self._sleep(dur)
         return True
 
     def _resolve_operand(self, raw: Any) -> float:
@@ -1099,7 +1126,9 @@ class WorkflowEngine:
         )
 
     def _a_wait(self, node, p) -> bool:
-        self._sleep(float(p.get("seconds", 1.0)))
+        secs = float(p.get("seconds", 1.0))
+        log_info(f"[workflow] ⏱ Đợi {secs:g}s")
+        self._sleep(secs)
         return True
 
     def _a_send_text(self, node, p) -> bool:

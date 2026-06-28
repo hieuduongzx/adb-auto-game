@@ -44,7 +44,7 @@
   --sh-md: 0 2px 8px rgba(20,30,45,.08);
   --sh-lg: 0 10px 30px rgba(20,30,45,.16);
   /* Semantic z-index scale — no arbitrary 999s. */
-  --z-node: 2; --z-selbox: 1; --z-menu: 50; --z-toast: 60;
+  --z-node: 2; --z-selbox: 1; --z-node-hover: 6; --z-menu: 50; --z-toast: 60;
   --ease: cubic-bezier(0.16,1,0.3,1);
   color-scheme: light;
 }
@@ -395,17 +395,23 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
    WF_WIRE_DEFS) so the flow direction reads at a glance. Rounded caps/joins keep
    the curves smooth. A wider transparent stroke under each path widens the
    click/hover target without thickening the visible line. */
-#wf-wires path.wire { fill:none; stroke:#9aa9bd; stroke-width:2.4; pointer-events:stroke; cursor:pointer;
-  stroke-linecap:round; stroke-linejoin:round; marker-end:url(#wf-ah); transition:stroke .1s; }
-#wf-wires path.wire:hover { stroke:var(--err); stroke-width:3.2; marker-end:url(#wf-ah-h); }
+/* A fat invisible hit-path sits under each wire so it's easy to hover / right-
+   click without thickening the visible line. The visible wire is click-through. */
+#wf-wires .wire-hit { fill:none; stroke:transparent; stroke-width:18; pointer-events:stroke;
+  cursor:pointer; stroke-linecap:round; }
+#wf-wires path.wire { fill:none; stroke:#9aa9bd; stroke-width:2.4; pointer-events:none;
+  stroke-linecap:round; stroke-linejoin:round; marker-end:url(#wf-ah); transition:stroke .1s, stroke-width .1s; }
 #wf-wires path.wire.t { stroke:#2fa55a; marker-end:url(#wf-ah-t); }
 #wf-wires path.wire.f { stroke:#cf6b43; marker-end:url(#wf-ah-f); }
-#wf-wires path.wire.t:hover, #wf-wires path.wire.f:hover { marker-end:url(#wf-ah-h); }
 #wf-wires path.wire.stack { stroke:#b6c0cc; stroke-width:3; marker-end:none; }
 /* Loop-back wire (target = a loop's 'lặp' input) — dashed amber so the wire that
    closes the loop reads differently from the forward flow. */
 #wf-wires path.wire.loopback { stroke:#e0a64b; stroke-dasharray:6 4; marker-end:url(#wf-ah-loop); }
-#wf-wires path.wire.loopback:hover { stroke:var(--err); marker-end:url(#wf-ah-h); }
+/* Hovering the hit-path tints the wire blue so you can tell which one you're on. */
+#wf-wires .wire-grp:hover path.wire { stroke:var(--accent); stroke-width:3.4; marker-end:url(#wf-ah-temp); }
+/* While wiring up a connection, wires ignore the pointer so the drop lands on the
+   node underneath rather than being swallowed by a wire's hit-path. */
+#wf-canvas.wf-connecting .wire-hit { pointer-events:none; }
 /* Run trail on wires: the branch the engine took this run (green) vs the
    true/false branch it skipped (red, dimmed). Override the static t/f colours. */
 #wf-wires path.wire.took-wire   { stroke:#2fa55a !important; stroke-width:3.4; marker-end:url(#wf-ah-t) !important; }
@@ -415,11 +421,11 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 #wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   color:var(--muted); font-size:12px; pointer-events:none; }
 
-/* Node — a clean rectangular card. The category colour lives in a thin accent
-   bar across the TOP (driven by each node's --node-accent var); the body and
-   header stay neutral white so the canvas reads calm and uncluttered. */
+/* Node — a clean rectangular card with one uniform neutral border. Category is
+   hinted only by the icon colour (--node-accent); the run colours (green/red/
+   amber) recolour the whole border so a run still reads at a glance. */
 .wf-node { position:absolute; width:158px; background:var(--panel);
-  border:1px solid var(--border2); border-top:3px solid var(--node-accent,#c4ccd6);
+  border:1px solid var(--border2);
   border-radius:var(--node-r); box-shadow:var(--sh-md); user-select:none; }
 .wf-node.sel { border-color:var(--accent); border-top-color:var(--accent);
   box-shadow:0 0 0 2px var(--accent-bd), var(--sh-md); }
@@ -450,6 +456,18 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-node.cat-flow  { --node-accent:#e0a64b; }
 .wf-node.cat-misc  { --node-accent:#9aa6b4; }
 .wf-node.conn-target { box-shadow:0 0 0 2px var(--ok); }
+/* ── Merged blocks (vertical stack) ───────────────────────────────────────────
+   Members of a merge share a `node.stack` id and sit flush; the join edges and
+   the ports between them are hidden so the stack reads as one block. A node
+   joined at its top/bottom loses that corner's radius and top accent bar. */
+.wf-node.wf-stacked { box-shadow:0 0 0 1px var(--accent-bd), var(--sh-md); }
+.wf-node.wf-stacked.sel { box-shadow:0 0 0 2px var(--accent-bd), var(--sh-md); }
+.wf-node.wf-stk-jtop { border-top-width:1px; border-top-color:var(--border2);
+  border-top-left-radius:0; border-top-right-radius:0; }
+.wf-node.wf-stk-jbot { border-bottom-left-radius:0; border-bottom-right-radius:0; }
+/* Drag preview: a bold accent bar on the edge the dragged block will snap onto. */
+.wf-node.wf-merge-bot { box-shadow:0 4px 0 -1px var(--accent), var(--sh-md); }
+.wf-node.wf-merge-top { box-shadow:0 -4px 0 -1px var(--accent), var(--sh-md); }
 /* ── Groups (frames) ──────────────────────────────────────────────────────────
    A named rectangle drawn behind the nodes. Moving its header moves every node
    inside it. The body is click-through (pointer-events:none) so nodes stay usable;
@@ -482,6 +500,9 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-node-eye.on { color:var(--accent); }
 .wf-node-thumb { display:block; width:100%; max-height:120px; object-fit:contain; background:#1a1d21;
   border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); }
+/* Hovering a block that's showing a preview image lifts it above neighbours so
+   the thumbnail isn't hidden behind other blocks. */
+.wf-node.has-thumb:hover { z-index:var(--z-node-hover); }
 .wf-tpl-preview { display:block; max-width:100%; max-height:150px; object-fit:contain; margin-top:6px;
   border:1px solid var(--border2); border-radius:6px; background:#1a1d21; }
 .wf-tpl-empty { font-size:10px; color:var(--muted); margin-top:5px; font-style:italic; }
@@ -498,14 +519,17 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-node.note { width:170px; border:1px solid #e7d5a4; background:#fdf6e9; }
 .wf-node.note .wf-node-hd { background:transparent; border-bottom:1px dashed #e7d5a4; }
 .wf-node.note .wf-node-sum { white-space:normal; color:#7a5b12; font-family:var(--sans); font-size:11px; }
+.wf-node.note .wf-node-title { color:#7a5b12; }   /* keep sticky-note blocks cohesive */
 .wf-selbox { position:absolute; border:1px solid var(--accent); background:rgba(47,111,237,.10); z-index:1; pointer-events:none; border-radius:2px; }
 .wf-node { cursor:grab; }
 .wf-node:active { cursor:grabbing; }
-.wf-node-hd { display:flex; align-items:center; gap:6px; padding:7px 9px; border-bottom:1px solid var(--line);
-  border-radius:var(--node-r) var(--node-r) 0 0; }
+/* Light-purple header band so the title row is clearly distinct from the white body. */
+.wf-node-hd { display:flex; align-items:center; gap:6px; padding:7px 9px; border-bottom:1px solid #ece3fb;
+  background:#f4eefe; border-radius:var(--node-r) var(--node-r) 0 0; }
 .wf-node.collapsed .wf-node-hd { border-bottom:none; border-radius:var(--node-r); }
 .wf-node .ico { font-size:13px; flex-shrink:0; color:var(--node-accent,var(--ink2)); }
-.wf-node-title { font-size:11.5px; font-weight:700; color:var(--ink); flex:1; min-width:0;
+/* Purple title on the light-purple header band — clearly set apart from the body. */
+.wf-node-title { font-size:11.5px; font-weight:700; color:#7c3aed; flex:1; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Keep the title clear of the top-right "T"/"F" port labels on branch nodes. */
 .wf-node.has-tf .wf-node-title { padding-right:14px; }
@@ -749,9 +773,12 @@ function wfColorBranch(id, takenPort){
     if(p.dataset.from!==id) return;
     p.classList.remove("took-wire","nottook-wire");
     if(p.dataset.fromport===takenPort) p.classList.add("took-wire");
-    else if(p.dataset.fromport==="true"||p.dataset.fromport==="false") p.classList.add("nottook-wire");
+    else if(wfIsBranchPort(p.dataset.fromport)) p.classList.add("nottook-wire");
   });
 }
+// Ports that are mutually-exclusive branches (so the not-taken ones dim on a run):
+// condition true/false, and a switch node's c0.. / default ports.
+function wfIsBranchPort(port){ return port==="true"||port==="false"||port==="default"||/^c\d+$/.test(port); }
 function wfMarkNodeResult(id, status, port){
   if(!id) return;
   wfRan[id] = status==="fail" ? "fail" : "ok";
@@ -769,7 +796,7 @@ function wfMarkNodeResult(id, status, port){
     p.classList.remove("took","nottook");
     if(taken==null) return;
     if(p.dataset.port===String(taken)) p.classList.add("took");
-    else if(p.dataset.port==="true"||p.dataset.port==="false") p.classList.add("nottook");
+    else if(wfIsBranchPort(p.dataset.port)) p.classList.add("nottook");
   });
   if(taken!=null) wfColorBranch(id, String(taken));
 }
@@ -832,8 +859,12 @@ window.__recv = function(raw){
   if(type==="devices_update"){ S.devices=data.devices||[]; rebuildDeviceSelect(S.devices,S.connectedSerial); return; }
   if(type==="device_status"){ S.connectedSerial=data.serial||null; setConnected(!!data.connected); rebuildDeviceSelect(S.devices,data.serial); return; }
   if(type==="workflow_state"){ wfSetRunning(!!data.running); return; }
-  if(type==="node_active"){ wfSetRunningNode(data.id); return; }
-  if(type==="node_result"){ wfMarkNodeResult(data.id, data.status, data.port); return; }
+  // Ignore node events for a graph we're not viewing (e.g. a function's internal
+  // nodes while a call node runs) so the call block stays lit instead of the
+  // highlight vanishing into the off-screen function graph. Also drop late events
+  // that land after the run already stopped.
+  if(type==="node_active"){ if(!wfRunning) return; if(data.id && !wfNode(data.id)) return; wfSetRunningNode(data.id); return; }
+  if(type==="node_result"){ if(!wfRunning) return; if(data.id && !wfNode(data.id)) return; wfMarkNodeResult(data.id, data.status, data.port); return; }
   if(type==="speedhack_state"){
     wfSpeedRunning=!!data.running; wfSyncSpeedUI();
     if(data.running && data.active) setStatus("Speed hack đang chạy");
@@ -926,6 +957,10 @@ const WF_NODES = {
   set_var:    {label:"Đặt biến",  ico:"📌",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i"},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name||"?"} = ${p.value}`},
   calc_var:   {label:"Tính biến", ico:"➗",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i"},{k:"op",t:"select",opts:["+","-","*","/","="],d:"+"},{k:"value",t:"text",d:"1"}], sum:p=>`${p.name} ${p.op}= ${p.value}`},
   if_var:     {label:"Nếu biến",  ico:"🔢",kind:"condition",cat:"logic",outs:["true","false"], fields:[{k:"name",t:"text",d:"i"},{k:"op",t:"select",opts:["==","!=",">","<",">=","<="],d:"=="},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name} ${p.op} ${p.value}`},
+  // Multi-way branch: each case is its own condition; first true case wins its
+  // own output port "c{i}", else the "default" port. Ports are dynamic (one per
+  // case + default) — see wfNodeEl. Cases edited by wfSwitchCasesEditor.
+  "switch":   {label:"Rẽ nhánh",  ico:"🔀",kind:"switch",cat:"logic",outs:["default"], fields:[], sum:p=>`${(p.cases||[]).length} nhánh`},
   launch_app: {label:"Mở app",    ico:"🚀",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"package",t:"text"},{k:"wait",lbl:"Chờ mở (s)",t:"num",d:0}], sum:p=>(p.package||"(package)")+(p.wait?` ·chờ ${p.wait}s`:"")},
   screenshot: {label:"Chụp",      ico:"📷",kind:"action",cat:"misc",  outs:["out"], fields:[], sum:()=>"chụp màn hình"},
   log:        {label:"Ghi log",   ico:"📝",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"message",t:"text"}], sum:p=>`"${p.message||""}"`},
@@ -1058,12 +1093,16 @@ const wfBaseAny=t=>{ const a=(Array.isArray(t)?t:[]).filter(Boolean); if(!a.leng
 // Top-level mode switch: Công cụ (helper) ↔ Workflow (node-graph).
 /* (mode switching removed — the designer is its own standalone window) */
 
+// Condition types a switch case may use — instant checks only (no wait_* timeout,
+// no tap_* side-effect). Kept in sync with SWITCH_CASE_TYPES in engine.py.
+const WF_SWITCH_CASE_TYPES = ["if_image","if_image_any","if_text","if_var"];
 function wfDefaults(type){
   const def=WF_NODES[type]||{fields:[]}; const p={};
   (def.fields||[]).forEach(f=>{
     if(f.t==="tpls"){ p[f.k]= Array.isArray(f.d)?f.d.slice():[]; return; }  // fresh array per node
     p[f.k]= f.d!==undefined?f.d : (f.t==="num"?0 : f.t==="bool"?false : "");
   });
+  if(type==="switch") p.cases=[];   // multi-branch starts with no cases
   return p;
 }
 
@@ -1075,8 +1114,119 @@ function wfCurAct(){ return WF.edit.kind==="activity" ? wfActById(WF.edit.id) : 
 function wfCurFn(){ return WF.edit.kind==="function" ? wfFnById(WF.edit.id) : null; }
 function wfGraph(){ const t=wfEditTarget(); return t?t.graph:null; }
 function wfNode(id){ const g=wfGraph(); return g?g.nodes.find(n=>n.id===id):null; }
-function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",showPreview:false}; }
+function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",showPreview:false,stack:null}; }
 function wfNewGraph(){ return { nodes:[{id:wfUid(),type:"start",x:60,y:70,params:{}}], edges:[], groups:[] }; }
+
+// ── Merge / stack blocks ─────────────────────────────────────────────────────
+// A "merged" block is a vertical stack of single-in/single-out nodes shown flush
+// and moved as one. Membership is a shared `node.stack` id; their order is the
+// REAL sequential edges between them, so the engine runs them in order with no
+// special-casing. Drop a block just above/below another to merge; right-click →
+// "Bỏ merge" to split. Only action/call nodes (one in, one out) can merge.
+const wfStackId=()=>"st"+Math.random().toString(36).slice(2,8);
+function wfMergeable(n){ const d=n&&WF_NODES[n.type]; return !!d && (d.kind==="action"||d.kind==="call"); }
+function wfStackMembers(sid){ const g=wfGraph(); return g?g.nodes.filter(n=>n.stack===sid):[]; }
+function wfSameStack(aId,bId){ const a=wfNode(aId),b=wfNode(bId); return !!(a&&b&&a.stack&&a.stack===b.stack); }
+function wfHasInternalIn(n){ const g=wfGraph(); return !!(g&&n.stack&&g.edges.some(e=>e.to===n.id&&wfSameStack(e.from,e.to))); }
+function wfHasInternalOut(n){ const g=wfGraph(); return !!(g&&n.stack&&g.edges.some(e=>e.from===n.id&&wfSameStack(e.from,e.to))); }
+function wfStackChain(sid){
+  const g=wfGraph(); if(!g) return [];
+  const members=g.nodes.filter(n=>n.stack===sid); if(!members.length) return [];
+  const byId=new Map(members.map(n=>[n.id,n]));
+  const head=members.find(n=>!g.edges.some(e=>e.to===n.id&&byId.has(e.from)))||members[0];
+  const chain=[]; const seen=new Set(); let cur=head;
+  while(cur&&!seen.has(cur.id)){ seen.add(cur.id); chain.push(cur);
+    const e=g.edges.find(ed=>ed.from===cur.id&&byId.has(ed.to)&&!seen.has(ed.to)); cur=e?byId.get(e.to):null; }
+  members.forEach(m=>{ if(!seen.has(m.id)) chain.push(m); });   // stragglers (defensive)
+  return chain;
+}
+// Lay every stack out flush: members snap under the head with borders touching.
+// Called after each canvas render (nodes must be in the DOM to measure heights).
+function wfReflowStacks(){
+  const g=wfGraph(); if(!g) return;
+  const sids=[...new Set(g.nodes.filter(n=>n.stack).map(n=>n.stack))];
+  for(const sid of sids){
+    const chain=wfStackChain(sid);
+    if(chain.length<2) continue;   // a lone survivor is dissolved on delete, not here
+    const x=chain[0].x; let y=chain[0].y;
+    for(const n of chain){
+      n.x=x; n.y=y;
+      const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
+      if(el){ el.style.left=x+"px"; el.style.top=y+"px"; }
+      y += (el?el.offsetHeight:46)-1;   // -1 so adjacent borders overlap into one
+    }
+  }
+}
+// Insert dragged node D adjacent to target T ("after" = below, "before" = above),
+// rewiring so the surrounding chain stays intact, then tag both into one stack.
+function wfMergeInsert(dragId, targetId, where){
+  const g=wfGraph(); if(!g) return;
+  const D=wfNode(dragId), T=wfNode(targetId); if(!D||!T) return;
+  g.edges=g.edges.filter(e=>e.from!==dragId&&e.to!==dragId);   // D starts free
+  const sid=T.stack||wfStackId(); T.stack=sid; D.stack=sid;
+  if(where==="after"){
+    const oe=g.edges.find(e=>e.from===targetId);              // T's old successor
+    const tgt=oe?oe.to:null, tgtPort=oe?(oe.toPort||"in"):"in";
+    if(oe) g.edges=g.edges.filter(e=>e!==oe);
+    g.edges.push({from:targetId,fromPort:"out",to:dragId,toPort:"in"});
+    if(tgt&&tgt!==dragId) g.edges.push({from:dragId,fromPort:"out",to:tgt,toPort:tgtPort});
+  } else {
+    g.edges.filter(e=>e.to===targetId&&(e.toPort||"in")==="in").forEach(e=>{ e.to=dragId; });
+    g.edges.push({from:dragId,fromPort:"out",to:targetId,toPort:"in"});
+  }
+  wfSelectOne(dragId); wfRenderCanvas(); wfRenderInspector();
+  setStatus("Đã gộp khối");
+}
+// Find where a lone dragged block would merge: the nearest mergeable block whose
+// top/bottom edge it landed flush against. Returns {target, where} or null.
+function wfFindMergeTarget(dragId){
+  const g=wfGraph(); if(!g) return null;
+  const D=wfNode(dragId); if(!D||D.stack||!wfMergeable(D)) return null;
+  const dEl=wfNodeElById(dragId); if(!dEl) return null;
+  const dh=dEl.offsetHeight, dcx=D.x+dEl.offsetWidth/2;
+  let best=null, bestWhere=null, bestScore=Infinity;
+  for(const T of g.nodes){
+    if(T.id===dragId||!wfMergeable(T)) continue;
+    const tEl=wfNodeElById(T.id); if(!tEl) continue;
+    const th=tEl.offsetHeight, tcx=T.x+tEl.offsetWidth/2;
+    const dxc=Math.abs(dcx-tcx); if(dxc>80) continue;             // must roughly line up
+    const gapBelow=Math.abs(D.y-(T.y+th));                        // D sits under T
+    const gapAbove=Math.abs((D.y+dh)-T.y);                        // D sits over T
+    if(gapBelow<=30 && !wfHasInternalOut(T)){                     // append after a tail
+      const s=gapBelow+dxc*0.25; if(s<bestScore){bestScore=s;best=T;bestWhere="after";} }
+    if(gapAbove<=30 && !wfHasInternalIn(T)){                      // prepend before a head
+      const s=gapAbove+dxc*0.25; if(s<bestScore){bestScore=s;best=T;bestWhere="before";} }
+  }
+  return best?{target:best, where:bestWhere}:null;
+}
+// On drop, merge the dragged block into the candidate target (if any).
+function wfTryMerge(dragId){
+  const c=wfFindMergeTarget(dragId);
+  if(c){ wfMergeInsert(dragId, c.target.id, c.where); return true; }
+  return false;
+}
+// Live preview while dragging: outline the edge the block will snap onto.
+function wfClearMergeHint(){
+  document.querySelectorAll(".wf-merge-top,.wf-merge-bot")
+    .forEach(el=>el.classList.remove("wf-merge-top","wf-merge-bot"));
+}
+function wfShowMergeHint(dragId){
+  wfClearMergeHint();
+  const c=wfFindMergeTarget(dragId); if(!c) return;
+  const el=wfNodeElById(c.target.id); if(el) el.classList.add(c.where==="after"?"wf-merge-bot":"wf-merge-top");
+}
+// Split a stack: clear membership (edges kept so the flow still runs) and spread
+// the blocks apart so each is independently editable again.
+function wfUnmerge(sid){
+  const g=wfGraph(); if(!g) return;
+  const chain=wfStackChain(sid); if(!chain.length) return;
+  const x=chain[0].x; let y=chain[0].y;
+  chain.forEach(n=>{ n.stack=null; });
+  chain.forEach(n=>{ const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
+    n.x=x; n.y=y; y += (el?el.offsetHeight:46)+26; });
+  wfRenderCanvas(); wfRenderInspector();
+  setStatus("Đã bỏ merge");
+}
 
 function wfAddActivity(type){
   const n=WF.activities.filter(a=>a.type===type).length+1;
@@ -1153,14 +1303,15 @@ function wfRenderFunctions(){
   WF.functions.forEach(fn=>{
     const sel = WF.edit.kind==="function" && fn.id===WF.edit.id;
     const el=document.createElement("div"); el.className="wf-act wf-fn"+(sel?" sel":""); el.dataset.id=fn.id;
+    el.title="Kéo ra canvas để chèn lệnh gọi · bấm để sửa function";
     el.innerHTML=
-      `<span class="wf-act-grip" title="Kéo để đổi thứ tự">${WF_GRIP}</span>
+      `<span class="wf-act-grip" title="Kéo ra canvas để dùng / kéo đổi thứ tự">${WF_GRIP}</span>
        <span class="wf-badge fn">ƒ</span>
        <span class="wf-act-name">${escHtml(fn.name)}</span>
        <button class="wf-act-del" title="Xoá function">×</button>`;
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteFunction(fn.id,e));
     el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-del,.wf-act-grip"))return; wfEditFunction(fn.id); });
-    wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.functions);
+    wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.functions, "call:"+fn.id);
     wrap.appendChild(el);
   });
 }
@@ -1172,17 +1323,26 @@ function wfRenderFunctions(){
 // for sequence activities this changes their run order.
 const WF_GRIP = `<svg width="8" height="13" viewBox="0 0 9 14" fill="currentColor"><circle cx="2" cy="2" r="1.3"/><circle cx="7" cy="2" r="1.3"/><circle cx="2" cy="7" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="2" cy="12" r="1.3"/><circle cx="7" cy="12" r="1.3"/></svg>`;
 
-function wfAttachReorder(el, handle, listEl, arr){
-  if(!handle) return;
-  handle.addEventListener("mousedown", ()=>{ el.draggable=true; });
-  handle.addEventListener("mouseup",   ()=>{ el.draggable=false; });
+// `paletteType` (optional): if set, the row also acts like a palette chip — it's
+// draggable from anywhere and dropping it on the canvas spawns that node (used by
+// the Function list so a function can be dragged straight onto the graph).
+function wfAttachReorder(el, handle, listEl, arr, paletteType){
+  if(paletteType){ el.draggable=true; }                     // drag from anywhere
+  else if(handle){
+    handle.addEventListener("mousedown", ()=>{ el.draggable=true; });
+    handle.addEventListener("mouseup",   ()=>{ el.draggable=false; });
+  } else return;
   el.addEventListener("dragstart", e=>{
     el.classList.add("wf-dragging");
-    e.dataTransfer.effectAllowed="move";
-    try{ e.dataTransfer.setData("text/plain", el.dataset.id); }catch{}
+    if(paletteType){ wfPaletteDrag=paletteType; e.dataTransfer.effectAllowed="copyMove";
+      try{ e.dataTransfer.setData("text/plain", paletteType); }catch{} }
+    else { e.dataTransfer.effectAllowed="move";
+      try{ e.dataTransfer.setData("text/plain", el.dataset.id); }catch{} }
   });
   el.addEventListener("dragend", ()=>{
-    el.draggable=false; el.classList.remove("wf-dragging");
+    if(!paletteType) el.draggable=false;
+    el.classList.remove("wf-dragging");
+    if(paletteType) wfPaletteDrag=null;
     wfCommitReorder(listEl, arr);
   });
 }
@@ -1227,13 +1387,8 @@ function wfRenderPalette(){
     types.forEach(type=>grid.appendChild(wfChip(WF_NODES[type].ico, WF_NODES[type].label, type)));
     pal.appendChild(grid);
   });
-  // Function calls.
-  const hdr=document.createElement("div"); hdr.className="wf-pal-cat"; hdr.textContent="Function"; pal.appendChild(hdr);
-  if(!WF.functions.length){ const d=document.createElement("div"); d.className="wf-insp-empty"; d.style.padding="0 0 4px"; d.textContent="Tạo function để dùng lại."; pal.appendChild(d); }
-  else { const grid=document.createElement("div"); grid.className="wf-pal-grid";
-    WF.functions.forEach(fn=>grid.appendChild(wfChip("ƒ", fn.name, "call:"+fn.id)));
-    pal.appendChild(grid);
-  }
+  // Function calls live in the Function list at the top of the sidebar — drag a
+  // row from there straight onto the canvas to insert a call node.
 }
 function wfChip(ico,label,dragType){
   const chip=document.createElement("div"); chip.className="wf-chip"; chip.draggable=true;
@@ -1251,6 +1406,7 @@ function wfRenderCanvas(){
   empty.style.display="none";
   wfRenderGroups();   // frames behind the nodes
   g.nodes.forEach(n=>world.appendChild(wfNodeEl(n)));
+  wfReflowStacks();   // snap merged blocks flush (needs nodes in the DOM)
   wfDrawWires();
   if(wfRunning||wfRunStopped) wfReapplyRunViz();   // keep the run-trail across redraws (live + after stop)
 }
@@ -1264,6 +1420,12 @@ function wfNodeWarnings(n, def, g){
     if(f.t==="tpl" && !String(n.params[f.k]||"").trim()) w.push("Chưa chọn ảnh template");
     if(f.t==="tpls"){ const a=n.params[f.k]; if(!Array.isArray(a)||!a.filter(x=>String(x||"").trim()).length) w.push("Chưa có ảnh nào trong danh sách"); }
   }
+  if(n.type==="switch"){
+    const cs=(n.params&&n.params.cases)||[];
+    if(!cs.length) w.push("Chưa có nhánh nào");
+    cs.forEach((c,i)=>{ const cd=WF_NODES[c.type]; (cd&&cd.fields||[]).forEach(f=>{
+      if(f.t==="tpl" && !String((c.params||{})[f.k]||"").trim()) w.push(`Nhánh #${i+1}: chưa chọn ảnh`); }); });
+  }
   if(def.kind!=="start" && def.kind!=="note" && g && !(g.edges||[]).some(ed=>ed.to===n.id))
     w.push("Chưa nối dây vào — block này sẽ không bao giờ chạy");
   return w;
@@ -1276,9 +1438,21 @@ function wfNodeEl(n){
   const catCls = (def.kind==="action"||def.kind==="condition") && def.cat ? " cat-"+def.cat : "";
   // Nodes with true/false outputs show "T"/"F" labels in the top-right corner;
   // flag them so the header reserves room and the title can't slide under the labels.
-  const tfCls = (def.outs||[]).includes("true") ? " has-tf" : "";
+  const tfCls = ((def.outs||[]).includes("true") || n.type==="switch") ? " has-tf" : "";
   el.className="wf-node "+def.kind+catCls+tfCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"");
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
+  // Switch has dynamic output ports (one per case + default) — grow the card so
+  // they all sit inside it (ports stack at top = 9 + i*19).
+  if(n.type==="switch"){
+    const portCount=((n.params&&n.params.cases)||[]).length+1;
+    el.style.minHeight=(9 + (portCount-1)*19 + 16)+"px";
+  }
+  // Merged-block membership: hide the join port at the joined edge and flatten
+  // that corner so the stack reads as one block.
+  const intIn = n.stack ? wfHasInternalIn(n) : false;
+  const intOut = n.stack ? wfHasInternalOut(n) : false;
+  if(n.stack){ el.classList.add("wf-stacked");
+    if(intIn) el.classList.add("wf-stk-jtop"); if(intOut) el.classList.add("wf-stk-jbot"); }
   // A call node shows the referenced function's name as its title.
   let title=def.label, sum="";
   if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?("ƒ "+fn.name):"ƒ (thiếu)"; }
@@ -1293,11 +1467,11 @@ function wfNodeEl(n){
     `<div class="wf-node-hd"><span class="ico">${def.ico}</span>${eyeBtn}<span class="wf-node-title">${escHtml(title)}</span></div>`+
     (sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"")+noteHtml+logHtml+thumbHtml;
   if(!sum && !n.note && !n.log && !thumbHtml) el.classList.add("collapsed");
-  if(thumbHtml) wfLoadThumb(el.querySelector(".wf-node-thumb"), wfTplOf(n));
+  if(thumbHtml){ el.classList.add("has-thumb"); wfLoadThumb(el.querySelector(".wf-node-thumb"), wfTplOf(n)); }
   // input ports (start has none; note floats).
   // Most nodes have a single 'in'; the loop also exposes a 'loop' (loop-back)
   // input below it so the wire that re-enters the loop lands on its own port.
-  if(def.kind!=="start" && def.kind!=="note"){
+  if(def.kind!=="start" && def.kind!=="note" && !intIn){
     const ins=wfIns(n.type);
     ins.forEach((port,i)=>{
       const top = ins.length<=1 ? 9 : 9 + i*21;
@@ -1309,16 +1483,22 @@ function wfNodeEl(n){
         lbl.style.top=(top+1)+"px"; lbl.textContent=WF_IN_LBL[port]||port; el.appendChild(lbl); }
     });
   }
-  // output ports
-  const outs=def.outs||[];
+  // output ports (hidden when this member feeds the next block in its stack).
+  // Switch builds its ports from the case list: c0..c{n-1} + default.
+  let outs;
+  if(intOut) outs=[];
+  else if(n.type==="switch") outs=((n.params&&n.params.cases)||[]).map((_,i)=>"c"+i).concat(["default"]);
+  else outs=(def.outs||[]);
   outs.forEach((port,i)=>{
     const top = outs.length<=1 ? 9 : 9 + i*19;
     const op=document.createElement("span");
     op.className="wf-port out"+(port==="true"?" t":port==="false"?" f":"");
     op.dataset.node=n.id; op.dataset.port=port; op.style.top=top+"px";
     el.appendChild(op);
+    let lblTxt;
+    if(n.type==="switch") lblTxt = (port==="default") ? "khác" : "#"+(i+1);
     // Parallel's "done" port is the JOIN point — wait all branches, then continue.
-    const lblTxt = (n.type==="parallel"&&port==="done") ? "gộp" : WF_PORT_LBL[port];
+    else lblTxt = (n.type==="parallel"&&port==="done") ? "gộp" : WF_PORT_LBL[port];
     if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+1)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl); }
   });
   // Validation badge (missing template / not wired in) so broken flows show before a run.
@@ -1337,6 +1517,28 @@ function wfNodeEl(n){
   return el;
 }
 
+// ── Switch-node case edits: keep outgoing wires attached as ports c0.. shift ──
+function wfRemoveSwitchCase(node, idx){
+  const g=wfGraph(); if(!g) return;
+  node.params.cases.splice(idx,1);
+  g.edges = g.edges.filter(e=>!(e.from===node.id && e.fromPort==="c"+idx));   // drop the removed case's wire
+  g.edges.forEach(e=>{ if(e.from===node.id && /^c\d+$/.test(e.fromPort)){
+    const j=parseInt(e.fromPort.slice(1)); if(j>idx) e.fromPort="c"+(j-1); } });   // shift higher cases down
+}
+function wfReorderSwitchCase(node, from, to){
+  const cs=node.params.cases, n=cs.length;
+  if(from<0||from>=n||to<0||to>=n||from===to) return;
+  // Derive old→new index map by applying the same move to an index array.
+  const ord=[]; for(let i=0;i<n;i++) ord.push(i);
+  const [m]=ord.splice(from,1); ord.splice(to,0,m);
+  const newIndexOf={}; ord.forEach((oldIdx,newIdx)=>{ newIndexOf[oldIdx]=newIdx; });
+  const [moved]=cs.splice(from,1); cs.splice(to,0,moved);
+  const g=wfGraph(); if(!g) return;
+  g.edges.forEach(e=>{ if(e.from===node.id && /^c\d+$/.test(e.fromPort)){
+    const old=parseInt(e.fromPort.slice(1));
+    if(newIndexOf[old]!==undefined) e.fromPort="c"+newIndexOf[old]; } });
+}
+
 // ── Selection ────────────────────────────────────────────────────────────────
 function wfMarkSel(){ document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("sel",WF.sel.includes(el.dataset.node))); }
 function wfSelectOne(id){ WF.sel=id?[id]:[]; WF.selectedNode=id||null; }
@@ -1350,6 +1552,9 @@ function wfDeleteNodes(ids){
   if(!del.length) return;
   g.nodes=g.nodes.filter(n=>!del.includes(n.id));
   g.edges=g.edges.filter(e=>!del.includes(e.from)&&!del.includes(e.to));
+  // A merge with only one block left is no longer a stack — dissolve it.
+  const stackCount={}; g.nodes.forEach(n=>{ if(n.stack) stackCount[n.stack]=(stackCount[n.stack]||0)+1; });
+  g.nodes.forEach(n=>{ if(n.stack && stackCount[n.stack]<2) n.stack=null; });
   WF.sel=WF.sel.filter(id=>!del.includes(id));
   if(del.includes(WF.selectedNode)) WF.selectedNode=null;
   wfRenderCanvas(); wfRenderInspector();
@@ -1370,7 +1575,7 @@ function wfCopy(){
   const idset=new Set(ids);
   const nodes=ids.map(id=>{ const n=g.nodes.find(x=>x.id===id);
     return { type:n.type, x:n.x, y:n.y, note:n.note||"", log:n.log||"", showPreview:!!n.showPreview,
-      params:JSON.parse(JSON.stringify(n.params||{})) }; });
+      stack:n.stack||null, params:JSON.parse(JSON.stringify(n.params||{})) }; });
   const edges=g.edges.filter(e=>idset.has(e.from)&&idset.has(e.to))
     .map(e=>({fromIdx:ids.indexOf(e.from), fromPort:e.fromPort, toIdx:ids.indexOf(e.to), toPort:e.toPort||"in"}));
   const minX=Math.min(...nodes.map(n=>n.x)), minY=Math.min(...nodes.map(n=>n.y));
@@ -1392,14 +1597,20 @@ function wfPaste(opts){
     dy=wfSnap((opts.clientY-wr.top)/wfZoom - clip.minY - 14);
   } else { wfPasteShift+=24; dx=wfPasteShift; dy=wfPasteShift; }
   const newIds=clip.nodes.map(()=>wfUid());
+  const stackMap={};   // remap copied stack ids → fresh ids so paste stays its own merge
   clip.nodes.forEach((n,i)=>{
     const node=wfNewNode(n.type, n.x+dx, n.y+dy);
     node.id=newIds[i];
     node.params=JSON.parse(JSON.stringify(n.params||{}));
     node.note=n.note||""; node.log=n.log||""; node.showPreview=!!n.showPreview;
+    if(n.stack){ stackMap[n.stack]=stackMap[n.stack]||wfStackId(); node.stack=stackMap[n.stack]; }
     g.nodes.push(node);
   });
   clip.edges.forEach(e=>g.edges.push({from:newIds[e.fromIdx], fromPort:e.fromPort, to:newIds[e.toIdx], toPort:e.toPort||"in"}));
+  // A partially-copied stack (only some members) can leave a lone tagged node —
+  // drop the tag so it isn't a one-block "merge".
+  const stkCnt={}; g.nodes.forEach(n=>{ if(n.stack) stkCnt[n.stack]=(stkCnt[n.stack]||0)+1; });
+  g.nodes.forEach(n=>{ if(n.stack && stkCnt[n.stack]<2) n.stack=null; });
   WF.sel=newIds.slice(); WF.selectedNode=newIds.length===1?newIds[0]:null;
   wfRenderCanvas(); wfMarkSel(); wfRenderInspector();
   setStatus(`Đã dán ${newIds.length} node`);
@@ -1446,19 +1657,25 @@ function wfDrawWires(){
   const temp=svg.querySelector(".temp");
   svg.innerHTML=WF_WIRE_DEFS; if(temp) svg.appendChild(temp);
   if(!g) return;
+  const NS="http://www.w3.org/2000/svg";
   g.edges.forEach(ed=>{
+    // Edges inside a merged block are implicit (the blocks sit flush) — don't draw.
+    if(wfSameStack(ed.from, ed.to)) return;
     const toPort = ed.toPort||"in";
     const a=wfPortPt(ed.from,ed.fromPort), b=wfPortPt(ed.to,toPort);
     if(!a||!b) return;
-    const p=document.createElementNS("http://www.w3.org/2000/svg","path");
+    const d=wfBezier(a,b);
+    // Group a fat invisible hit-path with the visible wire: the group carries the
+    // edge ref (right-click to delete) and widens the hover target generously.
+    const grp=document.createElementNS(NS,"g"); grp.setAttribute("class","wire-grp"); grp.__edge=ed;
+    const hit=document.createElementNS(NS,"path"); hit.setAttribute("class","wire-hit"); hit.setAttribute("d",d);
+    const tt=document.createElementNS(NS,"title"); tt.textContent="Chuột phải để xoá dây nối"; hit.appendChild(tt);
+    const p=document.createElementNS(NS,"path");
     p.setAttribute("class","wire"+(ed.fromPort==="true"?" t":ed.fromPort==="false"?" f":"")+(toPort==="loop"?" loopback":""));
     p.dataset.from=ed.from; p.dataset.fromport=ed.fromPort; p.dataset.to=ed.to;  // for run-trail branch colouring
-    p.setAttribute("d", wfBezier(a,b));
-    // Deleting a wire is right-click only (see wfShowMenu) — a plain click used to
-    // delete it, which was too easy to trigger by accident.
-    p.__edge = ed;
-    const tt=document.createElementNS("http://www.w3.org/2000/svg","title"); tt.textContent="Chuột phải để xoá dây nối"; p.appendChild(tt);
-    svg.appendChild(p);
+    p.setAttribute("d", d);
+    grp.appendChild(hit); grp.appendChild(p);
+    svg.appendChild(grp);
   });
 }
 function wfDeleteWire(ed){
@@ -1559,6 +1776,8 @@ function wfStartMove(e,n){
   let ids;
   if(WF.sel.length>1 && WF.sel.includes(n.id)){
     ids=WF.sel.slice();              // move the whole multi-selection together
+  } else if(n.stack){
+    ids=wfStackMembers(n.stack).map(m=>m.id); wfSelectOne(n.id);  // drag a merged block as one
   } else {
     ids=[n.id]; wfSelectOne(n.id);   // single node
   }
@@ -1570,6 +1789,7 @@ function wfStartMove(e,n){
 function wfStartConnect(e,nodeId,port){
   if(e.button!==0) return; e.stopPropagation(); e.preventDefault();
   wfGesture={mode:"connect",from:nodeId,port};
+  $("wf-canvas").classList.add("wf-connecting");   // let drops land on nodes, not wires
 }
 // Loose connect: the drop only has to land *anywhere on the target node*, not
 // exactly on its input dot. The node under the pointer becomes the target.
@@ -1594,6 +1814,10 @@ function wfNearestInPort(nodeId, clientX, clientY){
 function wfConnectTo(toNodeId, clientX, clientY){
   const g=wfGraph();
   if(g && wfGesture && wfGesture.from!==toNodeId){
+    // Dropping onto any block of a merged stack wires into the stack's head.
+    const tn=wfNode(toNodeId);
+    if(tn && tn.stack){ const chain=wfStackChain(tn.stack); if(chain.length) toNodeId=chain[0].id; }
+    if(wfGesture.from===toNodeId) return false;
     const toPort=wfNearestInPort(toNodeId, clientX, clientY);
     g.edges=g.edges.filter(ed=>!(ed.from===wfGesture.from && ed.fromPort===wfGesture.port)); // one wire per output port
     g.edges.push({from:wfGesture.from,fromPort:wfGesture.port,to:toNodeId,toPort});
@@ -1644,6 +1868,8 @@ function wfShowMenu(clientX, clientY){
   const m=$("wf-ctxmenu"); if(!m) return;
   const items=[];
   const copyable=WF.sel.filter(id=>{ const n=wfNode(id); return n && n.type!=="start"; }).length;
+  const stackSids=[...new Set(WF.sel.map(id=>{ const n=wfNode(id); return n&&n.stack; }).filter(Boolean))];
+  if(stackSids.length) items.push({label:"⛓ Bỏ merge", fn:()=>stackSids.forEach(wfUnmerge)});
   if(WF.sel.length>=1) items.push({label:"▢ Tạo nhóm quanh ("+WF.sel.length+")", fn:wfGroupSelection});
   if(copyable){ items.push({label:"⎘ Sao chép ("+copyable+")", fn:wfCopy});
     items.push({label:"✂ Cắt ("+copyable+")", fn:wfCut});
@@ -1675,8 +1901,8 @@ function wfInitCanvas(){
   canvas.addEventListener("contextmenu",e=>{
     e.preventDefault();
     // Right-click on a wire → offer to delete just that wire.
-    const wire=e.target.closest("path.wire");
-    if(wire && wire.__edge){ wfShowWireMenu(e.clientX, e.clientY, wire.__edge); return; }
+    const wireGrp=e.target.closest("g.wire-grp");
+    if(wireGrp && wireGrp.__edge){ wfShowWireMenu(e.clientX, e.clientY, wireGrp.__edge); return; }
     const ne=e.target.closest(".wf-node");
     if(ne && !WF.sel.includes(ne.dataset.node)){ wfSelectOne(ne.dataset.node); wfMarkSel(); wfRenderInspector(); }
     wfShowMenu(e.clientX, e.clientY);
@@ -1717,6 +1943,7 @@ function wfInitCanvas(){
         if(el){ el.style.left=n.x+"px"; el.style.top=n.y+"px"; }
       });
       wfDrawWires();
+      if(wfGesture.items.length===1) wfShowMergeHint(wfGesture.dragId);  // preview snap target
     } else if(wfGesture.mode==="groupmove"){
       // Move the frame + every node that was inside it when the drag began.
       const gr=wfGesture.gr;
@@ -1774,9 +2001,15 @@ function wfInitCanvas(){
       const box=$("wf-selbox"); if(box) box.remove();
       WF.selectedNode = WF.sel.length===1 ? WF.sel[0] : null;
       wfRenderInspector();
+    } else if(wfGesture.mode==="move"){
+      // Dropping a single lone block flush above/below another merges them.
+      wfClearMergeHint();
+      const moved=Math.abs(e.clientX-wfGesture.sx)+Math.abs(e.clientY-wfGesture.sy)>3;
+      if(moved && wfGesture.items.length===1) wfTryMerge(wfGesture.dragId);
     } else if(wfGesture.mode==="pan"){
       $("wf-canvas").classList.remove("panning");
     }
+    $("wf-canvas").classList.remove("wf-connecting");
     wfGesture=null;
   });
 }
@@ -1814,6 +2047,7 @@ function wfRenderInspector(){
     const def=WF_NODES[node.type]||{label:node.type,fields:[]};
     const h=document.createElement("div"); h.className="wf-insp-sec"; h.textContent=`${def.ico||""} ${def.label}`; body.appendChild(h);
     if(node.type==="call"){ body.appendChild(wfCallPicker(node)); }
+    else if(node.type==="switch"){ body.appendChild(wfSwitchCasesEditor(node)); }
     else {
       if(!(def.fields||[]).length){ const d=document.createElement("div"); d.className="wf-insp-empty"; d.textContent="Node này không có tham số."; body.appendChild(d); }
       (def.fields||[]).forEach(f=>body.appendChild(wfFieldEl(node,f)));
@@ -2037,6 +2271,50 @@ function wfFieldEl(node,f){
   }
   return row;
 }
+// Editor for the "Rẽ nhánh" (switch) node: a list of cases, each a condition of a
+// chosen type whose own fields are edited (reusing wfFieldEl via a throwaway proxy
+// so its DOM-refresh helpers no-op on the switch node). Add/remove/reorder go
+// through the edge-remap helpers so wires stay attached to the right case.
+function wfSwitchCasesEditor(node){
+  const wrap=document.createElement("div");
+  const cases=()=> Array.isArray(node.params.cases)?node.params.cases:(node.params.cases=[]);
+  const list=document.createElement("div"); list.style.cssText="display:flex;flex-direction:column;gap:8px;";
+  function render(){
+    list.innerHTML="";
+    cases().forEach((c,idx)=>{
+      const item=document.createElement("div");
+      item.style.cssText="border:1px solid var(--border2);border-radius:7px;padding:6px;display:flex;flex-direction:column;gap:5px;";
+      const hd=document.createElement("div"); hd.style.cssText="display:flex;align-items:center;gap:4px;";
+      const num=document.createElement("span"); num.textContent="#"+(idx+1);
+      num.style.cssText="font-size:10.5px;font-weight:700;color:var(--accent);flex-shrink:0;";
+      const sel=document.createElement("select"); sel.style.cssText="flex:1;min-width:0;font-size:11px;";
+      WF_SWITCH_CASE_TYPES.forEach(t=>{ const op=document.createElement("option"); op.value=t;
+        op.textContent=(WF_NODES[t].ico||"")+" "+WF_NODES[t].label; if(c.type===t)op.selected=true; sel.appendChild(op); });
+      sel.onchange=()=>{ c.type=sel.value; c.params=wfDefaults(sel.value); render(); wfUpdNodeSum(node); };
+      const up=document.createElement("button"); up.className="btn sm"; up.textContent="↑"; up.title="Lên"; up.disabled=idx===0;
+      up.onclick=()=>{ wfReorderSwitchCase(node, idx, idx-1); render(); wfRenderCanvas(); };
+      const dn=document.createElement("button"); dn.className="btn sm"; dn.textContent="↓"; dn.title="Xuống"; dn.disabled=idx===cases().length-1;
+      dn.onclick=()=>{ wfReorderSwitchCase(node, idx, idx+1); render(); wfRenderCanvas(); };
+      const del=document.createElement("button"); del.className="wf-act-del"; del.textContent="×"; del.title="Xoá nhánh";
+      del.onclick=()=>{ wfRemoveSwitchCase(node, idx); render(); wfRenderCanvas(); };
+      hd.appendChild(num); hd.appendChild(sel); hd.appendChild(up); hd.appendChild(dn); hd.appendChild(del);
+      item.appendChild(hd);
+      // Render the chosen condition's fields, edited against c.params. The proxy id
+      // doesn't match any DOM node, so wfFieldEl's wfUpdNodeSum/Preview no-op safely.
+      const proxy={ id:node.id+"__c"+idx, type:c.type, params:c.params };
+      (WF_NODES[c.type].fields||[]).forEach(f=> item.appendChild(wfFieldEl(proxy,f)));
+      list.appendChild(item);
+    });
+    if(!cases().length){ const e=document.createElement("div"); e.className="wf-insp-empty"; e.textContent='Chưa có nhánh. Bấm "+ Nhánh".'; list.appendChild(e); }
+  }
+  render();
+  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Nhánh";
+  add.onclick=()=>{ cases().push({type:"if_image", params:wfDefaults("if_image")}); render(); wfRenderCanvas(); wfUpdNodeSum(node); };
+  const hint=document.createElement("div"); hint.className="wf-insp-empty"; hint.style.marginTop="2px";
+  hint.textContent="Kiểm lần lượt từ trên xuống: đúng nhánh nào đi cổng đó (#1..#n), không khớp đi cổng 'khác'.";
+  wrap.appendChild(list); wrap.appendChild(add); wrap.appendChild(hint);
+  return wrap;
+}
 function wfUpdNodeSum(node){
   const def=WF_NODES[node.type]; if(!def||!def.sum) return;
   const el=document.querySelector(`.wf-node[data-node="${node.id}"] .wf-node-sum`);
@@ -2055,7 +2333,7 @@ function wfUpdNodePreview(node){
 // ── Export / import / run ────────────────────────────────────────────────────
 function wfCleanGraph(g){
   return {
-    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.showPreview) o.showPreview=true; return o; }),
+    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.showPreview) o.showPreview=true; if(n.stack) o.stack=n.stack; return o; }),
     edges:(g.edges||[]).map(e=>{ const o={from:e.from,fromPort:e.fromPort,to:e.to}; if(e.toPort&&e.toPort!=="in") o.toPort=e.toPort; return o; }),
     groups:(g.groups||[]).map(gr=>({id:gr.id,name:gr.name,x:Math.round(gr.x),y:Math.round(gr.y),w:Math.round(gr.w),h:Math.round(gr.h),color:gr.color||0})),
   };
@@ -2077,7 +2355,7 @@ function wfSerialize(){
 }
 function wfHydrateGraph(g){
   g=g||{nodes:[],edges:[]};
-  let nodes=(g.nodes||[]).map(n=>({id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params:n.params||wfDefaults(n.type),note:n.note||"",log:n.log||"",showPreview:!!n.showPreview}));
+  let nodes=(g.nodes||[]).map(n=>({id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params:n.params||wfDefaults(n.type),note:n.note||"",log:n.log||"",showPreview:!!n.showPreview,stack:n.stack||null}));
   if(!nodes.some(n=>n.type==="start")) nodes.unshift({id:wfUid(),type:"start",x:40,y:40,params:{}});
   const groups=(g.groups||[]).map(gr=>({id:gr.id||("g"+wfUid().slice(1)),name:gr.name||"Nhóm",x:gr.x||0,y:gr.y||0,w:gr.w||200,h:gr.h||140,color:gr.color||0}));
   return { nodes, edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort||"out",to:e.to,toPort:e.toPort||"in"})), groups };
@@ -2114,22 +2392,22 @@ const WF_ICO_PLAY = '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 
 const WF_ICO_STOP = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
 function wfSetRunning(on){
   wfRunning=on; const b=$("wf-run-btn");
-  if(!on){
-    wfSetRunningNode(null);         // clear the active-node glow when stopped (keep trail)
-    wfRunStopped=Object.keys(wfRan).length>0;
-    if(wfRunStopped) wfMarkUnreached();   // red-bar the blocks the run never reached
-  } else { wfRunStopped=false; }
-  if(!b)return;
-  b.innerHTML = on?WF_ICO_STOP:WF_ICO_PLAY;
-  b.title = on?"Dừng":"Chạy thử";
-  b.classList.toggle("ok",!on); b.classList.toggle("err",on);
+  // When a run ends (stopped or finished) every block returns to its original
+  // colour — no leftover green/red/amber trail.
+  if(!on) wfResetRunViz();
+  if(b){
+    b.innerHTML = on?WF_ICO_STOP:WF_ICO_PLAY;
+    b.title = on?"Dừng":"Chạy thử";
+    b.classList.toggle("ok",!on); b.classList.toggle("err",on);
+  }
 }
 async function wfToggleRun(){
-  if(wfRunning){ await api().workflow_stop(); wfSetRunning(false); return; }
+  if(wfRunning){ wfSetRunning(false); await api().workflow_stop(); return; }  // reset first, then stop
   if(!WF.activities.length){ alert("Chưa có hoạt động nào."); return; }
-  wfResetRunViz();   // clear last run's colours BEFORE the engine starts emitting
+  wfResetRunViz();        // clear last run's colours BEFORE the engine starts emitting
+  wfSetRunning(true);     // mark running before any node event can arrive
   const ok=await api().workflow_run(JSON.stringify(wfSerialize()));
-  wfSetRunning(!!ok);
+  if(!ok) wfSetRunning(false);
 }
 async function wfRunGui(){
   if(!WF.activities.length){ alert("Chưa có hoạt động nào."); return; }
