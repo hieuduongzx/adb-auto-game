@@ -51,6 +51,10 @@ from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.utils import (
     add_log_subscriber,
+    app_dir,
+    bundle_dir,
+    is_frozen,
+    launch_tool,
     log_error,
     log_info,
     log_success,
@@ -58,7 +62,14 @@ from src.utils import (
     remove_log_subscriber,
 )
 
-_WEB_DIR = os.path.join(os.path.dirname(__file__), "web")
+# In a frozen build, writable resources (out/, data/) live next to the .exe.
+if is_frozen():
+    _PROJECT_ROOT = app_dir()
+
+# Bundled HTML: from source it sits in ``tools/web``; in a frozen build it is
+# collected under ``<_MEIPASS>/web``.
+_WEB_DIR = (os.path.join(bundle_dir(), "web") if is_frozen()
+            else os.path.join(os.path.dirname(__file__), "web"))
 DEFAULT_OUT_DIR = os.path.join(_PROJECT_ROOT, "out")
 
 # Properties fetched for the Device tab info panel.
@@ -113,13 +124,21 @@ class DevHelperAPI:
     AUTO_REFRESH_MAX_HZ = 30.0
     INFO_REFRESH_INTERVAL = 2.0  # seconds
 
-    def __init__(self) -> None:
+    def __init__(self, out_dir: Optional[str] = None) -> None:
         self.controller = ADBController(auto_connect=False)
         self.scanner = DeviceScanner()
         self.matcher = TemplateMatcher(cache_size=64)
 
         self._ocr_reader: Optional[OCRReader] = None
+        # When launched from the Workflow Designer this points at the workflow's
+        # templates/ folder, so crops/screenshots bundle with that workflow.
         self._out_dir: str = DEFAULT_OUT_DIR
+        if out_dir:
+            try:
+                os.makedirs(out_dir, exist_ok=True)
+                self._out_dir = os.path.abspath(out_dir)
+            except Exception:
+                pass
 
         # Last directory a file dialog landed in, so dialogs reopen there instead
         # of always defaulting to ./out.
@@ -991,12 +1010,11 @@ class DevHelperAPI:
     def open_workflow_designer(self) -> bool:
         """Launch the Workflow Designer in a separate process."""
         try:
-            tool = os.path.join(os.path.dirname(__file__), "workflow_designer.py")
-            subprocess.Popen([sys.executable, tool])
-            log_success("Đã mở Workflow Designer")
+            launch_tool("designer")
+            log_success("Đã mở Workflow2k")
             return True
         except Exception as exc:
-            log_error(f"Mở Workflow Designer thất bại: {exc}")
+            log_error(f"Mở Workflow2k thất bại: {exc}")
             return False
 
     # ── Log ───────────────────────────────────────────────────────────────────
@@ -1016,8 +1034,9 @@ class DevHelperAPI:
 
 # ── Entry points ──────────────────────────────────────────────────────────────
 
-def create_dev_helper_window(title: str = "ADB Auto-Game - Dev Helper") -> webview.Window:
-    api = DevHelperAPI()
+def create_dev_helper_window(title: str = "DevScope",
+                             out_dir: Optional[str] = None) -> webview.Window:
+    api = DevHelperAPI(out_dir=out_dir)
     html_path = os.path.join(_WEB_DIR, "dev_helper.html")
     url = f"file:///{html_path.replace(os.sep, '/')}"
 
@@ -1036,11 +1055,16 @@ def create_dev_helper_window(title: str = "ADB Auto-Game - Dev Helper") -> webvi
     return window
 
 
-def run() -> None:
-    """Create the window and start the event loop (standalone entry point)."""
-    create_dev_helper_window()
+def run(out_dir: Optional[str] = None) -> None:
+    """Create the window and start the event loop (standalone entry point).
+
+    ``out_dir`` (optional, also accepted as the first CLI arg) presets the
+    output folder — the Workflow Designer passes its workflow's templates/ dir.
+    """
+    create_dev_helper_window(out_dir=out_dir)
     webview.start(debug=False, private_mode=False)
 
 
 if __name__ == "__main__":
-    run()
+    _out = sys.argv[1] if len(sys.argv) > 1 else None
+    run(_out)

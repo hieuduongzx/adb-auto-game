@@ -44,6 +44,10 @@ from src.game_core.frida_speedhack import FridaSpeedhackManager
 from src.workflow import NODE_TYPES, WorkflowEngine
 from src.utils import (
     add_log_subscriber,
+    app_dir,
+    bundle_dir,
+    is_frozen,
+    launch_tool,
     log_error,
     log_info,
     log_success,
@@ -51,8 +55,19 @@ from src.utils import (
     remove_log_subscriber,
 )
 
-_WEB_DIR = os.path.join(os.path.dirname(__file__), "web")
-_FLOWS_DIR = os.path.join(_PROJECT_ROOT, "data", "flows")
+# In a frozen build, writable resources (data/) live next to the .exe.
+if is_frozen():
+    _PROJECT_ROOT = app_dir()
+
+# Bundled HTML: ``tools/web`` from source, ``<_MEIPASS>/web`` when frozen.
+_WEB_DIR = (os.path.join(bundle_dir(), "web") if is_frozen()
+            else os.path.join(os.path.dirname(__file__), "web"))
+# Default home for saved workflows. Each workflow lives in its own subfolder
+# ``workflows/<name>/<name>.json`` (with its ``templates/`` bundle alongside),
+# next to the .exe in a frozen build or in the repo root from source.
+_WORKFLOWS_DIR = os.path.join(_PROJECT_ROOT, "workflows")
+# Transient flow written for the "Chạy GUI" handoff to the runner.
+_RUN_TMP_DIR = os.path.join(_WORKFLOWS_DIR, "_run")
 _SETTINGS_PATH = os.path.join(_PROJECT_ROOT, "data", "designer_settings.json")
 
 # Convention: a saved workflow.json is paired with a sibling assets folder of
@@ -440,30 +455,43 @@ class WorkflowDesignerAPI:
                 for k, v in NODE_TYPES.items()}
 
     def workflow_new(self) -> bool:
-        """Forget the currently open file so 'Lưu' prompts for a new path."""
+        """Forget the open file so the next 'Lưu' saves to the default folder
+        (``workflows/<name>/<name>.json``)."""
         self._wf_path = None
         return True
 
+    def _default_flow_path(self, name: str) -> str:
+        """Default save target: ``<workflows>/<name>/<name>.json``.
+
+        Used whenever the user doesn't pick an explicit location. Each workflow
+        gets its own folder so ``_write_flow`` can bundle a sibling
+        ``templates/`` folder, keeping the pair portable.
+        """
+        clean = _sanitize_name(name) or "workflow"
+        folder = os.path.join(_WORKFLOWS_DIR, clean)
+        os.makedirs(folder, exist_ok=True)
+        return os.path.join(folder, f"{clean}.json")
+
     def workflow_export(self, flow_json: str, name: str = "") -> bool:
-        os.makedirs(_FLOWS_DIR, exist_ok=True)
-        default = f"{_sanitize_name(name) or 'flow'}.json"
+        os.makedirs(_WORKFLOWS_DIR, exist_ok=True)
+        default = f"{_sanitize_name(name) or 'workflow'}.json"
         path = None
         win = self._win()
         try:
             if win:
                 paths = win.create_file_dialog(
-                    webview.SAVE_DIALOG, directory=self._start_dir(_FLOWS_DIR),
+                    webview.SAVE_DIALOG, directory=self._start_dir(_WORKFLOWS_DIR),
                     save_filename=default,
                     file_types=("JSON (*.json)", "All files (*.*)"),
                 )
-                if not paths:
-                    log_info("Lưu workflow bị huỷ")
-                    return False
-                path = paths[0] if isinstance(paths, (list, tuple)) else paths
+                if paths:
+                    path = paths[0] if isinstance(paths, (list, tuple)) else paths
         except Exception as exc:
-            log_warning(f"Dialog error: {exc} — lưu vào data/flows/")
+            log_warning(f"Dialog error: {exc}")
         if not path:
-            path = os.path.join(_FLOWS_DIR, default)
+            # No location chosen → default per-workflow folder next to the app.
+            path = self._default_flow_path(name)
+            log_info(f"Lưu mặc định vào workflows/{_sanitize_name(name) or 'workflow'}/")
         if not path.lower().endswith(".json"):
             path += ".json"
         try:
@@ -477,22 +505,24 @@ class WorkflowDesignerAPI:
             return False
 
     def workflow_save(self, flow_json: str, name: str = "") -> dict:
-        if self._wf_path:
-            try:
-                self._write_flow(flow_json, self._wf_path)
-                log_success(f"Đã lưu: {self._wf_path}")
-                return {"ok": True, "path": self._wf_path}
-            except Exception as exc:
-                log_error(f"Lưu thất bại: {exc}")
-                return {"ok": False, "path": self._wf_path}
-        ok = self.workflow_export(flow_json, name)
-        return {"ok": bool(ok), "path": self._wf_path}
+        # Save to the open file if there is one; otherwise drop the workflow
+        # into its default folder (workflows/<name>/<name>.json) with no dialog.
+        path = self._wf_path or self._default_flow_path(name)
+        try:
+            self._write_flow(flow_json, path)
+            self._wf_path = path
+            self._remember_dir(path)
+            log_success(f"Đã lưu: {path}")
+            return {"ok": True, "path": path}
+        except Exception as exc:
+            log_error(f"Lưu thất bại: {exc}")
+            return {"ok": False, "path": self._wf_path}
 
     def workflow_import(self) -> str:
         win = self._win()
         if win is None:
             return ""
-        start_dir = self._start_dir(_FLOWS_DIR if os.path.isdir(_FLOWS_DIR) else _PROJECT_ROOT)
+        start_dir = self._start_dir(_WORKFLOWS_DIR if os.path.isdir(_WORKFLOWS_DIR) else _PROJECT_ROOT)
         try:
             paths = win.create_file_dialog(
                 webview.OPEN_DIALOG, directory=start_dir, allow_multiple=False,
@@ -637,15 +667,48 @@ class WorkflowDesignerAPI:
     def speedhack_running(self) -> bool:
         return self._sh_mgr is not None
 
-    def open_dev_helper(self) -> bool:
-        """Launch the Dev Helper tool in a separate process."""
+    def _workflow_templates_dir(self, flow_json: str = "") -> Optional[str]:
+        """Best-effort path to the current workflow's ``templates/`` folder.
+
+        Captures from DevScope should land where the workflow will bundle its
+        images, so they're picked up by ``_write_flow`` on save. Uses the open
+        file's folder when saved; otherwise the default ``workflows/<name>/``.
+        Returns ``None`` if it can't be resolved.
+        """
+        name, tdir = "", _TEMPLATES_DIRNAME
         try:
-            tool = os.path.join(os.path.dirname(__file__), "dev_helper.py")
-            subprocess.Popen([sys.executable, tool])
-            log_success("Đã mở Dev Helper")
+            if flow_json:
+                flow = json.loads(flow_json)
+                name = flow.get("name") or ""
+                tdir = (flow.get("templatesDir") or _TEMPLATES_DIRNAME).strip().strip("/\\") \
+                    or _TEMPLATES_DIRNAME
+        except Exception:
+            pass
+        try:
+            if self._wf_path:
+                base = os.path.dirname(os.path.abspath(self._wf_path))
+            else:
+                base = os.path.dirname(self._default_flow_path(name))
+            dest = os.path.join(base, tdir)
+            os.makedirs(dest, exist_ok=True)
+            return dest
+        except Exception as exc:
+            log_warning(f"Không xác định được thư mục templates: {exc}")
+            return None
+
+    def open_dev_helper(self, flow_json: str = "") -> bool:
+        """Launch the Dev Helper tool, pointing its output at this workflow's
+        ``templates/`` folder so region crops / screenshots save alongside it."""
+        try:
+            out_dir = self._workflow_templates_dir(flow_json)
+            launch_tool("devhelper", [out_dir] if out_dir else None)
+            if out_dir:
+                log_success(f"Đã mở DevScope · ảnh lưu vào: {out_dir}")
+            else:
+                log_success("Đã mở DevScope")
             return True
         except Exception as exc:
-            log_error(f"Mở Dev Helper thất bại: {exc}")
+            log_error(f"Mở DevScope thất bại: {exc}")
             return False
 
     def open_runner(self, flow_json: str) -> bool:
@@ -660,11 +723,10 @@ class WorkflowDesignerAPI:
         finds every image.
         """
         try:
-            os.makedirs(_FLOWS_DIR, exist_ok=True)
-            tmp = os.path.join(_FLOWS_DIR, "_designer_run.json")
+            os.makedirs(_RUN_TMP_DIR, exist_ok=True)
+            tmp = os.path.join(_RUN_TMP_DIR, "_designer_run.json")
             self._write_flow(flow_json, tmp)
-            runner = os.path.join(os.path.dirname(__file__), "workflow_runner.py")
-            subprocess.Popen([sys.executable, runner, tmp])
+            launch_tool("runner", [tmp])
             log_success("Đã mở Runner GUI với workflow hiện tại")
             return True
         except Exception as exc:
@@ -690,7 +752,7 @@ class WorkflowDesignerAPI:
 
 # ── Entry points ────────────────────────────────────────────────────────────
 
-def create_workflow_designer_window(title: str = "ADB Auto-Game - Workflow Designer") -> webview.Window:
+def create_workflow_designer_window(title: str = "Workflow2k") -> webview.Window:
     api = WorkflowDesignerAPI()
     html_path = os.path.join(_WEB_DIR, "workflow_designer.html")
     url = f"file:///{html_path.replace(os.sep, '/')}"

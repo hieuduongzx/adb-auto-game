@@ -9,7 +9,10 @@ from typing import List, Optional, Tuple, Set
 from ppadb.client import Client as AdbClient
 
 from .constants import ALL_EMULATOR_PORTS, EMULATOR_PORT_RANGES, get_adb_path
-from src.utils import log_error, log_info, log_success, log_warning, log_normal, log_debug
+from src.utils import (
+    CREATE_NO_WINDOW,
+    log_error, log_info, log_success, log_warning, log_normal, log_debug,
+)
 
 
 class DeviceScanner:
@@ -140,6 +143,7 @@ class DeviceScanner:
                 capture_output=True,
                 text=True,
                 timeout=2,
+                creationflags=CREATE_NO_WINDOW,
             )
             
             # Check if connection was successful
@@ -244,7 +248,8 @@ class DeviceScanner:
                 [self.adb_path, "devices"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                creationflags=CREATE_NO_WINDOW,
             )
             
             if result.returncode == 0:
@@ -290,7 +295,8 @@ class DeviceScanner:
         try:
             log_info("Restarting ADB server...")
             try:
-                subprocess.run([self.adb_path, "kill-server"], capture_output=True, timeout=5)
+                subprocess.run([self.adb_path, "kill-server"], capture_output=True, timeout=5,
+                               creationflags=CREATE_NO_WINDOW)
             except subprocess.TimeoutExpired:
                 log_warning("kill-server timed out, continuing anyway")
             time.sleep(1)

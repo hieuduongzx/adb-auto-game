@@ -27,6 +27,9 @@ import webview
 from src.workflow import WorkflowEngine
 from src.utils import (
     add_log_subscriber,
+    app_dir,
+    bundle_dir,
+    is_frozen,
     log_error,
     log_info,
     log_success,
@@ -34,7 +37,9 @@ from src.utils import (
     remove_log_subscriber,
 )
 
-_WEB_DIR = os.path.join(os.path.dirname(__file__), "web", "workflow")
+# ``src/gui/web/workflow`` from source; mirrored under ``<_MEIPASS>`` when frozen.
+_WEB_DIR = (os.path.join(bundle_dir(), "src", "gui", "web", "workflow") if is_frozen()
+            else os.path.join(os.path.dirname(__file__), "web", "workflow"))
 
 
 class WorkflowRunnerAPI:
@@ -111,7 +116,7 @@ class WorkflowRunnerAPI:
 
     def get_state(self) -> dict:
         return {
-            "title": "Workflow Runner",
+            "title": "Workflow2k Runner",
             "name": self.flow.get("name", ""),
             "loaded": bool(self.flow),
             "activities": self._activities_payload(),
@@ -146,8 +151,8 @@ class WorkflowRunnerAPI:
 
     def load_json(self) -> dict:
         """Open a file dialog, load the flow, and return the new state."""
-        flows_dir = os.path.join(os.getcwd(), "data", "flows")
-        start_dir = flows_dir if os.path.isdir(flows_dir) else os.getcwd()
+        flows_dir = os.path.join(app_dir(), "workflows")
+        start_dir = flows_dir if os.path.isdir(flows_dir) else app_dir()
         try:
             wins = webview.windows
             win = wins[0] if wins else None
@@ -243,6 +248,27 @@ class WorkflowRunnerAPI:
                         v["value"] = value
                         return True
         return False
+
+    def reorder_activities(self, ordered_ids: List[str]) -> bool:
+        """Reorder ``flow['activities']`` to match the drag-and-drop order.
+
+        ``ordered_ids`` lists every activity id in its new order. The list is
+        rewritten *in place* so the engine (which shares the same dict) picks up
+        the new sequence order on the next run. Ignored while a run is in
+        progress to avoid mutating the list mid-iteration.
+        """
+        if self.engine.is_running():
+            log_warning("Không thể đổi thứ tự khi đang chạy")
+            return False
+        acts = self.flow.get("activities") or []
+        by_id = {a.get("id"): a for a in acts}
+        new_order = [by_id[i] for i in ordered_ids if i in by_id]
+        # Append any activity not mentioned (defensive), keeping its relative order.
+        for a in acts:
+            if a not in new_order:
+                new_order.append(a)
+        acts[:] = new_order
+        return True
 
     # ── Speedhack (mirrors the live slider in pywebview_gui) ──────────────────
 
@@ -366,7 +392,7 @@ class WorkflowRunnerAPI:
 
 # ── Entry points ────────────────────────────────────────────────────────────
 
-def create_workflow_runner_window(title: str = "Workflow Runner",
+def create_workflow_runner_window(title: str = "Workflow2k Runner",
                                   auto_load: Optional[str] = None) -> webview.Window:
     api = WorkflowRunnerAPI()
     api._pending_load = auto_load

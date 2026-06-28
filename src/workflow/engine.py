@@ -140,14 +140,14 @@ class WorkflowEngine:
         # Reusable subroutines, keyed by id. Each value is a function dict with
         # its own ``graph`` (nodes + edges); a ``call`` node runs one inline.
         self._functions: Dict[str, Dict[str, Any]] = {}
-        # Variables for set_var / if_var, reset at the start of each activity run.
-        self._vars: Dict[str, Any] = {}
-        # Center (x, y) of the most recently found image/text. An image
-        # condition (if_image / wait_image) sets it; a tap/long_press node with
-        # target="found" then acts on it — so "if see image → tap it" works.
-        self._last_pos: Optional[tuple] = None
-        # Set by a "break" node; the next loop node it reaches exits to "done".
-        self._break_loop: bool = False
+        # Per-thread execution context. The sequence thread, every parallel branch
+        # and every background activity each run a graph CONCURRENTLY; if they
+        # shared one vars dict / last-found-position they would clobber each other
+        # (a background popup-watcher resetting the main farm's variables, etc.).
+        # Backing _vars/_last_pos/_break_loop with thread-local storage isolates
+        # them automatically — see the properties below. A ``call`` runs on the
+        # caller's thread, so a function correctly shares its caller's context.
+        self._ctx = threading.local()
 
         self.running = False
         self._stop = threading.Event()
@@ -192,6 +192,39 @@ class WorkflowEngine:
             "read_var": self._a_read_var,
             "break": self._a_break,
         }
+
+    # ── Per-thread execution context ─────────────────────────────────────────
+    # These read/write the *current thread's* slot, so the existing
+    # ``self._vars[...]`` / ``self._last_pos`` accesses scattered through the
+    # handlers stay unchanged but become thread-isolated.
+
+    @property
+    def _vars(self) -> Dict[str, Any]:
+        v = getattr(self._ctx, "vars", None)
+        if v is None:
+            v = {}
+            self._ctx.vars = v
+        return v
+
+    @_vars.setter
+    def _vars(self, value: Dict[str, Any]) -> None:
+        self._ctx.vars = value if value is not None else {}
+
+    @property
+    def _last_pos(self) -> Optional[tuple]:
+        return getattr(self._ctx, "last_pos", None)
+
+    @_last_pos.setter
+    def _last_pos(self, value: Optional[tuple]) -> None:
+        self._ctx.last_pos = value
+
+    @property
+    def _break_loop(self) -> bool:
+        return getattr(self._ctx, "break_loop", False)
+
+    @_break_loop.setter
+    def _break_loop(self, value: bool) -> None:
+        self._ctx.break_loop = value
 
     # ── Callbacks ────────────────────────────────────────────────────────────
 
@@ -336,6 +369,7 @@ class WorkflowEngine:
         self._break_loop = False
         self._emit("on_activity_start", act)
         ok = False
+        t0 = time.time()
         for attempt in range(1, retries + 1):
             if self._stop.is_set():
                 break
@@ -345,10 +379,11 @@ class WorkflowEngine:
             ok = self._run_graph(act.get("graph", {}) or {})
             if ok:
                 break
+        elapsed = time.time() - t0
         if ok:
-            log_success(f"[workflow] ✔ {name}")
+            log_success(f"[workflow] ✔ {name} ({elapsed:.1f}s)")
         else:
-            log_warning(f"[workflow] ✖ {name}")
+            log_warning(f"[workflow] ✖ {name} ({elapsed:.1f}s)")
         self._emit("on_node", None)  # clear highlight between activities
         self._emit("on_activity_complete", act, ok)
         return ok
@@ -424,6 +459,7 @@ class WorkflowEngine:
             elif kind == "loop":
                 if self._break_loop:
                     self._break_loop = False
+                    log_info(f"[workflow] ↺ thoát vòng lặp sau {counters.get(cur, 0)} lần (break)")
                     counters[cur] = 0
                     loop_port = "done"
                 elif self._truthy(params.get("infinite", False)):
@@ -436,6 +472,7 @@ class WorkflowEngine:
                         counters[cur] = done + 1
                         loop_port = "body"
                     else:
+                        log_info(f"[workflow] ↺ vòng lặp xong {done} lần")
                         counters[cur] = 0
                         loop_port = "done"
                 self._emit("on_node_done", nid, "ok", loop_port)
@@ -462,6 +499,9 @@ class WorkflowEngine:
                 if handler is not None:
                     try:
                         ok_act = handler(node, params) is not False  # only explicit False = fail
+                        if not ok_act:
+                            label = (NODE_TYPES.get(ntype, {}).get("label") or ntype)
+                            log_warning(f"[workflow] ✖ '{label}' không thực hiện được")
                     except Exception as e:
                         log_error(f"[workflow] Node '{ntype}' error: {e}")
                         ok_act = False
@@ -472,21 +512,37 @@ class WorkflowEngine:
         return True
 
     def _run_parallel(self, nodes, adj, node_id, depth):
-        """Run every wired branch port of a parallel node at once, then join."""
+        """Run every wired branch port of a parallel node at once, then join.
+
+        Each branch runs on its own thread with its OWN copy of the current vars /
+        last-position (snapshotted at the fork), so branches can read what the flow
+        had so far but can't stomp each other's state mid-run.
+        """
         ports = [p for p in (NODE_TYPES["parallel"]["outs"]) if p != "done"]
+        vars0 = dict(self._vars)
+        pos0 = self._last_pos
         threads = []
         for p in ports:
             tgt = self._next(adj, node_id, p)
             if not tgt:
                 continue
             t = threading.Thread(
-                target=self._walk, args=(nodes, adj, tgt, {}, depth), daemon=True)
+                target=self._walk_branch, args=(nodes, adj, tgt, depth, vars0, pos0),
+                daemon=True)
             threads.append(t)
             t.start()
         if threads:
             log_info(f"[workflow] ⇉ chạy song song {len(threads)} nhánh")
         for t in threads:
             t.join()
+
+    def _walk_branch(self, nodes, adj, tgt, depth, vars0, pos0):
+        """Entry point for a parallel branch thread: seed this thread's context
+        from the fork snapshot, then walk. Isolated from siblings + the parent."""
+        self._vars = dict(vars0)
+        self._last_pos = pos0
+        self._break_loop = False
+        self._walk(nodes, adj, tgt, {}, depth)
 
     @staticmethod
     def _coerce(value: Any) -> Any:
@@ -621,11 +677,7 @@ class WorkflowEngine:
                 return False  # no match — false branch fires; no log (tap-miss is expected)
             self._last_pos = hit
             self._sleep(float(params.get("delay", 0)))  # wait after seeing, before tap
-            tc = 2 if str(params.get("taps", "1")) in ("2", "double") else 1
-            ok = bool(self.auto.tap(hit[0], hit[1], tap_count=tc))
-            if ok:
-                log_info(f"[workflow] 👆 chạm ảnh ({hit[0]}, {hit[1]})")
-            return ok
+            return self._tap_at(hit[0], hit[1], params, label="ảnh")
         if ntype == "tap_image":
             # Find (with timeout), remember position, optionally wait, then tap.
             tpl = self._resolve_template(params.get("template", ""))
@@ -637,11 +689,7 @@ class WorkflowEngine:
                 return False  # not found — false branch fires; no log (tap-miss is expected)
             self._last_pos = (res[0], res[1])
             self._sleep(float(params.get("delay", 0)))  # wait after seeing, before tap
-            tc = 2 if str(params.get("taps", "1")) in ("2", "double") else 1
-            ok = bool(self.auto.tap(res[0], res[1], tap_count=tc))
-            if ok:
-                log_info(f"[workflow] 👆 chạm ảnh {os.path.basename(tpl)} ({res[0]}, {res[1]})")
-            return ok
+            return self._tap_at(res[0], res[1], params, label=os.path.basename(tpl))
         if ntype == "wait_image":
             tpl = self._resolve_template(params.get("template", ""))
             res = self.auto.wait_for_template(
@@ -920,6 +968,20 @@ class WorkflowEngine:
             return self._last_pos
         return (int(p.get("x", 0)), int(p.get("y", 0)))
 
+    def _tap_at(self, x: int, y: int, params: Dict, label: str = "ảnh") -> bool:
+        """Tap a found image's center, applying the node's optional offsetX/offsetY
+        (handy when the thing to tap sits beside the matched icon). Honours the
+        ``taps`` field (1 / 2-double) and logs the actual tapped point."""
+        ox = int(params.get("offsetX", 0) or 0)
+        oy = int(params.get("offsetY", 0) or 0)
+        tx, ty = int(x) + ox, int(y) + oy
+        tc = 2 if str(params.get("taps", "1")) in ("2", "double") else 1
+        ok = bool(self.auto.tap(tx, ty, tap_count=tc))
+        if ok:
+            suffix = f" (+{ox},{oy})" if (ox or oy) else ""
+            log_info(f"[workflow] 👆 chạm {label} ({tx}, {ty}){suffix}")
+        return ok
+
     def _a_tap(self, node, p) -> bool:
         x, y = self._pos(p)
         ok = self.auto.tap(x, y)
@@ -1062,7 +1124,26 @@ class WorkflowEngine:
 
     def _a_launch_app(self, node, p) -> bool:
         pkg = str(p.get("package", "")).strip()
-        return bool(pkg) and self.auto.adb.launch_app(pkg)
+        if not pkg or not self.auto.adb.launch_app(pkg):
+            return False
+        # Optional: block until the app is actually in the foreground (0 = don't
+        # wait). Lets "open game → tap image" work without a manual fixed delay.
+        wait = float(p.get("wait", 0) or 0)
+        if wait > 0:
+            end = time.time() + wait
+            while time.time() < end and not self._stop.is_set():
+                self._pause.wait()
+                try:
+                    self.auto.adb.clear_info_cache()
+                    cur = self.auto.adb.get_current_app() or ""
+                except Exception:
+                    cur = ""
+                if cur and pkg in cur:
+                    log_success(f"[workflow] '{pkg}' đã lên foreground")
+                    return True
+                time.sleep(0.5)
+            log_warning(f"[workflow] '{pkg}' chưa lên foreground sau {wait:.0f}s")
+        return True
 
     def _a_screenshot(self, node, p) -> bool:
         self.auto.capture_screen()

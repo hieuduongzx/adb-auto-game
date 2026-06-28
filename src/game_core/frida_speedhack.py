@@ -51,7 +51,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from src.utils import log_error, log_info, log_success, log_warning
+from src.utils import CREATE_NO_WINDOW, log_error, log_info, log_success, log_warning
 
 
 _INJECT_SCRIPT = """
@@ -445,7 +445,12 @@ class FridaSpeedhackManager:
 
     @staticmethod
     def _project_root() -> Path:
-        """Find the repository root from this shared module location."""
+        """Find the repository root (or the folder next to a frozen .exe)."""
+        try:
+            from src.utils import app_dir
+            return Path(app_dir())
+        except Exception:
+            pass
         current = Path(__file__).resolve()
         for parent in current.parents:
             if (parent / "vendor").is_dir() or (parent / "bin").is_dir():
@@ -496,7 +501,8 @@ class FridaSpeedhackManager:
         for c in candidates:
             try:
                 result = subprocess.run(
-                    [c, "version"], shell=False, capture_output=True, text=True, timeout=5
+                    [c, "version"], shell=False, capture_output=True, text=True, timeout=5,
+                    creationflags=CREATE_NO_WINDOW,
                 )
                 if result.returncode == 0:
                     return c
@@ -530,6 +536,7 @@ class FridaSpeedhackManager:
                 capture_output=True,
                 text=True,
                 timeout=15,
+                creationflags=CREATE_NO_WINDOW,
             )
             return (result.stdout or "") + (result.stderr or "")
         except Exception as e:
@@ -604,6 +611,7 @@ class FridaSpeedhackManager:
                 capture_output=True,
                 text=True,
                 timeout=120,
+                creationflags=CREATE_NO_WINDOW,
             )
             self._run_adb(f"chmod 755 {inject_path}")
             self._frida_inject_path = device_path
@@ -646,6 +654,7 @@ class FridaSpeedhackManager:
                 capture_output=True,
                 text=True,
                 timeout=30,
+                creationflags=CREATE_NO_WINDOW,
             )
             return True
         except Exception as e:
@@ -735,6 +744,7 @@ class FridaSpeedhackManager:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                creationflags=CREATE_NO_WINDOW,
             )
             if keep_alive:
                 self._inject_proc = proc

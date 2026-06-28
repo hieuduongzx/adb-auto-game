@@ -97,13 +97,17 @@ _PROJECT_TESSERACT_CANDIDATES = (
 def _project_root() -> str:
     """Return the project root (the folder containing ``src/``).
 
-    This file lives at ``<root>/src/core/adb/auto/ocr.py`` so the root
-    is four ``dirname`` calls up.
+    From source this is the repo root; in a frozen build it is the folder
+    next to the executable, where a portable ``vendor/tesseract`` ships.
     """
-    here = os.path.abspath(__file__)
-    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.dirname(here)
-    ))))
+    try:
+        from src.utils import app_dir
+        return app_dir()
+    except Exception:
+        here = os.path.abspath(__file__)
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.dirname(here)
+        ))))
 
 
 def _try_locate_tesseract_binary() -> Optional[str]:

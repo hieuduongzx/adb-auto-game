@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Workflow Runner</title>
+<title>Workflow2k Runner</title>
 <style>
 /* ── Reset & tokens ─────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -375,6 +375,29 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   box-shadow: inset 3px 0 0 #e3b341;
 }
 
+/* Drag-to-reorder */
+.drag-handle {
+  width: 16px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin: -7px 0 -7px -4px;
+  color: #c4cbd4;
+  cursor: grab;
+  touch-action: none;
+  transition: color 0.12s;
+}
+.drag-handle:hover { color: var(--dim); }
+.drag-handle:active { cursor: grabbing; }
+.task-row.dragging {
+  opacity: 0.55;
+  background: var(--accent-bg);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.task-row.drop-target { background: var(--surface); }
+
 /* Custom checkbox */
 .cb {
   width: 17px; height: 17px;
@@ -468,7 +491,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 
 /* Inline settings expansion (per-activity vars / poll) */
 .task-settings {
-  padding: 0 11px 11px 37px;
+  padding: 0 11px 11px 59px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -760,7 +783,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   <div id="header-card" class="card">
     <div class="header-top">
       <div class="header-title-block">
-        <div class="app-title empty" id="flow-name">Workflow Runner</div>
+        <div class="app-title empty" id="flow-name">Workflow2k Runner</div>
         <div class="app-subtitle" id="flow-sub">Chưa tải workflow</div>
       </div>
       <button class="btn-load" onclick="onLoadJson()" title="Tải workflow đã xuất từ Designer">
@@ -910,6 +933,7 @@ const $ = id => document.getElementById(id);
 const PILL_TEXT = { pending:"Chưa làm", running:"Đang chạy", completed:"Xong", failed:"Lỗi", skipped:"Bỏ qua" };
 const LOG_TAG = { info:"INF", success:"OK ", warning:"WRN", error:"ERR" };
 const CHECK = `<svg class="icon" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>`;
+const GRIP = `<svg width="9" height="14" viewBox="0 0 9 14" fill="currentColor"><circle cx="2" cy="2" r="1.4"/><circle cx="7" cy="2" r="1.4"/><circle cx="2" cy="7" r="1.4"/><circle cx="7" cy="7" r="1.4"/><circle cx="2" cy="12" r="1.4"/><circle cx="7" cy="12" r="1.4"/></svg>`;
 
 function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
@@ -968,6 +992,11 @@ function buildRow(a){
   const row = document.createElement("div");
   row.className = "task-row"; row.dataset.id = a.id;
 
+  const handle = document.createElement("div");
+  handle.className = "drag-handle"; handle.title = "Kéo để đổi thứ tự";
+  handle.innerHTML = GRIP;
+  attachDragHandle(row, handle, isBg ? "bg-list" : "seq-list");
+
   const cb = document.createElement("button");
   cb.className = "cb" + (a.enabled ? " checked" : "");
   cb.title = "Bật/tắt"; cb.innerHTML = CHECK;
@@ -1002,8 +1031,62 @@ function buildRow(a){
     btns.appendChild(gear);
   }
 
-  row.appendChild(cb); row.appendChild(block); row.appendChild(pill); row.appendChild(btns);
+  row.appendChild(handle); row.appendChild(cb); row.appendChild(block); row.appendChild(pill); row.appendChild(btns);
   return row;
+}
+
+// ── Drag-to-reorder ──────────────────────────────────────────────────────────
+// The row is only draggable while the grip handle is held, so taps on the
+// checkbox / gear keep working. DOM rows are reordered live during dragover,
+// then the new order is persisted to Python on drop.
+function attachDragHandle(row, handle, listId){
+  handle.addEventListener("mousedown", ()=>{ if(!S.running) row.draggable = true; });
+  handle.addEventListener("mouseup",   ()=>{ row.draggable = false; });
+
+  row.addEventListener("dragstart", e=>{
+    if(S.running){ e.preventDefault(); return; }
+    // Collapse any open settings panel so it doesn't strand mid-list.
+    if(S.expandedId){ toggleSettings(S.expandedId); }
+    row.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    try{ e.dataTransfer.setData("text/plain", row.dataset.id); }catch(_){}
+  });
+  row.addEventListener("dragend", ()=>{
+    row.draggable = false;
+    row.classList.remove("dragging");
+    commitOrder();
+  });
+}
+
+function dragAfterElement(list, y){
+  const rows = [...list.querySelectorAll(".task-row:not(.dragging)")];
+  let closest = null, closestOffset = Number.NEGATIVE_INFINITY;
+  for(const r of rows){
+    const box = r.getBoundingClientRect();
+    const offset = y - box.top - box.height/2;
+    if(offset < 0 && offset > closestOffset){ closestOffset = offset; closest = r; }
+  }
+  return closest;
+}
+
+function setupListDnD(list){
+  list.addEventListener("dragover", e=>{
+    const dragging = document.querySelector(".task-row.dragging");
+    if(!dragging || dragging.parentElement !== list) return;  // same-list only
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const after = dragAfterElement(list, e.clientY);
+    if(after == null) list.appendChild(dragging);
+    else list.insertBefore(dragging, after);
+  });
+}
+
+function commitOrder(){
+  const ids = [];
+  $("seq-list").querySelectorAll(".task-row").forEach(r=>ids.push(r.dataset.id));
+  $("bg-list").querySelectorAll(".task-row").forEach(r=>ids.push(r.dataset.id));
+  S.activities.sort((a,b)=> ids.indexOf(a.id) - ids.indexOf(b.id));
+  try{ api().reorder_activities(ids); }catch(_){}
 }
 
 function actMeta(a){
@@ -1182,7 +1265,7 @@ function applyFlow(data){
   S.loaded = true;
   const nm = $("flow-name");
   nm.textContent = data.name || "(không tên)"; nm.classList.remove("empty");
-  $("flow-sub").textContent = "Workflow Runner";
+  $("flow-sub").textContent = "Workflow2k Runner";
   populateLists();
   updateProgress();
   // Tab counts
@@ -1249,6 +1332,8 @@ function selectAll(type, enabled){
 
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init(){
+  setupListDnD($("seq-list"));
+  setupListDnD($("bg-list"));
   let tries=0;
   while(!(window.pywebview&&window.pywebview.api)&&tries<40){ await new Promise(r=>setTimeout(r,100)); tries++; }
   if(!window.pywebview||!window.pywebview.api){ $("dev-label").textContent="⚠ pywebview không khả dụng"; return; }

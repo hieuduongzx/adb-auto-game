@@ -3,7 +3,7 @@
   "version": 2,
   "templatesDir": "templates",
   "speedhack": {
-    "enabled": false,
+    "enabled": true,
     "speed": 2,
     "package": "com.mjwygirls.qooapp"
   },
@@ -437,9 +437,9 @@
     },
     {
       "id": "sequence_4fd1",
-      "name": "Hoạt động 2",
+      "name": "Maiden Chamber",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -466,7 +466,7 @@
           {
             "id": "nftdmgu5",
             "type": "loop",
-            "x": 420,
+            "x": 400,
             "y": 60,
             "params": {
               "count": 3,
@@ -476,7 +476,7 @@
           {
             "id": "nt5ouzwl",
             "type": "tap_image",
-            "x": 620,
+            "x": 580,
             "y": 60,
             "params": {
               "template": "templates/crop_20260628_154327_264x42.png",
@@ -489,7 +489,7 @@
           {
             "id": "nfa16kds",
             "type": "tap_image",
-            "x": 900,
+            "x": 780,
             "y": 60,
             "params": {
               "template": "templates/crop_20260628_154717_155x53.png",
@@ -503,7 +503,7 @@
           {
             "id": "n9d9r29x",
             "type": "tap_image",
-            "x": 1300,
+            "x": 1180,
             "y": 60,
             "params": {
               "template": "templates/crop_20260628_132414_213x39.png",
@@ -516,8 +516,8 @@
           {
             "id": "nqq5uqhi",
             "type": "tap_image",
-            "x": 1520,
-            "y": 60,
+            "x": 1400,
+            "y": 80,
             "params": {
               "template": "templates/crop_20260628_094026_184x51.png",
               "taps": "1",
@@ -529,20 +529,20 @@
           {
             "id": "nropbwkp",
             "type": "tap_image",
-            "x": 1940,
-            "y": 60,
+            "x": 1780,
+            "y": 80,
             "params": {
               "template": "templates/crop_20260628_132414_213x39.png",
               "taps": "1",
               "threshold": 0.8,
-              "timeout": 60,
+              "timeout": 120,
               "delay": 0
             }
           },
           {
             "id": "n2dwmct2",
             "type": "loop",
-            "x": 1100,
+            "x": 1000,
             "y": 60,
             "params": {
               "count": 3,
@@ -552,8 +552,8 @@
           {
             "id": "nsjvuudw",
             "type": "loop",
-            "x": 1720,
-            "y": 60,
+            "x": 1600,
+            "y": 80,
             "params": {
               "count": 3,
               "infinite": true
@@ -562,7 +562,7 @@
           {
             "id": "nckfghu8",
             "type": "end",
-            "x": 2160,
+            "x": 1960,
             "y": 80,
             "params": {}
           }
@@ -629,6 +629,187 @@
             "from": "nropbwkp",
             "fromPort": "false",
             "to": "nckfghu8"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "background_fs5m",
+      "name": "Tác vụ nền 2",
+      "type": "background",
+      "enabled": false,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nmef1q16",
+            "type": "start",
+            "x": 60,
+            "y": 60,
+            "params": {}
+          },
+          {
+            "id": "nxe45f4w",
+            "type": "tap_image",
+            "x": 260,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260628_162025_61x31.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 1,
+              "delay": 0
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nmef1q16",
+            "fromPort": "out",
+            "to": "nxe45f4w"
+          }
+        ],
+        "groups": []
+      },
+      "pollInterval": 1
+    },
+    {
+      "id": "sequence_lzkp",
+      "name": "Hoạt động 3",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "n4dxd63z",
+            "type": "start",
+            "x": 60,
+            "y": 40,
+            "params": {}
+          },
+          {
+            "id": "n72gz2w6",
+            "type": "tap_image",
+            "x": 240,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260628_154306_35x37.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0
+            }
+          },
+          {
+            "id": "ncxtduat",
+            "type": "loop",
+            "x": 440,
+            "y": 40,
+            "params": {
+              "count": 3,
+              "infinite": true
+            }
+          },
+          {
+            "id": "nniewxh0",
+            "type": "tap_image",
+            "x": 640,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260628_163908_185x37.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0
+            }
+          },
+          {
+            "id": "nmze66vi",
+            "type": "tap_image",
+            "x": 820,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260628_163947_364x50.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n8s2ax4n",
+            "type": "tap_image",
+            "x": 1000,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260628_154717_155x53.png",
+              "taps": "1",
+              "threshold": 0.8,
+              "timeout": 5,
+              "delay": 0
+            },
+            "showPreview": true
+          },
+          {
+            "id": "n5a0tgc7",
+            "type": "loop",
+            "x": 1420,
+            "y": 40,
+            "params": {
+              "count": 3,
+              "infinite": false
+            }
+          },
+          {
+            "id": "ndqvrrbs",
+            "type": "tap_image",
+            "x": 1180,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260628_164126_189x57.png",
+              "taps": "1",
+              "threshold": 0.8,
+              "timeout": 5,
+              "delay": 0
+            },
+            "showPreview": true
+          }
+        ],
+        "edges": [
+          {
+            "from": "n4dxd63z",
+            "fromPort": "out",
+            "to": "n72gz2w6"
+          },
+          {
+            "from": "n72gz2w6",
+            "fromPort": "true",
+            "to": "ncxtduat"
+          },
+          {
+            "from": "ncxtduat",
+            "fromPort": "body",
+            "to": "nniewxh0"
+          },
+          {
+            "from": "nniewxh0",
+            "fromPort": "true",
+            "to": "nmze66vi"
+          },
+          {
+            "from": "n8s2ax4n",
+            "fromPort": "true",
+            "to": "ndqvrrbs"
+          },
+          {
+            "from": "nmze66vi",
+            "fromPort": "true",
+            "to": "n8s2ax4n"
           }
         ],
         "groups": []

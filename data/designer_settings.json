@@ -1,5 +1,6 @@
 {
   "snap": true,
-  "previewAll": true,
-  "logOpen": true
+  "previewAll": false,
+  "logOpen": true,
+  "sideW": 258
 }

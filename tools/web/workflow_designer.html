@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ADB Auto-Game · Workflow Designer</title>
+<title>Workflow2k</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -323,6 +323,11 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 
 /* Left sidebar: activities + palette */
 #wf-side { width:212px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
+/* Drag handle to resize the left sidebar. A wide hit-area with a thin visible spine. */
+#wf-side-resizer { width:7px; flex-shrink:0; cursor:col-resize; position:relative; align-self:stretch; }
+#wf-side-resizer::before { content:""; position:absolute; left:2px; top:0; bottom:0; width:3px; border-radius:3px;
+  background:transparent; transition:background .12s; }
+#wf-side-resizer:hover::before, #wf-side-resizer.drag::before { background:var(--accent); }
 .wf-side-sec { display:flex; flex-direction:column; min-height:0; }
 .wf-side-sec + .wf-side-sec { border-top:1px solid var(--line); }
 .wf-side-hdr { display:flex; align-items:center; gap:var(--s2); font-size:10.5px; font-weight:700; letter-spacing:.05em;
@@ -331,7 +336,6 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .side-count { font-family:var(--mono); font-size:9.5px; font-weight:600; color:var(--muted);
   background:var(--alt); border-radius:999px; padding:1px 6px; letter-spacing:0; }
 .side-count:empty { display:none; }
-.wf-side-hint { font-size:10px; color:var(--muted); line-height:1.5; padding:0 11px 7px; }
 #wf-activities { padding:0 9px 8px; display:flex; flex-direction:column; gap:4px; max-height:230px; overflow-y:auto; }
 #wf-side .wf-palette { padding:0 9px 10px; overflow-y:auto; }
 
@@ -350,6 +354,11 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-act-cb svg { opacity:0; } .wf-act-cb.checked svg { opacity:1; }
 .wf-act-del { color:var(--muted); font-size:14px; line-height:1; padding:0 3px; border-radius:4px; flex-shrink:0; }
 .wf-act-del:hover { color:var(--err); background:var(--err-bg); }
+.wf-act-grip { display:flex; align-items:center; justify-content:center; flex-shrink:0; width:11px;
+  margin:-6px 0 -6px -4px; align-self:stretch; color:#c4cbd4; cursor:grab; }
+.wf-act-grip:hover { color:var(--dim); }
+.wf-act-grip:active { cursor:grabbing; }
+.wf-act.wf-dragging { opacity:.55; border-color:var(--accent); background:var(--accent-bg); }
 
 .wf-palette { display:flex; flex-direction:column; gap:3px; }
 .wf-pal-cat { font-size:9px; font-weight:700; letter-spacing:.05em; color:var(--muted); text-transform:uppercase; margin:5px 0 1px; }
@@ -500,6 +509,12 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Keep the title clear of the top-right "T"/"F" port labels on branch nodes. */
 .wf-node.has-tf .wf-node-title { padding-right:14px; }
+/* Validation badge: a node missing a template / not wired in shows an amber "!" so
+   broken flows are obvious before you even run them. Hover for the reason(s). */
+.wf-node-warn { position:absolute; top:-8px; right:-8px; width:16px; height:16px; border-radius:50%;
+  background:#f3b51a; color:#3a2c05; font-size:10px; font-weight:800; line-height:16px; text-align:center;
+  box-shadow:0 1px 3px rgba(20,30,45,.3); z-index:3; cursor:help; }
+.wf-node.has-warn { border-color:#e6a417; }
 .wf-node-sum { font-family:var(--mono); font-size:9.5px; color:var(--muted); padding:5px 9px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wf-node-note { font-size:9.5px; font-style:italic; color:#7c6f55; background:#fdf9ee;
@@ -567,8 +582,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
       <svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg></button>
   </div>
   <span class="tb-divider"></span>
-  <button class="btn ico" onclick="openDevHelper()" title="Dev Helper — mở công cụ (cửa sổ mới)">
-    <svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.3L3 18l3 3 6.4-6.3a4 4 0 0 0 5.3-5.4l-2.6 2.6-2.5-.4-.4-2.5z"/></svg></button>
+  <button class="btn" onclick="openDevHelper()" title="DevScope — chụp/đo region, ảnh lưu thẳng vào templates của workflow hiện tại">
+    <svg width="15" height="15" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.3L3 18l3 3 6.4-6.3a4 4 0 0 0 5.3-5.4l-2.6 2.6-2.5-.4-.4-2.5z"/></svg>DevScope</button>
   <span class="spacer"></span>
   <div class="tb-group">
     <button class="btn ico" onclick="wfNew()" title="Mới — tạo workflow trống">
@@ -593,25 +608,25 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   <div id="wf-side" class="card">
     <div class="wf-side-sec">
       <div class="wf-side-hdr">
+        <span>Function</span><span class="side-count" id="wf-fn-count"></span><span class="spacer"></span>
+        <button class="btn sm" onclick="wfAddFunction()" title="Tạo function tái sử dụng">+ Function</button>
+      </div>
+      <div id="wf-functions"></div>
+    </div>
+    <div class="wf-side-sec">
+      <div class="wf-side-hdr">
         <span>Hoạt động</span><span class="side-count" id="wf-act-count"></span><span class="spacer"></span>
         <button class="btn sm" onclick="wfAddActivity('sequence')" title="Thêm hoạt động tuần tự">+ Tuần tự</button>
         <button class="btn sm" onclick="wfAddActivity('background')" title="Thêm hoạt động nền">+ Nền</button>
       </div>
       <div id="wf-activities"></div>
     </div>
-    <div class="wf-side-sec">
-      <div class="wf-side-hdr">
-        <span>Function</span><span class="side-count" id="wf-fn-count"></span><span class="spacer"></span>
-        <button class="btn sm" onclick="wfAddFunction()" title="Tạo function tái sử dụng">+ Function</button>
-      </div>
-      <div id="wf-functions"></div>
-    </div>
     <div class="wf-side-sec" style="flex:1;min-height:0;display:flex;flex-direction:column;">
       <div class="wf-side-hdr"><span>Node</span></div>
-      <div class="wf-side-hint">Kéo node vào canvas. Kéo từ cổng phải, thả lên node bất kỳ là tự nối. <b>Nhóm:</b> bấm nút <b>▢</b> trên thanh công cụ rồi kéo để vẽ khung (hoặc chọn vài node rồi bấm) — kéo tiêu đề khung để di chuyển cả nhóm, bấm đúp để đổi tên. Với node <b>Lặp lại</b>: thả vào cổng <b style="color:#c2841f">lặp</b> (dưới) để nối vòng lại. Ctrl+C/V sao chép/dán · Ctrl+D nhân đôi · Delete xoá.</div>
       <div id="wf-palette" class="wf-palette"></div>
     </div>
   </div>
+  <div id="wf-side-resizer" title="Kéo để đổi độ rộng cột trái"></div>
   <!-- Center: graph canvas -->
   <div id="wf-main" class="card">
     <div id="wf-bar">
@@ -638,6 +653,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
         <button class="btn sm" onclick="wfZoomBy(1/1.1)" title="Thu nhỏ">−</button>
         <span id="wf-zoom-lbl" onclick="wfZoomReset()" title="Đặt lại 100%">100%</span>
         <button class="btn sm" onclick="wfZoomBy(1.1)" title="Phóng to">+</button>
+        <button class="btn sm" onclick="wfFit()" title="Vừa khung — hiện toàn bộ block (F)">⛶</button>
       </span>
       <span class="spacer"></span>
       <span class="wf-hint" title="Cuộn chuột = zoom · Kéo = di chuyển khối · Chuột phải = menu (tạo nhóm/sao chép/xoá) hoặc xoá dây (trên dây nối) · Space hoặc chuột giữa = kéo nền">Cuộn = zoom · Kéo = di chuyển · Chuột phải = menu · ▢ = nhóm · Space = kéo nền</span>
@@ -841,7 +857,7 @@ async function onRefreshDevices(){ await api().refresh_devices(); }
 async function onScanPorts(){ await api().scan_ports(); }
 async function onRestartAdb(){ await api().restart_adb(); }
 async function onDeviceChange(serial){ if(serial){ S.connectedSerial=serial; await api().select_device(serial); } }
-async function openDevHelper(){ try{ await api().open_dev_helper(); setStatus("Đang mở Dev Helper…"); }catch{} }
+async function openDevHelper(){ try{ await api().open_dev_helper(JSON.stringify(wfSerialize())); setStatus("Đang mở DevScope…"); }catch{} }
 
 // New blank workflow.
 async function wfNew(){
@@ -870,6 +886,7 @@ window.addEventListener("keydown", e => {
   if(e.key===" "){ wfSpace=true; }
   if(e.key==="Delete"||e.key==="Backspace"){ if(WF.sel.length){ e.preventDefault(); wfDeleteSelected(); return; } }
   if((e.key==="a"||e.key==="A") && (e.ctrlKey||e.metaKey)){ const g=wfGraph(); if(g){ e.preventDefault(); WF.sel=g.nodes.map(n=>n.id); WF.selectedNode=null; wfMarkSel(); wfRenderInspector(); return; } }
+  if((e.key==="f"||e.key==="F") && !e.ctrlKey && !e.metaKey){ e.preventDefault(); wfFit(); return; }
   if(e.key==="Escape"){ if(wfGroupMode) wfSetGroupMode(false); wfClearSel(); wfMarkSel(); wfRenderInspector(); }
 });
 window.addEventListener("keyup", e => { if(e.key===" ") wfSpace=false; });
@@ -888,15 +905,15 @@ const WF_NODES = {
   swipe_dir:  {label:"Vuốt hướng",ico:"🧭",kind:"action",cat:"basic", outs:["out"], fields:[{k:"direction",t:"select",opts:["up","down","left","right"],d:"up"},{k:"distance",t:"num",d:400},{k:"duration",t:"num",d:300}], sum:p=>`${p.direction} ${p.distance}px`},
   wait:       {label:"Chờ",       ico:"⏱",kind:"action",cat:"basic", outs:["out"], fields:[{k:"seconds",t:"num",d:1,step:.5}], sum:p=>`${p.seconds}s`},
   wait_random:{label:"Chờ n.nhiên",ico:"⏳",kind:"action",cat:"basic", outs:["out"], fields:[{k:"min",t:"num",d:.5,step:.5},{k:"max",t:"num",d:2,step:.5}], sum:p=>`${p.min}-${p.max}s`},
-  send_text:  {label:"Nhập text", ico:"⌨",kind:"action",cat:"basic", outs:["out"], fields:[{k:"text",t:"text"}], sum:p=>`"${p.text||""}"`},
-  key:        {label:"Phím",      ico:"🔘",kind:"action",cat:"basic", outs:["out"], fields:[{k:"keycode",t:"text",d:"BACK"}], sum:p=>`${p.keycode}`},
-  back:       {label:"Back",      ico:"◀",kind:"action",cat:"basic", outs:["out"], fields:[], sum:()=>"phím back"},
-  home:       {label:"Home",      ico:"⌂",kind:"action",cat:"basic", outs:["out"], fields:[], sum:()=>"phím home"},
-  tap_image:  {label:"Chạm ảnh",  ico:"🎯",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:5},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+(p.delay?` ·chờ ${p.delay}s`:"")},
+  send_text:  {label:"Nhập text", ico:"⌨",kind:"action",cat:"input", outs:["out"], fields:[{k:"text",t:"text"}], sum:p=>`"${p.text||""}"`},
+  key:        {label:"Phím",      ico:"🔘",kind:"action",cat:"input", outs:["out"], fields:[{k:"keycode",t:"text",d:"BACK"}], sum:p=>`${p.keycode}`},
+  back:       {label:"Back",      ico:"◀",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"phím back"},
+  home:       {label:"Home",      ico:"⌂",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"phím home"},
+  tap_image:  {label:"Chạm ảnh",  ico:"🎯",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:5},{k:"delay",t:"num",d:0,step:.5},{k:"offsetX",lbl:"Lệch X",t:"num",d:0},{k:"offsetY",lbl:"Lệch Y",t:"num",d:0}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")+(p.delay?` ·chờ ${p.delay}s`:"")},
   wait_image: {label:"Chờ ảnh",   ico:"👁",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBase(p.template)+(p.delay?` ·chờ ${p.delay}s`:"")},
   if_image:   {label:"Nếu ảnh",   ico:"❓",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}thấy ${wfBase(p.template)}`},
   // "…_any" = OR over several images: true when ANY listed template matches.
-  tap_image_any: {label:"Chạm 1 trong ảnh", ico:"🎯",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:5},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBaseAny(p.templates)+(p.taps=="2"?" ×2":"")},
+  tap_image_any: {label:"Chạm 1 trong ảnh", ico:"🎯",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:5},{k:"delay",t:"num",d:0,step:.5},{k:"offsetX",lbl:"Lệch X",t:"num",d:0},{k:"offsetY",lbl:"Lệch Y",t:"num",d:0}], sum:p=>wfBaseAny(p.templates)+(p.taps=="2"?" ×2":"")},
   wait_image_any:{label:"Chờ 1 trong ảnh",  ico:"👁",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBaseAny(p.templates)+(p.delay?` ·chờ ${p.delay}s`:"")},
   if_image_any:  {label:"Nếu 1 trong ảnh",  ico:"❓",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}thấy ${wfBaseAny(p.templates)}`},
   wait_text:  {label:"Chờ chữ",   ico:"🔤",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10}], sum:p=>`"${p.text||""}"`},
@@ -909,13 +926,13 @@ const WF_NODES = {
   set_var:    {label:"Đặt biến",  ico:"📌",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i"},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name||"?"} = ${p.value}`},
   calc_var:   {label:"Tính biến", ico:"➗",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i"},{k:"op",t:"select",opts:["+","-","*","/","="],d:"+"},{k:"value",t:"text",d:"1"}], sum:p=>`${p.name} ${p.op}= ${p.value}`},
   if_var:     {label:"Nếu biến",  ico:"🔢",kind:"condition",cat:"logic",outs:["true","false"], fields:[{k:"name",t:"text",d:"i"},{k:"op",t:"select",opts:["==","!=",">","<",">=","<="],d:"=="},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name} ${p.op} ${p.value}`},
-  launch_app: {label:"Mở app",    ico:"🚀",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"package",t:"text"}], sum:p=>p.package||"(package)"},
+  launch_app: {label:"Mở app",    ico:"🚀",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"package",t:"text"},{k:"wait",lbl:"Chờ mở (s)",t:"num",d:0}], sum:p=>(p.package||"(package)")+(p.wait?` ·chờ ${p.wait}s`:"")},
   screenshot: {label:"Chụp",      ico:"📷",kind:"action",cat:"misc",  outs:["out"], fields:[], sum:()=>"chụp màn hình"},
   log:        {label:"Ghi log",   ico:"📝",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"message",t:"text"}], sum:p=>`"${p.message||""}"`},
   note:       {label:"Ghi chú",   ico:"💬",kind:"note",  cat:"misc",  outs:[],      fields:[{k:"text",t:"text",d:"ghi chú"}], sum:p=>p.text||""},
   call:       {label:"Function",  ico:"ƒ", kind:"call",  cat:null,    outs:["out"], fields:[]},
 };
-const WF_CATS = [ {key:"basic",label:"Cơ bản"}, {key:"image",label:"Hình ảnh"}, {key:"ocr",label:"Văn bản (OCR)"}, {key:"flow",label:"Luồng"}, {key:"logic",label:"Biến / Điều kiện"}, {key:"misc",label:"Khác"} ];
+const WF_CATS = [ {key:"basic",label:"Cơ bản"}, {key:"input",label:"Phím & Nhập liệu"}, {key:"image",label:"Hình ảnh"}, {key:"ocr",label:"Văn bản (OCR)"}, {key:"flow",label:"Luồng"}, {key:"logic",label:"Biến / Điều kiện"}, {key:"misc",label:"Khác"} ];
 const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"lặp", done:"xong", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
 const WF_IN_LBL = { in:"vào", loop:"lặp" };
@@ -931,7 +948,7 @@ const WF_GRID=20;   // grid step; snapping is opt-in (default off)
 let wfSnapOn=false;
 let wfPreviewAll=false;   // global: show image thumbnail on every image block
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
-function wfSaveSettings(){ try{ const lc=$("log-card"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, logOpen: !(lc&&lc.classList.contains("collapsed"))}); }catch{} }
+function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
   const s=$("wf-snap-btn"); if(s){ s.title="Bám lưới: "+(wfSnapOn?"Bật":"Tắt"); s.classList.toggle("on",wfSnapOn); }
@@ -1006,6 +1023,30 @@ function wfSetZoom(z, cx, cy){
 }
 function wfZoomBy(f){ wfSetZoom(wfZoom*f); }
 function wfZoomReset(){ wfSetZoom(1); }
+// Drag-to-resize the left sidebar; width persists in settings.
+function wfInitSideResizer(){
+  const side=$("wf-side"), rez=$("wf-side-resizer"); if(!side||!rez||rez.__wired) return;
+  rez.__wired=true; let drag=null;
+  rez.addEventListener("mousedown",e=>{ e.preventDefault(); drag={x:e.clientX, w:side.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
+  window.addEventListener("mousemove",e=>{ if(!drag) return; side.style.width=Math.max(150, Math.min(480, drag.w+(e.clientX-drag.x)))+"px"; });
+  window.addEventListener("mouseup",()=>{ if(!drag) return; drag=null; rez.classList.remove("drag"); document.body.style.cursor=""; wfSaveSettings(); });
+}
+// Fit & center all blocks of the current graph into the canvas. Uses the live DOM
+// node bounds (world coords), so it's exact regardless of node heights.
+function wfFit(){
+  const canvas=$("wf-canvas"); if(!canvas) return;
+  const els=[...document.querySelectorAll("#wf-world .wf-node")];
+  if(!els.length){ wfPan={x:0,y:0}; wfSetZoom(1); return; }
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  els.forEach(el=>{ const x=el.offsetLeft,y=el.offsetTop,w=el.offsetWidth,h=el.offsetHeight;
+    if(x<minX)minX=x; if(y<minY)minY=y; if(x+w>maxX)maxX=x+w; if(y+h>maxY)maxY=y+h; });
+  const pad=70, cw=canvas.clientWidth, ch=canvas.clientHeight;
+  const z=Math.max(0.2, Math.min(cw/((maxX-minX)+pad*2), ch/((maxY-minY)+pad*2), 1.5));
+  wfZoom=z;
+  wfPan.x=(cw-(minX+maxX)*z)/2;
+  wfPan.y=(ch-(minY+maxY)*z)/2;
+  wfApplyTransform();
+}
 let wfGesture=null;     // {mode:'pan'|'move'|'connect', ...}
 let wfPaletteDrag=null; // node type being dragged from palette
 let wfCanvasReady=false;
@@ -1090,15 +1131,17 @@ function wfRenderActivities(){
   WF.activities.forEach(act=>{
     const sel = WF.edit.kind==="activity" && act.id===WF.edit.id;
     const el=document.createElement("div");
-    el.className="wf-act"+(sel?" sel":"");
+    el.className="wf-act"+(sel?" sel":""); el.dataset.id=act.id;
     el.innerHTML=
-      `<span class="wf-act-cb ${act.enabled?"checked":""}">${check}</span>
+      `<span class="wf-act-grip" title="Kéo để đổi thứ tự">${WF_GRIP}</span>
+       <span class="wf-act-cb ${act.enabled?"checked":""}">${check}</span>
        <span class="wf-badge ${act.type==="background"?"bg":"seq"}">${act.type==="background"?"NỀN":"TUẦN TỰ"}</span>
        <span class="wf-act-name">${escHtml(act.name)}</span>
        <button class="wf-act-del" title="Xoá">×</button>`;
     el.querySelector(".wf-act-cb").addEventListener("click",e=>wfToggleActivity(act.id,e));
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteActivity(act.id,e));
-    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-cb,.wf-act-del"))return; wfSelectActivity(act.id); });
+    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-cb,.wf-act-del,.wf-act-grip"))return; wfSelectActivity(act.id); });
+    wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.activities);
     wrap.appendChild(el);
   });
 }
@@ -1109,15 +1152,68 @@ function wfRenderFunctions(){
   if(!WF.functions.length){ wrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có function. Bấm “+ Function”.</div>'; return; }
   WF.functions.forEach(fn=>{
     const sel = WF.edit.kind==="function" && fn.id===WF.edit.id;
-    const el=document.createElement("div"); el.className="wf-act wf-fn"+(sel?" sel":"");
+    const el=document.createElement("div"); el.className="wf-act wf-fn"+(sel?" sel":""); el.dataset.id=fn.id;
     el.innerHTML=
-      `<span class="wf-badge fn">ƒ</span>
+      `<span class="wf-act-grip" title="Kéo để đổi thứ tự">${WF_GRIP}</span>
+       <span class="wf-badge fn">ƒ</span>
        <span class="wf-act-name">${escHtml(fn.name)}</span>
        <button class="wf-act-del" title="Xoá function">×</button>`;
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteFunction(fn.id,e));
-    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-del"))return; wfEditFunction(fn.id); });
+    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-del,.wf-act-grip"))return; wfEditFunction(fn.id); });
+    wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.functions);
     wrap.appendChild(el);
   });
+}
+
+// ── Sidebar drag-to-reorder (activities + functions) ─────────────────────────
+// Dragging is armed only while the grip handle is held, so checkbox / select /
+// delete clicks keep working. Rows shuffle live during dragover; on drop the
+// backing array (WF.activities or WF.functions) is reordered to match the DOM —
+// for sequence activities this changes their run order.
+const WF_GRIP = `<svg width="8" height="13" viewBox="0 0 9 14" fill="currentColor"><circle cx="2" cy="2" r="1.3"/><circle cx="7" cy="2" r="1.3"/><circle cx="2" cy="7" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="2" cy="12" r="1.3"/><circle cx="7" cy="12" r="1.3"/></svg>`;
+
+function wfAttachReorder(el, handle, listEl, arr){
+  if(!handle) return;
+  handle.addEventListener("mousedown", ()=>{ el.draggable=true; });
+  handle.addEventListener("mouseup",   ()=>{ el.draggable=false; });
+  el.addEventListener("dragstart", e=>{
+    el.classList.add("wf-dragging");
+    e.dataTransfer.effectAllowed="move";
+    try{ e.dataTransfer.setData("text/plain", el.dataset.id); }catch{}
+  });
+  el.addEventListener("dragend", ()=>{
+    el.draggable=false; el.classList.remove("wf-dragging");
+    wfCommitReorder(listEl, arr);
+  });
+}
+
+function wfDragAfter(listEl, y){
+  const rows=[...listEl.querySelectorAll(".wf-act:not(.wf-dragging)")];
+  let closest=null, closestOff=Number.NEGATIVE_INFINITY;
+  for(const r of rows){
+    const box=r.getBoundingClientRect();
+    const off=y-box.top-box.height/2;
+    if(off<0 && off>closestOff){ closestOff=off; closest=r; }
+  }
+  return closest;
+}
+
+function wfSetupSortable(listEl){
+  listEl.addEventListener("dragover", e=>{
+    const dragging=listEl.querySelector(".wf-dragging");
+    if(!dragging) return;   // only react to a drag that started in THIS list
+    e.preventDefault();
+    e.dataTransfer.dropEffect="move";
+    const after=wfDragAfter(listEl, e.clientY);
+    if(after==null) listEl.appendChild(dragging);
+    else listEl.insertBefore(dragging, after);
+  });
+}
+
+function wfCommitReorder(listEl, arr){
+  const ids=[...listEl.querySelectorAll(".wf-act")].map(e=>e.dataset.id);
+  arr.sort((a,b)=> ids.indexOf(a.id) - ids.indexOf(b.id));
+  wfRenderAll();
 }
 
 function wfRenderPalette(){
@@ -1159,6 +1255,19 @@ function wfRenderCanvas(){
   if(wfRunning||wfRunStopped) wfReapplyRunViz();   // keep the run-trail across redraws (live + after stop)
 }
 
+// Lightweight static checks surfaced as a "!" badge on the node — catches the two
+// mistakes that silently break a flow: an image node with no template picked, and
+// a block that has no incoming wire (so the run never reaches it).
+function wfNodeWarnings(n, def, g){
+  const w=[];
+  for(const f of (def.fields||[])){
+    if(f.t==="tpl" && !String(n.params[f.k]||"").trim()) w.push("Chưa chọn ảnh template");
+    if(f.t==="tpls"){ const a=n.params[f.k]; if(!Array.isArray(a)||!a.filter(x=>String(x||"").trim()).length) w.push("Chưa có ảnh nào trong danh sách"); }
+  }
+  if(def.kind!=="start" && def.kind!=="note" && g && !(g.edges||[]).some(ed=>ed.to===n.id))
+    w.push("Chưa nối dây vào — block này sẽ không bao giờ chạy");
+  return w;
+}
 function wfNodeEl(n){
   const def=WF_NODES[n.type]||{label:n.type,ico:"?",kind:"action",outs:["out"],fields:[]};
   const el=document.createElement("div");
@@ -1212,6 +1321,10 @@ function wfNodeEl(n){
     const lblTxt = (n.type==="parallel"&&port==="done") ? "gộp" : WF_PORT_LBL[port];
     if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+1)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl); }
   });
+  // Validation badge (missing template / not wired in) so broken flows show before a run.
+  const warns=wfNodeWarnings(n,def,wfGraph());
+  if(warns.length){ el.classList.add("has-warn");
+    const b=document.createElement("span"); b.className="wf-node-warn"; b.textContent="!"; b.title=warns.join("\n"); el.appendChild(b); }
   // interactions — the whole node body is a drag handle (ports excluded inside wfStartMove).
   // Deletion is via Delete/Backspace or the right-click menu — no per-node × button.
   el.addEventListener("mousedown",e=>wfStartMove(e,n));
@@ -1484,7 +1597,9 @@ function wfConnectTo(toNodeId, clientX, clientY){
     const toPort=wfNearestInPort(toNodeId, clientX, clientY);
     g.edges=g.edges.filter(ed=>!(ed.from===wfGesture.from && ed.fromPort===wfGesture.port)); // one wire per output port
     g.edges.push({from:wfGesture.from,fromPort:wfGesture.port,to:toNodeId,toPort});
+    return true;
   }
+  return false;
 }
 function wfCanvasMouseDown(e){
   if(e.target.closest(".wf-node")||e.target.closest(".wf-group")) return;
@@ -1640,8 +1755,11 @@ function wfInitCanvas(){
     if(!wfGesture) return;
     if(wfGesture.mode==="connect"){
       const tid=wfNodeUnderPointer(e.clientX,e.clientY);
-      if(tid) wfConnectTo(tid, e.clientX, e.clientY);
-      wfClearTemp(); wfHighlightTarget(null); wfDrawWires();
+      const connected = tid ? wfConnectTo(tid, e.clientX, e.clientY) : false;
+      wfClearTemp(); wfHighlightTarget(null);
+      // A new wire changes which nodes are "wired in" → rebuild so the warning
+      // badges refresh; otherwise just redraw the wires (cheaper, no node change).
+      if(connected) wfRenderCanvas(); else wfDrawWires();
     } else if(wfGesture.mode==="groupresize"){
       wfRenderCanvas();
     } else if(wfGesture.mode==="groupdraw"){
@@ -1854,7 +1972,7 @@ function wfVarValue(v){
 }
 function wfFieldEl(node,f){
   const row=document.createElement("div"); row.className="wf-field";
-  const lab=document.createElement("label"); lab.textContent=f.k; row.appendChild(lab);
+  const lab=document.createElement("label"); lab.textContent=f.lbl||f.k; lab.title=f.k; row.appendChild(lab);
   if(f.t==="bool"){
     const cb=document.createElement("span"); cb.className="cb"+(node.params[f.k]?" checked":"");
     cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
@@ -2029,7 +2147,11 @@ async function init(){
   S.connectedSerial=state.connectedSerial||null;
   (state.log||[]).forEach(appendLog);
   try{ const st=await api().get_settings(); wfSnapOn=!!st.snap; wfPreviewAll=!!st.previewAll;
-    if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); } }catch{}
+    if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); }
+    if(st.sideW){ const sd=$("wf-side"); if(sd) sd.style.width=Math.max(150,Math.min(480,st.sideW))+"px"; } }catch{}
+  wfInitSideResizer();
+  wfSetupSortable($("wf-activities"));
+  if($("wf-functions")) wfSetupSortable($("wf-functions"));
   wfSyncToggleBtns();
   wfSetRunning(false);   // seed the run button's play icon
   updateLogCount();

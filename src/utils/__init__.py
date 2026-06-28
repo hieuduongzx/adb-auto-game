@@ -7,9 +7,11 @@ captured by any handlers attached to the root logger (e.g. log files).
 """
 import logging
 import os
+import subprocess
+import sys
 import threading
 from datetime import datetime
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Sequence
 
 from colorama import init as _colorama_init, Fore, Style
 
@@ -167,9 +169,90 @@ def log_normal(message: str) -> None:
     _notify_subscribers("normal", message)
 
 
+# ---------------------------------------------------------------------------
+# Frozen / packaged-build helpers
+#
+# These let the same code run from source (``python tools/...``) and from a
+# PyInstaller one-dir build. In a frozen build:
+#   * ``app_dir()``    -> the folder that contains the .exe (where ``vendor/``,
+#                         ``data/`` and ``out/`` live and stay writable);
+#   * ``bundle_dir()`` -> PyInstaller's ``_MEIPASS`` (read-only bundled assets
+#                         such as the web/ HTML).
+# From source both resolve to the project root, so behaviour is unchanged.
+# ---------------------------------------------------------------------------
+
+# <root>/src/utils/__init__.py -> up 3 dirnames -> <root>
+_SOURCE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+# Windows flag that prevents a child console process (adb.exe, frida-inject,
+# tesseract, …) from popping up its own black console window. Essential for the
+# windowed/frozen build, where the host has no console for children to attach to
+# — without it each subprocess call flashes a console window. 0 elsewhere.
+CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def is_frozen() -> bool:
+    """True when running inside a PyInstaller (or similar) frozen build."""
+    return bool(getattr(sys, "frozen", False))
+
+
+def app_dir() -> str:
+    """Folder for external, writable resources (``vendor/``, ``data/``, ``out/``).
+
+    Frozen: the directory containing the executable. Source: the project root.
+    """
+    if is_frozen():
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return _SOURCE_ROOT
+
+
+def bundle_dir() -> str:
+    """Folder for read-only assets bundled into the build (e.g. ``web/``).
+
+    Frozen: PyInstaller's ``_MEIPASS`` extraction dir. Source: project root.
+    """
+    if is_frozen():
+        return getattr(sys, "_MEIPASS", app_dir())
+    return _SOURCE_ROOT
+
+
+# Maps a logical tool name to (frozen exe basename, source-tree script path
+# relative to the project root). The designer executable also hosts the
+# runner GUI via the ``--runner`` switch.
+_TOOL_MAP = {
+    "designer": ("Workflow2k.exe", os.path.join("tools", "workflow_designer.py")),
+    "devhelper": ("DevScope.exe", os.path.join("tools", "dev_helper.py")),
+    "runner": ("Workflow2k.exe", os.path.join("tools", "workflow_runner.py")),
+}
+
+
+def launch_tool(tool: str, extra_args: Optional[Sequence[str]] = None) -> None:
+    """Launch a sibling tool process, working both frozen and from source.
+
+    Frozen: runs the matching ``*.exe`` next to the current executable (the
+    runner is launched as ``designer.exe --runner <args>``). Source: runs
+    ``python tools/<script>.py <args>``.
+    """
+    args = [str(a) for a in (extra_args or [])]
+    exe_name, script_rel = _TOOL_MAP[tool]
+    if is_frozen():
+        target = os.path.join(os.path.dirname(os.path.abspath(sys.executable)), exe_name)
+        prefix = ["--runner"] if tool == "runner" else []
+        cmd = [target, *prefix, *args]
+    else:
+        cmd = [sys.executable, os.path.join(_SOURCE_ROOT, script_rel), *args]
+    subprocess.Popen(cmd)
+
+
 __all__ = [
     "Fore",
     "Style",
+    "CREATE_NO_WINDOW",
+    "is_frozen",
+    "app_dir",
+    "bundle_dir",
+    "launch_tool",
     "setup_logger",
     "set_current_state",
     "log_with_time",

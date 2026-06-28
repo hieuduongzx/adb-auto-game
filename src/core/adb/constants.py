@@ -77,7 +77,7 @@ COMMON_APPS = {
 
 def get_adb_path() -> str:
     """Get the path to ADB executable"""
-    # this file: <root>/src/core/adb/constants.py -> up 3 levels to root
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-    return os.path.join(root_dir, "vendor", "adb", "adb.exe")
+    # ``app_dir()`` is the project root from source and the folder next to the
+    # .exe in a frozen build (where ``vendor/`` is shipped alongside).
+    from src.utils import app_dir
+    return os.path.join(app_dir(), "vendor", "adb", "adb.exe")

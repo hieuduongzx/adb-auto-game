@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ADB Auto-Game · Dev Helper</title>
+<title>DevScope</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -309,7 +309,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   <button class="btn ico" onclick="onRestartAdb()" title="Khởi động lại ADB server">
     <svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg></button>
   <span class="tb-divider" style="width:1px;height:20px;background:var(--border2);flex-shrink:0;"></span>
-  <button class="btn ico" onclick="openWorkflowDesigner()" title="Workflow Designer — mở (cửa sổ mới)">
+  <button class="btn ico" onclick="openWorkflowDesigner()" title="Workflow2k — mở (cửa sổ mới)">
     <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></button>
   <span class="spacer"></span>
   <div class="hz-wrap">
@@ -958,7 +958,7 @@ async function onCapture(){ await api().capture(); }
 async function onRefreshDevices(){ await api().refresh_devices(); }
 async function onScanPorts(){ await api().scan_ports(); }
 async function onRestartAdb(){ await api().restart_adb(); }
-async function openWorkflowDesigner(){ try{ await api().open_workflow_designer(); setStatus("Đang mở Workflow Designer…"); }catch{} }
+async function openWorkflowDesigner(){ try{ await api().open_workflow_designer(); setStatus("Đang mở Workflow2k…"); }catch{} }
 async function onDeviceChange(serial){ if(serial){S.connectedSerial=serial;await api().select_device(serial);} }
 function onHzChange(v){ api().set_refresh_hz(parseFloat(v)||5); }
 function onToggleAuto(){
