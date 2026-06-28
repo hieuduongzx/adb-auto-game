@@ -63,10 +63,28 @@ try { Interceptor.detachAll(); } catch (e) {}
 
 var currentScale = 1.0;
 var hookMode = 'none';        // 'clock-cmodule' | 'clock-js'
-var clockScaleBuf = null;     // Memory(8) holding the live scale for the CModule
+var clockScaleBuf = null;     // Memory(8): live scale for the CModule
+var clockEpochBuf = null;     // Memory(4): live epoch for the CModule (bumped on scale change)
 var jsHookInstalled = false;
-var baseByClock = {};         // state for the JS fallback hook
-var lastScaledMs = 0;         // monotonic floor: scaled CLOCK_MONOTONIC never decreases
+// Linear-anchor scaling state, per clock id (ids are small -> fixed 16 slots).
+//   scaled = baseScaled[clk] + (real - baseReal[clk]) * currentScale
+// This libfaketime-style model is a pure function of real time, so it does NOT
+// drift the way per-call accumulation does -- that accumulation drift is what
+// made the game lag and then freeze after running for a while. We scale the
+// whole monotonic family (CLOCK_MONOTONIC=1, CLOCK_MONOTONIC_RAW=4) off the one
+// rate so they can never diverge from each other over time (cross-clock
+// divergence is the other thing that froze the game). CLOCK_REALTIME (0) and
+// CLOCK_BOOTTIME (7) stay real: scaling wall clock desyncs server time and
+// scaling BOOTTIME trips SystemClock.elapsedRealtime() detection.
+var jsBaseReal = new Array(16).fill(0.0);
+var jsBaseScaled = new Array(16).fill(0.0);
+var jsLastOut = new Array(16).fill(0.0);   // per-clock monotonic floor
+var jsClkEpoch = new Array(16).fill(-1);
+var scaleEpoch = 0;           // bumped on every scale change -> forces a continuous re-anchor
+var origClockGettime = null;  // NativeFunction -> original, via replaceFast trampoline
+var jsClockCb = null;         // NativeCallback (kept referenced so it is never GC'd)
+
+function isScaledClock(clk) { return clk === 1 || clk === 4; }
 
 function log(msg) {
     send(msg);
@@ -84,19 +102,23 @@ var CLOCK_HOOK_C = `
 #include <stdint.h>
 
 extern double g_scale;
+extern int g_epoch;        /* bumped by the host on every live scale change */
 
 typedef struct { int64_t tv_sec; int64_t tv_nsec; } timespec64;
 typedef struct { int clock_id; void * tv; } HookState;
 
-static double real_base[16];
-static double scaled_base[16];
-static int has_base[16];
-/* Global floor: the scaled CLOCK_MONOTONIC we return must never decrease, even
- * across threads/cores. POSIX only guarantees per-core ordering, so two
- * back-to-back calls landing on different cores can see real time dip slightly;
- * without a floor that dip is multiplied by the scale and handed to callers as
- * time going backwards -- which hangs pthread_cond_timedwait / GC / netcode. */
-static double last_out = 0.0;
+/* Per-clock linear-anchor state (clock ids are small; 16 slots is plenty):
+ *   scaled = base_scaled[clk] + (real - base_real[clk]) * scale   (libfaketime)
+ * A pure function of real time -- no per-call accumulation, so no drift over
+ * time. The per-clock monotonic floor (last_out) covers cross-core dips: POSIX
+ * only guarantees per-core ordering, so back-to-back calls on different cores
+ * can see real time dip; without the floor that dip is amplified by the scale
+ * into time going backwards, which hangs pthread_cond_timedwait / GC / netcode. */
+static double base_real[16];
+static double base_scaled[16];
+static double last_out[16];
+static int clk_epoch[16];
+static int initialized[16];
 
 void
 onEnter (GumInvocationContext * ic)
@@ -114,48 +136,41 @@ onLeave (GumInvocationContext * ic)
 
   HookState * s = gum_invocation_context_get_listener_invocation_data (ic, sizeof (HookState));
   int clk = s->clock_id;
-  /* Scale ONLY CLOCK_MONOTONIC (1). Leaving CLOCK_BOOTTIME (7) real avoids the
-   * classic SystemClock.elapsedRealtime() speedhack detection, and leaving the
-   * CPU-time clocks (2,3) real avoids upsetting the ART GC / watchdog. */
-  if (clk != 1)
+  /* Scale the monotonic family (CLOCK_MONOTONIC=1, CLOCK_MONOTONIC_RAW=4)
+   * consistently off one rate so they never diverge from each other. Leave
+   * CLOCK_REALTIME (0) and CLOCK_BOOTTIME (7) real (server-time desync /
+   * elapsedRealtime detection) and CPU clocks (2,3) real (ART GC / watchdog).
+   * Bail before touching the buffer -- cheapest path for most calls. */
+  if (clk != 1 && clk != 4)
+    return;
+
+  double scale = g_scale;
+  /* Live-reset to normal speed: pure passthrough, leave the real value alone. */
+  if (scale == 1.0)
     return;
 
   timespec64 * ts = (timespec64 *) s->tv;
   if (ts == 0)
     return;
 
-  double scale = g_scale;
   double real_ms = (double) ts->tv_sec * 1000.0 + (double) ts->tv_nsec / 1000000.0;
-  double scaled_ms;
-  if (!has_base[clk]) {
-    has_base[clk] = 1;
-    real_base[clk] = real_ms;
-    scaled_base[clk] = real_ms;
-    scaled_ms = real_ms;
-  } else {
-    /* Clamp the per-call gap: a scene load stalls the caller for hundreds of
-     * ms (real), and multiplying that whole gap by the scale injects a huge
-     * time jump that detonates Unity's FixedUpdate accumulator (spiral of
-     * death -> freeze). Scale only up to MAX_STEP_MS; let the overflow pass
-     * through at 1x so big stalls don't get amplified and wall-clock stays
-     * close to real. */
-    double delta = real_ms - real_base[clk];
-    /* Cross-core dips would otherwise be amplified into a backward jump. */
-    if (delta < 0.0)
-      delta = 0.0;
-    double MAX_STEP_MS = 100.0;
-    if (delta > MAX_STEP_MS)
-      scaled_base[clk] += MAX_STEP_MS * scale + (delta - MAX_STEP_MS);
-    else
-      scaled_base[clk] += delta * scale;
-    real_base[clk] = real_ms;
-    scaled_ms = scaled_base[clk];
+
+  /* (Re)anchor on first sight of this clock or after a live scale change. Using
+   * the last scaled value as the new base keeps the scaled timeline continuous
+   * across rate changes (no jump that would detonate FixedUpdate). */
+  if (!initialized[clk] || clk_epoch[clk] != g_epoch) {
+    base_real[clk] = real_ms;
+    base_scaled[clk] = initialized[clk] ? last_out[clk] : real_ms;
+    initialized[clk] = 1;
+    clk_epoch[clk] = g_epoch;
   }
 
+  double scaled_ms = base_scaled[clk] + (real_ms - base_real[clk]) * scale;
+
   /* Never hand back a value below the last one we returned (monotonic floor). */
-  if (scaled_ms < last_out)
-    scaled_ms = last_out;
-  last_out = scaled_ms;
+  if (scaled_ms < last_out[clk])
+    scaled_ms = last_out[clk];
+  last_out[clk] = scaled_ms;
 
   int64_t sec = (int64_t) (scaled_ms / 1000.0);
   int64_t nsec = (int64_t) ((scaled_ms - (double) sec * 1000.0) * 1000000.0);
@@ -172,7 +187,9 @@ function installClockCModule(scale) {
         if (!cgAddr) { log('clock_gettime not found'); return false; }
         clockScaleBuf = Memory.alloc(8);
         clockScaleBuf.writeDouble(scale);
-        const cm = new CModule(CLOCK_HOOK_C, { g_scale: clockScaleBuf });
+        clockEpochBuf = Memory.alloc(4);
+        clockEpochBuf.writeInt(0);
+        const cm = new CModule(CLOCK_HOOK_C, { g_scale: clockScaleBuf, g_epoch: clockEpochBuf });
         Interceptor.attach(cgAddr, cm);
         currentScale = scale;
         hookMode = 'clock-cmodule';
@@ -184,42 +201,45 @@ function installClockCModule(scale) {
     }
 }
 
-/* ----------------- JS fallback clock hook (no per-call alloc) ---------------- */
-function scaledClockMs(clockId, realMs) {
-    const key = String(clockId);
-    let base = baseByClock[key];
-    if (!base) {
-        base = { real: realMs, scaled: realMs };
-        baseByClock[key] = base;
-        if (realMs > lastScaledMs) lastScaledMs = realMs;
-        return realMs;
+/* ----------------- JS clock hook (linear anchor, allocation-light) ----------
+ * Scales the timespec the original call just wrote, using the same libfaketime
+ * linear-anchor model as the CModule (scaled = baseScaled + (real-base)*scale).
+ * Per-clock scalars only -- no String() key, no dict lookup -- so the hot path
+ * makes almost no GC garbage. The model is a pure function of real time, so it
+ * never drifts over time (the old accumulator did, which is what eventually
+ * froze the game). */
+function scaleClock(clk, tv) {
+    const realMs = tv.readLong().toNumber() * 1000 +
+                   tv.add(8).readLong().toNumber() / 1000000;
+    // (Re)anchor on first sight of this clock or after a live scale change, so
+    // the scaled timeline stays continuous across rate changes (no jump).
+    if (jsClkEpoch[clk] !== scaleEpoch) {
+        jsClkEpoch[clk] = scaleEpoch;
+        jsBaseReal[clk] = realMs;
+        jsBaseScaled[clk] = jsLastOut[clk] > 0 ? jsLastOut[clk] : realMs;
     }
-    // Clamp the per-call gap so a scene-load stall (hundreds of ms real) is not
-    // multiplied by the scale into a huge time jump that triggers Unity's
-    // FixedUpdate spiral of death (freeze). Scale only up to MAX_STEP_MS; let
-    // the overflow pass through at 1x.
-    let delta = realMs - base.real;
-    // CLOCK_MONOTONIC can dip a few us across cores; without this the dip is
-    // multiplied by the scale and handed back as time going backwards.
-    if (delta < 0) delta = 0;
-    const MAX_STEP_MS = 100.0;
-    if (delta > MAX_STEP_MS) {
-        base.scaled += MAX_STEP_MS * currentScale + (delta - MAX_STEP_MS);
-    } else {
-        base.scaled += delta * currentScale;
-    }
-    base.real = realMs;
-    // Monotonic floor: never return less than the last value we handed out.
-    if (base.scaled < lastScaledMs) base.scaled = lastScaledMs;
-    lastScaledMs = base.scaled;
-    return base.scaled;
+    let scaledMs = jsBaseScaled[clk] + (realMs - jsBaseReal[clk]) * currentScale;
+    // Per-clock monotonic floor: never return less than the last value handed out.
+    if (scaledMs < jsLastOut[clk]) scaledMs = jsLastOut[clk];
+    jsLastOut[clk] = scaledMs;
+    const outSec = Math.floor(scaledMs / 1000);
+    tv.writeLong(outSec);
+    tv.add(8).writeLong(Math.floor((scaledMs - outSec * 1000) * 1000000));
 }
 
-function writeTimespec(tv, ms) {
-    const sec = Math.floor(ms / 1000);
-    const nsec = Math.floor((ms % 1000) * 1000000);
-    tv.writeLong(sec);
-    tv.add(8).writeLong(nsec);
+// Legacy attach hook (onEnter + onLeave => two JS-bridge crossings per call).
+// Used only when Interceptor.replaceFast is unavailable on the runtime.
+function installClockJsAttach(cgAddr) {
+    Interceptor.attach(cgAddr, {
+        onEnter: function(args) { this.tv = args[1]; this.clock = args[0].toInt32(); },
+        onLeave: function(retval) {
+            if (currentScale === 1.0) return;
+            if (retval.toInt32() !== 0) return;
+            if (!isScaledClock(this.clock)) return;
+            if (!this.tv || this.tv.isNull()) return;
+            scaleClock(this.clock, this.tv);
+        }
+    });
 }
 
 function installClockJs(scale) {
@@ -228,36 +248,61 @@ function installClockJs(scale) {
         if (!libc) { log('libc.so not found'); return false; }
         const cgAddr = libc.getExportByName('clock_gettime');
         if (!cgAddr) { log('clock_gettime not found'); return false; }
+
         if (!jsHookInstalled) {
-            // Read the real time straight from the output buffer the original
-            // call just filled in -- no Memory.alloc, no second syscall.
-            Interceptor.attach(cgAddr, {
-                onEnter: function(args) { this.tv = args[1]; this.clock = args[0].toInt32(); },
-                onLeave: function(retval) {
-                    if (currentScale === 1.0) return;
-                    if (retval.toInt32() !== 0) return;
-                    if (!this.tv || this.tv.isNull()) return;
-                    if (this.clock !== 1) return;  // only scale CLOCK_MONOTONIC
-                    const realMs = this.tv.readLong().toNumber() * 1000 +
-                                   this.tv.add(8).readLong().toNumber() / 1000000;
-                    writeTimespec(this.tv, scaledClockMs(this.clock, realMs));
-                }
-            });
+            // Prefer replaceFast: one native->JS crossing per call (the callback)
+            // instead of attach's two (onEnter + onLeave), and a lighter
+            // trampoline. The callback can only run its JS body once we yield the
+            // JS lock -- which is after origClockGettime is assigned below -- so
+            // there is no window where it could fire with a null original.
+            if (typeof Interceptor.replaceFast === 'function') {
+                try { Interceptor.revert(cgAddr); } catch (e) {}
+                jsClockCb = new NativeCallback(function(clk, tv) {
+                    const ret = origClockGettime(clk, tv);
+                    // Fast bails (the common case): error, wrong clock, or no scaling.
+                    if (ret !== 0 || currentScale === 1.0 || !isScaledClock(clk)) return ret;
+                    if (!tv.isNull()) scaleClock(clk, tv);
+                    return ret;
+                }, 'int', ['int', 'pointer']);
+                const orig = Interceptor.replaceFast(cgAddr, jsClockCb);
+                origClockGettime = new NativeFunction(orig, 'int', ['int', 'pointer']);
+                log('clock hook installed (JS replaceFast)');
+            } else {
+                installClockJsAttach(cgAddr);
+                log('clock hook installed (JS attach fallback)');
+            }
             jsHookInstalled = true;
         }
         currentScale = scale;
         hookMode = 'clock-js';
-        log('clock hook installed (JS fallback): scale=' + scale);
+        log('clock hook ready (JS): scale=' + scale);
         return true;
     } catch (e) {
         log('JS clock hook failed: ' + e.message);
+        // If replaceFast blew up before installing, fall back to attach.
+        if (!jsHookInstalled) {
+            try {
+                const libc = Process.findModuleByName('libc.so');
+                const cgAddr = libc && libc.getExportByName('clock_gettime');
+                if (cgAddr) {
+                    installClockJsAttach(cgAddr);
+                    jsHookInstalled = true;
+                    currentScale = scale;
+                    hookMode = 'clock-js';
+                    log('clock hook installed (JS attach fallback after error)');
+                    return true;
+                }
+            } catch (e2) {
+                log('JS attach fallback also failed: ' + e2.message);
+            }
+        }
         return false;
     }
 }
 
 /* ----------------------- strategy selection + live update ------------------- */
-// Hook libc clock_gettime to scale CLOCK_MONOTONIC (universal / GameGuardian-
-// style). Native CModule first when enabled, else the JS fallback.
+// Hook libc clock_gettime to scale the monotonic clock family (universal /
+// GameGuardian-style). Native CModule first when enabled, else the JS fallback.
 function initHook(scale) {
     if (scale === 1.0) { currentScale = 1.0; return true; }
     if (USE_CMODULE && installClockCModule(scale)) return true;
@@ -268,10 +313,15 @@ function initHook(scale) {
 
 function applyScale(scale) {
     currentScale = scale;
-    if (hookMode === 'clock-cmodule' && clockScaleBuf) {
-        clockScaleBuf.writeDouble(scale);            // native hook reads it live
+    // Bump the epoch so the next call to each clock re-anchors at the current
+    // scaled value -> the timeline stays continuous across the rate change
+    // (no time jump, which would otherwise spike FixedUpdate / time deltas).
+    scaleEpoch++;
+    if (hookMode === 'clock-cmodule') {
+        if (clockScaleBuf) clockScaleBuf.writeDouble(scale);   // native hook reads it live
+        if (clockEpochBuf) clockEpochBuf.writeInt((clockEpochBuf.readInt() + 1) | 0);
     } else if (hookMode === 'clock-js') {
-        /* currentScale is read live inside the JS hook */
+        /* currentScale + scaleEpoch are read live inside the JS hook */
     } else {
         initHook(scale);                              // not set up yet -> install now
     }

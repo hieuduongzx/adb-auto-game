@@ -27,19 +27,30 @@ class SpeedhackMixin:
     SPEEDHACK_MAX = 5.0
     SPEEDHACK_DEFAULT = 1.0
     SPEEDHACK_POLL_INTERVAL = 999999.0
+    # Default to the JS clock hook (survives protected titles). Set to True on a
+    # game class to use the native CModule hook instead: fully native, no
+    # JS-bridge crossing on the hot path, so it is the smoothest / freeze-free
+    # option -- but it compiles a TinyCC executable page that some protected
+    # titles detect and crash on at inject time. Opt in only for games proven
+    # to tolerate it.
+    SPEEDHACK_USE_CMODULE = False
 
     def setup_speedhack(
         self,
         package: Optional[str] = None,
         time_scale: float = 1.0,
+        use_cmodule: Optional[bool] = None,
     ) -> None:
         """Initialize the shared Frida speedhack manager for this game."""
         package_name = package or getattr(self, "PACKAGE_NAME", None) or getattr(self, "package_name", None)
         if not package_name:
             raise ValueError("setup_speedhack() requires PACKAGE_NAME or package")
+        if use_cmodule is None:
+            use_cmodule = self.SPEEDHACK_USE_CMODULE
         self.speedhack = FridaSpeedhackManager(
             package=package_name,
             time_scale=time_scale,
+            use_cmodule=bool(use_cmodule),
         )
         # Allow the manager to read the selected ADB device dynamically.
         self.speedhack.adb_controller = getattr(self, "adb", None)
