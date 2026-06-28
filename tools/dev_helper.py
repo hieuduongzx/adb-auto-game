@@ -30,9 +30,11 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 # --- bootstrap: make `src.*` importable when run from tools/ -------------
@@ -267,16 +269,7 @@ class DevHelperAPI:
             try:
                 self.scanner.ensure_adb_server_running()
                 devices = self.controller.client.devices()
-                items = []
-                for d in devices:
-                    try:
-                        model = (d.shell("getprop ro.product.model") or "").strip()
-                    except Exception:
-                        model = ""
-                    items.append({
-                        "serial": d.serial,
-                        "name": model or d.serial,
-                    })
+                items = self.scanner.unique_devices(devices)
                 if items and not self._selected_serial:
                     first = items[0].get("serial")
                     if first:
@@ -628,8 +621,27 @@ class DevHelperAPI:
         log_error(f"Failed to write {path}")
         return False
 
+    def _pkg_subdir(self) -> str:
+        """Output subfolder named after the foreground app's package.
+
+        QuickCrop drops crops into ``out/<package>/`` so assets are grouped per
+        game (mirroring the per-game folder convention of the workflow designer).
+        Falls back to the output root when no package can be detected.
+        """
+        pkg = ""
+        try:
+            if self.controller.device is not None:
+                pkg = _safe_detect_app(self.controller.device) or ""
+        except Exception:
+            pkg = ""
+        # Package names are already path-safe ([A-Za-z0-9_.]); strip anything else.
+        pkg = re.sub(r"[^A-Za-z0-9_.]+", "_", pkg).strip("._")
+        out = os.path.join(self._out_dir, pkg) if pkg else self._out_dir
+        os.makedirs(out, exist_ok=True)
+        return out
+
     def quick_crop(self, name: str = "") -> bool:
-        """Save the current region crop directly to ./out/ without a dialog.
+        """Save the current region crop without a dialog, into ``out/<package>/``.
 
         Uses ``name`` (sanitized) when non-empty, otherwise falls back to
         ``crop_<timestamp>_<W>x<H>.png`` so no prompt interrupts the flow.
@@ -640,8 +652,7 @@ class DevHelperAPI:
             return False
         x, y, w, h = region
         crop = self._screen[y:y + h, x:x + w].copy()
-        out_dir = self._out_dir
-        os.makedirs(out_dir, exist_ok=True)
+        out_dir = self._pkg_subdir()
         clean = _sanitize_name(name)
         fname = (f"{clean}_{_ts()}_{w}x{h}.png" if clean
                  else f"crop_{_ts()}_{w}x{h}.png")
@@ -918,30 +929,34 @@ class DevHelperAPI:
     # ── Asset library ────────────────────────────────────────────────────────
 
     def list_assets(self) -> list:
+        """List image assets under the output folder, including per-package
+        subfolders (e.g. QuickCrop's ``out/<package>/``). Names are shown
+        relative to the output root so ``pkg/file.png`` stays distinguishable.
+        """
         out_dir = self._out_dir
         if not os.path.exists(out_dir):
             return []
-        try:
-            files = os.listdir(out_dir)
-        except OSError:
-            return []
+        exts = (".png", ".jpg", ".jpeg", ".bmp")
         items = []
-        for fname in sorted(
-            files,
-            key=lambda f: os.path.getmtime(os.path.join(out_dir, f)),
-            reverse=True,
-        ):
-            if fname.lower().endswith((".png", ".jpg", ".jpeg", ".bmp")):
-                path = os.path.join(out_dir, fname)
+        for root, _dirs, files in os.walk(out_dir):
+            for fname in files:
+                if not fname.lower().endswith(exts):
+                    continue
+                path = os.path.join(root, fname)
                 try:
                     st = os.stat(path)
-                    items.append({
-                        "name": fname,
-                        "path": path.replace("\\", "/"),
-                        "size": st.st_size,
-                    })
                 except OSError:
-                    pass
+                    continue
+                rel = os.path.relpath(path, out_dir).replace("\\", "/")
+                items.append({
+                    "name": rel,
+                    "path": path.replace("\\", "/"),
+                    "size": st.st_size,
+                    "mtime": st.st_mtime,
+                })
+        items.sort(key=lambda it: it["mtime"], reverse=True)
+        for it in items:
+            it.pop("mtime", None)
         return items[:200]
 
     def get_asset_thumbnail(self, path: str) -> str:
@@ -969,6 +984,19 @@ class DevHelperAPI:
                 return True
             return False
         except Exception:
+            return False
+
+    # ── Tool switching ─────────────────────────────────────────────────────────
+
+    def open_workflow_designer(self) -> bool:
+        """Launch the Workflow Designer in a separate process."""
+        try:
+            tool = os.path.join(os.path.dirname(__file__), "workflow_designer.py")
+            subprocess.Popen([sys.executable, tool])
+            log_success("Đã mở Workflow Designer")
+            return True
+        except Exception as exc:
+            log_error(f"Mở Workflow Designer thất bại: {exc}")
             return False
 
     # ── Log ───────────────────────────────────────────────────────────────────

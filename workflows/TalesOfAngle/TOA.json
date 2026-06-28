@@ -1,9 +1,9 @@
 {
-  "name": "My Workflow",
+  "name": "WW",
   "version": 2,
   "templatesDir": "templates",
   "speedhack": {
-    "enabled": true,
+    "enabled": false,
     "speed": 2,
     "package": "com.mjwygirls.qooapp"
   },
@@ -46,14 +46,25 @@
           {
             "id": "n1ylhi2u",
             "type": "tap_image",
-            "x": 600,
-            "y": 60,
+            "x": 860,
+            "y": 140,
             "params": {
               "template": "templates/crop_20260628_100639_157x32.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
               "delay": 2
+            }
+          },
+          {
+            "id": "ncqmgrx9",
+            "type": "if_image",
+            "x": 620,
+            "y": 60,
+            "params": {
+              "template": "",
+              "threshold": 0.85,
+              "negate": false
             }
           }
         ],
@@ -71,6 +82,11 @@
           {
             "from": "nwt6qjob",
             "fromPort": "true",
+            "to": "ncqmgrx9"
+          },
+          {
+            "from": "ncqmgrx9",
+            "fromPort": "false",
             "to": "n1ylhi2u"
           }
         ]
@@ -80,7 +96,7 @@
   "activities": [
     {
       "id": "sequence_kdis",
-      "name": "Hoạt động 1",
+      "name": "Main Story",
       "type": "sequence",
       "enabled": true,
       "vars": [],
@@ -107,15 +123,6 @@
             }
           },
           {
-            "id": "n2xz0m3p",
-            "type": "call",
-            "x": 1120,
-            "y": 40,
-            "params": {
-              "fn": "fn_3ryk6"
-            }
-          },
-          {
             "id": "nzlnnqqf",
             "type": "tap",
             "x": 900,
@@ -129,8 +136,8 @@
           {
             "id": "nahmpri5",
             "type": "tap",
-            "x": 1320,
-            "y": 140,
+            "x": 2280,
+            "y": 40,
             "params": {
               "target": "pos",
               "x": 892,
@@ -150,24 +157,12 @@
           {
             "id": "non82rd1",
             "type": "wait_image",
-            "x": 1320,
-            "y": 40,
+            "x": 2080,
+            "y": 120,
             "params": {
               "template": "templates/crop_20260628_101155_294x50.png",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0
-            }
-          },
-          {
-            "id": "nedx1uet",
-            "type": "wait_image",
-            "x": 720,
-            "y": -40,
-            "params": {
-              "template": "templates/crop_20260628_100953_290x61.png",
-              "threshold": 0.85,
-              "timeout": 15,
               "delay": 0
             }
           },
@@ -183,45 +178,118 @@
               "timeout": 5,
               "delay": 0
             }
+          },
+          {
+            "id": "nryur9hv",
+            "type": "if_image",
+            "x": 1540,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260628_100621_196x60.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "n44ty3u5",
+            "type": "tap_image",
+            "x": 1900,
+            "y": 120,
+            "params": {
+              "template": "templates/crop_20260628_100639_157x32.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 2
+            }
+          },
+          {
+            "id": "n907yb0r",
+            "type": "if_image",
+            "x": 1720,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260628_132414_213x39.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nu0z2e71",
+            "type": "wait_image",
+            "x": 1340,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260628_100714_44x35.png",
+              "threshold": 0.85,
+              "timeout": 60,
+              "delay": 0
+            }
+          },
+          {
+            "id": "nzlccjdm",
+            "type": "loop",
+            "x": 1140,
+            "y": 40,
+            "params": {
+              "count": 3,
+              "infinite": true
+            }
+          },
+          {
+            "id": "nwhiv10o",
+            "type": "if_image_any",
+            "x": 720,
+            "y": -40,
+            "params": {
+              "templates": [
+                "templates/crop_20260628_100953_290x61.png",
+                "templates/crop_20260628_135110_152x31.png"
+              ],
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "na08d1lc",
+            "type": "tap",
+            "x": 1900,
+            "y": 40,
+            "params": {
+              "target": "found",
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": "nijwi0t9",
+            "type": "wait_image",
+            "x": 2080,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260628_101155_294x50.png",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0
+            }
+          },
+          {
+            "id": "ntni1ml1",
+            "type": "tap",
+            "x": 2280,
+            "y": 120,
+            "params": {
+              "target": "pos",
+              "x": 892,
+              "y": 1566
+            }
           }
         ],
         "edges": [
           {
-            "from": "n1bc508v",
-            "fromPort": "true",
-            "to": "n2xz0m3p"
-          },
-          {
             "from": "nzlnnqqf",
             "fromPort": "out",
             "to": "n1bc508v"
-          },
-          {
-            "from": "n2xz0m3p",
-            "fromPort": "out",
-            "to": "non82rd1"
-          },
-          {
-            "from": "non82rd1",
-            "fromPort": "true",
-            "to": "nahmpri5"
-          },
-          {
-            "from": "nedx1uet",
-            "fromPort": "true",
-            "to": "nzlnnqqf"
-          },
-          {
-            "from": "non82rd1",
-            "fromPort": "false",
-            "to": "n4pphsh8",
-            "toPort": "loop"
-          },
-          {
-            "from": "nahmpri5",
-            "fromPort": "out",
-            "to": "n4pphsh8",
-            "toPort": "loop"
           },
           {
             "from": "n3m2uvat",
@@ -234,9 +302,76 @@
             "to": "n4pphsh8"
           },
           {
+            "from": "nryur9hv",
+            "fromPort": "true",
+            "to": "n907yb0r"
+          },
+          {
+            "from": "nu0z2e71",
+            "fromPort": "true",
+            "to": "nryur9hv"
+          },
+          {
+            "from": "n1bc508v",
+            "fromPort": "true",
+            "to": "nzlccjdm"
+          },
+          {
+            "from": "nzlccjdm",
+            "fromPort": "body",
+            "to": "nu0z2e71"
+          },
+          {
+            "from": "n907yb0r",
+            "fromPort": "false",
+            "to": "n44ty3u5"
+          },
+          {
+            "from": "n44ty3u5",
+            "fromPort": "true",
+            "to": "non82rd1"
+          },
+          {
             "from": "n4pphsh8",
             "fromPort": "body",
-            "to": "nedx1uet"
+            "to": "nwhiv10o"
+          },
+          {
+            "from": "nwhiv10o",
+            "fromPort": "true",
+            "to": "nzlnnqqf"
+          },
+          {
+            "from": "n907yb0r",
+            "fromPort": "true",
+            "to": "na08d1lc"
+          },
+          {
+            "from": "na08d1lc",
+            "fromPort": "out",
+            "to": "nijwi0t9"
+          },
+          {
+            "from": "nijwi0t9",
+            "fromPort": "true",
+            "to": "nahmpri5"
+          },
+          {
+            "from": "nahmpri5",
+            "fromPort": "out",
+            "to": "nzlccjdm",
+            "toPort": "loop"
+          },
+          {
+            "from": "non82rd1",
+            "fromPort": "true",
+            "to": "ntni1ml1"
+          },
+          {
+            "from": "ntni1ml1",
+            "fromPort": "out",
+            "to": "n4pphsh8",
+            "toPort": "loop"
           }
         ]
       },
@@ -244,7 +379,7 @@
     },
     {
       "id": "background_dz84",
-      "name": "Tác vụ nền 1",
+      "name": "Skip",
       "type": "background",
       "enabled": true,
       "vars": [],

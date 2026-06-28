@@ -35,9 +35,20 @@
   --log-muted: #b3bbc4;
   --sans: "IBM Plex Sans","Segoe UI",system-ui,sans-serif;
   --mono: "IBM Plex Mono","Cascadia Code","Consolas",monospace;
-  --r-sm: 7px; --r-md: 10px;
+  --r-sm: 7px; --r-md: 10px; --r-lg: 14px;
+  /* 4pt spacing scale — every gap/pad pulls from here for consistent rhythm. */
+  --s1: 4px; --s2: 6px; --s3: 8px; --s4: 12px; --s5: 16px; --s6: 24px;
+  /* Elevation scale — subtle, reinforces hierarchy (sidebar < panel < node < menu). */
+  --sh-sm: 0 1px 2px rgba(20,30,45,.06);
+  --sh-md: 0 2px 8px rgba(20,30,45,.08);
+  --sh-lg: 0 10px 30px rgba(20,30,45,.16);
+  /* Semantic z-index scale — no arbitrary 999s. */
+  --z-node: 2; --z-selbox: 1; --z-menu: 50; --z-toast: 60;
   --ease: cubic-bezier(0.16,1,0.3,1);
   color-scheme: light;
+}
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
 }
 
 html, body { height: 100%; background: var(--bg); font-family: var(--sans);
@@ -61,10 +72,11 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 /* ── Layout ─────────────────────────────────────────────────────────────── */
 #app { flex: 1; display: flex; flex-direction: column; gap: 7px;
   padding: 8px 8px 4px; overflow: hidden; min-height: 0; }
-.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--sh-sm); }
 
 /* ── Toolbar ────────────────────────────────────────────────────────────── */
-#toolbar { padding: 7px 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+#toolbar { padding: var(--s2) var(--s4); display: flex; align-items: center; gap: var(--s4); flex-shrink: 0; }
+.tb-group { display: flex; align-items: center; gap: var(--s2); }
 .tb-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
   color: var(--muted); text-transform: uppercase; }
 
@@ -94,6 +106,17 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .btn.err:hover { background: #fae2e0; }
 .btn.sm  { height: 26px; padding: 0 9px;  font-size: 11px; }
 .btn.h30 { height: 30px; padding: 0 12px; }
+/* Icon-only toolbar button: square, glyph centered, label lives in the tooltip.
+   Keeps the toolbar compact instead of a wall of text. Colour variants
+   (.accent/.ok/.err) still apply for primary actions (save / run). */
+.btn.ico { width: 30px; padding: 0; }
+.btn.sm.ico { width: 26px; }
+.btn.ico svg { width: 16px; height: 16px; display: block; }
+.btn svg { stroke: currentColor; fill: none; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; }
+.btn.accent svg, .btn.ok svg, .btn.err svg { stroke-width: 2.1; }
+/* A toggle icon button reads its on/off state from colour, not text. */
+.btn.ico.on { background: var(--accent-bg); border-color: var(--accent-bd); color: var(--accent); }
 
 /* Inline icon button */
 .icon-btn { width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--border2);
@@ -236,15 +259,26 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 
 /* ── Log ─────────────────────────────────────────────────────────────────── */
 #log-card { flex-shrink: 0; display: flex; flex-direction: column; min-height: 100px; max-height: 155px; }
-.log-hdr  { display: flex; align-items: center; gap: 6px; padding: 7px 12px;
-  border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#log-card.collapsed { min-height: 0; max-height: none; }
+#log-card.collapsed .log-body { display: none; }
+#log-card.collapsed .log-hdr { border-bottom: none; }
+.log-hdr  { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s4);
+  border-bottom: 1px solid var(--border); flex-shrink: 0; cursor: pointer; user-select: none;
+  transition: background .1s; border-radius: var(--r-md) var(--r-md) 0 0; }
+.log-hdr:hover { background: var(--alt); }
+.log-chevron { color: var(--muted); display: inline-flex; transition: transform .15s var(--ease); }
+#log-card.collapsed .log-chevron { transform: rotate(-90deg); }
 .log-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
   color: var(--muted); text-transform: uppercase; }
+.log-count { font-family: var(--mono); font-size: 10px; color: var(--muted);
+  background: var(--alt); border-radius: 999px; padding: 1px 7px; min-width: 18px; text-align: center; }
+.log-count:empty { display: none; }
 .btn-log-clear { font-size: 11px; font-weight: 600; color: var(--muted);
-  padding: 2px 4px; border-radius: 4px; transition: color .1s; }
-.btn-log-clear:hover { color: var(--dim); }
+  padding: 3px 7px; border-radius: 5px; transition: color .1s, background .1s; }
+.btn-log-clear:hover { color: var(--dim); background: var(--panel); }
 .log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px;
-  background: var(--log-bg); border-radius: 0 0 var(--r-md) var(--r-md); }
+  background: var(--log-bg); border-radius: 0 0 var(--r-md) var(--r-md);
+  user-select: text; cursor: text; }
 .log-line { display: flex; gap: 7px; font-family: var(--mono); font-size: 10.5px;
   line-height: 1.75; white-space: nowrap; }
 .log-ts  { color: var(--log-muted); flex-shrink: 0; }
@@ -272,6 +306,17 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .mode-btn:hover:not(.active) { color:var(--ink); }
 .mode-btn.active { background:var(--panel); color:var(--accent); box-shadow:0 1px 2px rgba(0,0,0,.06); }
 .tb-divider { width:1px; height:20px; background:var(--border2); flex-shrink:0; }
+/* Speed-hack control cluster: its own bordered box so it reads as a separate,
+   manual tool — independent of "Chạy thử". Turns amber when enabled. */
+.wf-speed-group { display:flex; align-items:center; gap:5px; padding:3px 7px;
+  border:1px solid var(--border2); border-radius:8px; background:var(--surface); transition:background .15s, border-color .15s; }
+.wf-speed-group.on { border-color:#f1c84b; background:#fdf6e9; }
+.wf-speed-group .hz-unit { margin-left:-2px; }
+.wf-speed-title { font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--muted); white-space:nowrap; }
+.wf-speed-group.on .wf-speed-title { color:#9c6c12; }
+#wf-speed-run-btn.ok  { background:var(--ok);  color:#fff; border-color:var(--ok); }
+#wf-speed-run-btn.err { background:var(--err); color:#fff; border-color:var(--err); }
 
 #workflow-view { flex:1; display:flex; gap:7px; min-height:0; overflow:hidden; }
 
@@ -279,9 +324,12 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 #wf-side { width:212px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
 .wf-side-sec { display:flex; flex-direction:column; min-height:0; }
 .wf-side-sec + .wf-side-sec { border-top:1px solid var(--line); }
-.wf-side-hdr { display:flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; letter-spacing:.05em;
-  color:var(--muted); text-transform:uppercase; padding:9px 11px 5px; }
+.wf-side-hdr { display:flex; align-items:center; gap:var(--s2); font-size:10.5px; font-weight:700; letter-spacing:.05em;
+  color:var(--dim); text-transform:uppercase; padding:var(--s4) var(--s4) var(--s2); }
 .wf-side-hdr .btn { text-transform:none; letter-spacing:0; }
+.side-count { font-family:var(--mono); font-size:9.5px; font-weight:600; color:var(--muted);
+  background:var(--alt); border-radius:999px; padding:1px 6px; letter-spacing:0; }
+.side-count:empty { display:none; }
 .wf-side-hint { font-size:10px; color:var(--muted); line-height:1.5; padding:0 11px 7px; }
 #wf-activities { padding:0 9px 8px; display:flex; flex-direction:column; gap:4px; max-height:230px; overflow-y:auto; }
 #wf-side .wf-palette { padding:0 9px 10px; overflow-y:auto; }
@@ -316,10 +364,13 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 
 /* Center: canvas */
 #wf-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
-#wf-bar { display:flex; align-items:center; gap:9px; padding:9px 12px; border-bottom:1px solid var(--line); flex-shrink:0; }
-#wf-bar > input { font-family:var(--sans); font-size:13px; font-weight:700; width:200px; }
-.wf-cur-act { font-size:11.5px; font-weight:600; color:var(--accent); }
-.wf-hint { font-size:10px; color:var(--muted); }
+#wf-bar { display:flex; align-items:center; gap:var(--s3); padding:var(--s3) var(--s4); border-bottom:1px solid var(--line); flex-shrink:0; }
+#wf-bar > input { font-family:var(--sans); font-size:13px; font-weight:700; width:188px; flex-shrink:0; }
+.wf-cur-act { font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-bg);
+  border:1px solid var(--accent-bd); border-radius:999px; padding:3px 10px; max-width:170px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-shrink:0; }
+.wf-hint { font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis; min-width:0; flex-shrink:1; text-align:right; }
 .wf-zoom { display:inline-flex; align-items:center; gap:4px; }
 .wf-zoom .btn { width:24px; padding:0; font-size:14px; }
 #wf-zoom-lbl { font-size:11px; font-family:var(--mono); color:var(--dim); min-width:38px; text-align:center; cursor:pointer; }
@@ -330,11 +381,27 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 #wf-canvas.panning { cursor:grabbing; }
 #wf-world { position:absolute; left:0; top:0; width:4000px; height:3000px; transform:translate(0px,0px); transform-origin:0 0; }
 #wf-wires { position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
-#wf-wires path.wire { fill:none; stroke:#9aa9bd; stroke-width:2.4; pointer-events:stroke; cursor:pointer; }
-#wf-wires path.wire:hover { stroke:var(--err); }
-#wf-wires path.wire.t { stroke:#2fa55a; } #wf-wires path.wire.f { stroke:#cf6b43; }
-#wf-wires path.wire.stack { stroke:#b6c0cc; stroke-width:3; }
-#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:2.4; stroke-dasharray:5 4; pointer-events:none; }
+/* Wires carry a directional arrowhead (markers defined per-colour in <defs>, see
+   WF_WIRE_DEFS) so the flow direction reads at a glance. Rounded caps/joins keep
+   the curves smooth. A wider transparent stroke under each path widens the
+   click/hover target without thickening the visible line. */
+#wf-wires path.wire { fill:none; stroke:#9aa9bd; stroke-width:2.4; pointer-events:stroke; cursor:pointer;
+  stroke-linecap:round; stroke-linejoin:round; marker-end:url(#wf-ah); transition:stroke .1s; }
+#wf-wires path.wire:hover { stroke:var(--err); stroke-width:3.2; marker-end:url(#wf-ah-h); }
+#wf-wires path.wire.t { stroke:#2fa55a; marker-end:url(#wf-ah-t); }
+#wf-wires path.wire.f { stroke:#cf6b43; marker-end:url(#wf-ah-f); }
+#wf-wires path.wire.t:hover, #wf-wires path.wire.f:hover { marker-end:url(#wf-ah-h); }
+#wf-wires path.wire.stack { stroke:#b6c0cc; stroke-width:3; marker-end:none; }
+/* Loop-back wire (target = a loop's 'lặp' input) — dashed amber so the wire that
+   closes the loop reads differently from the forward flow. */
+#wf-wires path.wire.loopback { stroke:#e0a64b; stroke-dasharray:6 4; marker-end:url(#wf-ah-loop); }
+#wf-wires path.wire.loopback:hover { stroke:var(--err); marker-end:url(#wf-ah-h); }
+/* Run trail on wires: the branch the engine took this run (green) vs the
+   true/false branch it skipped (red, dimmed). Override the static t/f colours. */
+#wf-wires path.wire.took-wire   { stroke:#2fa55a !important; stroke-width:3.4; marker-end:url(#wf-ah-t) !important; }
+#wf-wires path.wire.nottook-wire{ stroke:#cf4b43 !important; opacity:.55; marker-end:url(#wf-ah-f) !important; }
+#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:2.4; stroke-dasharray:5 4;
+  stroke-linecap:round; pointer-events:none; marker-end:url(#wf-ah-temp); }
 #wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   color:var(--muted); font-size:12px; pointer-events:none; }
 
@@ -342,13 +409,29 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-node { position:absolute; width:158px; border:1px solid var(--border2); border-radius:9px; background:var(--panel);
   box-shadow:0 2px 6px rgba(20,30,45,.10); user-select:none; }
 .wf-node.sel { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-bd), 0 2px 8px rgba(20,30,45,.14); }
+/* Run trail: a node that finished this run (green = ran ok, red = action failed).
+   Defined before .running so the live amber glow still wins on the active node. */
+.wf-node.ran-ok   { border-color:#2fa55a; box-shadow:0 0 0 1px #2fa55a, 0 2px 6px rgba(31,146,84,.18); }
+.wf-node.ran-fail { border-color:#cf4b43; box-shadow:0 0 0 1px #cf4b43, 0 2px 6px rgba(207,75,67,.20); }
 .wf-node.start .wf-node-hd { background:var(--ok-bg); border-color:var(--ok-bd); }
 .wf-node.end   .wf-node-hd { background:var(--err-bg); }
 .wf-node.stop  .wf-node-hd { background:var(--err-bg); }
 .wf-node.condition .wf-node-hd { background:#f3eefe; }
 .wf-node.loop  .wf-node-hd { background:var(--warn-bg); }
+/* The loop block wears an amber left spine: the side that carries its two
+   inputs (enter on top, loop-back below). Makes the loop obvious at a glance. */
+.wf-node.loop { border-left:3px solid #e0a64b; }
 .wf-node.call  .wf-node-hd { background:#f3eefe; }
 .wf-node.call .ico { color:#7c3aed; font-style:italic; font-weight:700; }
+/* Per-category colour: a tinted header + a coloured left spine so each kind of
+   block (taps, image, OCR, logic…) is distinguishable at a glance. Placed after
+   the kind rules so it tints image/ocr/logic condition blocks too. */
+.wf-node.cat-basic .wf-node-hd { background:#eaf2ff; } .wf-node.cat-basic { border-left:3px solid #6f9be8; }
+.wf-node.cat-image .wf-node-hd { background:#e1f5f3; } .wf-node.cat-image { border-left:3px solid #2fb0a3; }
+.wf-node.cat-ocr   .wf-node-hd { background:#fbf0e4; } .wf-node.cat-ocr   { border-left:3px solid #e0954b; }
+.wf-node.cat-logic .wf-node-hd { background:#f1ecfd; } .wf-node.cat-logic { border-left:3px solid #9a78e6; }
+.wf-node.cat-flow  .wf-node-hd { background:#fdf3e0; } .wf-node.cat-flow  { border-left:3px solid #e0a64b; }
+.wf-node.cat-misc  .wf-node-hd { background:#eef1f5; } .wf-node.cat-misc  { border-left:3px solid #9aa6b4; }
 .wf-node.conn-target { box-shadow:0 0 0 2px var(--ok); }
 /* Merged ('out'-stacked) blocks read as one unit: square the touching edges. */
 .wf-node.merge-parent { border-bottom-left-radius:0; border-bottom-right-radius:0; border-bottom:none; }
@@ -361,7 +444,13 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   border:1px solid var(--border2); border-radius:8px; box-shadow:0 6px 22px rgba(20,30,45,.18); padding:4px; }
 .wf-ctx-item { padding:7px 10px; font-size:12px; color:var(--ink); border-radius:5px; cursor:pointer; white-space:nowrap; }
 .wf-ctx-item:hover { background:var(--accent-bg); color:var(--accent); }
-.wf-node.running { border-color:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.35), 0 0 14px rgba(245,158,11,.55); animation:wfRun 1s ease-in-out infinite; }
+/* The block the engine is on right now: a solid yellow "đang đợi / đang chạy"
+   fill (not just a glow) so it's unmistakable even when other blocks already
+   carry the green/red trail. Overrides ran-ok/ran-fail (defined earlier). */
+.wf-node.running { border-color:#f59e0b !important; background:#fff4d6;
+  box-shadow:0 0 0 3px rgba(245,158,11,.40), 0 0 16px rgba(245,158,11,.6) !important; animation:wfRun 1s ease-in-out infinite; }
+.wf-node.running .wf-node-hd { background:#fde68a; border-bottom-color:#f1c84b; }
+.wf-node.running .wf-node-title { color:#7a4f0a; }
 .wf-node-eye { color:var(--muted); font-size:12px; line-height:1; padding:0 2px; border-radius:4px; flex-shrink:0; cursor:pointer; }
 .wf-node-eye:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-node-eye.on { color:var(--accent); }
@@ -399,6 +488,10 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-node-note { font-size:9.5px; font-style:italic; color:#7c6f55; background:#fdf9ee;
   border-top:1px dashed var(--line); border-radius:0 0 9px 9px; padding:4px 9px; white-space:normal; word-break:break-word; }
 .wf-node-note::before { content:"📝 "; font-style:normal; }
+/* Runtime log line: text auto-emitted to the log panel each time this block runs. */
+.wf-node-log { font-size:9.5px; color:#2f6b8f; background:#eef6fb;
+  border-top:1px dashed var(--line); border-radius:0 0 9px 9px; padding:4px 9px; white-space:normal; word-break:break-word; }
+.wf-node-log::before { content:"📋 "; }
 
 /* Ports */
 .wf-port { position:absolute; width:13px; height:13px; border-radius:50%; background:var(--panel);
@@ -406,9 +499,21 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-port:hover { border-color:var(--accent); background:var(--accent-bg); }
 .wf-port.in  { left:-7px; top:9px; }
 .wf-port.out { right:-7px; }
+/* A loop's second input — the 'lặp' (loop-back) port — is amber-ringed so it
+   reads as the place a block wires back to, distinct from the plain 'vào' entry. */
+.wf-port.in.loop { border-color:#e0a64b; background:#fff7ea; }
+.wf-port.in.loop:hover { border-color:var(--accent); background:var(--accent-bg); }
 .wf-port-row { position:absolute; right:-7px; display:flex; align-items:center; }
 .wf-port-lbl { position:absolute; right:14px; font-size:8.5px; font-weight:700; color:var(--muted); white-space:nowrap; }
+/* Input-side labels sit in the gutter to the LEFT of the node (mirroring the
+   right-side output labels), so 'vào' / 'lặp' don't collide with node content. */
+.wf-port-lbl.in { right:auto; left:-34px; width:28px; text-align:right; }
+.wf-port-lbl.in.loop { color:#c2841f; }
 .wf-port.out.t { border-color:#2fa55a; } .wf-port.out.f { border-color:#cf6b43; }
+/* Run trail on ports: the output taken this run (filled green) vs the skipped
+   true/false sibling (filled red). */
+.wf-port.out.took    { border-color:#2fa55a; background:#2fa55a; }
+.wf-port.out.nottook { border-color:#cf4b43; background:#cf4b43; }
 
 /* Right inspector */
 #wf-inspector { width:236px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
@@ -429,24 +534,41 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 <div id="app">
 
 <div id="toolbar" class="card">
-  <span class="tb-label">Thiết bị</span>
-  <div class="device-wrap">
+  <div class="device-wrap" title="Thiết bị đang kết nối">
     <span id="device-dot"></span>
     <select id="device-select" onchange="onDeviceChange(this.value)">
       <option value="">Đang quét…</option>
     </select>
     <svg width="10" height="6" viewBox="0 0 12 7" fill="#9aa3ae" style="flex-shrink:0;pointer-events:none;"><path d="M0 0l6 7 6-7z"/></svg>
   </div>
-  <button class="btn" onclick="onRefreshDevices()">Làm mới</button>
-  <button class="btn" onclick="onScanPorts()">Quét cổng</button>
-  <button class="btn" onclick="onRestartAdb()">Khởi động lại ADB</button>
+  <div class="tb-group">
+    <button class="btn sm ico" onclick="onRefreshDevices()" title="Làm mới — quét lại thiết bị đã kết nối">
+      <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg></button>
+    <button class="btn sm ico" onclick="onScanPorts()" title="Quét cổng — dò mọi cổng giả lập đã biết">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+    <button class="btn sm ico" onclick="onRestartAdb()" title="Khởi động lại ADB server">
+      <svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg></button>
+  </div>
+  <span class="tb-divider"></span>
+  <button class="btn ico" onclick="openDevHelper()" title="Dev Helper — mở công cụ (cửa sổ mới)">
+    <svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.3L3 18l3 3 6.4-6.3a4 4 0 0 0 5.3-5.4l-2.6 2.6-2.5-.4-.4-2.5z"/></svg></button>
   <span class="spacer"></span>
-  <button class="btn" onclick="wfNew()" title="Tạo workflow mới (trống)">Mới</button>
-  <button class="btn" onclick="wfImport()" title="Mở workflow từ file JSON">Mở…</button>
-  <button class="btn accent" id="wf-save-btn" onclick="wfSave()" title="Lưu vào file đang mở (Ctrl+S)">Lưu</button>
-  <button class="btn" onclick="wfExport()" title="Lưu thành file JSON mới">Lưu thành…</button>
-  <button class="btn ok" id="wf-run-btn" onclick="wfToggleRun()">Chạy thử</button>
-  <button class="btn" onclick="wfRunGui()" title="Mở Runner GUI với workflow hiện tại">Chạy GUI</button>
+  <div class="tb-group">
+    <button class="btn ico" onclick="wfNew()" title="Mới — tạo workflow trống">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
+    <button class="btn ico" onclick="wfImport()" title="Mở… — workflow từ file JSON">
+      <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+    <button class="btn accent ico" id="wf-save-btn" onclick="wfSave()" title="Lưu vào file đang mở (Ctrl+S)">
+      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
+    <button class="btn ico" onclick="wfExport()" title="Lưu thành… — file JSON mới">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+  </div>
+  <span class="tb-divider"></span>
+  <div class="tb-group">
+    <button class="btn ok ico" id="wf-run-btn" onclick="wfToggleRun()" title="Chạy thử"></button>
+    <button class="btn ico" onclick="wfRunGui()" title="Chạy GUI — mở Runner với workflow hiện tại">
+      <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
+  </div>
 </div>
 
 <div id="workflow-view" style="display:flex;">
@@ -454,7 +576,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   <div id="wf-side" class="card">
     <div class="wf-side-sec">
       <div class="wf-side-hdr">
-        <span>Hoạt động</span><span class="spacer"></span>
+        <span>Hoạt động</span><span class="side-count" id="wf-act-count"></span><span class="spacer"></span>
         <button class="btn sm" onclick="wfAddActivity('sequence')" title="Thêm hoạt động tuần tự">+ Tuần tự</button>
         <button class="btn sm" onclick="wfAddActivity('background')" title="Thêm hoạt động nền">+ Nền</button>
       </div>
@@ -462,14 +584,14 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
     </div>
     <div class="wf-side-sec">
       <div class="wf-side-hdr">
-        <span>Function</span><span class="spacer"></span>
+        <span>Function</span><span class="side-count" id="wf-fn-count"></span><span class="spacer"></span>
         <button class="btn sm" onclick="wfAddFunction()" title="Tạo function tái sử dụng">+ Function</button>
       </div>
       <div id="wf-functions"></div>
     </div>
     <div class="wf-side-sec" style="flex:1;min-height:0;display:flex;flex-direction:column;">
       <div class="wf-side-hdr"><span>Node</span></div>
-      <div class="wf-side-hint">Kéo node vào canvas. Kéo từ cổng phải, thả lên node bất kỳ là tự nối. Phím Delete xoá node đang chọn.</div>
+      <div class="wf-side-hint">Kéo node vào canvas. Kéo từ cổng phải, thả lên node bất kỳ là tự nối. Với node <b>Lặp lại</b>: thả vào cổng <b style="color:#c2841f">lặp</b> (dưới) để nối vòng lại. Ctrl+C/V sao chép/dán · Ctrl+D nhân đôi · Delete xoá.</div>
       <div id="wf-palette" class="wf-palette"></div>
     </div>
   </div>
@@ -478,15 +600,28 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
     <div id="wf-bar">
       <input id="wf-name" type="text" placeholder="Tên workflow" value="My Workflow">
       <span class="wf-cur-act" id="wf-cur-act">—</span>
-      <button class="btn sm" id="wf-snap-btn" onclick="wfToggleSnap()" title="Bám node vào lưới khi kéo">Bám lưới: Tắt</button>
-      <button class="btn sm" id="wf-preview-btn" onclick="wfTogglePreview()" title="Hiện ảnh xem trước trên mọi block">Preview ảnh: Tắt</button>
+      <button class="btn sm ico" id="wf-snap-btn" onclick="wfToggleSnap()" title="Bám lưới: Tắt">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></button>
+      <button class="btn sm ico" id="wf-preview-btn" onclick="wfTogglePreview()" title="Preview ảnh: Tắt">
+        <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <span class="tb-divider"></span>
+      <div id="wf-speed-group" class="wf-speed-group" title="Speed hack — tách riêng khỏi Chạy thử">
+        <span class="wf-speed-title">Speed hack</span>
+        <button class="btn sm ico" id="wf-speed-btn" onclick="wfToggleSpeed()" title="Speed hack: Tắt (tăng tốc game bằng Frida — cần root)">
+          <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></button>
+        <input id="wf-speed-val" type="number" min="0.1" step="0.1" value="2" title="Tốc độ (x)" style="width:48px;text-align:right" onchange="wfSpeedChanged()">
+        <span class="hz-unit">x</span>
+        <input id="wf-speed-pkg" type="text" placeholder="package game" title="Package game để inject speedhack" style="width:150px" onchange="wfSpeedFromUI()">
+        <button class="btn sm ico ok" id="wf-speed-run-btn" onclick="wfSpeedRun()" title="Bật speed hack" style="display:none"></button>
+      </div>
+      <span class="tb-divider"></span>
       <span class="wf-zoom">
         <button class="btn sm" onclick="wfZoomBy(1/1.1)" title="Thu nhỏ">−</button>
         <span id="wf-zoom-lbl" onclick="wfZoomReset()" title="Đặt lại 100%">100%</span>
         <button class="btn sm" onclick="wfZoomBy(1.1)" title="Phóng to">+</button>
       </span>
       <span class="spacer"></span>
-      <span class="wf-hint">Cuộn chuột = zoom · Kéo = di chuyển khối · chuột phải = gộp/tách · Space/chuột giữa = kéo nền</span>
+      <span class="wf-hint" title="Cuộn chuột = zoom · Kéo = di chuyển khối · Chuột phải = gộp/tách (trên khối) hoặc xoá dây (trên dây nối) · Space hoặc chuột giữa = kéo nền">Cuộn = zoom · Kéo = di chuyển · Chuột phải = gộp/tách · xoá dây · Space = kéo nền</span>
     </div>
     <div id="wf-canvas">
       <div id="wf-world">
@@ -505,10 +640,12 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 
 
 <div id="log-card" class="card">
-  <div class="log-hdr">
+  <div class="log-hdr" onclick="wfToggleLog(event)" title="Bấm để thu gọn/mở nhật ký">
+    <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
     <span class="log-label">Nhật ký</span>
+    <span class="log-count" id="log-count"></span>
     <span class="spacer"></span>
-    <button class="btn-log-clear" onclick="onClearLog()">Xoá</button>
+    <button class="btn-log-clear" onclick="onClearLog(event)">Xoá</button>
   </div>
   <div class="log-body" id="log-body"></div>
 </div>
@@ -542,11 +679,62 @@ async function wfLoadThumb(img, path){
   try{ const d=await api().image_thumbnail(path); if(d){ img.src=d; img.style.display="block"; } }catch{}
 }
 
-// Highlight the node the engine is currently executing (border glow).
+// Run visualisation. The engine reports (a) the node about to run — painted amber
+// while live — and (b) each node's result once it finishes. Results accumulate
+// into a persistent "trail" for the whole run: a node that ran turns its border
+// green (red if an action failed), and a branch node greens the port/wire it took
+// and reds the one it didn't. This is why fast blocks now stay visible — they keep
+// the trail colour after the amber moves on.
 let wfRunNode=null;
+const wfRan={};       // nodeId -> "ok" | "fail"
+const wfRanPort={};   // nodeId -> output port actually taken
+function wfNodeElById(id){ return id ? document.querySelector(`.wf-node[data-node="${id}"]`) : null; }
 function wfSetRunningNode(id){
+  // Move the amber glow to the new node, leaving the green/red trail untouched.
+  const prev=wfNodeElById(wfRunNode); if(prev) prev.classList.remove("running");
   wfRunNode=id||null;
-  document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("running", el.dataset.node===wfRunNode));
+  const el=wfNodeElById(wfRunNode); if(el) el.classList.add("running");
+}
+function wfColorBranch(id, takenPort){
+  document.querySelectorAll("#wf-wires path.wire").forEach(p=>{
+    if(p.dataset.from!==id) return;
+    p.classList.remove("took-wire","nottook-wire");
+    if(p.dataset.fromport===takenPort) p.classList.add("took-wire");
+    else if(p.dataset.fromport==="true"||p.dataset.fromport==="false") p.classList.add("nottook-wire");
+  });
+}
+function wfMarkNodeResult(id, status, port){
+  if(!id) return;
+  wfRan[id] = status==="fail" ? "fail" : "ok";
+  if(port!==undefined && port!==null) wfRanPort[id]=port; else delete wfRanPort[id];
+  const el=wfNodeElById(id); if(!el) return;
+  el.classList.toggle("ran-ok",   wfRan[id]==="ok");
+  el.classList.toggle("ran-fail", wfRan[id]==="fail");
+  // Output ports: the one taken goes green, the other true/false sibling red.
+  const taken = wfRanPort[id];
+  el.querySelectorAll(".wf-port.out").forEach(p=>{
+    p.classList.remove("took","nottook");
+    if(taken==null) return;
+    if(p.dataset.port===String(taken)) p.classList.add("took");
+    else if(p.dataset.port==="true"||p.dataset.port==="false") p.classList.add("nottook");
+  });
+  if(taken!=null) wfColorBranch(id, String(taken));
+}
+// Re-paint the whole trail after a canvas redraw (nodes/wires are rebuilt fresh).
+function wfReapplyRunViz(){
+  Object.keys(wfRan).forEach(id=>wfMarkNodeResult(id, wfRan[id], wfRanPort[id]));
+  const el=wfNodeElById(wfRunNode); if(el) el.classList.add("running");
+}
+function wfResetRunViz(){
+  wfRunNode=null;
+  for(const k in wfRan) delete wfRan[k];
+  for(const k in wfRanPort) delete wfRanPort[k];
+  document.querySelectorAll(".wf-node.running,.wf-node.ran-ok,.wf-node.ran-fail")
+    .forEach(el=>el.classList.remove("running","ran-ok","ran-fail"));
+  document.querySelectorAll("#wf-wires path.took-wire,#wf-wires path.nottook-wire")
+    .forEach(p=>p.classList.remove("took-wire","nottook-wire"));
+  document.querySelectorAll(".wf-port.out.took,.wf-port.out.nottook")
+    .forEach(p=>p.classList.remove("took","nottook"));
 }
 
 function appendLog(entry){
@@ -558,6 +746,7 @@ function appendLog(entry){
   body.appendChild(line);
   while(body.children.length>500) body.removeChild(body.firstChild);
   body.scrollTop=body.scrollHeight;
+  updateLogCount();
 }
 function rebuildDeviceSelect(devices, connected){
   const sel=$("device-select"), prev=sel.value; sel.innerHTML="";
@@ -572,28 +761,47 @@ window.__recv = function(raw){
   let ev; try{ev=JSON.parse(raw);}catch{return;}
   const {type,data}=ev;
   if(type==="log"){ appendLog(data); return; }
-  if(type==="log_cleared"){ const b=$("log-body"); if(b)b.innerHTML=""; return; }
+  if(type==="log_cleared"){ const b=$("log-body"); if(b)b.innerHTML=""; updateLogCount(); return; }
   if(type==="devices_update"){ S.devices=data.devices||[]; rebuildDeviceSelect(S.devices,S.connectedSerial); return; }
   if(type==="device_status"){ S.connectedSerial=data.serial||null; setConnected(!!data.connected); rebuildDeviceSelect(S.devices,data.serial); return; }
   if(type==="workflow_state"){ wfSetRunning(!!data.running); return; }
   if(type==="node_active"){ wfSetRunningNode(data.id); return; }
+  if(type==="node_result"){ wfMarkNodeResult(data.id, data.status, data.port); return; }
+  if(type==="speedhack_state"){
+    wfSpeedRunning=!!data.running; wfSyncSpeedUI();
+    if(data.running && data.active) setStatus("Speed hack đang chạy");
+    else if(!data.running) setStatus("Speed hack đã tắt");
+    return;
+  }
 };
 
+// ── Log drawer ────────────────────────────────────────────────────────────────
+function updateLogCount(){ const c=$("log-count"), b=$("log-body"); if(c&&b) c.textContent = b.children.length? String(b.children.length):""; }
+function wfToggleLog(ev){
+  if(ev && ev.target.closest(".btn-log-clear")) return;   // let "Xoá" act without toggling
+  const c=$("log-card"); if(!c) return;
+  c.classList.toggle("collapsed");
+  wfSaveSettings();
+}
+
 // ── Device handlers ─────────────────────────────────────────────────────────
-function onClearLog(){ api().clear_log(); }
+function onClearLog(ev){ if(ev) ev.stopPropagation(); api().clear_log(); }
 async function onRefreshDevices(){ await api().refresh_devices(); }
 async function onScanPorts(){ await api().scan_ports(); }
 async function onRestartAdb(){ await api().restart_adb(); }
 async function onDeviceChange(serial){ if(serial){ S.connectedSerial=serial; await api().select_device(serial); } }
+async function openDevHelper(){ try{ await api().open_dev_helper(); setStatus("Đang mở Dev Helper…"); }catch{} }
 
 // New blank workflow.
 async function wfNew(){
   if((WF.activities.length || WF.functions.length) &&
      !confirm("Tạo workflow mới? Các thay đổi chưa lưu sẽ mất.")) return;
-  WF.name="My Workflow"; WF.version=2; WF.templatesDir="out";
+  WF.name="My Workflow"; WF.version=2; WF.templatesDir="templates";
+  WF.speedhack={enabled:false, speed:2.0, package:""};
   WF.activities=[]; WF.functions=[]; WF.edit={kind:"activity",id:null};
   WF.sel=[]; WF.selectedNode=null; wfPan={x:0,y:0}; wfZoom=1; wfRunNode=null;
   const nm=$("wf-name"); if(nm) nm.value=WF.name;
+  wfSyncSpeedUI();
   try{ await api().workflow_new(); }catch{}
   wfAddActivity("sequence");   // seed one activity so the canvas isn't empty
   setStatus("Workflow mới");
@@ -603,7 +811,11 @@ async function wfNew(){
 window.addEventListener("keydown", e => {
   const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
   if((e.key==="s"||e.key==="S") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); wfSave(); return; }
-  if(typing) return;
+  if(typing) return;   // below here: canvas shortcuts only (let inputs keep native Ctrl+C/V)
+  if((e.key==="c"||e.key==="C") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCopy(); } return; }
+  if((e.key==="x"||e.key==="X") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCut(); } return; }
+  if((e.key==="v"||e.key==="V") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); wfPaste(wfPointer.inside?{clientX:wfPointer.x,clientY:wfPointer.y}:null); return; }
+  if((e.key==="d"||e.key==="D") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfDuplicate(); } return; }
   if(e.key===" "){ wfSpace=true; }
   if(e.key==="Delete"||e.key==="Backspace"){ if(WF.sel.length){ e.preventDefault(); wfDeleteSelected(); return; } }
   if((e.key==="a"||e.key==="A") && (e.ctrlKey||e.metaKey)){ const g=wfGraph(); if(g){ e.preventDefault(); WF.sel=g.nodes.map(n=>n.id); WF.selectedNode=null; wfMarkSel(); wfRenderInspector(); return; } }
@@ -632,10 +844,14 @@ const WF_NODES = {
   tap_image:  {label:"Chạm ảnh",  ico:"🎯",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:5},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+(p.delay?` ·chờ ${p.delay}s`:"")},
   wait_image: {label:"Chờ ảnh",   ico:"👁",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBase(p.template)+(p.delay?` ·chờ ${p.delay}s`:"")},
   if_image:   {label:"Nếu ảnh",   ico:"❓",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}thấy ${wfBase(p.template)}`},
+  // "…_any" = OR over several images: true when ANY listed template matches.
+  tap_image_any: {label:"Chạm 1 trong ảnh", ico:"🎯",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:5},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBaseAny(p.templates)+(p.taps=="2"?" ×2":"")},
+  wait_image_any:{label:"Chờ 1 trong ảnh",  ico:"👁",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBaseAny(p.templates)+(p.delay?` ·chờ ${p.delay}s`:"")},
+  if_image_any:  {label:"Nếu 1 trong ảnh",  ico:"❓",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}thấy ${wfBaseAny(p.templates)}`},
   wait_text:  {label:"Chờ chữ",   ico:"🔤",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10}], sum:p=>`"${p.text||""}"`},
   if_text:    {label:"Nếu chữ",   ico:"🔡",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}có "${p.text||""}"`},
   read_var:   {label:"Đọc → biến",ico:"🔎",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`→ ${p.name||"?"}`},
-  loop:       {label:"Lặp lại",   ico:"🔁",kind:"loop", cat:"flow",   outs:["body","done"], fields:[{k:"count",t:"num",d:3},{k:"infinite",t:"bool",d:false}], sum:p=>p.infinite?"∞ vô cực":`${p.count}×`},
+  loop:       {label:"Lặp lại",   ico:"🔁",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"count",t:"num",d:3},{k:"infinite",t:"bool",d:false}], sum:p=>p.infinite?"∞ vô cực":`${p.count}×`},
   parallel:   {label:"Song song", ico:"⇉",kind:"parallel",cat:"flow", outs:["1","2","3","done"], fields:[], sum:()=>"chạy 3 nhánh // → chờ gộp ở cổng 'gộp'"},
   "break":    {label:"Thoát vòng",ico:"⛔",kind:"action",cat:"flow",  outs:["out"], fields:[], sum:()=>"break"},
   stop:       {label:"Dừng tất cả",ico:"🛑",kind:"stop", cat:"flow",  outs:[],      fields:[], sum:()=>"dừng phiên"},
@@ -650,25 +866,79 @@ const WF_NODES = {
 };
 const WF_CATS = [ {key:"basic",label:"Cơ bản"}, {key:"image",label:"Hình ảnh"}, {key:"ocr",label:"Văn bản (OCR)"}, {key:"flow",label:"Luồng"}, {key:"logic",label:"Biến / Điều kiện"}, {key:"misc",label:"Khác"} ];
 const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"lặp", done:"xong", "1":"1", "2":"2", "3":"3" };
+// Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
+const WF_IN_LBL = { in:"vào", loop:"lặp" };
+function wfIns(type){ const def=WF_NODES[type]; return (def&&def.ins)||["in"]; }
 
 // edit = which graph the canvas is showing: an activity or a function.
 // sel = ids of all selected nodes (multi-select); selectedNode = primary (inspector).
-const WF = { name:"My Workflow", version:2, templatesDir:"out", activities:[], functions:[],
+const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities:[], functions:[],
+  speedhack:{enabled:false, speed:2.0, package:""},
   edit:{kind:"activity", id:null}, sel:[], selectedNode:null };
 let wfSpace=false;  // space held → pan instead of box-select
 const WF_GRID=20;   // grid step; snapping is opt-in (default off)
 let wfSnapOn=false;
 let wfPreviewAll=false;   // global: show image thumbnail on every image block
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
-function wfSaveSettings(){ try{ api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll}); }catch{} }
+function wfSaveSettings(){ try{ const lc=$("log-card"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, logOpen: !(lc&&lc.classList.contains("collapsed"))}); }catch{} }
 function wfSyncToggleBtns(){
-  const s=$("wf-snap-btn"); if(s){ s.textContent="Bám lưới: "+(wfSnapOn?"Bật":"Tắt"); s.classList.toggle("accent",wfSnapOn); }
-  const p=$("wf-preview-btn"); if(p){ p.textContent="Preview ảnh: "+(wfPreviewAll?"Bật":"Tắt"); p.classList.toggle("accent",wfPreviewAll); }
+  // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
+  const s=$("wf-snap-btn"); if(s){ s.title="Bám lưới: "+(wfSnapOn?"Bật":"Tắt"); s.classList.toggle("on",wfSnapOn); }
+  const p=$("wf-preview-btn"); if(p){ p.title="Preview ảnh: "+(wfPreviewAll?"Bật":"Tắt"); p.classList.toggle("on",wfPreviewAll); }
+  wfSyncSpeedUI();
+}
+// ── Speed hack — a standalone manual tool, decoupled from "Chạy thử" ──────────
+// The ⚡ toggle enables the feature (still saved into the flow for the Runner GUI)
+// and reveals a separate ▶ button; pressing ▶ is what actually injects Frida here.
+let wfSpeedRunning=false;   // is the standalone injection currently on?
+function wfSyncSpeedUI(){
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
+  const b=$("wf-speed-btn"); if(b){ b.title="Speed hack: "+(sh.enabled?"Bật":"Tắt")+" (tăng tốc game bằng Frida — cần root)"; b.classList.toggle("on",sh.enabled); }
+  const v=$("wf-speed-val"); if(v && document.activeElement!==v) v.value=sh.speed;
+  const pk=$("wf-speed-pkg"); if(pk && document.activeElement!==pk) pk.value=sh.package||"";
+  const grp=$("wf-speed-group"); if(grp) grp.classList.toggle("on", sh.enabled);
+  const rb=$("wf-speed-run-btn");
+  if(rb){
+    rb.style.display = sh.enabled ? "inline-flex" : "none";
+    rb.innerHTML = wfSpeedRunning ? WF_ICO_STOP : WF_ICO_PLAY;
+    rb.title = wfSpeedRunning ? "Tắt speed hack" : "Bật speed hack ngay (độc lập với Chạy thử)";
+    rb.classList.toggle("ok", !wfSpeedRunning); rb.classList.toggle("err", wfSpeedRunning);
+  }
+}
+function wfSpeedFromUI(){
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
+  const v=parseFloat($("wf-speed-val").value); sh.speed=(isNaN(v)||v<=0)?1:v;
+  sh.package=($("wf-speed-pkg").value||"").trim();
+}
+// Speed value edited: persist, and if the hack is live, push the new scale.
+function wfSpeedChanged(){ wfSpeedFromUI(); if(wfSpeedRunning){ const sh=WF.speedhack; api().speedhack_start(sh.speed, sh.package); } }
+function wfToggleSpeed(){
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
+  wfSpeedFromUI(); sh.enabled=!sh.enabled;
+  if(!sh.enabled && wfSpeedRunning){ api().speedhack_stop(); wfSpeedRunning=false; }  // disabling stops it
+  wfSyncSpeedUI();
+}
+// Best-effort package: the field, else the first "Mở app" node's package.
+function wfAutoPackage(){
+  const graphs=[...WF.activities.map(a=>a.graph), ...WF.functions.map(f=>f.graph)];
+  for(const g of graphs){ for(const n of (g&&g.nodes||[])){
+    if(n.type==="launch_app"){ const p=((n.params||{}).package||"").trim(); if(p) return p; } } }
+  return "";
+}
+// The ▶/⏹ button: actually inject (or stop) the speed hack, on its own.
+async function wfSpeedRun(){
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
+  wfSpeedFromUI();
+  if(wfSpeedRunning){ await api().speedhack_stop(); return; }
+  const pkg=sh.package||wfAutoPackage();
+  if(!pkg){ alert("Nhập package game (hoặc thêm node Mở app) để bật speed hack."); return; }
+  const ok=await api().speedhack_start(sh.speed, pkg);
+  if(!ok){ wfSpeedRunning=false; wfSyncSpeedUI(); }
 }
 function wfToggleSnap(){ wfSnapOn=!wfSnapOn; wfSyncToggleBtns(); wfSaveSettings(); }
 function wfTogglePreview(){ wfPreviewAll=!wfPreviewAll; wfSyncToggleBtns(); wfRenderCanvas(); wfSaveSettings(); }
 let wfRunning=false;
-let wfPan={x:0,y:0}; wfZoom=1;
+let wfPan={x:0,y:0};
 let wfZoom=1;           // canvas zoom factor
 function wfApplyTransform(){ const w=$("wf-world"); if(w) w.style.transform=`translate(${wfPan.x}px,${wfPan.y}px) scale(${wfZoom})`;
   const lbl=$("wf-zoom-lbl"); if(lbl) lbl.textContent=Math.round(wfZoom*100)+"%"; }
@@ -690,13 +960,18 @@ let wfPaletteDrag=null; // node type being dragged from palette
 let wfCanvasReady=false;
 const wfUid=()=>"n"+Math.random().toString(36).slice(2,9);
 const wfBase=p=>{ if(!p)return"(ảnh)"; const s=String(p).replace(/\\/g,"/").split("/").pop(); return s.length>14?"…"+s.slice(-13):s; };
+// Summary for a multi-image ("…_any") node: list up to 2 names, else a count.
+const wfBaseAny=t=>{ const a=(Array.isArray(t)?t:[]).filter(Boolean); if(!a.length)return"(chưa có ảnh)"; return a.length<=2?a.map(wfBase).join(" / "):a.length+" ảnh"; };
 
 // Top-level mode switch: Công cụ (helper) ↔ Workflow (node-graph).
 /* (mode switching removed — the designer is its own standalone window) */
 
 function wfDefaults(type){
   const def=WF_NODES[type]||{fields:[]}; const p={};
-  (def.fields||[]).forEach(f=>{ p[f.k]= f.d!==undefined?f.d : (f.t==="num"?0 : f.t==="bool"?false : ""); });
+  (def.fields||[]).forEach(f=>{
+    if(f.t==="tpls"){ p[f.k]= Array.isArray(f.d)?f.d.slice():[]; return; }  // fresh array per node
+    p[f.k]= f.d!==undefined?f.d : (f.t==="num"?0 : f.t==="bool"?false : "");
+  });
   return p;
 }
 
@@ -708,7 +983,7 @@ function wfCurAct(){ return WF.edit.kind==="activity" ? wfActById(WF.edit.id) : 
 function wfCurFn(){ return WF.edit.kind==="function" ? wfFnById(WF.edit.id) : null; }
 function wfGraph(){ const t=wfEditTarget(); return t?t.graph:null; }
 function wfNode(id){ const g=wfGraph(); return g?g.nodes.find(n=>n.id===id):null; }
-function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",showPreview:false,stackParent:null,stackPort:null}; }
+function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",showPreview:false,stackParent:null,stackPort:null}; }
 function wfNewGraph(){ return { nodes:[{id:wfUid(),type:"start",x:60,y:70,params:{}}], edges:[] }; }
 
 function wfAddActivity(type){
@@ -758,6 +1033,7 @@ function wfRenderAll(){
 
 function wfRenderActivities(){
   const wrap=$("wf-activities"); wrap.innerHTML="";
+  const cnt=$("wf-act-count"); if(cnt) cnt.textContent = WF.activities.length? String(WF.activities.length):"";
   if(!WF.activities.length){ wrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có hoạt động.</div>'; return; }
   const check=`<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>`;
   WF.activities.forEach(act=>{
@@ -778,6 +1054,7 @@ function wfRenderActivities(){
 
 function wfRenderFunctions(){
   const wrap=$("wf-functions"); if(!wrap) return; wrap.innerHTML="";
+  const cnt=$("wf-fn-count"); if(cnt) cnt.textContent = WF.functions.length? String(WF.functions.length):"";
   if(!WF.functions.length){ wrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có function. Bấm “+ Function”.</div>'; return; }
   WF.functions.forEach(fn=>{
     const sel = WF.edit.kind==="function" && fn.id===WF.edit.id;
@@ -827,6 +1104,7 @@ function wfRenderCanvas(){
   empty.style.display="none";
   g.nodes.forEach(n=>world.appendChild(wfNodeEl(n)));
   wfDrawWires();
+  if(wfRunning) wfReapplyRunViz();   // keep the live run-trail across redraws
 }
 
 function wfNodeEl(n){
@@ -836,7 +1114,10 @@ function wfNodeEl(n){
   const mergeChild  = n.stackParent && n.stackPort==="out";
   const mergeParent = wfChildrenOf(n.id).some(c=>c.stackPort==="out");
   const el=document.createElement("div");
-  el.className="wf-node "+def.kind+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"")
+  // Category tint (only for the bulk action/condition blocks — structural kinds
+  // start/end/stop/loop/call/note keep their own distinct styling).
+  const catCls = (def.kind==="action"||def.kind==="condition") && def.cat ? " cat-"+def.cat : "";
+  el.className="wf-node "+def.kind+catCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"")
     +(mergeChild?" merge-child":"")+(mergeParent?" merge-parent":"");
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
   // A call node shows the referenced function's name as its title.
@@ -848,14 +1129,28 @@ function wfNodeEl(n){
   const showThumb = hasTpl && (wfPreviewAll || n.showPreview);
   const eyeBtn = hasTpl ? `<button class="wf-node-eye${n.showPreview?" on":""}" title="Xem trước ảnh (block này)">👁</button>` : "";
   const noteHtml = n.note ? `<div class="wf-node-note">${escHtml(n.note)}</div>` : "";
+  const logHtml = n.log ? `<div class="wf-node-log">${escHtml(n.log)}</div>` : "";
   const thumbHtml = showThumb ? `<img class="wf-node-thumb">` : "";
   el.innerHTML=
     `<div class="wf-node-hd"><span class="ico">${def.ico}</span><span class="wf-node-title">${escHtml(title)}</span>${eyeBtn}${delBtn}</div>`+
-    (sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"")+noteHtml+thumbHtml;
-  if(!sum && !n.note && !thumbHtml) el.classList.add("collapsed");
+    (sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"")+noteHtml+logHtml+thumbHtml;
+  if(!sum && !n.note && !n.log && !thumbHtml) el.classList.add("collapsed");
   if(thumbHtml) wfLoadThumb(el.querySelector(".wf-node-thumb"), wfTplOf(n));
-  // input port (start has none; note floats; a merged child's input is hidden)
-  if(def.kind!=="start" && def.kind!=="note" && !mergeChild){ const ip=document.createElement("span"); ip.className="wf-port in"; ip.dataset.node=n.id; ip.dataset.port="in"; el.appendChild(ip); }
+  // input ports (start has none; note floats; a merged child's input is hidden).
+  // Most nodes have a single 'in'; the loop also exposes a 'loop' (loop-back)
+  // input below it so the wire that re-enters the loop lands on its own port.
+  if(def.kind!=="start" && def.kind!=="note" && !mergeChild){
+    const ins=wfIns(n.type);
+    ins.forEach((port,i)=>{
+      const top = ins.length<=1 ? 9 : 9 + i*21;
+      const ip=document.createElement("span");
+      ip.className="wf-port in"+(port==="loop"?" loop":"");
+      ip.dataset.node=n.id; ip.dataset.port=port; ip.style.top=top+"px";
+      el.appendChild(ip);
+      if(ins.length>1){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl in"+(port==="loop"?" loop":"");
+        lbl.style.top=(top+1)+"px"; lbl.textContent=WF_IN_LBL[port]||port; el.appendChild(lbl); }
+    });
+  }
   // output ports (the 'out' port is hidden once a block is merged below it)
   const outs=def.outs||[];
   outs.forEach((port,i)=>{
@@ -901,10 +1196,69 @@ function wfDeleteNodes(ids){
   wfRenderCanvas(); wfRenderInspector();
 }
 
+// ── Copy / paste ──────────────────────────────────────────────────────────────
+// Clipboard holds detached clones of the copied nodes (params, note, stacking)
+// plus the edges *internal* to the selection, referenced by array index so they
+// survive id remapping. Works across activities/functions (it's not tied to the
+// current graph). The 'start' node is never copyable.
+let wfClipboard=null;
+let wfPasteShift=0;            // cascade offset for repeated Ctrl+V at no cursor
+let wfPointer={x:0,y:0,inside:false};   // last pointer pos over the canvas
+function wfCopy(){
+  const g=wfGraph(); if(!g) return false;
+  const ids=WF.sel.filter(id=>{ const n=g.nodes.find(x=>x.id===id); return n && n.type!=="start"; });
+  if(!ids.length) return false;
+  const idset=new Set(ids);
+  const nodes=ids.map(id=>{ const n=g.nodes.find(x=>x.id===id);
+    return { type:n.type, x:n.x, y:n.y, note:n.note||"", log:n.log||"", showPreview:!!n.showPreview,
+      params:JSON.parse(JSON.stringify(n.params||{})),
+      stackParentIdx:(n.stackParent&&idset.has(n.stackParent))?ids.indexOf(n.stackParent):-1,
+      stackPort:n.stackPort||null }; });
+  const edges=g.edges.filter(e=>idset.has(e.from)&&idset.has(e.to))
+    .map(e=>({fromIdx:ids.indexOf(e.from), fromPort:e.fromPort, toIdx:ids.indexOf(e.to), toPort:e.toPort||"in"}));
+  const minX=Math.min(...nodes.map(n=>n.x)), minY=Math.min(...nodes.map(n=>n.y));
+  wfClipboard={nodes,edges,minX,minY};
+  wfPasteShift=0;
+  setStatus(`Đã sao chép ${nodes.length} node`);
+  return true;
+}
+function wfCut(){ if(wfCopy()) wfDeleteSelected(); }
+function wfDuplicate(){ if(wfCopy()) wfPaste(); }   // copy + cascade-offset paste
+function wfPaste(opts){
+  const g=wfGraph(); if(!g){ alert("Chọn hoặc thêm một hoạt động trước."); return; }
+  if(!wfClipboard||!wfClipboard.nodes.length) return;
+  const clip=wfClipboard;
+  let dx, dy;
+  if(opts && opts.clientX!==undefined){
+    const wr=$("wf-world").getBoundingClientRect();
+    dx=wfSnap((opts.clientX-wr.left)/wfZoom - clip.minX - 70);
+    dy=wfSnap((opts.clientY-wr.top)/wfZoom - clip.minY - 14);
+  } else { wfPasteShift+=24; dx=wfPasteShift; dy=wfPasteShift; }
+  const newIds=clip.nodes.map(()=>wfUid());
+  clip.nodes.forEach((n,i)=>{
+    const node=wfNewNode(n.type, n.x+dx, n.y+dy);
+    node.id=newIds[i];
+    node.params=JSON.parse(JSON.stringify(n.params||{}));
+    node.note=n.note||""; node.log=n.log||""; node.showPreview=!!n.showPreview;
+    node.stackParent = n.stackParentIdx>=0 ? newIds[n.stackParentIdx] : null;
+    node.stackPort   = node.stackParent ? (n.stackPort||"out") : null;
+    g.nodes.push(node);
+  });
+  clip.edges.forEach(e=>g.edges.push({from:newIds[e.fromIdx], fromPort:e.fromPort, to:newIds[e.toIdx], toPort:e.toPort||"in"}));
+  WF.sel=newIds.slice(); WF.selectedNode=newIds.length===1?newIds[0]:null;
+  wfRenderCanvas(); wfMarkSel(); wfRenderInspector();
+  setStatus(`Đã dán ${newIds.length} node`);
+}
+
 // ── Wires ────────────────────────────────────────────────────────────────────
 function wfPortPt(nodeId,port){
   let el;
-  if(port==="in"){ el=document.querySelector(`.wf-node[data-node="${nodeId}"] .wf-port.in`); }
+  if(port==="in"||port==="loop"){
+    el=document.querySelector(`.wf-node[data-node="${nodeId}"] .wf-port.in[data-port="${port}"]`);
+    // Fall back to the node's first input (e.g. a 'loop' edge whose target is no
+    // longer a loop node) so the wire still anchors somewhere sensible.
+    if(!el) el=document.querySelector(`.wf-node[data-node="${nodeId}"] .wf-port.in`);
+  }
   else{
     el=document.querySelector(`.wf-node[data-node="${nodeId}"] .wf-port.out[data-port="${port}"]`);
     // Legacy/loose: if that exact out port is gone (e.g. a node that became a
@@ -916,6 +1270,13 @@ function wfPortPt(nodeId,port){
   // Wires are drawn inside the (scaled) world → convert screen delta to world units.
   return { x:(r.left+r.width/2-wr.left)/wfZoom, y:(r.top+r.height/2-wr.top)/wfZoom };
 }
+// Arrowhead markers, one per wire colour (CSS picks the right one via marker-end).
+// Re-inserted on every full redraw because wfDrawWires clears the <svg>.
+const WF_WIRE_DEFS = (function(){
+  const mk=(id,c)=>`<marker id="${id}" markerWidth="9" markerHeight="9" refX="6.6" refY="3.2" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L7,3.2 L0,6.4 Z" fill="${c}"/></marker>`;
+  return "<defs>"+mk("wf-ah","#9aa9bd")+mk("wf-ah-h","#bb3a33")+mk("wf-ah-t","#2fa55a")
+    +mk("wf-ah-f","#cf6b43")+mk("wf-ah-loop","#e0a64b")+mk("wf-ah-temp","#2f6fed")+"</defs>";
+})();
 function wfStackWire(a,b){ const k=16; return `M${a.x},${a.y} C${a.x+k},${a.y+k} ${b.x-k},${b.y-k} ${b.x},${b.y}`; }
 function wfBezier(a,b){
   // Forward edge (target to the right): smooth horizontal S-curve.
@@ -929,21 +1290,32 @@ function wfBezier(a,b){
 function wfDrawWires(){
   const svg=$("wf-wires"), g=wfGraph();
   const temp=svg.querySelector(".temp");
-  svg.innerHTML=""; if(temp) svg.appendChild(temp);
+  svg.innerHTML=WF_WIRE_DEFS; if(temp) svg.appendChild(temp);
   if(!g) return;
   g.edges.forEach(ed=>{
     const toNode=wfNode(ed.to);
     // Merged ('out') stack pairs are drawn as one block — no wire between them.
     if(toNode && toNode.stackParent===ed.from && ed.fromPort==="out") return;
-    const a=wfPortPt(ed.from,ed.fromPort), b=wfPortPt(ed.to,"in");
+    const toPort = ed.toPort||"in";
+    const a=wfPortPt(ed.from,ed.fromPort), b=wfPortPt(ed.to,toPort);
     if(!a||!b) return;
     const isStack = toNode && toNode.stackParent===ed.from;   // branch-stacked pair
     const p=document.createElementNS("http://www.w3.org/2000/svg","path");
-    p.setAttribute("class","wire"+(ed.fromPort==="true"?" t":ed.fromPort==="false"?" f":"")+(isStack?" stack":""));
+    p.setAttribute("class","wire"+(ed.fromPort==="true"?" t":ed.fromPort==="false"?" f":"")+(isStack?" stack":"")+(toPort==="loop"?" loopback":""));
+    p.dataset.from=ed.from; p.dataset.fromport=ed.fromPort; p.dataset.to=ed.to;  // for run-trail branch colouring
     p.setAttribute("d", isStack ? wfStackWire(a,b) : wfBezier(a,b));
-    p.addEventListener("click",ev=>{ ev.stopPropagation(); const i=g.edges.indexOf(ed); if(i>=0)g.edges.splice(i,1); const tn=wfNode(ed.to); if(tn&&tn.stackParent===ed.from){tn.stackParent=null;tn.stackPort=null;} wfDrawWires(); });
+    // Deleting a wire is right-click only (see wfShowMenu) — a plain click used to
+    // delete it, which was too easy to trigger by accident.
+    p.__edge = ed;
+    const tt=document.createElementNS("http://www.w3.org/2000/svg","title"); tt.textContent="Chuột phải để xoá dây nối"; p.appendChild(tt);
     svg.appendChild(p);
   });
+}
+function wfDeleteWire(ed){
+  const g=wfGraph(); if(!g||!ed) return;
+  const i=g.edges.indexOf(ed); if(i>=0) g.edges.splice(i,1);
+  const tn=wfNode(ed.to); if(tn&&tn.stackParent===ed.from){ tn.stackParent=null; tn.stackPort=null; }
+  wfRenderCanvas();
 }
 function wfDrawTempWire(mx,my){
   const a=wfPortPt(wfGesture.from,wfGesture.port); if(!a) return;
@@ -1049,11 +1421,23 @@ function wfNodeUnderPointer(x,y){
 function wfHighlightTarget(id){
   document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("conn-target", !!id && el.dataset.node===id));
 }
-function wfConnectTo(toNodeId){
+// When a node has >1 input (the loop), pick the input port nearest the drop
+// point so dropping low on a loop wires into its 'lặp' (loop-back) port.
+function wfNearestInPort(nodeId, clientX, clientY){
+  const ports=[...document.querySelectorAll(`.wf-node[data-node="${nodeId}"] .wf-port.in`)];
+  if(ports.length<=1) return "in";
+  let best="in", bestD=Infinity;
+  ports.forEach(p=>{ const r=p.getBoundingClientRect();
+    const dx=clientX-(r.left+r.width/2), dy=clientY-(r.top+r.height/2), d=dx*dx+dy*dy;
+    if(d<bestD){ bestD=d; best=p.dataset.port||"in"; } });
+  return best;
+}
+function wfConnectTo(toNodeId, clientX, clientY){
   const g=wfGraph();
   if(g && wfGesture && wfGesture.from!==toNodeId){
+    const toPort=wfNearestInPort(toNodeId, clientX, clientY);
     g.edges=g.edges.filter(ed=>!(ed.from===wfGesture.from && ed.fromPort===wfGesture.port)); // one wire per output port
-    g.edges.push({from:wfGesture.from,fromPort:wfGesture.port,to:toNodeId});
+    g.edges.push({from:wfGesture.from,fromPort:wfGesture.port,to:toNodeId,toPort});
   }
 }
 function wfCanvasMouseDown(e){
@@ -1078,9 +1462,14 @@ function wfHideMenu(){ const m=$("wf-ctxmenu"); if(m) m.style.display="none"; }
 function wfShowMenu(clientX, clientY){
   const m=$("wf-ctxmenu"); if(!m) return;
   const items=[];
+  const copyable=WF.sel.filter(id=>{ const n=wfNode(id); return n && n.type!=="start"; }).length;
   const mergeCount=WF.sel.map(wfNode).filter(n=>n&&wfMergeable(n)).length;
   if(mergeCount>=2) items.push({label:"⧉ Gộp khối ("+mergeCount+")", fn:wfMergeSelected});
   if(wfSelHasStack()) items.push({label:"⊟ Tách khối", fn:wfUnmergeSelected});
+  if(copyable){ items.push({label:"⎘ Sao chép ("+copyable+")", fn:wfCopy});
+    items.push({label:"✂ Cắt ("+copyable+")", fn:wfCut});
+    items.push({label:"⧉ Nhân đôi ("+copyable+")", fn:wfDuplicate}); }
+  if(wfClipboard&&wfClipboard.nodes.length) items.push({label:"📋 Dán ("+wfClipboard.nodes.length+")", fn:()=>wfPaste({clientX,clientY})});
   if(WF.sel.length) items.push({label:"🗑 Xoá ("+WF.sel.length+")", fn:()=>wfDeleteSelected()});
   if(!items.length){ wfHideMenu(); return; }
   m.innerHTML="";
@@ -1090,12 +1479,25 @@ function wfShowMenu(clientX, clientY){
   m.style.left=(clientX)+"px"; m.style.top=(clientY)+"px"; m.style.display="block";
 }
 
+function wfShowWireMenu(clientX, clientY, ed){
+  const m=$("wf-ctxmenu"); if(!m) return;
+  m.innerHTML="";
+  const d=document.createElement("div"); d.className="wf-ctx-item"; d.textContent="🗑 Xoá dây nối";
+  d.onclick=()=>{ wfHideMenu(); wfDeleteWire(ed); }; m.appendChild(d);
+  m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
+}
 function wfInitCanvas(){
   if(wfCanvasReady) return; wfCanvasReady=true;
   const canvas=$("wf-canvas");
   canvas.addEventListener("mousedown",wfCanvasMouseDown);
+  // Track the pointer over the canvas so Ctrl+V pastes under the cursor.
+  canvas.addEventListener("mousemove",e=>{ wfPointer.x=e.clientX; wfPointer.y=e.clientY; wfPointer.inside=true; });
+  canvas.addEventListener("mouseleave",()=>{ wfPointer.inside=false; });
   canvas.addEventListener("contextmenu",e=>{
     e.preventDefault();
+    // Right-click on a wire → offer to delete just that wire.
+    const wire=e.target.closest("path.wire");
+    if(wire && wire.__edge){ wfShowWireMenu(e.clientX, e.clientY, wire.__edge); return; }
     const ne=e.target.closest(".wf-node");
     if(ne && !WF.sel.includes(ne.dataset.node)){ wfSelectOne(ne.dataset.node); wfMarkSel(); wfRenderInspector(); }
     wfShowMenu(e.clientX, e.clientY);
@@ -1153,7 +1555,7 @@ function wfInitCanvas(){
     if(!wfGesture) return;
     if(wfGesture.mode==="connect"){
       const tid=wfNodeUnderPointer(e.clientX,e.clientY);
-      if(tid) wfConnectTo(tid);
+      if(tid) wfConnectTo(tid, e.clientX, e.clientY);
       wfClearTemp(); wfHighlightTarget(null); wfDrawWires();
     } else if(wfGesture.mode==="box"){
       const box=$("wf-selbox"); if(box) box.remove();
@@ -1205,6 +1607,9 @@ function wfRenderInspector(){
     }
     // A free-text note for any node (the standalone "note" node carries its own text).
     if(node.type!=="note") body.appendChild(wfNoteField(node));
+    // A runtime log line: auto-emitted to the log panel every time this block runs.
+    // 'start' never executes, and the "note" node isn't run, so skip both.
+    if(node.type!=="note" && node.type!=="start") body.appendChild(wfLogField(node));
     return;
   }
   if(fn){
@@ -1247,6 +1652,29 @@ function wfUpdNodeNote(node){
   if(node.note){
     if(!n){ n=document.createElement("div"); n.className="wf-node-note"; el.appendChild(n); el.classList.remove("collapsed"); }
     n.textContent=node.note;
+  } else if(n){ n.remove(); }
+}
+function wfLogField(node){
+  const wrap=document.createElement("div");
+  const sec=document.createElement("div"); sec.className="wf-insp-sec"; sec.textContent="Log khi chạy"; sec.style.marginTop="8px"; wrap.appendChild(sec);
+  const inp=document.createElement("input"); inp.type="text"; inp.placeholder="tự ghi log mỗi lần chạy node…"; inp.value=node.log||"";
+  inp.style.width="100%";
+  inp.oninput=()=>{ node.log=inp.value; wfUpdNodeLog(node); };
+  wrap.appendChild(inp);
+  const hint=document.createElement("div"); hint.className="wf-insp-empty"; hint.style.padding="2px 0 0";
+  hint.innerHTML='Có thể chèn biến: <code>{tên_biến}</code>';
+  wrap.appendChild(hint);
+  return wrap;
+}
+function wfUpdNodeLog(node){
+  const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
+  let n=el.querySelector(".wf-node-log");
+  if(node.log){
+    if(!n){ n=document.createElement("div"); n.className="wf-node-log";
+      const note=el.querySelector(".wf-node-note"), thumb=el.querySelector(".wf-node-thumb");
+      if(thumb) el.insertBefore(n, thumb); else el.appendChild(n);
+      el.classList.remove("collapsed"); }
+    n.textContent=node.log;
   } else if(n){ n.remove(); }
 }
 function wfActField(label,t,val,onset){
@@ -1345,6 +1773,37 @@ function wfFieldEl(node,f){
     sel.onchange=()=>{ node.params[f.k]=sel.value; wfUpdNodeSum(node); };
     row.appendChild(sel); return row;
   }
+  if(f.t==="tpls"){
+    // A vertical list of templates (OR-set): each row = path + pick + remove + thumb.
+    row.style.flexDirection="column"; row.style.alignItems="stretch"; row.style.gap="5px";
+    const arr=()=> Array.isArray(node.params[f.k])?node.params[f.k]:(node.params[f.k]=[]);
+    const list=document.createElement("div"); list.style.display="flex"; list.style.flexDirection="column"; list.style.gap="6px";
+    function renderList(){
+      list.innerHTML="";
+      arr().forEach((path,idx)=>{
+        const item=document.createElement("div");
+        item.style.cssText="border:1px solid var(--border2);border-radius:6px;padding:5px;display:flex;flex-direction:column;gap:4px;";
+        const r=document.createElement("div"); r.style.cssText="display:flex;align-items:center;gap:4px;";
+        const num=document.createElement("span"); num.textContent=(idx+1)+"."; num.style.cssText="font-size:10px;color:var(--muted);flex-shrink:0;";
+        const inp=document.createElement("input"); inp.type="text"; inp.value=path||""; inp.style.cssText="flex:1;min-width:0;font-size:10px;";
+        const pick=document.createElement("button"); pick.className="btn sm"; pick.textContent="Chọn…";
+        const del=document.createElement("button"); del.className="wf-act-del"; del.textContent="×"; del.title="Xoá ảnh";
+        const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img, path);
+        const commit=v=>{ arr()[idx]=v; wfUpdNodeSum(node); wfUpdNodePreview(node); wfLoadThumb(img,v); };
+        inp.oninput=()=>commit(inp.value);
+        pick.onclick=async()=>{ const pp=await api().pick_template(); if(pp){ inp.value=pp; commit(pp); } };
+        del.onclick=()=>{ arr().splice(idx,1); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); };
+        r.appendChild(num); r.appendChild(inp); r.appendChild(pick); r.appendChild(del);
+        item.appendChild(r); item.appendChild(img); list.appendChild(item);
+      });
+      if(!arr().length){ const e=document.createElement("div"); e.className="wf-tpl-empty"; e.textContent="Chưa có ảnh — thêm ít nhất 2 để dùng \"hoặc\"."; list.appendChild(e); }
+    }
+    renderList();
+    const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Ảnh";
+    add.onclick=async()=>{ const pp=await api().pick_template(); arr().push(pp||""); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); };
+    row.appendChild(list); row.appendChild(add);
+    return row;
+  }
   const inp=document.createElement("input");
   inp.type=f.t==="num"?"number":"text"; if(f.t==="num"&&f.step) inp.step=f.step;
   inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
@@ -1372,8 +1831,9 @@ function wfUpdNodeSum(node){
   if(el) el.textContent=s;
 }
 // Image-template helpers (which nodes carry a template, and its current path).
-function wfTplField(type){ const def=WF_NODES[type]; return def&&(def.fields||[]).find(f=>f.t==="tpl"); }
-function wfTplOf(node){ const f=wfTplField(node.type); return f?(node.params[f.k]||""):""; }
+function wfTplField(type){ const def=WF_NODES[type]; return def&&(def.fields||[]).find(f=>f.t==="tpl"||f.t==="tpls"); }
+function wfTplOf(node){ const f=wfTplField(node.type); if(!f) return ""; const v=node.params[f.k];
+  return Array.isArray(v)?(v.find(Boolean)||""):(v||""); }   // tpls → first set image
 function wfUpdNodePreview(node){
   const img=document.querySelector(`.wf-node[data-node="${node.id}"] .wf-node-thumb`);
   if(img) wfLoadThumb(img, wfTplOf(node));   // refresh in-node thumbnail if shown
@@ -1382,13 +1842,16 @@ function wfUpdNodePreview(node){
 // ── Export / import / run ────────────────────────────────────────────────────
 function wfCleanGraph(g){
   return {
-    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.showPreview) o.showPreview=true; if(n.stackParent){ o.stackParent=n.stackParent; o.stackPort=n.stackPort||"out"; } return o; }),
-    edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort,to:e.to})),
+    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.showPreview) o.showPreview=true; if(n.stackParent){ o.stackParent=n.stackParent; o.stackPort=n.stackPort||"out"; } return o; }),
+    edges:(g.edges||[]).map(e=>{ const o={from:e.from,fromPort:e.fromPort,to:e.to}; if(e.toPort&&e.toPort!=="in") o.toPort=e.toPort; return o; }),
   };
 }
 function wfSerialize(){
+  wfSpeedFromUI();
+  const sh=WF.speedhack||{enabled:false,speed:2.0,package:""};
   return {
-    name:$("wf-name").value||"workflow", version:2, templatesDir:WF.templatesDir||"out",
+    name:$("wf-name").value||"workflow", version:2, templatesDir:WF.templatesDir||"templates",
+    speedhack:{ enabled:!!sh.enabled, speed:sh.speed||2.0, package:(sh.package||"").trim() },
     functions: WF.functions.map(f=>({ id:f.id, name:f.name, graph:wfCleanGraph(f.graph) })),
     activities: WF.activities.map(a=>{
       const o={ id:a.id, name:a.name, type:a.type, enabled:a.enabled,
@@ -1400,12 +1863,13 @@ function wfSerialize(){
 }
 function wfHydrateGraph(g){
   g=g||{nodes:[],edges:[]};
-  let nodes=(g.nodes||[]).map(n=>({id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params:n.params||wfDefaults(n.type),note:n.note||"",showPreview:!!n.showPreview,stackParent:n.stackParent||null,stackPort:n.stackPort||null}));
+  let nodes=(g.nodes||[]).map(n=>({id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params:n.params||wfDefaults(n.type),note:n.note||"",log:n.log||"",showPreview:!!n.showPreview,stackParent:n.stackParent||null,stackPort:n.stackPort||null}));
   if(!nodes.some(n=>n.type==="start")) nodes.unshift({id:wfUid(),type:"start",x:40,y:40,params:{}});
-  return { nodes, edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort||"out",to:e.to})) };
+  return { nodes, edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort||"out",to:e.to,toPort:e.toPort||"in"})) };
 }
 function wfHydrate(flow){
-  WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"out";
+  WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"templates";
+  const sh=flow.speedhack||{}; WF.speedhack={enabled:!!sh.enabled, speed:(parseFloat(sh.speed)||2.0), package:(sh.package||"").trim()};
   WF.functions=(flow.functions||[]).map(f=>({ id:f.id||("fn_"+wfUid().slice(1,6)), name:f.name||"function", graph:wfHydrateGraph(f.graph) }));
   WF.activities=(flow.activities||[]).map(a=>({
     id:a.id||("act_"+wfUid().slice(1,5)), name:a.name||a.id||"activity",
@@ -1416,6 +1880,7 @@ function wfHydrate(flow){
   }));
   WF.edit={kind:"activity", id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
   $("wf-name").value=WF.name;
+  wfSyncSpeedUI();
   wfRenderAll();
 }
 
@@ -1429,11 +1894,16 @@ async function wfImport(){
   try{ wfHydrate(JSON.parse(txt)); setStatus("Đã nhập workflow"); }
   catch(e){ alert("JSON không hợp lệ: "+e); }
 }
+// Play / stop glyphs for the run toggle (icon-only button).
+const WF_ICO_PLAY = '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
+const WF_ICO_STOP = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
 function wfSetRunning(on){
   wfRunning=on; const b=$("wf-run-btn");
-  if(!on) wfSetRunningNode(null);   // clear the active-node glow when stopped
+  if(on) wfResetRunViz();           // fresh trail for this run
+  else wfSetRunningNode(null);      // clear the active-node glow when stopped (keep trail)
   if(!b)return;
-  b.textContent= on?"Dừng":"Chạy thử";
+  b.innerHTML = on?WF_ICO_STOP:WF_ICO_PLAY;
+  b.title = on?"Dừng":"Chạy thử";
   b.classList.toggle("ok",!on); b.classList.toggle("err",on);
 }
 async function wfToggleRun(){
@@ -1457,8 +1927,11 @@ async function init(){
   const state=await api().get_state();
   S.connectedSerial=state.connectedSerial||null;
   (state.log||[]).forEach(appendLog);
-  try{ const st=await api().get_settings(); wfSnapOn=!!st.snap; wfPreviewAll=!!st.previewAll; }catch{}
+  try{ const st=await api().get_settings(); wfSnapOn=!!st.snap; wfPreviewAll=!!st.previewAll;
+    if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); } }catch{}
   wfSyncToggleBtns();
+  wfSetRunning(false);   // seed the run button's play icon
+  updateLogCount();
   wfInitCanvas();
   if(!WF.activities.length) wfAddActivity("sequence");
   wfRenderAll();

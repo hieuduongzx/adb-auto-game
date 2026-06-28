@@ -1,4 +1,5 @@
 {
   "snap": true,
-  "previewAll": true
+  "previewAll": true,
+  "logOpen": true
 }

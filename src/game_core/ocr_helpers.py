@@ -6,7 +6,7 @@ when OCR is unavailable so callers can fall back to template matching.
 import time
 from typing import Optional, Tuple
 
-from src.utils import log_success, log_warning
+from src.utils import log_debug, log_success, log_warning
 
 # Type alias: (x, y, width, height) in device-pixel space.
 Region = Tuple[int, int, int, int]
@@ -85,5 +85,5 @@ class OCRHelperMixin:
                 )
                 return True
             time.sleep(interval)
-        log_warning(f"[OCR] Timeout waiting for '{needle}' in {region}")
+        log_debug(f"[OCR] Timeout waiting for '{needle}' in {region}")
         return False

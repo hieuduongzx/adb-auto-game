@@ -94,6 +94,16 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .btn.err:hover { background: #fae2e0; }
 .btn.sm  { height: 26px; padding: 0 9px;  font-size: 11px; }
 .btn.h30 { height: 30px; padding: 0 12px; }
+/* Icon-only toolbar button: square, glyph centered, label lives in the tooltip.
+   Keeps the toolbar compact instead of a wall of text. Colour variants
+   (.accent/.ok/.err) still apply for primary actions (e.g. capture). */
+.btn.ico { width: 30px; padding: 0; }
+.btn.sm.ico { width: 26px; }
+.btn.ico svg { width: 16px; height: 16px; display: block; }
+.btn svg { stroke: currentColor; fill: none; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; }
+.btn.accent svg, .btn.ok svg, .btn.err svg { stroke-width: 2.1; }
+.btn.ico.on { background: var(--accent-bg); border-color: var(--accent-bd); color: var(--accent); }
 
 /* Inline icon button */
 .icon-btn { width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--border2);
@@ -236,15 +246,26 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 
 /* ── Log ─────────────────────────────────────────────────────────────────── */
 #log-card { flex-shrink: 0; display: flex; flex-direction: column; min-height: 100px; max-height: 155px; }
+#log-card.collapsed { min-height: 0; max-height: none; }
+#log-card.collapsed .log-body { display: none; }
+#log-card.collapsed .log-hdr { border-bottom: none; }
 .log-hdr  { display: flex; align-items: center; gap: 6px; padding: 7px 12px;
-  border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  border-bottom: 1px solid var(--border); flex-shrink: 0; cursor: pointer; user-select: none;
+  transition: background .1s; border-radius: var(--r-md) var(--r-md) 0 0; }
+.log-hdr:hover { background: var(--alt); }
+.log-chevron { color: var(--muted); display: inline-flex; transition: transform .15s var(--ease); }
+#log-card.collapsed .log-chevron { transform: rotate(-90deg); }
 .log-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
   color: var(--muted); text-transform: uppercase; }
+.log-count { font-family: var(--mono); font-size: 10px; color: var(--muted);
+  background: var(--alt); border-radius: 999px; padding: 1px 7px; min-width: 18px; text-align: center; }
+.log-count:empty { display: none; }
 .btn-log-clear { font-size: 11px; font-weight: 600; color: var(--muted);
-  padding: 2px 4px; border-radius: 4px; transition: color .1s; }
-.btn-log-clear:hover { color: var(--dim); }
+  padding: 2px 6px; border-radius: 4px; transition: color .1s, background .1s; }
+.btn-log-clear:hover { color: var(--dim); background: var(--panel); }
 .log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px;
-  background: var(--log-bg); border-radius: 0 0 var(--r-md) var(--r-md); }
+  background: var(--log-bg); border-radius: 0 0 var(--r-md) var(--r-md);
+  user-select: text; cursor: text; }
 .log-line { display: flex; gap: 7px; font-family: var(--mono); font-size: 10.5px;
   line-height: 1.75; white-space: nowrap; }
 .log-ts  { color: var(--log-muted); flex-shrink: 0; }
@@ -281,9 +302,15 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
     </select>
     <svg width="10" height="6" viewBox="0 0 12 7" fill="#9aa3ae" style="flex-shrink:0;pointer-events:none;"><path d="M0 0l6 7 6-7z"/></svg>
   </div>
-  <button class="btn" onclick="onRefreshDevices()">Làm mới</button>
-  <button class="btn" onclick="onScanPorts()">Quét cổng</button>
-  <button class="btn" onclick="onRestartAdb()">Khởi động lại ADB</button>
+  <button class="btn ico" onclick="onRefreshDevices()" title="Làm mới — quét lại thiết bị đã kết nối">
+    <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg></button>
+  <button class="btn ico" onclick="onScanPorts()" title="Quét cổng — dò mọi cổng giả lập đã biết">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+  <button class="btn ico" onclick="onRestartAdb()" title="Khởi động lại ADB server">
+    <svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg></button>
+  <span class="tb-divider" style="width:1px;height:20px;background:var(--border2);flex-shrink:0;"></span>
+  <button class="btn ico" onclick="openWorkflowDesigner()" title="Workflow Designer — mở (cửa sổ mới)">
+    <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></button>
   <span class="spacer"></span>
   <div class="hz-wrap">
     <input id="hz-spin" type="number" min="0.2" max="30" step="0.5" value="5" onchange="onHzChange(this.value)">
@@ -293,10 +320,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
     <span id="auto-cb"><span id="auto-thumb"></span></span>
     <span class="pill-label">Tự động</span>
   </button>
-  <button class="btn ok" onclick="onCapture()">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-    Chụp <span style="opacity:.65;font-weight:500;font-family:var(--mono);font-size:10px;">F5</span>
-  </button>
+  <button class="btn ok ico" onclick="onCapture()" title="Chụp màn hình (F5)">
+    <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
 </div>
 
 <!-- ── Main split ────────────────────────────────────────────────────────── -->
@@ -621,10 +646,13 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 
 <!-- ── Log ──────────────────────────────────────────────────────────────── -->
 <div id="log-card" class="card">
-  <div class="log-hdr">
+  <div class="log-hdr" onclick="toggleLog(event)" title="Bấm để thu gọn/mở nhật ký">
+    <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
     <span class="log-label">Nhật ký</span>
+    <span class="log-count" id="log-count"></span>
     <span class="spacer"></span>
-    <button class="btn-log-clear" onclick="onClearLog()">Xoá</button>
+    <button class="btn-log-clear" onclick="onCopyLog(event)">Sao chép</button>
+    <button class="btn-log-clear" onclick="onClearLog(event)">Xoá</button>
   </div>
   <div class="log-body" id="log-body"></div>
 </div>
@@ -885,6 +913,19 @@ function appendLog(entry){
   body.appendChild(line);
   while(body.children.length>500) body.removeChild(body.firstChild);
   body.scrollTop=body.scrollHeight;
+  updateLogCount();
+}
+// ── Log drawer (collapsible + copyable) ─────────────────────────────────────
+function updateLogCount(){ const c=$("log-count"), b=$("log-body"); if(c&&b) c.textContent = b.children.length? String(b.children.length):""; }
+function toggleLog(ev){
+  if(ev && ev.target.closest(".btn-log-clear")) return;   // let header buttons act without toggling
+  const c=$("log-card"); if(c) c.classList.toggle("collapsed");
+}
+function onCopyLog(ev){
+  if(ev) ev.stopPropagation();
+  const b=$("log-body"); if(!b) return;
+  const text=[...b.children].map(l=>l.innerText.replace(/\s+/g," ").trim()).join("\n");
+  copyText(text, ev&&ev.currentTarget);
 }
 
 // ── Python events ─────────────────────────────────────────────────────────
@@ -892,7 +933,7 @@ window.__recv = function(raw){
   let ev; try{ev=JSON.parse(raw);}catch{return;}
   const{type,data}=ev;
   if(type==="log"){appendLog(data);return;}
-  if(type==="log_cleared"){$("log-body").innerHTML="";return;}
+  if(type==="log_cleared"){$("log-body").innerHTML="";updateLogCount();return;}
   if(type==="devices_update"){S.devices=data.devices||[];rebuildDeviceSelect(S.devices,S.connectedSerial,null);return;}
   if(type==="device_status"){S.connectedSerial=data.serial||null;setConnected(!!data.connected);rebuildDeviceSelect(S.devices,data.serial,data.serial);return;}
   if(type==="device_info"){INFO_KEYS.forEach(k=>{if(INFO_DOM[k])$(INFO_DOM[k]).textContent=data[k]||"-";});return;}
@@ -917,6 +958,7 @@ async function onCapture(){ await api().capture(); }
 async function onRefreshDevices(){ await api().refresh_devices(); }
 async function onScanPorts(){ await api().scan_ports(); }
 async function onRestartAdb(){ await api().restart_adb(); }
+async function openWorkflowDesigner(){ try{ await api().open_workflow_designer(); setStatus("Đang mở Workflow Designer…"); }catch{} }
 async function onDeviceChange(serial){ if(serial){S.connectedSerial=serial;await api().select_device(serial);} }
 function onHzChange(v){ api().set_refresh_hz(parseFloat(v)||5); }
 function onToggleAuto(){
@@ -983,7 +1025,7 @@ async function onRunMatch(all){
 async function onClearOverlay(){ await api().clear_overlay(); S.overlay=[]; draw(); }
 async function onRefreshInfo(){ await api().refresh_info(); }
 async function onCopyInfo(){ await api().copy_info(); }
-async function onClearLog(){ await api().clear_log(); }
+async function onClearLog(ev){ if(ev) ev.stopPropagation(); await api().clear_log(); }
 
 // ── Asset library ──────────────────────────────────────────────────────────
 async function onRefreshAssets(){
@@ -1032,6 +1074,7 @@ async function init(){
   $("hz-spin").value=state.refreshHz;
   if(state.outDir) updateOutDir(state.outDir);
   (state.log||[]).forEach(appendLog);
+  updateLogCount();
   resizeCanvas(); setStatus("Sẵn sàng");
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();

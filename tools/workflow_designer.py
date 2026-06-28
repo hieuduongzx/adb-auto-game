@@ -22,6 +22,7 @@ import datetime
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -39,6 +40,7 @@ if _PROJECT_ROOT not in sys.path:
 import webview
 
 from src.core.adb import ADBController, DeviceScanner
+from src.game_core.frida_speedhack import FridaSpeedhackManager
 from src.workflow import NODE_TYPES, WorkflowEngine
 from src.utils import (
     add_log_subscriber,
@@ -52,6 +54,18 @@ from src.utils import (
 _WEB_DIR = os.path.join(os.path.dirname(__file__), "web")
 _FLOWS_DIR = os.path.join(_PROJECT_ROOT, "data", "flows")
 _SETTINGS_PATH = os.path.join(_PROJECT_ROOT, "data", "designer_settings.json")
+
+# Convention: a saved workflow.json is paired with a sibling assets folder of
+# this name, so the pair (json + folder) is a self-contained, movable bundle —
+# the unit we later package into an .exe. Image nodes reference their templates
+# relative to the json as ``<_TEMPLATES_DIRNAME>/<file>``.
+_TEMPLATES_DIRNAME = "templates"
+# Node params whose value is a template image path (kept in sync with the
+# ``t:"tpl"`` fields in workflow_designer.html — all use the key "template").
+_TEMPLATE_PARAM_KEYS = ("template",)
+# Node params whose value is a *list* of template paths (``t:"tpls"`` fields —
+# the "…_any" multi-image OR nodes; key "templates").
+_TEMPLATE_LIST_PARAM_KEYS = ("templates",)
 
 
 def _sanitize_name(raw: str) -> str:
@@ -77,6 +91,12 @@ class WorkflowDesignerAPI:
         self._device_lock = threading.Lock()
         self._selected_serial: Optional[str] = None
         self._connected_serial: Optional[str] = None
+
+        # Standalone speed hack — fully decoupled from the test run. The designer's
+        # "Run test" never injects Frida; speedhack is its own manual ▶ action, so
+        # it owns its own manager/retry-thread rather than riding the engine run.
+        self._sh_mgr: Optional[FridaSpeedhackManager] = None
+        self._sh_stop: Optional[threading.Event] = None
 
     # ── Setup ────────────────────────────────────────────────────────────────
 
@@ -183,13 +203,7 @@ class WorkflowDesignerAPI:
             try:
                 self.scanner.ensure_adb_server_running()
                 devices = self.controller.client.devices()
-                items = []
-                for d in devices:
-                    try:
-                        model = (d.shell("getprop ro.product.model") or "").strip()
-                    except Exception:
-                        model = ""
-                    items.append({"serial": d.serial, "name": model or d.serial})
+                items = self.scanner.unique_devices(devices)
                 if items and not self._selected_serial:
                     first = items[0].get("serial")
                     if first:
@@ -315,6 +329,110 @@ class WorkflowDesignerAPI:
         self._remember_dir(path)
         return str(path)
 
+    # ── Template bundling (portable game folder) ───────────────────────────────
+
+    @staticmethod
+    def _iter_graphs(flow: dict):
+        """Yield every node-graph in a flow (each activity + each function)."""
+        for act in flow.get("activities") or []:
+            g = act.get("graph")
+            if isinstance(g, dict):
+                yield g
+        for fn in flow.get("functions") or []:
+            g = fn.get("graph")
+            if isinstance(g, dict):
+                yield g
+
+    def _resolve_existing(self, raw: str, save_dir: str) -> Optional[str]:
+        """Absolute path of an existing template, or ``None`` if not found.
+
+        Tries the save folder (already-bundled / in-place save), the currently
+        open flow's folder, then the project's usual asset roots.
+        """
+        raw = (raw or "").strip().replace("\\", "/")
+        if not raw:
+            return None
+        if os.path.isabs(raw):
+            return raw if os.path.isfile(raw) else None
+        anchors: List[str] = []
+        if save_dir:
+            anchors.append(save_dir)
+        if self._wf_path:
+            anchors.append(os.path.dirname(self._wf_path))
+        anchors += [_PROJECT_ROOT, os.path.join(_PROJECT_ROOT, "out"), os.getcwd()]
+        for a in anchors:
+            cand = os.path.join(a, raw)
+            if os.path.isfile(cand):
+                return cand
+        return None
+
+    def _materialize_templates(self, flow: dict, save_dir: str) -> int:
+        """Copy every template used by ``flow`` into ``save_dir/templates`` and
+        rewrite each node's path to the relative ``templates/<file>`` form.
+
+        Returns the number of distinct images bundled. Mutates ``flow`` in place.
+        """
+        tdir_name = (flow.get("templatesDir") or _TEMPLATES_DIRNAME).strip().strip("/\\")
+        tdir_name = tdir_name or _TEMPLATES_DIRNAME
+        flow["templatesDir"] = tdir_name
+        dest_dir = os.path.join(save_dir, tdir_name)
+
+        copied: Dict[str, str] = {}   # normalized source abs path -> "templates/<file>"
+        taken: set = set()            # lower-cased basenames already claimed
+
+        def relocate(raw: str) -> str:
+            src = self._resolve_existing(raw, save_dir)
+            if not src:
+                return raw  # leave unknown/empty paths untouched
+            key = os.path.normcase(os.path.abspath(src))
+            if key in copied:
+                return copied[key]
+            stem, ext = os.path.splitext(os.path.basename(src))
+            name, n = f"{stem}{ext}", 1
+            while name.lower() in taken:   # different source, same basename
+                name = f"{stem}_{n}{ext}"
+                n += 1
+            taken.add(name.lower())
+            dest = os.path.join(dest_dir, name)
+            if os.path.normcase(os.path.abspath(dest)) != key:
+                os.makedirs(dest_dir, exist_ok=True)
+                shutil.copy2(src, dest)
+            rel = f"{tdir_name}/{name}"
+            copied[key] = rel
+            return rel
+
+        for graph in self._iter_graphs(flow):
+            for node in graph.get("nodes") or []:
+                params = node.get("params")
+                if not isinstance(params, dict):
+                    continue
+                for pk in _TEMPLATE_PARAM_KEYS:
+                    if params.get(pk):
+                        params[pk] = relocate(params[pk])
+                for pk in _TEMPLATE_LIST_PARAM_KEYS:
+                    vals = params.get(pk)
+                    if isinstance(vals, list):
+                        params[pk] = [relocate(v) if v else v for v in vals]
+        return len(copied)
+
+    def _write_flow(self, flow_json: str, path: str) -> None:
+        """Write a flow to ``path``, bundling its templates into a sibling folder.
+
+        Falls back to writing the raw JSON unchanged if it can't be parsed or
+        the images can't be copied, so a save never silently fails.
+        """
+        text = flow_json
+        try:
+            flow = json.loads(flow_json)
+            n = self._materialize_templates(flow, os.path.dirname(os.path.abspath(path)))
+            text = json.dumps(flow, ensure_ascii=False, indent=2)
+            if n:
+                log_info(f"Đã đóng gói {n} ảnh template vào ./{_TEMPLATES_DIRNAME}/")
+        except Exception as exc:
+            log_warning(f"Không thể đóng gói ảnh template: {exc} — lưu JSON gốc")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+
     # ── Workflow file ops ──────────────────────────────────────────────────────
 
     def workflow_node_types(self) -> dict:
@@ -349,8 +467,7 @@ class WorkflowDesignerAPI:
         if not path.lower().endswith(".json"):
             path += ".json"
         try:
-            with open(path, "w", encoding="utf-8") as fh:
-                fh.write(flow_json)
+            self._write_flow(flow_json, path)
             self._wf_path = path
             self._remember_dir(path)
             log_success(f"Đã lưu workflow: {path}")
@@ -362,8 +479,7 @@ class WorkflowDesignerAPI:
     def workflow_save(self, flow_json: str, name: str = "") -> dict:
         if self._wf_path:
             try:
-                with open(self._wf_path, "w", encoding="utf-8") as fh:
-                    fh.write(flow_json)
+                self._write_flow(flow_json, self._wf_path)
                 log_success(f"Đã lưu: {self._wf_path}")
                 return {"ok": True, "path": self._wf_path}
             except Exception as exc:
@@ -426,7 +542,10 @@ class WorkflowDesignerAPI:
         self._engine.load(flow, flow_path=anchor)
         self._engine.callbacks["on_stop"] = [lambda: self._push("workflow_state", {"running": False})]
         self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
-        ok = self._engine.start(background=True)
+        self._engine.callbacks["on_node_done"] = [
+            lambda nid, st, port: self._push("node_result", {"id": nid, "status": st, "port": port})]
+        # Test runs never auto-apply speedhack — that's a separate ▶ action.
+        ok = self._engine.start(background=True, with_speedhack=False)
         self._push("workflow_state", {"running": ok})
         if ok:
             log_success("Workflow bắt đầu chạy")
@@ -441,13 +560,109 @@ class WorkflowDesignerAPI:
     def workflow_running(self) -> bool:
         return bool(self._engine and self._engine.is_running())
 
+    # ── Standalone speed hack (manual ▶, independent of the test run) ──────────
+
+    def _sh_push(self, active: bool, running: bool) -> None:
+        self._push("speedhack_state", {"active": active, "running": running})
+
+    def speedhack_start(self, speed=2.0, package: str = "") -> bool:
+        """Start (or live-adjust) the speed hack on its own — no workflow needed."""
+        try:
+            scale = float(speed)
+        except (TypeError, ValueError):
+            scale = 2.0
+        if self.controller.device is None:
+            log_error("[speedhack] chưa chọn thiết bị")
+            return False
+        if scale <= 0 or scale == 1.0:
+            log_warning("[speedhack] tốc độ phải khác 1.0 để tăng tốc")
+            return False
+        # Already running → just push the new scale live (no re-inject, no package).
+        if self._sh_mgr is not None:
+            ok = self._sh_mgr.set_scale(scale)
+            self._sh_push(bool(self._sh_mgr.active), True)
+            return ok
+        pkg = (package or "").strip()
+        if not pkg:
+            log_error("[speedhack] cần nhập package game để bật speed hack")
+            return False
+        mgr = FridaSpeedhackManager(package=pkg)
+        mgr.adb_controller = self.controller
+        if not mgr.available:
+            log_warning("[speedhack] không tìm thấy frida-inject trong vendor/frida/")
+            return False
+        self._sh_mgr = mgr
+        self._sh_stop = threading.Event()
+        self._sh_push(False, True)
+        threading.Thread(target=self._sh_loop, args=(scale,), daemon=True).start()
+        return True
+
+    def _sh_loop(self, scale: float) -> None:
+        """Inject in the background, retrying until the game process exists."""
+        stop_ev = self._sh_stop
+        mgr = self._sh_mgr
+        if mgr is None:
+            return
+        log_info(f"[speedhack] sẽ tăng tốc '{mgr.package}' x{scale} khi game chạy…")
+        while mgr is not None and stop_ev is not None and not stop_ev.is_set():
+            if mgr.active:
+                return
+            try:
+                if mgr.set_scale(scale):
+                    log_success(f"[speedhack] đã bật x{scale}")
+                    self._sh_push(True, True)
+                    return
+            except Exception as e:
+                log_warning(f"[speedhack] thử lại: {e}")
+            for _ in range(50):  # ~5s, stay responsive to stop
+                if stop_ev.is_set():
+                    return
+                time.sleep(0.1)
+
+    def speedhack_stop(self) -> bool:
+        ev = self._sh_stop
+        if ev is not None:
+            ev.set()
+        self._sh_stop = None
+        mgr = self._sh_mgr
+        self._sh_mgr = None
+        if mgr is not None:
+            try:
+                mgr.detach()
+            except Exception as e:
+                log_warning(f"[speedhack] lỗi khi tắt: {e}")
+        self._sh_push(False, False)
+        return True
+
+    def speedhack_running(self) -> bool:
+        return self._sh_mgr is not None
+
+    def open_dev_helper(self) -> bool:
+        """Launch the Dev Helper tool in a separate process."""
+        try:
+            tool = os.path.join(os.path.dirname(__file__), "dev_helper.py")
+            subprocess.Popen([sys.executable, tool])
+            log_success("Đã mở Dev Helper")
+            return True
+        except Exception as exc:
+            log_error(f"Mở Dev Helper thất bại: {exc}")
+            return False
+
     def open_runner(self, flow_json: str) -> bool:
-        """Launch the Runner GUI (separate process) preloaded with this flow."""
+        """Launch the Runner GUI (separate process) preloaded with this flow.
+
+        The runner resolves template images relative to the file it loads, so we
+        can't just dump the raw JSON next to it — its ``templates/<file>`` paths
+        point at the *original* bundle folder, not ``data/flows/``. ``_write_flow``
+        re-bundles the templates into a sibling ``templates/`` folder (pulling
+        from the original ``self._wf_path`` bundle / absolute picker paths) and
+        rewrites the paths, so the temp run file is self-contained and the runner
+        finds every image.
+        """
         try:
             os.makedirs(_FLOWS_DIR, exist_ok=True)
             tmp = os.path.join(_FLOWS_DIR, "_designer_run.json")
-            with open(tmp, "w", encoding="utf-8") as f:
-                f.write(flow_json)
+            self._write_flow(flow_json, tmp)
             runner = os.path.join(os.path.dirname(__file__), "workflow_runner.py")
             subprocess.Popen([sys.executable, runner, tmp])
             log_success("Đã mở Runner GUI với workflow hiện tại")
@@ -463,6 +678,11 @@ class WorkflowDesignerAPI:
         if self._engine and self._engine.is_running():
             try:
                 self._engine.stop()
+            except Exception:
+                pass
+        if self._sh_mgr is not None:
+            try:
+                self.speedhack_stop()
             except Exception:
                 pass
         remove_log_subscriber(self._on_log)

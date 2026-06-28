@@ -265,7 +265,7 @@ class ADBGameAutomation:
                 )
                 return True
             time.sleep(interval)
-        log_warning(f"[OCR] Timeout waiting for '{needle}' in region {region}")
+        log_debug(f"[OCR] Timeout waiting for '{needle}' in region {region}")
         return False
 
     def get_screen_size(self) -> Tuple[int, int]:
@@ -465,26 +465,29 @@ class ADBGameAutomation:
         attempts = 0
         next_log = 5.0
 
+        # Waiting/timing-out on a template is normal control flow (a condition's
+        # false branch), not a problem — keep it at DEBUG so it doesn't spam the
+        # GUI log panel. The workflow engine logs its own node-level lines.
         while time.time() - start_time < timeout:
             if self._stop_event.is_set():
-                log_info(f"[WAIT TEMPLATE] Interrupted: {template_name}")
+                log_debug(f"[WAIT TEMPLATE] Interrupted: {template_name}")
                 return None
             attempts += 1
             result = self.find_template(template_name, threshold=threshold)
             if result:
                 elapsed = time.time() - start_time
-                log_normal(
+                log_debug(
                     f"[WAIT TEMPLATE] {template_name} found after {elapsed:.2f}s ({attempts} attempts)"
                 )
                 return result
 
             elapsed = time.time() - start_time
             if elapsed >= next_log:
-                log_info(f"[WAIT TEMPLATE] Still waiting for {template_name}... ({elapsed:.1f}s)")
+                log_debug(f"[WAIT TEMPLATE] Still waiting for {template_name}... ({elapsed:.1f}s)")
                 next_log += 5.0
             time.sleep(interval)
 
-        log_warning(f"[WAIT TEMPLATE] Timeout waiting for {template_name}")
+        log_debug(f"[WAIT TEMPLATE] Timeout waiting for {template_name}")
         return None
     
     def wait_for_any_template(
@@ -517,7 +520,7 @@ class ADBGameAutomation:
             
             time.sleep(interval)
         
-        log_warning("Timeout waiting for any template")
+        log_debug("Timeout waiting for any template")
         return None
         
     def swipe(self, x1: int, y1: int, x2: int, y2: int, duration: int = 300) -> bool:

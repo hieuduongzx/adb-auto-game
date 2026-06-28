@@ -19,7 +19,104 @@ class DeviceScanner:
         self.host = host
         self.port = port
         self.adb_path = get_adb_path()
+        # Remember the last reported status so periodic polling (every few
+        # seconds) only logs when something actually changes — no spam.
+        self._last_server_ok: Optional[bool] = None
+        self._last_device_count: int = -1
     
+    @staticmethod
+    def _local_ipv4s() -> List[str]:
+        """This host's own non-loopback IPv4 addresses.
+
+        Needed because LDPlayer binds ``0.0.0.0:5555`` while MuMu binds the more
+        specific ``127.0.0.1:5555``; Windows routes loopback connects to the
+        specific bind (MuMu), so LDPlayer is only reachable via a LAN IP.
+        """
+        ips = set()
+        try:
+            for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+                ip = info[4][0]
+                if ip and not ip.startswith("127."):
+                    ips.add(ip)
+        except Exception:
+            pass
+        return sorted(ips)
+
+    def _scan_targets(self) -> List[str]:
+        """Loopback emulator ports, plus LDPlayer ports on each LAN IP."""
+        targets = list(ALL_EMULATOR_PORTS)
+        lan_ips = self._local_ipv4s()
+        if lan_ips:
+            ld_ports = [h.split(":", 1)[1]
+                        for h in EMULATOR_PORT_RANGES.get("ldplayer", [])]
+            for ip in lan_ips:
+                for port in ld_ports:
+                    targets.append(f"{ip}:{port}")
+        seen, out = set(), []
+        for t in targets:
+            if t not in seen:
+                seen.add(t)
+                out.append(t)
+        return out
+
+    def unique_devices(self, devices) -> List[dict]:
+        """One entry per *physical* device, as ``[{"serial","name"}]``.
+
+        A single emulator can appear under several ADB serials at once
+        (e.g. MuMu as ``127.0.0.1:16384`` + ``:5555`` + ``:7555`` +
+        ``emulator-5554``). We group by a stable hardware fingerprint
+        (``android_id``, falling back to ``ro.serialno``) so duplicates collapse
+        to one, while genuinely different emulators stay separate — even when
+        they share a port number on different hosts. The representative serial
+        prefers a loopback (``127.0.0.1``) address, then a LAN IP, then the
+        ``emulator-*`` console form.
+        """
+        info = []  # (serial, model, fingerprint)
+        for d in devices:
+            model = fp = ""
+            # A just-`adb connect`-ed device is briefly offline; retry so its
+            # fingerprint is stable instead of splitting one emulator into
+            # several rows right after a scan. Warm devices hit this once.
+            for attempt in range(3):
+                try:
+                    out = d.shell("getprop ro.product.model; settings get secure android_id") or ""
+                    parts = [ln.strip() for ln in out.splitlines() if ln.strip()]
+                    if parts:
+                        model = parts[0]
+                    if len(parts) > 1 and parts[1].lower() != "null":
+                        fp = parts[1]
+                except Exception:
+                    pass
+                if fp:
+                    break
+                if attempt < 2:
+                    time.sleep(0.3)
+            if not fp:
+                try:
+                    fp = (d.shell("getprop ro.serialno") or "").strip()
+                except Exception:
+                    fp = ""
+            if not fp:
+                fp = "@" + d.serial  # can't fingerprint → treat as its own device
+            info.append((d.serial, model, fp))
+
+        def rank(serial: str):
+            if serial.startswith("127.0.0.1:"):
+                return (0, serial)
+            if serial.startswith("emulator-"):
+                return (2, serial)
+            return (1, serial)  # LAN-IP form: between loopback and console
+
+        groups: Dict[str, list] = {}
+        for serial, model, fp in info:
+            groups.setdefault(fp, []).append((serial, model))
+        result = []
+        for fp, lst in groups.items():
+            lst.sort(key=lambda sm: rank(sm[0]))
+            serial, model = lst[0]
+            result.append({"serial": serial, "name": model or serial})
+        return result
+
     def _is_port_open(self, host: str, port: int, timeout: float = 1.0) -> bool:
         """Quickly check if a port is open"""
         try:
@@ -121,11 +218,12 @@ class DeviceScanner:
             return []
     
     def scan_all(self, stop_on_first: bool = False) -> List[Tuple[str, str]]:
-        """Scan all emulator ports"""
-        log_info(f"Scanning {len(ALL_EMULATOR_PORTS)} ports for all emulators...")
+        """Scan all emulator ports (loopback + LAN IPs for 0.0.0.0-bound ones)."""
+        targets = self._scan_targets()
+        log_info(f"Scanning {len(targets)} ports for all emulators...")
         log_info("Supported: MuMu, LDPlayer, BlueStacks, Nox, MEmu")
-        
-        return self.scan_ports(ALL_EMULATOR_PORTS, stop_on_first=stop_on_first)
+
+        return self.scan_ports(targets, stop_on_first=stop_on_first)
     
     def scan_emulator(self, emulator_type: str) -> List[Tuple[str, str]]:
         """Scan specific emulator type"""
@@ -150,21 +248,34 @@ class DeviceScanner:
             )
             
             if result.returncode == 0:
-                log_success("ADB server is running")
                 lines = result.stdout.strip().split("\n")[1:]  # Skip header
                 devices = [
                     line for line in lines
                     if line.strip() and "List of devices" not in line
                 ]
-                if devices:
-                    log_info(f"Connected devices: {len(devices)}")
-                    for device in devices:
-                        log_info(f"  - {device}")
+                # Only surface to the log when the picture actually changes;
+                # routine re-checks during polling go to debug instead of spamming.
+                changed = (self._last_server_ok is not True
+                           or len(devices) != self._last_device_count)
+                if changed:
+                    log_success("ADB server is running")
+                    if devices:
+                        log_info(f"Connected devices: {len(devices)}")
+                        for device in devices:
+                            log_info(f"  - {device}")
+                    else:
+                        log_info("No devices connected yet")
                 else:
-                    log_info("No devices connected yet")
+                    log_debug("ADB server still running "
+                              f"({len(devices)} device(s))")
+                self._last_server_ok = True
+                self._last_device_count = len(devices)
                 return True
             else:
-                log_error(f"ADB server error: {result.stderr}")
+                if self._last_server_ok is not False:
+                    log_error(f"ADB server error: {result.stderr}")
+                self._last_server_ok = False
+                self._last_device_count = -1
                 return False
                 
         except subprocess.TimeoutExpired:

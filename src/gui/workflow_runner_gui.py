@@ -118,6 +118,7 @@ class WorkflowRunnerAPI:
             "log": self._log_buffer[-300:],
             "running": self.engine.is_running(),
             "paused": self.engine.is_paused(),
+            "speedhack": self.engine.speedhack_info(),
             "connectedSerial": self._connected_serial,
             "selectedSerial": self._selected_serial,
         }
@@ -177,7 +178,8 @@ class WorkflowRunnerAPI:
         self.engine.load(flow, flow_path=path)
         log_success(f"Đã tải workflow: {flow.get('name', os.path.basename(path))}")
         state = {"ok": True, "name": flow.get("name", ""),
-                 "activities": self._activities_payload()}
+                 "activities": self._activities_payload(),
+                 "speedhack": self.engine.speedhack_info()}
         self._push("flow_loaded", state)
         return state
 
@@ -241,6 +243,37 @@ class WorkflowRunnerAPI:
                         v["value"] = value
                         return True
         return False
+
+    # ── Speedhack (mirrors the live slider in pywebview_gui) ──────────────────
+
+    def set_speedhack(self, enabled: bool, speed: float = None,
+                      package: str = None) -> dict:
+        """Toggle the speedhack and/or update its speed/package.
+
+        Applies live when a run is in progress, otherwise just stores the
+        config so the next Start picks it up.
+        """
+        try:
+            self.engine.configure_speedhack(
+                enabled=bool(enabled),
+                speed=speed,
+                package=package,
+            )
+        except Exception as exc:
+            log_error(f"Speedhack lỗi: {exc}")
+        info = self.engine.speedhack_info()
+        self._push("speedhack_update", info)
+        return info
+
+    def set_speed_scale(self, scale: float) -> dict:
+        """Change the live time scale while a run is in progress."""
+        try:
+            self.engine.set_speed_scale(float(scale))
+        except Exception as exc:
+            log_error(f"Speedhack lỗi: {exc}")
+        info = self.engine.speedhack_info()
+        self._push("speedhack_update", info)
+        return info
 
     def clear_log(self) -> bool:
         self._log_buffer.clear()
