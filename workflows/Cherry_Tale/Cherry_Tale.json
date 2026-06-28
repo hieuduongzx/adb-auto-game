@@ -1,0 +1,753 @@
+{
+  "name": "Cherry Tale",
+  "version": 2,
+  "templatesDir": "templates",
+  "speedhack": {
+    "enabled": false,
+    "speed": 2,
+    "package": ""
+  },
+  "functions": [
+    {
+      "id": "fn_ppung",
+      "name": "GoHome",
+      "graph": {
+        "nodes": [
+          {
+            "id": "n43hela1",
+            "type": "start",
+            "x": 60,
+            "y": -20,
+            "params": {}
+          },
+          {
+            "id": "njdme2qq",
+            "type": "if_image",
+            "x": 420,
+            "y": -20,
+            "params": {
+              "template": "templates/isHome_20260629_020356_32x32.png",
+              "threshold": 0.85,
+              "negate": true
+            }
+          },
+          {
+            "id": "nasty5ic",
+            "type": "tap_image_any",
+            "x": 600,
+            "y": -20,
+            "params": {
+              "templates": [
+                "templates/isHome_20260629_020427_37x32.png",
+                "templates/isHome_20260629_020820_29x28.png",
+                "templates/isHome_20260629_022433_10x49.png"
+              ],
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nb3rusi6",
+            "type": "loop",
+            "x": 240,
+            "y": -20,
+            "params": {
+              "count": 3,
+              "infinite": true
+            }
+          },
+          {
+            "id": "n25sgerm",
+            "type": "end",
+            "x": 600,
+            "y": 120,
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": "njdme2qq",
+            "fromPort": "true",
+            "to": "nasty5ic"
+          },
+          {
+            "from": "n43hela1",
+            "fromPort": "out",
+            "to": "nb3rusi6"
+          },
+          {
+            "from": "nb3rusi6",
+            "fromPort": "body",
+            "to": "njdme2qq"
+          },
+          {
+            "from": "nasty5ic",
+            "fromPort": "true",
+            "to": "nb3rusi6",
+            "toPort": "loop"
+          },
+          {
+            "from": "njdme2qq",
+            "fromPort": "false",
+            "to": "n25sgerm"
+          }
+        ],
+        "groups": []
+      }
+    }
+  ],
+  "activities": [
+    {
+      "id": "sequence_9x85",
+      "name": "Bữa Tiệc",
+      "type": "sequence",
+      "enabled": false,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nrajmf1d",
+            "type": "start",
+            "x": -120,
+            "y": 20,
+            "params": {}
+          },
+          {
+            "id": "nqmf20e6",
+            "type": "tap_image",
+            "x": 240,
+            "y": 20,
+            "params": {
+              "template": "templates/crop_20260629_015843_57x46.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nxbi2js8",
+            "type": "tap_image",
+            "x": 240,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_015855_103x30.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nfbv3qgp",
+            "type": "tap_image",
+            "x": 240,
+            "y": 140,
+            "params": {
+              "template": "templates/crop_20260629_015903_119x25.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nm0ibj2v",
+            "type": "tap_image",
+            "x": 240,
+            "y": 200,
+            "params": {
+              "template": "templates/crop_20260629_015910_107x34.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n52kitq9",
+            "type": "tap_image",
+            "x": 420,
+            "y": 200,
+            "params": {
+              "template": "templates/crop_20260629_020144_213x200.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "noste6ns",
+            "type": "call",
+            "x": 60,
+            "y": 20,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nqmf20e6",
+            "fromPort": "true",
+            "to": "nxbi2js8"
+          },
+          {
+            "from": "nxbi2js8",
+            "fromPort": "true",
+            "to": "nfbv3qgp"
+          },
+          {
+            "from": "nfbv3qgp",
+            "fromPort": "true",
+            "to": "nm0ibj2v"
+          },
+          {
+            "from": "nm0ibj2v",
+            "fromPort": "true",
+            "to": "n52kitq9"
+          },
+          {
+            "from": "nrajmf1d",
+            "fromPort": "out",
+            "to": "noste6ns"
+          },
+          {
+            "from": "noste6ns",
+            "fromPort": "out",
+            "to": "nqmf20e6"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_kc43",
+      "name": "Nhận Thư",
+      "type": "sequence",
+      "enabled": false,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nrpzh7ma",
+            "type": "start",
+            "x": 100,
+            "y": 180,
+            "params": {}
+          },
+          {
+            "id": "npb983wx",
+            "type": "tap_image",
+            "x": 460,
+            "y": 180,
+            "params": {
+              "template": "templates/isHome_20260629_020645_36x24.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "npmt5tuu",
+            "type": "tap_image",
+            "x": 460,
+            "y": 240,
+            "params": {
+              "template": "templates/isHome_20260629_020704_175x20.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nuw5egc1",
+            "type": "tap_image",
+            "x": 460,
+            "y": 300,
+            "params": {
+              "template": "templates/crop_20260629_020144_213x200.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "ns4utvft",
+            "type": "call",
+            "x": 280,
+            "y": 180,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "npb983wx",
+            "fromPort": "true",
+            "to": "npmt5tuu"
+          },
+          {
+            "from": "ns4utvft",
+            "fromPort": "out",
+            "to": "npb983wx"
+          },
+          {
+            "from": "npmt5tuu",
+            "fromPort": "true",
+            "to": "nuw5egc1"
+          },
+          {
+            "from": "nrpzh7ma",
+            "fromPort": "out",
+            "to": "ns4utvft"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_3q1b",
+      "name": "Drawn Free",
+      "type": "sequence",
+      "enabled": false,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "n5dkiz64",
+            "type": "start",
+            "x": 80,
+            "y": -60,
+            "params": {}
+          },
+          {
+            "id": "niu6w797",
+            "type": "tap_image",
+            "x": 440,
+            "y": -60,
+            "params": {
+              "template": "templates/isHome_20260629_021016_104x22.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "npra0kmq",
+            "type": "call",
+            "x": 260,
+            "y": -60,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          },
+          {
+            "id": "ndwddhww",
+            "type": "tap_image",
+            "x": 440,
+            "y": 0,
+            "params": {
+              "template": "templates/isHome_20260629_021039_94x25.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n2te0xjf",
+            "type": "wait",
+            "x": 620,
+            "y": -54,
+            "params": {
+              "seconds": 1
+            },
+            "stack": "stcuwwpj"
+          },
+          {
+            "id": "n3170j1v",
+            "type": "swipe",
+            "x": 620,
+            "y": 0,
+            "params": {
+              "x1": 877,
+              "y1": 953,
+              "x2": 500,
+              "y2": 953,
+              "duration": 300
+            },
+            "stack": "stcuwwpj"
+          },
+          {
+            "id": "nl6of53k",
+            "type": "tap_image",
+            "x": 820,
+            "y": -60,
+            "params": {
+              "template": "templates/isHome_20260629_021510_131x82.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n9mu7clk",
+            "type": "tap_image",
+            "x": 820,
+            "y": 20,
+            "params": {
+              "template": "templates/isHome_20260629_021513_127x83.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "no6ihwv3",
+            "type": "tap_image",
+            "x": 1220,
+            "y": -60,
+            "params": {
+              "template": "templates/isHome_20260629_021538_113x35.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n1ztghpi",
+            "type": "tap",
+            "x": 1420,
+            "y": -6,
+            "params": {
+              "target": "pos",
+              "x": 1730,
+              "y": 412
+            },
+            "stack": "stvyds7v"
+          },
+          {
+            "id": "nkzryy9a",
+            "type": "tap_image",
+            "x": 1600,
+            "y": -60,
+            "params": {
+              "template": "templates/isHome_20260629_021742_88x25.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n278kx1x",
+            "type": "tap_image",
+            "x": 1780,
+            "y": -60,
+            "params": {
+              "template": "templates/isHome_20260629_021816_131x29.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n70h5a35",
+            "type": "wait",
+            "x": 1420,
+            "y": -60,
+            "params": {
+              "seconds": 1
+            },
+            "stack": "stvyds7v"
+          },
+          {
+            "id": "nso8seo3",
+            "type": "if_image",
+            "x": 1020,
+            "y": -60,
+            "params": {
+              "template": "templates/isHome_20260629_022006_115x29.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nyf4txvl",
+            "type": "if_image",
+            "x": 1020,
+            "y": 20,
+            "params": {
+              "template": "templates/isHome_20260629_022006_115x29.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nr7m1c13",
+            "type": "end",
+            "x": 1220,
+            "y": 40,
+            "params": {}
+          },
+          {
+            "id": "n6r7p4l8",
+            "type": "wait",
+            "x": 620,
+            "y": 54,
+            "params": {
+              "seconds": 1
+            },
+            "stack": "stcuwwpj"
+          },
+          {
+            "id": "nefmstcy",
+            "type": "wait",
+            "x": 1420,
+            "y": 48,
+            "params": {
+              "seconds": 1
+            },
+            "stack": "stvyds7v"
+          }
+        ],
+        "edges": [
+          {
+            "from": "niu6w797",
+            "fromPort": "true",
+            "to": "ndwddhww"
+          },
+          {
+            "from": "ndwddhww",
+            "fromPort": "true",
+            "to": "n2te0xjf"
+          },
+          {
+            "from": "npra0kmq",
+            "fromPort": "out",
+            "to": "niu6w797"
+          },
+          {
+            "from": "n2te0xjf",
+            "fromPort": "out",
+            "to": "n3170j1v"
+          },
+          {
+            "from": "no6ihwv3",
+            "fromPort": "true",
+            "to": "n70h5a35"
+          },
+          {
+            "from": "nkzryy9a",
+            "fromPort": "true",
+            "to": "n278kx1x"
+          },
+          {
+            "from": "n70h5a35",
+            "fromPort": "out",
+            "to": "n1ztghpi"
+          },
+          {
+            "from": "nl6of53k",
+            "fromPort": "true",
+            "to": "nso8seo3"
+          },
+          {
+            "from": "nso8seo3",
+            "fromPort": "true",
+            "to": "no6ihwv3"
+          },
+          {
+            "from": "nso8seo3",
+            "fromPort": "false",
+            "to": "n9mu7clk"
+          },
+          {
+            "from": "n9mu7clk",
+            "fromPort": "true",
+            "to": "nyf4txvl"
+          },
+          {
+            "from": "nyf4txvl",
+            "fromPort": "true",
+            "to": "no6ihwv3"
+          },
+          {
+            "from": "n278kx1x",
+            "fromPort": "true",
+            "to": "n9mu7clk"
+          },
+          {
+            "from": "nyf4txvl",
+            "fromPort": "false",
+            "to": "nr7m1c13"
+          },
+          {
+            "from": "n5dkiz64",
+            "fromPort": "out",
+            "to": "npra0kmq"
+          },
+          {
+            "from": "n3170j1v",
+            "fromPort": "out",
+            "to": "n6r7p4l8"
+          },
+          {
+            "from": "n6r7p4l8",
+            "fromPort": "out",
+            "to": "nl6of53k"
+          },
+          {
+            "from": "n1ztghpi",
+            "fromPort": "out",
+            "to": "nefmstcy"
+          },
+          {
+            "from": "nefmstcy",
+            "fromPort": "out",
+            "to": "nkzryy9a"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_h2uf",
+      "name": "Hoạt động 4",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nyobzrgd",
+            "type": "start",
+            "x": 80,
+            "y": 60,
+            "params": {}
+          },
+          {
+            "id": "ndcwr0a0",
+            "type": "call",
+            "x": 260,
+            "y": 60,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          },
+          {
+            "id": "nto04qro",
+            "type": "tap_image",
+            "x": 440,
+            "y": 60,
+            "params": {
+              "template": "templates/isHome_20260629_022710_70x63.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nrhiub02",
+            "type": "tap_image",
+            "x": 1020,
+            "y": 80,
+            "params": {
+              "template": "templates/isHome_20260629_022751_268x80.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nkn5m2yy",
+            "type": "if_text",
+            "x": 620,
+            "y": 60,
+            "params": {
+              "text": "5/5",
+              "x": 1101,
+              "y": 235,
+              "w": 57,
+              "h": 21,
+              "negate": false
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nyobzrgd",
+            "fromPort": "out",
+            "to": "ndcwr0a0"
+          },
+          {
+            "from": "ndcwr0a0",
+            "fromPort": "out",
+            "to": "nto04qro"
+          },
+          {
+            "from": "nto04qro",
+            "fromPort": "true",
+            "to": "nkn5m2yy"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    }
+  ]
+}

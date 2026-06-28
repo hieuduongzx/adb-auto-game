@@ -166,14 +166,54 @@ class WorkflowDesignerAPI:
             return {}
 
     def save_settings(self, settings: dict) -> bool:
+        # Merge into the existing file so writing UI prefs (snap, previewAll…) from
+        # JS doesn't wipe keys the backend owns, like ``lastWorkflow``.
         try:
+            merged = self.get_settings()
+            merged.update(settings or {})
             os.makedirs(os.path.dirname(_SETTINGS_PATH), exist_ok=True)
             with open(_SETTINGS_PATH, "w", encoding="utf-8") as f:
-                json.dump(settings or {}, f, ensure_ascii=False, indent=2)
+                json.dump(merged, f, ensure_ascii=False, indent=2)
             return True
         except Exception as exc:
             log_warning(f"Lưu cài đặt thất bại: {exc}")
             return False
+
+    def _remember_last_workflow(self, path: Optional[str]) -> None:
+        """Persist (or clear) the path to reopen on the next launch."""
+        try:
+            s = self.get_settings()
+            if path:
+                s["lastWorkflow"] = str(path)
+            else:
+                s.pop("lastWorkflow", None)
+            os.makedirs(os.path.dirname(_SETTINGS_PATH), exist_ok=True)
+            with open(_SETTINGS_PATH, "w", encoding="utf-8") as f:
+                json.dump(s, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    def get_last_workflow(self) -> dict:
+        """Return the previously-open workflow so the designer can reopen it.
+
+        ``{ok, path, name, text}`` when a remembered file still exists, else ``{}``.
+        """
+        path = (self.get_settings() or {}).get("lastWorkflow")
+        if not path or not os.path.isfile(str(path)):
+            return {}
+        try:
+            with open(str(path), "r", encoding="utf-8") as fh:
+                text = fh.read()
+            name = ""
+            try:
+                name = (json.loads(text) or {}).get("name", "")
+            except Exception:
+                pass
+            self._wf_path = str(path)
+            self._remember_dir(path)
+            return {"ok": True, "path": str(path), "name": name, "text": text}
+        except Exception:
+            return {}
 
     # ── Device ops ───────────────────────────────────────────────────────────
 
@@ -458,6 +498,7 @@ class WorkflowDesignerAPI:
         """Forget the open file so the next 'Lưu' saves to the default folder
         (``workflows/<name>/<name>.json``)."""
         self._wf_path = None
+        self._remember_last_workflow(None)   # a fresh doc shouldn't reopen the old one
         return True
 
     def _default_flow_path(self, name: str) -> str:
@@ -498,6 +539,7 @@ class WorkflowDesignerAPI:
             self._write_flow(flow_json, path)
             self._wf_path = path
             self._remember_dir(path)
+            self._remember_last_workflow(path)
             log_success(f"Đã lưu workflow: {path}")
             return True
         except Exception as exc:
@@ -512,6 +554,7 @@ class WorkflowDesignerAPI:
             self._write_flow(flow_json, path)
             self._wf_path = path
             self._remember_dir(path)
+            self._remember_last_workflow(path)
             log_success(f"Đã lưu: {path}")
             return {"ok": True, "path": path}
         except Exception as exc:
@@ -539,6 +582,7 @@ class WorkflowDesignerAPI:
                 text = fh.read()
             self._wf_path = str(path)
             self._remember_dir(path)
+            self._remember_last_workflow(str(path))
             log_info(f"Đã mở workflow: {path}")
             return text
         except Exception as exc:
@@ -737,6 +781,8 @@ class WorkflowDesignerAPI:
 
     def _close(self) -> None:
         self._closing = True
+        # Remember whatever file is open so the next launch reopens it.
+        self._remember_last_workflow(self._wf_path)
         if self._engine and self._engine.is_running():
             try:
                 self._engine.stop()
