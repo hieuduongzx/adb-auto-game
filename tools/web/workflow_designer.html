@@ -406,33 +406,40 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 #wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   color:var(--muted); font-size:12px; pointer-events:none; }
 
-/* Node */
-.wf-node { position:absolute; width:158px; border:1px solid var(--border2); border-radius:9px; background:var(--panel);
-  box-shadow:0 2px 6px rgba(20,30,45,.10); user-select:none; }
-.wf-node.sel { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-bd), 0 2px 8px rgba(20,30,45,.14); }
+/* Node — a clean rectangular card. The category colour lives in a thin accent
+   bar across the TOP (driven by each node's --node-accent var); the body and
+   header stay neutral white so the canvas reads calm and uncluttered. */
+.wf-node { position:absolute; width:158px; background:var(--panel);
+  border:1px solid var(--border2); border-top:3px solid var(--node-accent,#c4ccd6);
+  border-radius:var(--node-r); box-shadow:var(--sh-md); user-select:none; }
+.wf-node.sel { border-color:var(--accent); border-top-color:var(--accent);
+  box-shadow:0 0 0 2px var(--accent-bd), var(--sh-md); }
 /* Run trail: a node that finished this run (green = ran ok, red = action failed).
    Defined before .running so the live amber glow still wins on the active node. */
 .wf-node.ran-ok   { border-color:#2fa55a; box-shadow:0 0 0 1px #2fa55a, 0 2px 6px rgba(31,146,84,.18); }
 .wf-node.ran-fail { border-color:#cf4b43; box-shadow:0 0 0 1px #cf4b43, 0 2px 6px rgba(207,75,67,.20); }
-.wf-node.start .wf-node-hd { background:var(--ok-bg); border-color:var(--ok-bd); }
-.wf-node.end   .wf-node-hd { background:var(--err-bg); }
-.wf-node.stop  .wf-node-hd { background:var(--err-bg); }
-.wf-node.condition .wf-node-hd { background:#f3eefe; }
-.wf-node.loop  .wf-node-hd { background:var(--warn-bg); }
-/* The loop block wears an amber left spine: the side that carries its two
-   inputs (enter on top, loop-back below). Makes the loop obvious at a glance. */
-.wf-node.loop { border-left:3px solid #e0a64b; }
-.wf-node.call  .wf-node-hd { background:#f3eefe; }
-.wf-node.call .ico { color:#7c3aed; font-style:italic; font-weight:700; }
-/* Per-category colour: a tinted header + a coloured left spine so each kind of
-   block (taps, image, OCR, logic…) is distinguishable at a glance. Placed after
-   the kind rules so it tints image/ocr/logic condition blocks too. */
-.wf-node.cat-basic .wf-node-hd { background:#eaf2ff; } .wf-node.cat-basic { border-left:3px solid #6f9be8; }
-.wf-node.cat-image .wf-node-hd { background:#e1f5f3; } .wf-node.cat-image { border-left:3px solid #2fb0a3; }
-.wf-node.cat-ocr   .wf-node-hd { background:#fbf0e4; } .wf-node.cat-ocr   { border-left:3px solid #e0954b; }
-.wf-node.cat-logic .wf-node-hd { background:#f1ecfd; } .wf-node.cat-logic { border-left:3px solid #9a78e6; }
-.wf-node.cat-flow  .wf-node-hd { background:#fdf3e0; } .wf-node.cat-flow  { border-left:3px solid #e0a64b; }
-.wf-node.cat-misc  .wf-node-hd { background:#eef1f5; } .wf-node.cat-misc  { border-left:3px solid #9aa6b4; }
+/* Reached-but-not blocks: a finished run never entered these (a branch not
+   taken). Their top accent bar reds out and the whole block dims, so the path
+   that DID run stays the bright green trail and the skipped paths recede. */
+.wf-node.ran-skip { border-top-color:#cf4b43 !important; opacity:.5; }
+/* Structural kinds set their own accent colour. Terminals (start/end/stop) also
+   keep a faint header tint so the flow's entry/exit points stand out. */
+.wf-node.start { --node-accent:var(--ok); }
+.wf-node.start .wf-node-hd { background:var(--ok-bg); }
+.wf-node.end, .wf-node.stop { --node-accent:var(--err); }
+.wf-node.end .wf-node-hd, .wf-node.stop .wf-node-hd { background:var(--err-bg); }
+.wf-node.condition { --node-accent:#9a78e6; }
+.wf-node.loop { --node-accent:#e0a64b; }
+.wf-node.call { --node-accent:#7c3aed; }
+.wf-node.call .ico { font-style:italic; font-weight:700; }
+/* Per-category accent colour, placed AFTER the kind rules so it also colours the
+   image/ocr/logic condition blocks (action + condition nodes carry a cat class). */
+.wf-node.cat-basic { --node-accent:#6f9be8; }
+.wf-node.cat-image { --node-accent:#2fb0a3; }
+.wf-node.cat-ocr   { --node-accent:#e0954b; }
+.wf-node.cat-logic { --node-accent:#9a78e6; }
+.wf-node.cat-flow  { --node-accent:#e0a64b; }
+.wf-node.cat-misc  { --node-accent:#9aa6b4; }
 .wf-node.conn-target { box-shadow:0 0 0 2px var(--ok); }
 /* ── Groups (frames) ──────────────────────────────────────────────────────────
    A named rectangle drawn behind the nodes. Moving its header moves every node
@@ -465,7 +472,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-node-eye:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-node-eye.on { color:var(--accent); }
 .wf-node-thumb { display:block; width:100%; max-height:120px; object-fit:contain; background:#1a1d21;
-  border-top:1px solid var(--line); border-radius:0 0 9px 9px; }
+  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); }
 .wf-tpl-preview { display:block; max-width:100%; max-height:150px; object-fit:contain; margin-top:6px;
   border:1px solid var(--border2); border-radius:6px; background:#1a1d21; }
 .wf-tpl-empty { font-size:10px; color:var(--muted); margin-top:5px; font-style:italic; }
@@ -479,28 +486,28 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-var-row .cb.checked { background:var(--accent); border-color:var(--accent); }
 .wf-var-row .cb svg { opacity:0; } .wf-var-row .cb.checked svg { opacity:1; }
 @keyframes wfRun { 0%,100%{ box-shadow:0 0 0 3px rgba(245,158,11,.30), 0 0 10px rgba(245,158,11,.45);} 50%{ box-shadow:0 0 0 3px rgba(245,158,11,.55), 0 0 20px rgba(245,158,11,.8);} }
-.wf-node.note { width:170px; border-color:#e7d5a4; background:#fdf6e9; }
+.wf-node.note { width:170px; border:1px solid #e7d5a4; background:#fdf6e9; }
 .wf-node.note .wf-node-hd { background:transparent; border-bottom:1px dashed #e7d5a4; }
 .wf-node.note .wf-node-sum { white-space:normal; color:#7a5b12; font-family:var(--sans); font-size:11px; }
 .wf-selbox { position:absolute; border:1px solid var(--accent); background:rgba(47,111,237,.10); z-index:1; pointer-events:none; border-radius:2px; }
 .wf-node { cursor:grab; }
 .wf-node:active { cursor:grabbing; }
 .wf-node-hd { display:flex; align-items:center; gap:6px; padding:7px 9px; border-bottom:1px solid var(--line);
-  border-radius:9px 9px 0 0; }
-.wf-node.collapsed .wf-node-hd { border-bottom:none; border-radius:9px; }
-.wf-node .ico { font-size:13px; flex-shrink:0; }
+  border-radius:var(--node-r) var(--node-r) 0 0; }
+.wf-node.collapsed .wf-node-hd { border-bottom:none; border-radius:var(--node-r); }
+.wf-node .ico { font-size:13px; flex-shrink:0; color:var(--node-accent,var(--ink2)); }
 .wf-node-title { font-size:11.5px; font-weight:700; color:var(--ink); flex:1; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wf-node-del { color:var(--muted); font-size:14px; line-height:1; padding:0 2px; border-radius:4px; flex-shrink:0; cursor:pointer; }
-.wf-node-del:hover { color:var(--err); background:var(--err-bg); }
+/* Keep the title clear of the top-right "T"/"F" port labels on branch nodes. */
+.wf-node.has-tf .wf-node-title { padding-right:14px; }
 .wf-node-sum { font-family:var(--mono); font-size:9.5px; color:var(--muted); padding:5px 9px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wf-node-note { font-size:9.5px; font-style:italic; color:#7c6f55; background:#fdf9ee;
-  border-top:1px dashed var(--line); border-radius:0 0 9px 9px; padding:4px 9px; white-space:normal; word-break:break-word; }
+  border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:4px 9px; white-space:normal; word-break:break-word; }
 .wf-node-note::before { content:"📝 "; font-style:normal; }
 /* Runtime log line: text auto-emitted to the log panel each time this block runs. */
 .wf-node-log { font-size:9.5px; color:#2f6b8f; background:#eef6fb;
-  border-top:1px dashed var(--line); border-radius:0 0 9px 9px; padding:4px 9px; white-space:normal; word-break:break-word; }
+  border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:4px 9px; white-space:normal; word-break:break-word; }
 .wf-node-log::before { content:"📋 "; }
 
 /* Ports */
@@ -698,13 +705,27 @@ async function wfLoadThumb(img, path){
 // and reds the one it didn't. This is why fast blocks now stay visible — they keep
 // the trail colour after the amber moves on.
 let wfRunNode=null;
+let wfRunStopped=false; // true once a finished run's trail is on display (greys-out skipped blocks)
+let wfSkipIds=null;     // ids greyed out as "not reached", captured once when the run stops
 const wfRan={};       // nodeId -> "ok" | "fail"
 const wfRanPort={};   // nodeId -> output port actually taken
 function wfNodeElById(id){ return id ? document.querySelector(`.wf-node[data-node="${id}"]`) : null; }
+let wfRunLitAt=0;            // when the current amber node lit up (ms)
+const WF_RUN_MIN_MS=220;    // floor on amber dwell, so instant blocks (nếu ảnh…) still flash yellow
 function wfSetRunningNode(id){
   // Move the amber glow to the new node, leaving the green/red trail untouched.
-  const prev=wfNodeElById(wfRunNode); if(prev) prev.classList.remove("running");
+  // Conditions like "nếu ảnh" finish in a few ms — without a dwell floor their
+  // amber is added and removed within one frame and never paints. So keep the
+  // previous node amber for at least WF_RUN_MIN_MS before clearing it.
+  const now=Date.now();
+  const prevId=wfRunNode, prevEl=wfNodeElById(prevId);
+  if(prevEl && prevId!==id){
+    const remain=WF_RUN_MIN_MS-(now-wfRunLitAt);
+    if(remain>0) setTimeout(()=>{ if(wfRunNode!==prevId) prevEl.classList.remove("running"); }, remain);
+    else prevEl.classList.remove("running");
+  }
   wfRunNode=id||null;
+  wfRunLitAt=now;
   const el=wfNodeElById(wfRunNode); if(el) el.classList.add("running");
 }
 function wfColorBranch(id, takenPort){
@@ -720,8 +741,12 @@ function wfMarkNodeResult(id, status, port){
   wfRan[id] = status==="fail" ? "fail" : "ok";
   if(port!==undefined && port!==null) wfRanPort[id]=port; else delete wfRanPort[id];
   const el=wfNodeElById(id); if(!el) return;
-  el.classList.toggle("ran-ok",   wfRan[id]==="ok");
-  el.classList.toggle("ran-fail", wfRan[id]==="fail");
+  // A condition that took its 'false' branch (e.g. "chạm ảnh" didn't find the
+  // image) didn't really succeed — paint the node red to match its red false-wire,
+  // instead of a misleading green. Only 'true'/'out'/'body'/'done' stay green.
+  const failish = wfRan[id]==="fail" || wfRanPort[id]==="false";
+  el.classList.toggle("ran-ok",   !failish);
+  el.classList.toggle("ran-fail", failish);
   // Output ports: the one taken goes green, the other true/false sibling red.
   const taken = wfRanPort[id];
   el.querySelectorAll(".wf-port.out").forEach(p=>{
@@ -732,17 +757,31 @@ function wfMarkNodeResult(id, status, port){
   });
   if(taken!=null) wfColorBranch(id, String(taken));
 }
+// Once a run has stopped, red-bar every executable block it never entered, so the
+// taken path (green) stands out against the skipped branches (dim red top). 'start'
+// has no result event (the walk begins after it) and 'note' isn't executable, so
+// both are left alone. The skip set is captured ONCE at stop time from the graph
+// that ran — so blocks dragged in afterwards (which aren't in it) never get dimmed.
+function wfMarkUnreached(){
+  if(!Object.keys(wfRan).length) return;        // no run happened — nothing to grey out
+  if(wfSkipIds===null){
+    const g=wfGraph();
+    wfSkipIds = g ? (g.nodes||[]).filter(n=>n.type!=="note"&&n.type!=="start"&&!wfRan[n.id]).map(n=>n.id) : [];
+  }
+  wfSkipIds.forEach(id=>{ const el=wfNodeElById(id); if(el) el.classList.add("ran-skip"); });
+}
 // Re-paint the whole trail after a canvas redraw (nodes/wires are rebuilt fresh).
 function wfReapplyRunViz(){
   Object.keys(wfRan).forEach(id=>wfMarkNodeResult(id, wfRan[id], wfRanPort[id]));
   const el=wfNodeElById(wfRunNode); if(el) el.classList.add("running");
+  if(wfRunStopped) wfMarkUnreached();
 }
 function wfResetRunViz(){
-  wfRunNode=null;
+  wfRunNode=null; wfRunStopped=false; wfSkipIds=null;
   for(const k in wfRan) delete wfRan[k];
   for(const k in wfRanPort) delete wfRanPort[k];
-  document.querySelectorAll(".wf-node.running,.wf-node.ran-ok,.wf-node.ran-fail")
-    .forEach(el=>el.classList.remove("running","ran-ok","ran-fail"));
+  document.querySelectorAll(".wf-node.running,.wf-node.ran-ok,.wf-node.ran-fail,.wf-node.ran-skip")
+    .forEach(el=>el.classList.remove("running","ran-ok","ran-fail","ran-skip"));
   document.querySelectorAll("#wf-wires path.took-wire,#wf-wires path.nottook-wire")
     .forEach(p=>p.classList.remove("took-wire","nottook-wire"));
   document.querySelectorAll(".wf-port.out.took,.wf-port.out.nottook")
@@ -1117,7 +1156,7 @@ function wfRenderCanvas(){
   wfRenderGroups();   // frames behind the nodes
   g.nodes.forEach(n=>world.appendChild(wfNodeEl(n)));
   wfDrawWires();
-  if(wfRunning) wfReapplyRunViz();   // keep the live run-trail across redraws
+  if(wfRunning||wfRunStopped) wfReapplyRunViz();   // keep the run-trail across redraws (live + after stop)
 }
 
 function wfNodeEl(n){
@@ -1126,13 +1165,15 @@ function wfNodeEl(n){
   // Category tint (only for the bulk action/condition blocks — structural kinds
   // start/end/stop/loop/call/note keep their own distinct styling).
   const catCls = (def.kind==="action"||def.kind==="condition") && def.cat ? " cat-"+def.cat : "";
-  el.className="wf-node "+def.kind+catCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"");
+  // Nodes with true/false outputs show "T"/"F" labels in the top-right corner;
+  // flag them so the header reserves room and the title can't slide under the labels.
+  const tfCls = (def.outs||[]).includes("true") ? " has-tf" : "";
+  el.className="wf-node "+def.kind+catCls+tfCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"");
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
   // A call node shows the referenced function's name as its title.
   let title=def.label, sum="";
   if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?("ƒ "+fn.name):"ƒ (thiếu)"; }
   else { try{ sum=def.sum?def.sum(n.params):""; }catch{} }
-  const delBtn = def.kind==="start" ? "" : `<button class="wf-node-del" title="Xoá node">×</button>`;
   const hasTpl = !!wfTplField(n.type);
   const showThumb = hasTpl && (wfPreviewAll || n.showPreview);
   const eyeBtn = hasTpl ? `<button class="wf-node-eye${n.showPreview?" on":""}" title="Xem trước ảnh (block này)">👁</button>` : "";
@@ -1140,7 +1181,7 @@ function wfNodeEl(n){
   const logHtml = n.log ? `<div class="wf-node-log">${escHtml(n.log)}</div>` : "";
   const thumbHtml = showThumb ? `<img class="wf-node-thumb">` : "";
   el.innerHTML=
-    `<div class="wf-node-hd"><span class="ico">${def.ico}</span><span class="wf-node-title">${escHtml(title)}</span>${eyeBtn}${delBtn}</div>`+
+    `<div class="wf-node-hd"><span class="ico">${def.ico}</span>${eyeBtn}<span class="wf-node-title">${escHtml(title)}</span></div>`+
     (sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"")+noteHtml+logHtml+thumbHtml;
   if(!sum && !n.note && !n.log && !thumbHtml) el.classList.add("collapsed");
   if(thumbHtml) wfLoadThumb(el.querySelector(".wf-node-thumb"), wfTplOf(n));
@@ -1171,12 +1212,11 @@ function wfNodeEl(n){
     const lblTxt = (n.type==="parallel"&&port==="done") ? "gộp" : WF_PORT_LBL[port];
     if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+1)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl); }
   });
-  // interactions — the whole node body is a drag handle (ports/× excluded inside wfStartMove)
+  // interactions — the whole node body is a drag handle (ports excluded inside wfStartMove).
+  // Deletion is via Delete/Backspace or the right-click menu — no per-node × button.
   el.addEventListener("mousedown",e=>wfStartMove(e,n));
   // Double-click a call node → jump into that function's graph.
   if(n.type==="call"){ el.addEventListener("dblclick",e=>{ e.stopPropagation(); if(n.params&&n.params.fn&&wfFnById(n.params.fn)) wfEditFunction(n.params.fn); }); }
-  const db=el.querySelector(".wf-node-del");
-  if(db){ db.addEventListener("mousedown",e=>e.stopPropagation()); db.addEventListener("click",e=>{ e.stopPropagation(); wfDeleteNode(n.id); }); }
   const eye=el.querySelector(".wf-node-eye");
   if(eye){ eye.addEventListener("mousedown",e=>e.stopPropagation()); eye.addEventListener("click",e=>{ e.stopPropagation(); n.showPreview=!n.showPreview; wfRenderCanvas(); }); }
   el.querySelectorAll(".wf-port.out").forEach(p=>p.addEventListener("mousedown",e=>wfStartConnect(e,n.id,p.dataset.port)));
@@ -1400,7 +1440,7 @@ function wfStartGroupResize(e,gr){
 }
 
 function wfStartMove(e,n){
-  if(e.button!==0||e.target.closest(".wf-port,.wf-node-del,.wf-node-eye")) return;
+  if(e.button!==0||e.target.closest(".wf-port,.wf-node-eye")) return;
   e.stopPropagation();
   if(e.shiftKey){ wfToggleSel(n.id); wfMarkSel(); wfRenderInspector(); return; }
   let ids;
@@ -1956,7 +1996,11 @@ const WF_ICO_PLAY = '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 
 const WF_ICO_STOP = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
 function wfSetRunning(on){
   wfRunning=on; const b=$("wf-run-btn");
-  if(!on) wfSetRunningNode(null);   // clear the active-node glow when stopped (keep trail)
+  if(!on){
+    wfSetRunningNode(null);         // clear the active-node glow when stopped (keep trail)
+    wfRunStopped=Object.keys(wfRan).length>0;
+    if(wfRunStopped) wfMarkUnreached();   // red-bar the blocks the run never reached
+  } else { wfRunStopped=false; }
   if(!b)return;
   b.innerHTML = on?WF_ICO_STOP:WF_ICO_PLAY;
   b.title = on?"Dừng":"Chạy thử";

@@ -89,7 +89,8 @@
             "fromPort": "false",
             "to": "n1ylhi2u"
           }
-        ]
+        ],
+        "groups": []
       }
     }
   ],
@@ -98,22 +99,22 @@
       "id": "sequence_kdis",
       "name": "Main Story",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
           {
             "id": "n3m2uvat",
             "type": "start",
-            "x": 60,
-            "y": -20,
+            "x": 100,
+            "y": -40,
             "params": {}
           },
           {
             "id": "n1bc508v",
             "type": "tap_image",
-            "x": 920,
-            "y": 40,
+            "x": 1040,
+            "y": -40,
             "params": {
               "template": "templates/crop_20260628_094026_184x51.png",
               "taps": "1",
@@ -125,7 +126,7 @@
           {
             "id": "nzlnnqqf",
             "type": "tap",
-            "x": 900,
+            "x": 860,
             "y": -40,
             "params": {
               "target": "pos",
@@ -136,8 +137,8 @@
           {
             "id": "nahmpri5",
             "type": "tap",
-            "x": 2280,
-            "y": 40,
+            "x": 2443,
+            "y": -446,
             "params": {
               "target": "pos",
               "x": 892,
@@ -147,7 +148,7 @@
           {
             "id": "n4pphsh8",
             "type": "loop",
-            "x": 540,
+            "x": 500,
             "y": -40,
             "params": {
               "count": 3,
@@ -157,8 +158,8 @@
           {
             "id": "non82rd1",
             "type": "wait_image",
-            "x": 2080,
-            "y": 120,
+            "x": 2263,
+            "y": -326,
             "params": {
               "template": "templates/crop_20260628_101155_294x50.png",
               "threshold": 0.85,
@@ -169,7 +170,7 @@
           {
             "id": "nt9a33t8",
             "type": "tap_image",
-            "x": 340,
+            "x": 280,
             "y": -40,
             "params": {
               "template": "templates/crop_20260628_125529_167x38.png",
@@ -182,8 +183,8 @@
           {
             "id": "nryur9hv",
             "type": "if_image",
-            "x": 1540,
-            "y": 40,
+            "x": 1620,
+            "y": -40,
             "params": {
               "template": "templates/crop_20260628_100621_196x60.png",
               "threshold": 0.85,
@@ -193,8 +194,8 @@
           {
             "id": "n44ty3u5",
             "type": "tap_image",
-            "x": 1900,
-            "y": 120,
+            "x": 2083,
+            "y": -326,
             "params": {
               "template": "templates/crop_20260628_100639_157x32.png",
               "taps": "1",
@@ -206,8 +207,8 @@
           {
             "id": "n907yb0r",
             "type": "if_image",
-            "x": 1720,
-            "y": 40,
+            "x": 1903,
+            "y": -446,
             "params": {
               "template": "templates/crop_20260628_132414_213x39.png",
               "threshold": 0.85,
@@ -217,8 +218,8 @@
           {
             "id": "nu0z2e71",
             "type": "wait_image",
-            "x": 1340,
-            "y": 40,
+            "x": 1420,
+            "y": -40,
             "params": {
               "template": "templates/crop_20260628_100714_44x35.png",
               "threshold": 0.85,
@@ -229,8 +230,8 @@
           {
             "id": "nzlccjdm",
             "type": "loop",
-            "x": 1140,
-            "y": 40,
+            "x": 1240,
+            "y": -40,
             "params": {
               "count": 3,
               "infinite": true
@@ -239,7 +240,7 @@
           {
             "id": "nwhiv10o",
             "type": "if_image_any",
-            "x": 720,
+            "x": 680,
             "y": -40,
             "params": {
               "templates": [
@@ -253,8 +254,8 @@
           {
             "id": "na08d1lc",
             "type": "tap",
-            "x": 1900,
-            "y": 40,
+            "x": 2083,
+            "y": -446,
             "params": {
               "target": "found",
               "x": 0,
@@ -264,8 +265,8 @@
           {
             "id": "nijwi0t9",
             "type": "wait_image",
-            "x": 2080,
-            "y": 40,
+            "x": 2263,
+            "y": -446,
             "params": {
               "template": "templates/crop_20260628_101155_294x50.png",
               "threshold": 0.85,
@@ -276,8 +277,8 @@
           {
             "id": "ntni1ml1",
             "type": "tap",
-            "x": 2280,
-            "y": 120,
+            "x": 2443,
+            "y": -326,
             "params": {
               "target": "pos",
               "x": 892,
@@ -372,6 +373,23 @@
             "fromPort": "out",
             "to": "n4pphsh8",
             "toPort": "loop"
+          },
+          {
+            "from": "nijwi0t9",
+            "fromPort": "false",
+            "to": "nzlccjdm",
+            "toPort": "loop"
+          }
+        ],
+        "groups": [
+          {
+            "id": "g2kw6por",
+            "name": "Nếu Thắng",
+            "x": 1881,
+            "y": -490,
+            "w": 742,
+            "h": 276,
+            "color": 0
           }
         ]
       },
@@ -381,7 +399,7 @@
       "id": "background_dz84",
       "name": "Skip",
       "type": "background",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -412,9 +430,210 @@
             "fromPort": "out",
             "to": "n9t4793b"
           }
-        ]
+        ],
+        "groups": []
       },
       "pollInterval": 1
+    },
+    {
+      "id": "sequence_4fd1",
+      "name": "Hoạt động 2",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "ndsfyaan",
+            "type": "start",
+            "x": 20,
+            "y": 60,
+            "params": {}
+          },
+          {
+            "id": "njj284im",
+            "type": "tap_image",
+            "x": 200,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260628_154306_35x37.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0
+            }
+          },
+          {
+            "id": "nftdmgu5",
+            "type": "loop",
+            "x": 420,
+            "y": 60,
+            "params": {
+              "count": 3,
+              "infinite": true
+            }
+          },
+          {
+            "id": "nt5ouzwl",
+            "type": "tap_image",
+            "x": 620,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260628_154327_264x42.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0
+            }
+          },
+          {
+            "id": "nfa16kds",
+            "type": "tap_image",
+            "x": 900,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260628_154717_155x53.png",
+              "taps": "1",
+              "threshold": 0.8,
+              "timeout": 5,
+              "delay": 0
+            },
+            "showPreview": true
+          },
+          {
+            "id": "n9d9r29x",
+            "type": "tap_image",
+            "x": 1300,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260628_132414_213x39.png",
+              "taps": "1",
+              "threshold": 0.8,
+              "timeout": 5,
+              "delay": 0
+            }
+          },
+          {
+            "id": "nqq5uqhi",
+            "type": "tap_image",
+            "x": 1520,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260628_094026_184x51.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "delay": 0
+            }
+          },
+          {
+            "id": "nropbwkp",
+            "type": "tap_image",
+            "x": 1940,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260628_132414_213x39.png",
+              "taps": "1",
+              "threshold": 0.8,
+              "timeout": 60,
+              "delay": 0
+            }
+          },
+          {
+            "id": "n2dwmct2",
+            "type": "loop",
+            "x": 1100,
+            "y": 60,
+            "params": {
+              "count": 3,
+              "infinite": false
+            }
+          },
+          {
+            "id": "nsjvuudw",
+            "type": "loop",
+            "x": 1720,
+            "y": 60,
+            "params": {
+              "count": 3,
+              "infinite": true
+            }
+          },
+          {
+            "id": "nckfghu8",
+            "type": "end",
+            "x": 2160,
+            "y": 80,
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": "ndsfyaan",
+            "fromPort": "out",
+            "to": "njj284im"
+          },
+          {
+            "from": "njj284im",
+            "fromPort": "true",
+            "to": "nftdmgu5"
+          },
+          {
+            "from": "nftdmgu5",
+            "fromPort": "body",
+            "to": "nt5ouzwl"
+          },
+          {
+            "from": "nt5ouzwl",
+            "fromPort": "true",
+            "to": "nfa16kds"
+          },
+          {
+            "from": "nfa16kds",
+            "fromPort": "true",
+            "to": "n2dwmct2"
+          },
+          {
+            "from": "n2dwmct2",
+            "fromPort": "body",
+            "to": "n9d9r29x"
+          },
+          {
+            "from": "n9d9r29x",
+            "fromPort": "true",
+            "to": "n2dwmct2",
+            "toPort": "loop"
+          },
+          {
+            "from": "n9d9r29x",
+            "fromPort": "false",
+            "to": "nqq5uqhi"
+          },
+          {
+            "from": "nqq5uqhi",
+            "fromPort": "true",
+            "to": "nsjvuudw"
+          },
+          {
+            "from": "nsjvuudw",
+            "fromPort": "body",
+            "to": "nropbwkp"
+          },
+          {
+            "from": "nropbwkp",
+            "fromPort": "true",
+            "to": "nsjvuudw",
+            "toPort": "loop"
+          },
+          {
+            "from": "nropbwkp",
+            "fromPort": "false",
+            "to": "nckfghu8"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
     }
   ]
 }

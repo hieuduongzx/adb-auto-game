@@ -119,6 +119,12 @@ class WorkflowEngine:
         ocr_backend: Optional[str] = None,
     ) -> None:
         self.auto = automation or ADBGameAutomation(ocr_backend=ocr_backend)
+        # Match images exactly like the Dev Helper tester: single scale (1.0) at the
+        # given threshold. Templates are QuickCropped on the same device at native
+        # resolution, so the auto-orientation scale-sweep (0.8–1.2) + portrait
+        # threshold-loosening only produces shifted / false matches here — the very
+        # reason a tap that's correct in the tester lands wrong in a run.
+        self.auto.auto_orientation_detection = False
 
         self.flow: Dict[str, Any] = {}
         self.flow_path: Optional[str] = None
@@ -604,6 +610,7 @@ class WorkflowEngine:
                                  float(params.get("threshold", 0.85)))
             if hit:
                 self._last_pos = hit
+                log_info(f"[workflow] 🔍 thấy ảnh ({hit[0]}, {hit[1]})")
                 self._sleep(float(params.get("delay", 0)))  # wait after seeing, before continuing
             return hit is not None
         if ntype == "tap_image_any":
@@ -611,12 +618,14 @@ class WorkflowEngine:
             hit = self._wait_any(templates, float(params.get("timeout", 5.0)),
                                  float(params.get("threshold", 0.85)))
             if not hit:
-                log_warning("[workflow] tap_image_any: không thấy ảnh nào trong danh sách")
-                return False
+                return False  # no match — false branch fires; no log (tap-miss is expected)
             self._last_pos = hit
             self._sleep(float(params.get("delay", 0)))  # wait after seeing, before tap
             tc = 2 if str(params.get("taps", "1")) in ("2", "double") else 1
-            return bool(self.auto.tap(hit[0], hit[1], tap_count=tc))
+            ok = bool(self.auto.tap(hit[0], hit[1], tap_count=tc))
+            if ok:
+                log_info(f"[workflow] 👆 chạm ảnh ({hit[0]}, {hit[1]})")
+            return ok
         if ntype == "tap_image":
             # Find (with timeout), remember position, optionally wait, then tap.
             tpl = self._resolve_template(params.get("template", ""))
@@ -625,12 +634,14 @@ class WorkflowEngine:
                 threshold=float(params.get("threshold", 0.85)),
             )
             if not res:
-                log_warning(f"[workflow] tap_image miss: {os.path.basename(tpl)}")
-                return False
+                return False  # not found — false branch fires; no log (tap-miss is expected)
             self._last_pos = (res[0], res[1])
             self._sleep(float(params.get("delay", 0)))  # wait after seeing, before tap
             tc = 2 if str(params.get("taps", "1")) in ("2", "double") else 1
-            return bool(self.auto.tap(res[0], res[1], tap_count=tc))
+            ok = bool(self.auto.tap(res[0], res[1], tap_count=tc))
+            if ok:
+                log_info(f"[workflow] 👆 chạm ảnh {os.path.basename(tpl)} ({res[0]}, {res[1]})")
+            return ok
         if ntype == "wait_image":
             tpl = self._resolve_template(params.get("template", ""))
             res = self.auto.wait_for_template(
@@ -639,6 +650,7 @@ class WorkflowEngine:
             )
             if res:
                 self._last_pos = (res[0], res[1])
+                log_info(f"[workflow] 🔍 thấy ảnh {os.path.basename(tpl)} ({res[0]}, {res[1]})")
                 self._sleep(float(params.get("delay", 0)))  # wait after seeing, before continuing
             return res is not None
         if ntype == "wait_text":
@@ -910,11 +922,17 @@ class WorkflowEngine:
 
     def _a_tap(self, node, p) -> bool:
         x, y = self._pos(p)
-        return self.auto.tap(x, y)
+        ok = self.auto.tap(x, y)
+        if ok:
+            log_info(f"[workflow] 👆 chạm ({x}, {y})")
+        return ok
 
     def _a_double_tap(self, node, p) -> bool:
         x, y = self._pos(p)
-        return self.auto.tap(x, y, tap_count=2)
+        ok = self.auto.tap(x, y, tap_count=2)
+        if ok:
+            log_info(f"[workflow] 👆 chạm đúp ({x}, {y})")
+        return ok
 
     def _a_swipe_dir(self, node, p) -> bool:
         direction = str(p.get("direction", "up")).lower()
@@ -941,7 +959,10 @@ class WorkflowEngine:
         w, h = int(p.get("w", 0)), int(p.get("h", 0))
         rx = x + (random.randint(0, w) if w > 0 else 0)
         ry = y + (random.randint(0, h) if h > 0 else 0)
-        return self.auto.tap(rx, ry)
+        ok = self.auto.tap(rx, ry)
+        if ok:
+            log_info(f"[workflow] 👆 chạm ngẫu nhiên ({rx}, {ry})")
+        return ok
 
     def _a_wait_random(self, node, p) -> bool:
         lo = float(p.get("min", 0.5))
