@@ -421,6 +421,48 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 #wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   color:var(--muted); font-size:12px; pointer-events:none; }
 
+/* Live variables panel — pinned bottom-right of the canvas. Shows the vars
+   declared on the current activity (declared value) overlaid with live runtime
+   values pushed from the engine during a test run. Collapsible. */
+.wf-vars-panel { position:absolute; right:10px; bottom:10px; width:200px; max-height:46%;
+  background:var(--panel); border:1px solid var(--border2); border-radius:9px;
+  box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5;
+  font-size:11px; overflow:hidden; }
+.wf-vars-panel.collapsed { max-height:26px; }
+.wf-vars-hdr { display:flex; align-items:center; justify-content:space-between; gap:6px;
+  padding:5px 9px; cursor:pointer; background:var(--bar); border-bottom:1px solid var(--border2);
+  font-weight:700; letter-spacing:.04em; text-transform:uppercase; font-size:10px; color:var(--dim);
+  user-select:none; }
+.wf-vars-actions { display:flex; align-items:center; gap:5px; }
+.wf-vars-live { color:var(--muted); font-size:9px; }
+.wf-vars-add { width:16px; height:16px; line-height:13px; padding:0; border:1px solid var(--border2);
+  border-radius:4px; background:var(--panel); color:var(--dim); cursor:pointer; font-size:13px;
+  display:flex; align-items:center; justify-content:center; }
+.wf-vars-add:hover { color:var(--accent); border-color:var(--accent); }
+/* Global vars editor popover. */
+.wf-globs-pop { position:fixed; z-index:50; width:250px; max-height:70vh;
+  background:var(--panel); border:1px solid var(--border2); border-radius:9px; box-shadow:var(--sh-md);
+  display:flex; flex-direction:column; overflow:hidden; }
+.wf-globs-pop .wf-vars-hdr { cursor:default; }
+.wf-globs-pop-body { overflow-y:auto; padding:6px; display:flex; flex-direction:column; gap:6px; }
+.wf-glob-card { border:1px solid var(--border2); border-radius:7px; padding:5px; display:flex; flex-direction:column; gap:4px; }
+.wf-glob-tag { font-size:9px; color:var(--accent); font-weight:700; letter-spacing:.04em; }
+.wf-glob-del { width:20px; height:20px; line-height:1; padding:0; border:1px solid var(--border2);
+  border-radius:5px; background:var(--panel); color:var(--err); cursor:pointer; font-size:15px;
+  font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.wf-glob-del:hover { background:var(--err-bg); border-color:var(--err); }
+.wf-vars-panel.live .wf-vars-live { color:#2fa55a; animation:wfPulse 1.4s ease-in-out infinite; }
+@keyframes wfPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.wf-vars-body { overflow-y:auto; padding:4px 6px 6px; }
+.wf-vars-empty { color:var(--muted); padding:6px 4px; font-size:10.5px; }
+.wf-var-row-live { display:flex; align-items:baseline; gap:6px; padding:3px 4px; border-radius:5px; }
+.wf-var-row-live:hover { background:var(--bg); }
+.wf-var-row-live .vn { font-family:var(--mono); color:var(--ink); flex:1; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-var-row-live .vv { font-family:var(--mono); color:var(--accent); max-width:96px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
+.wf-var-row-live .vv.fresh { color:#2fa55a; font-weight:600; }
+
 /* Node — a clean rectangular card with one uniform neutral border. Category is
    hinted only by the icon colour (--node-accent); the run colours (green/red/
    amber) recolour the whole border so a run still reads at a glance. */
@@ -503,6 +545,13 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-node-thumb { display:block; width:100%; height:68px; object-fit:scale-down;
   background:#eef1f5 repeating-conic-gradient(#e6e9ef 0% 25%, transparent 0% 50%) 50%/14px 14px;
   border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:3px; }
+/* Multi-template strip (tap_image_any / wait_image_any / if_image_any): a row of
+   small thumbnails so every OR-image is visible at a glance, not just the first. */
+.wf-node-thumbs { display:flex; flex-wrap:wrap; gap:3px; padding:4px; min-height:30px;
+  background:#eef1f5 repeating-conic-gradient(#e6e9ef 0% 25%, transparent 0% 50%) 50%/14px 14px;
+  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); }
+.wf-node-thumb-sm { width:38px; height:30px; object-fit:scale-down; border:1px solid var(--line);
+  border-radius:4px; background:var(--panel); }
 /* Hovering a block that's showing a preview image lifts it above neighbours so
    the thumbnail isn't hidden behind other blocks. */
 .wf-node.has-thumb:hover { z-index:var(--z-node-hover); }
@@ -690,6 +739,17 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
         <svg id="wf-wires"></svg>
       </div>
       <div id="wf-canvas-empty" class="wf-empty-note">Chọn hoặc thêm một hoạt động để mở canvas.</div>
+      <div id="wf-vars-panel" class="wf-vars-panel">
+        <div class="wf-vars-hdr">
+          <span>Biến</span>
+          <span class="wf-vars-actions">
+            <span class="wf-vars-live" id="wf-vars-live">●</span>
+            <button id="wf-vars-add" class="wf-vars-add" title="Thêm nhanh biến toàn cục">+</button>
+            <button id="wf-vars-mgr" class="wf-vars-add" title="Quản lý biến toàn cục">⚙</button>
+          </span>
+        </div>
+        <div id="wf-vars-body" class="wf-vars-body"></div>
+      </div>
     </div>
   </div>
   <!-- Right: inspector -->
@@ -874,6 +934,8 @@ window.__recv = function(raw){
     else if(!data.running) setStatus("Speed hack đã tắt");
     return;
   }
+  if(type==="var_update"){ wfLiveVars[data.name]=data.value; wfRenderVarsPanel(); return; }
+  if(type==="vars_snapshot"){ wfLiveVars=data.vars||{}; wfRenderVarsPanel(); return; }
 };
 
 // ── Log drawer ────────────────────────────────────────────────────────────────
@@ -952,14 +1014,15 @@ const WF_NODES = {
   if_image_any:  {label:"Nếu 1 trong ảnh",  ico:"❓",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}thấy ${wfBaseAny(p.templates)}`},
   wait_text:  {label:"Chờ chữ",   ico:"🔤",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10}], sum:p=>`"${p.text||""}"`},
   if_text:    {label:"Nếu chữ",   ico:"🔡",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}có "${p.text||""}"`},
-  read_var:   {label:"Đọc → biến",ico:"🔎",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`→ ${p.name||"?"}`},
+  read_var:   {label:"Đọc → biến",ico:"🔎",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`→ ${p.name||"?"}`},
+  parse_var:  {label:"Tách → biến",ico:"✂",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"Vùng OCR"},{v:"var",t:"Từ biến"}],d:"region"},{k:"fromVar",lbl:"Biến nguồn",t:"text",d:"",var:true},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
   loop:       {label:"Lặp lại",   ico:"🔁",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"count",t:"num",d:3},{k:"infinite",t:"bool",d:false}], sum:p=>p.infinite?"∞ vô cực":`${p.count}×`},
   parallel:   {label:"Song song", ico:"⇉",kind:"parallel",cat:"flow", outs:["1","2","3","done"], fields:[], sum:()=>"chạy 3 nhánh // → chờ gộp ở cổng 'gộp'"},
   "break":    {label:"Thoát vòng",ico:"⛔",kind:"action",cat:"flow",  outs:["out"], fields:[], sum:()=>"break"},
   stop:       {label:"Dừng tất cả",ico:"🛑",kind:"stop", cat:"flow",  outs:[],      fields:[], sum:()=>"dừng phiên"},
-  set_var:    {label:"Đặt biến",  ico:"📌",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i"},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name||"?"} = ${p.value}`},
-  calc_var:   {label:"Tính biến", ico:"➗",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i"},{k:"op",t:"select",opts:["+","-","*","/","="],d:"+"},{k:"value",t:"text",d:"1"}], sum:p=>`${p.name} ${p.op}= ${p.value}`},
-  if_var:     {label:"Nếu biến",  ico:"🔢",kind:"condition",cat:"logic",outs:["true","false"], fields:[{k:"name",t:"text",d:"i"},{k:"op",t:"select",opts:["==","!=",">","<",">=","<="],d:"=="},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name} ${p.op} ${p.value}`},
+  set_var:    {label:"Đặt biến",  ico:"📌",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name||"?"} = ${p.value}`},
+  calc_var:   {label:"Tính biến", ico:"➗",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:["+","-","*","/","="],d:"+"},{k:"value",t:"text",d:"1"}], sum:p=>`${p.name} ${p.op}= ${p.value}`},
+  if_var:     {label:"Nếu biến",  ico:"🔢",kind:"condition",cat:"logic",outs:["true","false"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:["==","!=",">","<",">=","<="],d:"=="},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name} ${p.op} ${p.value}`},
   // Multi-way branch: each case is its own condition; first true case wins its
   // own output port "c{i}", else the "default" port. Ports are dynamic (one per
   // case + default) — see wfNodeEl. Cases edited by wfSwitchCasesEditor.
@@ -979,12 +1042,18 @@ function wfIns(type){ const def=WF_NODES[type]; return (def&&def.ins)||["in"]; }
 // edit = which graph the canvas is showing: an activity or a function.
 // sel = ids of all selected nodes (multi-select); selectedNode = primary (inspector).
 const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities:[], functions:[],
+  globals:[],
   speedhack:{enabled:false, speed:2.0, package:""},
   edit:{kind:"activity", id:null}, sel:[], selectedNode:null };
 let wfSpace=false;  // space held → pan instead of box-select
 const WF_GRID=20;   // grid step; snapping is opt-in (default off)
 let wfSnapOn=false;
 let wfPreviewAll=false;   // global: show image thumbnail on every image block
+// Live runtime variable values pushed from the engine during a test run.
+// Keyed by var name -> current value (stringified for display).
+let wfLiveVars={};
+let wfFreshVar=null;       // name of the most-recently-changed var (brief highlight)
+let wfVarsCollapsed=false;
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
 function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined}); }catch{} }
 function wfSyncToggleBtns(){
@@ -1412,6 +1481,170 @@ function wfRenderCanvas(){
   wfReflowStacks();   // snap merged blocks flush (needs nodes in the DOM)
   wfDrawWires();
   if(wfRunning||wfRunStopped) wfReapplyRunViz();   // keep the run-trail across redraws (live + after stop)
+  wfRenderVarsPanel();
+}
+
+// ── Variables panel (bottom-right of canvas) ──────────────────────────────────
+// Collect every variable the user can reference: declared on the current
+// activity (with their declared default), plus any live values the engine has
+// pushed during a test run. Live values override declared defaults.
+function wfDeclaredVars(){
+  const out={};
+  // Globals first (declared at flow level, visible everywhere).
+  (WF.globals||[]).forEach(v=>{ const nm=(v.name||"").trim(); if(nm) out[nm]=v.value; });
+  const act=wfCurAct();
+  if(act && Array.isArray(act.vars)){
+    act.vars.forEach(v=>{ const nm=(v.name||"").trim(); if(nm) out[nm]=v.value; });
+  }
+  return out;
+}
+// All known variable names across the whole flow (every activity + functions),
+// so a dropdown in any graph can offer vars declared elsewhere too. Sources:
+//   1. Global vars (declared at flow top level — visible in every activity).
+//   2. Vars explicitly declared on an activity (the "Biến" section).
+//   3. Vars produced by nodes — set_var / calc_var / read_var / parse_var each
+//      write a var via their "name" field, so we treat those names as known
+//      defaults every other block can reference. Sort alphabetically.
+const WF_VAR_PRODUCERS = {"set_var":"name","calc_var":"name","read_var":"name","parse_var":"name"};
+function wfGraphVarNames(g){
+  const s=new Set();
+  (g && g.nodes || []).forEach(n=>{
+    const k=WF_VAR_PRODUCERS[n.type];
+    if(k){ const nm=String((n.params||{})[k]||"").trim(); if(nm) s.add(nm); }
+  });
+  return s;
+}
+function wfAllVarNames(){
+  const s=new Set();
+  (WF.globals||[]).forEach(v=>{ const n=(v.name||"").trim(); if(n)s.add(n); });
+  (WF.activities||[]).forEach(a=>{ (a.vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(n)s.add(n); }); });
+  // Vars produced by nodes anywhere in the flow count as defaults too.
+  (WF.activities||[]).forEach(a=>{ wfGraphVarNames(a.graph).forEach(n=>s.add(n)); });
+  (WF.functions||[]).forEach(fn=>{ wfGraphVarNames(fn.graph).forEach(n=>s.add(n)); });
+  return [...s].sort();
+}
+function wfRenderVarsPanel(){
+  const panel=$("wf-vars-panel"); if(!panel) return;
+  const body=$("wf-vars-body"); if(!body) return;
+  panel.classList.toggle("collapsed", wfVarsCollapsed);
+  panel.classList.toggle("live", Object.keys(wfLiveVars).length>0);
+  const declared=wfDeclaredVars();
+  // Names: globals first (in declared order), then activity-declared, then
+  // node-produced vars in the current graph, then extra live-only keys.
+  const globalNames=[]; (WF.globals||[]).forEach(v=>{ const n=(v.name||"").trim(); if(n) globalNames.push(n); });
+  const actDeclared={}; const act=wfCurAct(); (act&&act.vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(n&&!globalNames.includes(n)) actDeclared[n]=v.value; });
+  const names=[...globalNames, ...Object.keys(actDeclared)];
+  const g=wfGraph();
+  wfGraphVarNames(g).forEach(n=>{ if(!names.includes(n)) names.push(n); });
+  Object.keys(wfLiveVars).forEach(n=>{ if(!names.includes(n)) names.push(n); });
+  const globalSet=new Set(globalNames);
+  body.innerHTML="";
+  if(!names.length){
+    const e=document.createElement("div"); e.className="wf-vars-empty";
+    e.textContent="Chưa có biến nào. Bấm + để thêm biến toàn cục.";
+    body.appendChild(e); return;
+  }
+  names.forEach(n=>{
+    const row=document.createElement("div"); row.className="wf-var-row-live";
+    const nm=document.createElement("span"); nm.className="vn"; nm.textContent=(globalSet.has(n)?"⏺ ":"")+n; nm.title=n+(globalSet.has(n)?" · toàn cục":"");
+    if(globalSet.has(n)) nm.style.color="var(--accent)";
+    const live=wfLiveVars[n];
+    const hasDeclared=declared.hasOwnProperty(n);
+    const val = (live!==undefined) ? live : (hasDeclared ? declared[n] : undefined);
+    const vv=document.createElement("span"); vv.className="vv"+(n===wfFreshVar?" fresh":"");
+    vv.textContent = (val===undefined||val===null||val==="") ? (hasDeclared?"∅":"(tự sinh)") : String(val);
+    vv.title = (live!==undefined) ? "giá trị chạy" : (hasDeclared ? "giá trị khai báo" : "do node tạo — chưa có giá trị mặc định");
+    row.appendChild(nm); row.appendChild(vv);
+    body.appendChild(row);
+  });
+}
+
+// ── Global variables editor (popover from the vars panel "+") ─────────────────
+let wfGlobsOpen=false;
+function wfAddQuickGlobal(){
+  if(!Array.isArray(WF.globals)) WF.globals=[];
+  const n=WF.globals.length+1;
+  WF.globals.push({name:"g"+n, label:"Toàn cục "+n, type:"bool", value:false});
+  wfRenderVarsPanel();
+  wfShowGlobsEditor();
+}
+function wfToggleGlobsEditor(){
+  wfGlobsOpen=!wfGlobsOpen;
+  if(wfGlobsOpen) wfShowGlobsEditor(); else wfHideGlobsEditor();
+}
+function wfHideGlobsEditor(){ const p=document.getElementById("wf-globs-pop"); if(p) p.remove(); wfGlobsOpen=false; }
+function wfShowGlobsEditor(){
+  wfHideGlobsEditor();
+  if(!Array.isArray(WF.globals)) WF.globals=[];
+  const pop=document.createElement("div"); pop.id="wf-globs-pop"; pop.className="wf-globs-pop";
+  const hdr=document.createElement("div"); hdr.className="wf-vars-hdr";
+  hdr.innerHTML='<span>Biến toàn cục</span><span class="wf-vars-live" style="cursor:pointer" title="Đóng">✕</span>';
+  hdr.querySelector(".wf-vars-live").onclick=wfHideGlobsEditor;
+  pop.appendChild(hdr);
+  const body=document.createElement("div"); body.className="wf-globs-pop-body";
+  function render(){
+    body.innerHTML="";
+    if(!WF.globals.length){
+      const e=document.createElement("div"); e.className="wf-vars-empty";
+      e.textContent="Chưa có biến toàn cục. Bấm \"+ Thêm\".";
+      body.appendChild(e);
+    }
+    WF.globals.forEach((v,idx)=> body.appendChild(wfGlobRow(v,idx,render)));
+    const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Thêm";
+    add.style.marginTop="2px";
+    add.onclick=()=>{ const n=WF.globals.length+1; WF.globals.push({name:"g"+n, label:"Toàn cục "+n, type:"bool", value:false}); render(); wfRenderVarsPanel(); };
+    body.appendChild(add);
+  }
+  render();
+  pop.appendChild(body);
+  document.body.appendChild(pop);
+  // Anchor above the "+" button so it never gets clipped by the canvas.
+  const btn=$("wf-vars-add");
+  if(btn){
+    const r=btn.getBoundingClientRect();
+    let left=r.right-250, top=r.top-8;
+    pop.style.top=Math.max(8, top-pop.offsetHeight)+"px";
+    pop.style.left=Math.max(8, left)+"px";
+  }
+}
+function wfGlobRow(v,idx,render){
+  const card=document.createElement("div"); card.className="wf-glob-card";
+  const r1=document.createElement("div"); r1.className="wf-var-row";
+  r1.style.alignItems="center";
+  const tag=document.createElement("span"); tag.className="wf-glob-tag"; tag.textContent="⏺ TOÀN CỤC";
+  const del=document.createElement("button"); del.className="wf-glob-del"; del.textContent="−"; del.title="Xoá biến toàn cục";
+  del.onclick=(e)=>{ e.stopPropagation(); WF.globals.splice(idx,1); render(); wfRenderVarsPanel(); };
+  const sp=document.createElement("span"); sp.style.flex="1";
+  r1.appendChild(tag); r1.appendChild(sp); r1.appendChild(del);
+  card.appendChild(r1);
+  const r1b=document.createElement("div"); r1b.className="wf-var-row";
+  const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Tiêu đề"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
+  lbl.oninput=()=>{ v.label=lbl.value; };
+  r1b.appendChild(lbl);
+  card.appendChild(r1b);
+  const r2=document.createElement("div"); r2.className="wf-var-row";
+  const nm=document.createElement("input"); nm.type="text"; nm.value=v.name||""; nm.placeholder="biến"; nm.style.flex="1"; nm.style.minWidth="0"; nm.style.fontSize="10.5px"; nm.style.fontFamily="var(--mono)";
+  nm.oninput=()=>{ v.name=nm.value; wfRenderVarsPanel(); };
+  r2.appendChild(nm);
+  const ty=document.createElement("select");
+  [["bool","bool"],["number","số"],["text","chữ"],["select","chọn"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
+  ty.onchange=()=>{
+    v.type=ty.value;
+    if(ty.value==="select"){ if(!v.options||!v.options.length) v.options=["A","B"]; v.value=v.options[0]; }
+    else v.value = ty.value==="bool"?false : ty.value==="number"?0 : "";
+    render(); wfRenderVarsPanel();
+  };
+  r2.appendChild(ty);
+  card.appendChild(r2);
+  card.appendChild(wfVarValue(v));
+  if(v.type==="select"){
+    const r3=document.createElement("div"); r3.className="wf-var-row";
+    const l=document.createElement("label"); l.textContent="options"; l.style.fontSize="10px"; r3.appendChild(l);
+    const opt=document.createElement("input"); opt.type="text"; opt.value=(v.options||[]).join(", "); opt.placeholder="A, B, C"; opt.style.flex="1"; opt.style.minWidth="0"; opt.style.fontSize="10px";
+    opt.onchange=()=>{ v.options=opt.value.split(",").map(s=>s.trim()).filter(Boolean); if(!v.options.includes(v.value)) v.value=v.options[0]||""; render(); wfRenderVarsPanel(); };
+    r3.appendChild(opt); card.appendChild(r3);
+  }
+  return card;
 }
 
 // Lightweight static checks surfaced as a "!" badge on the node — catches the two
@@ -1460,17 +1693,32 @@ function wfNodeEl(n){
   let title=def.label, sum="";
   if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?("ƒ "+fn.name):"ƒ (thiếu)"; }
   else { try{ sum=def.sum?def.sum(n.params):""; }catch{} }
-  const hasTpl = !!wfTplField(n.type);
+  const tplField = wfTplField(n.type);
+  const isTpls = tplField && tplField.t==="tpls";
+  const hasTpl = !!tplField;
   const showThumb = hasTpl && (wfPreviewAll || n.showPreview);
   const eyeBtn = hasTpl ? `<button class="wf-node-eye${n.showPreview?" on":""}" title="Xem trước ảnh (block này)">👁</button>` : "";
   const noteHtml = n.note ? `<div class="wf-node-note">${escHtml(n.note)}</div>` : "";
   const logHtml = n.log ? `<div class="wf-node-log">${escHtml(n.log)}</div>` : "";
-  const thumbHtml = showThumb ? `<img class="wf-node-thumb">` : "";
+  // tpls → a strip of small thumbnails (one per listed image); single tpl → one.
+  const thumbHtml = showThumb ? (isTpls
+    ? `<div class="wf-node-thumbs"></div>`
+    : `<img class="wf-node-thumb">`) : "";
   el.innerHTML=
     `<div class="wf-node-hd"><span class="ico">${def.ico}</span>${eyeBtn}<span class="wf-node-title">${escHtml(title)}</span></div>`+
     (sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"")+noteHtml+logHtml+thumbHtml;
   if(!sum && !n.note && !n.log && !thumbHtml) el.classList.add("collapsed");
-  if(thumbHtml){ el.classList.add("has-thumb"); wfLoadThumb(el.querySelector(".wf-node-thumb"), wfTplOf(n)); }
+  if(thumbHtml){
+    el.classList.add("has-thumb");
+    if(isTpls){
+      const strip=el.querySelector(".wf-node-thumbs");
+      const arr=Array.isArray(n.params[tplField.k])?n.params[tplField.k].filter(p=>String(p||"").trim()):[];
+      if(!arr.length){ const e=document.createElement("span"); e.className="wf-tpl-empty"; e.textContent="(chưa có ảnh)"; strip.appendChild(e); }
+      arr.forEach(p=>{ const im=document.createElement("img"); im.className="wf-node-thumb-sm"; strip.appendChild(im); wfLoadThumb(im,p); });
+    } else {
+      wfLoadThumb(el.querySelector(".wf-node-thumb"), wfTplOf(n));
+    }
+  }
   // input ports (start has none; note floats).
   // Most nodes have a single 'in'; the loop also exposes a 'loop' (loop-back)
   // input below it so the wire that re-enters the loop lands on its own port.
@@ -1910,7 +2158,14 @@ function wfInitCanvas(){
     if(ne && !WF.sel.includes(ne.dataset.node)){ wfSelectOne(ne.dataset.node); wfMarkSel(); wfRenderInspector(); }
     wfShowMenu(e.clientX, e.clientY);
   });
-  document.addEventListener("mousedown",e=>{ if(!e.target.closest("#wf-ctxmenu")) wfHideMenu(); }, true);
+  document.addEventListener("mousedown",e=>{ if(!e.target.closest("#wf-ctxmenu")) wfHideMenu(); if(!e.target.closest("#wf-globs-pop") && !e.target.closest("#wf-vars-mgr") && !e.target.closest("#wf-vars-add")) wfHideGlobsEditor(); }, true);
+  // Vars panel header toggles collapse (click-through to drag is fine on body).
+  const vhdr=document.querySelector("#wf-vars-panel .wf-vars-hdr");
+  if(vhdr) vhdr.onclick=(e)=>{ if(e.target.closest(".wf-vars-actions")) return; wfVarsCollapsed=!wfVarsCollapsed; wfRenderVarsPanel(); };
+  const vadd=$("wf-vars-add");
+  if(vadd) vadd.onclick=(e)=>{ e.stopPropagation(); wfAddQuickGlobal(); };
+  const vmgr=$("wf-vars-mgr");
+  if(vmgr) vmgr.onclick=(e)=>{ e.stopPropagation(); wfToggleGlobsEditor(); };
   canvas.addEventListener("wheel",e=>{
     e.preventDefault();
     const r=canvas.getBoundingClientRect();
@@ -2037,6 +2292,7 @@ function wfBoxSelectMove(e){
 // ── Inspector ──────────────────────────────────────────────────────────────
 function wfRenderInspector(){
   const body=$("wf-insp-body"); body.innerHTML="";
+  wfRenderVarsPanel();   // the vars list depends on the current activity
   // Multi-selection: show a count + bulk delete instead of one node's params.
   if(WF.sel.length>1){
     const h=document.createElement("div"); h.className="wf-insp-sec"; h.textContent=`${WF.sel.length} node được chọn`; body.appendChild(h);
@@ -2254,6 +2510,25 @@ function wfFieldEl(node,f){
     row.appendChild(list); row.appendChild(add);
     return row;
   }
+  // Variable-picker field: a text input backed by a <datalist> of every
+  // variable declared anywhere in the flow, so the user can pick an existing
+  // var from a dropdown OR type a new name. Falls through to the plain input
+  // when no vars exist yet.
+  if(f.var && f.t!=="num"){
+    const names=wfAllVarNames();
+    const inp=document.createElement("input"); inp.type="text";
+    inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
+    inp.setAttribute("list","wf-varlist"); inp.style.flex="1"; inp.style.minWidth="0";
+    inp.oninput=()=>{ node.params[f.k]=inp.value; wfUpdNodeSum(node); wfRenderVarsPanel(); };
+    row.appendChild(inp);
+    if(names.length){
+      let dl=document.getElementById("wf-varlist");
+      if(!dl){ dl=document.createElement("datalist"); dl.id="wf-varlist"; document.body.appendChild(dl); }
+      // Rebuild each render so newly-declared vars appear.
+      dl.innerHTML=""; names.forEach(n=>{ const o=document.createElement("option"); o.value=n; dl.appendChild(o); });
+    }
+    return row;
+  }
   const inp=document.createElement("input");
   inp.type=f.t==="num"?"number":"text"; if(f.t==="num"&&f.step) inp.step=f.step;
   inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
@@ -2329,8 +2604,19 @@ function wfTplField(type){ const def=WF_NODES[type]; return def&&(def.fields||[]
 function wfTplOf(node){ const f=wfTplField(node.type); if(!f) return ""; const v=node.params[f.k];
   return Array.isArray(v)?(v.find(Boolean)||""):(v||""); }   // tpls → first set image
 function wfUpdNodePreview(node){
-  const img=document.querySelector(`.wf-node[data-node="${node.id}"] .wf-node-thumb`);
-  if(img) wfLoadThumb(img, wfTplOf(node));   // refresh in-node thumbnail if shown
+  const el=document.querySelector(`.wf-node[data-node="${node.id}"]`);
+  if(!el) return;
+  const strip=el.querySelector(".wf-node-thumbs");
+  if(strip){
+    const f=wfTplField(node.type);
+    const arr=Array.isArray(node.params[f.k])?node.params[f.k].filter(p=>String(p||"").trim()):[];
+    strip.innerHTML="";
+    if(!arr.length){ const e=document.createElement("span"); e.className="wf-tpl-empty"; e.textContent="(chưa có ảnh)"; strip.appendChild(e); return; }
+    arr.forEach(p=>{ const im=document.createElement("img"); im.className="wf-node-thumb-sm"; strip.appendChild(im); wfLoadThumb(im,p); });
+    return;
+  }
+  const img=el.querySelector(".wf-node-thumb");
+  if(img) wfLoadThumb(img, wfTplOf(node));   // refresh single in-node thumbnail if shown
 }
 
 // ── Export / import / run ────────────────────────────────────────────────────
@@ -2347,6 +2633,7 @@ function wfSerialize(){
   return {
     name:$("wf-name").value||"workflow", version:2, templatesDir:WF.templatesDir||"templates",
     speedhack:{ enabled:!!sh.enabled, speed:sh.speed||2.0, package:(sh.package||"").trim() },
+    globals:(WF.globals||[]).map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[]})),
     functions: WF.functions.map(f=>({ id:f.id, name:f.name, graph:wfCleanGraph(f.graph) })),
     activities: WF.activities.map(a=>{
       const o={ id:a.id, name:a.name, type:a.type, enabled:a.enabled,
@@ -2367,6 +2654,7 @@ function wfHydrate(flow){
   WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"templates";
   const sh=flow.speedhack||{}; WF.speedhack={enabled:!!sh.enabled, speed:(parseFloat(sh.speed)||2.0), package:(sh.package||"").trim()};
   WF.functions=(flow.functions||[]).map(f=>({ id:f.id||("fn_"+wfUid().slice(1,6)), name:f.name||"function", graph:wfHydrateGraph(f.graph) }));
+  WF.globals=(flow.globals||[]).map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[]}));
   WF.activities=(flow.activities||[]).map(a=>({
     id:a.id||("act_"+wfUid().slice(1,5)), name:a.name||a.id||"activity",
     type:a.type==="background"?"background":"sequence", enabled:a.enabled!==false,
@@ -2397,12 +2685,13 @@ function wfSetRunning(on){
   wfRunning=on; const b=$("wf-run-btn");
   // When a run ends (stopped or finished) every block returns to its original
   // colour — no leftover green/red/amber trail.
-  if(!on) wfResetRunViz();
+  if(!on){ wfResetRunViz(); wfLiveVars={}; wfFreshVar=null; }
   if(b){
     b.innerHTML = on?WF_ICO_STOP:WF_ICO_PLAY;
     b.title = on?"Dừng":"Chạy thử";
     b.classList.toggle("ok",!on); b.classList.toggle("err",on);
   }
+  wfRenderVarsPanel();
 }
 async function wfToggleRun(){
   if(wfRunning){ wfSetRunning(false); await api().workflow_stop(); return; }  // reset first, then stop

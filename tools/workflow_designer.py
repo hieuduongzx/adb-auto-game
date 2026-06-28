@@ -618,10 +618,15 @@ class WorkflowDesignerAPI:
         self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
         self._engine.callbacks["on_node_done"] = [
             lambda nid, st, port: self._push("node_result", {"id": nid, "status": st, "port": port})]
+        self._engine.callbacks["on_var"] = [
+            lambda name, value: self._push("var_update", {"name": name, "value": value})]
         # Test runs never auto-apply speedhack — that's a separate ▶ action.
         ok = self._engine.start(background=True, with_speedhack=False)
         self._push("workflow_state", {"running": ok})
         if ok:
+            # Seed the panel with global vars immediately (activity vars arrive
+            # via on_var when each activity starts).
+            self._push("vars_snapshot", {"vars": dict(self._engine._globals)})
             log_success("Workflow bắt đầu chạy")
         return ok
 

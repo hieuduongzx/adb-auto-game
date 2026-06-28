@@ -99,7 +99,8 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "log":        {"label": "Ghi nhật ký",   "kind": "action",    "ins": 1, "outs": ["out"]},
     "set_var":    {"label": "Đặt biến",      "kind": "action",    "ins": 1, "outs": ["out"]},
     "calc_var":   {"label": "Tính biến",     "kind": "action",    "ins": 1, "outs": ["out"]},
-    "read_var":   {"label": "Đọc chữ → biến","kind": "action",    "ins": 1, "outs": ["out"]},
+    "read_var":   {"label": "Đọc chữ → biến","kind": "action", "ins": 1, "outs": ["out"]},
+    "parse_var":  {"label": "Tách chữ → biến","kind": "action", "ins": 1, "outs": ["out"]},
     "break":      {"label": "Thoát vòng lặp","kind": "action",    "ins": 1, "outs": ["out"]},
     "if_image":   {"label": "Nếu thấy ảnh",  "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     "if_image_any":{"label": "Nếu thấy 1 trong ảnh","kind": "condition","ins": 1, "outs": ["true", "false"]},
@@ -138,6 +139,12 @@ class WorkflowEngine:
         self.flow: Dict[str, Any] = {}
         self.flow_path: Optional[str] = None
         self.templates_base: str = ""
+        # Global workflow variables — declared once at the flow top level
+        # (``globals``) and seeded into EVERY activity/thread before its own
+        # activity-local vars. Lets a counter or flag set in one place be seen
+        # by every block in the workflow. Runtime writes to a global name keep
+        # the shared dict in sync so other threads read the latest value.
+        self._globals: Dict[str, Any] = {}
         # Speedhack: a Frida clock_gettime time-scale, configured per-flow under
         # the top-level ``speedhack`` key ({enabled, speed, package}). The engine
         # owns the manager so both the designer's "Run test" and the runner GUI
@@ -177,6 +184,9 @@ class WorkflowEngine:
             # actually taken (a condition's "true"/"false", a loop's "body"/"done",
             # else "out"). Lets the designer paint the executed path + branch taken.
             "on_node_done": [],
+            # fired whenever a variable changes: (name, value). Lets the designer
+            # show a live "current variables" panel during a test run.
+            "on_var": [],
         }
 
         # Dispatch table for action nodes: type -> handler(node, params) -> bool.
@@ -199,6 +209,7 @@ class WorkflowEngine:
             "set_var": self._a_set_var,
             "calc_var": self._a_calc_var,
             "read_var": self._a_read_var,
+            "parse_var": self._a_parse_var,
             "break": self._a_break,
         }
 
@@ -206,6 +217,23 @@ class WorkflowEngine:
     # These read/write the *current thread's* slot, so the existing
     # ``self._vars[...]`` / ``self._last_pos`` accesses scattered through the
     # handlers stay unchanged but become thread-isolated.
+
+    def _set_var(self, name: str, value: Any) -> None:
+        """Write a variable and notify ``on_var`` subscribers (live var panel).
+
+        If ``name`` is a declared global, the shared ``_globals`` dict is kept
+        in sync so other threads/activities see the latest value too.
+        """
+        if not name:
+            return
+        self._vars[name] = value
+        if name in self._globals:
+            self._globals[name] = value
+        self._emit("on_var", name, value)
+
+    def _vars_snapshot(self) -> Dict[str, Any]:
+        """A shallow copy of the current thread's vars — for the live panel."""
+        return dict(self._vars)
 
     @property
     def _vars(self) -> Dict[str, Any]:
@@ -256,6 +284,9 @@ class WorkflowEngine:
         self.flow_path = flow_path
         self.speedhack_cfg = dict(self.flow.get("speedhack") or {})
         self._functions = {f.get("id"): f for f in (self.flow.get("functions") or []) if f.get("id")}
+        # Global vars: declared at flow top level (``globals``), seeded into every
+        # thread below. Reset the shared runtime dict on (re)load.
+        self._globals = self._seed_vars({"vars": self.flow.get("globals") or []})
         base = (self.flow.get("templatesDir") or "").strip()
         anchors: List[str] = []
         if flow_path:
@@ -377,6 +408,8 @@ class WorkflowEngine:
         self._last_pos = None
         self._break_loop = False
         self._emit("on_activity_start", act)
+        for k, v in self._vars.items():
+            self._emit("on_var", k, v)
         ok = False
         t0 = time.time()
         for attempt in range(1, retries + 1):
@@ -603,8 +636,12 @@ class WorkflowEngine:
                       s)
 
     def _seed_vars(self, act: Dict) -> Dict[str, Any]:
-        """Initial variable values declared on the activity (``vars``)."""
+        """Initial variable values for a thread: globals first, then the
+        activity's own declared ``vars`` (which may override a same-named
+        global for this run)."""
         out: Dict[str, Any] = {}
+        for v in (self._globals or {}).items():
+            out[v[0]] = v[1]
         for v in (act.get("vars") or []):
             nm = str(v.get("name", "")).strip()
             if not nm:
@@ -1073,7 +1110,7 @@ class WorkflowEngine:
     def _a_set_var(self, node, p) -> bool:
         name = str(p.get("name", "")).strip()
         if name:
-            self._vars[name] = self._coerce(p.get("value", ""))
+            self._set_var(name, self._coerce(p.get("value", "")))
             log_info(f"[workflow] set {name} = {self._vars[name]!r}")
         return True
 
@@ -1097,7 +1134,7 @@ class WorkflowEngine:
         # Keep ints clean (3.0 -> 3) for nicer comparisons/logs.
         if isinstance(res, float) and res.is_integer():
             res = int(res)
-        self._vars[name] = res
+        self._set_var(name, res)
         log_info(f"[workflow] {name} {op}= {rhs} -> {res}")
         return True
 
@@ -1105,8 +1142,57 @@ class WorkflowEngine:
         name = str(p.get("name", "")).strip()
         text = self.auto.read_text(region=self._region(p)) or ""
         if name:
-            self._vars[name] = self._coerce(text.strip())
+            self._set_var(name, self._coerce(text.strip()))
             log_info(f"[workflow] read {name} = {self._vars[name]!r}")
+        return True
+
+    def _a_parse_var(self, node, p) -> bool:
+        """Tách một đoạn text theo regex và lưu nhóm capture vào biến.
+
+        Nguồn text: vùng OCR (mặc định, dùng x/y/w/h), hoặc giá trị của một
+        biến có sẵn khi ``source`` = "var" (đọc từ ``fromVar``). Regex ``pattern``
+        được áp dụng (re.search); nhóm capture thứ ``group`` (mặc định 1) được
+        gán vào biến ``name``. Nếu không khớp, biến được đặt về "" và node vẫn
+        trả về True (không phải lỗi—chỉ là không thấy).
+
+        Ví dụ: text "5/5", pattern "(\\d+)/(\\d+)", group 1 -> name = "5".
+        """
+        name = str(p.get("name", "")).strip()
+        src = str(p.get("source", "region")).strip().lower()
+        if src == "var":
+            text = str(self._vars.get(str(p.get("fromVar", "")).strip(), ""))
+        else:
+            try:
+                text = self.auto.read_text(region=self._region(p)) or ""
+            except Exception as exc:
+                log_warning(f"[workflow] parse_var OCR lỗi: {exc}")
+                text = ""
+        pattern = str(p.get("pattern", "")).strip()
+        if not pattern:
+            if name:
+                self._set_var(name, self._coerce(text.strip()))
+                log_info(f"[workflow] parse {name} = {self._vars[name]!r} (không pattern)")
+            return True
+        try:
+            m = re.search(pattern, text, re.MULTILINE)
+        except re.error as exc:
+            log_error(f"[workflow] parse_var regex lỗi: {exc}")
+            if name:
+                self._set_var(name, "")
+            return False
+        value = ""
+        if m:
+            try:
+                grp = int(p.get("group", 1) or 1)
+            except (TypeError, ValueError):
+                grp = 1
+            if 0 <= grp <= len(m.groups()):
+                value = m.group(grp) or ""
+            else:
+                value = m.group(0) or ""
+        if name:
+            self._set_var(name, self._coerce(value.strip()))
+            log_info(f"[workflow] parse {name} = {self._vars[name]!r} (từ {text!r})")
         return True
 
     def _a_break(self, node, p) -> bool:
