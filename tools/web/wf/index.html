@@ -90,7 +90,7 @@
         <button class="btn sm" onclick="wfZoomBy(1/1.1)" title="Thu nhỏ">−</button>
         <span id="wf-zoom-lbl" onclick="wfZoomReset()" title="Đặt lại 100%">100%</span>
         <button class="btn sm" onclick="wfZoomBy(1.1)" title="Phóng to">+</button>
-        <button class="btn sm ico" onclick="wfFit()" title="Vừa khung — hiện toàn bộ block (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/></svg></button>
+        <button class="btn sm ico" onclick="wfFit()" title="Vừa khung — hiện toàn bộ block (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/></svg></button>
       </span>
       <span class="spacer"></span>
       <span class="wf-hint" title="Cuộn chuột = zoom · Kéo = di chuyển khối · Chuột phải = menu (tạo nhóm/sao chép/xoá) hoặc xoá dây (trên dây nối) · Space hoặc chuột giữa = kéo nền">Cuộn = zoom · Kéo = di chuyển · Chuột phải = menu · Space = kéo nền</span>
@@ -109,7 +109,7 @@
             <button id="wf-vars-add" class="wf-vars-add" title="Thêm biến toàn cục">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
-            <button id="wf-vars-mgr" class="wf-vars-add" title="Quản lý biến toàn cục"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+            <button id="wf-vars-mgr" class="wf-vars-add" title="Quản lý biến toàn cục"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
           </span>
         </div>
         <div id="wf-vars-body" class="wf-vars-body"></div>
@@ -120,7 +120,7 @@
         <div class="wf-act-panel-hdr">
           <div class="wf-act-hdr-row" id="wf-act-hdr-row">
             <span class="wf-act-hdr-chevron">
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
             </span>
             <span class="wf-act-hdr-title" id="wf-act-hdr-title">Hoạt động</span>
             <button class="wf-act-hdr-add" id="wf-act-add" title="Thêm hoạt động">+</button>
@@ -157,7 +157,7 @@
 
 <div id="log-card" class="card">
   <div class="log-hdr" onclick="wfToggleLog(event)" title="Bấm để thu gọn/mở nhật ký">
-    <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
+    <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
     <span class="log-label">Nhật ký</span>
     <span class="log-count" id="log-count"></span>
     <span class="spacer"></span>

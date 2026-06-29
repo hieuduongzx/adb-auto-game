@@ -34,7 +34,15 @@ function updateLogCount(){ const c=$("log-count"), b=$("log-body"); if(c&&b) c.t
 function wfToggleLog(ev){
   if(ev && ev.target.closest(".btn-log-clear")) return;   // let "Xoá" act without toggling
   const c=$("log-card"); if(!c) return;
-  c.classList.toggle("collapsed");
+  const isCollapsed = c.classList.contains("collapsed");
+  if (isCollapsed) {
+    c.style.display = "flex"; // Ensure it's not display:none if handled by CSS previously
+    // Force reflow
+    void c.offsetWidth;
+    c.classList.remove("collapsed");
+  } else {
+    c.classList.add("collapsed");
+  }
   wfSaveSettings();
 }
 

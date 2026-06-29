@@ -59,13 +59,13 @@ const WF_ICONS = {
   box:        '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="4 3"/>',
   log:        '<path d="M14 3v4h4"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>',
 };
-function wfIco(name){
-  const inner = WF_ICONS[name];
-  if(!inner) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/></svg>';
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
-}
-// Some node icos need a filled look (stop/launch) — mark them inline.
-function wfIcoHtml(name){ return wfIco(name); }
+  function wfIco(name){
+    const inner = WF_ICONS[name];
+    if(!inner) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/></svg>';
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+  }
+  // Some node icos need a filled look (stop/launch) — mark them inline.
+  function wfIcoHtml(name){ return wfIco(name); }
 
 // Node catalog: UI source of truth (icon, kind, output ports, param fields).
 // Mirrors src/workflow/engine.py NODE_TYPES. kind: start|end|action|condition|loop.

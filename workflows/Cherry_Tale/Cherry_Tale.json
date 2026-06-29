@@ -17,15 +17,15 @@
           {
             "id": "n43hela1",
             "type": "start",
-            "x": 60,
+            "x": -180,
             "y": -20,
             "params": {}
           },
           {
             "id": "njdme2qq",
             "type": "if_image",
-            "x": 420,
-            "y": -20,
+            "x": 820,
+            "y": -40,
             "params": {
               "template": "templates/isHome_20260629_020356_32x32.png",
               "threshold": 0.85,
@@ -35,8 +35,8 @@
           {
             "id": "nasty5ic",
             "type": "tap_image_any",
-            "x": 620,
-            "y": -20,
+            "x": 600,
+            "y": -40,
             "params": {
               "templates": [
                 "templates/isHome_20260629_020427_37x32.png",
@@ -56,7 +56,7 @@
             "id": "nb3rusi6",
             "type": "loop",
             "x": 240,
-            "y": -20,
+            "y": -40,
             "params": {
               "count": 3,
               "infinite": true
@@ -65,37 +65,72 @@
           {
             "id": "n25sgerm",
             "type": "end",
-            "x": 620,
-            "y": 80,
+            "x": 820,
+            "y": 120,
             "params": {}
+          },
+          {
+            "id": "ny49hsac",
+            "type": "if_image",
+            "x": 0,
+            "y": -20,
+            "params": {
+              "template": "templates/isHome_20260629_020356_32x32.png",
+              "threshold": 0.85,
+              "negate": true
+            }
+          },
+          {
+            "id": "ntwfgp0v",
+            "type": "wait",
+            "x": 420,
+            "y": -40,
+            "params": {
+              "seconds": 1
+            }
           }
         ],
         "edges": [
           {
             "from": "njdme2qq",
-            "fromPort": "true",
-            "to": "nasty5ic"
+            "fromPort": "false",
+            "to": "n25sgerm"
           },
           {
             "from": "n43hela1",
             "fromPort": "out",
+            "to": "ny49hsac"
+          },
+          {
+            "from": "ny49hsac",
+            "fromPort": "true",
             "to": "nb3rusi6"
           },
           {
-            "from": "nb3rusi6",
-            "fromPort": "body",
-            "to": "njdme2qq"
+            "from": "ny49hsac",
+            "fromPort": "false",
+            "to": "n25sgerm"
           },
           {
             "from": "nasty5ic",
+            "fromPort": "true",
+            "to": "njdme2qq"
+          },
+          {
+            "from": "njdme2qq",
             "fromPort": "true",
             "to": "nb3rusi6",
             "toPort": "loop"
           },
           {
-            "from": "njdme2qq",
-            "fromPort": "false",
-            "to": "n25sgerm"
+            "from": "nb3rusi6",
+            "fromPort": "body",
+            "to": "ntwfgp0v"
+          },
+          {
+            "from": "ntwfgp0v",
+            "fromPort": "out",
+            "to": "nasty5ic"
           }
         ],
         "groups": []
@@ -443,7 +478,7 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
+              "delay": 3,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2602,7 +2637,7 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
-              "delay": 0,
+              "delay": 1,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2617,7 +2652,7 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
-              "delay": 0,
+              "delay": 2,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2659,7 +2694,7 @@
             "y": 40,
             "params": {
               "count": 3,
-              "infinite": false
+              "infinite": true
             }
           },
           {
@@ -2783,7 +2818,7 @@
       "id": "sequence_boed",
       "name": "Hoạt động 11",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -2948,7 +2983,7 @@
             "id": "n345db9k",
             "type": "tap",
             "x": 1500,
-            "y": 0,
+            "y": 40,
             "params": {
               "target": "found",
               "x": 0,

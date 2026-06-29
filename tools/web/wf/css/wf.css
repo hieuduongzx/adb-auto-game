@@ -27,8 +27,8 @@
 #wf-side-resizer:hover::before, #wf-side-resizer.drag::before { background:var(--accent); }
 .wf-side-sec { display:flex; flex-direction:column; min-height:0; }
 .wf-side-sec + .wf-side-sec { border-top:1px solid var(--line); }
-.wf-side-hdr { display:flex; align-items:center; gap:var(--s2); font-size:10.5px; font-weight:700; letter-spacing:.05em;
-  color:var(--dim); text-transform:uppercase; padding:var(--s4) var(--s4) var(--s2); }
+  .wf-side-hdr { display:flex; align-items:center; gap:var(--s2); font-size:10.5px; font-weight:700; letter-spacing:.05em;
+    color:var(--dim); text-transform:uppercase; padding:var(--s4) var(--s4) var(--s2); border-bottom: 1px solid var(--line); }
 .wf-side-hdr .btn { text-transform:none; letter-spacing:0; }
 .side-count { font-family:var(--mono); font-size:9.5px; font-weight:600; color:var(--muted);
   background:var(--alt); border-radius:999px; padding:1px 6px; letter-spacing:0; }
@@ -59,11 +59,11 @@
 
 .wf-palette { display:flex; flex-direction:column; gap:3px; }
 /* Category label: pill with color dot */
-.wf-pal-cat { display:flex; align-items:center; gap:5px; font-size:9px; font-weight:800;
-  letter-spacing:.04em; text-transform:uppercase; margin:7px 0 3px; padding:3px 7px;
-  border-radius:5px; color:var(--muted); }
-.wf-pal-cat::before { content:""; width:7px; height:7px; border-radius:2px; flex-shrink:0;
-  background:currentColor; display:block; }
+  .wf-pal-cat { display:flex; align-items:center; gap:5px; font-size:9.5px; font-weight:700;
+    letter-spacing:.04em; margin:7px 0 3px; padding:3px 7px;
+    border-radius:5px; color:var(--dim); }
+  .wf-pal-cat::before { content:""; width:6px; height:6px; border-radius:50%; flex-shrink:0;
+    background:currentColor; display:block; }
 .wf-pal-cat.cat-basic { color:#2d64cc; background:#eef5ff; }
 .wf-pal-cat.cat-input { color:#4338ca; background:#eef0ff; }
 .wf-pal-cat.cat-image { color:#0f766e; background:#ecfdf9; }
@@ -76,22 +76,15 @@
 .wf-badge.fn { display:inline-flex; align-items:center; justify-content:center; color:#fff;
   background:#7c3aed; border:none; font-size:9.5px; font-weight:800;
   padding:2px 5px; letter-spacing:.02em; border-radius:4px; min-width:16px; }
-.wf-chip { display:flex; align-items:center; gap:5px; padding:6px 7px; border:1px solid var(--border2);
-  border-left-width:3px; border-radius:7px; background:var(--panel); cursor:grab;
-  font-size:10.5px; font-weight:600; color:var(--ink2);
-  transition:border-color .1s, background .1s; user-select:none; }
-.wf-chip:hover { border-color:var(--accent); border-left-color:var(--accent); background:var(--accent-bg); }
+  .wf-chip { display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--border2);
+    border-radius:7px; background:var(--panel); cursor:grab;
+    font-size:11px; font-weight:600; color:var(--ink2);
+    transition:border-color .1s, background .1s, box-shadow .1s; user-select:none; }
+  .wf-chip:hover { border-color:var(--accent); background:var(--accent-bg); box-shadow: 0 1px 3px rgba(47,111,237,.1); }
 .wf-chip:active { cursor:grabbing; }
 .wf-chip .ico { display:flex; align-items:center; justify-content:center; width:14px; height:14px; }
 .wf-chip .ico svg { width:14px; height:14px; display:block; }
-/* Per-category chip accent: left edge colour + icon tint */
-.wf-chip.cat-basic { border-left-color:#6f9be8; }
-.wf-chip.cat-input { border-left-color:#818cf8; }
-.wf-chip.cat-image { border-left-color:#2fb0a3; }
-.wf-chip.cat-ocr   { border-left-color:#e0954b; }
-.wf-chip.cat-flow  { border-left-color:#e0a64b; }
-.wf-chip.cat-logic { border-left-color:#9a78e6; }
-.wf-chip.cat-misc  { border-left-color:#9aa6b4; }
+  /* Per-category chip accent: icon tint */
 .wf-chip.cat-basic .ico { color:#2d64cc; }
 .wf-chip.cat-input .ico { color:#4338ca; }
 .wf-chip.cat-image .ico { color:#0f766e; }
@@ -99,10 +92,10 @@
 .wf-chip.cat-flow  .ico { color:#b45309; }
 .wf-chip.cat-logic .ico { color:#6d28d9; }
 .wf-chip.cat-misc  .ico { color:#4b5563; }
-/* Function sidebar rows: purple tint + left border */
-.wf-act.wf-fn { border-left:3px solid #9a78e6; background:#faf7ff; }
-.wf-act.wf-fn:hover { background:#f3eefe; border-left-color:#7c3aed; }
-.wf-act.wf-fn.sel  { background:#ede8fc; border-left-color:#7c3aed; border-color:#c4b1f6; }
+  /* Function sidebar rows: purple tint + subtle hover */
+  .wf-act.wf-fn { border:1px solid #d8c8f7; background:#faf7ff; }
+  .wf-act.wf-fn:hover { background:#f3eefe; border-color:#c4b1f6; box-shadow: 0 1px 3px rgba(124,58,237,.1); }
+  .wf-act.wf-fn.sel  { background:#ede8fc; border-color:#9a78e6; }
 
 /* Center: canvas */
 #wf-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
@@ -175,15 +168,15 @@
 /* Activities + Functions panel — pinned bottom-right of the canvas.
    Header = title row (chevron + label + add btn) stacked above a tab bar.
    Collapsing hides the tab bar + body; only the title row stays visible. */
-.wf-act-panel { position:absolute; right:10px; bottom:10px; width:248px; max-height:50%;
-  background:var(--panel); border:1px solid var(--border2); border-radius:9px;
-  box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5; overflow:hidden; }
-.wf-act-panel.collapsed { max-height:30px; }
-.wf-act-panel-hdr { display:flex; flex-direction:column; flex-shrink:0; }
-/* Title row: chevron + label + add button */
-.wf-act-hdr-row { display:flex; align-items:center; gap:6px; padding:5px 10px;
-  background:var(--surface); border-bottom:1px solid var(--border2);
-  cursor:pointer; user-select:none; transition:background .1s; min-height:30px; }
+  .wf-act-panel { position:absolute; right:10px; bottom:10px; width:248px; max-height:50%;
+      background:var(--panel); border:1px solid var(--border2); border-radius:9px;
+      box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5; overflow:hidden; transition: max-height 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+  .wf-act-panel.collapsed { max-height:34px; }
+  .wf-act-panel-hdr { display:flex; flex-direction:column; flex-shrink:0; }
+  /* Title row: chevron + label + add button */
+  .wf-act-hdr-row { display:flex; align-items:center; gap:6px; padding:6px 10px;
+    background:var(--surface); border-bottom:1px solid var(--border2);
+    cursor:pointer; user-select:none; transition:background .1s; min-height:32px; }
 .wf-act-hdr-row:hover { background:var(--alt); }
 .wf-act-hdr-chevron { color:var(--muted); display:flex; align-items:center; flex-shrink:0;
   transition:transform .15s var(--ease); }
@@ -215,14 +208,14 @@
 /* Live variables panel — pinned top-right of the canvas. Shows the vars
    declared on the current activity (declared value) overlaid with live runtime
    values pushed from the engine during a test run. Collapsible. */
-.wf-vars-panel { position:absolute; right:10px; top:10px; width:232px; max-height:50%;
-  background:var(--panel); border:1px solid var(--border2); border-radius:9px;
-  box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5;
-  font-size:11px; overflow:hidden; }
-.wf-vars-panel.collapsed { max-height:30px; }
-.wf-vars-hdr { display:flex; align-items:center; gap:5px;
-  padding:6px 10px; cursor:pointer; background:var(--surface); border-bottom:1px solid var(--border2);
-  user-select:none; min-height:30px; }
+  .wf-vars-panel { position:absolute; right:10px; top:10px; width:232px; max-height:50%;
+      background:var(--panel); border:1px solid var(--border2); border-radius:9px;
+      box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5;
+      font-size:11px; overflow:hidden; transition: max-height 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+  .wf-vars-panel.collapsed { max-height:34px; }
+  .wf-vars-hdr { display:flex; align-items:center; gap:5px;
+      padding:6px 10px; cursor:pointer; background:var(--surface); border-bottom:1px solid var(--border2);
+      user-select:none; min-height:32px; }
 .wf-vars-title { font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
   color:var(--dim); }
 .wf-vars-count { font-family:var(--mono); font-size:9.5px; color:var(--muted); background:var(--alt);
@@ -383,11 +376,11 @@
 .wf-selbox { position:absolute; border:1px solid var(--accent); background:rgba(47,111,237,.10); z-index:1; pointer-events:none; border-radius:2px; }
 .wf-node { cursor:grab; }
 .wf-node:active { cursor:grabbing; }
-/* Node header: tinted per-category via --nhd-bg/--nhd-bd CSS vars; default keeps existing light-purple for uncategorised nodes. */
-.wf-node-hd { display:flex; align-items:center; gap:6px; padding:7px 9px;
-  border-bottom:1px solid var(--nhd-bd,#ece3fb); background:var(--nhd-bg,#f4eefe);
-  border-radius:var(--node-r) var(--node-r) 0 0; }
-.wf-node.collapsed .wf-node-hd { border-bottom:none; border-radius:var(--node-r); }
+  /* Node header: tinted per-category via --nhd-bg/--nhd-bd CSS vars; default keeps existing light-purple for uncategorised nodes. */
+  .wf-node-hd { display:flex; align-items:center; gap:6px; padding:7px 9px;
+    border-bottom:1px solid var(--nhd-bd,#ece3fb); background:var(--nhd-bg,#f4eefe);
+    border-radius:var(--node-r) var(--node-r) 0 0; transition: background .15s, border-bottom-color .15s; }
+  .wf-node.collapsed .wf-node-hd { border-bottom:none; border-radius:var(--node-r); }
 .wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:15px; height:15px; }
 .wf-node .ico svg { width:15px; height:15px; display:block; }
 .wf-node.call .ico { font-style:italic; font-weight:700; }
