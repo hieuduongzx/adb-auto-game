@@ -276,9 +276,9 @@ class WorkflowEngine:
     def _break_loop(self, value: bool) -> None:
         self._ctx.break_loop = value
 
-    # Set True the moment an action node in the current branch returns False
-    # (tap miss, wait_image timeout, set_var error...). try_chain reads it after
-    # each branch to decide whether to fall through to the next one.
+    # Set True when the current try_chain branch reaches an unhandled failure.
+    # A condition returning false is only unhandled when its false/out path is not
+    # wired; if the graph handles that path, the branch may still succeed.
     @property
     def _branch_failed(self) -> bool:
         return getattr(self._ctx, "branch_failed", False)
@@ -530,11 +530,13 @@ class WorkflowEngine:
                 res = self._eval_condition(ntype, params)
                 port = "true" if res else "false"
                 self._emit("on_node_done", nid, "ok", port)  # branch taken
-                if self._try_chain_mode and not res:
+                nxt = self._next(adj, cur, port)
+                if nxt is None:
+                    nxt = self._next(adj, cur, "out")
+                if self._try_chain_mode and not res and nxt is None:
                     self._branch_failed = True
                     break
-                nxt = self._next(adj, cur, port)
-                cur = nxt if nxt is not None else self._next(adj, cur, "out")
+                cur = nxt
             elif kind == "loop":
                 if self._break_loop:
                     self._break_loop = False
