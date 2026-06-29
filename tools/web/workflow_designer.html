@@ -442,7 +442,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 /* True/False branch wires: bolder and fully opaque — the decision fork is the
    the most information-dense part of the graph and must read first. */
 #wf-wires path.wire.t { stroke:#25a05a; stroke-width:1.6; stroke-opacity:1; marker-end:url(#wf-ah-t); }
-#wf-wires path.wire.f { stroke:#d45f3a; stroke-width:1.6; stroke-opacity:1; marker-end:url(#wf-ah-f); }
+#wf-wires path.wire.f { stroke:#e07428; stroke-width:1.6; stroke-opacity:1; marker-end:url(#wf-ah-f); }
 /* Stack wire: structural, not a data flow — very faint dotted rule, no arrowhead. */
 #wf-wires path.wire.stack { stroke:#b8c6d4; stroke-width:1.0; stroke-opacity:0.45;
   stroke-dasharray:2.5 3; marker-end:none; }
@@ -459,7 +459,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 #wf-canvas.wf-connecting .wire-hit { pointer-events:none; }
 /* Run trail on wires: the path taken (bright green) vs the skipped branch (faint red). */
 #wf-wires path.wire.took-wire    { stroke:#2fa55a !important; stroke-width:2.1; stroke-opacity:1 !important; marker-end:url(#wf-ah-t) !important; }
-#wf-wires path.wire.nottook-wire { stroke:#cf4b43 !important; stroke-opacity:.38 !important; stroke-width:1.25; marker-end:url(#wf-ah-f) !important; }
+#wf-wires path.wire.nottook-wire { stroke:#cf4b43 !important; stroke-opacity:.38 !important; stroke-width:1.25; marker-end:url(#wf-ah-nottook) !important; }
 #wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:1.5; stroke-dasharray:6 4;
   stroke-linecap:round; pointer-events:none; marker-end:url(#wf-ah-temp); }
 #wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -747,7 +747,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
    right-side output labels), so 'vào' / 'lặp' don't collide with node content. */
 .wf-port-lbl.in { right:auto; left:-34px; width:28px; text-align:right; }
 .wf-port-lbl.in.loop { color:#c2841f; }
-.wf-port.out.t { border-color:#2fa55a; } .wf-port.out.f { border-color:#cf6b43; }
+.wf-port.out.t { border-color:#2fa55a; } .wf-port.out.f { border-color:#e07428; }
 /* Run trail on ports: the output taken this run (filled green) vs the skipped
    true/false sibling (filled red). */
 .wf-port.out.took    { border-color:#2fa55a; background:#2fa55a; }
@@ -2306,7 +2306,7 @@ const WF_WIRE_DEFS = (function(){
   // refX=8 aligns the sharp tip exactly to the path endpoint.
   const mk=(id,c)=>`<marker id="${id}" markerWidth="7" markerHeight="7" refX="5.6" refY="2.6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0.4 L5.6,2.6 L0,4.8 L1.3,2.6 Z" fill="${c}" fill-opacity="0.95"/></marker>`;
   return "<defs>"+mk("wf-ah","#9aaec2")+mk("wf-ah-h","#bb3a33")+mk("wf-ah-t","#25a05a")
-    +mk("wf-ah-f","#d45f3a")+mk("wf-ah-loop","#d09030")+mk("wf-ah-temp","#2f6fed")+"</defs>";
+    +mk("wf-ah-f","#e07428")+mk("wf-ah-nottook","#cf4b43")+mk("wf-ah-loop","#d09030")+mk("wf-ah-temp","#2f6fed")+"</defs>";
 })();
 // ── Wire routing ──────────────────────────────────────────────────────────────
 // Three regimes ordered by a single invariant:
@@ -2444,6 +2444,23 @@ function wfGroupSelection(){
   wfAddGroup(x0-pad, y0-pad-22, (x1-x0)+pad*2, (y1-y0)+pad*2+22);
   return true;
 }
+// Resize an existing group to tightly wrap all its current member nodes.
+function wfFitGroup(gr){
+  const members=wfNodesInGroup(gr);
+  if(!members.length){ setStatus('Nhóm "'+gr.name+'" không chứa block nào'); return; }
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  members.forEach(n=>{
+    const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
+    const w=el?el.offsetWidth:158, h=el?el.offsetHeight:52;
+    x0=Math.min(x0,n.x); y0=Math.min(y0,n.y); x1=Math.max(x1,n.x+w); y1=Math.max(y1,n.y+h);
+  });
+  if(!isFinite(x0)) return;
+  const pad=22;
+  gr.x=wfSnap(x0-pad); gr.y=wfSnap(y0-pad-22);
+  gr.w=wfSnap((x1-x0)+pad*2); gr.h=wfSnap((y1-y0)+pad*2+22);
+  wfRenderCanvas();
+  setStatus(`Đã khớp viền nhóm "${gr.name}"`);
+}
 function wfRenderGroups(){
   const world=$("wf-world"), svg=$("wf-wires");
   [...world.querySelectorAll(".wf-group")].forEach(el=>el.remove());
@@ -2457,6 +2474,7 @@ function wfRenderGroups(){
     const hd=el.querySelector(".wf-group-hd");
     hd.addEventListener("mousedown",e=>wfStartGroupMove(e,gr));
     hd.addEventListener("dblclick",e=>{ e.stopPropagation(); wfRenameGroup(gr); });
+    hd.addEventListener("contextmenu",e=>{ e.preventDefault(); e.stopPropagation(); wfShowGroupMenu(e.clientX, e.clientY, gr); });
     const del=el.querySelector(".wf-group-del");
     del.addEventListener("mousedown",e=>e.stopPropagation());
     del.addEventListener("click",e=>{ e.stopPropagation(); wfDeleteGroup(gr.id); });
@@ -2619,6 +2637,21 @@ function wfShowWireMenu(clientX, clientY, ed){
   d.onclick=()=>{ wfHideMenu(); wfDeleteWire(ed); }; m.appendChild(d);
   m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
 }
+function wfShowGroupMenu(clientX, clientY, gr){
+  const m=$("wf-ctxmenu"); if(!m) return;
+  m.innerHTML="";
+  const items=[
+    {ico:"expand", label:"Khớp viền", fn:()=>wfFitGroup(gr)},
+    {ico:"edit",   label:"Đổi tên",   fn:()=>wfRenameGroup(gr)},
+    {ico:"trash",  label:"Xoá nhóm",  fn:()=>wfDeleteGroup(gr.id)},
+  ];
+  items.forEach(it=>{
+    const d=document.createElement("div"); d.className="wf-ctx-item";
+    d.innerHTML=`<span class="wf-ctx-ico">${wfIco(it.ico)}</span>${escHtml(it.label)}`;
+    d.onclick=()=>{ wfHideMenu(); it.fn(); }; m.appendChild(d);
+  });
+  m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
+}
 function wfInitCanvas(){
   if(wfCanvasReady) return; wfCanvasReady=true;
   const canvas=$("wf-canvas");
@@ -2631,6 +2664,8 @@ function wfInitCanvas(){
     // Right-click on a wire → offer to delete just that wire.
     const wireGrp=e.target.closest("g.wire-grp");
     if(wireGrp && wireGrp.__edge){ wfShowWireMenu(e.clientX, e.clientY, wireGrp.__edge); return; }
+    // Right-click on a group header → group menu (handled by its own listener via stopPropagation).
+    if(e.target.closest(".wf-group-hd")) return;
     const ne=e.target.closest(".wf-node");
     if(ne && !WF.sel.includes(ne.dataset.node)){ wfSelectOne(ne.dataset.node); wfMarkSel(); wfRenderInspector(); }
     wfShowMenu(e.clientX, e.clientY);
@@ -2709,8 +2744,8 @@ function wfInitCanvas(){
       wfDrawWires();
     } else if(wfGesture.mode==="groupresize"){
       const gr=wfGesture.gr;
-      gr.w=Math.max(80, Math.round(wfGesture.ow+(e.clientX-wfGesture.sx)/wfZoom));
-      gr.h=Math.max(60, Math.round(wfGesture.oh+(e.clientY-wfGesture.sy)/wfZoom));
+      gr.w=Math.max(80, wfSnap(wfGesture.ow+(e.clientX-wfGesture.sx)/wfZoom));
+      gr.h=Math.max(60, wfSnap(wfGesture.oh+(e.clientY-wfGesture.sy)/wfZoom));
       const el=document.querySelector(`.wf-group[data-group="${gr.id}"]`);
       if(el){ el.style.width=gr.w+"px"; el.style.height=gr.h+"px"; }
     } else if(wfGesture.mode==="groupdraw"){
