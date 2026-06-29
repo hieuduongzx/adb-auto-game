@@ -475,56 +475,77 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center; }
 .wf-layout-btn:hover { color:var(--accent); background:var(--accent-bg); border-color:var(--accent-bd); }
 
-/* Activities + Functions panel — pinned bottom-right of the canvas. Two tabs
-   (Hoạt động / Function) switch the list; the "+" button adds to the active tab.
-   Collapsible via the header, like the vars panel. */
-.wf-act-panel { position:absolute; right:10px; bottom:10px; width:240px; max-height:46%;
+/* Activities + Functions panel — pinned bottom-right of the canvas.
+   Header = title row (chevron + label + add btn) stacked above a tab bar.
+   Collapsing hides the tab bar + body; only the title row stays visible. */
+.wf-act-panel { position:absolute; right:10px; bottom:10px; width:248px; max-height:50%;
   background:var(--panel); border:1px solid var(--border2); border-radius:9px;
   box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5; overflow:hidden; }
-.wf-act-panel.collapsed { max-height:26px; }
-.wf-act-panel-hdr { display:flex; align-items:center; gap:4px; padding:5px 8px;
-  background:var(--bar); border-bottom:1px solid var(--border2); flex-shrink:0; cursor:pointer;
-  user-select:none; }
-.wf-act-tab { font-size:10.5px; font-weight:700; color:var(--muted); background:none; border:none;
-  cursor:pointer; padding:3px 7px; border-radius:5px; display:flex; align-items:center; gap:4px;
-  letter-spacing:.03em; text-transform:uppercase; }
-.wf-act-tab:hover { color:var(--ink); background:var(--alt); }
-.wf-act-tab.sel { color:var(--accent); background:var(--accent-bg); }
-.wf-act-add { width:20px; height:20px; padding:0; border:1px solid var(--border2); border-radius:5px;
-  background:var(--panel); color:var(--dim); cursor:pointer; font-size:14px; font-weight:700;
-  display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.wf-act-add:hover { color:var(--accent); border-color:var(--accent); }
-.wf-act-panel-body { overflow-y:auto; padding:5px 7px 7px; }
+.wf-act-panel.collapsed { max-height:30px; }
+.wf-act-panel-hdr { display:flex; flex-direction:column; flex-shrink:0; }
+/* Title row: chevron + label + add button */
+.wf-act-hdr-row { display:flex; align-items:center; gap:6px; padding:5px 10px;
+  background:var(--surface); border-bottom:1px solid var(--border2);
+  cursor:pointer; user-select:none; transition:background .1s; min-height:30px; }
+.wf-act-hdr-row:hover { background:var(--alt); }
+.wf-act-hdr-chevron { color:var(--muted); display:flex; align-items:center; flex-shrink:0;
+  transition:transform .15s var(--ease); }
+.wf-act-panel.collapsed .wf-act-hdr-chevron { transform:rotate(-90deg); }
+.wf-act-hdr-title { font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--dim); flex:1; min-width:0; }
+.wf-act-hdr-add { width:22px; height:22px; padding:0; border:1px solid var(--border2);
+  border-radius:6px; background:var(--panel); color:var(--dim); cursor:pointer; font-size:16px;
+  font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  line-height:1; transition:color .1s, border-color .1s, background .1s; }
+.wf-act-hdr-add:hover { color:var(--accent); border-color:var(--accent); background:var(--accent-bg); }
+/* Tab bar — hidden when collapsed */
+.wf-act-tab-row { display:flex; align-items:stretch; background:var(--panel); flex-shrink:0; }
+.wf-act-panel.collapsed .wf-act-tab-row { display:none; }
+.wf-act-tab { font-size:11px; font-weight:600; color:var(--muted); background:none; border:none;
+  cursor:pointer; padding:6px 10px 5px; display:flex; align-items:center; gap:4px;
+  letter-spacing:0; text-transform:none; position:relative; flex-shrink:0; }
+.wf-act-tab::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px;
+  background:transparent; border-radius:2px 2px 0 0; transition:background .15s; }
+.wf-act-tab.sel { color:var(--accent); }
+.wf-act-tab.sel::after { background:var(--accent); }
+.wf-act-tab:hover:not(.sel) { color:var(--ink); background:var(--alt); }
+/* Legacy .wf-act-add (hidden — replaced by .wf-act-hdr-add above) */
+.wf-act-add { display:none; }
+.wf-act-panel-body { overflow-y:auto; padding:5px 7px 7px; border-top:1px solid var(--line); }
 .wf-act-list { display:flex; flex-direction:column; gap:4px; }
-#wf-activities { padding:0; max-height:none; }   /* override the old sidebar styling */
+#wf-activities { padding:0; max-height:none; }
 
 /* Live variables panel — pinned top-right of the canvas. Shows the vars
    declared on the current activity (declared value) overlaid with live runtime
    values pushed from the engine during a test run. Collapsible. */
-.wf-vars-panel { position:absolute; right:10px; top:10px; width:200px; max-height:46%;
+.wf-vars-panel { position:absolute; right:10px; top:10px; width:232px; max-height:50%;
   background:var(--panel); border:1px solid var(--border2); border-radius:9px;
   box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5;
   font-size:11px; overflow:hidden; }
-.wf-vars-panel.collapsed { max-height:26px; }
-.wf-vars-hdr { display:flex; align-items:center; justify-content:space-between; gap:6px;
-  padding:5px 9px; cursor:pointer; background:var(--bar); border-bottom:1px solid var(--border2);
-  font-weight:700; letter-spacing:.04em; text-transform:uppercase; font-size:10px; color:var(--dim);
-  user-select:none; }
-.wf-vars-actions { display:flex; align-items:center; gap:5px; }
-.wf-vars-live { color:var(--muted); font-size:9px; }
-.wf-vars-add { width:18px; height:18px; line-height:1; padding:0; border:1px solid var(--border2);
-  border-radius:4px; background:var(--panel); color:var(--dim); cursor:pointer; font-size:13px;
-  display:flex; align-items:center; justify-content:center; }
-.wf-vars-add svg { width:11px; height:11px; display:block; }
+.wf-vars-panel.collapsed { max-height:30px; }
+.wf-vars-hdr { display:flex; align-items:center; gap:5px;
+  padding:6px 10px; cursor:pointer; background:var(--surface); border-bottom:1px solid var(--border2);
+  user-select:none; min-height:30px; }
+.wf-vars-title { font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--dim); }
+.wf-vars-count { font-family:var(--mono); font-size:9.5px; color:var(--muted); background:var(--alt);
+  border-radius:999px; padding:1px 6px; letter-spacing:0; }
+.wf-vars-count:empty { display:none; }
+.wf-vars-live { color:var(--muted); font-size:9px; margin-left:auto; flex-shrink:0; }
+.wf-vars-actions { display:flex; align-items:center; gap:4px; flex-shrink:0; }
+.wf-vars-add { width:20px; height:20px; line-height:1; padding:0; border:1px solid var(--border2);
+  border-radius:5px; background:var(--panel); color:var(--dim); cursor:pointer; font-size:13px;
+  display:flex; align-items:center; justify-content:center; transition:color .1s, border-color .1s; }
+.wf-vars-add svg { width:12px; height:12px; display:block; }
 .wf-vars-add:hover { color:var(--accent); border-color:var(--accent); }
 .wf-vars-close { display:flex; align-items:center; color:var(--muted); }
 .wf-vars-close svg { width:12px; height:12px; display:block; }
 .wf-vars-close:hover { color:var(--err); }
 /* Global vars editor popover. */
-.wf-globs-pop { position:fixed; z-index:50; width:250px; max-height:70vh;
+.wf-globs-pop { position:fixed; z-index:50; width:260px; max-height:70vh;
   background:var(--panel); border:1px solid var(--border2); border-radius:9px; box-shadow:var(--sh-md);
   display:flex; flex-direction:column; overflow:hidden; }
-.wf-globs-pop .wf-vars-hdr { cursor:default; }
+.wf-globs-pop .wf-vars-hdr { cursor:default; background:var(--surface); }
 .wf-globs-pop-body { overflow-y:auto; padding:6px; display:flex; flex-direction:column; gap:6px; }
 .wf-glob-card { border:1px solid var(--border2); border-radius:7px; padding:5px; display:flex; flex-direction:column; gap:4px; }
 .wf-glob-tag { font-size:9px; color:var(--accent); font-weight:700; letter-spacing:.04em; }
@@ -534,13 +555,17 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-glob-del:hover { background:var(--err-bg); border-color:var(--err); }
 .wf-vars-panel.live .wf-vars-live { color:#2fa55a; animation:wfPulse 1.4s ease-in-out infinite; }
 @keyframes wfPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-.wf-vars-body { overflow-y:auto; padding:4px 6px 6px; }
-.wf-vars-empty { color:var(--muted); padding:6px 4px; font-size:10.5px; }
-.wf-var-row-live { display:flex; align-items:baseline; gap:6px; padding:3px 4px; border-radius:5px; }
-.wf-var-row-live:hover { background:var(--bg); }
-.wf-var-row-live .vn { font-family:var(--mono); color:var(--ink); flex:1; min-width:0;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wf-var-row-live .vv { font-family:var(--mono); color:var(--accent); max-width:96px;
+.wf-vars-body { overflow-y:auto; padding:4px 7px 7px; }
+.wf-vars-empty { color:var(--muted); padding:7px 5px; font-size:10.5px; }
+/* Section separator inside the vars panel body */
+.wf-vars-sep { font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); padding:5px 5px 2px; display:block; }
+.wf-vars-sep:first-child { padding-top:2px; }
+.wf-var-row-live { display:flex; align-items:baseline; gap:6px; padding:3px 5px; border-radius:5px; }
+.wf-var-row-live:hover { background:var(--alt); }
+.wf-var-row-live .vn { font-family:var(--mono); font-size:10.5px; color:var(--ink); flex:1;
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-var-row-live .vv { font-family:var(--mono); font-size:10.5px; color:var(--accent); max-width:100px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
 .wf-var-row-live .vv.fresh { color:#2fa55a; font-weight:600; }
 
@@ -629,20 +654,18 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-node-eye svg { width:13px; height:13px; display:block; }
 .wf-node-eye:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-node-eye.on { color:var(--accent); }
-/* Uniform preview band: a fixed-height frame, image centred and NEVER upscaled
-   (scale-down keeps small crops crisp instead of stretching them blurry). */
-.wf-node-thumb { display:block; width:100%; height:68px; object-fit:scale-down;
-  background:#eef1f5 repeating-conic-gradient(#e6e9ef 0% 25%, transparent 0% 50%) 50%/14px 14px;
-  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:3px; }
-/* Multi-template strip (tap_image_any / wait_image_any / if_image_any): a row of
-   small thumbnails so every OR-image is visible at a glance, not just the first. */
-.wf-node-thumbs { display:flex; flex-wrap:wrap; gap:3px; padding:4px; min-height:30px;
-  background:#eef1f5 repeating-conic-gradient(#e6e9ef 0% 25%, transparent 0% 50%) 50%/14px 14px;
-  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); }
-.wf-node-thumb-sm { width:38px; height:30px; object-fit:scale-down; border:1px solid var(--line);
-  border-radius:4px; background:var(--panel); }
-/* Hovering a block that's showing a preview image lifts it above neighbours so
-   the thumbnail isn't hidden behind other blocks. */
+/* Compact preview band — sits flush at the bottom of the node. Reduced from 68px
+   to keep nodes small; scale-down never upscales so tiny crops stay crisp. */
+.wf-node-thumb { display:block; width:100%; height:44px; object-fit:scale-down;
+  background:#f0f2f5 repeating-conic-gradient(#e6e9ef 0% 25%, transparent 0% 50%) 50%/8px 8px;
+  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:2px; }
+/* Multi-template strip: tighter row of thumbnails, one per OR-image. */
+.wf-node-thumbs { display:flex; flex-wrap:wrap; align-items:center; gap:2px; padding:3px;
+  background:#f0f2f5 repeating-conic-gradient(#e6e9ef 0% 25%, transparent 0% 50%) 50%/8px 8px;
+  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); min-height:28px; }
+.wf-node-thumb-sm { width:32px; height:24px; object-fit:scale-down; border:1px solid var(--border);
+  border-radius:3px; background:var(--panel); flex-shrink:0; }
+/* On hover the node rises above neighbours so the thumbnail is not obscured. */
 .wf-node.has-thumb:hover { z-index:var(--z-node-hover); }
 .wf-tpl-preview { display:block; max-width:100%; max-height:150px; object-fit:contain; margin-top:6px;
   border:1px solid var(--border2); border-radius:6px; background:#1a1d21; }
@@ -833,23 +856,33 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
       <div id="wf-canvas-empty" class="wf-empty-note">Chọn hoặc thêm một hoạt động để mở canvas.</div>
       <div id="wf-vars-panel" class="wf-vars-panel">
         <div class="wf-vars-hdr">
-          <span>Biến</span>
+          <span class="wf-vars-title">Biến</span>
+          <span class="wf-vars-count" id="wf-vars-count"></span>
+          <span class="wf-vars-live" id="wf-vars-live" title="● Live — engine đang chạy">●</span>
           <span class="wf-vars-actions">
-            <span class="wf-vars-live" id="wf-vars-live">●</span>
-            <button id="wf-vars-add" class="wf-vars-add" title="Thêm nhanh biến toàn cục">+</button>
+            <button id="wf-vars-add" class="wf-vars-add" title="Thêm biến toàn cục">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
             <button id="wf-vars-mgr" class="wf-vars-add" title="Quản lý biến toàn cục"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
           </span>
         </div>
         <div id="wf-vars-body" class="wf-vars-body"></div>
       </div>
-      <!-- Activities + Functions panel — pinned bottom-left of the canvas (moved
-           out of the sidebar to keep the palette roomy). Two tabs switch the list. -->
+      <!-- Activities + Functions panel — pinned bottom-right of the canvas.
+           Title row (chevron + label + add btn) + tab bar stacked in the header. -->
       <div id="wf-act-panel" class="wf-act-panel">
         <div class="wf-act-panel-hdr">
-          <button class="wf-act-tab sel" data-tab="acts" id="wf-tab-acts">Hoạt động <span class="side-count" id="wf-act-count"></span></button>
-          <button class="wf-act-tab" data-tab="fns" id="wf-tab-fns">Function <span class="side-count" id="wf-fn-count"></span></button>
-          <span class="spacer"></span>
-          <button class="wf-act-add" id="wf-act-add" title="Thêm hoạt động">+</button>
+          <div class="wf-act-hdr-row" id="wf-act-hdr-row">
+            <span class="wf-act-hdr-chevron">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+            </span>
+            <span class="wf-act-hdr-title" id="wf-act-hdr-title">Hoạt động</span>
+            <button class="wf-act-hdr-add" id="wf-act-add" title="Thêm hoạt động">+</button>
+          </div>
+          <div class="wf-act-tab-row">
+            <button class="wf-act-tab sel" data-tab="acts" id="wf-tab-acts">Hoạt động <span class="side-count" id="wf-act-count"></span></button>
+            <button class="wf-act-tab" data-tab="fns" id="wf-tab-fns">Function <span class="side-count" id="wf-fn-count"></span></button>
+          </div>
         </div>
         <div class="wf-act-panel-body">
           <div id="wf-activities" class="wf-act-list"></div>
@@ -1356,7 +1389,7 @@ function wfFit(){
 // Each rearranges every node in the current graph into a tidy arrangement, then
 // fits the result to view. Notes are excluded (they float free). Nodes keep their
 // x/y in world coords; stacks/groups are not touched (members follow their head).
-const WF_LAY_NODE_W=158, WF_LAY_NODE_H=52, WF_LAY_GAP_X=80, WF_LAY_GAP_Y=70;
+const WF_LAY_NODE_W=158, WF_LAY_NODE_H=52, WF_LAY_GAP_X=36, WF_LAY_GAP_Y=36;
 // Approximate node height: real DOM height when available, else the default.
 function wfNodeH(n){
   const el=wfNodeElById(n.id); return el?el.offsetHeight:WF_LAY_NODE_H;
@@ -1473,8 +1506,8 @@ function wfLayoutCompact(g){
       n.x=x; n.y=y;
       const h=wfNodeH(n); if(h>rowMaxH) rowMaxH=h;
       col++;
-      if(col>=cols){ col=0; x=40; y+=rowMaxH+40; rowMaxH=0; }
-      else x+=WF_LAY_NODE_W+40;
+      if(col>=cols){ col=0; x=40; y+=rowMaxH+28; rowMaxH=0; }
+      else x+=WF_LAY_NODE_W+28;
     });
   });
 }
@@ -1703,7 +1736,7 @@ function wfRenderActivities(){
     el.innerHTML=
       `<span class="wf-act-grip" title="Kéo để đổi thứ tự">${WF_GRIP}</span>
        <span class="wf-act-cb ${act.enabled?"checked":""}">${check}</span>
-       <span class="wf-badge ${act.type==="background"?"bg":"seq"}">${act.type==="background"?"NỀN":"TUẦN TỰ"}</span>
+       <span class="wf-badge ${act.type==="background"?"bg":"seq"}">${act.type==="background"?"BG":"SEQ"}</span>
        <span class="wf-act-name">${escHtml(act.name)}</span>
        <button class="wf-act-del" title="Xoá">${wfIco("x")}</button>`;
     el.querySelector(".wf-act-cb").addEventListener("click",e=>wfToggleActivity(act.id,e));
@@ -1742,8 +1775,10 @@ function wfActTab(which){
   const acts=$("wf-activities"), fns=$("wf-functions");
   if(acts) acts.style.display = which==="acts"?"":"none";
   if(fns) fns.style.display  = which==="fns" ?"":"none";
-  // The "+" button's action depends on the active tab.
-  const add=$("wf-act-add"); if(add) add.title = which==="fns"?"Tạo function mới":"Thêm hoạt động";
+  const add=$("wf-act-add");
+  if(add) add.title = which==="fns"?"Tạo function mới":"Thêm hoạt động";
+  const title=$("wf-act-hdr-title");
+  if(title) title.textContent = which==="fns" ? "Functions" : "Hoạt động";
 }
 function wfActAddCurrent(){
   if(wfActTabCur==="fns") wfAddFunction();
@@ -1894,34 +1929,44 @@ function wfRenderVarsPanel(){
   panel.classList.toggle("collapsed", wfVarsCollapsed);
   panel.classList.toggle("live", Object.keys(wfLiveVars).length>0);
   const declared=wfDeclaredVars();
-  // Names: globals first (in declared order), then activity-declared, then
-  // node-produced vars in the current graph, then extra live-only keys.
+  // Buckets: globals → activity-declared → node-produced → live-only extras.
   const globalNames=[]; (WF.globals||[]).forEach(v=>{ const n=(v.name||"").trim(); if(n) globalNames.push(n); });
   const actDeclared={}; const act=wfCurAct(); (act&&act.vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(n&&!globalNames.includes(n)) actDeclared[n]=v.value; });
-  const names=[...globalNames, ...Object.keys(actDeclared)];
+  const actNames=Object.keys(actDeclared);
   const g=wfGraph();
-  wfGraphVarNames(g).forEach(n=>{ if(!names.includes(n)) names.push(n); });
-  Object.keys(wfLiveVars).forEach(n=>{ if(!names.includes(n)) names.push(n); });
-  const globalSet=new Set(globalNames);
+  const nodeNames=[]; wfGraphVarNames(g).forEach(n=>{ if(!globalNames.includes(n)&&!actNames.includes(n)) nodeNames.push(n); });
+  const liveExtra=[]; Object.keys(wfLiveVars).forEach(n=>{ if(!globalNames.includes(n)&&!actNames.includes(n)&&!nodeNames.includes(n)) liveExtra.push(n); });
+  const allNames=[...globalNames,...actNames,...nodeNames,...liveExtra];
+  // Update count badge in header.
+  const countEl=$("wf-vars-count"); if(countEl) countEl.textContent=allNames.length?String(allNames.length):"";
   body.innerHTML="";
-  if(!names.length){
+  if(!allNames.length){
     const e=document.createElement("div"); e.className="wf-vars-empty";
     e.textContent="Chưa có biến nào. Bấm + để thêm biến toàn cục.";
     body.appendChild(e); return;
   }
-  names.forEach(n=>{
+  function mkSep(label){ const s=document.createElement("span"); s.className="wf-vars-sep"; s.textContent=label; return s; }
+  function mkRow(n, isGlobal){
     const row=document.createElement("div"); row.className="wf-var-row-live";
-    const nm=document.createElement("span"); nm.className="vn"; nm.innerHTML=(globalSet.has(n)?'<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>':'')+n; nm.title=n+(globalSet.has(n)?" · toàn cục":"");
-    if(globalSet.has(n)) nm.style.color="var(--accent)";
+    const nm=document.createElement("span"); nm.className="vn";
+    nm.title=n+(isGlobal?" · toàn cục":"");
+    if(isGlobal){
+      nm.style.color="var(--accent)";
+      nm.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>'+n;
+    } else { nm.textContent=n; }
     const live=wfLiveVars[n];
     const hasDeclared=declared.hasOwnProperty(n);
-    const val = (live!==undefined) ? live : (hasDeclared ? declared[n] : undefined);
+    const val=(live!==undefined)?live:(hasDeclared?declared[n]:undefined);
     const vv=document.createElement("span"); vv.className="vv"+(n===wfFreshVar?" fresh":"");
-    vv.textContent = (val===undefined||val===null||val==="") ? (hasDeclared?"∅":"(tự sinh)") : String(val);
-    vv.title = (live!==undefined) ? "giá trị chạy" : (hasDeclared ? "giá trị khai báo" : "do node tạo — chưa có giá trị mặc định");
+    vv.textContent=(val===undefined||val===null||val==="")?(hasDeclared?"∅":"(tự sinh)"):String(val);
+    vv.title=(live!==undefined)?"giá trị chạy":(hasDeclared?"giá trị khai báo":"do node tạo");
     row.appendChild(nm); row.appendChild(vv);
-    body.appendChild(row);
-  });
+    return row;
+  }
+  if(globalNames.length){ body.appendChild(mkSep("Toàn cục")); globalNames.forEach(n=>body.appendChild(mkRow(n,true))); }
+  if(actNames.length){ body.appendChild(mkSep("Hoạt động")); actNames.forEach(n=>body.appendChild(mkRow(n,false))); }
+  if(nodeNames.length){ body.appendChild(mkSep("Node")); nodeNames.forEach(n=>body.appendChild(mkRow(n,false))); }
+  if(liveExtra.length){ body.appendChild(mkSep("Live")); liveExtra.forEach(n=>body.appendChild(mkRow(n,false))); }
 }
 
 // ── Global variables editor (popover from the vars panel "+") ─────────────────
@@ -2604,8 +2649,9 @@ function wfInitCanvas(){
   });
   const aadd=$("wf-act-add");
   if(aadd) aadd.onclick=(e)=>{ e.stopPropagation(); wfActAddCurrent(); };
-  const ahdr=document.querySelector("#wf-act-panel .wf-act-panel-hdr");
-  if(ahdr) ahdr.onclick=(e)=>{ if(e.target.closest(".wf-act-tab,.wf-act-add")) return; wfActCollapsed=!wfActCollapsed; wfToggleActPanel(); };
+  // Only the title row (not the tab bar) is the collapse trigger.
+  const ahdr=document.querySelector("#wf-act-hdr-row");
+  if(ahdr) ahdr.onclick=(e)=>{ if(e.target.closest(".wf-act-hdr-add")) return; wfActCollapsed=!wfActCollapsed; wfToggleActPanel(); };
   // Auto-layout buttons (bottom-left toolbar).
   document.querySelectorAll(".wf-layout-btn").forEach(btn=>{
     btn.onclick=(e)=>{ e.stopPropagation(); wfAutoLayout(btn.dataset.layout); };

@@ -194,8 +194,8 @@
           {
             "id": "n1bc508v",
             "type": "tap_image",
-            "x": 280,
-            "y": 200,
+            "x": 460,
+            "y": 140,
             "params": {
               "template": "templates/crop_20260628_094026_184x51.png",
               "taps": "1",
@@ -207,8 +207,8 @@
           {
             "id": "nzlnnqqf",
             "type": "tap",
-            "x": 280,
-            "y": 140,
+            "x": 460,
+            "y": 80,
             "params": {
               "target": "pos",
               "x": 892,
@@ -218,8 +218,8 @@
           {
             "id": "nahmpri5",
             "type": "tap",
-            "x": 1080,
-            "y": 380,
+            "x": 1580,
+            "y": 200,
             "params": {
               "target": "pos",
               "x": 892,
@@ -239,8 +239,8 @@
           {
             "id": "non82rd1",
             "type": "wait_image",
-            "x": 898,
-            "y": 516,
+            "x": 1380,
+            "y": 260,
             "params": {
               "template": "templates/crop_20260628_101155_294x50.png",
               "threshold": 0.85,
@@ -262,21 +262,10 @@
             }
           },
           {
-            "id": "nryur9hv",
-            "type": "if_image",
-            "x": 280,
-            "y": 380,
-            "params": {
-              "template": "templates/crop_20260628_100621_196x60.png",
-              "threshold": 0.7,
-              "negate": false
-            }
-          },
-          {
             "id": "n44ty3u5",
             "type": "tap_image",
-            "x": 718,
-            "y": 516,
+            "x": 1200,
+            "y": 260,
             "params": {
               "template": "templates/crop_20260628_100639_157x32.png",
               "taps": "1",
@@ -288,19 +277,20 @@
           {
             "id": "n907yb0r",
             "type": "if_image",
-            "x": 540,
-            "y": 380,
+            "x": 1020,
+            "y": 252,
             "params": {
               "template": "templates/crop_20260628_132414_213x39.png",
               "threshold": 0.85,
               "negate": false
-            }
+            },
+            "stack": "st0uvwd8"
           },
           {
             "id": "nu0z2e71",
             "type": "wait_image",
-            "x": 280,
-            "y": 320,
+            "x": 640,
+            "y": 200,
             "params": {
               "template": "templates/crop_20260628_100714_44x35.png",
               "threshold": 0.85,
@@ -311,8 +301,8 @@
           {
             "id": "nzlccjdm",
             "type": "loop",
-            "x": 280,
-            "y": 260,
+            "x": 460,
+            "y": 200,
             "params": {
               "count": 3,
               "infinite": true
@@ -321,8 +311,8 @@
           {
             "id": "nwhiv10o",
             "type": "if_image_any",
-            "x": 280,
-            "y": 80,
+            "x": 460,
+            "y": 20,
             "params": {
               "templates": [
                 "templates/crop_20260628_100953_290x61.png",
@@ -335,8 +325,8 @@
           {
             "id": "na08d1lc",
             "type": "tap",
-            "x": 720,
-            "y": 380,
+            "x": 1200,
+            "y": 200,
             "params": {
               "target": "found",
               "x": 0,
@@ -346,8 +336,8 @@
           {
             "id": "nijwi0t9",
             "type": "wait_image",
-            "x": 900,
-            "y": 380,
+            "x": 1380,
+            "y": 200,
             "params": {
               "template": "templates/crop_20260628_101155_294x50.png",
               "threshold": 0.85,
@@ -358,12 +348,34 @@
           {
             "id": "ntni1ml1",
             "type": "tap",
-            "x": 1078,
-            "y": 516,
+            "x": 1580,
+            "y": 260,
             "params": {
               "target": "pos",
               "x": 892,
               "y": 1566
+            }
+          },
+          {
+            "id": "n6zy27iq",
+            "type": "wait",
+            "x": 1020,
+            "y": 200,
+            "params": {
+              "seconds": 3
+            },
+            "stack": "st0uvwd8"
+          },
+          {
+            "id": "nk25jo6i",
+            "type": "wait_image",
+            "x": 820,
+            "y": 200,
+            "params": {
+              "template": "templates/crop_20260628_100621_196x60.png",
+              "threshold": 0.85,
+              "timeout": 60,
+              "delay": 0
             }
           }
         ],
@@ -374,24 +386,9 @@
             "to": "n1bc508v"
           },
           {
-            "from": "n3m2uvat",
-            "fromPort": "out",
-            "to": "nt9a33t8"
-          },
-          {
             "from": "nt9a33t8",
             "fromPort": "true",
             "to": "n4pphsh8"
-          },
-          {
-            "from": "nryur9hv",
-            "fromPort": "true",
-            "to": "n907yb0r"
-          },
-          {
-            "from": "nu0z2e71",
-            "fromPort": "true",
-            "to": "nryur9hv"
           },
           {
             "from": "n1bc508v",
@@ -460,14 +457,40 @@
             "fromPort": "false",
             "to": "nzlccjdm",
             "toPort": "loop"
+          },
+          {
+            "from": "n3m2uvat",
+            "fromPort": "out",
+            "to": "nt9a33t8"
+          },
+          {
+            "from": "non82rd1",
+            "fromPort": "false",
+            "to": "nzlccjdm",
+            "toPort": "loop"
+          },
+          {
+            "from": "n6zy27iq",
+            "fromPort": "out",
+            "to": "n907yb0r"
+          },
+          {
+            "from": "nu0z2e71",
+            "fromPort": "true",
+            "to": "nk25jo6i"
+          },
+          {
+            "from": "nk25jo6i",
+            "fromPort": "true",
+            "to": "n6zy27iq"
           }
         ],
         "groups": [
           {
             "id": "g2kw6por",
             "name": "Nếu Thắng",
-            "x": 520,
-            "y": 360,
+            "x": 1000,
+            "y": 180,
             "w": 738,
             "h": 289,
             "color": 0
