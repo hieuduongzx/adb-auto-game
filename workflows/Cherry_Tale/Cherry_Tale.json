@@ -136,8 +136,8 @@
           {
             "id": "nxbi2js8",
             "type": "tap_image",
-            "x": 240,
-            "y": 80,
+            "x": 420,
+            "y": 20,
             "params": {
               "template": "templates/crop_20260629_015855_103x30.png",
               "taps": "1",
@@ -151,8 +151,8 @@
           {
             "id": "nfbv3qgp",
             "type": "tap_image",
-            "x": 240,
-            "y": 140,
+            "x": 600,
+            "y": 20,
             "params": {
               "template": "templates/crop_20260629_015903_119x25.png",
               "taps": "1",
@@ -166,8 +166,8 @@
           {
             "id": "nm0ibj2v",
             "type": "tap_image",
-            "x": 240,
-            "y": 200,
+            "x": 780,
+            "y": 20,
             "params": {
               "template": "templates/crop_20260629_015910_107x34.png",
               "taps": "1",
@@ -181,8 +181,8 @@
           {
             "id": "n52kitq9",
             "type": "tap_image",
-            "x": 420,
-            "y": 200,
+            "x": 960,
+            "y": 20,
             "params": {
               "template": "templates/crop_20260629_020144_213x200.png",
               "taps": "1",
@@ -197,6 +197,15 @@
             "id": "noste6ns",
             "type": "call",
             "x": 60,
+            "y": 20,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          },
+          {
+            "id": "n1o1l7q1",
+            "type": "call",
+            "x": 1140,
             "y": 20,
             "params": {
               "fn": "fn_ppung"
@@ -233,6 +242,146 @@
             "from": "noste6ns",
             "fromPort": "out",
             "to": "nqmf20e6"
+          },
+          {
+            "from": "n52kitq9",
+            "fromPort": "true",
+            "to": "n1o1l7q1"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_hlng",
+      "name": "Bạn Bè",
+      "type": "sequence",
+      "enabled": false,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nm2lo3fi",
+            "type": "start",
+            "x": 60,
+            "y": 60,
+            "params": {}
+          },
+          {
+            "id": "nhyqipr1",
+            "type": "tap_image",
+            "x": 420,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260629_130141_38x27.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nc5cndaf",
+            "type": "call",
+            "x": 240,
+            "y": 60,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          },
+          {
+            "id": "nra6r08c",
+            "type": "tap_image",
+            "x": 600,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260629_130207_115x26.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nqex23b5",
+            "type": "tap_image",
+            "x": 800,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260629_130210_174x33.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "ns2jsrxy",
+            "type": "tap_image",
+            "x": 980,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260629_020144_213x200_1.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nek3kzdq",
+            "type": "call",
+            "x": 1160,
+            "y": 60,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nc5cndaf",
+            "fromPort": "out",
+            "to": "nhyqipr1"
+          },
+          {
+            "from": "nm2lo3fi",
+            "fromPort": "out",
+            "to": "nc5cndaf"
+          },
+          {
+            "from": "nhyqipr1",
+            "fromPort": "true",
+            "to": "nra6r08c"
+          },
+          {
+            "from": "nra6r08c",
+            "fromPort": "true",
+            "to": "nqex23b5"
+          },
+          {
+            "from": "nra6r08c",
+            "fromPort": "false",
+            "to": "nqex23b5"
+          },
+          {
+            "from": "nqex23b5",
+            "fromPort": "true",
+            "to": "ns2jsrxy"
+          },
+          {
+            "from": "ns2jsrxy",
+            "fromPort": "true",
+            "to": "nek3kzdq"
           }
         ],
         "groups": []
@@ -2194,6 +2343,217 @@
       "maxRetries": 1
     },
     {
+      "id": "sequence_vf95",
+      "name": "Bang Hội",
+      "type": "sequence",
+      "enabled": false,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nkab045s",
+            "type": "start",
+            "x": 80,
+            "y": 80,
+            "params": {}
+          },
+          {
+            "id": "nul2tpw9",
+            "type": "call",
+            "x": 260,
+            "y": 80,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          },
+          {
+            "id": "nr5siouv",
+            "type": "tap_image",
+            "x": 440,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_103650_72x20.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "na5k6qze",
+            "type": "tap",
+            "x": 620,
+            "y": 140,
+            "params": {
+              "target": "pos",
+              "x": 1009,
+              "y": 429
+            }
+          },
+          {
+            "id": "nsznfqxb",
+            "type": "wait_image",
+            "x": 620,
+            "y": 80,
+            "params": {
+              "template": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\Cherry_Tale\\templates\\com.neversoft.rpg.erolabs\\crop_20260629_104119_216x91.png",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0
+            }
+          },
+          {
+            "id": "nf0eedqt",
+            "type": "tap_image",
+            "x": 1020,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_104220_118x34.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "note": "d"
+          },
+          {
+            "id": "n201qfnl",
+            "type": "tap_image",
+            "x": 1200,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_020144_213x200_1.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n8acfo3y",
+            "type": "loop",
+            "x": 840,
+            "y": 80,
+            "params": {
+              "count": 3,
+              "infinite": true
+            }
+          },
+          {
+            "id": "ni3qjkmc",
+            "type": "tap_image",
+            "x": 1400,
+            "y": 80,
+            "params": {
+              "template": "templates/back_14x37.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n1t57s6k",
+            "type": "tap_image",
+            "x": 1580,
+            "y": 80,
+            "params": {
+              "template": "templates/khai_thac_118x18.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nj80v5s3",
+            "type": "tap_image",
+            "x": 1760,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_104753_201x16.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nul2tpw9",
+            "fromPort": "out",
+            "to": "nr5siouv"
+          },
+          {
+            "from": "nr5siouv",
+            "fromPort": "true",
+            "to": "nsznfqxb"
+          },
+          {
+            "from": "nsznfqxb",
+            "fromPort": "true",
+            "to": "na5k6qze"
+          },
+          {
+            "from": "nf0eedqt",
+            "fromPort": "true",
+            "to": "n201qfnl"
+          },
+          {
+            "from": "n8acfo3y",
+            "fromPort": "body",
+            "to": "nf0eedqt"
+          },
+          {
+            "from": "n201qfnl",
+            "fromPort": "true",
+            "to": "n8acfo3y",
+            "toPort": "loop"
+          },
+          {
+            "from": "na5k6qze",
+            "fromPort": "out",
+            "to": "n8acfo3y"
+          },
+          {
+            "from": "nf0eedqt",
+            "fromPort": "false",
+            "to": "ni3qjkmc"
+          },
+          {
+            "from": "nkab045s",
+            "fromPort": "out",
+            "to": "n8acfo3y"
+          },
+          {
+            "from": "ni3qjkmc",
+            "fromPort": "true",
+            "to": "n1t57s6k"
+          },
+          {
+            "from": "n1t57s6k",
+            "fromPort": "true",
+            "to": "nj80v5s3"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
       "id": "sequence_99fk",
       "name": "Hoạt động 5",
       "type": "sequence",
@@ -2420,55 +2780,366 @@
       "maxRetries": 1
     },
     {
-      "id": "sequence_vf95",
-      "name": "Hoạt động 9",
+      "id": "sequence_boed",
+      "name": "Hoạt động 11",
       "type": "sequence",
       "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
           {
-            "id": "nkab045s",
+            "id": "ny31prs0",
             "type": "start",
-            "x": 80,
-            "y": 80,
+            "x": 60,
+            "y": 60,
             "params": {}
           },
           {
-            "id": "nul2tpw9",
+            "id": "ngdhzqcg",
             "type": "call",
-            "x": 260,
-            "y": 80,
+            "x": 240,
+            "y": 60,
             "params": {
               "fn": "fn_ppung"
             }
           },
           {
-            "id": "nr5siouv",
+            "id": "nnpnamcn",
             "type": "tap_image",
             "x": 440,
-            "y": 80,
+            "y": 60,
             "params": {
-              "template": "templates/crop_20260629_103650_72x20.png",
+              "template": "templates/crop_20260629_130613_46x21.png",
               "taps": "1",
               "threshold": 0.85,
-              "timeout": 5,
+              "timeout": 10,
               "delay": 0,
               "offsetX": 0,
               "offsetY": 0
+            }
+          },
+          {
+            "id": "ngdw25no",
+            "type": "tap_image",
+            "x": 620,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260629_130623_79x19.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nhv4zj68",
+            "type": "tap_image",
+            "x": 1080,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_130633_100x23.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nzq2pdll",
+            "type": "tap_image",
+            "x": 1280,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260629_130623_79x19.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n3uh9k24",
+            "type": "tap_image",
+            "x": 1480,
+            "y": 160,
+            "params": {
+              "template": "templates/crop_20260629_130641_122x28.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "np1l46vv",
+            "type": "tap_image",
+            "x": 1660,
+            "y": 160,
+            "params": {
+              "template": "templates/crop_20260629_130623_79x19.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "ndp576p2",
+            "type": "if_image",
+            "x": 800,
+            "y": 120,
+            "params": {
+              "template": "templates/crop_20260629_020144_213x200_1.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nwk711it",
+            "type": "wait",
+            "x": 800,
+            "y": 60,
+            "params": {
+              "seconds": 1
+            }
+          },
+          {
+            "id": "nzpwto49",
+            "type": "tap",
+            "x": 800,
+            "y": 180,
+            "params": {
+              "target": "found",
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": "nflsccc2",
+            "type": "if_image",
+            "x": 1500,
+            "y": -100,
+            "params": {
+              "template": "templates/crop_20260629_020144_213x200_1.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nm1i56fj",
+            "type": "wait",
+            "x": 1500,
+            "y": -120,
+            "params": {
+              "seconds": 1
+            }
+          },
+          {
+            "id": "n345db9k",
+            "type": "tap",
+            "x": 1500,
+            "y": 0,
+            "params": {
+              "target": "found",
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": "nxa4aupw",
+            "type": "if_image",
+            "x": 800,
+            "y": 300,
+            "params": {
+              "template": "templates/crop_20260629_131052_41x43.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nhdla4t1",
+            "type": "wait",
+            "x": 800,
+            "y": 240,
+            "params": {
+              "seconds": 1
+            }
+          },
+          {
+            "id": "ng2jsnn4",
+            "type": "tap",
+            "x": 800,
+            "y": 360,
+            "params": {
+              "target": "found",
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": "nbabqce2",
+            "type": "if_image",
+            "x": 800,
+            "y": 480,
+            "params": {
+              "template": "templates/crop_20260629_020144_213x200_1.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nz3rq1o8",
+            "type": "tap",
+            "x": 800,
+            "y": 540,
+            "params": {
+              "target": "found",
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": "n2bz4bgy",
+            "type": "end",
+            "x": 1860,
+            "y": 180,
+            "params": {}
+          },
+          {
+            "id": "n41o95kr",
+            "type": "wait",
+            "x": 800,
+            "y": 420,
+            "params": {
+              "seconds": 1
             }
           }
         ],
         "edges": [
           {
-            "from": "nul2tpw9",
+            "from": "ngdhzqcg",
             "fromPort": "out",
-            "to": "nr5siouv"
+            "to": "nnpnamcn"
           },
           {
-            "from": "nkab045s",
+            "from": "nhv4zj68",
+            "fromPort": "true",
+            "to": "nzq2pdll"
+          },
+          {
+            "from": "nnpnamcn",
+            "fromPort": "true",
+            "to": "ngdw25no"
+          },
+          {
+            "from": "n3uh9k24",
+            "fromPort": "true",
+            "to": "np1l46vv"
+          },
+          {
+            "from": "nwk711it",
             "fromPort": "out",
-            "to": "nul2tpw9"
+            "to": "ndp576p2"
+          },
+          {
+            "from": "ngdw25no",
+            "fromPort": "true",
+            "to": "nwk711it"
+          },
+          {
+            "from": "ndp576p2",
+            "fromPort": "true",
+            "to": "nzpwto49"
+          },
+          {
+            "from": "ndp576p2",
+            "fromPort": "false",
+            "to": "nhv4zj68"
+          },
+          {
+            "from": "nm1i56fj",
+            "fromPort": "out",
+            "to": "nflsccc2"
+          },
+          {
+            "from": "nzq2pdll",
+            "fromPort": "true",
+            "to": "nm1i56fj"
+          },
+          {
+            "from": "nflsccc2",
+            "fromPort": "false",
+            "to": "n3uh9k24"
+          },
+          {
+            "from": "nhdla4t1",
+            "fromPort": "out",
+            "to": "nxa4aupw"
+          },
+          {
+            "from": "nxa4aupw",
+            "fromPort": "true",
+            "to": "ng2jsnn4"
+          },
+          {
+            "from": "nzpwto49",
+            "fromPort": "out",
+            "to": "nhdla4t1"
+          },
+          {
+            "from": "nbabqce2",
+            "fromPort": "true",
+            "to": "nz3rq1o8"
+          },
+          {
+            "from": "ngdw25no",
+            "fromPort": "false",
+            "to": "nxa4aupw"
+          },
+          {
+            "from": "nz3rq1o8",
+            "fromPort": "out",
+            "to": "nhv4zj68"
+          },
+          {
+            "from": "nflsccc2",
+            "fromPort": "true",
+            "to": "n345db9k"
+          },
+          {
+            "from": "nzq2pdll",
+            "fromPort": "false",
+            "to": "n3uh9k24"
+          },
+          {
+            "from": "np1l46vv",
+            "fromPort": "false",
+            "to": "n2bz4bgy"
+          },
+          {
+            "from": "ng2jsnn4",
+            "fromPort": "out",
+            "to": "n41o95kr"
+          },
+          {
+            "from": "n41o95kr",
+            "fromPort": "out",
+            "to": "nbabqce2"
+          },
+          {
+            "from": "ny31prs0",
+            "fromPort": "out",
+            "to": "n41o95kr"
           }
         ],
         "groups": []

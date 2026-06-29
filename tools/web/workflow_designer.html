@@ -669,9 +669,11 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-node.has-warn { border-color:#e6a417; }
 .wf-node-sum { font-family:var(--mono); font-size:9.5px; color:var(--muted); padding:5px 9px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wf-node-note { font-size:9.5px; font-style:italic; color:#7c6f55; background:#fdf9ee;
-  border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:4px 9px; white-space:normal; word-break:break-word; }
-.wf-node-note::before { content:"📝 "; font-style:normal; }
+.wf-node-note { display:flex; align-items:flex-start; gap:5px; font-size:9.5px; font-style:italic;
+  color:var(--muted); background:transparent; border-top:1px solid var(--line);
+  border-radius:0 0 var(--node-r) var(--node-r); padding:4px 8px 5px; white-space:normal;
+  word-break:break-word; line-height:1.4; }
+.wf-node-note svg { width:9px; height:9px; flex-shrink:0; margin-top:1.5px; opacity:.4; }
 /* Runtime log line: text auto-emitted to the log panel each time this block runs. */
 .wf-node-log { font-size:9.5px; color:#2f6b8f; background:#eef6fb;
   border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:4px 9px; white-space:normal; word-break:break-word; }
@@ -872,8 +874,9 @@ function setConnected(on){ const a=$("device-dot"),b=$("footer-dot"); if(a)a.cla
 // Load a template thumbnail (data-URL from Python) into an <img>, hide if none.
 async function wfLoadThumb(img, path){
   if(!img) return;
-  img.style.display="none"; img.removeAttribute("src");
-  if(!path){ return; }
+  img.removeAttribute("src");
+  if(!path){ img.style.display="none"; return; }
+  img.style.display="";  // let CSS show checkerboard while loading
   try{ const d=await api().image_thumbnail(path); if(d){ img.src=d; img.style.display="block"; } }catch{}
 }
 
@@ -1159,11 +1162,11 @@ const WF_NODES = {
   back:       {label:"Back",      ico:"back",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"phím back"},
   home:       {label:"Home",      ico:"home",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"phím home"},
   tap_image:  {label:"Chạm ảnh",  ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5},{k:"offsetX",lbl:"Lệch X",t:"num",d:0},{k:"offsetY",lbl:"Lệch Y",t:"num",d:0}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")+(p.delay?` ·chờ ${p.delay}s`:"")},
-  wait_image: {label:"Chờ ảnh",   ico:"eye",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBase(p.template)+(p.delay?` ·chờ ${p.delay}s`:"")},
+  wait_image: {label:"Chờ ảnh",   ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBase(p.template)+(p.delay?` ·chờ ${p.delay}s`:"")},
   if_image:   {label:"Nếu ảnh",   ico:"help",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}thấy ${wfBase(p.template)}`},
   // "…_any" = OR over several images: true when ANY listed template matches.
   tap_image_any: {label:"Chạm 1 trong ảnh", ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5},{k:"mode",lbl:"Kiểu tìm",t:"select",opts:[{v:"sequential",t:"Tuần tự"},{v:"parallel",t:"Song song"}],d:"sequential"},{k:"offsetX",lbl:"Lệch X",t:"num",d:0},{k:"offsetY",lbl:"Lệch Y",t:"num",d:0}], sum:p=>wfBaseAny(p.templates)+(p.taps=="2"?" ×2":"")+(p.mode==="parallel"?" //":"")},
-  wait_image_any:{label:"Chờ 1 trong ảnh",  ico:"eye",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5},{k:"mode",lbl:"Kiểu tìm",t:"select",opts:[{v:"sequential",t:"Tuần tự"},{v:"parallel",t:"Song song"}],d:"sequential"}], sum:p=>wfBaseAny(p.templates)+(p.delay?` ·chờ ${p.delay}s`:"")+(p.mode==="parallel"?" //":"")},
+  wait_image_any:{label:"Chờ 1 trong ảnh",  ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5},{k:"mode",lbl:"Kiểu tìm",t:"select",opts:[{v:"sequential",t:"Tuần tự"},{v:"parallel",t:"Song song"}],d:"sequential"}], sum:p=>wfBaseAny(p.templates)+(p.delay?` ·chờ ${p.delay}s`:"")+(p.mode==="parallel"?" //":"")},
   if_image_any:  {label:"Nếu 1 trong ảnh",  ico:"layers",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"mode",lbl:"Kiểu tìm",t:"select",opts:[{v:"sequential",t:"Tuần tự"},{v:"parallel",t:"Song song"}],d:"sequential"}], sum:p=>`${p.negate?"không ":""}thấy ${wfBaseAny(p.templates)}${p.mode==="parallel"?" //":""}`},
   wait_text:  {label:"Chờ chữ",   ico:"scan_text",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10}], sum:p=>`"${p.text||""}"`},
   if_text:    {label:"Nếu chữ",   ico:"type",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}có "${p.text||""}"`},
@@ -1870,7 +1873,7 @@ function wfNodeEl(n){
   const hasTpl = !!tplField;
   const showThumb = hasTpl && (wfPreviewAll || n.showPreview);
   const eyeBtn = hasTpl ? `<button class="wf-node-eye${n.showPreview?" on":""}" title="Xem trước ảnh (block này)">${wfIco("eye")}</button>` : "";
-  const noteHtml = n.note ? `<div class="wf-node-note">${escHtml(n.note)}</div>` : "";
+  const noteHtml = n.note ? `<div class="wf-node-note">${wfIco("edit")}<span>${escHtml(n.note)}</span></div>` : "";
   const logHtml = n.log ? `<div class="wf-node-log">${escHtml(n.log)}</div>` : "";
   // tpls → a strip of small thumbnails (one per listed image); single tpl → one.
   const thumbHtml = showThumb ? (isTpls
@@ -2626,7 +2629,7 @@ function wfUpdNodeNote(node){
   let n=el.querySelector(".wf-node-note");
   if(node.note){
     if(!n){ n=document.createElement("div"); n.className="wf-node-note"; el.appendChild(n); el.classList.remove("collapsed"); }
-    n.textContent=node.note;
+    n.innerHTML=wfIco("edit")+`<span>${escHtml(node.note)}</span>`;
   } else if(n){ n.remove(); }
 }
 function wfLogField(node){
@@ -3001,13 +3004,14 @@ async function init(){
   updateLogCount();
   wfInitCanvas();
   // Reopen the workflow that was open when the designer last closed.
-  let reopened="";
+  let reopened="", didRender=false;
   try{
     const lw=await api().get_last_workflow();
-    if(lw && lw.text){ wfHydrate(JSON.parse(lw.text)); reopened=lw.name||"workflow trước"; }
+    if(lw && lw.text){ wfHydrate(JSON.parse(lw.text)); reopened=lw.name||"workflow trước"; didRender=true; }
   }catch(e){}
-  if(!WF.activities.length) wfAddActivity("sequence");
-  wfRenderAll();
+  // wfHydrate and wfAddActivity both call wfRenderAll() themselves; only fall back here.
+  if(!WF.activities.length){ wfAddActivity("sequence"); didRender=true; }
+  if(!didRender) wfRenderAll();
   setStatus(reopened ? ("Đã mở lại: "+reopened) : "Sẵn sàng");
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
