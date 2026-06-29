@@ -3,5 +3,6 @@
   "previewAll": true,
   "logOpen": true,
   "sideW": 307,
-  "inspW": 275
+  "inspW": 275,
+  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\GirlWars\\GirlWars.json"
 }

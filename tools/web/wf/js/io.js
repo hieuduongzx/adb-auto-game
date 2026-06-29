@@ -109,6 +109,13 @@ async function init(){
   if(!window.pywebview||!window.pywebview.api){ setStatus("⚠ pywebview không khả dụng"); return; }
   const state=await api().get_state();
   S.connectedSerial=state.connectedSerial||null;
+  S.captureBackend=state.captureBackend||"scrcpy";
+  const capSel=$("capture-backend");
+  if(capSel){
+    capSel.innerHTML="";
+    (state.captureBackends||["scrcpy","adb"]).forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b==="adb"?"ADB screencap":"scrcpy (nhanh)"; capSel.appendChild(o); });
+    capSel.value=S.captureBackend;
+  }
   (state.log||[]).forEach(appendLog);
   try{ const st=await api().get_settings(); wfSnapOn=!!st.snap; wfPreviewAll=!!st.previewAll;
     if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); }

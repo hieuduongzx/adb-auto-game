@@ -716,7 +716,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-#device-select {
+#device-select, #capture-backend {
   font-family: var(--sans);
   font-size: 11px;
   font-weight: 500;
@@ -734,7 +734,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   background-position: right 7px center;
   padding-right: 22px;
 }
-#device-select:focus { outline: none; border-color: var(--accent); }
+#device-select:focus, #capture-backend:focus { outline: none; border-color: var(--accent); }
+#capture-backend { max-width: 88px; }
 .btn-refresh {
   width: 28px; height: 28px;
   border-radius: 7px;
@@ -905,6 +906,11 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
       <select id="device-select" onchange="onDeviceChange(this.value)">
         <option value="">Không có thiết bị</option>
       </select>
+      <span style="font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap;">Nguồn ảnh</span>
+      <select id="capture-backend" onchange="onCaptureBackendChange(this.value)" title="Nguồn ảnh workflow: scrcpy nhanh/headless · ADB screencap chậm hơn nhưng ổn định">
+        <option value="scrcpy">scrcpy (nhanh)</option>
+        <option value="adb">ADB screencap</option>
+      </select>
       <button class="btn-refresh" id="btn-refresh" onclick="onRefresh()" title="Làm mới thiết bị">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -926,6 +932,7 @@ const S = {
   expandedId:      null,
   devices:         [],
   connectedSerial: null,
+  captureBackend:  "scrcpy",
   speedhack: { enabled:false, speed:2.0, package:"", active:false },
 };
 
@@ -1292,6 +1299,11 @@ window.__recv = function(raw){
     S.connectedSerial=data.serial||null; setConnected(data.connected, data.name, data.serial);
     rebuildDevices(S.devices, data.serial); return;
   }
+  if(type==="capture_backend"){
+    S.captureBackend=data.backend||"scrcpy";
+    const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
+    return;
+  }
   if(type==="flow_loaded"){ applyFlow(data); return; }
   if(type==="running_state"){
     S.running=!!data.running; S.paused=!!data.paused;
@@ -1319,6 +1331,11 @@ async function onStop(){ await api().stop(); }
 async function onPause(){ const r=await api().pause(); S.paused=!!(r&&r.paused); refreshButtons(); }
 async function onClearLog(){ await api().clear_log(); }
 async function onDeviceChange(serial){ if(serial){ S.connectedSerial=serial; await api().select_device(serial); } }
+async function onCaptureBackendChange(backend){
+  const r=await api().set_capture_backend(backend);
+  S.captureBackend=(r&&r.backend)||backend;
+  const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
+}
 async function onRefresh(){ $("btn-refresh").classList.add("spinning"); await api().refresh_devices(); }
 
 function selectAll(type, enabled){
@@ -1339,6 +1356,13 @@ async function init(){
   if(!window.pywebview||!window.pywebview.api){ $("dev-label").textContent="⚠ pywebview không khả dụng"; return; }
   const st = await api().get_state();
   S.connectedSerial = st.connectedSerial||null;
+  S.captureBackend = st.captureBackend||"scrcpy";
+  const capSel=$("capture-backend");
+  if(capSel){
+    capSel.innerHTML="";
+    (st.captureBackends||["scrcpy","adb"]).forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b==="adb"?"ADB screencap":"scrcpy (nhanh)"; capSel.appendChild(o); });
+    capSel.value=S.captureBackend;
+  }
   if(st.loaded) applyFlow({name:st.name, activities:st.activities, speedhack:st.speedhack});
   S.running=!!st.running; S.paused=!!st.paused;
   refreshButtons();

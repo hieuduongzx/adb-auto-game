@@ -29,6 +29,13 @@
   <span class="tb-divider"></span>
   <button class="btn" onclick="openDevHelper()" title="DevScope — chụp/đo region, ảnh lưu thẳng vào templates của workflow hiện tại">
     <svg width="15" height="15" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.3L3 18l3 3 6.4-6.3a4 4 0 0 0 5.3-5.4l-2.6 2.6-2.5-.4-.4-2.5z"/></svg>DevScope</button>
+  <div class="device-wrap" title="Nguồn ảnh dùng cho Chạy thử, screenshot, OCR và khớp mẫu · scrcpy nhanh/headless · ADB screencap ổn định" style="max-width:172px;">
+    <span style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;">Nguồn ảnh</span>
+    <select id="capture-backend" onchange="onCaptureBackendChange(this.value)">
+      <option value="scrcpy">scrcpy (nhanh)</option>
+      <option value="adb">ADB screencap</option>
+    </select>
+  </div>
   <span class="spacer"></span>
   <div class="tb-group">
     <button class="btn ico" onclick="wfNew()" title="Mới — tạo workflow trống">

@@ -16,6 +16,11 @@ window.__recv = function(raw){
     setStatus("Đã sao chép thông tin thiết bị"); return;
   }
   if(type==="out_dir"){updateOutDir(data.path);return;}
+  if(type==="capture_backend"){
+    S.captureBackend=data.backend||"scrcpy";
+    const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
+    return;
+  }
 };
 window.__recvFrame = function(dataUrl,w,h){
   const img=new Image();

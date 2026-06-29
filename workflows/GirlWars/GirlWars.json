@@ -78,10 +78,10 @@
               "template": "templates/region_20260629_191829_1312_364_78_78.png",
               "threshold": 0.85,
               "negate": true,
-              "regionW": 78,
-              "regionH": 78,
-              "regionX": 1312,
-              "regionY": 364
+              "regionW": 0,
+              "regionH": 0,
+              "regionX": 0,
+              "regionY": 0
             },
             "showPreview": true
           },
@@ -95,7 +95,7 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
+              "delay": 1,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2900,7 +2900,7 @@
           "name": "school",
           "label": "School",
           "type": "bool",
-          "value": false
+          "value": true
         },
         {
           "name": "claim_resouce",
@@ -3285,20 +3285,21 @@
           {
             "id": "nnsl1hha",
             "type": "if_var",
-            "x": 640,
-            "y": -280,
+            "x": 440,
+            "y": -380,
             "params": {
               "name": "claim_resouce",
               "op": "==",
               "value": "true"
             },
-            "note": "Claim all"
+            "note": "Claim all",
+            "log": "Claim all"
           },
           {
             "id": "n39b33wx",
             "type": "tap_image",
-            "x": 820,
-            "y": -280,
+            "x": 640,
+            "y": -380,
             "params": {
               "template": "templates/crop_20260629_162448_33x42.png",
               "taps": "1",
@@ -3317,8 +3318,8 @@
           {
             "id": "nbtuci9z",
             "type": "wait_image",
-            "x": 1000,
-            "y": -280,
+            "x": 820,
+            "y": -380,
             "params": {
               "template": "templates/crop_20260629_162634_191x30.png",
               "threshold": 0.85,

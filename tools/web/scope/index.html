@@ -29,6 +29,11 @@
   <button class="btn ico" onclick="openWorkflowDesigner()" title="Workflow2k — mở (cửa sổ mới)">
     <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></button>
   <span class="spacer"></span>
+  <span class="tb-label" title="Nguồn ảnh dùng cho preview, screenshot, OCR và khớp mẫu">Nguồn ảnh</span>
+  <select id="capture-backend" onchange="onCaptureBackendChange(this.value)" title="scrcpy: nhanh/headless · ADB screencap: chậm hơn nhưng ổn định">
+    <option value="scrcpy">scrcpy (nhanh)</option>
+    <option value="adb">ADB screencap</option>
+  </select>
   <div class="hz-wrap">
     <input id="hz-spin" type="number" min="0.2" max="30" step="0.5" value="5" onchange="onHzChange(this.value)">
     <span class="hz-unit">Hz</span>

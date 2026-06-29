@@ -6,6 +6,12 @@ window.__recv = function(raw){
   if(type==="log_cleared"){ const b=$("log-body"); if(b)b.innerHTML=""; updateLogCount(); return; }
   if(type==="devices_update"){ S.devices=data.devices||[]; rebuildDeviceSelect(S.devices,S.connectedSerial); return; }
   if(type==="device_status"){ S.connectedSerial=data.serial||null; setConnected(!!data.connected); rebuildDeviceSelect(S.devices,data.serial); return; }
+  if(type==="capture_backend"){
+    S.captureBackend=data.backend||"scrcpy";
+    const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
+    setStatus("Nguồn ảnh: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (nhanh/headless)"));
+    return;
+  }
   if(type==="workflow_state"){ wfSetRunning(!!data.running); return; }
   // Ignore node events for a graph we're not viewing (e.g. a function's internal
   // nodes while a call node runs) so the call block stays lit instead of the
@@ -38,6 +44,12 @@ async function onRefreshDevices(){ await api().refresh_devices(); }
 async function onScanPorts(){ await api().scan_ports(); }
 async function onRestartAdb(){ await api().restart_adb(); }
 async function onDeviceChange(serial){ if(serial){ S.connectedSerial=serial; await api().select_device(serial); } }
+async function onCaptureBackendChange(backend){
+  const r=await api().set_capture_backend(backend);
+  S.captureBackend=(r&&r.backend)||backend;
+  const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
+  setStatus("Nguồn ảnh: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (nhanh/headless)"));
+}
 async function openDevHelper(){ try{ await api().open_dev_helper(JSON.stringify(wfSerialize())); setStatus("Đang mở DevScope…"); }catch{} }
 
 // New blank workflow.

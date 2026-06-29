@@ -7,6 +7,7 @@ const S = {
   panning:false,  panStart:null, panBase:null,
   point:null, region:null, overlay:[],
   autoRefresh:true, devices:[], connectedSerial:null,
+  captureBackend:"scrcpy",
   selectedAsset:null,
 };
 const $ = id => document.getElementById(id);

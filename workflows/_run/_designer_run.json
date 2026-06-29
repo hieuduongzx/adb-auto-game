@@ -27,7 +27,7 @@
             "x": 240,
             "y": 60,
             "params": {
-              "template": "templates/crop_20260628_232825_249x36_3_1.png",
+              "template": "templates/crop_20260628_232825_249x36_3.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 30,
@@ -75,10 +75,15 @@
             "x": 480,
             "y": 40,
             "params": {
-              "template": "templates/crop_20260628_222549_80x76_2.png",
+              "template": "templates/region_20260629_191829_1312_364_78_78.png",
               "threshold": 0.85,
-              "negate": true
-            }
+              "negate": true,
+              "regionW": 78,
+              "regionH": 78,
+              "regionX": 1312,
+              "regionY": 364
+            },
+            "showPreview": true
           },
           {
             "id": "n7uenter",
@@ -86,7 +91,7 @@
             "x": 680,
             "y": -20,
             "params": {
-              "template": "templates/crop_20260628_223610_67x42_1.png",
+              "template": "templates/crop_20260628_223610_67x42.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -175,7 +180,7 @@
             "x": 820,
             "y": 80,
             "params": {
-              "template": "templates/crop_20260628_224052_35x27_1.png",
+              "template": "templates/crop_20260628_224052_35x27.png",
               "threshold": 0.85,
               "negate": false
             }
@@ -186,7 +191,7 @@
             "x": 640,
             "y": 80,
             "params": {
-              "template": "templates/crop_20260628_224231_47x40_1.png",
+              "template": "templates/crop_20260628_224231_47x40.png",
               "threshold": 0.85,
               "timeout": 10,
               "delay": 2
@@ -252,7 +257,7 @@
             "x": 260,
             "y": 60,
             "params": {
-              "template": "templates/crop_20260628_230152_237x42_1.png",
+              "template": "templates/crop_20260628_230152_237x42.png",
               "threshold": 0.85,
               "negate": true
             }
@@ -282,6 +287,96 @@
     }
   ],
   "activities": [
+    {
+      "id": "sequence_sw9b",
+      "name": "Nhận Thư",
+      "type": "sequence",
+      "enabled": false,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nsfwqmvn",
+            "type": "start",
+            "x": 60,
+            "y": 60,
+            "params": {}
+          },
+          {
+            "id": "n3z6f0gy",
+            "type": "call",
+            "x": 260,
+            "y": 60,
+            "params": {
+              "fn": "fn_yt9m6"
+            }
+          },
+          {
+            "id": "nau3vmjd",
+            "type": "tap_image",
+            "x": 460,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260629_164052_48x33.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nlyvsk2o",
+            "type": "tap_image",
+            "x": 640,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260629_164104_154x40.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "delay": 0,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nzywv8kw",
+            "type": "call",
+            "x": 820,
+            "y": 60,
+            "params": {
+              "fn": "fn_hh4kj"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "n3z6f0gy",
+            "fromPort": "out",
+            "to": "nau3vmjd"
+          },
+          {
+            "from": "nau3vmjd",
+            "fromPort": "true",
+            "to": "nlyvsk2o"
+          },
+          {
+            "from": "nlyvsk2o",
+            "fromPort": "true",
+            "to": "nzywv8kw"
+          },
+          {
+            "from": "nsfwqmvn",
+            "fromPort": "out",
+            "to": "n3z6f0gy"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
     {
       "id": "sequence_hhiq",
       "name": "Dungeon",
@@ -580,7 +675,7 @@
             "x": 1722,
             "y": -356,
             "params": {
-              "template": "templates/crop_20260628_223040_97x44_1.png",
+              "template": "templates/crop_20260628_223040_97x44.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -595,7 +690,7 @@
             "x": 1902,
             "y": -356,
             "params": {
-              "template": "templates/crop_20260628_223206_255x45_1.png",
+              "template": "templates/crop_20260628_223206_255x45.png",
               "threshold": 0.85,
               "timeout": 10,
               "delay": 0
@@ -628,7 +723,7 @@
             "x": 2442,
             "y": -356,
             "params": {
-              "template": "templates/crop_20260628_224052_35x27_1.png",
+              "template": "templates/crop_20260628_224052_35x27.png",
               "threshold": 0.85,
               "negate": false
             }
@@ -639,7 +734,7 @@
             "x": 2262,
             "y": -356,
             "params": {
-              "template": "templates/crop_20260628_224231_47x40_1.png",
+              "template": "templates/crop_20260628_224231_47x40.png",
               "threshold": 0.85,
               "timeout": 10,
               "delay": 2
@@ -1173,7 +1268,7 @@
             "x": 3060,
             "y": 140,
             "params": {
-              "template": "templates/crop_20260628_232748_47x38_1.png",
+              "template": "templates/crop_20260628_232748_47x38.png",
               "threshold": 0.85,
               "negate": false
             }
@@ -1229,7 +1324,7 @@
             "x": 1580,
             "y": 200,
             "params": {
-              "template": "templates/crop_20260628_233202_85x37_1.png",
+              "template": "templates/crop_20260628_233202_85x37.png",
               "threshold": 0.85,
               "negate": false
             }
@@ -1240,7 +1335,7 @@
             "x": 1780,
             "y": 120,
             "params": {
-              "template": "templates/crop_20260628_233206_121x40_1.png",
+              "template": "templates/crop_20260628_233206_121x40.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
@@ -1418,7 +1513,7 @@
             "x": 640,
             "y": 80,
             "params": {
-              "template": "templates/crop_20260628_222549_80x76_1_1.png",
+              "template": "templates/crop_20260628_222549_80x76_1.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -1457,7 +1552,7 @@
             "x": 260,
             "y": 60,
             "params": {
-              "template": "templates/crop_20260628_232249_198x35_1.png",
+              "template": "templates/crop_20260628_232249_198x35.png",
               "threshold": 0.85,
               "negate": false
             }
@@ -1468,7 +1563,7 @@
             "x": 1020,
             "y": 60,
             "params": {
-              "template": "templates/crop_20260628_232644_38x37_1.png",
+              "template": "templates/crop_20260628_232644_38x37.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -1543,7 +1638,7 @@
             "x": 2160,
             "y": 260,
             "params": {
-              "template": "templates/crop_20260628_232825_249x36_1_1.png",
+              "template": "templates/crop_20260628_232825_249x36_1.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -1558,7 +1653,7 @@
             "x": 2340,
             "y": 260,
             "params": {
-              "template": "templates/crop_20260628_232644_38x37_1.png",
+              "template": "templates/crop_20260628_232644_38x37.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -1573,7 +1668,7 @@
             "x": 2520,
             "y": 260,
             "params": {
-              "template": "templates/crop_20260628_234149_74x67_1.png",
+              "template": "templates/crop_20260628_234149_74x67.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -1599,7 +1694,7 @@
             "x": 3060,
             "y": 260,
             "params": {
-              "template": "templates/crop_20260628_234749_118x39_1.png",
+              "template": "templates/crop_20260628_234749_118x39.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -1651,7 +1746,7 @@
             "x": 1980,
             "y": -400,
             "params": {
-              "template": "templates/crop_20260628_232825_249x36_1_1.png",
+              "template": "templates/crop_20260628_232825_249x36_1.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -1702,7 +1797,7 @@
             "x": 2160,
             "y": -540,
             "params": {
-              "template": "templates/crop_20260628_232825_249x36_1_1.png",
+              "template": "templates/crop_20260628_232825_249x36_1.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -1749,7 +1844,7 @@
             "x": 1800,
             "y": -640,
             "params": {
-              "template": "templates/crop_20260628_232825_249x36_1_1.png",
+              "template": "templates/crop_20260628_232825_249x36_1.png",
               "threshold": 0.85,
               "negate": false
             }
@@ -1786,7 +1881,7 @@
             "x": 1800,
             "y": 260,
             "params": {
-              "template": "templates/crop_20260628_234959_75x34_1.png",
+              "template": "templates/crop_20260628_234959_75x34.png",
               "threshold": 0.85,
               "negate": false
             }
@@ -1819,7 +1914,7 @@
             "x": 2160,
             "y": 80,
             "params": {
-              "template": "templates/crop_20260628_235333_173x44_1.png",
+              "template": "templates/crop_20260628_235333_173x44.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -1834,7 +1929,7 @@
             "x": 2340,
             "y": 80,
             "params": {
-              "template": "templates/crop_20260628_235333_173x44_1.png",
+              "template": "templates/crop_20260628_235333_173x44.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -2088,7 +2183,7 @@
             "x": 320,
             "y": 40,
             "params": {
-              "template": "templates/crop_20260628_222549_80x76_1_1.png",
+              "template": "templates/crop_20260628_222549_80x76_1.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -2112,7 +2207,7 @@
             "x": 140,
             "y": -20,
             "params": {
-              "template": "templates/crop_20260628_232249_198x35_1.png",
+              "template": "templates/crop_20260628_232249_198x35.png",
               "threshold": 0.85,
               "negate": false
             }
@@ -2221,7 +2316,7 @@
             "x": 1840,
             "y": 440,
             "params": {
-              "template": "templates/crop_20260628_224052_35x27_1_1.png",
+              "template": "templates/crop_20260628_224052_35x27_1.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 30,
@@ -2558,7 +2653,7 @@
             "x": 660,
             "y": 200,
             "params": {
-              "template": "templates/crop_20260628_232825_249x36_2_1.png",
+              "template": "templates/crop_20260628_232825_249x36_2.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -2603,7 +2698,7 @@
             "x": 480,
             "y": 480,
             "params": {
-              "template": "templates/crop_20260628_232825_249x36_2_1.png",
+              "template": "templates/crop_20260628_232825_249x36_2.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -2618,7 +2713,7 @@
             "x": 660,
             "y": 480,
             "params": {
-              "template": "templates/crop_20260628_232825_249x36_2_1.png",
+              "template": "templates/crop_20260628_232825_249x36_2.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -2819,15 +2914,15 @@
           {
             "id": "n1wdskrd",
             "type": "start",
-            "x": 20,
-            "y": -220,
+            "x": -120,
+            "y": -440,
             "params": {}
           },
           {
             "id": "nbgk5sw8",
             "type": "call",
-            "x": 20,
-            "y": -180,
+            "x": -120,
+            "y": -400,
             "params": {
               "fn": "fn_yt9m6"
             }
@@ -2847,8 +2942,8 @@
           {
             "id": "nwyxdv95",
             "type": "tap_image",
-            "x": 200,
-            "y": -180,
+            "x": 60,
+            "y": -400,
             "params": {
               "template": "templates/crop_20260629_005509_152x24.png",
               "taps": "1",
@@ -3026,8 +3121,8 @@
             "y": -956,
             "params": {
               "templates": [
-                "templates/crop_20260629_010913_19x33_1.png",
-                "templates/crop_20260629_010916_28x28_1.png"
+                "templates/crop_20260629_010913_19x33.png",
+                "templates/crop_20260629_010916_28x28.png"
               ],
               "taps": "1",
               "threshold": 0.85,
@@ -3045,8 +3140,8 @@
             "y": -956,
             "params": {
               "templates": [
-                "templates/crop_20260629_005559_147x83_1_1.png",
-                "templates/crop_20260629_010201_153x91_1.png"
+                "templates/crop_20260629_005559_147x83_1.png",
+                "templates/crop_20260629_010201_153x91.png"
               ],
               "threshold": 0.85,
               "timeout": 10,
@@ -3190,8 +3285,8 @@
           {
             "id": "nnsl1hha",
             "type": "if_var",
-            "x": 420,
-            "y": -220,
+            "x": 440,
+            "y": -380,
             "params": {
               "name": "claim_resouce",
               "op": "==",
@@ -3202,8 +3297,8 @@
           {
             "id": "n39b33wx",
             "type": "tap_image",
-            "x": 600,
-            "y": -220,
+            "x": 700,
+            "y": -380,
             "params": {
               "template": "templates/crop_20260629_162448_33x42.png",
               "taps": "1",
@@ -3222,8 +3317,8 @@
           {
             "id": "nbtuci9z",
             "type": "wait_image",
-            "x": 780,
-            "y": -220,
+            "x": 1000,
+            "y": -280,
             "params": {
               "template": "templates/crop_20260629_162634_191x30.png",
               "threshold": 0.85,
@@ -3234,13 +3329,31 @@
           {
             "id": "n5yut0oa",
             "type": "tap_random",
-            "x": 980,
-            "y": -220,
+            "x": 1200,
+            "y": -280,
             "params": {
               "x": 0,
               "y": 0,
               "w": 100,
               "h": 100
+            }
+          },
+          {
+            "id": "nren6sng",
+            "type": "switch",
+            "x": 240,
+            "y": -400,
+            "params": {
+              "cases": [
+                {
+                  "type": "else",
+                  "params": {}
+                },
+                {
+                  "type": "else",
+                  "params": {}
+                }
+              ]
             }
           }
         ],
@@ -3249,11 +3362,6 @@
             "from": "nbgk5sw8",
             "fromPort": "out",
             "to": "nwyxdv95"
-          },
-          {
-            "from": "nwyxdv95",
-            "fromPort": "true",
-            "to": "nkmmjag6"
           },
           {
             "from": "nkmmjag6",
@@ -3392,11 +3500,6 @@
             "to": "nh9axzjk"
           },
           {
-            "from": "nkmmjag6",
-            "fromPort": "false",
-            "to": "nnsl1hha"
-          },
-          {
             "from": "nnsl1hha",
             "fromPort": "true",
             "to": "n39b33wx"
@@ -3415,6 +3518,21 @@
             "from": "n1wdskrd",
             "fromPort": "out",
             "to": "nbgk5sw8"
+          },
+          {
+            "from": "nwyxdv95",
+            "fromPort": "true",
+            "to": "nren6sng"
+          },
+          {
+            "from": "nren6sng",
+            "fromPort": "c0",
+            "to": "nkmmjag6"
+          },
+          {
+            "from": "nren6sng",
+            "fromPort": "c1",
+            "to": "nnsl1hha"
           }
         ],
         "groups": [
@@ -3452,7 +3570,7 @@
             "x": 460,
             "y": 140,
             "params": {
-              "template": "templates/crop_20260628_222549_80x76_1_1.png",
+              "template": "templates/crop_20260628_222549_80x76_1.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -3476,7 +3594,7 @@
             "x": 260,
             "y": 80,
             "params": {
-              "template": "templates/crop_20260628_232249_198x35_1.png",
+              "template": "templates/crop_20260628_232249_198x35.png",
               "threshold": 0.85,
               "negate": false
             }
@@ -3563,7 +3681,7 @@
             "x": 2020,
             "y": -20,
             "params": {
-              "template": "templates/crop_20260628_232825_249x36_3_1.png",
+              "template": "templates/crop_20260628_232825_249x36_3.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
@@ -3578,7 +3696,7 @@
             "x": 2200,
             "y": -20,
             "params": {
-              "template": "templates/crop_20260628_232825_249x36_3_1.png",
+              "template": "templates/crop_20260628_232825_249x36_3.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,

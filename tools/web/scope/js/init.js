@@ -5,6 +5,13 @@ async function init(){
     await new Promise(r=>setTimeout(r,100)),tries++;
   if(!window.pywebview||!window.pywebview.api){setStatus("⚠ pywebview không khả dụng");return;}
   const state=await api().get_state();
+  const capSel=$("capture-backend");
+  if(capSel){
+    capSel.innerHTML="";
+    (state.captureBackends||["scrcpy","adb"]).forEach(b=>{const o=document.createElement("option");o.value=b;o.textContent=b==="adb"?"ADB screencap":"scrcpy (nhanh)";capSel.appendChild(o);});
+    capSel.value=state.captureBackend||"scrcpy";
+    S.captureBackend=capSel.value;
+  }
   const sel=$("ocr-backend");
   (state.ocrBackends||[]).forEach(b=>{const o=document.createElement("option");o.value=o.textContent=b;sel.appendChild(o);});
   if(sel.options.length){

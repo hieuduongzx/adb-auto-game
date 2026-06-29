@@ -47,7 +47,13 @@ import numpy as np
 import webview
 
 from src.core.adb import ADBController, DeviceScanner
-from src.core.adb.auto.scrcpy_capture import capture_screen as capture_screen_frame
+from src.core.adb.auto.scrcpy_capture import (
+    CAPTURE_BACKENDS,
+    capture_screen as capture_screen_frame,
+    get_capture_backend,
+    set_capture_backend,
+    stop_scrcpy_sources,
+)
 from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.utils import (
@@ -241,8 +247,15 @@ class DevHelperAPI:
             "connectedSerial": self._connected_serial,
             "selectedSerial": self._selected_serial,
             "outDir": self._out_dir,
+            "captureBackend": get_capture_backend(),
+            "captureBackends": list(CAPTURE_BACKENDS),
             "log": self._log_buffer[-300:],
         }
+
+    def set_capture_backend(self, backend: str) -> dict:
+        selected = set_capture_backend(backend)
+        self._push("capture_backend", {"backend": selected})
+        return {"backend": selected, "backends": list(CAPTURE_BACKENDS)}
 
     # ── Device ops ───────────────────────────────────────────────────────────
 
@@ -1028,6 +1041,7 @@ class DevHelperAPI:
 
     def _close(self) -> None:
         self._closing = True
+        stop_scrcpy_sources()
         remove_log_subscriber(self._on_log)
 
 

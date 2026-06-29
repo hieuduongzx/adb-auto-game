@@ -24,6 +24,12 @@ from typing import Any, Dict, List, Optional
 
 import webview
 
+from src.core.adb.auto.scrcpy_capture import (
+    CAPTURE_BACKENDS,
+    get_capture_backend,
+    set_capture_backend,
+    stop_scrcpy_sources,
+)
 from src.workflow import WorkflowEngine
 from src.utils import (
     add_log_subscriber,
@@ -126,7 +132,14 @@ class WorkflowRunnerAPI:
             "speedhack": self.engine.speedhack_info(),
             "connectedSerial": self._connected_serial,
             "selectedSerial": self._selected_serial,
+            "captureBackend": get_capture_backend(),
+            "captureBackends": list(CAPTURE_BACKENDS),
         }
+
+    def set_capture_backend(self, backend: str) -> dict:
+        selected = set_capture_backend(backend)
+        self._push("capture_backend", {"backend": selected})
+        return {"backend": selected, "backends": list(CAPTURE_BACKENDS)}
 
     def _activities_payload(self) -> List[dict]:
         out = []
@@ -388,6 +401,7 @@ class WorkflowRunnerAPI:
             self.engine.stop()
         except Exception:
             pass
+        stop_scrcpy_sources()
 
 
 # ── Entry points ────────────────────────────────────────────────────────────

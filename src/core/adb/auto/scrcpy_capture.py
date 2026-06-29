@@ -2,13 +2,11 @@
 
 The old path uses ``adb shell screencap`` for every screenshot. This module adds
 an optional scrcpy-backed frame source so DevScope, workflow template matching
-and OCR can all read from the same low-latency video stream. It is intentionally
-best-effort: if scrcpy/PyAV cannot start, callers fall back to ADB screencap.
+and OCR can all read from the same low-latency mirror frame.
 """
 from __future__ import annotations
 
 import os
-import subprocess
 import threading
 import time
 from typing import Dict, Optional
@@ -26,11 +24,32 @@ _SCRCPY_SERVER = os.path.join(_SCRCPY_DIR, "scrcpy-server")
 
 _SOURCES: Dict[str, "ScrcpyFrameSource"] = {}
 _SOURCES_LOCK = threading.Lock()
+CAPTURE_BACKENDS = ("scrcpy", "adb")
+_LAST_NO_FRAME_LOG = 0.0
 
 
 def _capture_backend() -> str:
-    """Return requested capture backend: auto, scrcpy or adb."""
-    return os.environ.get("ADB_AUTO_CAPTURE_BACKEND", "auto").strip().lower() or "auto"
+    """Return requested capture backend: scrcpy or adb."""
+    backend = os.environ.get("ADB_AUTO_CAPTURE_BACKEND", "scrcpy").strip().lower()
+    return backend if backend in CAPTURE_BACKENDS else "scrcpy"
+
+
+def get_capture_backend() -> str:
+    """Public backend value for UIs."""
+    return _capture_backend()
+
+
+def set_capture_backend(backend: str) -> str:
+    """Set process-wide capture backend and return the normalized value."""
+    normalized = (backend or "").strip().lower()
+    if normalized not in CAPTURE_BACKENDS:
+        normalized = "scrcpy"
+    old = _capture_backend()
+    os.environ["ADB_AUTO_CAPTURE_BACKEND"] = normalized
+    if old != normalized:
+        stop_scrcpy_sources()
+        log_info(f"[capture] backend → {normalized}")
+    return normalized
 
 
 def _serial_of(controller) -> str:
@@ -60,30 +79,29 @@ def capture_adb_screen(controller) -> Optional[np.ndarray]:
 
 
 def capture_screen(controller, timeout: float = 1.5) -> Optional[np.ndarray]:
-    """Capture a BGR frame using configured backend, falling back to ADB.
+    """Capture a BGR frame using configured backend.
 
     ``ADB_AUTO_CAPTURE_BACKEND``:
-    - ``auto`` (default): try scrcpy, then ADB screencap
-    - ``scrcpy``: try scrcpy first, still fallback to ADB on failure
+    - ``scrcpy`` (default): use headless scrcpy-client, return None on failure
     - ``adb``: force old screencap path
     """
     backend = _capture_backend()
-    if backend != "adb":
-        frame = capture_scrcpy_screen(controller, timeout=timeout)
-        if frame is not None:
-            return frame
-        if backend == "scrcpy":
-            log_warning("[capture] scrcpy chưa có frame, fallback ADB screencap")
-    return capture_adb_screen(controller)
+    if backend == "adb":
+        return capture_adb_screen(controller)
+    frame = capture_scrcpy_screen(controller, timeout=timeout)
+    if frame is None:
+        global _LAST_NO_FRAME_LOG
+        now = time.monotonic()
+        if now - _LAST_NO_FRAME_LOG >= 1.0:
+            _LAST_NO_FRAME_LOG = now
+            log_warning("[capture] scrcpy chưa có frame (ADB fallback đang tắt)")
+    return frame
 
 
 def capture_scrcpy_screen(controller, timeout: float = 1.5) -> Optional[np.ndarray]:
     """Return the latest scrcpy frame for a controller, or None if unavailable."""
     if not os.path.isfile(_SCRCPY_EXE):
-        return None
-    try:
-        import av  # type: ignore  # optional dependency, imported lazily
-    except Exception:
+        log_warning(f"[capture] không tìm thấy scrcpy: {_SCRCPY_EXE}")
         return None
 
     serial = _serial_of(controller)
@@ -105,13 +123,11 @@ def stop_scrcpy_sources() -> None:
 
 
 class ScrcpyFrameSource:
-    """Background scrcpy process + PyAV decoder for one device serial."""
+    """Headless scrcpy-client frame source for one device serial."""
 
     def __init__(self, serial: str) -> None:
         self.serial = serial
-        self._proc: Optional[subprocess.Popen] = None
-        self._thread: Optional[threading.Thread] = None
-        self._stderr_thread: Optional[threading.Thread] = None
+        self._client = None
         self._lock = threading.Lock()
         self._frame_event = threading.Event()
         self._latest: Optional[np.ndarray] = None
@@ -122,6 +138,8 @@ class ScrcpyFrameSource:
 
     def get_frame(self, timeout: float = 1.5) -> Optional[np.ndarray]:
         self.start()
+        if self._client is None:
+            return None
         start_id = self._frame_id
         deadline = time.monotonic() + max(0.05, timeout)
         while time.monotonic() < deadline:
@@ -136,7 +154,7 @@ class ScrcpyFrameSource:
             return self._latest.copy() if self._latest is not None else None
 
     def start(self) -> None:
-        if self._proc is not None and self._proc.poll() is None:
+        if self._client is not None:
             return
         if not os.path.isfile(_SCRCPY_EXE):
             return
@@ -145,98 +163,54 @@ class ScrcpyFrameSource:
             return
         self._last_start_attempt = now
 
-        port_base = 30000 + (abs(hash(self.serial)) % 500)
-        args = [
-            _SCRCPY_EXE,
-            "--no-window",
-            "--no-audio",
-            "--no-control",
-            "--record=-",
-            "--record-format=mkv",
-            "--max-fps=30",
-            f"--port={port_base}:{port_base + 20}",
-            "-V",
-            "warn",
-        ]
-        if self.serial and self.serial != "default":
-            args.extend(["-s", self.serial])
-
-        env = os.environ.copy()
-        if os.path.isfile(_SCRCPY_SERVER):
-            env["SCRCPY_SERVER_PATH"] = _SCRCPY_SERVER
-
-        startupinfo = None
-        if os.name == "nt":
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-
         try:
-            self._proc = subprocess.Popen(
-                args,
-                cwd=_SCRCPY_DIR,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                stdin=subprocess.DEVNULL,
-                startupinfo=startupinfo,
+            # scrcpy-client uses adbutils internally and starts scrcpy-server
+            # headlessly. Point it at the bundled adb/server assets where possible.
+            os.environ.setdefault("SCRCPY_SERVER_PATH", _SCRCPY_SERVER)
+            os.environ.setdefault("ADB", os.path.join(_SCRCPY_DIR, "adb.exe"))
+            import scrcpy  # type: ignore
+
+            client = scrcpy.Client(
+                device=None if self.serial == "default" else self.serial,
+                max_fps=30,
+                block_frame=False,
             )
+            client.add_listener(scrcpy.EVENT_FRAME, self._on_frame)
+            client.start(threaded=True)
+            self._client = client
         except Exception as exc:
             self._last_error = str(exc)
-            log_warning(f"[capture] không mở được scrcpy: {exc}")
+            self._client = None
+            log_warning(f"[capture] không mở được scrcpy-client: {exc}")
             return
 
-        self._thread = threading.Thread(target=self._decode_loop, daemon=True)
-        self._thread.start()
-        self._stderr_thread = threading.Thread(target=self._stderr_loop, daemon=True)
-        self._stderr_thread.start()
         if not self._started_once:
-            log_info(f"[capture] scrcpy frame source started ({self.serial})")
+            log_info(f"[capture] scrcpy-client started headless ({self.serial})")
             self._started_once = True
 
     def stop(self) -> None:
-        proc = self._proc
-        self._proc = None
-        if proc is not None and proc.poll() is None:
+        client = self._client
+        self._client = None
+        if client is not None:
             try:
-                proc.terminate()
-                proc.wait(timeout=1.0)
+                client.stop()
             except Exception:
-                try:
-                    proc.kill()
-                except Exception:
-                    pass
+                pass
 
-    def _decode_loop(self) -> None:
-        proc = self._proc
-        if proc is None or proc.stdout is None:
+    def _on_frame(self, frame) -> None:
+        if frame is None:
             return
         try:
-            import av  # type: ignore
-            container = av.open(proc.stdout, format="matroska", mode="r")
-            for frame in container.decode(video=0):
-                arr = frame.to_ndarray(format="bgr24")
-                with self._lock:
-                    self._latest = arr
-                    self._frame_id += 1
-                self._frame_event.set()
-                if proc.poll() is not None:
-                    break
+            arr = np.asarray(frame, dtype=np.uint8)
+            # scrcpy-client 0.4.x already yields frames in OpenCV-friendly BGR
+            # order on this stack. Do not RGB->BGR swap here, or template colors
+            # diverge strongly from ADB screencap captures.
+            if arr.ndim == 3 and arr.shape[2] >= 3:
+                arr = arr[:, :, :3]
+            with self._lock:
+                self._latest = arr.copy()
+                self._frame_id += 1
+            self._frame_event.set()
         except Exception as exc:
             self._last_error = str(exc)
-            log_debug(f"[capture] scrcpy decode stopped: {exc}")
-        finally:
-            self.stop()
-
-    def _stderr_loop(self) -> None:
-        proc = self._proc
-        if proc is None or proc.stderr is None:
-            return
-        try:
-            for raw in iter(proc.stderr.readline, b""):
-                line = raw.decode("utf-8", errors="replace").strip()
-                if line and ("ERROR" in line or "WARN" in line):
-                    log_debug(f"[scrcpy] {line}")
-                if proc.poll() is not None:
-                    break
-        except Exception:
-            pass
+            log_debug(f"[capture] scrcpy frame callback lỗi: {exc}")

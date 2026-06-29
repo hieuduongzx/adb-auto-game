@@ -40,6 +40,12 @@ if _PROJECT_ROOT not in sys.path:
 import webview
 
 from src.core.adb import ADBController, DeviceScanner
+from src.core.adb.auto.scrcpy_capture import (
+    CAPTURE_BACKENDS,
+    get_capture_backend,
+    set_capture_backend,
+    stop_scrcpy_sources,
+)
 from src.game_core.frida_speedhack import FridaSpeedhackManager
 from src.workflow import NODE_TYPES, WorkflowEngine
 from src.utils import (
@@ -147,8 +153,15 @@ class WorkflowDesignerAPI:
         return {
             "connectedSerial": self._connected_serial,
             "selectedSerial": self._selected_serial,
+            "captureBackend": get_capture_backend(),
+            "captureBackends": list(CAPTURE_BACKENDS),
             "log": self._log_buffer[-300:],
         }
+
+    def set_capture_backend(self, backend: str) -> dict:
+        selected = set_capture_backend(backend)
+        self._push("capture_backend", {"backend": selected})
+        return {"backend": selected, "backends": list(CAPTURE_BACKENDS)}
 
     def clear_log(self) -> bool:
         self._log_buffer.clear()
@@ -848,6 +861,7 @@ class WorkflowDesignerAPI:
                 self.speedhack_stop()
             except Exception:
                 pass
+        stop_scrcpy_sources()
         remove_log_subscriber(self._on_log)
 
 

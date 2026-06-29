@@ -132,6 +132,22 @@ class ADBGameAutomation:
             )
             self.capture_thread.start()
             log_info("Continuous screen capture started")
+
+        # The workflow may call find_template immediately after enabling the
+        # capture thread. scrcpy-client needs a short warm-up before the first
+        # frame arrives, so seed/wait for one frame here instead of letting the
+        # first nodes run against an empty screen.
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline:
+            if self.get_latest_screen() is not None:
+                return
+            screen = capture_screen_frame(self.adb, timeout=0.5)
+            if screen is not None:
+                with self.screen_lock:
+                    self.latest_screen = screen
+                return
+            time.sleep(0.05)
+        log_warning("Continuous capture started but no first frame is available yet")
     
     def stop_continuous_capture(self):
         """Stop continuous screen capture"""

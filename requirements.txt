@@ -30,9 +30,10 @@ qtawesome>=1.4.2       # FontAwesome icons for Qt UI
 
 # Mobile automation
 pure-python-adb>=0.3.0.dev0
-# Optional but recommended for scrcpy-backed screenshot/frame capture.
-# If missing, the app falls back to ADB screencap.
-av>=12.0.0
+# Optional scrcpy-backed screenshot/frame capture:
+#   python -m pip install adbutils==1.2.15 scrcpy-client --no-deps
+#   python -m pip install whichcraft cached-property logzero deprecation apkutils2 retry decorator
+# The app reports a clear capture error if scrcpy-client is missing.
 # Utilities
 keyboard>=0.13.5      # Keyboard hotkeys (q to quit)
 colorama>=0.4.6       # Coloured console output
