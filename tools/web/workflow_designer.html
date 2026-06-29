@@ -336,7 +336,6 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .side-count { font-family:var(--mono); font-size:9.5px; font-weight:600; color:var(--muted);
   background:var(--alt); border-radius:999px; padding:1px 6px; letter-spacing:0; }
 .side-count:empty { display:none; }
-#wf-activities { padding:0 9px 8px; display:flex; flex-direction:column; gap:4px; max-height:230px; overflow-y:auto; }
 #wf-side .wf-palette { padding:0 9px 10px; overflow-y:auto; }
 
 .wf-act { display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--border);
@@ -407,9 +406,6 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-act.wf-fn { border-left:3px solid #9a78e6; background:#faf7ff; }
 .wf-act.wf-fn:hover { background:#f3eefe; border-left-color:#7c3aed; }
 .wf-act.wf-fn.sel  { background:#ede8fc; border-left-color:#7c3aed; border-color:#c4b1f6; }
-/* Sidebar section header tints */
-.wf-side-sec:nth-child(1) > .wf-side-hdr { color:#6d28d9; }
-.wf-side-sec:nth-child(2) > .wf-side-hdr { color:#2d64cc; }
 
 /* Center: canvas */
 #wf-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
@@ -439,40 +435,73 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 #wf-wires .wire-hit { fill:none; stroke:transparent; stroke-width:18; pointer-events:stroke;
   cursor:pointer; stroke-linecap:round; }
 /* Default forward flow — thin neutral line that recedes into the background.
-   T/F branch wires and the run trail are thicker so they immediately pop. */
-#wf-wires path.wire { fill:none; stroke:#9aaec2; stroke-width:1.8; pointer-events:none;
+    T/F branch wires and the run trail are thicker so they immediately pop. */
+#wf-wires path.wire { fill:none; stroke:#9aaec2; stroke-width:1.25; pointer-events:none;
   stroke-linecap:round; stroke-linejoin:round; marker-end:url(#wf-ah);
   stroke-opacity:0.75; transition:stroke .12s, stroke-width .12s, stroke-opacity .12s; }
 /* True/False branch wires: bolder and fully opaque — the decision fork is the
-   most information-dense part of the graph and must read first. */
-#wf-wires path.wire.t { stroke:#25a05a; stroke-width:2.3; stroke-opacity:1; marker-end:url(#wf-ah-t); }
-#wf-wires path.wire.f { stroke:#d45f3a; stroke-width:2.3; stroke-opacity:1; marker-end:url(#wf-ah-f); }
+   the most information-dense part of the graph and must read first. */
+#wf-wires path.wire.t { stroke:#25a05a; stroke-width:1.6; stroke-opacity:1; marker-end:url(#wf-ah-t); }
+#wf-wires path.wire.f { stroke:#d45f3a; stroke-width:1.6; stroke-opacity:1; marker-end:url(#wf-ah-f); }
 /* Stack wire: structural, not a data flow — very faint dotted rule, no arrowhead. */
-#wf-wires path.wire.stack { stroke:#b8c6d4; stroke-width:1.4; stroke-opacity:0.45;
+#wf-wires path.wire.stack { stroke:#b8c6d4; stroke-width:1.0; stroke-opacity:0.45;
   stroke-dasharray:2.5 3; marker-end:none; }
 /* Loop-back wire: amber dashed — "going back" reads visually different from forward flow. */
-#wf-wires path.wire.loopback { stroke:#d09030; stroke-width:2.0; stroke-opacity:0.9;
+#wf-wires path.wire.loopback { stroke:#d09030; stroke-width:1.4; stroke-opacity:0.9;
   stroke-dasharray:9 5; marker-end:url(#wf-ah-loop); }
 /* Hover: lift the targeted wire sharply above the crowd — full opacity, accent colour,
    modest weight gain (avoids a thick band that obscures nearby nodes). */
-#wf-wires .wire-grp:hover path.wire { stroke:var(--accent); stroke-width:2.8; stroke-opacity:1;
+#wf-wires .wire-grp:hover path.wire { stroke:var(--accent); stroke-width:2.0; stroke-opacity:1;
   marker-end:url(#wf-ah-temp); }
 #wf-wires .wire-grp:hover { filter:drop-shadow(0 1px 4px rgba(47,111,237,.32)); }
 /* While wiring up a connection, wires ignore the pointer so the drop lands on the
    node underneath rather than being swallowed by a wire's hit-path. */
 #wf-canvas.wf-connecting .wire-hit { pointer-events:none; }
 /* Run trail on wires: the path taken (bright green) vs the skipped branch (faint red). */
-#wf-wires path.wire.took-wire    { stroke:#2fa55a !important; stroke-width:3.0; stroke-opacity:1 !important; marker-end:url(#wf-ah-t) !important; }
-#wf-wires path.wire.nottook-wire { stroke:#cf4b43 !important; stroke-opacity:.38 !important; stroke-width:1.8; marker-end:url(#wf-ah-f) !important; }
-#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:2.2; stroke-dasharray:6 4;
+#wf-wires path.wire.took-wire    { stroke:#2fa55a !important; stroke-width:2.1; stroke-opacity:1 !important; marker-end:url(#wf-ah-t) !important; }
+#wf-wires path.wire.nottook-wire { stroke:#cf4b43 !important; stroke-opacity:.38 !important; stroke-width:1.25; marker-end:url(#wf-ah-f) !important; }
+#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:1.5; stroke-dasharray:6 4;
   stroke-linecap:round; pointer-events:none; marker-end:url(#wf-ah-temp); }
 #wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   color:var(--muted); font-size:12px; pointer-events:none; }
 
-/* Live variables panel — pinned bottom-right of the canvas. Shows the vars
+/* Auto-layout toolbar — pinned bottom-left of the canvas. A small floating
+   cluster of buttons, one per layout strategy. */
+.wf-layout-bar { position:absolute; left:10px; bottom:10px; display:flex; gap:4px;
+  background:var(--panel); border:1px solid var(--border2); border-radius:9px;
+  box-shadow:var(--sh-md); padding:5px; z-index:5; }
+.wf-layout-btn { width:30px; height:30px; padding:0; border:1px solid transparent;
+  border-radius:6px; background:var(--alt); color:var(--dim); cursor:pointer;
+  font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center; }
+.wf-layout-btn:hover { color:var(--accent); background:var(--accent-bg); border-color:var(--accent-bd); }
+
+/* Activities + Functions panel — pinned bottom-right of the canvas. Two tabs
+   (Hoạt động / Function) switch the list; the "+" button adds to the active tab.
+   Collapsible via the header, like the vars panel. */
+.wf-act-panel { position:absolute; right:10px; bottom:10px; width:240px; max-height:46%;
+  background:var(--panel); border:1px solid var(--border2); border-radius:9px;
+  box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5; overflow:hidden; }
+.wf-act-panel.collapsed { max-height:26px; }
+.wf-act-panel-hdr { display:flex; align-items:center; gap:4px; padding:5px 8px;
+  background:var(--bar); border-bottom:1px solid var(--border2); flex-shrink:0; cursor:pointer;
+  user-select:none; }
+.wf-act-tab { font-size:10.5px; font-weight:700; color:var(--muted); background:none; border:none;
+  cursor:pointer; padding:3px 7px; border-radius:5px; display:flex; align-items:center; gap:4px;
+  letter-spacing:.03em; text-transform:uppercase; }
+.wf-act-tab:hover { color:var(--ink); background:var(--alt); }
+.wf-act-tab.sel { color:var(--accent); background:var(--accent-bg); }
+.wf-act-add { width:20px; height:20px; padding:0; border:1px solid var(--border2); border-radius:5px;
+  background:var(--panel); color:var(--dim); cursor:pointer; font-size:14px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.wf-act-add:hover { color:var(--accent); border-color:var(--accent); }
+.wf-act-panel-body { overflow-y:auto; padding:5px 7px 7px; }
+.wf-act-list { display:flex; flex-direction:column; gap:4px; }
+#wf-activities { padding:0; max-height:none; }   /* override the old sidebar styling */
+
+/* Live variables panel — pinned top-right of the canvas. Shows the vars
    declared on the current activity (declared value) overlaid with live runtime
    values pushed from the engine during a test run. Collapsible. */
-.wf-vars-panel { position:absolute; right:10px; bottom:10px; width:200px; max-height:46%;
+.wf-vars-panel { position:absolute; right:10px; top:10px; width:200px; max-height:46%;
   background:var(--panel); border:1px solid var(--border2); border-radius:9px;
   box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5;
   font-size:11px; overflow:hidden; }
@@ -758,23 +787,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 </div>
 
 <div id="workflow-view" style="display:flex;">
-  <!-- Left: activities + node palette -->
+  <!-- Left: node palette only (activities + functions moved into the canvas) -->
   <div id="wf-side" class="card">
-    <div class="wf-side-sec">
-      <div class="wf-side-hdr">
-        <span>Function</span><span class="side-count" id="wf-fn-count"></span><span class="spacer"></span>
-        <button class="btn sm" onclick="wfAddFunction()" title="Tạo function tái sử dụng">+ Function</button>
-      </div>
-      <div id="wf-functions"></div>
-    </div>
-    <div class="wf-side-sec">
-      <div class="wf-side-hdr">
-        <span>Hoạt động</span><span class="side-count" id="wf-act-count"></span><span class="spacer"></span>
-        <button class="btn sm" onclick="wfAddActivity('sequence')" title="Thêm hoạt động tuần tự">+ Tuần tự</button>
-        <button class="btn sm" onclick="wfAddActivity('background')" title="Thêm hoạt động nền">+ Nền</button>
-      </div>
-      <div id="wf-activities"></div>
-    </div>
     <div class="wf-side-sec" style="flex:1;min-height:0;display:flex;flex-direction:column;">
       <div class="wf-side-hdr"><span>Node</span></div>
       <div id="wf-palette" class="wf-palette"></div>
@@ -827,6 +841,28 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
           </span>
         </div>
         <div id="wf-vars-body" class="wf-vars-body"></div>
+      </div>
+      <!-- Activities + Functions panel — pinned bottom-left of the canvas (moved
+           out of the sidebar to keep the palette roomy). Two tabs switch the list. -->
+      <div id="wf-act-panel" class="wf-act-panel">
+        <div class="wf-act-panel-hdr">
+          <button class="wf-act-tab sel" data-tab="acts" id="wf-tab-acts">Hoạt động <span class="side-count" id="wf-act-count"></span></button>
+          <button class="wf-act-tab" data-tab="fns" id="wf-tab-fns">Function <span class="side-count" id="wf-fn-count"></span></button>
+          <span class="spacer"></span>
+          <button class="wf-act-add" id="wf-act-add" title="Thêm hoạt động">+</button>
+        </div>
+        <div class="wf-act-panel-body">
+          <div id="wf-activities" class="wf-act-list"></div>
+          <div id="wf-functions" class="wf-act-list" style="display:none"></div>
+        </div>
+      </div>
+      <!-- Auto-layout toolbar — pinned bottom-left of the canvas. One button per
+           layout strategy; each tidies the whole graph then fits it to view. -->
+      <div id="wf-layout-bar" class="wf-layout-bar">
+        <button class="wf-layout-btn" data-layout="vertical" title="Xếp dọc — luồng từ trên xuống">⬇</button>
+        <button class="wf-layout-btn" data-layout="horizontal" title="Xếp ngang — luồng từ trái sang">➡</button>
+        <button class="wf-layout-btn" data-layout="tree" title="Xếp cây — rẽ nhánh trải ra">⌥</button>
+        <button class="wf-layout-btn" data-layout="compact" title="Xếp gọn — tối thiểu khoảng cách">◫</button>
       </div>
     </div>
   </div>
@@ -1215,6 +1251,7 @@ let wfPreviewAll=false;   // global: show image thumbnail on every image block
 let wfLiveVars={};
 let wfFreshVar=null;       // name of the most-recently-changed var (brief highlight)
 let wfVarsCollapsed=false;
+let wfActCollapsed=false;
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
 function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined}); }catch{} }
 function wfSyncToggleBtns(){
@@ -1314,6 +1351,142 @@ function wfFit(){
   wfPan.x=(cw-(minX+maxX)*z)/2;
   wfPan.y=(ch-(minY+maxY)*z)/2;
   wfApplyTransform();
+}
+// ── Auto-layout strategies ────────────────────────────────────────────────────
+// Each rearranges every node in the current graph into a tidy arrangement, then
+// fits the result to view. Notes are excluded (they float free). Nodes keep their
+// x/y in world coords; stacks/groups are not touched (members follow their head).
+const WF_LAY_NODE_W=158, WF_LAY_NODE_H=52, WF_LAY_GAP_X=80, WF_LAY_GAP_Y=70;
+// Approximate node height: real DOM height when available, else the default.
+function wfNodeH(n){
+  const el=wfNodeElById(n.id); return el?el.offsetHeight:WF_LAY_NODE_H;
+}
+function wfNodeW(n){
+  const el=wfNodeElById(n.id); return el?el.offsetWidth:WF_LAY_NODE_W;
+}
+// Build an adjacency map: out-edges only (forward flow), ignoring loop-backs.
+function wfAdjForward(g){
+  const adj={}; (g.nodes||[]).forEach(n=>adj[n.id]=[]);
+  (g.edges||[]).forEach(e=>{ if(e.to!==e.from && (e.toPort||"in")!=="loop") adj[e.from].push(e.to); });
+  return adj;
+}
+// Topological layers via BFS from the start node (or any node with no in-edges).
+// Returns an array of layers; each layer is an array of node ids.
+function wfTopoLayers(g){
+  const nodes=g.nodes||[];
+  const adj=wfAdjForward(g);
+  // in-degree
+  const indeg={}; nodes.forEach(n=>indeg[n.id]=0);
+  (g.edges||[]).forEach(e=>{ if(e.to!==e.from && (e.toPort||"in")!=="loop") indeg[e.to]=(indeg[e.to]||0)+1; });
+  const start=nodes.find(n=>n.type==="start") || nodes.find(n=>(indeg[n.id]||0)===0);
+  let layer0=start?[start.id]:nodes.filter(n=>(indeg[n.id]||0)===0).map(n=>n.id);
+  if(!layer0.length && nodes.length) layer0=[nodes[0].id];
+  const layers=[layer0];
+  const seen=new Set(layer0);
+  // For a clean visual, every successor enters the NEXT layer (so siblings in the
+  // same fork share a column) — breadth-first.
+  let cur=layer0;
+  while(cur.length){
+    const nxt=[];
+    cur.forEach(id=>{
+      (adj[id]||[]).forEach(t=>{ if(!seen.has(t)){ seen.add(t); nxt.push(t); } });
+    });
+    // Also pull in any unseen zero-in-degree nodes (disconnected islands).
+    nodes.forEach(n=>{ if(!seen.has(n.id) && (indeg[n.id]||0)===0){ seen.add(n.id); nxt.push(n.id); } });
+    if(nxt.length) layers.push(nxt);
+    cur=nxt;
+  }
+  // Any leftover (cyclic / unreached) → one more layer.
+  const left=nodes.filter(n=>!seen.has(n.id)).map(n=>n.id);
+  if(left.length) layers.push(left);
+  return layers;
+}
+// Layout: vertical columns (top-to-bottom flow), one column per topo layer.
+function wfLayoutVertical(g){
+  const layers=wfTopoLayers(g);
+  let y=40;
+  layers.forEach(layer=>{
+    let x=40;
+    let maxW=0;
+    layer.forEach(id=>{
+      const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
+      n.x=x; n.y=y;
+      const w=wfNodeW(n); if(w>maxW) maxW=w;
+      x+=w+WF_LAY_GAP_X;
+    });
+    // tallest node in this row → advance y
+    const maxH=Math.max(...layer.map(id=>{ const n=g.nodes.find(n=>n.id===id); return n?wfNodeH(n):WF_LAY_NODE_H; }));
+    y+=maxH+WF_LAY_GAP_Y;
+  });
+}
+// Layout: horizontal rows (left-to-right flow), one row per topo layer.
+function wfLayoutHorizontal(g){
+  const layers=wfTopoLayers(g);
+  let x=40;
+  layers.forEach(layer=>{
+    let y=40;
+    layer.forEach(id=>{
+      const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
+      n.x=x; n.y=y;
+      y+=wfNodeH(n)+WF_LAY_GAP_Y;
+    });
+    const maxW=Math.max(...layer.map(id=>{ const n=g.nodes.find(n=>n.id===id); return n?wfNodeW(n):WF_LAY_NODE_W; }));
+    x+=maxW+WF_LAY_GAP_X;
+  });
+}
+// Layout: tree — layers as columns, but each branch's children centered under
+// their parent, so forks fan out like a tree.
+function wfLayoutTree(g){
+  const layers=wfTopoLayers(g);
+  const adj=wfAdjForward(g);
+  // Compute subtree width (leaf count) per node.
+  const widths={};
+  function wOf(id){ if(widths[id]!==undefined) return widths[id];
+    const kids=(adj[id]||[]).filter(t=>layers.some(l=>l.includes(t)));
+    if(!kids.length) return widths[id]=1;
+    return widths[id]=kids.reduce((s,k)=>s+wOf(k),0); }
+  const colW=WF_LAY_NODE_W+WF_LAY_GAP_X;
+  let x=40;
+  layers.forEach((layer,i)=>{
+    let cursor=x;
+    // Position each node, reserving subtree width; center it over its span.
+    layer.forEach(id=>{
+      const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
+      const w=wOf(id);
+      n.x=cursor+(w*colW-WF_LAY_NODE_W)/2;
+      n.y=40+i*(WF_LAY_NODE_H+WF_LAY_GAP_Y);
+      cursor+=w*colW;
+    });
+    const span=layer.reduce((s,id)=>s+wOf(id),0);
+    x=40+Math.max(span*colW, colW);
+  });
+}
+// Layout: compact — vertical columns but with tight gaps and nodes packed by
+// topo order into a near-square grid (good for many small blocks).
+function wfLayoutCompact(g){
+  const layers=wfTopoLayers(g);
+  const cols=Math.max(1, Math.ceil(Math.sqrt(g.nodes.filter(n=>n.type!=="note").length)));
+  let y=40, col=0, x=40, rowMaxH=0;
+  layers.forEach(layer=>{
+    layer.forEach(id=>{
+      const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
+      n.x=x; n.y=y;
+      const h=wfNodeH(n); if(h>rowMaxH) rowMaxH=h;
+      col++;
+      if(col>=cols){ col=0; x=40; y+=rowMaxH+40; rowMaxH=0; }
+      else x+=WF_LAY_NODE_W+40;
+    });
+  });
+}
+function wfAutoLayout(kind){
+  const g=wfGraph(); if(!g) return;
+  if(kind==="vertical")   wfLayoutVertical(g);
+  else if(kind==="horizontal") wfLayoutHorizontal(g);
+  else if(kind==="tree")  wfLayoutTree(g);
+  else if(kind==="compact") wfLayoutCompact(g);
+  wfRenderCanvas();
+  wfFit();
+  setStatus("Đã sắp xếp: "+kind);
 }
 let wfGesture=null;     // {mode:'pan'|'move'|'connect', ...}
 let wfPaletteDrag=null; // node type being dragged from palette
@@ -1519,7 +1692,7 @@ function wfRenderAll(){
 }
 
 function wfRenderActivities(){
-  const wrap=$("wf-activities"); wrap.innerHTML="";
+  const wrap=$("wf-activities"); if(!wrap) return; wrap.innerHTML="";
   const cnt=$("wf-act-count"); if(cnt) cnt.textContent = WF.activities.length? String(WF.activities.length):"";
   if(!WF.activities.length){ wrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có hoạt động.</div>'; return; }
   const check=`<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>`;
@@ -1561,7 +1734,24 @@ function wfRenderFunctions(){
   });
 }
 
-// ── Sidebar drag-to-reorder (activities + functions) ─────────────────────────
+// ── Activities/Functions panel tabs (in-canvas bottom-left) ──────────────────
+let wfActTabCur="acts";
+function wfActTab(which){
+  wfActTabCur=which;
+  document.querySelectorAll(".wf-act-tab").forEach(t=>t.classList.toggle("sel", t.dataset.tab===which));
+  const acts=$("wf-activities"), fns=$("wf-functions");
+  if(acts) acts.style.display = which==="acts"?"":"none";
+  if(fns) fns.style.display  = which==="fns" ?"":"none";
+  // The "+" button's action depends on the active tab.
+  const add=$("wf-act-add"); if(add) add.title = which==="fns"?"Tạo function mới":"Thêm hoạt động";
+}
+function wfActAddCurrent(){
+  if(wfActTabCur==="fns") wfAddFunction();
+  else wfAddActivity("sequence");
+}
+function wfToggleActPanel(){
+  const p=$("wf-act-panel"); if(p) p.classList.toggle("collapsed", wfActCollapsed);
+}
 // Dragging is armed only while the grip handle is held, so checkbox / select /
 // delete clicks keep working. Rows shuffle live during dragover; on drop the
 // backing array (WF.activities or WF.functions) is reordered to match the DOM —
@@ -1773,13 +1963,13 @@ function wfShowGlobsEditor(){
   render();
   pop.appendChild(body);
   document.body.appendChild(pop);
-  // Anchor above the "+" button so it never gets clipped by the canvas.
+  // Anchor below the "+" button (vars panel is now top-right).
   const btn=$("wf-vars-add");
   if(btn){
     const r=btn.getBoundingClientRect();
-    let left=r.right-250, top=r.top-8;
-    pop.style.top=Math.max(8, top-pop.offsetHeight)+"px";
-    pop.style.left=Math.max(8, left)+"px";
+    let left=r.right-250, top=r.bottom+6;
+    pop.style.top=Math.max(8, top)+"px";
+    pop.style.left=Math.max(8, Math.min(window.innerWidth-250, left))+"px";
   }
 }
 function wfGlobRow(v,idx,render){
@@ -2069,7 +2259,7 @@ function wfPortPt(nodeId,port){
 const WF_WIRE_DEFS = (function(){
   // Elongated filled chevron: 8×7.5 in userspace, notch at 22% depth.
   // refX=8 aligns the sharp tip exactly to the path endpoint.
-  const mk=(id,c)=>`<marker id="${id}" markerWidth="10" markerHeight="10" refX="8" refY="3.75" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0.6 L8,3.75 L0,6.9 L1.8,3.75 Z" fill="${c}" fill-opacity="0.95"/></marker>`;
+  const mk=(id,c)=>`<marker id="${id}" markerWidth="7" markerHeight="7" refX="5.6" refY="2.6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0.4 L5.6,2.6 L0,4.8 L1.3,2.6 Z" fill="${c}" fill-opacity="0.95"/></marker>`;
   return "<defs>"+mk("wf-ah","#9aaec2")+mk("wf-ah-h","#bb3a33")+mk("wf-ah-t","#25a05a")
     +mk("wf-ah-f","#d45f3a")+mk("wf-ah-loop","#d09030")+mk("wf-ah-temp","#2f6fed")+"</defs>";
 })();
@@ -2408,6 +2598,18 @@ function wfInitCanvas(){
   if(vadd) vadd.onclick=(e)=>{ e.stopPropagation(); wfAddQuickGlobal(); };
   const vmgr=$("wf-vars-mgr");
   if(vmgr) vmgr.onclick=(e)=>{ e.stopPropagation(); wfToggleGlobsEditor(); };
+  // Activities/Functions panel: tab switching + "+" add button + collapse.
+  document.querySelectorAll(".wf-act-tab").forEach(tab=>{
+    tab.onclick=(e)=>{ e.stopPropagation(); wfActTab(tab.dataset.tab); };
+  });
+  const aadd=$("wf-act-add");
+  if(aadd) aadd.onclick=(e)=>{ e.stopPropagation(); wfActAddCurrent(); };
+  const ahdr=document.querySelector("#wf-act-panel .wf-act-panel-hdr");
+  if(ahdr) ahdr.onclick=(e)=>{ if(e.target.closest(".wf-act-tab,.wf-act-add")) return; wfActCollapsed=!wfActCollapsed; wfToggleActPanel(); };
+  // Auto-layout buttons (bottom-left toolbar).
+  document.querySelectorAll(".wf-layout-btn").forEach(btn=>{
+    btn.onclick=(e)=>{ e.stopPropagation(); wfAutoLayout(btn.dataset.layout); };
+  });
   canvas.addEventListener("wheel",e=>{
     e.preventDefault();
     const r=canvas.getBoundingClientRect();
@@ -2735,6 +2937,40 @@ function wfVarValue(v){
   inp.oninput=()=>{ v.value = v.type==="number"?(parseFloat(inp.value)||0):inp.value; };
   return inp;
 }
+// ── Smart paste on coordinate fields ─────────────────────────────────────────
+// When the user pastes into an x/y/w/h input, detect a tuple on the clipboard
+// ("548, 1536" or "(327, 887, 394, 234)") and distribute the numbers across the
+// node's sibling fields in [x,y,w,h] order — so pasting a region fills all four
+// boxes at once. Only fires for number fields whose key is a coordinate.
+const WF_COORD_KEYS = ["x","y","w","h"];
+function wfAttachCoordPaste(node, f, inp){
+  if(f.t!=="num" || !WF_COORD_KEYS.includes(f.k)) return;
+  inp.addEventListener("paste", e=>{
+    const txt=(e.clipboardData||{}).getData("text") || "";
+    // Match 2-4 comma/space separated numbers, optionally wrapped in parens.
+    const m=txt.match(/^\s*\(?\s*(-?\d+(?:\.\d+)?)\s*[, ]+\s*(-?\d+(?:\.\d+)?)\s*(?:[, ]+\s*(-?\d+(?:\.\d+)?)\s*(?:[, ]+\s*(-?\d+(?:\.\d+)?)\s*)?)?\)?\s*$/);
+    if(!m) return;   // single number or non-numeric → let the native paste happen
+    e.preventDefault();
+    const nums=[m[1],m[2],m[3],m[4]].filter(v=>v!==undefined).map(parseFloat);
+    // Map numbers to coordinate keys by canonical order, only setting fields the
+    // node actually has (a tap node has x,y; an OCR node has x,y,w,h).
+    const def=WF_NODES[node.type];
+    const have=new Set((def&&def.fields||[]).filter(ff=>ff.t==="num"&&WF_COORD_KEYS.includes(ff.k)).map(ff=>ff.k));
+    nums.forEach((val,i)=>{ const key=WF_COORD_KEYS[i]; if(have.has(key)) node.params[key]=val; });
+    wfUpdNodeSum(node);
+    if(f.refresh) wfRenderCanvas();
+    // Refresh the visible inputs in the inspector so the pasted values show.
+    const body=$("wf-insp-body");
+    if(body){
+      WF_COORD_KEYS.forEach(key=>{
+        if(!have.has(key)) return;
+        const labEl=body.querySelector(`.wf-field > label[title="${key}"]`);
+        const inpEl=labEl&&labEl.parentNode.querySelector("input");
+        if(inpEl) inpEl.value=node.params[key];
+      });
+    }
+  });
+}
 function wfFieldEl(node,f){
   const row=document.createElement("div"); row.className="wf-field";
   const lab=document.createElement("label"); lab.textContent=f.lbl||f.k; lab.title=f.k; row.appendChild(lab);
@@ -2805,6 +3041,11 @@ function wfFieldEl(node,f){
   inp.type=f.t==="num"?"number":"text"; if(f.t==="num"&&f.step) inp.step=f.step;
   inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
   inp.oninput=()=>{ node.params[f.k]= f.t==="num"?(parseFloat(inp.value)||0):inp.value; wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); };
+  // Smart paste on coordinate fields (x/y/w/h): if the clipboard holds a tuple
+  // like "548, 1536" or "(327, 887, 394, 234)", split it across the sibling
+  // fields in canonical order [x,y,w,h] so pasting a region fills all four at
+  // once instead of dumping garbage into one box.
+  wfAttachCoordPaste(node, f, inp);
   row.appendChild(inp);
   if(f.t==="tpl"){
     inp.style.fontSize="10px";
