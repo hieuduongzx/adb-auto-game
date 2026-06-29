@@ -15,6 +15,7 @@ from src.utils import log_error, log_info, log_warning, log_normal, log_debug
 from ..controller import ADBController
 from .config import Config, PerformanceMetrics
 from .ocr import OCRReader, Region
+from .scrcpy_capture import capture_screen as capture_screen_frame, decode_screencap
 from .template_matcher import TemplateMatcher
 from .visualizer import DebugVisualizer
 
@@ -105,23 +106,18 @@ class ADBGameAutomation:
     @staticmethod
     def _decode_screencap(raw: Optional[bytes]) -> Optional[np.ndarray]:
         """Decode raw ``screencap`` PNG bytes into a BGR ndarray (or None)."""
-        if not raw:
-            return None
-        nparr = np.frombuffer(raw, np.uint8)
-        return cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        return decode_screencap(raw)
 
     def _continuous_capture_worker(self):
         """Background thread for continuous screen capture"""
         log_info("Starting continuous screen capture thread")
         while self.capture_running:
             try:
-                result = self.adb.capture_screen_raw()
-                if result:
-                    screen = self._decode_screencap(result)
-                    if screen is not None:
-                        with self.screen_lock:
-                            self.latest_screen = screen
-                    time.sleep(self.capture_interval)
+                screen = capture_screen_frame(self.adb, timeout=self.capture_interval)
+                if screen is not None:
+                    with self.screen_lock:
+                        self.latest_screen = screen
+                time.sleep(self.capture_interval)
             except Exception as e:
                 log_error(f"Error in capture thread: {e}")
                 time.sleep(self.capture_interval)
@@ -275,11 +271,7 @@ class ADBGameAutomation:
     def capture_screen(self) -> Optional[np.ndarray]:
         """Capture screen immediately"""
         try:
-            result = self.adb.capture_screen_raw()
-            if not result:
-                log_warning("Empty screencap result")
-                return None
-            image = self._decode_screencap(result)
+            image = capture_screen_frame(self.adb)
             if image is None:
                 log_error("Failed to decode screenshot")
                 return None

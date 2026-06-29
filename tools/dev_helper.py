@@ -47,6 +47,7 @@ import numpy as np
 import webview
 
 from src.core.adb import ADBController, DeviceScanner
+from src.core.adb.auto.scrcpy_capture import capture_screen as capture_screen_frame
 from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.utils import (
@@ -491,14 +492,9 @@ class DevHelperAPI:
 
     def _capture_worker(self) -> None:
         try:
-            raw = self.controller.capture_screen_raw()
-            if not raw:
-                self._push("capture_failed", {"error": "Empty screenshot"})
-                return
-            arr = np.frombuffer(raw, dtype=np.uint8)
-            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            img = capture_screen_frame(self.controller)
             if img is None:
-                self._push("capture_failed", {"error": "Failed to decode PNG"})
+                self._push("capture_failed", {"error": "Failed to capture screen"})
                 return
             h, w = img.shape[:2]
             self._screen = img
