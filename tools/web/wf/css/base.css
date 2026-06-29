@@ -255,6 +255,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 #log-card { flex-shrink: 0; display: flex; flex-direction: column; min-height: 100px; max-height: 155px; transition: min-height 0.2s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
 #log-card.collapsed { min-height: 33px; max-height: 33px; }
 #log-card.collapsed .log-hdr { border-bottom: none; border-radius: var(--r-md); }
+#log-card.collapsed .log-body { display: none; }
 .log-hdr  { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s4);
   border-bottom: 1px solid var(--border); flex-shrink: 0; cursor: pointer; user-select: none;
   transition: background .1s; border-radius: var(--r-md) var(--r-md) 0 0; }
