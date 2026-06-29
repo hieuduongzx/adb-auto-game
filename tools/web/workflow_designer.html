@@ -352,7 +352,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 .wf-act-cb.checked { background:var(--accent); border-color:var(--accent); }
 .wf-act-cb svg { opacity:0; } .wf-act-cb.checked svg { opacity:1; }
-.wf-act-del { color:var(--muted); font-size:14px; line-height:1; padding:0 3px; border-radius:4px; flex-shrink:0; }
+.wf-act-del { color:var(--muted); line-height:0; padding:3px; border-radius:4px; flex-shrink:0; display:flex; align-items:center; }
+.wf-act-del svg { width:12px; height:12px; display:block; }
 .wf-act-del:hover { color:var(--err); background:var(--err-bg); }
 .wf-act-grip { display:flex; align-items:center; justify-content:center; flex-shrink:0; width:11px;
   margin:-6px 0 -6px -4px; align-self:stretch; color:#c4cbd4; cursor:grab; }
@@ -361,17 +362,54 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-act.wf-dragging { opacity:.55; border-color:var(--accent); background:var(--accent-bg); }
 
 .wf-palette { display:flex; flex-direction:column; gap:3px; }
-.wf-pal-cat { font-size:9px; font-weight:700; letter-spacing:.05em; color:var(--muted); text-transform:uppercase; margin:5px 0 1px; }
+/* Category label: pill with color dot */
+.wf-pal-cat { display:flex; align-items:center; gap:5px; font-size:9px; font-weight:800;
+  letter-spacing:.04em; text-transform:uppercase; margin:7px 0 3px; padding:3px 7px;
+  border-radius:5px; color:var(--muted); }
+.wf-pal-cat::before { content:""; width:7px; height:7px; border-radius:2px; flex-shrink:0;
+  background:currentColor; display:block; }
+.wf-pal-cat.cat-basic { color:#2d64cc; background:#eef5ff; }
+.wf-pal-cat.cat-input { color:#4338ca; background:#eef0ff; }
+.wf-pal-cat.cat-image { color:#0f766e; background:#ecfdf9; }
+.wf-pal-cat.cat-ocr   { color:#c2610f; background:#fff7ed; }
+.wf-pal-cat.cat-flow  { color:#b45309; background:#fffbeb; }
+.wf-pal-cat.cat-logic { color:#6d28d9; background:#f5f3ff; }
+.wf-pal-cat.cat-misc  { color:#4b5563; background:#f3f4f6; }
 .wf-pal-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
 .wf-fn { cursor:pointer; }
-.wf-badge.fn { color:#7c3aed; background:#f3eefe; border:1px solid #e0d4fb; font-size:11px; padding:1px 6px; }
+.wf-badge.fn { display:inline-flex; align-items:center; justify-content:center; color:#fff;
+  background:#7c3aed; border:none; font-size:9.5px; font-weight:800;
+  padding:2px 5px; letter-spacing:.02em; border-radius:4px; min-width:16px; }
 .wf-chip { display:flex; align-items:center; gap:5px; padding:6px 7px; border:1px solid var(--border2);
-  border-radius:7px; background:var(--panel); cursor:grab; font-size:10.5px; font-weight:600; color:var(--ink2);
+  border-left-width:3px; border-radius:7px; background:var(--panel); cursor:grab;
+  font-size:10.5px; font-weight:600; color:var(--ink2);
   transition:border-color .1s, background .1s; user-select:none; }
-.wf-chip:hover { border-color:var(--accent); background:var(--accent-bg); }
+.wf-chip:hover { border-color:var(--accent); border-left-color:var(--accent); background:var(--accent-bg); }
 .wf-chip:active { cursor:grabbing; }
 .wf-chip .ico { display:flex; align-items:center; justify-content:center; width:14px; height:14px; }
 .wf-chip .ico svg { width:14px; height:14px; display:block; }
+/* Per-category chip accent: left edge colour + icon tint */
+.wf-chip.cat-basic { border-left-color:#6f9be8; }
+.wf-chip.cat-input { border-left-color:#818cf8; }
+.wf-chip.cat-image { border-left-color:#2fb0a3; }
+.wf-chip.cat-ocr   { border-left-color:#e0954b; }
+.wf-chip.cat-flow  { border-left-color:#e0a64b; }
+.wf-chip.cat-logic { border-left-color:#9a78e6; }
+.wf-chip.cat-misc  { border-left-color:#9aa6b4; }
+.wf-chip.cat-basic .ico { color:#2d64cc; }
+.wf-chip.cat-input .ico { color:#4338ca; }
+.wf-chip.cat-image .ico { color:#0f766e; }
+.wf-chip.cat-ocr   .ico { color:#c2610f; }
+.wf-chip.cat-flow  .ico { color:#b45309; }
+.wf-chip.cat-logic .ico { color:#6d28d9; }
+.wf-chip.cat-misc  .ico { color:#4b5563; }
+/* Function sidebar rows: purple tint + left border */
+.wf-act.wf-fn { border-left:3px solid #9a78e6; background:#faf7ff; }
+.wf-act.wf-fn:hover { background:#f3eefe; border-left-color:#7c3aed; }
+.wf-act.wf-fn.sel  { background:#ede8fc; border-left-color:#7c3aed; border-color:#c4b1f6; }
+/* Sidebar section header tints */
+.wf-side-sec:nth-child(1) > .wf-side-hdr { color:#6d28d9; }
+.wf-side-sec:nth-child(2) > .wf-side-hdr { color:#2d64cc; }
 
 /* Center: canvas */
 #wf-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
@@ -400,30 +438,33 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
    click without thickening the visible line. The visible wire is click-through. */
 #wf-wires .wire-hit { fill:none; stroke:transparent; stroke-width:18; pointer-events:stroke;
   cursor:pointer; stroke-linecap:round; }
-/* Default forward flow: a calm slate that recedes so true/false branches and the
-   run trail can pop. Slightly thinner than before for a cleaner dense graph. */
-#wf-wires path.wire { fill:none; stroke:#9aa9bd; stroke-width:2.2; pointer-events:none;
-  stroke-linecap:round; stroke-linejoin:round; marker-end:url(#wf-ah); transition:stroke .12s ease, stroke-width .12s ease; }
-/* Branch wires are a touch thicker + more saturated so the T/F fork reads first. */
-#wf-wires path.wire.t { stroke:#2fa55a; stroke-width:2.6; marker-end:url(#wf-ah-t); }
-#wf-wires path.wire.f { stroke:#cf6b43; stroke-width:2.6; marker-end:url(#wf-ah-f); }
-#wf-wires path.wire.stack { stroke:#b6c0cc; stroke-width:3; marker-end:none; }
-/* Loop-back wire (target = a loop's 'lặp' input) — dashed amber so the wire that
-   closes the loop reads differently from the forward flow. Drawn first so it sits
-   under the forward flow where they cross. */
-#wf-wires path.wire.loopback { stroke:#e0a64b; stroke-width:2.2; stroke-dasharray:7 5; marker-end:url(#wf-ah-loop); }
-/* Hovering the hit-path lifts the wire: brighter accent, slight weight gain, and a
-   refined hover arrowhead so the focused connection is unmistakable. */
-#wf-wires .wire-grp:hover path.wire { stroke:var(--accent); stroke-width:3.2; marker-end:url(#wf-ah-temp); }
-#wf-wires .wire-grp:hover { filter:drop-shadow(0 1px 2px rgba(47,111,237,.22)); }
+/* Default forward flow — thin neutral line that recedes into the background.
+   T/F branch wires and the run trail are thicker so they immediately pop. */
+#wf-wires path.wire { fill:none; stroke:#9aaec2; stroke-width:1.8; pointer-events:none;
+  stroke-linecap:round; stroke-linejoin:round; marker-end:url(#wf-ah);
+  stroke-opacity:0.75; transition:stroke .12s, stroke-width .12s, stroke-opacity .12s; }
+/* True/False branch wires: bolder and fully opaque — the decision fork is the
+   most information-dense part of the graph and must read first. */
+#wf-wires path.wire.t { stroke:#25a05a; stroke-width:2.3; stroke-opacity:1; marker-end:url(#wf-ah-t); }
+#wf-wires path.wire.f { stroke:#d45f3a; stroke-width:2.3; stroke-opacity:1; marker-end:url(#wf-ah-f); }
+/* Stack wire: structural, not a data flow — very faint dotted rule, no arrowhead. */
+#wf-wires path.wire.stack { stroke:#b8c6d4; stroke-width:1.4; stroke-opacity:0.45;
+  stroke-dasharray:2.5 3; marker-end:none; }
+/* Loop-back wire: amber dashed — "going back" reads visually different from forward flow. */
+#wf-wires path.wire.loopback { stroke:#d09030; stroke-width:2.0; stroke-opacity:0.9;
+  stroke-dasharray:9 5; marker-end:url(#wf-ah-loop); }
+/* Hover: lift the targeted wire sharply above the crowd — full opacity, accent colour,
+   modest weight gain (avoids a thick band that obscures nearby nodes). */
+#wf-wires .wire-grp:hover path.wire { stroke:var(--accent); stroke-width:2.8; stroke-opacity:1;
+  marker-end:url(#wf-ah-temp); }
+#wf-wires .wire-grp:hover { filter:drop-shadow(0 1px 4px rgba(47,111,237,.32)); }
 /* While wiring up a connection, wires ignore the pointer so the drop lands on the
    node underneath rather than being swallowed by a wire's hit-path. */
 #wf-canvas.wf-connecting .wire-hit { pointer-events:none; }
-/* Run trail on wires: the branch the engine took this run (green) vs the
-   true/false branch it skipped (red, dimmed). Override the static t/f colours. */
-#wf-wires path.wire.took-wire   { stroke:#2fa55a !important; stroke-width:3.4; marker-end:url(#wf-ah-t) !important; }
-#wf-wires path.wire.nottook-wire{ stroke:#cf4b43 !important; opacity:.5; stroke-width:2.4; marker-end:url(#wf-ah-f) !important; }
-#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:2.4; stroke-dasharray:6 4;
+/* Run trail on wires: the path taken (bright green) vs the skipped branch (faint red). */
+#wf-wires path.wire.took-wire    { stroke:#2fa55a !important; stroke-width:3.0; stroke-opacity:1 !important; marker-end:url(#wf-ah-t) !important; }
+#wf-wires path.wire.nottook-wire { stroke:#cf4b43 !important; stroke-opacity:.38 !important; stroke-width:1.8; marker-end:url(#wf-ah-f) !important; }
+#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:2.2; stroke-dasharray:6 4;
   stroke-linecap:round; pointer-events:none; marker-end:url(#wf-ah-temp); }
 #wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   color:var(--muted); font-size:12px; pointer-events:none; }
@@ -482,6 +523,10 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   border-radius:var(--node-r); box-shadow:var(--sh-md); user-select:none; }
 .wf-node.sel { border-color:var(--accent); border-top-color:var(--accent);
   box-shadow:0 0 0 2px var(--accent-bd), var(--sh-md); }
+.wf-node.wf-entry::before { content:"▶ mặc định"; position:absolute; bottom:100%; left:50%;
+  transform:translateX(-50%); margin-bottom:3px; font-size:8px; font-weight:800; letter-spacing:.04em;
+  color:var(--accent); background:var(--accent-bg); border:1px solid var(--accent-bd);
+  border-radius:4px; padding:1px 7px; white-space:nowrap; pointer-events:none; }
 /* Run trail: a node that finished this run (green = ran ok, red = action failed).
    Defined before .running so the live amber glow still wins on the active node. */
 .wf-node.ran-ok   { border-color:#2fa55a; box-shadow:0 0 0 1px #2fa55a, 0 2px 6px rgba(31,146,84,.18); }
@@ -530,7 +575,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   padding:0 4px 0 9px; border-radius:8px 8px 0 0; font-size:11px; font-weight:700; color:#fff;
   pointer-events:auto; cursor:move; white-space:nowrap; }
 .wf-group-name { overflow:hidden; text-overflow:ellipsis; }
-.wf-group-del { color:#fff; opacity:.8; font-size:14px; line-height:1; padding:0 2px; border-radius:4px; flex-shrink:0; cursor:pointer; }
+.wf-group-del { color:#fff; opacity:.85; line-height:0; padding:2px; border-radius:4px; flex-shrink:0; cursor:pointer; display:flex; align-items:center; }
+.wf-group-del svg { width:12px; height:12px; display:block; }
 .wf-group-del:hover { opacity:1; background:rgba(255,255,255,.25); }
 .wf-group-resize { position:absolute; right:-5px; bottom:-5px; width:14px; height:14px; cursor:nwse-resize; pointer-events:auto;
   border-right:2.5px solid currentColor; border-bottom:2.5px solid currentColor; border-bottom-right-radius:9px; opacity:.6; }
@@ -538,8 +584,11 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 /* Context menu */
 #wf-ctxmenu { position:fixed; z-index:50; display:none; min-width:140px; background:var(--panel);
   border:1px solid var(--border2); border-radius:8px; box-shadow:0 6px 22px rgba(20,30,45,.18); padding:4px; }
-.wf-ctx-item { padding:7px 10px; font-size:12px; color:var(--ink); border-radius:5px; cursor:pointer; white-space:nowrap; }
+.wf-ctx-item { padding:7px 10px; font-size:12px; color:var(--ink); border-radius:5px; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:8px; }
 .wf-ctx-item:hover { background:var(--accent-bg); color:var(--accent); }
+.wf-ctx-ico { display:flex; align-items:center; color:var(--muted); }
+.wf-ctx-ico svg { width:14px; height:14px; display:block; }
+.wf-ctx-item:hover .wf-ctx-ico { color:var(--accent); }
 /* The block the engine is on right now: a solid yellow "đang đợi / đang chạy"
    fill (not just a glow) so it's unmistakable even when other blocks already
    carry the green/red trail. Overrides ran-ok/ran-fail (defined earlier). */
@@ -586,18 +635,32 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .wf-selbox { position:absolute; border:1px solid var(--accent); background:rgba(47,111,237,.10); z-index:1; pointer-events:none; border-radius:2px; }
 .wf-node { cursor:grab; }
 .wf-node:active { cursor:grabbing; }
-/* Light-purple header band so the title row is clearly distinct from the white body. */
-.wf-node-hd { display:flex; align-items:center; gap:6px; padding:7px 9px; border-bottom:1px solid #ece3fb;
-  background:#f4eefe; border-radius:var(--node-r) var(--node-r) 0 0; }
+/* Node header: tinted per-category via --nhd-bg/--nhd-bd CSS vars; default keeps existing light-purple for uncategorised nodes. */
+.wf-node-hd { display:flex; align-items:center; gap:6px; padding:7px 9px;
+  border-bottom:1px solid var(--nhd-bd,#ece3fb); background:var(--nhd-bg,#f4eefe);
+  border-radius:var(--node-r) var(--node-r) 0 0; }
 .wf-node.collapsed .wf-node-hd { border-bottom:none; border-radius:var(--node-r); }
 .wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:15px; height:15px; }
 .wf-node .ico svg { width:15px; height:15px; display:block; }
 .wf-node.call .ico { font-style:italic; font-weight:700; }
-/* Purple title on the light-purple header band — clearly set apart from the body. */
-.wf-node-title { font-size:11.5px; font-weight:700; color:#7c3aed; flex:1; min-width:0;
+/* Node title: driven by --ntitle (set per-category); falls back to purple for structural kinds. */
+.wf-node-title { font-size:11.5px; font-weight:700; color:var(--ntitle,#7c3aed); flex:1; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Keep the title clear of the top-right "T"/"F" port labels on branch nodes. */
 .wf-node.has-tf .wf-node-title { padding-right:14px; }
+/* Per-category node header+title (action/condition nodes only — structural kinds keep own styling above) */
+.wf-node.cat-basic  { --nhd-bg:#eef5ff; --nhd-bd:#c5d8f5; --ntitle:#2d64cc; }
+.wf-node.cat-input  { --nhd-bg:#eef0ff; --nhd-bd:#c4c6f5; --ntitle:#4338ca; }
+.wf-node.cat-image  { --nhd-bg:#ecfdf9; --nhd-bd:#99e6d4; --ntitle:#0f766e; }
+.wf-node.cat-ocr    { --nhd-bg:#fff7ed; --nhd-bd:#fbc99a; --ntitle:#c2610f; }
+.wf-node.cat-flow   { --nhd-bg:#fffbeb; --nhd-bd:#f7d97e; --ntitle:#b45309; }
+.wf-node.cat-logic  { --nhd-bg:#f5f3ff; --nhd-bd:#d8c8f7; --ntitle:#6d28d9; }
+.wf-node.cat-misc   { --nhd-bg:#f3f4f6; --nhd-bd:#d1d5db; --ntitle:#374151; }
+/* Structural kinds that lack a cat class: give them matching header tints */
+.wf-node.loop       { --nhd-bg:#fff8ea; --nhd-bd:#f4d97a; --ntitle:#b45309; }
+.wf-node.call       { --nhd-bg:#f5f3ff; --nhd-bd:#d8c8f7; --ntitle:#6d28d9; }
+.wf-node.switch     { --nhd-bg:#f5f3ff; --nhd-bd:#d8c8f7; --ntitle:#6d28d9; }
+.wf-node.parallel   { --nhd-bg:#eef5ff; --nhd-bd:#c5d8f5; --ntitle:#2d64cc; }
 /* Validation badge: a node missing a template / not wired in shows an amber "!" so
    broken flows are obvious before you even run them. Hover for the reason(s). */
 .wf-node-warn { position:absolute; top:-8px; right:-8px; width:16px; height:16px; border-radius:50%;
@@ -612,7 +675,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 /* Runtime log line: text auto-emitted to the log panel each time this block runs. */
 .wf-node-log { font-size:9.5px; color:#2f6b8f; background:#eef6fb;
   border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:4px 9px; white-space:normal; word-break:break-word; }
-.wf-node-log::before { content:"📋 "; }
+.wf-node-log::before { content:""; display:inline-block; width:11px; height:11px; vertical-align:-1px; margin-right:4px; background:currentColor; -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; }
 
 /* Ports */
 .wf-port { position:absolute; width:13px; height:13px; border-radius:50%; background:var(--panel);
@@ -742,10 +805,10 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
         <button class="btn sm" onclick="wfZoomBy(1/1.1)" title="Thu nhỏ">−</button>
         <span id="wf-zoom-lbl" onclick="wfZoomReset()" title="Đặt lại 100%">100%</span>
         <button class="btn sm" onclick="wfZoomBy(1.1)" title="Phóng to">+</button>
-        <button class="btn sm" onclick="wfFit()" title="Vừa khung — hiện toàn bộ block (F)">⛶</button>
+        <button class="btn sm ico" onclick="wfFit()" title="Vừa khung — hiện toàn bộ block (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/></svg></button>
       </span>
       <span class="spacer"></span>
-      <span class="wf-hint" title="Cuộn chuột = zoom · Kéo = di chuyển khối · Chuột phải = menu (tạo nhóm/sao chép/xoá) hoặc xoá dây (trên dây nối) · Space hoặc chuột giữa = kéo nền">Cuộn = zoom · Kéo = di chuyển · Chuột phải = menu · ▢ = nhóm · Space = kéo nền</span>
+      <span class="wf-hint" title="Cuộn chuột = zoom · Kéo = di chuyển khối · Chuột phải = menu (tạo nhóm/sao chép/xoá) hoặc xoá dây (trên dây nối) · Space hoặc chuột giữa = kéo nền">Cuộn = zoom · Kéo = di chuyển · Chuột phải = menu · Space = kéo nền</span>
     </div>
     <div id="wf-canvas">
       <div id="wf-world">
@@ -758,7 +821,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
           <span class="wf-vars-actions">
             <span class="wf-vars-live" id="wf-vars-live">●</span>
             <button id="wf-vars-add" class="wf-vars-add" title="Thêm nhanh biến toàn cục">+</button>
-            <button id="wf-vars-mgr" class="wf-vars-add" title="Quản lý biến toàn cục">${wfIco("settings")}</button>
+            <button id="wf-vars-mgr" class="wf-vars-add" title="Quản lý biến toàn cục"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
           </span>
         </div>
         <div id="wf-vars-body" class="wf-vars-body"></div>
@@ -997,6 +1060,15 @@ window.addEventListener("keydown", e => {
   if((e.key==="a"||e.key==="A") && (e.ctrlKey||e.metaKey)){ const g=wfGraph(); if(g){ e.preventDefault(); WF.sel=g.nodes.map(n=>n.id); WF.selectedNode=null; wfMarkSel(); wfRenderInspector(); return; } }
   if((e.key==="f"||e.key==="F") && !e.ctrlKey && !e.metaKey){ e.preventDefault(); wfFit(); return; }
   if(e.key==="Escape"){ if(wfGroupMode) wfSetGroupMode(false); wfClearSel(); wfMarkSel(); wfRenderInspector(); }
+  if(e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown"){
+    if(WF.sel.length){ e.preventDefault();
+      const dx=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0;
+      const dy=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0;
+      const step=e.shiftKey?10:1;
+      const g=wfGraph(); if(g){ WF.sel.forEach(id=>{ const n=g.nodes.find(x=>x.id===id); if(n){ n.x+=dx*step; n.y+=dy*step; } }); wfRenderCanvas(); }
+    }
+    return;
+  }
 });
 window.addEventListener("keyup", e => { if(e.key===" ") wfSpace=false; });
 
@@ -1039,6 +1111,9 @@ const WF_ICONS = {
   calculator: '<rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="12" x2="8" y2="12"/><line x1="12" y1="12" x2="12" y2="12"/><line x1="16" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="12" y1="16" x2="12" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>',
   hash:       '<line x1="9" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="15" y2="21"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="3" y1="15" x2="19" y2="15"/>',
   git_branch: '<line x1="6" y1="3" x2="6" y2="21"/><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="9" r="2.5"/><path d="M18 11.5a6 6 0 0 1-6 6"/>',
+  git_merge:  '<circle cx="18" cy="18" r="2.5"/><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><line x1="6" y1="8.5" x2="6" y2="15.5"/><path d="M6 8.5a9 9 0 0 0 9 9"/>',
+  bell:       '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  scroll:     '<rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 7h6M9 11h6M9 15h4"/><path d="M17 14l2.5 2.5L17 19"/>',
   // misc
   rocket:     '<path d="M5 13c-2 1-3 4-3 7 3 0 6-1 7-3"/><path d="M14 4c3 1 6 4 6 8-2 2-5 3-9 3l-4-4c0-4 1-7 3-9z"/><circle cx="15" cy="9" r="1.4"/>',
   camera:     '<path d="M4 7h3l2-2h6l2 2h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="3.5"/>',
@@ -1083,19 +1158,20 @@ const WF_NODES = {
   key:        {label:"Phím",      ico:"disc",kind:"action",cat:"input", outs:["out"], fields:[{k:"keycode",t:"text",d:"BACK"}], sum:p=>`${p.keycode}`},
   back:       {label:"Back",      ico:"back",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"phím back"},
   home:       {label:"Home",      ico:"home",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"phím home"},
-  tap_image:  {label:"Chạm ảnh",  ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:5},{k:"delay",t:"num",d:0,step:.5},{k:"offsetX",lbl:"Lệch X",t:"num",d:0},{k:"offsetY",lbl:"Lệch Y",t:"num",d:0}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")+(p.delay?` ·chờ ${p.delay}s`:"")},
+  tap_image:  {label:"Chạm ảnh",  ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5},{k:"offsetX",lbl:"Lệch X",t:"num",d:0},{k:"offsetY",lbl:"Lệch Y",t:"num",d:0}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")+(p.delay?` ·chờ ${p.delay}s`:"")},
   wait_image: {label:"Chờ ảnh",   ico:"eye",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBase(p.template)+(p.delay?` ·chờ ${p.delay}s`:"")},
   if_image:   {label:"Nếu ảnh",   ico:"help",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}thấy ${wfBase(p.template)}`},
   // "…_any" = OR over several images: true when ANY listed template matches.
-  tap_image_any: {label:"Chạm 1 trong ảnh", ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:5},{k:"delay",t:"num",d:0,step:.5},{k:"offsetX",lbl:"Lệch X",t:"num",d:0},{k:"offsetY",lbl:"Lệch Y",t:"num",d:0}], sum:p=>wfBaseAny(p.templates)+(p.taps=="2"?" ×2":"")},
-  wait_image_any:{label:"Chờ 1 trong ảnh",  ico:"eye",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5}], sum:p=>wfBaseAny(p.templates)+(p.delay?` ·chờ ${p.delay}s`:"")},
-  if_image_any:  {label:"Nếu 1 trong ảnh",  ico:"layers",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}thấy ${wfBaseAny(p.templates)}`},
+  tap_image_any: {label:"Chạm 1 trong ảnh", ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5},{k:"mode",lbl:"Kiểu tìm",t:"select",opts:[{v:"sequential",t:"Tuần tự"},{v:"parallel",t:"Song song"}],d:"sequential"},{k:"offsetX",lbl:"Lệch X",t:"num",d:0},{k:"offsetY",lbl:"Lệch Y",t:"num",d:0}], sum:p=>wfBaseAny(p.templates)+(p.taps=="2"?" ×2":"")+(p.mode==="parallel"?" //":"")},
+  wait_image_any:{label:"Chờ 1 trong ảnh",  ico:"eye",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"delay",t:"num",d:0,step:.5},{k:"mode",lbl:"Kiểu tìm",t:"select",opts:[{v:"sequential",t:"Tuần tự"},{v:"parallel",t:"Song song"}],d:"sequential"}], sum:p=>wfBaseAny(p.templates)+(p.delay?` ·chờ ${p.delay}s`:"")+(p.mode==="parallel"?" //":"")},
+  if_image_any:  {label:"Nếu 1 trong ảnh",  ico:"layers",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"mode",lbl:"Kiểu tìm",t:"select",opts:[{v:"sequential",t:"Tuần tự"},{v:"parallel",t:"Song song"}],d:"sequential"}], sum:p=>`${p.negate?"không ":""}thấy ${wfBaseAny(p.templates)}${p.mode==="parallel"?" //":""}`},
   wait_text:  {label:"Chờ chữ",   ico:"scan_text",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10}], sum:p=>`"${p.text||""}"`},
   if_text:    {label:"Nếu chữ",   ico:"type",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}có "${p.text||""}"`},
   read_var:   {label:"Đọc → biến",ico:"search",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`→ ${p.name||"?"}`},
   parse_var:  {label:"Tách → biến",ico:"scissors",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"Vùng OCR"},{v:"var",t:"Từ biến"}],d:"region"},{k:"fromVar",lbl:"Biến nguồn",t:"text",d:"",var:true},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
-  loop:       {label:"Lặp lại",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"count",t:"num",d:3},{k:"infinite",t:"bool",d:false}], sum:p=>p.infinite?"∞ vô cực":`${p.count}×`},
-  parallel:   {label:"Song song", ico:"parallel",kind:"parallel",cat:"flow", outs:["1","2","3","done"], fields:[], sum:()=>"chạy 3 nhánh // → chờ gộp ở cổng 'gộp'"},
+  loop:       {label:"Lặp lại",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"count",t:"num",d:3},{k:"infinite",t:"bool",d:true}], sum:p=>p.infinite?"∞ vô cực":`${p.count}×`},
+  parallel:   {label:"Song song", ico:"parallel",kind:"parallel",cat:"flow", outs:[], fields:[{k:"count",lbl:"Số luồng",t:"num",d:3,refresh:true}], sum:p=>`${p.count||3} luồng song song`},
+  join:       {label:"Gộp",       ico:"git_merge",kind:"join",  cat:"flow", outs:["out"], fields:[], sum:()=>"chờ tất cả luồng → tiếp"},
   "break":    {label:"Thoát vòng",ico:"octagon",kind:"action",cat:"flow",  outs:["out"], fields:[], sum:()=>"break"},
   stop:       {label:"Dừng tất cả",ico:"octagon",kind:"stop", cat:"flow",  outs:[],      fields:[], sum:()=>"dừng phiên"},
   set_var:    {label:"Đặt biến",  ico:"pin",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name||"?"} = ${p.value}`},
@@ -1108,8 +1184,12 @@ const WF_NODES = {
   launch_app: {label:"Mở app",    ico:"rocket",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"package",t:"text"},{k:"wait",lbl:"Chờ mở (s)",t:"num",d:0}], sum:p=>(p.package||"(package)")+(p.wait?` ·chờ ${p.wait}s`:"")},
   screenshot: {label:"Chụp",      ico:"camera",kind:"action",cat:"misc",  outs:["out"], fields:[], sum:()=>"chụp màn hình"},
   log:        {label:"Ghi log",   ico:"log",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"message",t:"text"}], sum:p=>`"${p.message||""}"`},
-  note:       {label:"Ghi chú",   ico:"message",kind:"note",  cat:"misc",  outs:[],      fields:[{k:"text",t:"text",d:"ghi chú"}], sum:p=>p.text||""},
-  call:       {label:"Function",  ico:"function", kind:"call",  cat:null,    outs:["out"], fields:[]},
+  note:          {label:"Ghi chú",        ico:"message",  kind:"note",      cat:"misc",   outs:[],             fields:[{k:"text",t:"text",d:"ghi chú"}], sum:p=>p.text||""},
+  call:          {label:"Function",       ico:"function", kind:"call",      cat:null,     outs:["out"],        fields:[]},
+  scroll_find:   {label:"Kéo đến ảnh",   ico:"scroll",   kind:"condition", cat:"image",  outs:["true","false"],fields:[{k:"template",t:"tpl"},{k:"direction",lbl:"Hướng vuốt",t:"select",opts:[{v:"up",t:"↑ Lên"},{v:"down",t:"↓ Xuống"},{v:"left",t:"← Trái"},{v:"right",t:"→ Phải"}],d:"up"},{k:"max_swipes",lbl:"Tối đa vuốt",t:"num",d:10},{k:"swipe_distance",lbl:"Khoảng cách (px)",t:"num",d:400},{k:"threshold",t:"num",d:.85,step:.05},{k:"swipe_duration",lbl:"Thời gian vuốt (ms)",t:"num",d:300}], sum:p=>`${({"up":"↑","down":"↓","left":"←","right":"→"})[p.direction]||"↑"} ≤${p.max_swipes||10}× → ${wfBase(p.template)}`},
+  random_branch: {label:"Chọn ngẫu nhiên",ico:"dice",   kind:"random",    cat:"flow",   outs:[],              fields:[{k:"count",lbl:"Số nhánh",t:"num",d:2,refresh:true}], sum:p=>`🎲 ${p.count||2} nhánh đều nhau`},
+  format_var:    {label:"Định dạng chuỗi",ico:"type",   kind:"action",    cat:"logic",  outs:["out"],         fields:[{k:"name",lbl:"Biến đích",t:"text",d:"text",var:true},{k:"template",lbl:"Chuỗi mẫu",t:"text",d:"Vòng {round}/{total}"}], sum:p=>`${p.name||"?"} = "${p.template||""}"`},
+  notify:        {label:"Thông báo",      ico:"bell",   kind:"action",    cat:"misc",   outs:["out"],         fields:[{k:"title",lbl:"Tiêu đề",t:"text",d:"Workflow"},{k:"message",lbl:"Nội dung",t:"text",d:"Đã hoàn thành!"},{k:"sound",lbl:"Phát âm thanh",t:"bool",d:true}], sum:p=>`🔔 [${p.title||"Workflow"}] ${p.message||""}`},
 };
 const WF_CATS = [ {key:"basic",label:"Cơ bản"}, {key:"input",label:"Phím & Nhập liệu"}, {key:"image",label:"Hình ảnh"}, {key:"ocr",label:"Văn bản (OCR)"}, {key:"flow",label:"Luồng"}, {key:"logic",label:"Biến / Điều kiện"}, {key:"misc",label:"Khác"} ];
 const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"lặp", done:"xong", "1":"1", "2":"2", "3":"3" };
@@ -1268,17 +1348,27 @@ function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type
 function wfNewGraph(){ return { nodes:[{id:wfUid(),type:"start",x:60,y:70,params:{}}], edges:[], groups:[] }; }
 
 // ── Merge / stack blocks ─────────────────────────────────────────────────────
-// A "merged" block is a vertical stack of single-in/single-out nodes shown flush
-// and moved as one. Membership is a shared `node.stack` id; their order is the
-// REAL sequential edges between them, so the engine runs them in order with no
-// special-casing. Drop a block just above/below another to merge; right-click →
-// "Bỏ merge" to split. Only action/call nodes (one in, one out) can merge.
+// A "merged" block is a vertical stack of nodes shown flush and moved as one.
+// Membership is a shared `node.stack` id; their order is the REAL sequential
+// edges between them, so the engine runs them in order with no special-casing.
+// Drop a block just above/below another to merge; right-click → "Bỏ merge".
+// Supported: action, call, AND condition nodes. For condition nodes the "true"
+// (success) port is the sequential continuation; "false" stays free externally.
 const wfStackId=()=>"st"+Math.random().toString(36).slice(2,8);
-function wfMergeable(n){ const d=n&&WF_NODES[n.type]; return !!d && (d.kind==="action"||d.kind==="call"); }
+function wfMergeable(n){ const d=n&&WF_NODES[n.type]; return !!d && (d.kind==="action"||d.kind==="call"||d.kind==="condition"); }
+// Port used as the sequential "next" link inside a merged stack.
+// Condition nodes continue via their "true" (success) branch; everything else uses "out".
+function wfMergeOutPort(n){ const d=n&&WF_NODES[n.type]; return (d&&d.kind==="condition")?"true":"out"; }
 function wfStackMembers(sid){ const g=wfGraph(); return g?g.nodes.filter(n=>n.stack===sid):[]; }
 function wfSameStack(aId,bId){ const a=wfNode(aId),b=wfNode(bId); return !!(a&&b&&a.stack&&a.stack===b.stack); }
 function wfHasInternalIn(n){ const g=wfGraph(); return !!(g&&n.stack&&g.edges.some(e=>e.to===n.id&&wfSameStack(e.from,e.to))); }
-function wfHasInternalOut(n){ const g=wfGraph(); return !!(g&&n.stack&&g.edges.some(e=>e.from===n.id&&wfSameStack(e.from,e.to))); }
+// Check only the merge-out port so a condition node with a free "false" edge
+// is not incorrectly treated as "already has a successor".
+function wfHasInternalOut(n){
+  const g=wfGraph(); if(!g||!n.stack) return false;
+  const fp=wfMergeOutPort(n);
+  return g.edges.some(e=>e.from===n.id&&(e.fromPort||"out")===fp&&wfSameStack(e.from,e.to));
+}
 function wfStackChain(sid){
   const g=wfGraph(); if(!g) return [];
   const members=g.nodes.filter(n=>n.stack===sid); if(!members.length) return [];
@@ -1314,15 +1404,17 @@ function wfMergeInsert(dragId, targetId, where){
   const D=wfNode(dragId), T=wfNode(targetId); if(!D||!T) return;
   g.edges=g.edges.filter(e=>e.from!==dragId&&e.to!==dragId);   // D starts free
   const sid=T.stack||wfStackId(); T.stack=sid; D.stack=sid;
+  const tfp=wfMergeOutPort(T), dfp=wfMergeOutPort(D);
   if(where==="after"){
-    const oe=g.edges.find(e=>e.from===targetId);              // T's old successor
+    // Find the edge from T's sequential-exit port specifically (not any port).
+    const oe=g.edges.find(e=>e.from===targetId&&(e.fromPort||"out")===tfp);
     const tgt=oe?oe.to:null, tgtPort=oe?(oe.toPort||"in"):"in";
     if(oe) g.edges=g.edges.filter(e=>e!==oe);
-    g.edges.push({from:targetId,fromPort:"out",to:dragId,toPort:"in"});
-    if(tgt&&tgt!==dragId) g.edges.push({from:dragId,fromPort:"out",to:tgt,toPort:tgtPort});
+    g.edges.push({from:targetId,fromPort:tfp,to:dragId,toPort:"in"});
+    if(tgt&&tgt!==dragId) g.edges.push({from:dragId,fromPort:dfp,to:tgt,toPort:tgtPort});
   } else {
     g.edges.filter(e=>e.to===targetId&&(e.toPort||"in")==="in").forEach(e=>{ e.to=dragId; });
-    g.edges.push({from:dragId,fromPort:"out",to:targetId,toPort:"in"});
+    g.edges.push({from:dragId,fromPort:dfp,to:targetId,toPort:"in"});
   }
   wfSelectOne(dragId); wfRenderCanvas(); wfRenderInspector();
   setStatus("Đã gộp khối");
@@ -1437,7 +1529,7 @@ function wfRenderActivities(){
        <span class="wf-act-cb ${act.enabled?"checked":""}">${check}</span>
        <span class="wf-badge ${act.type==="background"?"bg":"seq"}">${act.type==="background"?"NỀN":"TUẦN TỰ"}</span>
        <span class="wf-act-name">${escHtml(act.name)}</span>
-       <button class="wf-act-del" title="Xoá">×</button>`;
+       <button class="wf-act-del" title="Xoá">${wfIco("x")}</button>`;
     el.querySelector(".wf-act-cb").addEventListener("click",e=>wfToggleActivity(act.id,e));
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteActivity(act.id,e));
     el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-cb,.wf-act-del,.wf-act-grip"))return; wfSelectActivity(act.id); });
@@ -1458,7 +1550,7 @@ function wfRenderFunctions(){
       `<span class="wf-act-grip" title="Kéo ra canvas để dùng / kéo đổi thứ tự">${WF_GRIP}</span>
        <span class="wf-badge fn">ƒ</span>
        <span class="wf-act-name">${escHtml(fn.name)}</span>
-       <button class="wf-act-del" title="Xoá function">×</button>`;
+       <button class="wf-act-del" title="Xoá function">${wfIco("x")}</button>`;
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteFunction(fn.id,e));
     el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-del,.wf-act-grip"))return; wfEditFunction(fn.id); });
     wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.functions, "call:"+fn.id);
@@ -1532,16 +1624,17 @@ function wfRenderPalette(){
   WF_CATS.forEach(cat=>{
     const types=Object.keys(WF_NODES).filter(t=>WF_NODES[t].cat===cat.key);
     if(!types.length) return;
-    const hdr=document.createElement("div"); hdr.className="wf-pal-cat"; hdr.textContent=cat.label; pal.appendChild(hdr);
+    const hdr=document.createElement("div"); hdr.className="wf-pal-cat cat-"+cat.key; hdr.textContent=cat.label; pal.appendChild(hdr);
     const grid=document.createElement("div"); grid.className="wf-pal-grid";
-    types.forEach(type=>grid.appendChild(wfChip(WF_NODES[type].ico, WF_NODES[type].label, type)));
+    types.forEach(type=>grid.appendChild(wfChip(WF_NODES[type].ico, WF_NODES[type].label, type, cat.key)));
     pal.appendChild(grid);
   });
   // Function calls live in the Function list at the top of the sidebar — drag a
   // row from there straight onto the canvas to insert a call node.
 }
-function wfChip(ico,label,dragType){
-  const chip=document.createElement("div"); chip.className="wf-chip"; chip.draggable=true;
+function wfChip(ico,label,dragType,catKey){
+  const chip=document.createElement("div");
+  chip.className="wf-chip"+(catKey?" cat-"+catKey:""); chip.draggable=true;
   chip.innerHTML=`<span class="ico">${wfIco(ico)}</span>${escHtml(label)}`;
   chip.addEventListener("dragstart",e=>{ wfPaletteDrag=dragType; e.dataTransfer.effectAllowed="copy"; try{e.dataTransfer.setData("text/plain",dragType);}catch{} });
   chip.addEventListener("dragend",()=>{ wfPaletteDrag=null; });
@@ -1558,6 +1651,7 @@ function wfRenderCanvas(){
   g.nodes.forEach(n=>world.appendChild(wfNodeEl(n)));
   wfReflowStacks();   // snap merged blocks flush (needs nodes in the DOM)
   wfDrawWires();
+  wfMarkDefaultEntry();  // pill above the block that start.out points to
   if(wfRunning||wfRunStopped) wfReapplyRunViz();   // keep the run-trail across redraws (live + after stop)
   wfRenderVarsPanel();
 }
@@ -1745,7 +1839,7 @@ function wfNodeWarnings(n, def, g){
   return w;
 }
 function wfNodeEl(n){
-  const def=WF_NODES[n.type]||{label:n.type,ico:"?",kind:"action",outs:["out"],fields:[]};
+  const def=WF_NODES[n.type]||{label:n.type,ico:"help",kind:"action",outs:["out"],fields:[]};
   const el=document.createElement("div");
   // Category tint (only for the bulk action/condition blocks — structural kinds
   // start/end/stop/loop/call/note keep their own distinct styling).
@@ -1817,6 +1911,7 @@ function wfNodeEl(n){
   let outs;
   if(intOut) outs=[];
   else if(n.type==="switch") outs=((n.params&&n.params.cases)||[]).map((_,i)=>"c"+i).concat(["default"]);
+  else if(n.type==="parallel"||n.type==="random_branch") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||(n.type==="parallel"?3:2))},(_,i)=>String(i+1));
   else outs=(def.outs||[]);
   outs.forEach((port,i)=>{
     const top = outs.length<=1 ? 9 : 9 + i*19;
@@ -1826,8 +1921,8 @@ function wfNodeEl(n){
     el.appendChild(op);
     let lblTxt;
     if(n.type==="switch") lblTxt = (port==="default") ? "khác" : "#"+(i+1);
-    // Parallel's "done" port is the JOIN point — wait all branches, then continue.
-    else lblTxt = (n.type==="parallel"&&port==="done") ? "gộp" : WF_PORT_LBL[port];
+    else if(n.type==="parallel"||n.type==="random_branch") lblTxt = port;
+    else lblTxt = WF_PORT_LBL[port];
     if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+1)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl); }
   });
   // Validation badge (missing template / not wired in) so broken flows show before a run.
@@ -1969,38 +2064,54 @@ function wfPortPt(nodeId,port){
 // Compact chevrons (not chunky triangles) so they read as direction hints, not
 // dots. Re-inserted on every full redraw because wfDrawWires clears the <svg>.
 const WF_WIRE_DEFS = (function(){
-  // A slim filled chevron: 7 wide × 6 tall, anchored just past the line tip.
-  const mk=(id,c)=>`<marker id="${id}" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0.6 L6,3 L0,5.4 L1.8,3 Z" fill="${c}"/></marker>`;
-  return "<defs>"+mk("wf-ah","#9aa9bd")+mk("wf-ah-h","#bb3a33")+mk("wf-ah-t","#2fa55a")
-    +mk("wf-ah-f","#cf6b43")+mk("wf-ah-loop","#e0a64b")+mk("wf-ah-temp","#2f6fed")+"</defs>";
+  // Elongated filled chevron: 8×7.5 in userspace, notch at 22% depth.
+  // refX=8 aligns the sharp tip exactly to the path endpoint.
+  const mk=(id,c)=>`<marker id="${id}" markerWidth="10" markerHeight="10" refX="8" refY="3.75" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0.6 L8,3.75 L0,6.9 L1.8,3.75 Z" fill="${c}" fill-opacity="0.95"/></marker>`;
+  return "<defs>"+mk("wf-ah","#9aaec2")+mk("wf-ah-h","#bb3a33")+mk("wf-ah-t","#25a05a")
+    +mk("wf-ah-f","#d45f3a")+mk("wf-ah-loop","#d09030")+mk("wf-ah-temp","#2f6fed")+"</defs>";
 })();
 // ── Wire routing ──────────────────────────────────────────────────────────────
-// Three regimes, picked by the relative position of the ports:
-//   1. Forward (target to the right, ~same row): a horizontal S-curve whose
-//      curvature is CAPPED so a long wire stays a gentle arc, not a flat line.
-//   2. Vertical-ish (target below/above, near-same x): a vertical S-curve so the
-//      wire bends down/up naturally instead of looping sideways.
-//   3. Backward (target to the left, e.g. a loop-back): a wide bow that arcs
-//      toward the emptier side (below when target is higher, above when lower)
-//      so it routes around nodes instead of cutting through them.
+// Three regimes ordered by a single invariant:
+//   • Forward (dx ≥ 0): horizontal S-curve.
+//       KEY RULE: hx ≤ dx/2. When this is violated the two control points cross
+//       each other → the bezier folds back on itself → the "spiral" artefact.
+//       At small dx the wire becomes a nearly-straight line, which is correct.
+//   • Near-vertical (|dx| < 55 AND dy is the dominant dimension): vertical
+//       S-curve so the wire exits/arrives straight down instead of diagonal.
+//       Only fires when ady > adx*1.8 to avoid false-triggering on diagonal wires.
+//   • Backward (dx < 0, not near-vertical): U-bow sized by the actual span
+//       between the two ports so close nodes get a tight arc and far nodes a
+//       wide one — avoids the "huge arch over two adjacent blocks" problem.
 function wfBezier(a,b){
-  const dx=b.x-a.x, dy=b.y-a.y;
-  // Backward / loop-back: bow around the nodes, away from the midline.
-  if(dx < -20){
-    const off=Math.min(140, Math.max(60, Math.abs(dx)*0.35));
-    // Bow downward when the target sits above the source (loop-back up), upward
-    // when the target sits below — keeps the arc on the outer, emptier side.
-    const sign = dy < 0 ? 1 : -1;
-    const bow=Math.max(80, Math.abs(dy)*0.5 + 70);
-    return `M${a.x},${a.y} C${a.x+off},${a.y+sign*bow} ${b.x-off},${b.y+sign*bow} ${b.x},${b.y}`;
+  const dx=b.x-a.x, dy=b.y-a.y, adx=Math.abs(dx), ady=Math.abs(dy);
+
+  // ── Near-vertical (applies to both forward and slightly-backward) ───────────
+  // Condition: small horizontal gap AND vertical is the dominant direction.
+  if(adx < 55 && ady > adx * 1.8){
+    const h=Math.max(48, ady * 0.44);
+    const ys=Math.sign(dy)||1;
+    return `M${a.x},${a.y} C${a.x},${a.y+ys*h} ${b.x},${b.y-ys*h} ${b.x},${b.y}`;
   }
-  // Vertical-ish: target nearly straight below/above → route vertically.
-  if(Math.abs(dx) < 24){
-    const dy2=Math.max(45, Math.abs(dy)*0.5);
-    return `M${a.x},${a.y} C${a.x},${a.y+Math.sign(dy)*dy2} ${b.x},${b.y-Math.sign(dy)*dy2} ${b.x},${b.y}`;
+
+  // ── Backward: U-bow ─────────────────────────────────────────────────────────
+  if(dx < 0){
+    // hx: horizontal kick from each port before the bow starts.
+    const hx=Math.min(155, Math.max(42, adx * 0.38 + 28));
+    // bow: perpendicular offset, scaled by the diagonal span so adjacent nodes
+    // get a tight arc and far-apart nodes get a wide, comfortable arc.
+    const span=Math.hypot(adx, ady);
+    const bow=Math.min(195, Math.max(48, span * 0.44 + 36));
+    // Bow away from the midline: downward when target is above, upward when below.
+    const bowSign=dy < 0 ? 1 : -1;
+    return `M${a.x},${a.y} C${a.x+hx},${a.y+bowSign*bow} ${b.x-hx},${b.y+bowSign*bow} ${b.x},${b.y}`;
   }
-  // Forward S-curve: cap the horizontal handle so long wires keep a real arc.
-  const hx=Math.min(120, Math.max(40, Math.abs(dx)*0.5));
+
+  // ── Forward S-curve ─────────────────────────────────────────────────────────
+  // hx is capped at dx/2 (hard invariant: prevents crossing = prevents spirals).
+  // Below that cap it scales with dx + a small ady contribution so the wire
+  // exits horizontally even when the target is far below/above.
+  const preferred=dx * 0.46 + ady * 0.06;
+  const hx=Math.min(dx / 2, Math.min(170, Math.max(dx * 0.28, preferred)));
   return `M${a.x},${a.y} C${a.x+hx},${a.y} ${b.x-hx},${b.y} ${b.x},${b.y}`;
 }
 function wfDrawWires(){
@@ -2103,7 +2214,7 @@ function wfRenderGroups(){
     const el=document.createElement("div"); el.className="wf-group"; el.dataset.group=gr.id;
     el.style.left=gr.x+"px"; el.style.top=gr.y+"px"; el.style.width=gr.w+"px"; el.style.height=gr.h+"px";
     el.style.borderColor=c.b; el.style.background=c.bg; el.style.color=c.b;
-    el.innerHTML=`<div class="wf-group-hd" style="background:${c.b}"><span class="wf-group-name">${escHtml(gr.name)}</span><button class="wf-group-del" title="Xoá nhóm (giữ lại các node)">×</button></div><div class="wf-group-resize"></div>`;
+    el.innerHTML=`<div class="wf-group-hd" style="background:${c.b}"><span class="wf-group-name">${escHtml(gr.name)}</span><button class="wf-group-del" title="Xoá nhóm (giữ lại các node)">${wfIco("x")}</button></div><div class="wf-group-resize"></div>`;
     world.insertBefore(el, svg);   // behind the wires + nodes
     const hd=el.querySelector(".wf-group-hd");
     hd.addEventListener("mousedown",e=>wfStartGroupMove(e,gr));
@@ -2128,7 +2239,7 @@ function wfStartGroupResize(e,gr){
 function wfStartMove(e,n){
   if(e.button!==0||e.target.closest(".wf-port,.wf-node-eye")) return;
   e.stopPropagation();
-  if(e.shiftKey){ wfToggleSel(n.id); wfMarkSel(); wfRenderInspector(); return; }
+  if(e.shiftKey||e.ctrlKey){ wfToggleSel(n.id); wfMarkSel(); wfRenderInspector(); return; }
   let ids;
   if(WF.sel.length>1 && WF.sel.includes(n.id)){
     ids=WF.sel.slice();              // move the whole multi-selection together
@@ -2140,7 +2251,7 @@ function wfStartMove(e,n){
   wfMarkSel(); wfRenderInspector();
   const g=wfGraph(); if(!g) return;
   const items=ids.map(id=>{ const nn=g.nodes.find(x=>x.id===id); return nn?{id,ox:nn.x,oy:nn.y}:null; }).filter(Boolean);
-  wfGesture={mode:"move",items,sx:e.clientX,sy:e.clientY,dragId:n.id};
+  wfGesture={mode:"move",items,sx:e.clientX,sy:e.clientY,dragId:n.id,mergeOk:e.ctrlKey};
 }
 function wfStartConnect(e,nodeId,port){
   if(e.button!==0) return; e.stopPropagation(); e.preventDefault();
@@ -2218,6 +2329,27 @@ function wfToggleGroupMode(){
   if(!wfGroupMode && WF.sel.length>0){ wfGroupSelection(); return; }
   wfSetGroupMode(!wfGroupMode);
 }
+// ── Default entry block ───────────────────────────────────────────────────────
+// "Set as default" rewires start.out to point at the chosen block.
+// The visual pill (::before) is applied after every canvas render.
+function wfSetAsDefault(nodeId){
+  const g=wfGraph(); if(!g) return;
+  const n=wfNode(nodeId); if(!n||n.type==="start") return;
+  const startNode=g.nodes.find(nd=>nd.type==="start"); if(!startNode) return;
+  g.edges=g.edges.filter(e=>!(e.from===startNode.id&&(e.fromPort||"out")==="out"));
+  g.edges.push({from:startNode.id,fromPort:"out",to:nodeId,toPort:"in"});
+  wfRenderCanvas();
+  setStatus("Đã đặt làm block mặc định");
+}
+function wfMarkDefaultEntry(){
+  document.querySelectorAll(".wf-node.wf-entry").forEach(el=>el.classList.remove("wf-entry"));
+  const g=wfGraph(); if(!g) return;
+  const startNode=g.nodes.find(nd=>nd.type==="start"); if(!startNode) return;
+  const e=g.edges.find(ed=>ed.from===startNode.id&&(ed.fromPort||"out")==="out");
+  if(!e||!e.to) return;
+  const target=wfNodeElById(e.to); if(target) target.classList.add("wf-entry");
+}
+
 // ── Right-click context menu (group / copy / delete) ──────────────────────────
 function wfHideMenu(){ const m=$("wf-ctxmenu"); if(m) m.style.display="none"; }
 function wfShowMenu(clientX, clientY){
@@ -2225,16 +2357,18 @@ function wfShowMenu(clientX, clientY){
   const items=[];
   const copyable=WF.sel.filter(id=>{ const n=wfNode(id); return n && n.type!=="start"; }).length;
   const stackSids=[...new Set(WF.sel.map(id=>{ const n=wfNode(id); return n&&n.stack; }).filter(Boolean))];
-  if(stackSids.length) items.push({label:"⛓ Bỏ merge", fn:()=>stackSids.forEach(wfUnmerge)});
-  if(WF.sel.length>=1) items.push({label:"▢ Tạo nhóm quanh ("+WF.sel.length+")", fn:wfGroupSelection});
-  if(copyable){ items.push({label:"⎘ Sao chép ("+copyable+")", fn:wfCopy});
-    items.push({label:"✂ Cắt ("+copyable+")", fn:wfCut});
-    items.push({label:"⧉ Nhân đôi ("+copyable+")", fn:wfDuplicate}); }
-  if(wfClipboard&&wfClipboard.nodes.length) items.push({label:"📋 Dán ("+wfClipboard.nodes.length+")", fn:()=>wfPaste({clientX,clientY})});
-  if(WF.sel.length) items.push({label:"🗑 Xoá ("+WF.sel.length+")", fn:()=>wfDeleteSelected()});
+  if(WF.sel.length===1){ const _n=wfNode(WF.sel[0]); if(_n&&_n.type!=="start") items.push({ico:"play",label:"Đặt làm mặc định", fn:()=>wfSetAsDefault(WF.sel[0])}); }
+  if(stackSids.length) items.push({ico:"link_off",label:"Bỏ merge", fn:()=>stackSids.forEach(wfUnmerge)});
+  if(WF.sel.length>=1) items.push({ico:"box",label:"Tạo nhóm quanh ("+WF.sel.length+")", fn:wfGroupSelection});
+  if(copyable){ items.push({ico:"copy",label:"Sao chép ("+copyable+")", fn:wfCopy});
+    items.push({ico:"scissors",label:"Cắt ("+copyable+")", fn:wfCut});
+    items.push({ico:"copy",label:"Nhân đôi ("+copyable+")", fn:wfDuplicate}); }
+  if(wfClipboard&&wfClipboard.nodes.length) items.push({ico:"clipboard",label:"Dán ("+wfClipboard.nodes.length+")", fn:()=>wfPaste({clientX,clientY})});
+  if(WF.sel.length) items.push({ico:"trash",label:"Xoá ("+WF.sel.length+")", fn:()=>wfDeleteSelected()});
   if(!items.length){ wfHideMenu(); return; }
   m.innerHTML="";
-  items.forEach(it=>{ const d=document.createElement("div"); d.className="wf-ctx-item"; d.textContent=it.label;
+  items.forEach(it=>{ const d=document.createElement("div"); d.className="wf-ctx-item";
+    d.innerHTML=`<span class="wf-ctx-ico">${wfIco(it.ico||"help")}</span>${escHtml(it.label)}`;
     d.onclick=()=>{ wfHideMenu(); it.fn(); }; m.appendChild(d); });
   const cr=$("wf-canvas").getBoundingClientRect();
   m.style.left=(clientX)+"px"; m.style.top=(clientY)+"px"; m.style.display="block";
@@ -2243,7 +2377,7 @@ function wfShowMenu(clientX, clientY){
 function wfShowWireMenu(clientX, clientY, ed){
   const m=$("wf-ctxmenu"); if(!m) return;
   m.innerHTML="";
-  const d=document.createElement("div"); d.className="wf-ctx-item"; d.textContent="🗑 Xoá dây nối";
+  const d=document.createElement("div"); d.className="wf-ctx-item"; d.innerHTML=`<span class="wf-ctx-ico">${wfIco("trash")}</span>Xoá dây nối`;
   d.onclick=()=>{ wfHideMenu(); wfDeleteWire(ed); }; m.appendChild(d);
   m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
 }
@@ -2306,15 +2440,20 @@ function wfInitCanvas(){
         if(el){ el.style.left=n.x+"px"; el.style.top=n.y+"px"; }
       });
       wfDrawWires();
-      if(wfGesture.items.length===1) wfShowMergeHint(wfGesture.dragId);  // preview snap target
+      wfGesture.mergeOk=e.ctrlKey;  // live-track Ctrl so user can press it mid-drag
+      if(wfGesture.items.length===1 && wfGesture.mergeOk) wfShowMergeHint(wfGesture.dragId);
+      else wfClearMergeHint();
     } else if(wfGesture.mode==="groupmove"){
       // Move the frame + every node that was inside it when the drag began.
+      // Snap the group frame first, then apply the same snapped delta to members
+      // so the whole group moves on-grid when snapping is on.
       const gr=wfGesture.gr;
-      const dx=(e.clientX-wfGesture.sx)/wfZoom, dy=(e.clientY-wfGesture.sy)/wfZoom;
-      gr.x=Math.round(wfGesture.gx+dx); gr.y=Math.round(wfGesture.gy+dy);
+      gr.x=wfSnap(wfGesture.gx+(e.clientX-wfGesture.sx)/wfZoom);
+      gr.y=wfSnap(wfGesture.gy+(e.clientY-wfGesture.sy)/wfZoom);
+      const sdx=gr.x-wfGesture.gx, sdy=gr.y-wfGesture.gy;
       const gel=document.querySelector(`.wf-group[data-group="${gr.id}"]`);
       if(gel){ gel.style.left=gr.x+"px"; gel.style.top=gr.y+"px"; }
-      wfGesture.members.forEach(m=>{ const n=wfNode(m.id); if(!n) return; n.x=m.ox+dx; n.y=m.oy+dy;
+      wfGesture.members.forEach(m=>{ const n=wfNode(m.id); if(!n) return; n.x=m.ox+sdx; n.y=m.oy+sdy;
         const el=document.querySelector(`.wf-node[data-node="${m.id}"]`); if(el){ el.style.left=n.x+"px"; el.style.top=n.y+"px"; } });
       wfDrawWires();
     } else if(wfGesture.mode==="groupresize"){
@@ -2368,7 +2507,7 @@ function wfInitCanvas(){
       // Dropping a single lone block flush above/below another merges them.
       wfClearMergeHint();
       const moved=Math.abs(e.clientX-wfGesture.sx)+Math.abs(e.clientY-wfGesture.sy)>3;
-      if(moved && wfGesture.items.length===1) wfTryMerge(wfGesture.dragId);
+      if(moved && wfGesture.items.length===1 && wfGesture.mergeOk) wfTryMerge(wfGesture.dragId);
     } else if(wfGesture.mode==="pan"){
       $("wf-canvas").classList.remove("panning");
     }
@@ -2398,12 +2537,37 @@ function wfBoxSelectMove(e){
 function wfRenderInspector(){
   const body=$("wf-insp-body"); body.innerHTML="";
   wfRenderVarsPanel();   // the vars list depends on the current activity
-  // Multi-selection: show a count + bulk delete instead of one node's params.
+  // Multi-selection: show count, node list, alignment tools, and bulk actions.
   if(WF.sel.length>1){
-    const h=document.createElement("div"); h.className="wf-insp-sec"; h.textContent=`${WF.sel.length} node được chọn`; body.appendChild(h);
-    const btn=document.createElement("button"); btn.className="btn sm err"; btn.textContent="Xoá các node đã chọn";
-    btn.onclick=()=>wfDeleteSelected(); body.appendChild(btn);
-    const tip=document.createElement("div"); tip.className="wf-insp-empty"; tip.textContent="Kéo một node để di chuyển cả nhóm. Phím Delete để xoá."; body.appendChild(tip);
+    const g=wfGraph();
+    const selNodes=g?WF.sel.map(id=>g.nodes.find(n=>n.id===id)).filter(Boolean):[];
+    // Header
+    const h=document.createElement("div"); h.className="wf-insp-sec";
+    h.textContent=`${WF.sel.length} block được chọn`; body.appendChild(h);
+    // Selected node name list (truncated at 6)
+    const list=document.createElement("div"); list.style.cssText="display:flex;flex-direction:column;gap:2px;margin:4px 0 8px;";
+    selNodes.slice(0,6).forEach(n=>{ const def=WF_NODES[n.type]||{}; const row=document.createElement("div"); row.style.cssText="font-size:11px;color:var(--muted);padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"; row.textContent=(def.label||n.type)+(n.label?` · ${n.label}`:""); list.appendChild(row); });
+    if(selNodes.length>6){ const more=document.createElement("div"); more.style.cssText="font-size:10px;color:var(--muted);padding:1px 4px;"; more.textContent=`+${selNodes.length-6} nữa…`; list.appendChild(more); }
+    body.appendChild(list);
+    // Align buttons
+    const alignSec=document.createElement("div"); alignSec.className="wf-insp-sec"; alignSec.textContent="Căn chỉnh"; body.appendChild(alignSec);
+    const alignRow=document.createElement("div"); alignRow.style.cssText="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;";
+    const mkAlign=(lbl,fn)=>{ const b=document.createElement("button"); b.className="btn sm"; b.textContent=lbl; b.title=lbl; b.onclick=fn; return b; };
+    alignRow.appendChild(mkAlign("← Trái", ()=>{ if(!g||!selNodes.length) return; const minX=Math.min(...selNodes.map(n=>n.x)); selNodes.forEach(n=>n.x=minX); wfRenderCanvas(); }));
+    alignRow.appendChild(mkAlign("→ Phải",()=>{ if(!g||!selNodes.length) return; const maxX=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=maxX-(el?el.offsetWidth:158); }); wfRenderCanvas(); }));
+    alignRow.appendChild(mkAlign("↑ Trên", ()=>{ if(!g||!selNodes.length) return; const minY=Math.min(...selNodes.map(n=>n.y)); selNodes.forEach(n=>n.y=minY); wfRenderCanvas(); }));
+    alignRow.appendChild(mkAlign("↓ Dưới",()=>{ if(!g||!selNodes.length) return; const maxY=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=maxY-(el?el.offsetHeight:46); }); wfRenderCanvas(); }));
+    alignRow.appendChild(mkAlign("↔ Giữa X",()=>{ if(!g||!selNodes.length) return; const cx=(Math.min(...selNodes.map(n=>n.x))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=cx-(el?el.offsetWidth:158)/2; }); wfRenderCanvas(); }));
+    alignRow.appendChild(mkAlign("↕ Giữa Y",()=>{ if(!g||!selNodes.length) return; const cy=(Math.min(...selNodes.map(n=>n.y))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=cy-(el?el.offsetHeight:46)/2; }); wfRenderCanvas(); }));
+    body.appendChild(alignRow);
+    // Bulk actions
+    const actSec=document.createElement("div"); actSec.className="wf-insp-sec"; actSec.textContent="Thao tác"; body.appendChild(actSec);
+    const actRow=document.createElement("div"); actRow.style.cssText="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;";
+    const dupBtn=document.createElement("button"); dupBtn.className="btn sm"; dupBtn.textContent="Nhân bản (Ctrl+D)"; dupBtn.onclick=()=>wfDuplicate(); actRow.appendChild(dupBtn);
+    const grpBtn=document.createElement("button"); grpBtn.className="btn sm"; grpBtn.textContent="Tạo nhóm"; grpBtn.onclick=()=>wfGroupSelection(); actRow.appendChild(grpBtn);
+    const delBtn=document.createElement("button"); delBtn.className="btn sm err"; delBtn.textContent="Xoá (Delete)"; delBtn.onclick=()=>wfDeleteSelected(); actRow.appendChild(delBtn);
+    body.appendChild(actRow);
+    const tip=document.createElement("div"); tip.className="wf-insp-empty"; tip.textContent="Ctrl+click / Shift+click để thêm/bớt chọn. Phím ← → ↑ ↓ để di chuyển (Shift+mũi tên = 10px)."; body.appendChild(tip);
     return;
   }
   const node=wfNode(WF.selectedNode), act=wfCurAct(), fn=wfCurFn();
@@ -2520,7 +2684,7 @@ function wfVarRow(act,v,idx){
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Tiêu đề (hiện trong settings)"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
   lbl.oninput=()=>{ v.label=lbl.value; };
   r1.appendChild(lbl);
-  const del=document.createElement("button"); del.className="wf-act-del"; del.textContent="×"; del.title="Xoá biến";
+  const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá biến";
   del.onclick=()=>{ act.vars.splice(idx,1); wfRenderInspector(); };
   r1.appendChild(del);
   // Line 2: variable name (key) + type + default value.
@@ -2598,7 +2762,7 @@ function wfFieldEl(node,f){
         const num=document.createElement("span"); num.textContent=(idx+1)+"."; num.style.cssText="font-size:10px;color:var(--muted);flex-shrink:0;";
         const inp=document.createElement("input"); inp.type="text"; inp.value=path||""; inp.style.cssText="flex:1;min-width:0;font-size:10px;";
         const pick=document.createElement("button"); pick.className="btn sm"; pick.textContent="Chọn…";
-        const del=document.createElement("button"); del.className="wf-act-del"; del.textContent="×"; del.title="Xoá ảnh";
+        const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá ảnh";
         const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img, path);
         const commit=v=>{ arr()[idx]=v; wfUpdNodeSum(node); wfUpdNodePreview(node); wfLoadThumb(img,v); };
         inp.oninput=()=>commit(inp.value);
@@ -2637,7 +2801,7 @@ function wfFieldEl(node,f){
   const inp=document.createElement("input");
   inp.type=f.t==="num"?"number":"text"; if(f.t==="num"&&f.step) inp.step=f.step;
   inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
-  inp.oninput=()=>{ node.params[f.k]= f.t==="num"?(parseFloat(inp.value)||0):inp.value; wfUpdNodeSum(node); };
+  inp.oninput=()=>{ node.params[f.k]= f.t==="num"?(parseFloat(inp.value)||0):inp.value; wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); };
   row.appendChild(inp);
   if(f.t==="tpl"){
     inp.style.fontSize="10px";
@@ -2674,11 +2838,11 @@ function wfSwitchCasesEditor(node){
       WF_SWITCH_CASE_TYPES.forEach(t=>{ const op=document.createElement("option"); op.value=t;
         op.textContent=WF_NODES[t].label; if(c.type===t)op.selected=true; sel.appendChild(op); });
       sel.onchange=()=>{ c.type=sel.value; c.params=wfDefaults(sel.value); render(); wfUpdNodeSum(node); };
-      const up=document.createElement("button"); up.className="btn sm"; up.textContent="↑"; up.title="Lên"; up.disabled=idx===0;
+      const up=document.createElement("button"); up.className="btn sm ico"; up.innerHTML=wfIco("chevron_up"); up.title="Lên"; up.disabled=idx===0;
       up.onclick=()=>{ wfReorderSwitchCase(node, idx, idx-1); render(); wfRenderCanvas(); };
-      const dn=document.createElement("button"); dn.className="btn sm"; dn.textContent="↓"; dn.title="Xuống"; dn.disabled=idx===cases().length-1;
+      const dn=document.createElement("button"); dn.className="btn sm ico"; dn.innerHTML=wfIco("chevron_dn"); dn.title="Xuống"; dn.disabled=idx===cases().length-1;
       dn.onclick=()=>{ wfReorderSwitchCase(node, idx, idx+1); render(); wfRenderCanvas(); };
-      const del=document.createElement("button"); del.className="wf-act-del"; del.textContent="×"; del.title="Xoá nhánh";
+      const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá nhánh";
       del.onclick=()=>{ wfRemoveSwitchCase(node, idx); render(); wfRenderCanvas(); };
       hd.appendChild(num); hd.appendChild(sel); hd.appendChild(up); hd.appendChild(dn); hd.appendChild(del);
       item.appendChild(hd);
@@ -2788,9 +2952,14 @@ const WF_ICO_PLAY = '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 
 const WF_ICO_STOP = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
 function wfSetRunning(on){
   wfRunning=on; const b=$("wf-run-btn");
-  // When a run ends (stopped or finished) every block returns to its original
-  // colour — no leftover green/red/amber trail.
-  if(!on){ wfResetRunViz(); wfLiveVars={}; wfFreshVar=null; }
+  if(!on){
+    // Keep the green/red trail so the user can see where execution stopped.
+    // Only remove the amber "currently running" pulse and dim unreached blocks.
+    if(wfRunNode){ const _re=wfNodeElById(wfRunNode); if(_re) _re.classList.remove("running"); }
+    wfRunNode=null; wfRunStopped=true;
+    wfMarkUnreached();
+    wfLiveVars={}; wfFreshVar=null;
+  }
   if(b){
     b.innerHTML = on?WF_ICO_STOP:WF_ICO_PLAY;
     b.title = on?"Dừng":"Chạy thử";

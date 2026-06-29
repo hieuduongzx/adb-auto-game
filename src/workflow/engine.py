@@ -107,11 +107,18 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "if_text":    {"label": "Nếu thấy chữ",  "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     "if_var":     {"label": "Nếu biến",      "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     "loop":       {"label": "Lặp lại",       "kind": "loop",      "ins": 1, "outs": ["body", "done"]},
-    "parallel":   {"label": "Chạy song song","kind": "parallel",  "ins": 1, "outs": ["1", "2", "3", "done"]},
+    "parallel":   {"label": "Chạy song song","kind": "parallel",  "ins": 1, "outs": []},
+    # Output ports are dynamic (count param) so outs is left empty here; the
+    # engine reads params["count"] at runtime and the designer renders them live.
+    "join":       {"label": "Gộp",           "kind": "join",      "ins": 1, "outs": ["out"]},
     # Multi-way branch: each case is its own condition; the first true case routes
     # to its port "c{i}", else "default". Output ports are dynamic (per the node's
     # ``cases`` list) so ``outs`` here is only the static fallback hint.
-    "switch":     {"label": "Rẽ nhánh",       "kind": "switch",    "ins": 1, "outs": ["default"]},
+    "switch":      {"label": "Rẽ nhánh",       "kind": "switch",    "ins": 1, "outs": ["default"]},
+    "scroll_find": {"label": "Kéo đến ảnh",    "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    "random_branch":{"label":"Chọn ngẫu nhiên","kind": "random",    "ins": 1, "outs": []},
+    "format_var":  {"label": "Định dạng chuỗi","kind": "action",    "ins": 1, "outs": ["out"]},
+    "notify":      {"label": "Thông báo",       "kind": "action",    "ins": 1, "outs": ["out"]},
 }
 
 # Condition node types a switch case may use — only the *instant* ones (no
@@ -210,7 +217,9 @@ class WorkflowEngine:
             "calc_var": self._a_calc_var,
             "read_var": self._a_read_var,
             "parse_var": self._a_parse_var,
-            "break": self._a_break,
+            "break":      self._a_break,
+            "format_var": self._a_format_var,
+            "notify":     self._a_notify,
         }
 
     # ── Per-thread execution context ─────────────────────────────────────────
@@ -521,8 +530,33 @@ class WorkflowEngine:
                 cur = self._next(adj, cur, loop_port)
             elif kind == "parallel":
                 self._run_parallel(nodes, adj, cur, depth)
-                self._emit("on_node_done", nid, "ok", "done")
-                cur = self._next(adj, cur, "done")
+                # Execution after all branches is handled inside _run_parallel
+                # (the last branch to hit a join node continues from join.out).
+                # The parent walk ends here — no "done" port anymore.
+                break
+            elif kind == "join":
+                # Barrier for parallel branches. The last branch to arrive
+                # continues walking; all earlier arrivals stop here.
+                ctx = getattr(self._ctx, "join_ctx", None)
+                if ctx is not None:
+                    with ctx["lock"]:
+                        ctx["remaining"] -= 1
+                        ctx["join_node"] = cur
+                        is_last = ctx["remaining"] == 0
+                    if not is_last:
+                        # Not the last branch — stop this thread here.
+                        self._emit("on_node_done", nid, "ok", None)
+                        break
+                    # Last branch: fall through and continue from "out".
+                self._emit("on_node_done", nid, "ok", "out")
+                cur = self._next(adj, cur, "out")
+            elif kind == "random":
+                # Pick one of count numbered ports at random (uniform distribution).
+                count = max(1, int(params.get("count", 2)))
+                chosen = str(random.randint(1, count))
+                log_info(f"[workflow] 🎲 ngẫu nhiên → nhánh {chosen}/{count}")
+                self._emit("on_node_done", nid, "ok", chosen)
+                cur = self._next(adj, cur, chosen)
             elif kind == "switch":
                 # Evaluate each case top-to-bottom; first true wins its port "c{i}".
                 taken = "default"
@@ -572,34 +606,57 @@ class WorkflowEngine:
     def _run_parallel(self, nodes, adj, node_id, depth):
         """Run every wired branch port of a parallel node at once, then join.
 
-        Each branch runs on its own thread with its OWN copy of the current vars /
-        last-position (snapshotted at the fork), so branches can read what the flow
-        had so far but can't stomp each other's state mid-run.
+        Branch count is read from the node's ``count`` param (default 3). Each
+        branch runs on its own thread with its OWN copy of the current vars /
+        last-position (snapshotted at the fork) so branches can't stomp each other.
+
+        If any branch reaches a ``join`` node, a shared join_ctx coordinates the
+        barrier: the last branch to arrive continues execution from the join's
+        ``out`` port. Branches that arrive earlier stop at the join.
         """
-        ports = [p for p in (NODE_TYPES["parallel"]["outs"]) if p != "done"]
+        params = (nodes.get(node_id) or {}).get("params", {})
+        count = max(1, int(params.get("count", 3)))
+        ports = [str(i + 1) for i in range(count)]
+
         vars0 = dict(self._vars)
         pos0 = self._last_pos
+
+        active = [(p, self._next(adj, node_id, p)) for p in ports]
+        active = [(p, tgt) for p, tgt in active if tgt]
+        if not active:
+            return
+
+        # Shared barrier for join-node coordination (see _walk "join" handler).
+        join_ctx: Dict[str, Any] = {
+            "lock": threading.Lock(),
+            "remaining": len(active),
+            "join_node": None,   # id of the join node all branches converge to
+        }
+
         threads = []
-        for p in ports:
-            tgt = self._next(adj, node_id, p)
-            if not tgt:
-                continue
+        for _p, tgt in active:
             t = threading.Thread(
-                target=self._walk_branch, args=(nodes, adj, tgt, depth, vars0, pos0),
+                target=self._walk_branch,
+                args=(nodes, adj, tgt, depth, vars0, pos0, join_ctx),
                 daemon=True)
             threads.append(t)
             t.start()
-        if threads:
-            log_info(f"[workflow] ⇉ chạy song song {len(threads)} nhánh")
+
+        log_info(f"[workflow] ⇉ chạy song song {len(threads)} nhánh")
         for t in threads:
             t.join()
 
-    def _walk_branch(self, nodes, adj, tgt, depth, vars0, pos0):
+        # All branches done. If they converged at a join node, the last-arriving
+        # branch already continued from join.out — nothing more to do here.
+        # (The parent _walk call proceeds from wherever _run_parallel returns.)
+
+    def _walk_branch(self, nodes, adj, tgt, depth, vars0, pos0, join_ctx=None):
         """Entry point for a parallel branch thread: seed this thread's context
         from the fork snapshot, then walk. Isolated from siblings + the parent."""
         self._vars = dict(vars0)
         self._last_pos = pos0
         self._break_loop = False
+        self._ctx.join_ctx = join_ctx   # thread-local; cleared when thread exits
         self._walk(nodes, adj, tgt, {}, depth)
 
     @staticmethod
@@ -680,25 +737,55 @@ class WorkflowEngine:
         return [self._resolve_template(it) for it in items if it.strip()]
 
     def _find_any(self, templates: List[str], threshold: float):
-        """(x, y) of the first listed template currently on screen, or ``None``."""
+        """(x, y) of the first listed template currently on screen, or ``None``.
+        Sequential: stops at the first match (list order is the priority order)."""
         for tpl in templates:
             res = self.auto.find_template(tpl, threshold=threshold)
             if res:
                 return (res[0], res[1])
         return None
 
-    def _wait_any(self, templates: List[str], timeout: float, threshold: float):
+    def _find_any_parallel(self, templates: List[str], threshold: float):
+        """Check all templates concurrently; return position of whichever matches first.
+        Unlike the sequential variant, list order does NOT determine priority —
+        the template actually visible on screen wins."""
+        if not templates:
+            return None
+        results: List = []
+        lock = threading.Lock()
+
+        def check(tpl: str) -> None:
+            try:
+                res = self.auto.find_template(tpl, threshold=threshold)
+                if res:
+                    with lock:
+                        results.append((res[0], res[1]))
+            except Exception:
+                pass
+
+        threads = [threading.Thread(target=check, args=(tpl,), daemon=True)
+                   for tpl in templates]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        return results[0] if results else None
+
+    def _wait_any(self, templates: List[str], timeout: float, threshold: float,
+                  parallel: bool = False):
         """Poll until ANY listed template appears, or ``timeout``. Pause/stop aware.
 
         ``wait_for_template`` waits on one specific image, so for an OR-over-images
         we poll ``find_template`` across the whole list each round instead.
+        When ``parallel=True`` all templates are checked concurrently each round.
         """
         if not templates:
             return None
+        finder = self._find_any_parallel if parallel else self._find_any
         end = time.time() + max(0.0, timeout)
         while not self._stop.is_set():
             self._pause.wait()
-            hit = self._find_any(templates, threshold)
+            hit = finder(templates, threshold)
             if hit:
                 return hit
             if time.time() >= end:
@@ -718,14 +805,18 @@ class WorkflowEngine:
         if ntype == "if_image_any":
             templates = self._templates_list(params)
             negate = bool(params.get("negate", False))
-            hit = self._find_any(templates, float(params.get("threshold", 0.85)))
+            parallel = params.get("mode", "sequential") == "parallel"
+            finder = self._find_any_parallel if parallel else self._find_any
+            hit = finder(templates, float(params.get("threshold", 0.85)))
             if hit:
                 self._last_pos = hit
             return (hit is not None) != negate
         if ntype == "wait_image_any":
             templates = self._templates_list(params)
+            parallel = params.get("mode", "sequential") == "parallel"
             hit = self._wait_any(templates, float(params.get("timeout", 10.0)),
-                                 float(params.get("threshold", 0.85)))
+                                 float(params.get("threshold", 0.85)),
+                                 parallel=parallel)
             if hit:
                 self._last_pos = hit
                 log_info(f"[workflow] 🔍 thấy ảnh ({hit[0]}, {hit[1]})")
@@ -733,8 +824,10 @@ class WorkflowEngine:
             return hit is not None
         if ntype == "tap_image_any":
             templates = self._templates_list(params)
-            hit = self._wait_any(templates, float(params.get("timeout", 5.0)),
-                                 float(params.get("threshold", 0.85)))
+            parallel = params.get("mode", "sequential") == "parallel"
+            hit = self._wait_any(templates, float(params.get("timeout", 10.0)),
+                                 float(params.get("threshold", 0.85)),
+                                 parallel=parallel)
             if not hit:
                 return False  # no match — false branch fires; no log (tap-miss is expected)
             self._last_pos = hit
@@ -744,7 +837,7 @@ class WorkflowEngine:
             # Find (with timeout), remember position, optionally wait, then tap.
             tpl = self._resolve_template(params.get("template", ""))
             res = self.auto.wait_for_template(
-                tpl, timeout=float(params.get("timeout", 5.0)),
+                tpl, timeout=float(params.get("timeout", 10.0)),
                 threshold=float(params.get("threshold", 0.85)),
             )
             if not res:
@@ -776,6 +869,32 @@ class WorkflowEngine:
         if ntype == "if_var":
             cur = self._vars.get(str(params.get("name", "")))
             return self._compare(cur, str(params.get("op", "==")), params.get("value", ""))
+        if ntype == "scroll_find":
+            template  = self._resolve_template(params.get("template", ""))
+            direction = str(params.get("direction", "up")).lower()
+            max_sw    = max(1, int(params.get("max_swipes", 10)))
+            distance  = int(params.get("swipe_distance", 400))
+            duration  = int(params.get("swipe_duration", 300))
+            threshold = float(params.get("threshold", 0.85))
+            try:
+                w, h = self.auto.adb.get_screen_size()
+            except Exception:
+                w, h = 0, 0
+            cx, cy = (w // 2, h // 2) if (w and h) else (540, 960)
+            delta  = {"up": (0, -distance), "down": (0, distance),
+                      "left": (-distance, 0), "right": (distance, 0)}.get(direction, (0, -distance))
+            for i in range(max_sw):
+                if self._stop.is_set():
+                    return False
+                self._pause.wait()
+                res = self.auto.find_template(template, threshold=threshold)
+                if res:
+                    self._last_pos = (res[0], res[1])
+                    log_info(f"[workflow] 🔍 thấy ảnh sau {i} lần vuốt ({res[0]}, {res[1]})")
+                    return True
+                self.auto.swipe(cx, cy, cx + delta[0], cy + delta[1], duration)
+                self._sleep(0.4)
+            return False
         return False
 
     def _compare(self, cur: Any, op: str, rhs: Any) -> bool:
@@ -1266,4 +1385,47 @@ class WorkflowEngine:
 
     def _a_log(self, node, p) -> bool:
         log_info(f"[workflow] {self._format_msg(p.get('message', ''))}")
+        return True
+
+    def _a_format_var(self, node, p) -> bool:
+        name     = str(p.get("name", "")).strip()
+        template = str(p.get("template", ""))
+        result   = template
+        for k, v in list(self._vars.items()):
+            result = result.replace(f"{{{k}}}", str(v))
+        if name:
+            self._set_var(name, result)
+            log_info(f"[workflow] 📝 {name} = \"{result}\"")
+        return True
+
+    def _a_notify(self, node, p) -> bool:
+        title   = str(p.get("title", "Workflow")).strip() or "Workflow"
+        message = self._format_msg(str(p.get("message", "Đã hoàn thành!")))
+        sound   = bool(p.get("sound", True))
+        log_info(f"[workflow] 🔔 [{title}] {message}")
+        if sound:
+            try:
+                import winsound
+                winsound.MessageBeep(winsound.MB_ICONASTERISK)
+            except Exception:
+                pass
+        try:
+            import subprocess
+            safe_t = title.replace('"', '\\"')
+            safe_m = message.replace('"', '\\"')
+            ps = (
+                "Add-Type -AssemblyName System.Windows.Forms;"
+                "$n=New-Object System.Windows.Forms.NotifyIcon;"
+                "$n.Icon=[System.Drawing.SystemIcons]::Information;"
+                "$n.Visible=$true;"
+                f'$n.ShowBalloonTip(6000,"{safe_t}","{safe_m}",'
+                "[System.Windows.Forms.ToolTipIcon]::Info);"
+                "Start-Sleep 7;$n.Dispose()"
+            )
+            subprocess.Popen(
+                ["powershell", "-WindowStyle", "Hidden", "-NonInteractive", "-Command", ps],
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+            )
+        except Exception:
+            pass
         return True
