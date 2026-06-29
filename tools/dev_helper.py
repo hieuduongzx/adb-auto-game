@@ -1041,7 +1041,7 @@ class DevHelperAPI:
 def create_dev_helper_window(title: str = "DevScope",
                              out_dir: Optional[str] = None) -> webview.Window:
     api = DevHelperAPI(out_dir=out_dir)
-    html_path = os.path.join(_WEB_DIR, "dev_helper.html")
+    html_path = os.path.join(_WEB_DIR, "scope", "index.html")
     url = f"file:///{html_path.replace(os.sep, '/')}"
 
     window = webview.create_window(

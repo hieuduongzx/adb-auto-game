@@ -77,12 +77,17 @@ class TemplateMatcher:
         use_grayscale: bool = False,
         multi_scale: bool = False,
         scales: Optional[List[float]] = None,
+        region: Optional[Tuple[int, int, int, int]] = None,
     ) -> Optional[Tuple[int, int, float, float]]:
         """
         Match template in screen
-        
+
         Returns:
             Tuple of (center_x, center_y, confidence, scale) or None
+
+        ``region``: optional (x, y, w, h) crop of the screen (device coords) to
+        search within. Tames false positives when the same icon appears in many
+        places. Coordinates in the returned match are mapped back to full-screen.
         """
         try:
             if use_grayscale and len(screen.shape) == 3:
@@ -93,6 +98,19 @@ class TemplateMatcher:
             # always are from screencap) — matchTemplate only reads them.
             screen_processed = np.asarray(screen_processed, dtype=np.uint8)
             template = np.asarray(template, dtype=np.uint8)
+
+            # Region crop: restrict the search to a sub-rectangle of the screen.
+            # Coords are clamped to the screen bounds; empty/zero-area → full screen.
+            reg_x = reg_y = 0
+            if region is not None:
+                rx, ry, rw, rh = region
+                sh, sw = screen_processed.shape[:2]
+                rx = max(0, int(rx)); ry = max(0, int(ry))
+                rw = max(0, int(rw)); rh = max(0, int(rh))
+                rx2 = min(sw, rx + rw); ry2 = min(sh, ry + rh)
+                if rx2 > rx and ry2 > ry and (rx2 - rx) < sw and (ry2 - ry) < sh:
+                    screen_processed = screen_processed[ry:ry2, rx:rx2]
+                    reg_x, reg_y = rx, ry
 
             best_match = None
             best_confidence = 0.0
@@ -123,15 +141,15 @@ class TemplateMatcher:
                     best_scale = scale
 
             if best_confidence >= threshold:
-                # Calculate center point
+                # Calculate center point (mapped back to full-screen coords).
                 h, w = template.shape[:2]
-                center_x = int(best_match[0] + (w * best_scale) // 2)
-                center_y = int(best_match[1] + (h * best_scale) // 2)
-                
+                center_x = int(best_match[0] + (w * best_scale) // 2) + reg_x
+                center_y = int(best_match[1] + (h * best_scale) // 2) + reg_y
+
                 return (center_x, center_y, best_confidence, best_scale)
-            
+
             return None
-            
+
         except Exception as e:
             log_error(f"Error in template matching: {e}")
             return None

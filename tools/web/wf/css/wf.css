@@ -1,0 +1,469 @@
+/* ── Workflow designer (node-graph view) ───────────────────────────────────── */
+#mode-tabs { display:flex; gap:2px; background:var(--alt); border-radius:8px; padding:3px; }
+.mode-btn { padding:5px 14px; border-radius:6px; font-size:12px; font-weight:700; color:var(--dim); transition:background .15s, color .15s; }
+.mode-btn:hover:not(.active) { color:var(--ink); }
+.mode-btn.active { background:var(--panel); color:var(--accent); box-shadow:0 1px 2px rgba(0,0,0,.06); }
+.tb-divider { width:1px; height:20px; background:var(--border2); flex-shrink:0; }
+/* Speed-hack control cluster: its own bordered box so it reads as a separate,
+   manual tool — independent of "Chạy thử". Turns amber when enabled. */
+.wf-speed-group { display:flex; align-items:center; gap:5px; padding:3px 7px;
+  border:1px solid var(--border2); border-radius:8px; background:var(--surface); transition:background .15s, border-color .15s; }
+.wf-speed-group.on { border-color:#f1c84b; background:#fdf6e9; }
+.wf-speed-group .hz-unit { margin-left:-2px; }
+.wf-speed-title { font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--muted); white-space:nowrap; }
+.wf-speed-group.on .wf-speed-title { color:#9c6c12; }
+#wf-speed-run-btn.ok  { background:var(--ok);  color:#fff; border-color:var(--ok); }
+#wf-speed-run-btn.err { background:var(--err); color:#fff; border-color:var(--err); }
+
+#workflow-view { flex:1; display:flex; gap:7px; min-height:0; overflow:hidden; }
+
+/* Left sidebar: activities + palette */
+#wf-side { width:212px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
+/* Drag handle to resize the left sidebar. A wide hit-area with a thin visible spine. */
+#wf-side-resizer { width:7px; flex-shrink:0; cursor:col-resize; position:relative; align-self:stretch; }
+#wf-side-resizer::before { content:""; position:absolute; left:2px; top:0; bottom:0; width:3px; border-radius:3px;
+  background:transparent; transition:background .12s; }
+#wf-side-resizer:hover::before, #wf-side-resizer.drag::before { background:var(--accent); }
+.wf-side-sec { display:flex; flex-direction:column; min-height:0; }
+.wf-side-sec + .wf-side-sec { border-top:1px solid var(--line); }
+.wf-side-hdr { display:flex; align-items:center; gap:var(--s2); font-size:10.5px; font-weight:700; letter-spacing:.05em;
+  color:var(--dim); text-transform:uppercase; padding:var(--s4) var(--s4) var(--s2); }
+.wf-side-hdr .btn { text-transform:none; letter-spacing:0; }
+.side-count { font-family:var(--mono); font-size:9.5px; font-weight:600; color:var(--muted);
+  background:var(--alt); border-radius:999px; padding:1px 6px; letter-spacing:0; }
+.side-count:empty { display:none; }
+#wf-side .wf-palette { padding:0 9px 10px; overflow-y:auto; }
+
+.wf-act { display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--border);
+  border-radius:7px; cursor:pointer; transition:border-color .1s, background .1s; }
+.wf-act:hover { background:var(--alt); }
+.wf-act.sel { border-color:var(--accent); background:var(--accent-bg); }
+.wf-badge { font-size:8.5px; font-weight:700; letter-spacing:.03em; border-radius:4px; padding:2px 4px; flex-shrink:0; }
+.wf-badge.seq { color:#2559c7; background:#eef5ff; border:1px solid var(--accent-bd); }
+.wf-badge.bg  { color:#9c6c12; background:var(--warn-bg); border:1px solid #e7d5a4; }
+.wf-act-name { font-size:11.5px; font-weight:600; color:var(--ink); flex:1; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-act-cb { width:15px; height:15px; border-radius:4px; border:1.5px solid #cfd5dd; background:var(--panel);
+  flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.wf-act-cb.checked { background:var(--accent); border-color:var(--accent); }
+.wf-act-cb svg { opacity:0; } .wf-act-cb.checked svg { opacity:1; }
+.wf-act-del { color:var(--muted); line-height:0; padding:3px; border-radius:4px; flex-shrink:0; display:flex; align-items:center; }
+.wf-act-del svg { width:12px; height:12px; display:block; }
+.wf-act-del:hover { color:var(--err); background:var(--err-bg); }
+.wf-act-grip { display:flex; align-items:center; justify-content:center; flex-shrink:0; width:11px;
+  margin:-6px 0 -6px -4px; align-self:stretch; color:#c4cbd4; cursor:grab; }
+.wf-act-grip:hover { color:var(--dim); }
+.wf-act-grip:active { cursor:grabbing; }
+.wf-act.wf-dragging { opacity:.55; border-color:var(--accent); background:var(--accent-bg); }
+
+.wf-palette { display:flex; flex-direction:column; gap:3px; }
+/* Category label: pill with color dot */
+.wf-pal-cat { display:flex; align-items:center; gap:5px; font-size:9px; font-weight:800;
+  letter-spacing:.04em; text-transform:uppercase; margin:7px 0 3px; padding:3px 7px;
+  border-radius:5px; color:var(--muted); }
+.wf-pal-cat::before { content:""; width:7px; height:7px; border-radius:2px; flex-shrink:0;
+  background:currentColor; display:block; }
+.wf-pal-cat.cat-basic { color:#2d64cc; background:#eef5ff; }
+.wf-pal-cat.cat-input { color:#4338ca; background:#eef0ff; }
+.wf-pal-cat.cat-image { color:#0f766e; background:#ecfdf9; }
+.wf-pal-cat.cat-ocr   { color:#c2610f; background:#fff7ed; }
+.wf-pal-cat.cat-flow  { color:#b45309; background:#fffbeb; }
+.wf-pal-cat.cat-logic { color:#6d28d9; background:#f5f3ff; }
+.wf-pal-cat.cat-misc  { color:#4b5563; background:#f3f4f6; }
+.wf-pal-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.wf-fn { cursor:pointer; }
+.wf-badge.fn { display:inline-flex; align-items:center; justify-content:center; color:#fff;
+  background:#7c3aed; border:none; font-size:9.5px; font-weight:800;
+  padding:2px 5px; letter-spacing:.02em; border-radius:4px; min-width:16px; }
+.wf-chip { display:flex; align-items:center; gap:5px; padding:6px 7px; border:1px solid var(--border2);
+  border-left-width:3px; border-radius:7px; background:var(--panel); cursor:grab;
+  font-size:10.5px; font-weight:600; color:var(--ink2);
+  transition:border-color .1s, background .1s; user-select:none; }
+.wf-chip:hover { border-color:var(--accent); border-left-color:var(--accent); background:var(--accent-bg); }
+.wf-chip:active { cursor:grabbing; }
+.wf-chip .ico { display:flex; align-items:center; justify-content:center; width:14px; height:14px; }
+.wf-chip .ico svg { width:14px; height:14px; display:block; }
+/* Per-category chip accent: left edge colour + icon tint */
+.wf-chip.cat-basic { border-left-color:#6f9be8; }
+.wf-chip.cat-input { border-left-color:#818cf8; }
+.wf-chip.cat-image { border-left-color:#2fb0a3; }
+.wf-chip.cat-ocr   { border-left-color:#e0954b; }
+.wf-chip.cat-flow  { border-left-color:#e0a64b; }
+.wf-chip.cat-logic { border-left-color:#9a78e6; }
+.wf-chip.cat-misc  { border-left-color:#9aa6b4; }
+.wf-chip.cat-basic .ico { color:#2d64cc; }
+.wf-chip.cat-input .ico { color:#4338ca; }
+.wf-chip.cat-image .ico { color:#0f766e; }
+.wf-chip.cat-ocr   .ico { color:#c2610f; }
+.wf-chip.cat-flow  .ico { color:#b45309; }
+.wf-chip.cat-logic .ico { color:#6d28d9; }
+.wf-chip.cat-misc  .ico { color:#4b5563; }
+/* Function sidebar rows: purple tint + left border */
+.wf-act.wf-fn { border-left:3px solid #9a78e6; background:#faf7ff; }
+.wf-act.wf-fn:hover { background:#f3eefe; border-left-color:#7c3aed; }
+.wf-act.wf-fn.sel  { background:#ede8fc; border-left-color:#7c3aed; border-color:#c4b1f6; }
+
+/* Center: canvas */
+#wf-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+#wf-bar { display:flex; align-items:center; gap:var(--s3); padding:var(--s3) var(--s4); border-bottom:1px solid var(--line); flex-shrink:0; }
+#wf-bar > input { font-family:var(--sans); font-size:13px; font-weight:700; width:188px; flex-shrink:0; }
+.wf-cur-act { font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-bg);
+  border:1px solid var(--accent-bd); border-radius:999px; padding:3px 10px; max-width:170px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-shrink:0; }
+.wf-hint { font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis; min-width:0; flex-shrink:1; text-align:right; }
+.wf-zoom { display:inline-flex; align-items:center; gap:4px; }
+.wf-zoom .btn { width:24px; padding:0; font-size:14px; }
+#wf-zoom-lbl { font-size:11px; font-family:var(--mono); color:var(--dim); min-width:38px; text-align:center; cursor:pointer; }
+#wf-zoom-lbl:hover { color:var(--accent); }
+#wf-canvas { flex:1; min-height:0; position:relative; overflow:hidden;
+  background:var(--bg) radial-gradient(circle, #d9dee6 1px, transparent 1px); background-size:20px 20px;
+  cursor:grab; }
+#wf-canvas.panning { cursor:grabbing; }
+#wf-world { position:absolute; left:0; top:0; width:4000px; height:3000px; transform:translate(0px,0px); transform-origin:0 0; }
+#wf-wires { position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+/* Wires carry a directional arrowhead (markers defined per-colour in <defs>, see
+   WF_WIRE_DEFS) so the flow direction reads at a glance. Rounded caps/joins keep
+   the curves smooth. A wider transparent stroke under each path widens the
+   click/hover target without thickening the visible line. */
+/* A fat invisible hit-path sits under each wire so it's easy to hover / right-
+   click without thickening the visible line. The visible wire is click-through. */
+#wf-wires .wire-hit { fill:none; stroke:transparent; stroke-width:18; pointer-events:stroke;
+  cursor:pointer; stroke-linecap:round; }
+/* Default forward flow — thin neutral line that recedes into the background.
+    T/F branch wires and the run trail are thicker so they immediately pop. */
+#wf-wires path.wire { fill:none; stroke:#9aaec2; stroke-width:1.25; pointer-events:none;
+  stroke-linecap:round; stroke-linejoin:round; marker-end:url(#wf-ah);
+  stroke-opacity:0.75; transition:stroke .12s, stroke-width .12s, stroke-opacity .12s; }
+/* True/False branch wires: bolder and fully opaque — the decision fork is the
+   the most information-dense part of the graph and must read first. */
+#wf-wires path.wire.t { stroke:#25a05a; stroke-width:1.6; stroke-opacity:1; marker-end:url(#wf-ah-t); }
+#wf-wires path.wire.f { stroke:#e07428; stroke-width:1.6; stroke-opacity:1; marker-end:url(#wf-ah-f); }
+/* Stack wire: structural, not a data flow — very faint dotted rule, no arrowhead. */
+#wf-wires path.wire.stack { stroke:#b8c6d4; stroke-width:1.0; stroke-opacity:0.45;
+  stroke-dasharray:2.5 3; marker-end:none; }
+/* Loop-back wire: amber dashed — "going back" reads visually different from forward flow. */
+#wf-wires path.wire.loopback { stroke:#d09030; stroke-width:1.4; stroke-opacity:0.9;
+  stroke-dasharray:9 5; marker-end:url(#wf-ah-loop); }
+/* Hover: lift the targeted wire sharply above the crowd — full opacity, accent colour,
+   modest weight gain (avoids a thick band that obscures nearby nodes). */
+#wf-wires .wire-grp:hover path.wire { stroke:var(--accent); stroke-width:2.0; stroke-opacity:1;
+  marker-end:url(#wf-ah-temp); }
+#wf-wires .wire-grp:hover { filter:drop-shadow(0 1px 4px rgba(47,111,237,.32)); }
+/* While wiring up a connection, wires ignore the pointer so the drop lands on the
+   node underneath rather than being swallowed by a wire's hit-path. */
+#wf-canvas.wf-connecting .wire-hit { pointer-events:none; }
+/* Run trail on wires: the path taken (bright green) vs the skipped branch (faint red). */
+#wf-wires path.wire.took-wire    { stroke:#2fa55a !important; stroke-width:2.1; stroke-opacity:1 !important; marker-end:url(#wf-ah-t) !important; }
+#wf-wires path.wire.nottook-wire { stroke:#cf4b43 !important; stroke-opacity:.38 !important; stroke-width:1.25; marker-end:url(#wf-ah-nottook) !important; }
+#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:1.5; stroke-dasharray:6 4;
+  stroke-linecap:round; pointer-events:none; marker-end:url(#wf-ah-temp); }
+#wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  color:var(--muted); font-size:12px; pointer-events:none; }
+
+/* Auto-layout toolbar — pinned bottom-left of the canvas. A small floating
+   cluster of buttons, one per layout strategy. */
+.wf-layout-bar { position:absolute; left:10px; bottom:10px; display:flex; gap:4px;
+  background:var(--panel); border:1px solid var(--border2); border-radius:9px;
+  box-shadow:var(--sh-md); padding:5px; z-index:5; }
+.wf-layout-btn { width:30px; height:30px; padding:0; border:1px solid transparent;
+  border-radius:6px; background:var(--alt); color:var(--dim); cursor:pointer;
+  font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center; }
+.wf-layout-btn:hover { color:var(--accent); background:var(--accent-bg); border-color:var(--accent-bd); }
+
+/* Activities + Functions panel — pinned bottom-right of the canvas.
+   Header = title row (chevron + label + add btn) stacked above a tab bar.
+   Collapsing hides the tab bar + body; only the title row stays visible. */
+.wf-act-panel { position:absolute; right:10px; bottom:10px; width:248px; max-height:50%;
+  background:var(--panel); border:1px solid var(--border2); border-radius:9px;
+  box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5; overflow:hidden; }
+.wf-act-panel.collapsed { max-height:30px; }
+.wf-act-panel-hdr { display:flex; flex-direction:column; flex-shrink:0; }
+/* Title row: chevron + label + add button */
+.wf-act-hdr-row { display:flex; align-items:center; gap:6px; padding:5px 10px;
+  background:var(--surface); border-bottom:1px solid var(--border2);
+  cursor:pointer; user-select:none; transition:background .1s; min-height:30px; }
+.wf-act-hdr-row:hover { background:var(--alt); }
+.wf-act-hdr-chevron { color:var(--muted); display:flex; align-items:center; flex-shrink:0;
+  transition:transform .15s var(--ease); }
+.wf-act-panel.collapsed .wf-act-hdr-chevron { transform:rotate(-90deg); }
+.wf-act-hdr-title { font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--dim); flex:1; min-width:0; }
+.wf-act-hdr-add { width:22px; height:22px; padding:0; border:1px solid var(--border2);
+  border-radius:6px; background:var(--panel); color:var(--dim); cursor:pointer; font-size:16px;
+  font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  line-height:1; transition:color .1s, border-color .1s, background .1s; }
+.wf-act-hdr-add:hover { color:var(--accent); border-color:var(--accent); background:var(--accent-bg); }
+/* Tab bar — hidden when collapsed */
+.wf-act-tab-row { display:flex; align-items:stretch; background:var(--panel); flex-shrink:0; }
+.wf-act-panel.collapsed .wf-act-tab-row { display:none; }
+.wf-act-tab { font-size:11px; font-weight:600; color:var(--muted); background:none; border:none;
+  cursor:pointer; padding:6px 10px 5px; display:flex; align-items:center; gap:4px;
+  letter-spacing:0; text-transform:none; position:relative; flex-shrink:0; }
+.wf-act-tab::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px;
+  background:transparent; border-radius:2px 2px 0 0; transition:background .15s; }
+.wf-act-tab.sel { color:var(--accent); }
+.wf-act-tab.sel::after { background:var(--accent); }
+.wf-act-tab:hover:not(.sel) { color:var(--ink); background:var(--alt); }
+/* Legacy .wf-act-add (hidden — replaced by .wf-act-hdr-add above) */
+.wf-act-add { display:none; }
+.wf-act-panel-body { overflow-y:auto; padding:5px 7px 7px; border-top:1px solid var(--line); }
+.wf-act-list { display:flex; flex-direction:column; gap:4px; }
+#wf-activities { padding:0; max-height:none; }
+
+/* Live variables panel — pinned top-right of the canvas. Shows the vars
+   declared on the current activity (declared value) overlaid with live runtime
+   values pushed from the engine during a test run. Collapsible. */
+.wf-vars-panel { position:absolute; right:10px; top:10px; width:232px; max-height:50%;
+  background:var(--panel); border:1px solid var(--border2); border-radius:9px;
+  box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5;
+  font-size:11px; overflow:hidden; }
+.wf-vars-panel.collapsed { max-height:30px; }
+.wf-vars-hdr { display:flex; align-items:center; gap:5px;
+  padding:6px 10px; cursor:pointer; background:var(--surface); border-bottom:1px solid var(--border2);
+  user-select:none; min-height:30px; }
+.wf-vars-title { font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--dim); }
+.wf-vars-count { font-family:var(--mono); font-size:9.5px; color:var(--muted); background:var(--alt);
+  border-radius:999px; padding:1px 6px; letter-spacing:0; }
+.wf-vars-count:empty { display:none; }
+.wf-vars-live { color:var(--muted); font-size:9px; margin-left:auto; flex-shrink:0; }
+.wf-vars-actions { display:flex; align-items:center; gap:4px; flex-shrink:0; }
+.wf-vars-add { width:20px; height:20px; line-height:1; padding:0; border:1px solid var(--border2);
+  border-radius:5px; background:var(--panel); color:var(--dim); cursor:pointer; font-size:13px;
+  display:flex; align-items:center; justify-content:center; transition:color .1s, border-color .1s; }
+.wf-vars-add svg { width:12px; height:12px; display:block; }
+.wf-vars-add:hover { color:var(--accent); border-color:var(--accent); }
+.wf-vars-close { display:flex; align-items:center; color:var(--muted); }
+.wf-vars-close svg { width:12px; height:12px; display:block; }
+.wf-vars-close:hover { color:var(--err); }
+/* Global vars editor popover. */
+.wf-globs-pop { position:fixed; z-index:50; width:260px; max-height:70vh;
+  background:var(--panel); border:1px solid var(--border2); border-radius:9px; box-shadow:var(--sh-md);
+  display:flex; flex-direction:column; overflow:hidden; }
+.wf-globs-pop .wf-vars-hdr { cursor:default; background:var(--surface); }
+.wf-globs-pop-body { overflow-y:auto; padding:6px; display:flex; flex-direction:column; gap:6px; }
+.wf-glob-card { border:1px solid var(--border2); border-radius:7px; padding:5px; display:flex; flex-direction:column; gap:4px; }
+.wf-glob-tag { font-size:9px; color:var(--accent); font-weight:700; letter-spacing:.04em; }
+.wf-glob-del { width:20px; height:20px; line-height:1; padding:0; border:1px solid var(--border2);
+  border-radius:5px; background:var(--panel); color:var(--err); cursor:pointer; font-size:15px;
+  font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.wf-glob-del:hover { background:var(--err-bg); border-color:var(--err); }
+.wf-vars-panel.live .wf-vars-live { color:#2fa55a; animation:wfPulse 1.4s ease-in-out infinite; }
+@keyframes wfPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.wf-vars-body { overflow-y:auto; padding:4px 7px 7px; }
+.wf-vars-empty { color:var(--muted); padding:7px 5px; font-size:10.5px; }
+/* Section separator inside the vars panel body */
+.wf-vars-sep { font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); padding:5px 5px 2px; display:block; }
+.wf-vars-sep:first-child { padding-top:2px; }
+.wf-var-row-live { display:flex; align-items:baseline; gap:6px; padding:3px 5px; border-radius:5px; }
+.wf-var-row-live:hover { background:var(--alt); }
+.wf-var-row-live .vn { font-family:var(--mono); font-size:10.5px; color:var(--ink); flex:1;
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-var-row-live .vv { font-family:var(--mono); font-size:10.5px; color:var(--accent); max-width:100px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
+.wf-var-row-live .vv.fresh { color:#2fa55a; font-weight:600; }
+
+/* Node — a clean rectangular card with one uniform neutral border. Category is
+   hinted only by the icon colour (--node-accent); the run colours (green/red/
+   amber) recolour the whole border so a run still reads at a glance. */
+.wf-node { position:absolute; width:158px; background:var(--panel);
+  border:1px solid var(--border2);
+  border-radius:var(--node-r); box-shadow:var(--sh-md); user-select:none; }
+.wf-node.sel { border-color:var(--accent); border-top-color:var(--accent);
+  box-shadow:0 0 0 2px var(--accent-bd), var(--sh-md); }
+.wf-node.wf-entry::before { content:"▶ mặc định"; position:absolute; bottom:100%; left:50%;
+  transform:translateX(-50%); margin-bottom:3px; font-size:8px; font-weight:800; letter-spacing:.04em;
+  color:var(--accent); background:var(--accent-bg); border:1px solid var(--accent-bd);
+  border-radius:4px; padding:1px 7px; white-space:nowrap; pointer-events:none; }
+/* Run trail: a node that finished this run (green = ran ok, red = action failed).
+   Defined before .running so the live amber glow still wins on the active node. */
+.wf-node.ran-ok   { border-color:#2fa55a; box-shadow:0 0 0 1px #2fa55a, 0 2px 6px rgba(31,146,84,.18); }
+.wf-node.ran-fail { border-color:#cf4b43; box-shadow:0 0 0 1px #cf4b43, 0 2px 6px rgba(207,75,67,.20); }
+/* Reached-but-not blocks: a finished run never entered these (a branch not
+   taken). Their top accent bar reds out and the whole block dims, so the path
+   that DID run stays the bright green trail and the skipped paths recede. */
+.wf-node.ran-skip { border-top-color:#cf4b43 !important; opacity:.5; }
+/* Structural kinds set their own accent colour. Terminals (start/end/stop) also
+   keep a faint header tint so the flow's entry/exit points stand out. */
+.wf-node.start { --node-accent:var(--ok); }
+.wf-node.start .wf-node-hd { background:var(--ok-bg); }
+.wf-node.end, .wf-node.stop { --node-accent:var(--err); }
+.wf-node.end .wf-node-hd, .wf-node.stop .wf-node-hd { background:var(--err-bg); }
+.wf-node.condition { --node-accent:#9a78e6; }
+.wf-node.loop { --node-accent:#e0a64b; }
+.wf-node.call { --node-accent:#7c3aed; }
+/* Per-category accent colour, placed AFTER the kind rules so it also colours the
+   image/ocr/logic condition blocks (action + condition nodes carry a cat class). */
+.wf-node.cat-basic { --node-accent:#6f9be8; }
+.wf-node.cat-image { --node-accent:#2fb0a3; }
+.wf-node.cat-ocr   { --node-accent:#e0954b; }
+.wf-node.cat-logic { --node-accent:#9a78e6; }
+.wf-node.cat-flow  { --node-accent:#e0a64b; }
+.wf-node.cat-misc  { --node-accent:#9aa6b4; }
+.wf-node.conn-target { box-shadow:0 0 0 2px var(--ok); }
+/* ── Merged blocks (vertical stack) ───────────────────────────────────────────
+   Members of a merge share a `node.stack` id and sit flush; the join edges and
+   the ports between them are hidden so the stack reads as one block. A node
+   joined at its top/bottom loses that corner's radius and top accent bar. */
+.wf-node.wf-stacked { box-shadow:0 0 0 1px var(--accent-bd), var(--sh-md); }
+.wf-node.wf-stacked.sel { box-shadow:0 0 0 2px var(--accent-bd), var(--sh-md); }
+.wf-node.wf-stk-jtop { border-top-width:1px; border-top-color:var(--border2);
+  border-top-left-radius:0; border-top-right-radius:0; }
+.wf-node.wf-stk-jbot { border-bottom-left-radius:0; border-bottom-right-radius:0; }
+/* Drag preview: a bold accent bar on the edge the dragged block will snap onto. */
+.wf-node.wf-merge-bot { box-shadow:0 4px 0 -1px var(--accent), var(--sh-md); }
+.wf-node.wf-merge-top { box-shadow:0 -4px 0 -1px var(--accent), var(--sh-md); }
+/* ── Groups (frames) ──────────────────────────────────────────────────────────
+   A named rectangle drawn behind the nodes. Moving its header moves every node
+   inside it. The body is click-through (pointer-events:none) so nodes stay usable;
+   only the header tab + resize handle are interactive. */
+.wf-group { position:absolute; z-index:0; border:1.5px dashed; border-radius:10px; pointer-events:none; }
+.wf-group.sel { border-style:solid; box-shadow:0 0 0 1px currentColor; }
+.wf-group-hd { position:absolute; left:-1.5px; top:-23px; max-width:280px; height:22px; display:flex; align-items:center; gap:6px;
+  padding:0 4px 0 9px; border-radius:8px 8px 0 0; font-size:11px; font-weight:700; color:#fff;
+  pointer-events:auto; cursor:move; white-space:nowrap; }
+.wf-group-name { overflow:hidden; text-overflow:ellipsis; }
+.wf-group-del { color:#fff; opacity:.85; line-height:0; padding:2px; border-radius:4px; flex-shrink:0; cursor:pointer; display:flex; align-items:center; }
+.wf-group-del svg { width:12px; height:12px; display:block; }
+.wf-group-del:hover { opacity:1; background:rgba(255,255,255,.25); }
+.wf-group-resize { position:absolute; right:-5px; bottom:-5px; width:14px; height:14px; cursor:nwse-resize; pointer-events:auto;
+  border-right:2.5px solid currentColor; border-bottom:2.5px solid currentColor; border-bottom-right-radius:9px; opacity:.6; }
+.wf-group-resize:hover { opacity:1; }
+/* Context menu */
+#wf-ctxmenu { position:fixed; z-index:50; display:none; min-width:140px; background:var(--panel);
+  border:1px solid var(--border2); border-radius:8px; box-shadow:0 6px 22px rgba(20,30,45,.18); padding:4px; }
+.wf-ctx-item { padding:7px 10px; font-size:12px; color:var(--ink); border-radius:5px; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:8px; }
+.wf-ctx-item:hover { background:var(--accent-bg); color:var(--accent); }
+.wf-ctx-ico { display:flex; align-items:center; color:var(--muted); }
+.wf-ctx-ico svg { width:14px; height:14px; display:block; }
+.wf-ctx-item:hover .wf-ctx-ico { color:var(--accent); }
+/* The block the engine is on right now: a solid yellow "đang đợi / đang chạy"
+   fill (not just a glow) so it's unmistakable even when other blocks already
+   carry the green/red trail. Overrides ran-ok/ran-fail (defined earlier). */
+.wf-node.running { border-color:#f59e0b !important; background:#fff4d6;
+  box-shadow:0 0 0 3px rgba(245,158,11,.40), 0 0 16px rgba(245,158,11,.6) !important; animation:wfRun 1s ease-in-out infinite; }
+.wf-node.running .wf-node-hd { background:#fde68a; border-bottom-color:#f1c84b; }
+.wf-node.running .wf-node-title { color:#7a4f0a; }
+.wf-node-eye { color:var(--muted); line-height:0; padding:2px; border-radius:4px; flex-shrink:0; cursor:pointer; display:flex; align-items:center; }
+.wf-node-eye svg { width:13px; height:13px; display:block; }
+.wf-node-eye:hover { color:var(--accent); background:var(--accent-bg); }
+.wf-node-eye.on { color:var(--accent); }
+/* Compact preview band — sits flush at the bottom of the node. Reduced from 68px
+   to keep nodes small; scale-down never upscales so tiny crops stay crisp. */
+.wf-node-thumb { display:block; width:100%; height:44px; object-fit:scale-down;
+  background:#f0f2f5 repeating-conic-gradient(#e6e9ef 0% 25%, transparent 0% 50%) 50%/8px 8px;
+  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:2px; }
+/* Multi-template strip: tighter row of thumbnails, one per OR-image. */
+.wf-node-thumbs { display:flex; flex-wrap:wrap; align-items:center; gap:2px; padding:3px;
+  background:#f0f2f5 repeating-conic-gradient(#e6e9ef 0% 25%, transparent 0% 50%) 50%/8px 8px;
+  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); min-height:28px; }
+.wf-node-thumb-sm { width:32px; height:24px; object-fit:scale-down; border:1px solid var(--border);
+  border-radius:3px; background:var(--panel); flex-shrink:0; }
+/* On hover the node rises above neighbours so the thumbnail is not obscured. */
+.wf-node.has-thumb:hover { z-index:var(--z-node-hover); }
+.wf-tpl-preview { display:block; max-width:100%; max-height:150px; object-fit:contain; margin-top:6px;
+  border:1px solid var(--border2); border-radius:6px; background:#1a1d21; }
+.wf-tpl-empty { font-size:10px; color:var(--muted); margin-top:5px; font-style:italic; }
+.wf-var-card { border:1px solid var(--border2); border-radius:7px; padding:6px; margin-top:6px; background:var(--panel); display:flex; flex-direction:column; gap:5px; }
+.wf-var-row { display:flex; align-items:center; gap:5px; }
+.wf-var-chip { cursor:grab; font-size:13px; flex-shrink:0; padding:2px; border:1px solid var(--border2); border-radius:5px; background:var(--panel); }
+.wf-var-chip:hover { border-color:var(--accent); background:var(--accent-bg); }
+.wf-var-chip:active { cursor:grabbing; }
+.wf-var-row select { font-size:11px; padding:3px 4px; }
+.wf-var-row .cb { width:17px; height:17px; border-radius:5px; border:1.5px solid #cfd5dd; background:var(--panel); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+.wf-var-row .cb.checked { background:var(--accent); border-color:var(--accent); }
+.wf-var-row .cb svg { opacity:0; } .wf-var-row .cb.checked svg { opacity:1; }
+@keyframes wfRun { 0%,100%{ box-shadow:0 0 0 3px rgba(245,158,11,.30), 0 0 10px rgba(245,158,11,.45);} 50%{ box-shadow:0 0 0 3px rgba(245,158,11,.55), 0 0 20px rgba(245,158,11,.8);} }
+.wf-node.note { width:170px; border:1px solid #e7d5a4; background:#fdf6e9; }
+.wf-node.note .wf-node-hd { background:transparent; border-bottom:1px dashed #e7d5a4; }
+.wf-node.note .wf-node-sum { white-space:normal; color:#7a5b12; font-family:var(--sans); font-size:11px; }
+.wf-node.note .wf-node-title { color:#7a5b12; }   /* keep sticky-note blocks cohesive */
+.wf-selbox { position:absolute; border:1px solid var(--accent); background:rgba(47,111,237,.10); z-index:1; pointer-events:none; border-radius:2px; }
+.wf-node { cursor:grab; }
+.wf-node:active { cursor:grabbing; }
+/* Node header: tinted per-category via --nhd-bg/--nhd-bd CSS vars; default keeps existing light-purple for uncategorised nodes. */
+.wf-node-hd { display:flex; align-items:center; gap:6px; padding:7px 9px;
+  border-bottom:1px solid var(--nhd-bd,#ece3fb); background:var(--nhd-bg,#f4eefe);
+  border-radius:var(--node-r) var(--node-r) 0 0; }
+.wf-node.collapsed .wf-node-hd { border-bottom:none; border-radius:var(--node-r); }
+.wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:15px; height:15px; }
+.wf-node .ico svg { width:15px; height:15px; display:block; }
+.wf-node.call .ico { font-style:italic; font-weight:700; }
+/* Node title: driven by --ntitle (set per-category); falls back to purple for structural kinds. */
+.wf-node-title { font-size:11.5px; font-weight:700; color:var(--ntitle,#7c3aed); flex:1; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Keep the title clear of the top-right "T"/"F" port labels on branch nodes. */
+.wf-node.has-tf .wf-node-title { padding-right:14px; }
+/* Per-category node header+title (action/condition nodes only — structural kinds keep own styling above) */
+.wf-node.cat-basic  { --nhd-bg:#eef5ff; --nhd-bd:#c5d8f5; --ntitle:#2d64cc; }
+.wf-node.cat-input  { --nhd-bg:#eef0ff; --nhd-bd:#c4c6f5; --ntitle:#4338ca; }
+.wf-node.cat-image  { --nhd-bg:#ecfdf9; --nhd-bd:#99e6d4; --ntitle:#0f766e; }
+.wf-node.cat-ocr    { --nhd-bg:#fff7ed; --nhd-bd:#fbc99a; --ntitle:#c2610f; }
+.wf-node.cat-flow   { --nhd-bg:#fffbeb; --nhd-bd:#f7d97e; --ntitle:#b45309; }
+.wf-node.cat-logic  { --nhd-bg:#f5f3ff; --nhd-bd:#d8c8f7; --ntitle:#6d28d9; }
+.wf-node.cat-misc   { --nhd-bg:#f3f4f6; --nhd-bd:#d1d5db; --ntitle:#374151; }
+/* Structural kinds that lack a cat class: give them matching header tints */
+.wf-node.loop       { --nhd-bg:#fff8ea; --nhd-bd:#f4d97a; --ntitle:#b45309; }
+.wf-node.call       { --nhd-bg:#f5f3ff; --nhd-bd:#d8c8f7; --ntitle:#6d28d9; }
+.wf-node.switch     { --nhd-bg:#f5f3ff; --nhd-bd:#d8c8f7; --ntitle:#6d28d9; }
+.wf-node.parallel   { --nhd-bg:#eef5ff; --nhd-bd:#c5d8f5; --ntitle:#2d64cc; }
+/* Validation badge: a node missing a template / not wired in shows an amber "!" so
+   broken flows are obvious before you even run them. Hover for the reason(s). */
+.wf-node-warn { position:absolute; top:-8px; right:-8px; width:16px; height:16px; border-radius:50%;
+  background:#f3b51a; color:#3a2c05; font-size:10px; font-weight:800; line-height:16px; text-align:center;
+  box-shadow:0 1px 3px rgba(20,30,45,.3); z-index:3; cursor:help; }
+.wf-node.has-warn { border-color:#e6a417; }
+.wf-node-sum { font-family:var(--mono); font-size:9.5px; color:var(--muted); padding:5px 9px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-node-note { display:flex; align-items:flex-start; gap:5px; font-size:9.5px; font-style:italic;
+  color:var(--muted); background:transparent; border-top:1px solid var(--line);
+  border-radius:0 0 var(--node-r) var(--node-r); padding:4px 8px 5px; white-space:normal;
+  word-break:break-word; line-height:1.4; }
+.wf-node-note svg { width:9px; height:9px; flex-shrink:0; margin-top:1.5px; opacity:.4; }
+/* Runtime log line: text auto-emitted to the log panel each time this block runs. */
+.wf-node-log { font-size:9.5px; color:#2f6b8f; background:#eef6fb;
+  border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:4px 9px; white-space:normal; word-break:break-word; }
+.wf-node-log::before { content:""; display:inline-block; width:11px; height:11px; vertical-align:-1px; margin-right:4px; background:currentColor; -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; }
+
+/* Ports */
+.wf-port { position:absolute; width:13px; height:13px; border-radius:50%; background:var(--panel);
+  border:2px solid var(--muted); cursor:crosshair; z-index:2; }
+.wf-port:hover { border-color:var(--accent); background:var(--accent-bg); }
+.wf-port.in  { left:-7px; top:9px; }
+.wf-port.out { right:-7px; }
+/* A loop's second input — the 'lặp' (loop-back) port — is amber-ringed so it
+   reads as the place a block wires back to, distinct from the plain 'vào' entry. */
+.wf-port.in.loop { border-color:#e0a64b; background:#fff7ea; }
+.wf-port.in.loop:hover { border-color:var(--accent); background:var(--accent-bg); }
+.wf-port-row { position:absolute; right:-7px; display:flex; align-items:center; }
+.wf-port-lbl { position:absolute; right:14px; font-size:8.5px; font-weight:700; color:var(--muted); white-space:nowrap; }
+/* Input-side labels sit in the gutter to the LEFT of the node (mirroring the
+   right-side output labels), so 'vào' / 'lặp' don't collide with node content. */
+.wf-port-lbl.in { right:auto; left:-34px; width:28px; text-align:right; }
+.wf-port-lbl.in.loop { color:#c2841f; }
+.wf-port.out.t { border-color:#2fa55a; } .wf-port.out.f { border-color:#e07428; }
+/* Run trail on ports: the output taken this run (filled green) vs the skipped
+   true/false sibling (filled red). */
+.wf-port.out.took    { border-color:#2fa55a; background:#2fa55a; }
+.wf-port.out.nottook { border-color:#cf4b43; background:#cf4b43; }
+
+/* Right inspector */
+#wf-inspector { width:236px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
+#wf-insp-body { flex:1; min-height:0; overflow-y:auto; padding:4px 12px 12px; display:flex; flex-direction:column; gap:8px; }
+.wf-insp-empty { font-size:11.5px; color:var(--muted); line-height:1.6; padding-top:6px; }
+.wf-field { display:flex; align-items:center; gap:6px; }
+.wf-field > label { font-size:10.5px; color:var(--dim); font-weight:600; min-width:58px; flex-shrink:0; }
+.wf-field > input[type=text], .wf-field > input[type=number] { flex:1; min-width:0; }
+.wf-field .cb { width:17px; height:17px; border-radius:5px; border:1.5px solid #cfd5dd; background:var(--panel);
+  display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+.wf-field .cb.checked { background:var(--accent); border-color:var(--accent); }
+.wf-field .cb svg { opacity:0; } .wf-field .cb.checked svg { opacity:1; }
+.wf-insp-sec { font-size:10px; font-weight:700; letter-spacing:.05em; color:var(--muted); text-transform:uppercase; margin-top:4px; }
+/* Optional region-crop panel in the inspector: 2×2 grid of X/Y/W/H inputs. */
+.wf-region-panel { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:2px; border:1px solid var(--border2); border-radius:5px; padding:3px; background:var(--surface); width:100%; box-sizing:border-box; }
+.wf-region-cell { display:flex; }
+.wf-region-cell input { width:100%; min-width:0; box-sizing:border-box; text-align:center; padding:2px 1px; font-size:10px; height:20px; background:var(--panel); }
+.wf-empty-note { font-size:11.5px; color:var(--muted); padding:6px 2px; text-align:center; }

@@ -719,6 +719,22 @@ class WorkflowEngine:
         return (int(params.get("x", 0)), int(params.get("y", 0)),
                 int(params.get("w", 200)), int(params.get("h", 80)))
 
+    @staticmethod
+    def _search_region(params: Dict) -> Optional[tuple]:
+        """Optional (x, y, w, h) crop to restrict a template search to.
+
+        Reads ``regionX/Y/W/H`` (set by the designer's optional "Vùng tìm" group
+        on image nodes). Returns ``None`` when the crop is empty or covers the
+        whole screen — i.e. when there's effectively no restriction.
+        """
+        x = int(params.get("regionX", 0) or 0)
+        y = int(params.get("regionY", 0) or 0)
+        w = int(params.get("regionW", 0) or 0)
+        h = int(params.get("regionH", 0) or 0)
+        if w <= 0 or h <= 0:
+            return None
+        return (x, y, w, h)
+
     def _templates_list(self, params: Dict) -> List[str]:
         """Resolved template paths for an "…_any" node.
 
@@ -736,16 +752,16 @@ class WorkflowEngine:
             items = [str(params.get("template"))]
         return [self._resolve_template(it) for it in items if it.strip()]
 
-    def _find_any(self, templates: List[str], threshold: float):
+    def _find_any(self, templates: List[str], threshold: float, region=None):
         """(x, y) of the first listed template currently on screen, or ``None``.
         Sequential: stops at the first match (list order is the priority order)."""
         for tpl in templates:
-            res = self.auto.find_template(tpl, threshold=threshold)
+            res = self.auto.find_template(tpl, threshold=threshold, region=region)
             if res:
                 return (res[0], res[1])
         return None
 
-    def _find_any_parallel(self, templates: List[str], threshold: float):
+    def _find_any_parallel(self, templates: List[str], threshold: float, region=None):
         """Check all templates concurrently; return position of whichever matches first.
         Unlike the sequential variant, list order does NOT determine priority —
         the template actually visible on screen wins."""
@@ -756,7 +772,7 @@ class WorkflowEngine:
 
         def check(tpl: str) -> None:
             try:
-                res = self.auto.find_template(tpl, threshold=threshold)
+                res = self.auto.find_template(tpl, threshold=threshold, region=region)
                 if res:
                     with lock:
                         results.append((res[0], res[1]))
@@ -772,7 +788,7 @@ class WorkflowEngine:
         return results[0] if results else None
 
     def _wait_any(self, templates: List[str], timeout: float, threshold: float,
-                  parallel: bool = False):
+                  parallel: bool = False, region=None):
         """Poll until ANY listed template appears, or ``timeout``. Pause/stop aware.
 
         ``wait_for_template`` waits on one specific image, so for an OR-over-images
@@ -785,7 +801,7 @@ class WorkflowEngine:
         end = time.time() + max(0.0, timeout)
         while not self._stop.is_set():
             self._pause.wait()
-            hit = finder(templates, threshold)
+            hit = finder(templates, threshold, region=region)
             if hit:
                 return hit
             if time.time() >= end:
@@ -798,7 +814,7 @@ class WorkflowEngine:
             tpl = self._resolve_template(params.get("template", ""))
             threshold = float(params.get("threshold", 0.85))
             negate = bool(params.get("negate", False))
-            res = self.auto.find_template(tpl, threshold=threshold)
+            res = self.auto.find_template(tpl, threshold=threshold, region=self._search_region(params))
             if res:
                 self._last_pos = (res[0], res[1])
             return (res is not None) != negate
@@ -807,7 +823,7 @@ class WorkflowEngine:
             negate = bool(params.get("negate", False))
             parallel = params.get("mode", "sequential") == "parallel"
             finder = self._find_any_parallel if parallel else self._find_any
-            hit = finder(templates, float(params.get("threshold", 0.85)))
+            hit = finder(templates, float(params.get("threshold", 0.85)), region=self._search_region(params))
             if hit:
                 self._last_pos = hit
             return (hit is not None) != negate
@@ -816,7 +832,7 @@ class WorkflowEngine:
             parallel = params.get("mode", "sequential") == "parallel"
             hit = self._wait_any(templates, float(params.get("timeout", 10.0)),
                                  float(params.get("threshold", 0.85)),
-                                 parallel=parallel)
+                                 parallel=parallel, region=self._search_region(params))
             if hit:
                 self._last_pos = hit
                 log_info(f"[workflow] 🔍 thấy ảnh ({hit[0]}, {hit[1]})")
@@ -827,7 +843,7 @@ class WorkflowEngine:
             parallel = params.get("mode", "sequential") == "parallel"
             hit = self._wait_any(templates, float(params.get("timeout", 10.0)),
                                  float(params.get("threshold", 0.85)),
-                                 parallel=parallel)
+                                 parallel=parallel, region=self._search_region(params))
             if not hit:
                 return False  # no match — false branch fires; no log (tap-miss is expected)
             self._last_pos = hit
@@ -839,6 +855,7 @@ class WorkflowEngine:
             res = self.auto.wait_for_template(
                 tpl, timeout=float(params.get("timeout", 10.0)),
                 threshold=float(params.get("threshold", 0.85)),
+                region=self._search_region(params),
             )
             if not res:
                 return False  # not found — false branch fires; no log (tap-miss is expected)
@@ -850,6 +867,7 @@ class WorkflowEngine:
             res = self.auto.wait_for_template(
                 tpl, timeout=float(params.get("timeout", 10.0)),
                 threshold=float(params.get("threshold", 0.85)),
+                region=self._search_region(params),
             )
             if res:
                 self._last_pos = (res[0], res[1])
@@ -887,7 +905,8 @@ class WorkflowEngine:
                 if self._stop.is_set():
                     return False
                 self._pause.wait()
-                res = self.auto.find_template(template, threshold=threshold)
+                res = self.auto.find_template(template, threshold=threshold,
+                                              region=self._search_region(params))
                 if res:
                     self._last_pos = (res[0], res[1])
                     log_info(f"[workflow] 🔍 thấy ảnh sau {i} lần vuốt ({res[0]}, {res[1]})")
@@ -995,6 +1014,58 @@ class WorkflowEngine:
         self.running = False
         self._emit("on_stop")
         log_success("[workflow] Stopped")
+
+    def run_single_node(self, node: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute one node in isolation (no graph walk), on the calling thread.
+
+        Used by the designer's "Chạy block này" context-menu action: it fires
+        the same on_node / on_node_done callbacks as a real run so the UI paints
+        the block amber then green/red, and the log panel streams the node's
+        output. Conditions report the taken branch; actions report ok/fail.
+
+        Returns ``{status, port}`` so the caller can relay the outcome.
+        """
+        if self.running:
+            log_warning("[workflow] Đang chạy — không thể chạy 1 block")
+            return {"status": "busy", "port": None}
+        if not self._ensure_ready():
+            return {"status": "error", "port": None}
+        nid = node.get("id")
+        ntype = node.get("type")
+        params = node.get("params", {}) or {}
+        spec = NODE_TYPES.get(ntype)
+        kind = spec.get("kind") if spec else None
+        self._emit("on_node", nid)
+        port: Optional[str] = None
+        status = "ok"
+        try:
+            if kind == "condition":
+                res = self._eval_condition(ntype, params)
+                port = "true" if res else "false"
+            elif kind in ("start", "end", "note", "stop"):
+                # Terminals/notes have no side-effects; just report ok.
+                port = None
+            elif kind in ("loop", "parallel", "join", "random", "switch", "call"):
+                # Structural nodes don't make sense standalone; report no-op.
+                log_info(f"[workflow] Block '{ntype}' là cấu trúc — chạy trong luồng")
+                port = None
+            else:
+                handler = self._actions.get(ntype)
+                if handler is not None:
+                    ok_act = handler(node, params) is not False
+                    status = "ok" if ok_act else "fail"
+                    port = "out"
+                else:
+                    log_warning(f"[workflow] Unknown node: {ntype}")
+                    status = "fail"
+                    port = "out"
+        except Exception as e:
+            log_error(f"[workflow] Node '{ntype}' error: {e}")
+            status = "fail"
+            port = "out"
+        self._emit("on_node_done", nid, status, port)
+        self._emit("on_node", None)  # clear the amber highlight
+        return {"status": status, "port": port}
 
     # ── Speedhack ────────────────────────────────────────────────────────────
 

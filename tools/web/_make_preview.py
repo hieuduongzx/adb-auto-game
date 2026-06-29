@@ -1,14 +1,23 @@
-"""Dev-only: build a self-contained preview of workflow_designer.html.
+"""Dev-only: build a self-contained preview of the workflow designer UI.
 
-Injects a stub `window.pywebview.api` so the page boots without the Python
-backend, then seeds a sample workflow so the canvas/sidebar render real nodes.
-Used only to screenshot the layout during UI work; safe to delete.
+Inlines wf/css + wf/js into wf/index.html, then injects a stub
+`window.pywebview.api` so the page boots without the Python backend, and seeds
+a sample workflow so the canvas/sidebar render real nodes. Used only to
+screenshot the layout during UI work; safe to delete.
 """
-import sys, os
+import sys, os, re
 
-SRC = os.path.join(os.path.dirname(__file__), "workflow_designer.html")
-OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
+HERE   = os.path.dirname(os.path.abspath(__file__))
+WF_DIR = os.path.join(HERE, "wf")
+SRC    = os.path.join(WF_DIR, "index.html")
+OUT    = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     os.environ.get("TEMP", "."), "wf_preview.html")
+
+
+def _read(p):
+    with open(p, encoding="utf-8") as f:
+        return f.read()
+
 
 STUB = """<script>
 window.pywebview = { api: new Proxy({}, { get:(t,k)=> (...a)=> Promise.resolve(
@@ -59,7 +68,16 @@ SEED = """<script>
 </script>
 """
 
-html = open(SRC, encoding="utf-8").read()
+html = _read(SRC)
+
+# Inline every <link rel="stylesheet" href="..."> and <script src="...">.
+html = re.sub(r'<link rel="stylesheet" href="([^"]+)">',
+              lambda m: "<style>\n" + _read(os.path.join(WF_DIR, m.group(1))) + "\n</style>",
+              html)
+html = re.sub(r'<script src="([^"]+)">\s*</script>',
+              lambda m: "<script>\n" + _read(os.path.join(WF_DIR, m.group(1))) + "\n</script>",
+              html)
+
 html = html.replace("<script>", STUB + "<script>", 1)
 html = html.replace("</body>", SEED + "</body>", 1)
 open(OUT, "w", encoding="utf-8").write(html)

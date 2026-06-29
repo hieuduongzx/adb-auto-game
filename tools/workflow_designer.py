@@ -639,6 +639,56 @@ class WorkflowDesignerAPI:
     def workflow_running(self) -> bool:
         return bool(self._engine and self._engine.is_running())
 
+    def workflow_run_node(self, node_json: str, flow_json: str = "") -> bool:
+        """Run a single node in isolation (no graph walk) — context-menu action.
+
+        ``flow_json`` is the current serialized workflow so template paths resolve
+        against the same templates dir. The engine fires the node on the calling
+        thread and emits the same on_node / on_node_done callbacks a real run does,
+        so the canvas paints the block amber→green/red.
+        """
+        if self.controller.device is None:
+            log_error("Chưa chọn thiết bị để chạy block")
+            return False
+        try:
+            node = json.loads(node_json)
+            flow = json.loads(flow_json) if flow_json else None
+        except Exception as exc:
+            log_error(f"JSON không hợp lệ: {exc}")
+            return False
+        if self._engine is None:
+            self._engine = WorkflowEngine()
+        if self._engine.is_running():
+            log_warning("Workflow đang chạy")
+            return False
+        serial = self._connected_serial or self._selected_serial
+        try:
+            if serial:
+                self._engine.auto.adb.device_id = serial
+                self._engine.auto.adb.select_device(serial)
+        except Exception as exc:
+            log_warning(f"Không thể chọn thiết bị cho engine: {exc}")
+        # Load the current flow (templates base + functions) so the node runs
+        # against the same assets as a full run. Anchor to the open file if any.
+        anchor = self._wf_path or os.path.join(_PROJECT_ROOT, "flow.json")
+        try:
+            if flow:
+                self._engine.load(flow, flow_path=anchor)
+            else:
+                log_warning("Không có flow để nạp cho block")
+        except Exception as exc:
+            log_warning(f"Không nạp được flow cho block: {exc}")
+        # Re-bind the same GUI callbacks a full test run uses.
+        self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
+        self._engine.callbacks["on_node_done"] = [
+            lambda nid, st, port: self._push("node_result", {"id": nid, "status": st, "port": port})]
+        try:
+            self._engine.run_single_node(node)
+        except Exception as exc:
+            log_error(f"Chạy block lỗi: {exc}")
+            return False
+        return True
+
     # ── Standalone speed hack (manual ▶, independent of the test run) ──────────
 
     def _sh_push(self, active: bool, running: bool) -> None:
@@ -805,7 +855,7 @@ class WorkflowDesignerAPI:
 
 def create_workflow_designer_window(title: str = "Workflow2k") -> webview.Window:
     api = WorkflowDesignerAPI()
-    html_path = os.path.join(_WEB_DIR, "workflow_designer.html")
+    html_path = os.path.join(_WEB_DIR, "wf", "index.html")
     url = f"file:///{html_path.replace(os.sep, '/')}"
     window = webview.create_window(
         title=title,

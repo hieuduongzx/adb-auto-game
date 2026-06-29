@@ -1,0 +1,25 @@
+// ── Keyboard (workflow shortcuts) ─────────────────────────────────────────────
+window.addEventListener("keydown", e => {
+  const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  if((e.key==="s"||e.key==="S") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); wfSave(); return; }
+  if(typing) return;   // below here: canvas shortcuts only (let inputs keep native Ctrl+C/V)
+  if((e.key==="c"||e.key==="C") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCopy(); } return; }
+  if((e.key==="x"||e.key==="X") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCut(); } return; }
+  if((e.key==="v"||e.key==="V") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); wfPaste(wfPointer.inside?{clientX:wfPointer.x,clientY:wfPointer.y}:null); return; }
+  if((e.key==="d"||e.key==="D") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfDuplicate(); } return; }
+  if(e.key===" "){ wfSpace=true; }
+  if(e.key==="Delete"||e.key==="Backspace"){ if(WF.sel.length){ e.preventDefault(); wfDeleteSelected(); return; } }
+  if((e.key==="a"||e.key==="A") && (e.ctrlKey||e.metaKey)){ const g=wfGraph(); if(g){ e.preventDefault(); WF.sel=g.nodes.map(n=>n.id); WF.selectedNode=null; wfMarkSel(); wfRenderInspector(); return; } }
+  if((e.key==="f"||e.key==="F") && !e.ctrlKey && !e.metaKey){ e.preventDefault(); wfFit(); return; }
+  if(e.key==="Escape"){ if(wfGroupMode) wfSetGroupMode(false); wfClearSel(); wfMarkSel(); wfRenderInspector(); }
+  if(e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown"){
+    if(WF.sel.length){ e.preventDefault();
+      const dx=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0;
+      const dy=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0;
+      const step=e.shiftKey?10:1;
+      const g=wfGraph(); if(g){ WF.sel.forEach(id=>{ const n=g.nodes.find(x=>x.id===id); if(n){ n.x+=dx*step; n.y+=dy*step; } }); wfRenderCanvas(); }
+    }
+    return;
+  }
+});
+window.addEventListener("keyup", e => { if(e.key===" ") wfSpace=false; });

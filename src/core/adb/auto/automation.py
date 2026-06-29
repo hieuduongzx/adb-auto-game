@@ -364,6 +364,7 @@ class ADBGameAutomation:
         use_grayscale: bool = False,
         multi_scale: Optional[bool] = None,
         last_screen: bool = False,
+        region: Optional[Tuple[int, int, int, int]] = None,
     ) -> Optional[Tuple[int, int, float]]:
         """Find template in screen with performance tracking"""
         start_time = time.time()
@@ -395,7 +396,8 @@ class ADBGameAutomation:
 
         result = self.matcher.match(
             screen, template, threshold=threshold,
-            use_grayscale=use_grayscale, multi_scale=multi_scale, scales=scales
+            use_grayscale=use_grayscale, multi_scale=multi_scale, scales=scales,
+            region=region,
         )
 
         match_time = time.time() - start_time
@@ -458,6 +460,7 @@ class ADBGameAutomation:
         timeout: float = 10.0,
         interval: float = 0.5,
         threshold: Optional[float] = None,
+        region: Optional[Tuple[int, int, int, int]] = None,
     ) -> Optional[Tuple[int, int, float]]:
         """Wait for template to appear on screen"""
         threshold = self._resolve_threshold(threshold)
@@ -473,7 +476,7 @@ class ADBGameAutomation:
                 log_debug(f"[WAIT TEMPLATE] Interrupted: {template_name}")
                 return None
             attempts += 1
-            result = self.find_template(template_name, threshold=threshold)
+            result = self.find_template(template_name, threshold=threshold, region=region)
             if result:
                 elapsed = time.time() - start_time
                 log_debug(
