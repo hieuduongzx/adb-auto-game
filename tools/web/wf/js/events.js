@@ -31,6 +31,12 @@ window.__recv = function(raw){
 
 // ── Log drawer ────────────────────────────────────────────────────────────────
 function updateLogCount(){ const c=$("log-count"), b=$("log-body"); if(c&&b) c.textContent = b.children.length? String(b.children.length):""; }
+function wfToggleVarsPanel(ev){
+  if(ev && ev.target.closest(".wf-vars-actions")) return;
+  wfVarsCollapsed = !wfVarsCollapsed;
+  wfRenderVarsPanel();
+}
+
 function wfToggleLog(ev){
   if(ev && ev.target.closest(".btn-log-clear")) return;   // let "Xoá" act without toggling
   const c=$("log-card"); if(!c) return;

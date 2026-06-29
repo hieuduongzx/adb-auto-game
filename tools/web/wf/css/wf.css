@@ -160,9 +160,9 @@
 .wf-layout-bar { position:absolute; left:10px; bottom:10px; display:flex; gap:4px;
   background:var(--panel); border:1px solid var(--border2); border-radius:9px;
   box-shadow:var(--sh-md); padding:5px; z-index:5; }
-.wf-layout-btn { width:30px; height:30px; padding:0; border:1px solid transparent;
-  border-radius:6px; background:var(--alt); color:var(--dim); cursor:pointer;
-  font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center; }
+  .wf-layout-btn { width:30px; height:30px; padding:0; border:1px solid transparent;
+    border-radius:6px; background:var(--alt); color:var(--dim); cursor:pointer;
+    font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center; transition:color .1s, border-color .1s, background .1s; }
 .wf-layout-btn:hover { color:var(--accent); background:var(--accent-bg); border-color:var(--accent-bd); }
 
 /* Activities + Functions panel — pinned bottom-right of the canvas.
@@ -215,7 +215,8 @@
   .wf-vars-panel.collapsed { max-height:34px; }
   .wf-vars-hdr { display:flex; align-items:center; gap:5px;
       padding:6px 10px; cursor:pointer; background:var(--surface); border-bottom:1px solid var(--border2);
-      user-select:none; min-height:32px; }
+      user-select:none; min-height:32px; transition: background .1s; }
+  .wf-vars-hdr:hover { background:var(--alt); }
 .wf-vars-title { font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
   color:var(--dim); }
 .wf-vars-count { font-family:var(--mono); font-size:9.5px; color:var(--muted); background:var(--alt);
