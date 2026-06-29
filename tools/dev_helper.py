@@ -140,10 +140,12 @@ class DevHelperAPI:
         # When launched from the Workflow Designer this points at the workflow's
         # templates/ folder, so crops/screenshots bundle with that workflow.
         self._out_dir: str = DEFAULT_OUT_DIR
+        self._pinned_out_dir = False
         if out_dir:
             try:
                 os.makedirs(out_dir, exist_ok=True)
                 self._out_dir = os.path.abspath(out_dir)
+                self._pinned_out_dir = True
             except Exception:
                 pass
 
@@ -665,6 +667,23 @@ class DevHelperAPI:
         if re.search(r"_\d+_\d+_\d+_\d+(?:\.\d+)?$", base):
             return path
         return f"{base}{suffix}{ext}"
+
+    def _pkg_subdir(self) -> str:
+        """Return the QuickCrop output folder.
+
+        Standalone DevScope keeps crops grouped under ``out/<package>/``. When
+        Workflow2k launches DevScope with a workflow templates folder, that folder
+        is already the target bundle, so QuickCrop must not create a package
+        subfolder or the designer will not find ``templates/<file>`` assets.
+        """
+        if self._pinned_out_dir:
+            os.makedirs(self._out_dir, exist_ok=True)
+            return self._out_dir
+        pkg = _safe_detect_app(self.controller.device) if self.controller.device is not None else None
+        clean = _sanitize_name(pkg or "unknown_app") or "unknown_app"
+        out_dir = os.path.join(self._out_dir, clean)
+        os.makedirs(out_dir, exist_ok=True)
+        return out_dir
 
     def quick_crop(self, name: str = "") -> bool:
         """Save the current region crop without a dialog, into ``out/<package>/``.

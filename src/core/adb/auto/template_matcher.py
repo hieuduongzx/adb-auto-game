@@ -68,7 +68,7 @@ class TemplateMatcher:
                 "max_size": self._max_cache_size,
                 "templates": list(self._cache.keys()),
             }
-    
+
     def match(
         self,
         screen: np.ndarray,

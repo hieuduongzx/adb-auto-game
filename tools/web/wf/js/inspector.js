@@ -66,7 +66,7 @@ function wfRenderInspector(){
 
     // Parameters.
     if(node.type==="call"){ body.appendChild(wfCallPicker(node)); }
-    else if(node.type==="switch"){ body.appendChild(wfSwitchCasesEditor(node)); }
+    else if(node.type==="switch" || node.type==="try_chain"){ body.appendChild(wfBranchCountEditor(node)); }
     else {
       if(!(def.fields||[]).length){
         const d=document.createElement("div"); d.className="wf-insp-tip"; d.textContent="Node này không có tham số."; body.appendChild(d);
@@ -325,7 +325,7 @@ function wfFieldEl(node,f){
     const wrap=document.createElement("div"); wrap.appendChild(row);
     const img=document.createElement("img"); img.className="wf-tpl-preview"; wrap.appendChild(img);
     wfLoadThumb(img, node.params[f.k]);
-      const refresh=v=>{ node.params[f.k]=v; wfApplyRegionFromTplName(node,v); wfUpdNodeSum(node); wfLoadThumb(img,v); wfUpdNodePreview(node); wfRenderCanvas(); };
+      const refresh=v=>{ node.params[f.k]=v; wfUpdNodeSum(node); wfLoadThumb(img,v); wfUpdNodePreview(node); wfRenderCanvas(); };
     inp.oninput=()=>refresh(inp.value);
     btn.onclick=async()=>{ const p=await api().pick_template(); if(p){ inp.value=p; refresh(p); } };
     return wrap;
@@ -346,7 +346,7 @@ function wfTplsField(node,f,row){
       const pick=document.createElement("button"); pick.className="btn sm"; pick.textContent="Chọn…";
       const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá ảnh";
       const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img, path);
-      const commit=v=>{ arr()[idx]=v; wfApplyRegionFromTplName(node,v); wfUpdNodeSum(node); wfUpdNodePreview(node); wfLoadThumb(img,v); wfRenderCanvas(); };
+      const commit=v=>{ arr()[idx]=v; wfUpdNodeSum(node); wfUpdNodePreview(node); wfLoadThumb(img,v); wfRenderCanvas(); };
       inp.oninput=()=>commit(inp.value);
       pick.onclick=async()=>{ const pp=await api().pick_template(); if(pp){ inp.value=pp; commit(pp); } };
       del.onclick=()=>{ arr().splice(idx,1); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
@@ -357,7 +357,7 @@ function wfTplsField(node,f,row){
   }
   renderList();
   const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Ảnh";
-  add.onclick=async()=>{ const pp=await api().pick_template(); arr().push(pp||""); wfApplyRegionFromTplName(node,pp||""); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
+  add.onclick=async()=>{ const pp=await api().pick_template(); arr().push(pp||""); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
   row.appendChild(list); row.appendChild(add);
   return row;
 }
@@ -392,8 +392,10 @@ function wfRegionField(node,f){
       node.params.regionX=0; node.params.regionY=0; node.params.regionW=0; node.params.regionH=0;
       x.input.value=y.input.value=w.input.value=h.input.value="";
     } else {
+      wfApplyRegionFromTplName(node, wfTemplatePathForRegion(node));
       if(!node.params.regionW) node.params.regionW=540;
       if(!node.params.regionH) node.params.regionH=960;
+      x.input.value=node.params.regionX||""; y.input.value=node.params.regionY||"";
       w.input.value=node.params.regionW; h.input.value=node.params.regionH;
     }
     sync();
@@ -402,12 +404,67 @@ function wfRegionField(node,f){
   return wrap;
 }
 
+// Shared branch-count editor for dynamic branch blocks. Switch keeps detailed
+// per-branch conditions; try_chain only needs numbered output ports.
+function wfBranchCountEditor(node){
+  return node.type==="switch" ? wfSwitchCasesEditor(node) : wfCountBranchesEditor(node);
+}
+
+function wfNormalizeCount(v, fallback, min=1){
+  const n=parseInt(v,10);
+  return Math.max(min, Number.isFinite(n)?n:fallback);
+}
+
+function wfBranchCountControl(label, count, onSet, onAdd, min=1){
+  const row=document.createElement("div"); row.className="wf-field wf-branch-count";
+  const lab=document.createElement("label"); lab.textContent=label; row.appendChild(lab);
+  const inp=document.createElement("input"); inp.type="number"; inp.min=String(min); inp.step="1"; inp.value=count;
+  inp.title="Nhập số nhánh để thêm/xoá nhanh";
+  inp.onchange=()=>{ const n=wfNormalizeCount(inp.value, count, min); inp.value=n; onSet(n); };
+  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Nhánh"; add.title="Thêm một nhánh";
+  add.onclick=()=>onAdd();
+  row.appendChild(inp); row.appendChild(add);
+  return row;
+}
+
+function wfSetTryChainCount(node, nextCount){
+  const prev=wfNormalizeCount(node.params.count, 3);
+  node.params.count=nextCount;
+  if(nextCount<prev){
+    const g=wfGraph();
+    if(g) g.edges=(g.edges||[]).filter(e=>!(e.from===node.id && /^\d+$/.test(e.fromPort) && parseInt(e.fromPort,10)>nextCount));
+  }
+  wfUpdNodeSum(node); wfRenderCanvas();
+}
+
+function wfCountBranchesEditor(node){
+  const wrap=document.createElement("div");
+  const count=()=>wfNormalizeCount(node.params.count, 3);
+  const render=()=>{ wrap.innerHTML="";
+    wrap.appendChild(wfBranchCountControl("Số nhánh", count(), n=>{ wfSetTryChainCount(node,n); render(); }, ()=>{ wfSetTryChainCount(node,count()+1); render(); }));
+    const hint=document.createElement("div"); hint.className="wf-insp-tip";
+    hint.textContent="Chạy nhánh #1 trước; nếu fail thì thử #2…#n. Khi tất cả fail sẽ đi cổng 'fail'.";
+    wrap.appendChild(hint);
+  };
+  render();
+  return wrap;
+}
+
 // Switch case editor.
 function wfSwitchCasesEditor(node){
   const wrap=document.createElement("div");
   const cases=()=> Array.isArray(node.params.cases)?node.params.cases:(node.params.cases=[]);
+  const addCase=()=>cases().push({type:"if_image", params:wfDefaults("if_image")});
+  const setCaseCount=n=>{
+    const cs=cases();
+    while(cs.length<n) addCase();
+    while(cs.length>n) wfRemoveSwitchCase(node, cs.length-1);
+    wfUpdNodeSum(node); wfRenderCanvas();
+  };
   const list=document.createElement("div"); list.style.cssText="display:flex;flex-direction:column;gap:8px;";
   function render(){
+    const countCtl=wrap.querySelector(".wf-branch-count input");
+    if(countCtl) countCtl.value=cases().length;
     list.innerHTML="";
     cases().forEach((c,idx)=>{
       const item=document.createElement("div"); item.className="wf-case";
@@ -429,14 +486,13 @@ function wfSwitchCasesEditor(node){
       (WF_NODES[c.type].fields||[]).forEach(f=> item.appendChild(wfFieldEl(proxy,f)));
       list.appendChild(item);
     });
-    if(!cases().length){ const e=document.createElement("div"); e.className="wf-insp-tip"; e.textContent='Chưa có nhánh. Bấm "+ Nhánh".'; list.appendChild(e); }
+    if(!cases().length){ const e=document.createElement("div"); e.className="wf-insp-tip"; e.textContent='Chưa có nhánh. Bấm "+ Nhánh" hoặc nhập số nhánh.'; list.appendChild(e); }
   }
-  render();
-  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Nhánh";
-  add.onclick=()=>{ cases().push({type:"if_image", params:wfDefaults("if_image")}); render(); wfRenderCanvas(); wfUpdNodeSum(node); };
+  const countCtl=wfBranchCountControl("Số nhánh", cases().length, n=>{ setCaseCount(n); render(); }, ()=>{ addCase(); render(); wfRenderCanvas(); wfUpdNodeSum(node); }, 0);
   const hint=document.createElement("div"); hint.className="wf-insp-tip";
   hint.textContent="Kiểm lần lượt từ trên xuống: đúng nhánh nào đi cổng đó (#1..#n), không khớp đi cổng 'khác'.";
-  wrap.appendChild(list); wrap.appendChild(add); wrap.appendChild(hint);
+  wrap.appendChild(countCtl); wrap.appendChild(list); wrap.appendChild(hint);
+  render();
   return wrap;
 }
 

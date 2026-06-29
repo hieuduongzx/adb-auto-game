@@ -25,16 +25,6 @@ function wfSerialize(){
 function wfHydrateGraph(g){
   g=g||{nodes:[],edges:[]};
   let nodes=(g.nodes||[]).map(n=>({id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params:n.params||wfDefaults(n.type),note:n.note||"",log:n.log||"",showPreview:!!n.showPreview,stack:n.stack||null}));
-  nodes.forEach(n=>{
-    // Auto-fill region from template filename on load, but never overwrite an
-    // existing explicit region (e.g. a user-edited value or a prior auto-fill).
-    const def=WF_NODES[n.type];
-    const hasRegion=def&&(def.fields||[]).some(f=>f.t==="region");
-    if(hasRegion && !(n.params.regionX||n.params.regionY||n.params.regionW||n.params.regionH)){
-      const tpl=n.params.template || (Array.isArray(n.params.templates)?n.params.templates[0]:"") || "";
-      wfApplyRegionFromTplName(n, tpl);
-    }
-  });
   if(!nodes.some(n=>n.type==="start")) nodes.unshift({id:wfUid(),type:"start",x:40,y:40,params:{}});
   const groups=(g.groups||[]).map(gr=>({id:gr.id||("g"+wfUid().slice(1)),name:gr.name||"Nhóm",x:gr.x||0,y:gr.y||0,w:gr.w||200,h:gr.h||140,color:gr.color||0}));
   return { nodes, edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort||"out",to:e.to,toPort:e.toPort||"in"})), groups };
