@@ -97,6 +97,7 @@ const WF_NODES = {
   parse_var:  {label:"Tách → biến",ico:"scissors",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"Vùng OCR"},{v:"var",t:"Từ biến"}],d:"region"},{k:"fromVar",lbl:"Biến nguồn",t:"text",d:"",var:true},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
   loop:       {label:"Lặp lại",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"count",t:"num",d:3},{k:"infinite",t:"bool",d:true}], sum:p=>p.infinite?"∞ vô cực":`${p.count}×`},
   parallel:   {label:"Song song", ico:"parallel",kind:"parallel",cat:"flow", outs:[], fields:[{k:"count",lbl:"Số luồng",t:"num",d:3,refresh:true}], sum:p=>`${p.count||3} luồng song song`},
+  try_chain:  {label:"Thử lần lượt",ico:"git_branch",kind:"try_chain",cat:"flow", outs:[], fields:[{k:"count",lbl:"Số nhánh",t:"num",d:3,refresh:true}], sum:p=>`${p.count||3} nhánh · fail thì thử nhánh kế`},
   join:       {label:"Gộp",       ico:"git_merge",kind:"join",  cat:"flow", outs:["out"], fields:[], sum:()=>"chờ tất cả luồng → tiếp"},
   "break":    {label:"Thoát vòng",ico:"octagon",kind:"action",cat:"flow",  outs:["out"], fields:[], sum:()=>"break"},
   stop:       {label:"Dừng tất cả",ico:"octagon",kind:"stop", cat:"flow",  outs:[],      fields:[], sum:()=>"dừng phiên"},
@@ -118,9 +119,35 @@ const WF_NODES = {
   notify:        {label:"Thông báo",      ico:"bell",   kind:"action",    cat:"misc",   outs:["out"],         fields:[{k:"title",lbl:"Tiêu đề",t:"text",d:"Workflow"},{k:"message",lbl:"Nội dung",t:"text",d:"Đã hoàn thành!"},{k:"sound",lbl:"Phát âm thanh",t:"bool",d:true}], sum:p=>`🔔 [${p.title||"Workflow"}] ${p.message||""}`},
 };
 const WF_CATS = [ {key:"basic",label:"Cơ bản"}, {key:"input",label:"Phím & Nhập liệu"}, {key:"image",label:"Hình ảnh"}, {key:"ocr",label:"Văn bản (OCR)"}, {key:"flow",label:"Luồng"}, {key:"logic",label:"Biến / Điều kiện"}, {key:"misc",label:"Khác"} ];
-const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"lặp", done:"xong", "1":"1", "2":"2", "3":"3" };
+const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"lặp", done:"xong", fail:"fail", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
 const WF_IN_LBL = { in:"vào", loop:"lặp" };
+
+// Parse a filename like ``btn_ok_120_340_80_40.png`` into {x,y,w,h}.
+// Works on the basename (with or without extension). Returns null if no
+// _<int>_<int>_<int>_<int> suffix is found.
+function wfParseRegionFromName(path){
+  if(!path) return null;
+  const base = path.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
+  const m = base.match(/_(\d+)_(\d+)_(\d+)_(\d+)$/);
+  if(!m) return null;
+  return { x:parseInt(m[1],10), y:parseInt(m[2],10), w:parseInt(m[3],10), h:parseInt(m[4],10) };
+}
+
+function wfApplyRegionFromTplName(node, tplPath){
+  // Only fill region from the filename when the node supports it and the user
+  // hasn't explicitly configured one yet. This keeps manual overrides intact.
+  const def = WF_NODES[node.type];
+  const hasRegion = def && (def.fields||[]).some(f => f.t === "region");
+  if(!hasRegion) return;
+  const r = wfParseRegionFromName(tplPath);
+  if(!r) return;
+  // If any region coordinate is already non-zero, don't overwrite the user's choice.
+  if(node.params.regionX || node.params.regionY || node.params.regionW || node.params.regionH) return;
+  node.params.regionX = r.x; node.params.regionY = r.y;
+  node.params.regionW = r.w; node.params.regionH = r.h;
+}
+
 function wfIns(type){ const def=WF_NODES[type]; return (def&&def.ins)||["in"]; }
 
 // edit = which graph the canvas is showing: an activity or a function.

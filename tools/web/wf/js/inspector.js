@@ -325,7 +325,7 @@ function wfFieldEl(node,f){
     const wrap=document.createElement("div"); wrap.appendChild(row);
     const img=document.createElement("img"); img.className="wf-tpl-preview"; wrap.appendChild(img);
     wfLoadThumb(img, node.params[f.k]);
-      const refresh=v=>{ node.params[f.k]=v; wfUpdNodeSum(node); wfLoadThumb(img,v); wfUpdNodePreview(node); wfRenderCanvas(); };
+      const refresh=v=>{ node.params[f.k]=v; wfApplyRegionFromTplName(node,v); wfUpdNodeSum(node); wfLoadThumb(img,v); wfUpdNodePreview(node); wfRenderCanvas(); };
     inp.oninput=()=>refresh(inp.value);
     btn.onclick=async()=>{ const p=await api().pick_template(); if(p){ inp.value=p; refresh(p); } };
     return wrap;
@@ -346,7 +346,7 @@ function wfTplsField(node,f,row){
       const pick=document.createElement("button"); pick.className="btn sm"; pick.textContent="Chọn…";
       const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá ảnh";
       const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img, path);
-      const commit=v=>{ arr()[idx]=v; wfUpdNodeSum(node); wfUpdNodePreview(node); wfLoadThumb(img,v); wfRenderCanvas(); };
+      const commit=v=>{ arr()[idx]=v; wfApplyRegionFromTplName(node,v); wfUpdNodeSum(node); wfUpdNodePreview(node); wfLoadThumb(img,v); wfRenderCanvas(); };
       inp.oninput=()=>commit(inp.value);
       pick.onclick=async()=>{ const pp=await api().pick_template(); if(pp){ inp.value=pp; commit(pp); } };
       del.onclick=()=>{ arr().splice(idx,1); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
@@ -357,7 +357,7 @@ function wfTplsField(node,f,row){
   }
   renderList();
   const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Ảnh";
-  add.onclick=async()=>{ const pp=await api().pick_template(); arr().push(pp||""); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
+  add.onclick=async()=>{ const pp=await api().pick_template(); arr().push(pp||""); wfApplyRegionFromTplName(node,pp||""); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
   row.appendChild(list); row.appendChild(add);
   return row;
 }

@@ -368,10 +368,12 @@ function wfNodeEl(n){
   const tfCls = ((def.outs||[]).includes("true") || n.type==="switch") ? " has-tf" : "";
   el.className="wf-node "+def.kind+catCls+tfCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"");
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
-  // Switch has dynamic output ports (one per case + default) — grow the card so
-  // they all sit inside it (ports stack at top = 9 + i*19).
-  if(n.type==="switch"){
-    const portCount=((n.params&&n.params.cases)||[]).length+1;
+  // Dynamic output ports — grow the card so they all sit inside it (ports stack
+  // at top = 9 + i*19).
+  if(n.type==="switch"||n.type==="try_chain"){
+    const portCount = n.type==="switch"
+      ? ((n.params&&n.params.cases)||[]).length+1
+      : Math.max(1,parseInt(n.params&&n.params.count)||3)+1;
     el.style.minHeight=(9 + (portCount-1)*19 + 16)+"px";
   }
   // Merged-block membership: hide the join port at the joined edge and flatten
@@ -426,10 +428,12 @@ function wfNodeEl(n){
     });
   }
   // output ports (hidden when this member feeds the next block in its stack).
-  // Switch builds its ports from the case list: c0..c{n-1} + default.
+  // Switch builds its ports from the case list: c0..c{n-1} (one per case,
+  // including "else") + the shared "default" fallback port.
   let outs;
   if(intOut) outs=[];
   else if(n.type==="switch") outs=((n.params&&n.params.cases)||[]).map((_,i)=>"c"+i).concat(["default"]);
+  else if(n.type==="try_chain") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1)).concat(["fail"]);
   else if(n.type==="parallel"||n.type==="random_branch") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||(n.type==="parallel"?3:2))},(_,i)=>String(i+1));
   else outs=(def.outs||[]);
   outs.forEach((port,i)=>{
@@ -440,7 +444,7 @@ function wfNodeEl(n){
     el.appendChild(op);
     let lblTxt;
     if(n.type==="switch") lblTxt = (port==="default") ? "khác" : "#"+(i+1);
-    else if(n.type==="parallel"||n.type==="random_branch") lblTxt = port;
+    else if(n.type==="parallel"||n.type==="random_branch"||n.type==="try_chain") lblTxt = port;
     else lblTxt = WF_PORT_LBL[port];
     if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+1)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl); }
   });

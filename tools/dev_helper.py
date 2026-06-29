@@ -158,9 +158,9 @@ class DevHelperAPI:
         self._region: Optional[Tuple[int, int, int, int]] = None
         self._overlay: List[Tuple[int, int, int, int, float]] = []
 
-        # Auto-refresh.
+        # Auto-refresh. Default to 20 Hz so DevScope feels like a live mirror.
         self._auto_refresh_enabled = True
-        self._refresh_hz = 5.0
+        self._refresh_hz = 20.0
         self._last_auto_capture = 0.0
 
         # Background workers.
@@ -601,7 +601,9 @@ class DevHelperAPI:
         x, y, w, h = region
         crop = self._screen[y:y + h, x:x + w].copy()
         clean = _sanitize_name(name)
-        default = (f"{clean}_{w}x{h}.png" if clean else f"region_{_ts()}_{w}x{h}.png")
+        # Filename embeds the region so Workflow2k can auto-fill a search region.
+        default = (f"{clean}_{x}_{y}_{w}_{h}.png" if clean
+                   else f"region_{_ts()}_{x}_{y}_{w}_{h}.png")
         dialog_ok = True
         paths = None
         out_dir = self._out_dir
@@ -634,36 +636,33 @@ class DevHelperAPI:
 
         if not path.lower().endswith((".png", ".jpg", ".jpeg")):
             path += ".png"
+        # If the user edits the filename and removes coords, we still try to inject
+        # the current region back in when the name contains no coordinate suffix.
+        path = self._ensure_region_in_filename(path, x, y, w, h)
         if cv2.imwrite(path, crop):
             log_success(f"Saved crop: {path}")
             return True
         log_error(f"Failed to write {path}")
         return False
 
-    def _pkg_subdir(self) -> str:
-        """Output subfolder named after the foreground app's package.
+    def _ensure_region_in_filename(self, path: str, x: int, y: int, w: int, h: int) -> str:
+        """Make sure a saved crop filename ends with _x_y_w_h.ext.
 
-        QuickCrop drops crops into ``out/<package>/`` so assets are grouped per
-        game (mirroring the per-game folder convention of the workflow designer).
-        Falls back to the output root when no package can be detected.
+        If the user-supplied path already has a coordinate suffix, leave it alone.
+        Otherwise rewrite the basename so Workflow2k can parse the region later.
         """
-        pkg = ""
-        try:
-            if self.controller.device is not None:
-                pkg = _safe_detect_app(self.controller.device) or ""
-        except Exception:
-            pkg = ""
-        # Package names are already path-safe ([A-Za-z0-9_.]); strip anything else.
-        pkg = re.sub(r"[^A-Za-z0-9_.]+", "_", pkg).strip("._")
-        out = os.path.join(self._out_dir, pkg) if pkg else self._out_dir
-        os.makedirs(out, exist_ok=True)
-        return out
+        base, ext = os.path.splitext(path)
+        suffix = f"_{x}_{y}_{w}_{h}"
+        if re.search(r"_\d+_\d+_\d+_\d+(?:\.\d+)?$", base):
+            return path
+        return f"{base}{suffix}{ext}"
 
     def quick_crop(self, name: str = "") -> bool:
         """Save the current region crop without a dialog, into ``out/<package>/``.
 
         Uses ``name`` (sanitized) when non-empty, otherwise falls back to
-        ``crop_<timestamp>_<W>x<H>.png`` so no prompt interrupts the flow.
+        ``crop_<timestamp>_<x>_<y>_<w>_<h>.png`` so no prompt interrupts the flow.
+        The filename embeds the region so Workflow2k can auto-fill it.
         """
         region = self._region
         if self._screen is None or not region:
@@ -674,11 +673,11 @@ class DevHelperAPI:
         out_dir = self._pkg_subdir()
         clean = _sanitize_name(name)
         if clean:
-            fname = f"{clean}_{w}x{h}.png"
+            fname = f"{clean}_{x}_{y}_{w}_{h}.png"
             if os.path.exists(os.path.join(out_dir, fname)):
-                fname = f"{clean}_{_ts()}_{w}x{h}.png"
+                fname = f"{clean}_{_ts()}_{x}_{y}_{w}_{h}.png"
         else:
-            fname = f"crop_{_ts()}_{w}x{h}.png"
+            fname = f"crop_{_ts()}_{x}_{y}_{w}_{h}.png"
         path = os.path.join(out_dir, fname)
         if cv2.imwrite(path, crop):
             log_success(f"QuickCrop: {path}")

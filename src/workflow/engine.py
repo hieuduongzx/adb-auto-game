@@ -108,6 +108,10 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "if_var":     {"label": "Nếu biến",      "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     "loop":       {"label": "Lặp lại",       "kind": "loop",      "ins": 1, "outs": ["body", "done"]},
     "parallel":   {"label": "Chạy song song","kind": "parallel",  "ins": 1, "outs": []},
+    # Sequential fallback: run branch 1; if that branch fails (a block returns
+    # false), stop that branch and try branch 2, then 3... If every wired branch
+    # fails, continue from the "fail" port.
+    "try_chain":  {"label": "Thử lần lượt",  "kind": "try_chain", "ins": 1, "outs": []},
     # Output ports are dynamic (count param) so outs is left empty here; the
     # engine reads params["count"] at runtime and the designer renders them live.
     "join":       {"label": "Gộp",           "kind": "join",      "ins": 1, "outs": ["out"]},
@@ -272,6 +276,25 @@ class WorkflowEngine:
     def _break_loop(self, value: bool) -> None:
         self._ctx.break_loop = value
 
+    # Set True the moment an action node in the current branch returns False
+    # (tap miss, wait_image timeout, set_var error...). try_chain reads it after
+    # each branch to decide whether to fall through to the next one.
+    @property
+    def _branch_failed(self) -> bool:
+        return getattr(self._ctx, "branch_failed", False)
+
+    @_branch_failed.setter
+    def _branch_failed(self, value: bool) -> None:
+        self._ctx.branch_failed = value
+
+    @property
+    def _try_chain_mode(self) -> bool:
+        return getattr(self._ctx, "try_chain_mode", False)
+
+    @_try_chain_mode.setter
+    def _try_chain_mode(self, value: bool) -> None:
+        self._ctx.try_chain_mode = value
+
     # ── Callbacks ────────────────────────────────────────────────────────────
 
     def on(self, event: str, fn: Callable) -> None:
@@ -416,6 +439,8 @@ class WorkflowEngine:
         self._vars = self._seed_vars(act)
         self._last_pos = None
         self._break_loop = False
+        self._branch_failed = False
+        self._try_chain_mode = False
         self._emit("on_activity_start", act)
         for k, v in self._vars.items():
             self._emit("on_var", k, v)
@@ -505,6 +530,9 @@ class WorkflowEngine:
                 res = self._eval_condition(ntype, params)
                 port = "true" if res else "false"
                 self._emit("on_node_done", nid, "ok", port)  # branch taken
+                if self._try_chain_mode and not res:
+                    self._branch_failed = True
+                    break
                 nxt = self._next(adj, cur, port)
                 cur = nxt if nxt is not None else self._next(adj, cur, "out")
             elif kind == "loop":
@@ -557,6 +585,51 @@ class WorkflowEngine:
                 log_info(f"[workflow] 🎲 ngẫu nhiên → nhánh {chosen}/{count}")
                 self._emit("on_node_done", nid, "ok", chosen)
                 cur = self._next(adj, cur, chosen)
+            elif kind == "try_chain":
+                count = max(1, int(params.get("count", 3)))
+                ports = [str(i + 1) for i in range(count)]
+                vars0 = dict(self._vars)
+                pos0 = self._last_pos
+                break0 = self._break_loop
+                failed0 = self._branch_failed
+                try0 = self._try_chain_mode
+
+                success = False
+                attempted = 0
+                for port in ports:
+                    if self._stop.is_set():
+                        break
+                    tgt = self._next(adj, cur, port)
+                    if not tgt:
+                        continue
+                    attempted += 1
+                    log_info(f"[workflow] thử nhánh {port}/{count}")
+                    self._emit("on_node_done", nid, "ok", port)
+                    self._vars = dict(vars0)
+                    self._last_pos = pos0
+                    self._break_loop = False
+                    self._branch_failed = False
+                    self._try_chain_mode = True
+                    self._walk(nodes, adj, tgt, {}, depth)
+                    if not self._branch_failed:
+                        log_success(f"[workflow] nhánh {port} thành công")
+                        success = True
+                        break
+                    log_warning(f"[workflow] nhánh {port} fail → thử nhánh kế")
+
+                self._try_chain_mode = try0
+                self._break_loop = break0
+                if success:
+                    # The successful branch already walked to its own end.
+                    self._branch_failed = failed0
+                    break
+                self._vars = dict(vars0)
+                self._last_pos = pos0
+                self._branch_failed = failed0
+                self._emit("on_node_done", nid, "fail", "fail")
+                if attempted:
+                    log_warning("[workflow] tất cả nhánh thử lần lượt đều fail")
+                cur = self._next(adj, cur, "fail")
             elif kind == "switch":
                 # Evaluate each case top-to-bottom; first true wins its port "c{i}".
                 taken = "default"
@@ -584,6 +657,8 @@ class WorkflowEngine:
                     log_info(f"[workflow] ƒ {fn.get('name', fid)}")
                     self._run_graph(fn.get("graph", {}) or {}, depth + 1)
                 self._emit("on_node_done", nid, "ok", "out")
+                if self._try_chain_mode and self._branch_failed:
+                    break
                 cur = self._next(adj, cur, "out")
             else:  # action (or unknown -> just follow out)
                 ok_act = True
@@ -592,14 +667,18 @@ class WorkflowEngine:
                     try:
                         ok_act = handler(node, params) is not False  # only explicit False = fail
                         if not ok_act:
+                            self._branch_failed = True
                             label = (NODE_TYPES.get(ntype, {}).get("label") or ntype)
                             log_warning(f"[workflow] ✖ '{label}' không thực hiện được")
                     except Exception as e:
                         log_error(f"[workflow] Node '{ntype}' error: {e}")
                         ok_act = False
+                        self._branch_failed = True
                 else:
                     log_warning(f"[workflow] Unknown node: {ntype}")
                 self._emit("on_node_done", nid, "ok" if ok_act else "fail", "out")
+                if self._try_chain_mode and not ok_act:
+                    break
                 cur = self._next(adj, cur, "out")
         return True
 
