@@ -102,8 +102,10 @@ async function init(){
   (state.log||[]).forEach(appendLog);
   try{ const st=await api().get_settings(); wfSnapOn=!!st.snap; wfPreviewAll=!!st.previewAll;
     if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); }
-    if(st.sideW){ const sd=$("wf-side"); if(sd) sd.style.width=Math.max(150,Math.min(480,st.sideW))+"px"; } }catch{}
+    if(st.sideW){ const sd=$("wf-side"); if(sd) sd.style.width=Math.max(150,Math.min(480,st.sideW))+"px"; }
+    if(st.inspW){ const insp=$("wf-inspector"); if(insp) insp.style.width=Math.max(180,Math.min(520,st.inspW))+"px"; } }catch{}
   wfInitSideResizer();
+  wfInitInspResizer();
   wfSetupSortable($("wf-activities"));
   if($("wf-functions")) wfSetupSortable($("wf-functions"));
   wfSyncToggleBtns();

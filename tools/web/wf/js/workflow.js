@@ -140,7 +140,7 @@ let wfFreshVar=null;       // name of the most-recently-changed var (brief highl
 let wfVarsCollapsed=false;
 let wfActCollapsed=false;
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
-function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined}); }catch{} }
+function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined, inspW: insp?insp.offsetWidth:undefined}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
   const s=$("wf-snap-btn"); if(s){ s.title="Bám lưới: "+(wfSnapOn?"Bật":"Tắt"); s.classList.toggle("on",wfSnapOn); }
@@ -221,6 +221,14 @@ function wfInitSideResizer(){
   rez.__wired=true; let drag=null;
   rez.addEventListener("mousedown",e=>{ e.preventDefault(); drag={x:e.clientX, w:side.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
   window.addEventListener("mousemove",e=>{ if(!drag) return; side.style.width=Math.max(150, Math.min(480, drag.w+(e.clientX-drag.x)))+"px"; });
+  window.addEventListener("mouseup",()=>{ if(!drag) return; drag=null; rez.classList.remove("drag"); document.body.style.cursor=""; wfSaveSettings(); });
+}
+// Drag-to-resize the right inspector; width persists in settings.
+function wfInitInspResizer(){
+  const insp=$("wf-inspector"), rez=$("wf-insp-resizer"); if(!insp||!rez||rez.__wired) return;
+  rez.__wired=true; let drag=null;
+  rez.addEventListener("mousedown",e=>{ e.preventDefault(); drag={x:e.clientX, w:insp.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
+  window.addEventListener("mousemove",e=>{ if(!drag) return; insp.style.width=Math.max(180, Math.min(520, drag.w-(e.clientX-drag.x)))+"px"; });
   window.addEventListener("mouseup",()=>{ if(!drag) return; drag=null; rez.classList.remove("drag"); document.body.style.cursor=""; wfSaveSettings(); });
 }
 // Fit & center all blocks of the current graph into the canvas. Uses the live DOM
