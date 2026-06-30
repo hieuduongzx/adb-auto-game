@@ -38,9 +38,9 @@ function wfBezier(a,b){
 
   // ── Backward ngang (dy nhỏ): U-turn gọn — ra phải, xuống dưới, sang trái, vào ─
   if(dx < -10 && ady < 40){
-    const h=Math.max(55, Math.min(adx*0.35, 120));
+    const h=Math.max(15, Math.min(adx*0.25, 30));
     const outX=a.x+h, inX=b.x-h;
-    const vOff=35;
+    const vOff=45;
     const midY=(a.y+b.y)/2 + vOff;
     return `M${a.x},${a.y} L${outX},${a.y} L${outX},${midY} L${inX},${midY} L${inX},${b.y} L${b.x},${b.y}`;
   }
