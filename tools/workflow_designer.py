@@ -158,7 +158,7 @@ class WorkflowDesignerAPI:
         self._capture_lock = threading.Lock()
         self._capture_in_flight = False
         self._auto_refresh_enabled = False
-        self._refresh_hz = 10.0
+        self._refresh_hz = 30.0
         self._last_auto_capture = 0.0
 
         # DevScope-style tool state shared with the Preview tab's tool panel:

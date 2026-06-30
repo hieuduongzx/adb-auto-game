@@ -13,7 +13,7 @@ function wfNewGraph(){ return { nodes:[{id:wfUid(),type:"start",x:60,y:70,params
 // A "merged" block is a vertical stack of nodes shown flush and moved as one.
 // Membership is a shared `node.stack` id; their order is the REAL sequential
 // edges between them, so the engine runs them in order with no special-casing.
-// Drop a block just above/below another to merge; right-click → "Bỏ merge".
+// Drop a block just above/below another to merge; right-click → "Unmerge".
 // Supported: action, call, AND condition nodes. For condition nodes the "true"
 // (success) port is the sequential continuation; "false" stays free externally.
 const wfStackId=()=>"st"+Math.random().toString(36).slice(2,8);
@@ -80,7 +80,7 @@ function wfMergeInsert(dragId, targetId, where){
     g.edges.push({from:dragId,fromPort:dfp,to:targetId,toPort:"in"});
   }
   wfSelectOne(dragId); wfRenderCanvas(); wfRenderInspector();
-  setStatus("Đã gộp khối");
+  setStatus("Blocks merged");
 }
 // Find where a lone dragged block would merge: the nearest mergeable block whose
 // top/bottom edge it landed flush against. Returns {target, where} or null.
@@ -131,14 +131,14 @@ function wfUnmerge(sid){
   chain.forEach(n=>{ const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
     n.x=x; n.y=y; y += (el?el.offsetHeight:46)+26; });
   wfRenderCanvas(); wfRenderInspector();
-  setStatus("Đã bỏ merge");
+  setStatus("Unmerged");
 }
 
 function wfAddActivity(type){
   wfPushUndo();
   const n=WF.activities.filter(a=>a.type===type).length+1;
   const id=type+"_"+wfUid().slice(1,5);
-  const act={id, name:(type==="background"?"Tác vụ nền ":"Hoạt động ")+n, type,
+  const act={id, name:(type==="background"?"Background task ":"Activity ")+n, type,
     enabled:true, maxRetries:1, pollInterval:1.0, vars:[], graph:wfNewGraph()};
   WF.activities.push(act); WF.edit={kind:"activity",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
   if(typeof wfActTab==="function") wfActTab(type==="background"?"bg":"seq");
@@ -147,7 +147,7 @@ function wfAddActivity(type){
 function wfDeleteActivity(id,ev){
   ev&&ev.stopPropagation();
   const i=WF.activities.findIndex(a=>a.id===id); if(i<0)return;
-  if(!confirm(`Xoá hoạt động "${WF.activities[i].name}"?`))return;
+  if(!confirm(`Delete activity "${WF.activities[i].name}"?`))return;
   wfPushUndo();
   WF.activities.splice(i,1);
   if(WF.edit.kind==="activity"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
@@ -158,7 +158,7 @@ function wfToggleActivity(id,ev){ ev&&ev.stopPropagation(); const a=wfActById(id
 
 // ── Functions (reusable subroutines, used via a "call" node) ──────────────────
 function wfAddFunction(){
-  const name=(prompt("Tên function (vd: Về Home):","")||"").trim();
+  const name=(prompt("Function name (e.g. Go Home):","")||"").trim();
   if(!name) return;
   wfPushUndo();
   const id="fn_"+wfUid().slice(1,6);
@@ -171,7 +171,7 @@ function wfEditFunction(id,ev){ ev&&ev.stopPropagation(); WF.edit={kind:"functio
 function wfDeleteFunction(id,ev){
   ev&&ev.stopPropagation();
   const i=WF.functions.findIndex(f=>f.id===id); if(i<0)return;
-  if(!confirm(`Xoá function "${WF.functions[i].name}"? Các node gọi nó sẽ bị vô hiệu.`))return;
+  if(!confirm(`Delete function "${WF.functions[i].name}"? Nodes calling it will be disabled.`))return;
   wfPushUndo();
   WF.functions.splice(i,1);
   if(WF.edit.kind==="function"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }

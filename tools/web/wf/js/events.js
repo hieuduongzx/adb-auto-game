@@ -9,13 +9,13 @@ window.__recv = function(raw){
   if(type==="capture_backend"){
     S.captureBackend=data.backend||"scrcpy";
     const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
-    setStatus("Nguồn ảnh: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (nhanh/headless)"));
+    setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (nhanh/headless)"));
     return;
   }
   if(type==="workflow_state"){ wfSetRunning(!!data.running); return; }
   if(type==="capture_failed"){
     // From the Preview tab's live mirror — surface the error and refresh the empty state.
-    setStatus(`Chụp thất bại: ${data.error||""}`);
+    setStatus(`Capture failed: ${data.error||""}`);
     if(typeof wfPvErr!=="undefined"){ wfPvErr=String(data.error||""); if(!wfPvImg && wfPvActive) wfPvDrawEmpty(); }
     return;
   }
@@ -42,7 +42,7 @@ window.__recv = function(raw){
       android:"pv-i-android",abi:"pv-i-abi",screen_size:"pv-i-screen",density:"pv-i-density",
       app:"pv-i-app",battery:"pv-i-battery",ip:"pv-i-ip",uptime:"pv-i-uptime"};
     navigator.clipboard.writeText(Object.keys(D).map(k=>`${k}: ${$(D[k]).textContent}`).join("\n"));
-    setStatus("Đã sao chép thông tin thiết bị"); return;
+    setStatus("Device info copied"); return;
   }
   // Ignore node events for a graph we're not viewing (e.g. a function's internal
   // nodes while a call node runs) so the call block stays lit instead of the
@@ -57,8 +57,8 @@ window.__recv = function(raw){
   if(type==="activity_result"){ if(data.id) wfSetActStatus(data.id, data.status==="ok" ? null : "errored"); return; }
   if(type==="speedhack_state"){
     wfSpeedRunning=!!data.running; wfSyncSpeedUI();
-    if(data.running && data.active) setStatus("Speed hack đang chạy");
-    else if(!data.running) setStatus("Speed hack đã tắt");
+    if(data.running && data.active) setStatus("Speed hack is running");
+    else if(!data.running) setStatus("Speed hack is off");
     return;
   }
   if(type==="var_update"){ wfLiveVars[data.name]=data.value; wfRenderVarsPanel(); return; }
@@ -74,7 +74,7 @@ function wfToggleVarsPanel(ev){
 }
 
 function wfToggleLog(ev){
-  if(ev && ev.target.closest(".btn-log-clear")) return;   // let "Xoá" act without toggling
+  if(ev && ev.target.closest(".btn-log-clear")) return;   // let "Clear" act without toggling
   const c=$("log-card"); if(!c) return;
   const isCollapsed = c.classList.contains("collapsed");
   if (isCollapsed) {
@@ -98,14 +98,14 @@ async function onCaptureBackendChange(backend){
   const r=await api().set_capture_backend(backend);
   S.captureBackend=(r&&r.backend)||backend;
   const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
-  setStatus("Nguồn ảnh: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (nhanh/headless)"));
+  setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (nhanh/headless)"));
 }
-async function openDevHelper(){ try{ await api().open_dev_helper(JSON.stringify(wfSerialize())); setStatus("Đang mở DevScope…"); }catch{} }
+async function openDevHelper(){ try{ await api().open_dev_helper(JSON.stringify(wfSerialize())); setStatus("Opening DevScope…"); }catch{} }
 
 // New blank workflow.
 async function wfNew(){
   if((WF.activities.length || WF.functions.length) &&
-     !confirm("Tạo workflow mới? Các thay đổi chưa lưu sẽ mất.")) return;
+     !confirm("Create a new workflow? Unsaved changes will be lost.")) return;
   WF.name="My Workflow"; WF.version=2; WF.templatesDir="templates";
   WF.speedhack={enabled:false, speed:2.0, package:""};
   WF.activities=[]; WF.functions=[]; WF.edit={kind:"activity",id:null};
@@ -114,5 +114,5 @@ async function wfNew(){
   wfSyncSpeedUI();
   try{ await api().workflow_new(); }catch{}
   wfAddActivity("sequence");   // seed one activity so the canvas isn't empty
-  setStatus("Workflow mới");
+  setStatus("New workflow");
 }

@@ -23,13 +23,13 @@ function wfNodesInGroup(gr){
 }
 function wfAddGroup(x,y,w,h){
   const groups=wfGroups();
-  const gr={ id:"g"+wfUid().slice(1), name:"Nhóm "+(groups.length+1),
+  const gr={ id:"g"+wfUid().slice(1), name:"Group "+(groups.length+1),
     x:Math.round(x), y:Math.round(y), w:Math.round(w), h:Math.round(h), color:groups.length%WF_GROUP_COLORS.length };
-  groups.push(gr); wfRenderCanvas(); setStatus(`Đã tạo "${gr.name}" — kéo tiêu đề để di chuyển cả nhóm`);
+  groups.push(gr); wfRenderCanvas(); setStatus(`Created "${gr.name}" — drag the title to move the whole group`);
   return gr;
 }
 function wfDeleteGroup(id){ wfPushUndo(); const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); } }
-function wfRenameGroup(gr){ wfPushUndo(); const nm=prompt("Tên nhóm:", gr.name||""); if(nm!==null){ gr.name=(nm.trim()||gr.name); wfRenderCanvas(); } }
+function wfRenameGroup(gr){ wfPushUndo(); const nm=prompt("Group name:", gr.name||""); if(nm!==null){ gr.name=(nm.trim()||gr.name); wfRenderCanvas(); } }
 // Create a group hugging the current multi-selection (toolbar button shortcut).
 function wfGroupSelection(){
   const ids=WF.sel.slice(); if(ids.length<1) return false;
@@ -48,7 +48,7 @@ function wfGroupSelection(){
 // Resize an existing group to tightly wrap all its current member nodes.
 function wfFitGroup(gr){
   const members=wfNodesInGroup(gr);
-  if(!members.length){ setStatus('Nhóm "'+gr.name+'" không chứa block nào'); return; }
+  if(!members.length){ setStatus('Group "'+gr.name+'" contains no blocks'); return; }
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
   members.forEach(n=>{
     const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
@@ -60,7 +60,7 @@ function wfFitGroup(gr){
   gr.x=wfSnap(x0-pad); gr.y=wfSnap(y0-pad-22);
   gr.w=wfSnap((x1-x0)+pad*2); gr.h=wfSnap((y1-y0)+pad*2+22);
   wfRenderCanvas();
-  setStatus(`Đã khớp viền nhóm "${gr.name}"`);
+  setStatus(`Fit group bounds for "${gr.name}"`);
 }
 function wfRenderGroups(){
   const world=$("wf-world"), svg=$("wf-wires");
@@ -70,7 +70,7 @@ function wfRenderGroups(){
     const el=document.createElement("div"); el.className="wf-group"; el.dataset.group=gr.id;
     el.style.left=gr.x+"px"; el.style.top=gr.y+"px"; el.style.width=gr.w+"px"; el.style.height=gr.h+"px";
     el.style.borderColor=c.b; el.style.background=c.bg; el.style.color=c.b;
-    el.innerHTML=`<div class="wf-group-hd" style="background:${c.b}"><span class="wf-group-name">${escHtml(gr.name)}</span><button class="wf-group-del" title="Xoá nhóm (giữ lại các node)">${wfIco("x")}</button></div><div class="wf-group-resize"></div>`;
+    el.innerHTML=`<div class="wf-group-hd" style="background:${c.b}"><span class="wf-group-name">${escHtml(gr.name)}</span><button class="wf-group-del" title="Delete group (keep nodes)">${wfIco("x")}</button></div><div class="wf-group-resize"></div>`;
     world.insertBefore(el, svg);   // behind the wires + nodes
     const hd=el.querySelector(".wf-group-hd");
     hd.addEventListener("mousedown",e=>wfStartGroupMove(e,gr));
@@ -125,7 +125,7 @@ function wfHighlightTarget(id){
   document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("conn-target", !!id && el.dataset.node===id));
 }
 // When a node has >1 input (the loop), pick the input port nearest the drop
-// point so dropping low on a loop wires into its 'lặp' (loop-back) port.
+// point so dropping low on a loop wires into its 'loop' (loop-back) port.
 function wfNearestInPort(nodeId, clientX, clientY){
   const ports=[...document.querySelectorAll(`.wf-node[data-node="${nodeId}"] .wf-port.in`)];
   if(ports.length<=1) return "in";
@@ -178,7 +178,7 @@ function wfCanvasMouseDown(e){
 let wfGroupMode=false;
 function wfSetGroupMode(on){
   wfGroupMode=!!on;
-  const b=$("wf-group-btn"); if(b){ b.classList.toggle("on",wfGroupMode); b.title="Tạo nhóm: "+(wfGroupMode?"đang bật — kéo để vẽ khung":"Tắt"); }
+  const b=$("wf-group-btn"); if(b){ b.classList.toggle("on",wfGroupMode); b.title="Create group: "+(wfGroupMode?"on — drag to draw a frame":"Off"); }
   const c=$("wf-canvas"); if(c) c.style.cursor=wfGroupMode?"crosshair":"";
 }
 function wfToggleGroupMode(){
@@ -197,7 +197,7 @@ function wfSetAsDefault(nodeId){
   g.edges=g.edges.filter(e=>!(e.from===startNode.id&&(e.fromPort||"out")==="out"));
   g.edges.push({from:startNode.id,fromPort:"out",to:nodeId,toPort:"in"});
   wfRenderCanvas();
-  setStatus("Đã đặt làm block mặc định");
+  setStatus("Set as default block");
 }
 function wfMarkDefaultEntry(){
   document.querySelectorAll(".wf-node.wf-entry").forEach(el=>el.classList.remove("wf-entry"));
@@ -214,15 +214,15 @@ function wfMarkDefaultEntry(){
 // does, so the canvas paints it amber→green/red and the log streams its output.
 function wfRunSingleNode(node){
   if(!node) return;
-  if(wfRunning){ setStatus("Workflow đang chạy — dừng trước khi chạy 1 block"); return; }
+  if(wfRunning){ setStatus("Workflow is running — stop before running one block"); return; }
   // Serialize just this node (id/type/params + note/log) and the current flow
   // so the engine can resolve templates against the right templates dir.
   const clean={ id:node.id, type:node.type, params:Object.assign({}, node.params||{}) };
   if(node.note) clean.note=node.note;
   if(node.log)  clean.log=node.log;
-  setStatus("Đang chạy block…");
+  setStatus("Running block…");
   api().workflow_run_node(JSON.stringify(clean), JSON.stringify(wfSerialize())).then(ok=>{
-    if(!ok) setStatus("Chạy block thất bại");
+    if(!ok) setStatus("Block run failed");
   });
 }
 function wfHideMenu(){ const m=$("wf-ctxmenu"); if(m) m.style.display="none"; }
@@ -233,7 +233,7 @@ function wfShowMenu(clientX, clientY){
   const stackSids=[...new Set(WF.sel.map(id=>{ const n=wfNode(id); return n&&n.stack; }).filter(Boolean))];
   if(WF.sel.length===1){
     const _n=wfNode(WF.sel[0]);
-    if(_n&&_n.type!=="start") items.push({ico:"play",label:"Đặt làm mặc định", fn:()=>wfSetAsDefault(WF.sel[0])});
+    if(_n&&_n.type!=="start") items.push({ico:"play",label:"Set as default", fn:()=>wfSetAsDefault(WF.sel[0])});
     // Run a single block in isolation (no graph walk). Structural nodes (loop,
     // parallel, switch, call) and terminals don't make sense standalone, so the
     // entry only shows on executable action/condition kinds.
@@ -241,17 +241,17 @@ function wfShowMenu(clientX, clientY){
       const _def=WF_NODES[_n.type]||{};
       const _kind=_def.kind;
       if(_kind==="action"||_kind==="condition"){
-        items.push({ico:"play",label:"Chạy block này", fn:()=>wfRunSingleNode(_n)});
+        items.push({ico:"play",label:"Run this block", fn:()=>wfRunSingleNode(_n)});
       }
     }
   }
-  if(stackSids.length) items.push({ico:"link_off",label:"Bỏ merge", fn:()=>stackSids.forEach(wfUnmerge)});
-  if(WF.sel.length>=1) items.push({ico:"box",label:"Tạo nhóm quanh ("+WF.sel.length+")", fn:wfGroupSelection});
-  if(copyable){ items.push({ico:"copy",label:"Sao chép ("+copyable+")", fn:wfCopy});
-    items.push({ico:"scissors",label:"Cắt ("+copyable+")", fn:wfCut});
-    items.push({ico:"copy",label:"Nhân đôi ("+copyable+")", fn:wfDuplicate}); }
-  if(wfClipboard&&wfClipboard.nodes.length) items.push({ico:"clipboard",label:"Dán ("+wfClipboard.nodes.length+")", fn:()=>wfPaste({clientX,clientY})});
-  if(WF.sel.length) items.push({ico:"trash",label:"Xoá ("+WF.sel.length+")", fn:()=>wfDeleteSelected()});
+  if(stackSids.length) items.push({ico:"link_off",label:"Unmerge", fn:()=>stackSids.forEach(wfUnmerge)});
+  if(WF.sel.length>=1) items.push({ico:"box",label:"Create group around ("+WF.sel.length+")", fn:wfGroupSelection});
+  if(copyable){ items.push({ico:"copy",label:"Copy ("+copyable+")", fn:wfCopy});
+    items.push({ico:"scissors",label:"Cut ("+copyable+")", fn:wfCut});
+    items.push({ico:"copy",label:"Duplicate ("+copyable+")", fn:wfDuplicate}); }
+  if(wfClipboard&&wfClipboard.nodes.length) items.push({ico:"clipboard",label:"Paste ("+wfClipboard.nodes.length+")", fn:()=>wfPaste({clientX,clientY})});
+  if(WF.sel.length) items.push({ico:"trash",label:"Delete ("+WF.sel.length+")", fn:()=>wfDeleteSelected()});
   if(!items.length){ wfHideMenu(); return; }
   m.innerHTML="";
   items.forEach(it=>{ const d=document.createElement("div"); d.className="wf-ctx-item";
@@ -264,7 +264,7 @@ function wfShowMenu(clientX, clientY){
 function wfShowWireMenu(clientX, clientY, ed){
   const m=$("wf-ctxmenu"); if(!m) return;
   m.innerHTML="";
-  const d=document.createElement("div"); d.className="wf-ctx-item"; d.innerHTML=`<span class="wf-ctx-ico">${wfIco("trash")}</span>Xoá dây nối`;
+  const d=document.createElement("div"); d.className="wf-ctx-item"; d.innerHTML=`<span class="wf-ctx-ico">${wfIco("trash")}</span>Delete wire`;
   d.onclick=()=>{ wfHideMenu(); wfDeleteWire(ed); }; m.appendChild(d);
   m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
 }
@@ -272,9 +272,9 @@ function wfShowGroupMenu(clientX, clientY, gr){
   const m=$("wf-ctxmenu"); if(!m) return;
   m.innerHTML="";
   const items=[
-    {ico:"expand", label:"Khớp viền", fn:()=>wfFitGroup(gr)},
-    {ico:"edit",   label:"Đổi tên",   fn:()=>wfRenameGroup(gr)},
-    {ico:"trash",  label:"Xoá nhóm",  fn:()=>wfDeleteGroup(gr.id)},
+    {ico:"expand", label:"Fit bounds", fn:()=>wfFitGroup(gr)},
+    {ico:"edit",   label:"Rename",   fn:()=>wfRenameGroup(gr)},
+    {ico:"trash",  label:"Delete group",  fn:()=>wfDeleteGroup(gr.id)},
   ];
   items.forEach(it=>{
     const d=document.createElement("div"); d.className="wf-ctx-item";
@@ -344,7 +344,7 @@ function wfInitCanvas(){
   canvas.addEventListener("dragover",e=>{ if(wfPaletteDrag){ e.preventDefault(); e.dataTransfer.dropEffect="copy"; } });
   canvas.addEventListener("drop",e=>{
     if(!wfPaletteDrag) return; e.preventDefault();
-    const g=wfGraph(); if(!g){ alert("Chọn hoặc thêm một hoạt động/function trước."); wfPaletteDrag=null; return; }
+    const g=wfGraph(); if(!g){ alert("Select or add an activity/function first."); wfPaletteDrag=null; return; }
     const wr=$("wf-world").getBoundingClientRect();
     const x=wfSnap((e.clientX-wr.left)/wfZoom-70), y=wfSnap((e.clientY-wr.top)/wfZoom-14);
     wfPushUndo();

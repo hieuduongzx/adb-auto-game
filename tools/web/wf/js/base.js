@@ -48,10 +48,10 @@ function wfResetActStatus(){
 }
 function wfNodeElById(id){ return id ? document.querySelector(`.wf-node[data-node="${id}"]`) : null; }
 let wfRunLitAt=0;            // when the current amber node lit up (ms)
-const WF_RUN_MIN_MS=220;    // floor on amber dwell, so instant blocks (nếu ảnh…) still flash yellow
+const WF_RUN_MIN_MS=220;    // floor on amber dwell, so instant blocks (if image…) still flash yellow
 function wfSetRunningNode(id){
   // Move the amber glow to the new node, leaving the green/red trail untouched.
-  // Conditions like "nếu ảnh" finish in a few ms — without a dwell floor their
+  // Conditions like "if image" finish in a few ms — without a dwell floor their
   // amber is added and removed within one frame and never paints. So keep the
   // previous node amber for at least WF_RUN_MIN_MS before clearing it.
   const now=Date.now();
@@ -81,7 +81,7 @@ function wfMarkNodeResult(id, status, port){
   wfRan[id] = status==="fail" ? "fail" : "ok";
   if(port!==undefined && port!==null) wfRanPort[id]=port; else delete wfRanPort[id];
   const el=wfNodeElById(id); if(!el) return;
-  // A condition that took its 'false' branch (e.g. "chạm ảnh" didn't find the
+  // A condition that took its 'false' branch (e.g. "tap image" didn't find the
   // image) didn't really succeed — paint the node red to match its red false-wire,
   // instead of a misleading green. Only 'true'/'out'/'body'/'done' stay green.
   const failish = wfRan[id]==="fail" || wfRanPort[id]==="false";
@@ -142,7 +142,7 @@ function appendLog(entry){
 }
 function rebuildDeviceSelect(devices, connected){
   const sel=$("device-select"), prev=sel.value; sel.innerHTML="";
-  if(!devices||!devices.length){ const o=document.createElement("option"); o.value=""; o.textContent="Không có thiết bị"; sel.appendChild(o); sel.disabled=true; return; }
+  if(!devices||!devices.length){ const o=document.createElement("option"); o.value=""; o.textContent="No devices"; sel.appendChild(o); sel.disabled=true; return; }
   sel.disabled=false;
   devices.forEach(d=>{ const o=document.createElement("option"); o.value=d.serial||""; o.textContent=(d.name||d.serial)+(d.serial?` (${d.serial})`:""); sel.appendChild(o); });
   sel.value=connected||S.connectedSerial||prev||(devices[0]&&devices[0].serial)||"";

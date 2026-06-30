@@ -3,7 +3,7 @@ window.addEventListener("keydown", e => {
   const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
   if((e.key==="s"||e.key==="S") && (e.ctrlKey||e.metaKey)){
     e.preventDefault();
-    // In Preview mode with a selected region, Ctrl+S = "Chụp vùng" (quick crop)
+    // In Preview mode with a selected region, Ctrl+S = "Capture region" (quick crop)
     // straight into the workflow's templates/ folder. Otherwise it saves the flow.
     if(wfPvActive && wfPvRegion){ pvQuickCrop(); return; }
     wfSave(); return;

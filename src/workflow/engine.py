@@ -115,6 +115,7 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # Output ports are dynamic (count param) so outs is left empty here; the
     # engine reads params["count"] at runtime and the designer renders them live.
     "join":       {"label": "Gộp",           "kind": "join",      "ins": 1, "outs": ["out"]},
+    "and":        {"label": "And",            "kind": "and",       "ins": 1, "outs": ["out"]},
     # Multi-way branch: each case is its own condition; the first true case routes
     # to its port "c{i}", else "default". Output ports are dynamic (per the node's
     # ``cases`` list) so ``outs`` here is only the static fallback hint.
@@ -587,6 +588,30 @@ class WorkflowEngine:
                     # Last branch: fall through and continue from "out".
                 self._emit("on_node_done", nid, "ok", "out")
                 cur = self._next(adj, cur, "out")
+            elif kind == "and":
+                expected = max(1, int(params.get("count", 2) or 2))
+                ctx = getattr(self._ctx, "join_ctx", None)
+                if ctx is None:
+                    if expected <= 1:
+                        self._emit("on_node_done", nid, "ok", "out")
+                        cur = self._next(adj, cur, "out")
+                    else:
+                        log_warning(f"[workflow] And cần {expected} nhánh song song")
+                        self._branch_failed = True
+                        self._emit("on_node_done", nid, "fail", "out")
+                        break
+                else:
+                    is_last, ok = self._and_arrive(ctx, cur, expected, self._branch_failed)
+                    if not is_last:
+                        self._emit("on_node_done", nid, "ok", None)
+                        break
+                    if not ok:
+                        log_warning(f"[workflow] And fail: có nhánh lỗi trước khi gộp {expected} nhánh")
+                        self._branch_failed = True
+                        self._emit("on_node_done", nid, "fail", "out")
+                        break
+                    self._emit("on_node_done", nid, "ok", "out")
+                    cur = self._next(adj, cur, "out")
             elif kind == "random":
                 # Pick one of count numbered ports at random (uniform distribution).
                 count = max(1, int(params.get("count", 2)))
@@ -726,6 +751,8 @@ class WorkflowEngine:
             "lock": threading.Lock(),
             "remaining": len(active),
             "join_node": None,   # id of the join node all branches converge to
+            "barriers": {},      # per-And-node arrival / failure state
+            "failed": False,     # any branch failed while running under this fork
         }
 
         threads = []
@@ -741,9 +768,35 @@ class WorkflowEngine:
         for t in threads:
             t.join()
 
+        for bid, state in join_ctx.get("barriers", {}).items():
+            if state.get("arrived", 0) < state.get("expected", 0):
+                join_ctx["failed"] = True
+                self._emit("on_node_done", bid, "fail", "out")
+                log_warning(
+                    f"[workflow] And '{bid}' chỉ nhận {state.get('arrived', 0)}/"
+                    f"{state.get('expected', 0)} nhánh"
+                )
+
         # All branches done. If they converged at a join node, the last-arriving
         # branch already continued from join.out — nothing more to do here.
         # (The parent _walk call proceeds from wherever _run_parallel returns.)
+        if join_ctx.get("failed"):
+            self._branch_failed = True
+
+    def _and_arrive(self, ctx: Dict[str, Any], node_id: str, expected: int, branch_failed: bool):
+        """Record one parallel branch arriving at an And barrier."""
+        with ctx["lock"]:
+            barriers = ctx.setdefault("barriers", {})
+            state = barriers.setdefault(node_id, {"arrived": 0, "failed": False, "expected": expected, "released": False})
+            state["expected"] = expected
+            state["arrived"] += 1
+            state["failed"] = bool(state["failed"] or branch_failed)
+            ctx["failed"] = bool(ctx.get("failed") or branch_failed)
+            is_last = state["arrived"] >= expected and not state["released"]
+            if is_last:
+                state["released"] = True
+            ok = not state["failed"]
+        return is_last, ok
 
     def _walk_branch(self, nodes, adj, tgt, depth, vars0, pos0, join_ctx=None):
         """Entry point for a parallel branch thread: seed this thread's context
@@ -752,7 +805,14 @@ class WorkflowEngine:
         self._last_pos = pos0
         self._break_loop = False
         self._ctx.join_ctx = join_ctx   # thread-local; cleared when thread exits
-        self._walk(nodes, adj, tgt, {}, depth)
+        self._branch_failed = False
+        try:
+            self._walk(nodes, adj, tgt, {}, depth)
+        finally:
+            if join_ctx is not None and self._branch_failed:
+                with join_ctx["lock"]:
+                    join_ctx["failed"] = True
+            self._ctx.join_ctx = None
 
     @staticmethod
     def _coerce(value: Any) -> Any:

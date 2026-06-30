@@ -38,7 +38,7 @@ function wfHydrateGraph(g){
       showPreview:!!n.showPreview,stack:n.stack||null};
   });
   if(!nodes.some(n=>n.type==="start")) nodes.unshift({id:wfUid(),type:"start",x:40,y:40,params:{}});
-  const groups=(g.groups||[]).map(gr=>({id:gr.id||("g"+wfUid().slice(1)),name:gr.name||"Nhóm",x:gr.x||0,y:gr.y||0,w:gr.w||200,h:gr.h||140,color:gr.color||0}));
+  const groups=(g.groups||[]).map(gr=>({id:gr.id||("g"+wfUid().slice(1)),name:gr.name||"Group",x:gr.x||0,y:gr.y||0,w:gr.w||200,h:gr.h||140,color:gr.color||0}));
   return { nodes, edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort||"out",to:e.to,toPort:e.toPort||"in"})), groups };
 }
 function wfHydrate(flow){
@@ -62,12 +62,12 @@ function wfHydrate(flow){
 async function wfExport(){ await api().workflow_export(JSON.stringify(wfSerialize(),null,2), $("wf-name").value); }
 async function wfSave(){
   const r=await api().workflow_save(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
-  if(r&&r.ok) setStatus("Đã lưu workflow");
+  if(r&&r.ok) setStatus("Workflow saved");
 }
 async function wfImport(){
   const txt=await api().workflow_import(); if(!txt)return;
-  try{ wfHydrate(JSON.parse(txt)); setStatus("Đã nhập workflow"); }
-  catch(e){ alert("JSON không hợp lệ: "+e); }
+  try{ wfHydrate(JSON.parse(txt)); setStatus("Workflow imported"); }
+  catch(e){ alert("Invalid JSON: "+e); }
 }
 // Play / stop glyphs for the run toggle (icon-only button).
 const WF_ICO_PLAY = '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
@@ -87,30 +87,30 @@ function wfSetRunning(on){
   }
   if(b){
     b.innerHTML = on?WF_ICO_STOP:WF_ICO_PLAY;
-    b.title = on?"Dừng":"Chạy thử";
+    b.title = on?"Stop":"Test run";
     b.classList.toggle("ok",!on); b.classList.toggle("err",on);
   }
-  // Running status pill: amber "Đang chạy" while executing, grey "Sẵn sàng" at rest.
+  // Running status pill: amber "Running" while executing, grey "Ready" at rest.
   const pill=$("wf-run-status");
   if(pill){
     pill.classList.toggle("running", !!on);
     const txt=pill.querySelector(".wf-run-txt");
-    if(txt) txt.textContent = on ? "Đang chạy" : (wfRunStopped ? "Đã dừng" : "Sẵn sàng");
+    if(txt) txt.textContent = on ? "Running" : (wfRunStopped ? "Stopped" : "Ready");
   }
   wfRenderVarsPanel();
 }
 async function wfToggleRun(){
   if(wfRunning){ wfSetRunning(false); await api().workflow_stop(); return; }  // reset first, then stop
-  if(!WF.activities.length){ alert("Chưa có hoạt động nào."); return; }
+  if(!WF.activities.length){ alert("No activities."); return; }
   wfResetRunViz();        // clear last run's colours BEFORE the engine starts emitting
   wfSetRunning(true);     // mark running before any node event can arrive
   const ok=await api().workflow_run(JSON.stringify(wfSerialize()));
   if(!ok) wfSetRunning(false);
 }
 async function wfRunGui(){
-  if(!WF.activities.length){ alert("Chưa có hoạt động nào."); return; }
+  if(!WF.activities.length){ alert("No activities."); return; }
   await api().open_runner(JSON.stringify(wfSerialize()));
-  setStatus("Đã mở Runner GUI");
+  setStatus("Runner GUI opened");
 }
 
 
@@ -118,14 +118,14 @@ async function wfRunGui(){
 async function init(){
   let tries=0;
   while(!(window.pywebview&&window.pywebview.api)&&tries<40){ await new Promise(r=>setTimeout(r,100)); tries++; }
-  if(!window.pywebview||!window.pywebview.api){ setStatus("⚠ pywebview không khả dụng"); return; }
+  if(!window.pywebview||!window.pywebview.api){ setStatus("⚠ pywebview unavailable"); return; }
   const state=await api().get_state();
   S.connectedSerial=state.connectedSerial||null;
   S.captureBackend=state.captureBackend||"scrcpy";
   const capSel=$("capture-backend");
   if(capSel){
     capSel.innerHTML="";
-    (state.captureBackends||["scrcpy","adb"]).forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b==="adb"?"ADB screencap":"scrcpy (nhanh)"; capSel.appendChild(o); });
+    (state.captureBackends||["scrcpy","adb"]).forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b==="adb"?"ADB screencap":"scrcpy (fast)"; capSel.appendChild(o); });
     capSel.value=S.captureBackend;
   }
   (state.log||[]).forEach(appendLog);
@@ -146,12 +146,12 @@ async function init(){
   let reopened="", didRender=false;
   try{
     const lw=await api().get_last_workflow();
-    if(lw && lw.text){ wfHydrate(JSON.parse(lw.text)); reopened=lw.name||"workflow trước"; didRender=true; }
+    if(lw && lw.text){ wfHydrate(JSON.parse(lw.text)); reopened=lw.name||"previous workflow"; didRender=true; }
   }catch(e){}
   // wfHydrate and wfAddActivity both call wfRenderAll() themselves; only fall back here.
   if(!WF.activities.length){ wfAddActivity("sequence"); didRender=true; }
   if(!didRender) wfRenderAll();
   wfZoomApplyMode("canvas");  // ensure the shared zoom cluster targets the graph on load
-  setStatus(reopened ? ("Đã mở lại: "+reopened) : "Sẵn sàng");
+  setStatus(reopened ? ("Reopened: "+reopened) : "Ready");
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();

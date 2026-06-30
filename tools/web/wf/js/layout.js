@@ -135,7 +135,7 @@ function wfAutoLayout(kind){
   else if(kind==="radial") wfLayoutRadial(g);
   wfRenderCanvas();
   wfFit();
-  setStatus("Đã sắp xếp: "+kind);
+  setStatus("Layout applied: "+kind);
 }
 // Layout menu — toggle open/closed; click outside to close (wired in wfInitCanvas).
 function wfToggleLayoutMenu(e){
@@ -192,11 +192,11 @@ let wfGesture=null;     // {mode:'pan'|'move'|'connect', ...}
 let wfPaletteDrag=null; // node type being dragged from palette
 let wfCanvasReady=false;
 const wfUid=()=>"n"+Math.random().toString(36).slice(2,9);
-const wfBase=p=>{ if(!p)return"(ảnh)"; const s=String(p).replace(/\\/g,"/").split("/").pop(); return s.length>14?"…"+s.slice(-13):s; };
+const wfBase=p=>{ if(!p)return"(image)"; const s=String(p).replace(/\\/g,"/").split("/").pop(); return s.length>14?"…"+s.slice(-13):s; };
 // Summary for a multi-image ("…_any") node: list up to 2 names, else a count.
-const wfBaseAny=t=>{ const a=(Array.isArray(t)?t:[]).filter(Boolean); if(!a.length)return"(chưa có ảnh)"; return a.length<=2?a.map(wfBase).join(" / "):a.length+" ảnh"; };
+const wfBaseAny=t=>{ const a=(Array.isArray(t)?t:[]).filter(Boolean); if(!a.length)return"(no image)"; return a.length<=2?a.map(wfBase).join(" / "):a.length+" images"; };
 
-// Top-level mode switch: Công cụ (helper) ↔ Workflow (node-graph).
+// Top-level mode switch: Tools (helper) ↔ Workflow (node-graph).
 /* (mode switching removed — the designer is its own standalone window) */
 
 // Condition types a switch case may use — instant checks only (no wait_* timeout,

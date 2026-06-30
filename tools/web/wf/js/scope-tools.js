@@ -9,9 +9,29 @@ function pvCopyText(text, btn){
 }
 function pvCopyEl(id, btn){ pvCopyText($(id).value, btn); }
 
+let pvDeviceInfoCopyReady=false;
+function pvInitDeviceInfoCopy(){
+  if(pvDeviceInfoCopyReady) return;
+  const grid=document.querySelector("#pv-tab-device .info-grid");
+  if(!grid) return;
+  pvDeviceInfoCopyReady=true;
+  grid.addEventListener("click", e=>{
+    const cell=e.target.closest(".k,.v");
+    if(!cell || !grid.contains(cell)) return;
+    const cells=[...grid.children];
+    const idx=cells.indexOf(cell);
+    const key=cells[idx%2===0?idx:idx-1];
+    const val=cells[idx%2===0?idx+1:idx];
+    if(!key||!val) return;
+    const text=`${key.textContent.trim()}: ${val.textContent.trim()}`;
+    pvCopyText(text);
+    setStatus(`Copied ${key.textContent.trim()}`);
+  });
+}
+
 function pvSetRegionBadge(on){ const b=$("pv-region-badge"); if(b) b.style.display=on?"inline-flex":"none"; }
 
-// Fill the Điểm & Màu readouts from a set_point / set_region result.
+// Fill the Point & Color readouts from a set_point / set_region result.
 function pvFillPoint(r){
   if(!r) return;
   $("pv-pt-x").value=r.x; $("pv-pt-y").value=r.y;
@@ -62,18 +82,18 @@ async function pvCheckColor(){
   if(r.error){ el.className="cc-result bad"; el.textContent=r.error; return; }
   el.className="cc-result "+(r.match?"ok":"bad");
   el.innerHTML=r.match
-    ?`✓ Khớp &nbsp;·&nbsp; thực tế: <b>${escHtml(r.actual)}</b> &nbsp;·&nbsp; Δ${r.dist}`
-    :`✗ Không khớp &nbsp;·&nbsp; thực tế: <b>${escHtml(r.actual)}</b> &nbsp;·&nbsp; Δ${r.dist}`;
+    ?`✓ Match &nbsp;·&nbsp; actual: <b>${escHtml(r.actual)}</b> &nbsp;·&nbsp; Δ${r.dist}`
+    :`✗ No match &nbsp;·&nbsp; actual: <b>${escHtml(r.actual)}</b> &nbsp;·&nbsp; Δ${r.dist}`;
 }
 
 // ── Region ──────────────────────────────────────────────────────────────────
-// "Chụp vùng" saves the current drag-region crop into the open workflow's
+// "Capture region" saves the current drag-region crop into the open workflow's
 // templates/ folder (resolved by the backend) so it's ready to use as a node
 // template. The path comes back from Python so we can confirm where it landed.
 async function pvQuickCrop(){
   const path = await api().quick_crop($("pv-crop-name").value);
-  if(path){ pvRefreshAssets(); setStatus(`Đã lưu vùng → ${path}`); }
-  else setStatus("Chưa có vùng — kéo chọn vùng trên ảnh trước");
+  if(path){ pvRefreshAssets(); setStatus(`Saved region → ${path}`); }
+  else setStatus("No region — drag-select a region on the image first");
 }
 async function pvClearRegion(){
   $("pv-rg-x").value=$("pv-rg-y").value=$("pv-rg-w").value=$("pv-rg-h").value=0;
@@ -85,7 +105,7 @@ async function pvClearRegion(){
 async function pvOcrBackendChange(name){
   const r=await api().set_ocr_backend(name);
   const el=$("pv-ocr-engine");
-  el.textContent=r.engine+(r.available?" · sẵn sàng":" · không khả dụng");
+  el.textContent=r.engine+(r.available?" · ready":" · unavailable");
   el.className=r.available?"":"unavailable";
 }
 async function pvReadText(){ $("pv-ocr-result").value=await api().read_text($("pv-ocr-wl").value); }
@@ -114,7 +134,7 @@ async function pvRefreshAssets(){
   $("pv-btn-del-asset").style.display="none";
   let sel=null;
   grid.innerHTML="";
-  if(!list.length){ grid.innerHTML='<div style="font-size:11.5px;color:var(--muted);padding:4px 0;">Chưa có ảnh.</div>'; return; }
+  if(!list.length){ grid.innerHTML='<div style="font-size:11.5px;color:var(--muted);padding:4px 0;">No images.</div>'; return; }
   for(const a of list){
     const card=document.createElement("div"); card.className="asset-card"; card.dataset.path=a.path;
     const thumb=document.createElement("img"); thumb.className="asset-thumb"; thumb.alt=a.name;
@@ -134,7 +154,7 @@ async function pvRefreshAssets(){
 }
 let pvSelAsset=()=>null;
 async function pvDeleteAsset(){
-  const path=pvSelAsset(); if(!path||!confirm(`Xoá ${path.split("/").pop()}?`)) return;
+  const path=pvSelAsset(); if(!path||!confirm(`Delete ${path.split("/").pop()}?`)) return;
   try{ await api().delete_asset(path); }catch{}
   pvRefreshAssets();
 }

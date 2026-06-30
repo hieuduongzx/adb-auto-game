@@ -6,7 +6,7 @@
 
 let wfPvActive = false;        // true only while the Preview tab is visible
 let wfPvAuto   = true;         // auto-refresh toggle
-let wfPvHz     = 10;           // refresh rate (Hz)
+let wfPvHz     = 30;           // refresh rate (Hz)
 let wfPvReady  = false;        // preview system initialised
 let wfPvImg    = null;         // current frame Image
 let wfPvImgW   = 0, wfPvImgH = 0;
@@ -39,7 +39,7 @@ function wfSwitchView(view){
     const inspTitle=document.getElementById("wf-insp-title");
     if(inspBody) inspBody.style.display="none";
     if(scopePanel){ scopePanel.style.display="flex"; }
-    if(inspTitle) inspTitle.textContent="Công cụ DevScope";
+    if(inspTitle) inspTitle.textContent="DevScope tools";
     wfPvActive = true;
     wfPvInit();                 // lazy init on first switch
     wfPvResize();
@@ -62,7 +62,7 @@ function wfSwitchView(view){
     const inspTitle=document.getElementById("wf-insp-title");
     if(inspBody) inspBody.style.display="";
     if(scopePanel) scopePanel.style.display="none";
-    if(inspTitle) inspTitle.textContent="Thuộc tính";
+    if(inspTitle) inspTitle.textContent="Properties";
     wfZoomApplyMode("canvas");  // hand the zoom cluster back to the graph
   }
 }
@@ -80,14 +80,14 @@ function wfZoomApplyMode(mode){
   if(mode==="preview"){
     if(out) out.onclick=()=>wfPvZoomBy(1/1.1);
     if(inb) inb.onclick=()=>wfPvZoomBy(1.1);
-    if(lbl){ lbl.onclick=wfPvResetZoom; lbl.title="Đặt lại 100% (Preview)"; }
-    if(fit){ fit.onclick=wfPvFit; fit.title="Vừa khung ảnh (Preview)"; }
+    if(lbl){ lbl.onclick=wfPvResetZoom; lbl.title="Reset 100% (Preview)"; }
+    if(fit){ fit.onclick=wfPvFit; fit.title="Fit image (Preview)"; }
     if(lbl) lbl.textContent=Math.round(wfPvZoom*100)+"%";
   } else {
     if(out) out.onclick=()=>wfZoomBy(1/1.1);
     if(inb) inb.onclick=()=>wfZoomBy(1.1);
-    if(lbl){ lbl.onclick=wfZoomReset; lbl.title="Đặt lại 100%"; }
-    if(fit){ fit.onclick=wfFit; fit.title="Vừa khung — hiện toàn bộ block (F)"; }
+    if(lbl){ lbl.onclick=wfZoomReset; lbl.title="Reset 100%"; }
+    if(fit){ fit.onclick=wfFit; fit.title="Fit view — show all blocks (F)"; }
     if(lbl) lbl.textContent=Math.round(wfZoom*100)+"%";
   }
 }
@@ -116,10 +116,11 @@ function wfPvInit(){
 
   const hzInput = document.getElementById("wf-pv-hz");
   if(hzInput) hzInput.onchange = ()=>{
-    wfPvHz = Math.max(0.2, Math.min(30, parseFloat(hzInput.value)||10));
+    wfPvHz = Math.max(0.2, Math.min(30, parseFloat(hzInput.value)||30));
     hzInput.value = wfPvHz;
     if(wfPvAuto && wfPvActive){ wfPvStopAuto(); wfPvStartAuto(); }
   };
+  if(typeof pvInitDeviceInfoCopy==="function") pvInitDeviceInfoCopy();
 
   // Tap on the mirror → send a tap to the device at the image-space point.
   // (Replaced by the full DevScope interaction set in wfPvAttachCanvas —
@@ -237,7 +238,7 @@ function wfPvDrawEmpty(){
   ctx.fillStyle="#121316"; ctx.fillRect(0,0,cw,ch);
   ctx.fillStyle="#9aa3ae"; ctx.font="13px IBM Plex Sans,Segoe UI,sans-serif";
   ctx.textAlign="center";
-  const msg = wfPvErr ? ("Lỗi chụp: "+wfPvErr) : (S.connectedSerial ? "Đang chụp…" : "Chưa kết nối thiết bị.");
+  const msg = wfPvErr ? ("Capture error: "+wfPvErr) : (S.connectedSerial ? "Capturing…" : "No device connected.");
   ctx.fillText(msg, cw/2, ch/2);
 }
 
@@ -248,7 +249,7 @@ function wfPvResetZoom(){
 // the Preview tab is active).
 function wfPvZoomBy(f){ wfPvZoom=Math.max(.3, Math.min(10, wfPvZoom*f)); wfPvDraw(); }
 // Fit the device image to the canvas (reset zoom/pan) — the Preview analogue of
-// the graph's "Vừa khung" button.
+// the graph's "Fit view" button.
 function wfPvFit(){ wfPvResetZoom(); }
 
 // ── Canvas interactions (DevScope parity) ───────────────────────────────────
@@ -293,7 +294,7 @@ function wfPvAttachCanvas(){
       wfPvPoint=p; wfPvRegion=null; pvSetRegionBadge(false);
       const r=await api().set_point(p[0],p[1]);
       pvFillPoint(r); wfPvDraw();
-      setStatus(`Đã chọn (${r.x}, ${r.y})`);
+      setStatus(`Selected (${r.x}, ${r.y})`);
     } else {
       // Drag → select a region.
       const a=wfPvImgFromCanvas(start), b=wfPvImgFromCanvas(end);
@@ -304,7 +305,7 @@ function wfPvAttachCanvas(){
       wfPvRegion=[x,y,w,h]; wfPvPoint=null; pvSetRegionBadge(true);
       const r=await api().set_region(x,y,w,h);
       pvFillRegion(r); wfPvDraw();
-      setStatus(`Vùng ${x},${y} · ${w}×${h}`);
+      setStatus(`Region ${x},${y} · ${w}×${h}`);
     }
   });
 

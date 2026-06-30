@@ -115,19 +115,19 @@ function wfRestoreSnapshot(snap) {
 }
 
 function wfUndo() {
-  if (!_undoStack.length) { setStatus("Không còn gì để hoàn tác"); return; }
+  if (!_undoStack.length) { setStatus("Nothing to undo"); return; }
   // Push current state onto redo stack before restoring.
   _redoStack.push(wfTakeSnapshot());
   const snap = _undoStack.pop();
   wfRestoreSnapshot(snap);
-  setStatus("Đã hoàn tác");
+  setStatus("Undone");
 }
 
 function wfRedo() {
-  if (!_redoStack.length) { setStatus("Không còn gì để làm lại"); return; }
+  if (!_redoStack.length) { setStatus("Nothing to redo"); return; }
   // Push current state onto undo stack before restoring.
   _undoStack.push(wfTakeSnapshot());
   const snap = _redoStack.pop();
   wfRestoreSnapshot(snap);
-  setStatus("Đã làm lại");
+  setStatus("Redone");
 }

@@ -27,10 +27,10 @@ function wfRenderActivities(){
     el.dataset.id=act.id;
     el.innerHTML=
       `<span class="wf-act-runbar"></span>
-       <span class="wf-act-grip" title="Kéo để đổi thứ tự">${WF_GRIP}</span>
+       <span class="wf-act-grip" title="Drag to reorder">${WF_GRIP}</span>
        <span class="wf-act-cb ${act.enabled?"checked":""}">${check}</span>
        <span class="wf-act-name">${escHtml(act.name)}</span>
-       <button class="wf-act-del" title="Xoá">${wfIco("x")}</button>`;
+       <button class="wf-act-del" title="Delete">${wfIco("x")}</button>`;
     el.querySelector(".wf-act-cb").addEventListener("click",e=>wfToggleActivity(act.id,e));
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteActivity(act.id,e));
     el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-cb,.wf-act-del,.wf-act-grip"))return; wfSelectActivity(act.id); });
@@ -38,11 +38,11 @@ function wfRenderActivities(){
     wrap.appendChild(el);
   }
   if(seqWrap){
-    if(!seqActs.length){ seqWrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có hoạt động tuần tự.</div>'; }
+    if(!seqActs.length){ seqWrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">No sequence activities.</div>'; }
     else seqActs.forEach(a=>rowInto(seqWrap, a));
   }
   if(bgWrap){
-    if(!bgActs.length){ bgWrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có tác vụ nền.</div>'; }
+    if(!bgActs.length){ bgWrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">No background tasks.</div>'; }
     else bgActs.forEach(a=>rowInto(bgWrap, a));
   }
 }
@@ -50,16 +50,16 @@ function wfRenderActivities(){
 function wfRenderFunctions(){
   const wrap=$("wf-functions"); if(!wrap) return; wrap.innerHTML="";
   const cnt=$("wf-fn-count"); if(cnt) cnt.textContent = WF.functions.length? String(WF.functions.length):"";
-  if(!WF.functions.length){ wrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có function. Bấm “+ Function”.</div>'; return; }
+  if(!WF.functions.length){ wrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">No functions. Click “+ Function”.</div>'; return; }
   WF.functions.forEach(fn=>{
     const sel = WF.edit.kind==="function" && fn.id===WF.edit.id;
     const el=document.createElement("div"); el.className="wf-act wf-fn"+(sel?" sel":""); el.dataset.id=fn.id;
-    el.title="Kéo ra canvas để chèn lệnh gọi · bấm để sửa function";
+    el.title="Drag to canvas to insert a call · click to edit function";
     el.innerHTML=
-      `<span class="wf-act-grip" title="Kéo ra canvas để dùng / kéo đổi thứ tự">${WF_GRIP}</span>
+      `<span class="wf-act-grip" title="Drag to canvas to use / drag to reorder">${WF_GRIP}</span>
        <span class="wf-badge fn">ƒ</span>
        <span class="wf-act-name">${escHtml(fn.name)}</span>
-       <button class="wf-act-del" title="Xoá function">${wfIco("x")}</button>`;
+       <button class="wf-act-del" title="Delete function">${wfIco("x")}</button>`;
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteFunction(fn.id,e));
     el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-del,.wf-act-grip"))return; wfEditFunction(fn.id); });
     wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.functions, "call:"+fn.id);
@@ -78,9 +78,9 @@ function wfActTab(which){
   if(bg)   bg.style.display   = which==="bg" ?"":"none";
   if(fns)  fns.style.display  = which==="fns"?"":"none";
   const add=$("wf-act-add");
-  if(add) add.title = which==="fns"?"Tạo function mới":which==="bg"?"Thêm tác vụ nền":"Thêm hoạt động";
+  if(add) add.title = which==="fns"?"Create new function":which==="bg"?"Add background task":"Add activity";
   const title=$("wf-act-hdr-title");
-  if(title) title.textContent = which==="fns"?"Functions":which==="bg"?"Tác vụ nền":"Hoạt động";
+  if(title) title.textContent = which==="fns"?"Functions":which==="bg"?"Background tasks":"Activities";
 }
 function wfActAddCurrent(){
   if(wfActTabCur==="fns") wfAddFunction();
@@ -214,7 +214,7 @@ function wfDeclaredVars(){
 // All known variable names across the whole flow (every activity + functions),
 // so a dropdown in any graph can offer vars declared elsewhere too. Sources:
 //   1. Global vars (declared at flow top level — visible in every activity).
-//   2. Vars explicitly declared on an activity (the "Biến" section).
+//   2. Vars explicitly declared on an activity (the "Variables" section).
 //   3. Vars produced by nodes — set_var / calc_var / read_var / parse_var each
 //      write a var via their "name" field, so we treat those names as known
 //      defaults every other block can reference. Sort alphabetically.
@@ -260,14 +260,14 @@ function wfRenderVarsPanel(){
   body.innerHTML="";
   if(!allNames.length){
     const e=document.createElement("div"); e.className="wf-vars-empty";
-    e.textContent="Chưa có biến nào. Bấm + để thêm biến toàn cục.";
+    e.textContent="No variables. Click + to add a global variable.";
     body.appendChild(e); return;
   }
   function mkSep(label){ const s=document.createElement("span"); s.className="wf-vars-sep"; s.textContent=label; return s; }
   function mkRow(n, isGlobal){
     const row=document.createElement("div"); row.className="wf-var-row-live";
     const nm=document.createElement("span"); nm.className="vn";
-    nm.title=n+(isGlobal?" · toàn cục":"");
+    nm.title=n+(isGlobal?" · global":"");
     if(isGlobal){
       nm.style.color="var(--accent)";
       nm.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>'+n;
@@ -276,13 +276,13 @@ function wfRenderVarsPanel(){
     const hasDeclared=declared.hasOwnProperty(n);
     const val=(live!==undefined)?live:(hasDeclared?declared[n]:undefined);
     const vv=document.createElement("span"); vv.className="vv"+(n===wfFreshVar?" fresh":"");
-    vv.textContent=(val===undefined||val===null||val==="")?(hasDeclared?"∅":"(tự sinh)"):String(val);
-    vv.title=(live!==undefined)?"giá trị chạy":(hasDeclared?"giá trị khai báo":"do node tạo");
+    vv.textContent=(val===undefined||val===null||val==="")?(hasDeclared?"∅":"(generated)"):String(val);
+    vv.title=(live!==undefined)?"runtime value":(hasDeclared?"declared value":"created by node");
     row.appendChild(nm); row.appendChild(vv);
     return row;
   }
-  if(globalNames.length){ body.appendChild(mkSep("Toàn cục")); globalNames.forEach(n=>body.appendChild(mkRow(n,true))); }
-  if(actNames.length){ body.appendChild(mkSep("Hoạt động")); actNames.forEach(n=>body.appendChild(mkRow(n,false))); }
+  if(globalNames.length){ body.appendChild(mkSep("Global")); globalNames.forEach(n=>body.appendChild(mkRow(n,true))); }
+  if(actNames.length){ body.appendChild(mkSep("Activities")); actNames.forEach(n=>body.appendChild(mkRow(n,false))); }
   if(nodeNames.length){ body.appendChild(mkSep("Node")); nodeNames.forEach(n=>body.appendChild(mkRow(n,false))); }
   if(liveExtra.length){ body.appendChild(mkSep("Live")); liveExtra.forEach(n=>body.appendChild(mkRow(n,false))); }
 }
@@ -293,7 +293,7 @@ function wfAddQuickGlobal(){
   if(!Array.isArray(WF.globals)) WF.globals=[];
   wfPushUndoDebounced();
   const n=WF.globals.length+1;
-  WF.globals.push({name:"g"+n, label:"Toàn cục "+n, type:"bool", value:false});
+  WF.globals.push({name:"g"+n, label:"Global "+n, type:"bool", value:false});
   wfRenderVarsPanel();
   wfShowGlobsEditor();
 }
@@ -307,7 +307,7 @@ function wfShowGlobsEditor(){
   if(!Array.isArray(WF.globals)) WF.globals=[];
   const pop=document.createElement("div"); pop.id="wf-globs-pop"; pop.className="wf-globs-pop";
   const hdr=document.createElement("div"); hdr.className="wf-vars-hdr";
-  hdr.innerHTML='<span>Biến toàn cục</span><span class="wf-vars-close" style="cursor:pointer" title="Đóng">'+wfIco("x")+'</span>';
+  hdr.innerHTML='<span>Global variables</span><span class="wf-vars-close" style="cursor:pointer" title="Close">'+wfIco("x")+'</span>';
   hdr.querySelector(".wf-vars-close").onclick=wfHideGlobsEditor;
   pop.appendChild(hdr);
   const body=document.createElement("div"); body.className="wf-globs-pop-body";
@@ -315,13 +315,13 @@ function wfShowGlobsEditor(){
     body.innerHTML="";
     if(!WF.globals.length){
       const e=document.createElement("div"); e.className="wf-vars-empty";
-      e.textContent="Chưa có biến toàn cục. Bấm \"+ Thêm\".";
+      e.textContent="No global variables. Click \"+ Add\".";
       body.appendChild(e);
     }
     WF.globals.forEach((v,idx)=> { body.appendChild(wfGlobRow(v,idx,render)); wfBuildGlobChildren(v,body,render); });
-    const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Thêm";
+    const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Add";
     add.style.marginTop="2px";
-    add.onclick=()=>{ wfPushUndoDebounced(); const n=WF.globals.length+1; WF.globals.push({name:"g"+n, label:"Toàn cục "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
+    add.onclick=()=>{ wfPushUndoDebounced(); const n=WF.globals.length+1; WF.globals.push({name:"g"+n, label:"Global "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
     body.appendChild(add);
   }
   render();
@@ -340,25 +340,25 @@ function wfGlobRow(v,idx,render){
   const card=document.createElement("div"); card.className="wf-glob-card";
   const r1=document.createElement("div"); r1.className="wf-var-row";
   r1.style.alignItems="center";
-  const tag=document.createElement("span"); tag.className="wf-glob-tag"; tag.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>TOÀN CỤC';
-  const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Con"; addChild.title="Thêm biến con";
+  const tag=document.createElement("span"); tag.className="wf-glob-tag"; tag.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>GLOBAL';
+  const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Child"; addChild.title="Add child variable";
   addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
-  const del=document.createElement("button"); del.className="wf-glob-del"; del.textContent="−"; del.title="Xoá biến toàn cục";
+  const del=document.createElement("button"); del.className="wf-glob-del"; del.textContent="−"; del.title="Delete global variable";
   del.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); WF.globals.splice(idx,1); render(); wfRenderVarsPanel(); };
   const sp=document.createElement("span"); sp.style.flex="1";
   r1.appendChild(tag); r1.appendChild(sp); r1.appendChild(addChild); r1.appendChild(del);
   card.appendChild(r1);
   const r1b=document.createElement("div"); r1b.className="wf-var-row";
-  const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Tiêu đề"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
+  const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Title"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
   lbl.oninput=()=>{ wfPushUndoDebounced(); v.label=lbl.value; };
   r1b.appendChild(lbl);
   card.appendChild(r1b);
   const r2=document.createElement("div"); r2.className="wf-var-row";
-  const nm=document.createElement("input"); nm.type="text"; nm.value=v.name||""; nm.placeholder="biến"; nm.style.flex="1"; nm.style.minWidth="0"; nm.style.fontSize="10.5px"; nm.style.fontFamily="var(--mono)";
+  const nm=document.createElement("input"); nm.type="text"; nm.value=v.name||""; nm.placeholder="variable"; nm.style.flex="1"; nm.style.minWidth="0"; nm.style.fontSize="10.5px"; nm.style.fontFamily="var(--mono)";
   nm.oninput=()=>{ wfPushUndoDebounced(); v.name=nm.value; wfRenderVarsPanel(); };
   r2.appendChild(nm);
   const ty=document.createElement("select");
-  [["bool","bool"],["number","số"],["text","chữ"],["select","chọn"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
+  [["bool","bool"],["number","number"],["text","text"],["select","select"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
   ty.onchange=()=>{
     wfPushUndoDebounced();
     v.type=ty.value;
@@ -395,17 +395,23 @@ function wfBuildGlobChildren(v,container,render,depth){
 function wfNodeWarnings(n, def, g){
   const w=[];
   for(const f of (def.fields||[])){
-    if(f.t==="tpl" && !String(n.params[f.k]||"").trim()) w.push("Chưa chọn ảnh template");
-    if(f.t==="tpls"){ const a=n.params[f.k]; if(!Array.isArray(a)||!a.filter(x=>String(x||"").trim()).length) w.push("Chưa có ảnh nào trong danh sách"); }
+    if(f.t==="tpl" && !String(n.params[f.k]||"").trim()) w.push("No template image selected");
+    if(f.t==="tpls"){ const a=n.params[f.k]; if(!Array.isArray(a)||!a.filter(x=>String(x||"").trim()).length) w.push("No images in the list"); }
   }
   if(n.type==="switch"){
     const cs=(n.params&&n.params.cases)||[];
-    if(!cs.length) w.push("Chưa có nhánh nào");
+    if(!cs.length) w.push("No branches");
     cs.forEach((c,i)=>{ const cd=WF_NODES[c.type]; (cd&&cd.fields||[]).forEach(f=>{
-      if(f.t==="tpl" && !String((c.params||{})[f.k]||"").trim()) w.push(`Nhánh #${i+1}: chưa chọn ảnh`); }); });
+      if(f.t==="tpl" && !String((c.params||{})[f.k]||"").trim()) w.push(`Branch #${i+1}: no image selected`); }); });
   }
-  if(def.kind!=="start" && def.kind!=="note" && g && !(g.edges||[]).some(ed=>ed.to===n.id))
-    w.push("Chưa nối dây vào — block này sẽ không bao giờ chạy");
+  if(n.type==="and" && g){
+    const expected=Math.max(1,parseInt(n.params&&n.params.count)||2);
+    const incoming=(g.edges||[]).filter(ed=>ed.to===n.id).length;
+    if(!incoming) w.push("No incoming wire — this block will never run");
+    else if(incoming!==expected) w.push(`Expected ${expected} incoming branches, found ${incoming}`);
+  }
+  if(def.kind!=="start" && def.kind!=="note" && n.type!=="and" && g && !(g.edges||[]).some(ed=>ed.to===n.id))
+    w.push("No incoming wire — this block will never run");
   return w;
 }
 function wfNodeEl(n){
@@ -436,18 +442,18 @@ function wfNodeEl(n){
     if(intIn) el.classList.add("wf-stk-jtop"); if(intOut) el.classList.add("wf-stk-jbot"); }
   // A call node shows the referenced function's name as its title.
   let title=def.label, sum="";
-  if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?fn.name:"(chưa chọn function)"; }
+  if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?fn.name:"(no function selected)"; }
   else { try{ sum=def.sum?def.sum(n.params):""; }catch{} }
   const tplField = wfTplField(n.type);
   const isTpls = tplField && tplField.t==="tpls";
   const hasTpl = !!tplField;
   const showThumb = hasTpl && (wfPreviewAll || n.showPreview);
-  const eyeBtn = hasTpl ? `<button class="wf-node-eye${n.showPreview?" on":""}" title="Xem trước ảnh (block này)">${wfIco("eye")}</button>` : "";
+  const eyeBtn = hasTpl ? `<button class="wf-node-eye${n.showPreview?" on":""}" title="Preview image (this block)">${wfIco("eye")}</button>` : "";
   const noteHtml = n.note ? `<div class="wf-node-note">${wfIco("edit")}<span>${escHtml(n.note)}</span></div>` : "";
   const logHtml = n.log ? `<div class="wf-node-log">${escHtml(n.log)}</div>` : "";
   const dp=[];
-  if(n.delayBefore) dp.push(`${wfIco("clock")}<span>Chờ ${n.delayBefore}s</span>`);
-  if(n.delayAfter)  dp.push(`${wfIco("timer")}<span>Đợi ${n.delayAfter}s</span>`);
+  if(n.delayBefore) dp.push(`${wfIco("clock")}<span>Wait ${n.delayBefore}s</span>`);
+  if(n.delayAfter)  dp.push(`${wfIco("timer")}<span>After wait ${n.delayAfter}s</span>`);
   const delayHtml = dp.length ? `<div class="wf-node-delay">${dp.join("")}</div>` : "";
   // tpls → a strip of small thumbnails (one per listed image); single tpl → one.
   // The preview row is always rendered (so block height is stable) but the image
@@ -468,7 +474,7 @@ function wfNodeEl(n){
     if(isTpls){
       const strip=el.querySelector(".wf-node-thumbs");
       const arr=Array.isArray(n.params[tplField.k])?n.params[tplField.k].filter(p=>String(p||"").trim()):[];
-      if(!arr.length){ const e=document.createElement("span"); e.className="wf-tpl-empty"; e.textContent="(chưa có ảnh)"; strip.appendChild(e); }
+      if(!arr.length){ const e=document.createElement("span"); e.className="wf-tpl-empty"; e.textContent="(no image)"; strip.appendChild(e); }
       arr.forEach(p=>{ const im=document.createElement("img"); im.className="wf-node-thumb-sm"; strip.appendChild(im); wfLoadThumb(im,p); });
     } else {
       wfLoadThumb(el.querySelector(".wf-node-thumb"), wfTplOf(n));
@@ -516,7 +522,7 @@ function wfNodeEl(n){
     op.dataset.node=n.id; op.dataset.port=port; op.style.top=top+"px";
     el.appendChild(op);
     let lblTxt;
-    if(n.type==="switch") lblTxt = (port==="default") ? "khác" : "#"+(i+1);
+    if(n.type==="switch") lblTxt = (port==="default") ? "else" : "#"+(i+1);
     else if(n.type==="parallel"||n.type==="random_branch"||n.type==="try_chain") lblTxt = port;
     else lblTxt = WF_PORT_LBL[port];
     if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+0)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl); }

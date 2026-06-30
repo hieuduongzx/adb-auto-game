@@ -35,7 +35,7 @@ function wfRenderInspector(){
     const g=wfGraph();
     const selNodes=g?WF.sel.map(id=>g.nodes.find(n=>n.id===id)).filter(Boolean):[];
 
-    body.appendChild(wfInspId("box", WF.sel.length+" block được chọn", null, WF.sel.length));
+    body.appendChild(wfInspId("box", WF.sel.length+" blocks selected", null, WF.sel.length));
 
     const listBlock=wfInspBlock();
     const list=document.createElement("div"); list.style.cssText="display:flex;flex-direction:column;gap:3px;";
@@ -49,31 +49,31 @@ function wfRenderInspector(){
     if(selNodes.length>8){
       const more=document.createElement("div");
       more.style.cssText="font-size:10px;color:var(--muted);";
-      more.textContent=`+${selNodes.length-8} nữa…`; list.appendChild(more);
+      more.textContent=`+${selNodes.length-8} more…`; list.appendChild(more);
     }
     listBlock.appendChild(list); body.appendChild(listBlock);
 
-    const alignBlock=wfInspBlock("Căn chỉnh");
+    const alignBlock=wfInspBlock("Align");
     const alignGrid=document.createElement("div"); alignGrid.className="wf-insp-grid";
     const mkAlign=(lbl,fn)=>{ const b=document.createElement("button"); b.className="btn sm"; b.textContent=lbl; b.title=lbl; b.onclick=fn; return b; };
-    alignGrid.appendChild(mkAlign("← Trái", ()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const minX=Math.min(...selNodes.map(n=>n.x)); selNodes.forEach(n=>n.x=minX); wfRenderCanvas(); }));
-    alignGrid.appendChild(mkAlign("→ Phải",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const maxX=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=maxX-(el?el.offsetWidth:158); }); wfRenderCanvas(); }));
-    alignGrid.appendChild(mkAlign("↑ Trên", ()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const minY=Math.min(...selNodes.map(n=>n.y)); selNodes.forEach(n=>n.y=minY); wfRenderCanvas(); }));
-    alignGrid.appendChild(mkAlign("↓ Dưới",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const maxY=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=maxY-(el?el.offsetHeight:46); }); wfRenderCanvas(); }));
-    alignGrid.appendChild(mkAlign("↔ Giữa X",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const cx=(Math.min(...selNodes.map(n=>n.x))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=cx-(el?el.offsetWidth:158)/2; }); wfRenderCanvas(); }));
-    alignGrid.appendChild(mkAlign("↕ Giữa Y",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const cy=(Math.min(...selNodes.map(n=>n.y))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=cy-(el?el.offsetHeight:46)/2; }); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("← Left", ()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const minX=Math.min(...selNodes.map(n=>n.x)); selNodes.forEach(n=>n.x=minX); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("→ Right",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const maxX=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=maxX-(el?el.offsetWidth:158); }); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("↑ Top", ()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const minY=Math.min(...selNodes.map(n=>n.y)); selNodes.forEach(n=>n.y=minY); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("↓ Bottom",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const maxY=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=maxY-(el?el.offsetHeight:46); }); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("↔ Center X",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const cx=(Math.min(...selNodes.map(n=>n.x))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=cx-(el?el.offsetWidth:158)/2; }); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("↕ Center Y",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const cy=(Math.min(...selNodes.map(n=>n.y))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=cy-(el?el.offsetHeight:46)/2; }); wfRenderCanvas(); }));
     alignBlock.appendChild(alignGrid); body.appendChild(alignBlock);
 
-    const actBlock=wfInspBlock("Thao tác");
+    const actBlock=wfInspBlock("Actions");
     const actGrid=document.createElement("div"); actGrid.className="wf-insp-grid";
-    const dupBtn=document.createElement("button"); dupBtn.className="btn sm"; dupBtn.textContent="Nhân bản"; dupBtn.title="Ctrl+D"; dupBtn.onclick=()=>wfDuplicate(); actGrid.appendChild(dupBtn);
-    const grpBtn=document.createElement("button"); grpBtn.className="btn sm"; grpBtn.textContent="Tạo nhóm"; grpBtn.onclick=()=>wfGroupSelection(); actGrid.appendChild(grpBtn);
-    const delBtn=document.createElement("button"); delBtn.className="btn sm err"; delBtn.textContent="Xoá"; delBtn.onclick=()=>wfDeleteSelected(); actGrid.appendChild(delBtn);
+    const dupBtn=document.createElement("button"); dupBtn.className="btn sm"; dupBtn.textContent="Duplicate"; dupBtn.title="Ctrl+D"; dupBtn.onclick=()=>wfDuplicate(); actGrid.appendChild(dupBtn);
+    const grpBtn=document.createElement("button"); grpBtn.className="btn sm"; grpBtn.textContent="Create group"; grpBtn.onclick=()=>wfGroupSelection(); actGrid.appendChild(grpBtn);
+    const delBtn=document.createElement("button"); delBtn.className="btn sm err"; delBtn.textContent="Delete"; delBtn.onclick=()=>wfDeleteSelected(); actGrid.appendChild(delBtn);
     actBlock.appendChild(actGrid); body.appendChild(actBlock);
 
     const tipBlock=wfInspBlock();
     const tip=document.createElement("div"); tip.className="wf-insp-tip";
-    tip.textContent="Ctrl+click / Shift+click để thêm/bớt chọn. Phím ← → ↑ ↓ di chuyển (Shift = 10px).";
+    tip.textContent="Ctrl+click / Shift+click to add/remove selection. Arrow keys move (Shift = 10px).";
     tipBlock.appendChild(tip); body.appendChild(tipBlock);
     return;
   }
@@ -83,12 +83,12 @@ function wfRenderInspector(){
     const def=WF_NODES[node.type]||{label:node.type,fields:[]};
     body.appendChild(wfInspId(def.ico||"box", def.label||node.type, node.type));
 
-    const pblock=wfInspBlock("Tham số");
+    const pblock=wfInspBlock("Parameters");
     if(node.type==="call"){ pblock.appendChild(wfCallPicker(node)); }
-    else if(node.type==="switch" || node.type==="try_chain"){ pblock.appendChild(wfBranchCountEditor(node)); }
+    else if(node.type==="switch" || node.type==="try_chain" || node.type==="and"){ pblock.appendChild(wfBranchCountEditor(node)); }
     else {
       if(!(def.fields||[]).length){
-        const d=document.createElement("div"); d.className="wf-insp-tip"; d.textContent="Node này không có tham số."; pblock.appendChild(d);
+        const d=document.createElement("div"); d.className="wf-insp-tip"; d.textContent="This node has no parameters."; pblock.appendChild(d);
       }
       (def.fields||[]).forEach(f=>pblock.appendChild(wfFieldEl(node,f)));
     }
@@ -102,39 +102,39 @@ function wfRenderInspector(){
 
   if(fn){
     body.appendChild(wfInspId("function","Function","ƒ "+(fn.name||"")));
-    const b=wfInspBlock("Tên function");
-    b.appendChild(wfActField("Tên","text",fn.name,v=>{ fn.name=v; wfRenderFunctions(); wfRenderPalette(); $("wf-cur-act").textContent="ƒ "+v; }));
-    const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Xếp node cho function này. Nó dùng được như một node trong mọi hoạt động (kéo từ mục Function).";
+    const b=wfInspBlock("Function name");
+    b.appendChild(wfActField("Name","text",fn.name,v=>{ fn.name=v; wfRenderFunctions(); wfRenderPalette(); $("wf-cur-act").textContent="ƒ "+v; }));
+    const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Arrange nodes for this function. It can be used as a node in any activity (drag from Functions).";
     b.appendChild(tip);
     body.appendChild(b);
     return;
   }
 
   if(act){
-    const typeLabel=act.type==="background"?"Hoạt động nền":"Hoạt động tuần tự";
+    const typeLabel=act.type==="background"?"Background activity":"Sequence activity";
     body.appendChild(wfInspId(act.type==="background"?"layers":"play", typeLabel, act.name||""));
 
-    const b=wfInspBlock("Cấu hình");
-    b.appendChild(wfActField("Tên","text",act.name,v=>{ act.name=v; wfRenderActivities(); $("wf-cur-act").textContent=v; }));
-    if(act.type==="background") b.appendChild(wfActField("Chu kỳ (s)","num",act.pollInterval,v=>act.pollInterval=parseFloat(v)||1));
-    else b.appendChild(wfActField("Số lần thử","num",act.maxRetries,v=>act.maxRetries=parseInt(v)||1));
+    const b=wfInspBlock("Configuration");
+    b.appendChild(wfActField("Name","text",act.name,v=>{ act.name=v; wfRenderActivities(); $("wf-cur-act").textContent=v; }));
+    if(act.type==="background") b.appendChild(wfActField("Interval (s)","num",act.pollInterval,v=>act.pollInterval=parseFloat(v)||1));
+    else b.appendChild(wfActField("Retry count","num",act.maxRetries,v=>act.maxRetries=parseInt(v)||1));
     body.appendChild(b);
 
     body.appendChild(wfVarsSection(act));
 
     const tipBlock=wfInspBlock();
-    const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Bấm một node trên canvas để sửa tham số của nó.";
+    const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Click a node on the canvas to edit its parameters.";
     tipBlock.appendChild(tip); body.appendChild(tipBlock);
     return;
   }
-  body.innerHTML='<div class="wf-insp-empty">Chưa chọn hoạt động.</div>';
+  body.innerHTML='<div class="wf-insp-empty">No activity selected.</div>';
 }
 
 function wfCallPicker(node){
   const row=document.createElement("div"); row.className="wf-field";
   const l=document.createElement("label"); l.textContent="function"; row.appendChild(l);
   const sel=document.createElement("select");
-  if(!WF.functions.length){ const o=document.createElement("option"); o.value=""; o.textContent="(chưa có function)"; sel.appendChild(o); }
+  if(!WF.functions.length){ const o=document.createElement("option"); o.value=""; o.textContent="(no functions)"; sel.appendChild(o); }
   WF.functions.forEach(fn=>{ const o=document.createElement("option"); o.value=fn.id; o.textContent=fn.name; if(fn.id===node.params.fn)o.selected=true; sel.appendChild(o); });
   sel.onchange=()=>{ wfPushUndoDebounced(); node.params.fn=sel.value; wfRenderCanvas(); };
   row.appendChild(sel); return row;
@@ -144,7 +144,7 @@ function wfCallPicker(node){
 // finishes (before the next block). Stored top-level like note/log, applied by
 // the engine around every block — see src/workflow/engine.py _walk.
 function wfTimingField(node){
-  const b=wfInspBlock("Thời gian chờ");
+  const b=wfInspBlock("Timing");
   const mk=(key,label,hint)=>{
     const row=document.createElement("div"); row.className="wf-field";
     const l=document.createElement("label"); l.textContent=label; l.title=hint; row.appendChild(l);
@@ -153,21 +153,21 @@ function wfTimingField(node){
     inp.placeholder="0";
     inp.oninput=()=>{ wfPushUndoDebounced(); node[key]=parseFloat(inp.value)||0; wfUpdNodeTiming(node); };
     row.appendChild(inp);
-    const unit=document.createElement("span"); unit.className="hz-unit"; unit.textContent="giây"; row.appendChild(unit);
+    const unit=document.createElement("span"); unit.className="hz-unit"; unit.textContent="seconds"; row.appendChild(unit);
     return row;
   };
-  b.appendChild(mk("delayBefore","Chờ","Chờ bấy nhiêu giây rồi mới chạy block này (vd đợi màn hình ổn định rồi mới tìm ảnh)."));
-  b.appendChild(mk("delayAfter","Đợi","Chạy xong block này rồi đợi thêm bấy nhiêu giây mới sang block kế tiếp."));
+  b.appendChild(mk("delayBefore","Before","Wait this many seconds before running this block (e.g. wait for the screen to stabilize before finding an image)."));
+  b.appendChild(mk("delayAfter","After","After this block runs, wait this many seconds before moving to the next block."));
   const hint=document.createElement("div"); hint.className="wf-insp-tip";
-  hint.innerHTML="<b>Chờ</b> X giây = đợi rồi mới chạy block. <b>Đợi</b> X giây = chạy xong rồi mới sang block kế. Giống block “Chờ” nhưng gắn sẵn vào block này.";
+  hint.innerHTML="<b>Before</b> X seconds = wait before running this block. <b>After</b> X seconds = wait after it finishes before the next block. Like a Wait block, but attached to this block.";
   b.appendChild(hint);
   return b;
 }
 function wfUpdNodeTiming(node){
   const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
   const dp=[];
-  if(node.delayBefore) dp.push(`${wfIco("clock")}<span>Chờ ${node.delayBefore}s</span>`);
-  if(node.delayAfter)  dp.push(`${wfIco("timer")}<span>Đợi ${node.delayAfter}s</span>`);
+  if(node.delayBefore) dp.push(`${wfIco("clock")}<span>Before ${node.delayBefore}s</span>`);
+  if(node.delayAfter)  dp.push(`${wfIco("timer")}<span>After ${node.delayAfter}s</span>`);
   let n=el.querySelector(".wf-node-delay");
   if(dp.length){
     if(!n){ n=document.createElement("div"); n.className="wf-node-delay";
@@ -179,9 +179,9 @@ function wfUpdNodeTiming(node){
 }
 
 function wfNoteField(node){
-  const b=wfInspBlock("Ghi chú");
+  const b=wfInspBlock("Note");
   const inp=document.createElement("input"); inp.type="text"; inp.className="wf-insp-input";
-  inp.placeholder="ghi chú cho node này…"; inp.value=node.note||"";
+  inp.placeholder="note for this node…"; inp.value=node.note||"";
   inp.oninput=()=>{ wfPushUndoDebounced(); node.note=inp.value; wfUpdNodeNote(node); };
   b.appendChild(inp);
   return b;
@@ -196,13 +196,13 @@ function wfUpdNodeNote(node){
 }
 
 function wfLogField(node){
-  const b=wfInspBlock("Log khi chạy");
+  const b=wfInspBlock("Run log");
   const inp=document.createElement("input"); inp.type="text"; inp.className="wf-insp-input";
-  inp.placeholder="tự ghi log mỗi lần chạy node…"; inp.value=node.log||"";
+  inp.placeholder="write a log each time this node runs…"; inp.value=node.log||"";
   inp.oninput=()=>{ wfPushUndoDebounced(); node.log=inp.value; wfUpdNodeLog(node); };
   b.appendChild(inp);
   const hint=document.createElement("div"); hint.className="wf-insp-tip";
-  hint.innerHTML='Có thể chèn biến: <code>{tên_biến}</code>';
+  hint.innerHTML='You can insert variables: <code>{variable_name}</code>';
   b.appendChild(hint);
   return b;
 }
@@ -228,14 +228,14 @@ function wfActField(label,t,val,onset){
 // Per-activity variables.
 function wfVarsSection(act){
   if(!act.vars) act.vars=[];
-  const b=wfInspBlock("Biến hoạt động", act.vars.length);
+  const b=wfInspBlock("Activity variables", act.vars.length);
   b.style.gap="2px";
   act.vars.forEach((v,idx)=>wfBuildVarTree(act,v,idx,b));
   b.appendChild(wfVarAddBtn(act));
   return b;
 }
 function wfVarAddBtn(act, parentVar, parentIdx){
-  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Biến"; add.style.alignSelf="flex-start";
+  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Variable"; add.style.alignSelf="flex-start";
   add.onclick=()=>{
     wfPushUndoDebounced();
     const arr=parentVar?parentVar.children:(act.vars);
@@ -264,17 +264,17 @@ function wfVarRow(act,v,idx,depth){
   // Line 1: drag-chip + title + delete + add-child button.
   const r1=document.createElement("div"); r1.className="wf-var-row";
   const chip=document.createElement("span"); chip.className="wf-var-chip"; chip.draggable=true;
-  chip.textContent="🔖"; chip.title="Kéo vào canvas để tạo node kiểm tra";
+  chip.textContent="🔖"; chip.title="Drag to canvas to create a check node";
   chip.addEventListener("dragstart",e=>{ wfPaletteDrag="var:"+(v.type||"bool")+":"+(v.name||""); e.dataTransfer.effectAllowed="copy"; try{e.dataTransfer.setData("text/plain",v.name||"");}catch{} });
   chip.addEventListener("dragend",()=>{ wfPaletteDrag=null; });
   r1.appendChild(chip);
-  const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Tiêu đề (hiện trong settings)"; lbl.style.cssText="flex:1;min-width:0;font-weight:600;";
+  const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Title (shown in settings)"; lbl.style.cssText="flex:1;min-width:0;font-weight:600;";
   lbl.oninput=()=>{ wfPushUndoDebounced(); v.label=lbl.value; };
   r1.appendChild(lbl);
-  const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Con"; addChild.title="Thêm biến con (nested)";
+  const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Child"; addChild.title="Add child variable (nested)";
   addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); wfRenderInspector(); };
   r1.appendChild(addChild);
-  const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá biến";
+  const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Delete variable";
   del.onclick=()=>{
     wfPushUndoDebounced();
     // Find parent array and remove this var
@@ -286,11 +286,11 @@ function wfVarRow(act,v,idx,depth){
   r1.appendChild(del);
   // Line 2: name + type + default value.
   const r2=document.createElement("div"); r2.className="wf-var-row";
-  const nm=document.createElement("input"); nm.type="text"; nm.value=v.name||""; nm.placeholder="biến (vd isClaim)"; nm.style.cssText="flex:1;min-width:0;font-size:10.5px;font-family:var(--mono);";
+  const nm=document.createElement("input"); nm.type="text"; nm.value=v.name||""; nm.placeholder="variable (e.g. isClaim)"; nm.style.cssText="flex:1;min-width:0;font-size:10.5px;font-family:var(--mono);";
   nm.oninput=()=>{ wfPushUndoDebounced(); v.name=nm.value; };
   r2.appendChild(nm);
   const ty=document.createElement("select");
-  [["bool","bool"],["number","số"],["text","chữ"],["select","chọn"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
+  [["bool","bool"],["number","number"],["text","text"],["select","select"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
   ty.onchange=()=>{
     wfPushUndoDebounced();
     v.type=ty.value;
@@ -304,7 +304,7 @@ function wfVarRow(act,v,idx,depth){
   // Line 3 (select only): options.
   if(v.type==="select"){
     const r3=document.createElement("div"); r3.className="wf-var-row";
-    const opt=document.createElement("input"); opt.type="text"; opt.placeholder="lựa chọn: A, B, C"; opt.value=(v.options||[]).join(", ");
+    const opt=document.createElement("input"); opt.type="text"; opt.placeholder="options: A, B, C"; opt.value=(v.options||[]).join(", ");
     opt.style.cssText="flex:1;min-width:0;font-size:10.5px;";
     opt.onchange=()=>{ wfPushUndoDebounced(); v.options=opt.value.split(",").map(s=>s.trim()).filter(Boolean); if(!v.options.includes(v.value)) v.value=v.options[0]||""; wfRenderInspector(); };
     r3.appendChild(opt); card.appendChild(r3);
@@ -332,7 +332,7 @@ function findParentVarIdx(arr, idx, depth){
 }
 function wfVarValue(v){
   if((v.type||"bool")==="bool"){
-    const cb=document.createElement("span"); cb.className="cb"+(v.value?" checked":""); cb.title="Giá trị mặc định";
+    const cb=document.createElement("span"); cb.className="cb"+(v.value?" checked":""); cb.title="Default value";
     cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
     cb.onclick=()=>{ wfPushUndoDebounced(); v.value=!v.value; cb.classList.toggle("checked",v.value); };
     return cb;
@@ -424,7 +424,7 @@ function wfFieldEl(node,f){
 
   if(f.t==="tpl"){
     inp.style.fontSize="10px";
-    const btn=document.createElement("button"); btn.className="btn sm"; btn.textContent="Chọn…";
+    const btn=document.createElement("button"); btn.className="btn sm"; btn.textContent="Choose…";
     const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img, node.params[f.k]);
     row.appendChild(btn); row.appendChild(img);   // thumb beside the picker button
     const refresh=v=>{ wfPushUndoDebounced(); node.params[f.k]=v; wfUpdNodeSum(node); wfLoadThumb(img,v); wfUpdNodePreview(node); wfRenderCanvas(); };
@@ -450,8 +450,8 @@ function wfTplsField(node,f,row){
       const r=document.createElement("div"); r.className="wf-tpls-hdr";
       const num=document.createElement("span"); num.className="num"; num.textContent=(idx+1)+".";
       const inp=document.createElement("input"); inp.type="text"; inp.value=path||"";
-      const pick=document.createElement("button"); pick.className="btn sm"; pick.textContent="Chọn…";
-      const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá ảnh";
+      const pick=document.createElement("button"); pick.className="btn sm"; pick.textContent="Choose…";
+      const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Delete image";
       const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img, path);
       const commit=v=>{ wfPushUndoDebounced(); arr()[idx]=v; wfUpdNodeSum(node); wfUpdNodePreview(node); wfLoadThumb(img,v); wfRenderCanvas(); };
       inp.oninput=()=>commit(inp.value);
@@ -460,10 +460,10 @@ function wfTplsField(node,f,row){
       r.appendChild(num); r.appendChild(inp); r.appendChild(pick); r.appendChild(del); r.appendChild(img);
       item.appendChild(r); list.appendChild(item);
     });
-    if(!arr().length){ const e=document.createElement("div"); e.className="wf-tpls-empty"; e.textContent="Chưa có ảnh — thêm ít nhất 2 để dùng \"hoặc\"."; list.appendChild(e); }
+    if(!arr().length){ const e=document.createElement("div"); e.className="wf-tpls-empty"; e.textContent="No images — add at least 2 to use \"or\"."; list.appendChild(e); }
   }
   renderList();
-  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Ảnh";
+  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Image";
   add.onclick=async()=>{ wfPushUndoDebounced(); const pp=await api().pick_template(); arr().push(pp||""); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
   wrap.appendChild(list); wrap.appendChild(add);
   return wrap;
@@ -473,7 +473,7 @@ function wfRegionField(node,f){
   const wrap=document.createElement("div");
   wrap.style.cssText="display:flex;flex-direction:column;gap:5px;padding:5px 0;";
   const hdr=document.createElement("div"); hdr.className="wf-field"; hdr.style.margin="0";
-  const lab=document.createElement("label"); lab.textContent="Vùng tìm"; lab.title="Giới hạn khớp ảnh trong 1 vùng màn hình (tuỳ chọn)"; hdr.appendChild(lab);
+  const lab=document.createElement("label"); lab.textContent="Search region"; lab.title="Limit image matching to one screen region (optional)"; hdr.appendChild(lab);
   const cb=document.createElement("span"); cb.className="cb";
   const enabled=()=> !!(node.params.regionX||node.params.regionY||node.params.regionW||node.params.regionH);
   cb.classList.toggle("checked", enabled());
@@ -513,7 +513,7 @@ function wfRegionField(node,f){
 }
 
 // Shared branch-count editor for dynamic branch blocks. Switch keeps detailed
-// per-branch conditions; try_chain only needs numbered output ports.
+// per-branch conditions; try_chain exposes numbered outputs; and waits for N inputs.
 function wfBranchCountEditor(node){
   return node.type==="switch" ? wfSwitchCasesEditor(node) : wfCountBranchesEditor(node);
 }
@@ -527,18 +527,18 @@ function wfBranchCountControl(label, count, onSet, onAdd, min=1){
   const row=document.createElement("div"); row.className="wf-field wf-branch-count";
   const lab=document.createElement("label"); lab.textContent=label; row.appendChild(lab);
   const inp=document.createElement("input"); inp.type="number"; inp.min=String(min); inp.step="1"; inp.value=count;
-  inp.title="Nhập số nhánh để thêm/xoá nhanh";
+  inp.title="Enter branch count to quickly add/delete";
   inp.onchange=()=>{ wfPushUndoDebounced(); const n=wfNormalizeCount(inp.value, count, min); inp.value=n; onSet(n); };
-  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Nhánh"; add.title="Thêm một nhánh";
+  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Branch"; add.title="Add one branch";
   add.onclick=()=>{ wfPushUndoDebounced(); onAdd(); };
   row.appendChild(inp); row.appendChild(add);
   return row;
 }
 
-function wfSetTryChainCount(node, nextCount){
-  const prev=wfNormalizeCount(node.params.count, 3);
+function wfSetBranchCount(node, nextCount){
+  const prev=wfNormalizeCount(node.params.count, node.type==="and"?2:3);
   node.params.count=nextCount;
-  if(nextCount<prev){
+  if(nextCount<prev && node.type!=="and"){
     const g=wfGraph();
     if(g) g.edges=(g.edges||[]).filter(e=>!(e.from===node.id && /^\d+$/.test(e.fromPort) && parseInt(e.fromPort,10)>nextCount));
   }
@@ -547,11 +547,15 @@ function wfSetTryChainCount(node, nextCount){
 
 function wfCountBranchesEditor(node){
   const wrap=document.createElement("div");
-  const count=()=>wfNormalizeCount(node.params.count, 3);
+  const isAnd=node.type==="and";
+  const fallback=isAnd?2:3;
+  const count=()=>wfNormalizeCount(node.params.count, fallback);
   const render=()=>{ wrap.innerHTML="";
-    wrap.appendChild(wfBranchCountControl("Số nhánh", count(), n=>{ wfSetTryChainCount(node,n); render(); }, ()=>{ wfSetTryChainCount(node,count()+1); render(); }));
+    wrap.appendChild(wfBranchCountControl(isAnd?"Expected branches":"Branch count", count(), n=>{ wfSetBranchCount(node,n); render(); }, ()=>{ wfSetBranchCount(node,count()+1); render(); }));
     const hint=document.createElement("div"); hint.className="wf-insp-tip";
-    hint.textContent="Chạy nhánh #1 trước; nếu fail thì thử #2…#n. Khi tất cả fail sẽ đi cổng 'fail'.";
+    hint.textContent=isAnd
+      ? "Wait until this many incoming parallel branches reach this node; continue only if all arrived branches had no errors."
+      : "Run branch #1 first; if it fails, try #2…#n. If all fail, use the 'fail' port.";
     wrap.appendChild(hint);
   };
   render();
@@ -582,11 +586,11 @@ function wfSwitchCasesEditor(node){
       WF_SWITCH_CASE_TYPES.forEach(t=>{ const op=document.createElement("option"); op.value=t;
         op.textContent=WF_NODES[t].label; if(c.type===t)op.selected=true; sel.appendChild(op); });
       sel.onchange=()=>{ wfPushUndoDebounced(); c.type=sel.value; c.params=wfDefaults(sel.value); render(); wfUpdNodeSum(node); };
-      const up=document.createElement("button"); up.className="btn sm ico"; up.innerHTML=wfIco("chevron_up"); up.title="Lên"; up.disabled=idx===0;
+      const up=document.createElement("button"); up.className="btn sm ico"; up.innerHTML=wfIco("chevron_up"); up.title="Up"; up.disabled=idx===0;
       up.onclick=()=>{ wfPushUndoDebounced(); wfReorderSwitchCase(node, idx, idx-1); render(); wfRenderCanvas(); };
-      const dn=document.createElement("button"); dn.className="btn sm ico"; dn.innerHTML=wfIco("chevron_dn"); dn.title="Xuống"; dn.disabled=idx===cases().length-1;
+      const dn=document.createElement("button"); dn.className="btn sm ico"; dn.innerHTML=wfIco("chevron_dn"); dn.title="Down"; dn.disabled=idx===cases().length-1;
       dn.onclick=()=>{ wfPushUndoDebounced(); wfReorderSwitchCase(node, idx, idx+1); render(); wfRenderCanvas(); };
-      const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá nhánh";
+      const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Delete branch";
       del.onclick=()=>{ wfPushUndoDebounced(); wfRemoveSwitchCase(node, idx); render(); wfRenderCanvas(); };
       hd.appendChild(num); hd.appendChild(sel); hd.appendChild(up); hd.appendChild(dn); hd.appendChild(del);
       item.appendChild(hd);
@@ -594,11 +598,11 @@ function wfSwitchCasesEditor(node){
       (WF_NODES[c.type].fields||[]).forEach(f=> item.appendChild(wfFieldEl(proxy,f)));
       list.appendChild(item);
     });
-    if(!cases().length){ const e=document.createElement("div"); e.className="wf-insp-tip"; e.textContent='Chưa có nhánh. Bấm "+ Nhánh" hoặc nhập số nhánh.'; list.appendChild(e); }
+    if(!cases().length){ const e=document.createElement("div"); e.className="wf-insp-tip"; e.textContent='No branches. Click "+ Branch" or enter a branch count.'; list.appendChild(e); }
   }
-  const countCtl=wfBranchCountControl("Số nhánh", cases().length, n=>{ setCaseCount(n); render(); }, ()=>{ addCase(); render(); wfRenderCanvas(); wfUpdNodeSum(node); }, 0);
+  const countCtl=wfBranchCountControl("Branch count", cases().length, n=>{ setCaseCount(n); render(); }, ()=>{ addCase(); render(); wfRenderCanvas(); wfUpdNodeSum(node); }, 0);
   const hint=document.createElement("div"); hint.className="wf-insp-tip";
-  hint.textContent="Kiểm lần lượt từ trên xuống: đúng nhánh nào đi cổng đó (#1..#n), không khớp đi cổng 'khác'.";
+  hint.textContent="Check from top to bottom: the first matching branch uses its port (#1..#n), otherwise use the 'else' port.";
   wrap.appendChild(countCtl); wrap.appendChild(list); wrap.appendChild(hint);
   render();
   return wrap;
@@ -623,7 +627,7 @@ function wfUpdNodePreview(node){
     const f=wfTplField(node.type);
     const arr=Array.isArray(node.params[f.k])?node.params[f.k].filter(p=>String(p||"").trim()):[];
     strip.innerHTML="";
-    if(!arr.length){ const e=document.createElement("span"); e.className="wf-tpl-empty"; e.textContent="(chưa có ảnh)"; strip.appendChild(e); return; }
+    if(!arr.length){ const e=document.createElement("span"); e.className="wf-tpl-empty"; e.textContent="(no image)"; strip.appendChild(e); return; }
     arr.forEach(p=>{ const im=document.createElement("img"); im.className="wf-node-thumb-sm"; strip.appendChild(im); wfLoadThumb(im,p); });
     return;
   }

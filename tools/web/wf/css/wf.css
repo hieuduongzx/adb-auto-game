@@ -114,9 +114,9 @@
 .wf-badge.fn { display:inline-flex; align-items:center; justify-content:center; color:#fff;
   background:#7c3aed; border:none; font-size:9.5px; font-weight:800;
   padding:2px 5px; letter-spacing:.02em; border-radius:4px; min-width:16px; }
-  .wf-chip { display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--border2);
+  .wf-chip { display:flex; align-items:center; gap:6px; padding:7px 8px; border:1px solid var(--border2);
     border-radius:7px; background:var(--panel); cursor:grab;
-    font-size:11px; font-weight:600; color:var(--ink2);
+    font-size:12.5px; font-weight:600; color:var(--ink2);
     transition:border-color .1s, background .1s, box-shadow .1s; user-select:none; }
   .wf-chip:hover { border-color:var(--accent); background:var(--accent-bg); box-shadow: 0 1px 3px rgba(47,111,237,.1); }
 .wf-chip:active { cursor:grabbing; }
@@ -677,5 +677,10 @@
   border-bottom:1px solid var(--border); flex-shrink:0; }
 #wf-scope-panel .tab-pane { padding:8px; }
 #wf-scope-panel .group { margin-bottom:6px; }
+#pv-tab-device .info-grid .k,
+#pv-tab-device .info-grid .v { cursor:copy; border-radius:4px; padding:2px 3px; margin:-2px -3px; }
+#pv-tab-device .info-grid .k:hover,
+#pv-tab-device .info-grid .k:hover + .v,
+#pv-tab-device .info-grid .v:hover { background:var(--accent-bg); }
 /* Scope panel needs its own scroll surface (the inspector is overflow:hidden). */
 #wf-scope-panel .tab-pane.active { overflow-y:auto; }

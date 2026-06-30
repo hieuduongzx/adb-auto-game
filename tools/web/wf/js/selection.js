@@ -41,13 +41,13 @@ function wfCopy(){
   const minX=Math.min(...nodes.map(n=>n.x)), minY=Math.min(...nodes.map(n=>n.y));
   wfClipboard={nodes,edges,minX,minY};
   wfPasteShift=0;
-  setStatus(`Đã sao chép ${nodes.length} node`);
+  setStatus(`Copied ${nodes.length} node`);
   return true;
 }
 function wfCut(){ if(wfCopy()) wfDeleteSelected(); }
 function wfDuplicate(){ if(wfCopy()) wfPaste(); }   // copy + cascade-offset paste
 function wfPaste(opts){
-  const g=wfGraph(); if(!g){ alert("Chọn hoặc thêm một hoạt động trước."); return; }
+  const g=wfGraph(); if(!g){ alert("Select or add an activity first."); return; }
   if(!wfClipboard||!wfClipboard.nodes.length) return;
   wfPushUndo();
   const clip=wfClipboard;
@@ -74,5 +74,5 @@ function wfPaste(opts){
   g.nodes.forEach(n=>{ if(n.stack && stkCnt[n.stack]<2) n.stack=null; });
   WF.sel=newIds.slice(); WF.selectedNode=newIds.length===1?newIds[0]:null;
   wfRenderCanvas(); wfMarkSel(); wfRenderInspector();
-  setStatus(`Đã dán ${newIds.length} node`);
+  setStatus(`Pasted ${newIds.length} node`);
 }

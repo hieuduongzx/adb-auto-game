@@ -71,58 +71,59 @@ const WF_ICONS = {
 // Node catalog: UI source of truth (icon, kind, output ports, param fields).
 // Mirrors src/workflow/engine.py NODE_TYPES. kind: start|end|action|condition|loop.
 const WF_NODES = {
-  start:      {label:"Bắt đầu",   ico:"play", kind:"start", cat:null,    outs:["out"], fields:[]},
-  end:        {label:"Kết thúc",  ico:"square", kind:"end",   cat:"flow",  outs:[],      fields:[]},
-  tap:        {label:"Chạm",      ico:"pointer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Toạ độ"},{v:"found",t:"Ảnh vừa thấy"}],d:"pos"},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>p.target==="found"?"↳ ảnh vừa thấy":`(${p.x}, ${p.y})`},
-  double_tap: {label:"Chạm đúp",  ico:"hand",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Toạ độ"},{v:"found",t:"Ảnh vừa thấy"}],d:"pos"},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>(p.target==="found"?"↳ ảnh vừa thấy":`(${p.x}, ${p.y})`)+" ×2"},
-  tap_random: {label:"Chạm n.nhiên",ico:"dice",kind:"action",cat:"basic", outs:["out"], fields:[{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:100},{k:"h",t:"num",d:100}], sum:p=>`vùng (${p.x},${p.y}) ${p.w}×${p.h}`},
-  long_press: {label:"Giữ",       ico:"timer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Toạ độ"},{v:"found",t:"Ảnh vừa thấy"}],d:"pos"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"duration",t:"num",d:800}], sum:p=>(p.target==="found"?"↳ ảnh vừa thấy":`(${p.x},${p.y})`)+` ${p.duration}ms`},
-  swipe:      {label:"Vuốt",      ico:"arrow_down",kind:"action",cat:"basic", outs:["out"], fields:[{k:"x1",t:"num"},{k:"y1",t:"num"},{k:"x2",t:"num"},{k:"y2",t:"num"},{k:"duration",t:"num",d:300}], sum:p=>`(${p.x1},${p.y1})→(${p.x2},${p.y2})`},
-  swipe_dir:  {label:"Vuốt hướng",ico:"arrow_down",kind:"action",cat:"basic", outs:["out"], fields:[{k:"direction",t:"select",opts:["up","down","left","right"],d:"up"},{k:"distance",t:"num",d:400},{k:"duration",t:"num",d:300}], sum:p=>`${p.direction} ${p.distance}px`},
-  wait:       {label:"Chờ",       ico:"timer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"seconds",t:"num",d:1,step:.5}], sum:p=>`${p.seconds}s`},
-  wait_random:{label:"Chờ n.nhiên",ico:"hourglass",kind:"action",cat:"basic", outs:["out"], fields:[{k:"min",t:"num",d:.5,step:.5},{k:"max",t:"num",d:2,step:.5}], sum:p=>`${p.min}-${p.max}s`},
-  send_text:  {label:"Nhập text", ico:"keyboard",kind:"action",cat:"input", outs:["out"], fields:[{k:"text",t:"text"}], sum:p=>`"${p.text||""}"`},
-  key:        {label:"Phím",      ico:"disc",kind:"action",cat:"input", outs:["out"], fields:[{k:"keycode",t:"text",d:"BACK"}], sum:p=>`${p.keycode}`},
-  back:       {label:"Back",      ico:"back",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"phím back"},
-  home:       {label:"Home",      ico:"home",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"phím home"},
-  tap_image:  {label:"Chạm ảnh",  ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"offsetX",lbl:"Lệch X",t:"num",d:0},{k:"offsetY",lbl:"Lệch Y",t:"num",d:0},{k:"_region",lbl:"Vùng tìm",t:"region"}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")},
-  wait_image: {label:"Chờ ảnh",   ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"_region",lbl:"Vùng tìm",t:"region"}], sum:p=>wfBase(p.template)},
-  if_image:   {label:"Nếu ảnh",   ico:"help",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"_region",lbl:"Vùng tìm",t:"region"}], sum:p=>`${p.negate?"không ":""}thấy ${wfBase(p.template)}`},
+  start:      {label:"Start",   ico:"play", kind:"start", cat:null,    outs:["out"], fields:[]},
+  end:        {label:"End",  ico:"square", kind:"end",   cat:"flow",  outs:[],      fields:[]},
+  tap:        {label:"Tap",      ico:"pointer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`},
+  double_tap: {label:"Double tap",  ico:"hand",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`)+" ×2"},
+  tap_random: {label:"Random tap",ico:"dice",kind:"action",cat:"basic", outs:["out"], fields:[{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:100},{k:"h",t:"num",d:100}], sum:p=>`region (${p.x},${p.y}) ${p.w}×${p.h}`},
+  long_press: {label:"Long press",       ico:"timer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"duration",t:"num",d:800}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x},${p.y})`)+` ${p.duration}ms`},
+  swipe:      {label:"Swipe",      ico:"arrow_down",kind:"action",cat:"basic", outs:["out"], fields:[{k:"x1",t:"num"},{k:"y1",t:"num"},{k:"x2",t:"num"},{k:"y2",t:"num"},{k:"duration",t:"num",d:300}], sum:p=>`(${p.x1},${p.y1})→(${p.x2},${p.y2})`},
+  swipe_dir:  {label:"Swipe direction",ico:"arrow_down",kind:"action",cat:"basic", outs:["out"], fields:[{k:"direction",t:"select",opts:["up","down","left","right"],d:"up"},{k:"distance",t:"num",d:400},{k:"duration",t:"num",d:300}], sum:p=>`${p.direction} ${p.distance}px`},
+  wait:       {label:"Wait",       ico:"timer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"seconds",t:"num",d:1,step:.5}], sum:p=>`${p.seconds}s`},
+  wait_random:{label:"Random wait",ico:"hourglass",kind:"action",cat:"basic", outs:["out"], fields:[{k:"min",t:"num",d:.5,step:.5},{k:"max",t:"num",d:2,step:.5}], sum:p=>`${p.min}-${p.max}s`},
+  send_text:  {label:"Input text", ico:"keyboard",kind:"action",cat:"input", outs:["out"], fields:[{k:"text",t:"text"}], sum:p=>`"${p.text||""}"`},
+  key:        {label:"Key",      ico:"disc",kind:"action",cat:"input", outs:["out"], fields:[{k:"keycode",t:"text",d:"BACK"}], sum:p=>`${p.keycode}`},
+  back:       {label:"Back",      ico:"back",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"Back key"},
+  home:       {label:"Home",      ico:"home",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"Home key"},
+  tap_image:  {label:"Tap image",  ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")},
+  wait_image: {label:"Wait image",   ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBase(p.template)},
+  if_image:   {label:"If image",   ico:"help",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.negate?"not ":""}found ${wfBase(p.template)}`},
   // "…_any" = OR over several images: true when ANY listed template matches.
-  tap_image_any: {label:"Chạm 1 trong ảnh", ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"taps",t:"select",opts:[{v:"1",t:"Chạm"},{v:"2",t:"Chạm đúp"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"mode",lbl:"Kiểu tìm",t:"select",opts:[{v:"sequential",t:"Tuần tự"},{v:"parallel",t:"Song song"}],d:"sequential"},{k:"offsetX",lbl:"Lệch X",t:"num",d:0},{k:"offsetY",lbl:"Lệch Y",t:"num",d:0},{k:"_region",lbl:"Vùng tìm",t:"region"}], sum:p=>wfBaseAny(p.templates)+(p.taps=="2"?" ×2":"")+(p.mode==="parallel"?" //":"")},
-  wait_image_any:{label:"Chờ 1 trong ảnh",  ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"mode",lbl:"Kiểu tìm",t:"select",opts:[{v:"sequential",t:"Tuần tự"},{v:"parallel",t:"Song song"}],d:"sequential"},{k:"_region",lbl:"Vùng tìm",t:"region"}], sum:p=>wfBaseAny(p.templates)+(p.mode==="parallel"?" //":"")},
-  if_image_any:  {label:"Nếu 1 trong ảnh",  ico:"layers",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"mode",lbl:"Kiểu tìm",t:"select",opts:[{v:"sequential",t:"Tuần tự"},{v:"parallel",t:"Song song"}],d:"sequential"},{k:"_region",lbl:"Vùng tìm",t:"region"}], sum:p=>`${p.negate?"không ":""}thấy ${wfBaseAny(p.templates)}${p.mode==="parallel"?" //":""}`},
-  wait_text:  {label:"Chờ chữ",   ico:"scan_text",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10}], sum:p=>`"${p.text||""}"`},
-  if_text:    {label:"Nếu chữ",   ico:"type",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"không ":""}có "${p.text||""}"`},
-  read_var:   {label:"Đọc → biến",ico:"search",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`→ ${p.name||"?"}`},
-  parse_var:  {label:"Tách → biến",ico:"scissors",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"Vùng OCR"},{v:"var",t:"Từ biến"}],d:"region"},{k:"fromVar",lbl:"Biến nguồn",t:"text",d:"",var:true},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
-  loop:       {label:"Lặp lại",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"count",t:"num",d:3},{k:"infinite",t:"bool",d:true}], sum:p=>p.infinite?"∞ vô cực":`${p.count}×`},
-  parallel:   {label:"Song song", ico:"parallel",kind:"parallel",cat:"flow", outs:[], fields:[{k:"count",lbl:"Số luồng",t:"num",d:3,refresh:true}], sum:p=>`${p.count||3} luồng song song`},
-  try_chain:  {label:"Thử lần lượt",ico:"git_branch",kind:"try_chain",cat:"flow", outs:[], fields:[], sum:p=>`${p.count||3} nhánh · fail thì thử nhánh kế`},
-  join:       {label:"Gộp",       ico:"git_merge",kind:"join",  cat:"flow", outs:["out"], fields:[], sum:()=>"chờ tất cả luồng → tiếp"},
-  "break":    {label:"Thoát vòng",ico:"octagon",kind:"action",cat:"flow",  outs:["out"], fields:[], sum:()=>"break"},
-  stop:       {label:"Dừng tất cả",ico:"octagon",kind:"stop", cat:"flow",  outs:[],      fields:[], sum:()=>"dừng phiên"},
-  set_var:    {label:"Đặt biến",  ico:"pin",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name||"?"} = ${p.value}`},
-  calc_var:   {label:"Tính biến", ico:"calculator",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:["+","-","*","/","="],d:"+"},{k:"value",t:"text",d:"1"}], sum:p=>`${p.name} ${p.op}= ${p.value}`},
-  if_var:     {label:"Nếu biến",  ico:"hash",kind:"condition",cat:"logic",outs:["true","false"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:["==","!=",">","<",">=","<="],d:"=="},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name} ${p.op} ${p.value}`},
+  tap_image_any: {label:"Tap any image", ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBaseAny(p.templates)+(p.taps=="2"?" ×2":"")+(p.mode==="parallel"?" //":"")},
+  wait_image_any:{label:"Wait any image",  ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBaseAny(p.templates)+(p.mode==="parallel"?" //":"")},
+  if_image_any:  {label:"If any image",  ico:"layers",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.negate?"not ":""}found ${wfBaseAny(p.templates)}${p.mode==="parallel"?" //":""}`},
+  wait_text:  {label:"Wait text",   ico:"scan_text",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10}], sum:p=>`"${p.text||""}"`},
+  if_text:    {label:"If text",   ico:"type",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}contains "${p.text||""}"`},
+  read_var:   {label:"Read → variable",ico:"search",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`→ ${p.name||"?"}`},
+  parse_var:  {label:"Parse → variable",ico:"scissors",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"OCR region"},{v:"var",t:"From variable"}],d:"region"},{k:"fromVar",lbl:"Source variable",t:"text",d:"",var:true},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
+  loop:       {label:"Repeat",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"count",t:"num",d:3},{k:"infinite",t:"bool",d:true}], sum:p=>p.infinite?"∞ infinite":`${p.count}×`},
+  parallel:   {label:"Parallel", ico:"parallel",kind:"parallel",cat:"flow", outs:[], fields:[{k:"count",lbl:"Thread count",t:"num",d:3,refresh:true}], sum:p=>`${p.count||3} parallel threads`},
+  try_chain:  {label:"Try in order",ico:"git_branch",kind:"try_chain",cat:"flow", outs:[], fields:[], sum:p=>`${p.count||3} branches · on fail try next branch`},
+  join:       {label:"Join",       ico:"git_merge",kind:"join",  cat:"flow", outs:["out"], fields:[], sum:()=>"wait for all threads → continue"},
+  and:        {label:"And",        ico:"git_merge",kind:"and",   cat:"flow", outs:["out"], fields:[{k:"count",lbl:"Branch count",t:"num",d:2,refresh:true}], sum:p=>`${p.count||2} branches · all must succeed`},
+  "break":    {label:"Break loop",ico:"octagon",kind:"action",cat:"flow",  outs:["out"], fields:[], sum:()=>"break"},
+  stop:       {label:"Stop all",ico:"octagon",kind:"stop", cat:"flow",  outs:[],      fields:[], sum:()=>"stop session"},
+  set_var:    {label:"Set variable",  ico:"pin",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name||"?"} = ${p.value}`},
+  calc_var:   {label:"Calculate variable", ico:"calculator",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:["+","-","*","/","="],d:"+"},{k:"value",t:"text",d:"1"}], sum:p=>`${p.name} ${p.op}= ${p.value}`},
+  if_var:     {label:"If variable",  ico:"hash",kind:"condition",cat:"logic",outs:["true","false"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:["==","!=",">","<",">=","<="],d:"=="},{k:"value",t:"text",d:"0"}], sum:p=>`${p.name} ${p.op} ${p.value}`},
   // Multi-way branch: each case is its own condition; first true case wins its
   // own output port "c{i}", else the "default" port. Ports are dynamic (one per
   // case + default) — see wfNodeEl. Cases edited by wfSwitchCasesEditor.
-  "switch":   {label:"Rẽ nhánh",  ico:"git_branch",kind:"switch",cat:"logic",outs:["default"], fields:[], sum:p=>`${(p.cases||[]).length} nhánh`},
-  launch_app: {label:"Mở app",    ico:"rocket",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"package",t:"text"},{k:"wait",lbl:"Chờ mở (s)",t:"num",d:0}], sum:p=>(p.package||"(package)")+(p.wait?` ·chờ ${p.wait}s`:"")},
-  screenshot: {label:"Chụp",      ico:"camera",kind:"action",cat:"misc",  outs:["out"], fields:[], sum:()=>"chụp màn hình"},
-  log:        {label:"Ghi log",   ico:"log",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"message",t:"text"}], sum:p=>`"${p.message||""}"`},
-  note:          {label:"Ghi chú",        ico:"message",  kind:"note",      cat:"misc",   outs:[],             fields:[{k:"text",t:"text",d:"ghi chú"}], sum:p=>p.text||""},
+  "switch":   {label:"Switch",  ico:"git_branch",kind:"switch",cat:"logic",outs:["default"], fields:[], sum:p=>`${(p.cases||[]).length} branches`},
+  launch_app: {label:"Launch app",    ico:"rocket",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"package",t:"text"},{k:"wait",lbl:"Launch wait (s)",t:"num",d:0}], sum:p=>(p.package||"(package)")+(p.wait?` ·wait ${p.wait}s`:"")},
+  screenshot: {label:"Screenshot",      ico:"camera",kind:"action",cat:"misc",  outs:["out"], fields:[], sum:()=>"take screenshot"},
+  log:        {label:"Log",   ico:"log",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"message",t:"text"}], sum:p=>`"${p.message||""}"`},
+  note:          {label:"Note",        ico:"message",  kind:"note",      cat:"misc",   outs:[],             fields:[{k:"text",t:"text",d:"note"}], sum:p=>p.text||""},
   call:          {label:"Function",       ico:"function", kind:"call",      cat:null,     outs:["out"],        fields:[]},
-  scroll_find:   {label:"Kéo đến ảnh",   ico:"scroll",   kind:"condition", cat:"image",  outs:["true","false"],fields:[{k:"template",t:"tpl"},{k:"direction",lbl:"Hướng vuốt",t:"select",opts:[{v:"up",t:"↑ Lên"},{v:"down",t:"↓ Xuống"},{v:"left",t:"← Trái"},{v:"right",t:"→ Phải"}],d:"up"},{k:"max_swipes",lbl:"Tối đa vuốt",t:"num",d:10},{k:"swipe_distance",lbl:"Khoảng cách (px)",t:"num",d:400},{k:"threshold",t:"num",d:.85,step:.05},{k:"swipe_duration",lbl:"Thời gian vuốt (ms)",t:"num",d:300},{k:"_region",lbl:"Vùng tìm",t:"region"}], sum:p=>`${({"up":"↑","down":"↓","left":"←","right":"→"})[p.direction]||"↑"} ≤${p.max_swipes||10}× → ${wfBase(p.template)}`},
-  random_branch: {label:"Chọn ngẫu nhiên",ico:"dice",   kind:"random",    cat:"flow",   outs:[],              fields:[{k:"count",lbl:"Số nhánh",t:"num",d:2,refresh:true}], sum:p=>`🎲 ${p.count||2} nhánh đều nhau`},
-  format_var:    {label:"Định dạng chuỗi",ico:"type",   kind:"action",    cat:"logic",  outs:["out"],         fields:[{k:"name",lbl:"Biến đích",t:"text",d:"text",var:true},{k:"template",lbl:"Chuỗi mẫu",t:"text",d:"Vòng {round}/{total}"}], sum:p=>`${p.name||"?"} = "${p.template||""}"`},
-  notify:        {label:"Thông báo",      ico:"bell",   kind:"action",    cat:"misc",   outs:["out"],         fields:[{k:"title",lbl:"Tiêu đề",t:"text",d:"Workflow"},{k:"message",lbl:"Nội dung",t:"text",d:"Đã hoàn thành!"},{k:"sound",lbl:"Phát âm thanh",t:"bool",d:true}], sum:p=>`🔔 [${p.title||"Workflow"}] ${p.message||""}`},
+  scroll_find:   {label:"Scroll to image",   ico:"scroll",   kind:"condition", cat:"image",  outs:["true","false"],fields:[{k:"template",t:"tpl"},{k:"direction",lbl:"Swipe direction",t:"select",opts:[{v:"up",t:"↑ Up"},{v:"down",t:"↓ Down"},{v:"left",t:"← Left"},{v:"right",t:"→ Right"}],d:"up"},{k:"max_swipes",lbl:"Max swipes",t:"num",d:10},{k:"swipe_distance",lbl:"Distance (px)",t:"num",d:400},{k:"threshold",t:"num",d:.85,step:.05},{k:"swipe_duration",lbl:"Swipe duration (ms)",t:"num",d:300},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${({"up":"↑","down":"↓","left":"←","right":"→"})[p.direction]||"↑"} ≤${p.max_swipes||10}× → ${wfBase(p.template)}`},
+  random_branch: {label:"Random branch",ico:"dice",   kind:"random",    cat:"flow",   outs:[],              fields:[{k:"count",lbl:"Branch count",t:"num",d:2,refresh:true}], sum:p=>`🎲 ${p.count||2} even branches`},
+  format_var:    {label:"Format string",ico:"type",   kind:"action",    cat:"logic",  outs:["out"],         fields:[{k:"name",lbl:"Target variable",t:"text",d:"text",var:true},{k:"template",lbl:"Template string",t:"text",d:"Round {round}/{total}"}], sum:p=>`${p.name||"?"} = "${p.template||""}"`},
+  notify:        {label:"Notify",      ico:"bell",   kind:"action",    cat:"misc",   outs:["out"],         fields:[{k:"title",lbl:"Title",t:"text",d:"Workflow"},{k:"message",lbl:"Message",t:"text",d:"Completed!"},{k:"sound",lbl:"Play sound",t:"bool",d:true}], sum:p=>`🔔 [${p.title||"Workflow"}] ${p.message||""}`},
 };
-const WF_CATS = [ {key:"basic",label:"Cơ bản"}, {key:"input",label:"Phím & Nhập liệu"}, {key:"image",label:"Hình ảnh"}, {key:"ocr",label:"Văn bản (OCR)"}, {key:"flow",label:"Luồng"}, {key:"logic",label:"Biến / Điều kiện"}, {key:"misc",label:"Khác"} ];
-const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"lặp", done:"xong", fail:"fail", "1":"1", "2":"2", "3":"3" };
+const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"input",label:"Keys & Input"}, {key:"image",label:"Image"}, {key:"ocr",label:"Text (OCR)"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"misc",label:"Other"} ];
+const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"loop", done:"done", fail:"fail", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
-const WF_IN_LBL = { in:"vào", loop:"lặp" };
+const WF_IN_LBL = { in:"in", loop:"loop" };
 
 // Parse a filename like ``btn_ok_120_340_80_40.png`` into {x,y,w,h}.
 // Works on the basename (with or without extension). Returns null if no
@@ -141,7 +142,7 @@ function wfTemplatePathForRegion(node){
 }
 
 function wfApplyRegionFromTplName(node, tplPath){
-  // Fill region from the filename when the user explicitly enables "Vùng tìm".
+  // Fill region from the filename when the user explicitly enables "Search region".
   const def = WF_NODES[node.type];
   const hasRegion = def && (def.fields||[]).some(f => f.t === "region");
   if(!hasRegion) return false;
@@ -174,17 +175,17 @@ const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
 function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined, inspW: insp?insp.offsetWidth:undefined}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
-  const s=$("wf-snap-btn"); if(s){ s.title="Bám lưới: "+(wfSnapOn?"Bật":"Tắt"); s.classList.toggle("on",wfSnapOn); }
-  const p=$("wf-preview-btn"); if(p){ p.title="Preview ảnh: "+(wfPreviewAll?"Bật":"Tắt"); p.classList.toggle("on",wfPreviewAll); }
+  const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off"); s.classList.toggle("on",wfSnapOn); }
+  const p=$("wf-preview-btn"); if(p){ p.title="Image preview: "+(wfPreviewAll?"On":"Off"); p.classList.toggle("on",wfPreviewAll); }
   wfSyncSpeedUI();
 }
-// ── Speed hack — a standalone manual tool, decoupled from "Chạy thử" ──────────
+// ── Speed hack — a standalone manual tool, decoupled from "Test run" ──────────
 // The ⚡ toggle enables the feature (still saved into the flow for the Runner GUI)
 // and reveals a separate ▶ button; pressing ▶ is what actually injects Frida here.
 let wfSpeedRunning=false;   // is the standalone injection currently on?
 function wfSyncSpeedUI(){
   const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
-  const b=$("wf-speed-btn"); if(b){ b.title="Speed hack: "+(sh.enabled?"Bật":"Tắt")+" (tăng tốc game bằng Frida — cần root)"; b.classList.toggle("on",sh.enabled); }
+  const b=$("wf-speed-btn"); if(b){ b.title="Speed hack: "+(sh.enabled?"On":"Off")+" (accelerate the game with Frida — root required)"; b.classList.toggle("on",sh.enabled); }
   const v=$("wf-speed-val"); if(v && document.activeElement!==v) v.value=sh.speed;
   const pk=$("wf-speed-pkg"); if(pk && document.activeElement!==pk) pk.value=sh.package||"";
   const grp=$("wf-speed-group"); if(grp) grp.classList.toggle("on", sh.enabled);
@@ -192,7 +193,7 @@ function wfSyncSpeedUI(){
   if(rb){
     rb.style.display = sh.enabled ? "inline-flex" : "none";
     rb.innerHTML = wfSpeedRunning ? WF_ICO_STOP : WF_ICO_PLAY;
-    rb.title = wfSpeedRunning ? "Tắt speed hack" : "Bật speed hack ngay (độc lập với Chạy thử)";
+    rb.title = wfSpeedRunning ? "Disable speed hack" : "Enable speed hack now (independent of Test run)";
     rb.classList.toggle("ok", !wfSpeedRunning); rb.classList.toggle("err", wfSpeedRunning);
   }
 }
@@ -209,7 +210,7 @@ function wfToggleSpeed(){
   if(!sh.enabled && wfSpeedRunning){ api().speedhack_stop(); wfSpeedRunning=false; }  // disabling stops it
   wfSyncSpeedUI();
 }
-// Best-effort package: the field, else the first "Mở app" node's package.
+// Best-effort package: the field, else the first "Launch app" node's package.
 function wfAutoPackage(){
   const graphs=[...WF.activities.map(a=>a.graph), ...WF.functions.map(f=>f.graph)];
   for(const g of graphs){ for(const n of (g&&g.nodes||[])){
@@ -222,7 +223,7 @@ async function wfSpeedRun(){
   wfSpeedFromUI();
   if(wfSpeedRunning){ await api().speedhack_stop(); return; }
   const pkg=sh.package||wfAutoPackage();
-  if(!pkg){ alert("Nhập package game (hoặc thêm node Mở app) để bật speed hack."); return; }
+  if(!pkg){ alert("Enter a game package (or add a Launch app node) to enable speed hack."); return; }
   const ok=await api().speedhack_start(sh.speed, pkg);
   if(!ok){ wfSpeedRunning=false; wfSyncSpeedUI(); }
 }
