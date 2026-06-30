@@ -1220,6 +1220,13 @@ class WorkflowDesignerAPI:
             lambda nid, st, port: self._push("node_result", {"id": nid, "status": st, "port": port})]
         self._engine.callbacks["on_var"] = [
             lambda name, value: self._push("var_update", {"name": name, "value": value})]
+        # Activity-level status: drives the blinking-green / solid-red indicator
+        # on each activity row in the bottom-right panel.
+        self._engine.callbacks["on_activity_start"] = [
+            lambda act: self._push("activity_active", {"id": act.get("id")})]
+        self._engine.callbacks["on_activity_complete"] = [
+            lambda act, ok: self._push("activity_result",
+                                       {"id": act.get("id"), "status": "ok" if ok else "fail"})]
         # Test runs never auto-apply speedhack — that's a separate ▶ action.
         ok = self._engine.start(background=True, with_speedhack=False)
         self._push("workflow_state", {"running": ok})

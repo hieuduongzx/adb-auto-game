@@ -255,7 +255,24 @@
 .wf-act-add { display:none; }
 .wf-act-panel-body { overflow-y:auto; padding:5px 7px 7px; border-top:1px solid var(--line); }
 .wf-act-list { display:flex; flex-direction:column; gap:4px; }
-#wf-activities { padding:0; max-height:none; }
+/* Cap each list at 8 visible rows; overflow scrolls instead of expanding
+   the whole panel. 8 rows × ~32px + 7 gaps × 4px ≈ 284px. */
+#wf-activities, #wf-activities-bg, #wf-functions { padding:0; max-height:284px; overflow-y:auto; }
+/* Thin scrollbar for the activity lists (WebKit). */
+#wf-activities::-webkit-scrollbar, #wf-activities-bg::-webkit-scrollbar, #wf-functions::-webkit-scrollbar { width:6px; }
+#wf-activities::-webkit-scrollbar-thumb, #wf-activities-bg::-webkit-scrollbar-thumb, #wf-functions::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+#wf-activities::-webkit-scrollbar-track, #wf-activities-bg::-webkit-scrollbar-track, #wf-functions::-webkit-scrollbar-track { background:transparent; }
+/* Run-status indicators on activity rows.
+   .running  → blinking green left bar (engine is executing this activity)
+   .errored  → solid red left bar (activity finished with failure) */
+.wf-act { position:relative; }
+.wf-act .wf-act-runbar { position:absolute; left:0; top:0; bottom:0; width:3px; border-radius:7px 0 0 7px;
+  background:transparent; transition:background .15s; pointer-events:none; }
+.wf-act.running .wf-act-runbar { background:#1f9d57; animation:wfActBlink 1s ease-in-out infinite; }
+.wf-act.errored .wf-act-runbar { background:#d6483f; }
+.wf-act.running { border-color:#1f9d57; }
+.wf-act.errored { border-color:#d6483f; }
+@keyframes wfActBlink { 0%,100%{opacity:1} 50%{opacity:.3} }
 
 /* Live variables panel — pinned top-right of the canvas. Shows the vars
    declared on the current activity (declared value) overlaid with live runtime
@@ -413,12 +430,12 @@
    full-width band opening downward). object-fit:contain shows the whole crop. */
 .wf-node-prevrow { display:flex; align-items:center; gap:7px; padding:2px 9px; }
 .wf-node-prevrow .wf-node-sum { padding:0; flex:1; min-width:0; }
-.wf-node-thumb { flex-shrink:0; width:20px; height:20px; object-fit:contain;
+.wf-node-thumb { flex-shrink:0; width:28px; height:28px; object-fit:contain;
   background:#fff repeating-conic-gradient(#e6e9ee 0% 25%, transparent 0% 50%) 50%/6px 6px;
   border:1px solid var(--border2); border-radius:4px; padding:1px; }
 /* Multi-template (OR) preview: a tight row of small squares, one per image. */
 .wf-node-thumbs { flex-shrink:0; display:flex; align-items:center; gap:3px; }
-.wf-node-thumb-sm { width:18px; height:18px; object-fit:contain; border:1px solid var(--border);
+.wf-node-thumb-sm { width:24px; height:24px; object-fit:contain; border:1px solid var(--border);
   border-radius:3px; background:#fff repeating-conic-gradient(#e6e9ee 0% 25%, transparent 0% 50%) 50%/5px 5px; flex-shrink:0; }
 /* On hover the node rises above neighbours so the thumbnail is not obscured. */
 .wf-node.has-thumb:hover { z-index:var(--z-node-hover); }

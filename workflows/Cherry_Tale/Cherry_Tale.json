@@ -142,7 +142,7 @@
       "id": "sequence_9x85",
       "name": "Bữa Tiệc",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -180,7 +180,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delayBefore": 3
           },
           {
             "id": "nfbv3qgp",
@@ -195,7 +195,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delayBefore": 3
           },
           {
             "id": "nm0ibj2v",
@@ -283,13 +283,13 @@
         ],
         "groups": []
       },
-      "maxRetries": 1
+      "maxRetries": 3
     },
     {
       "id": "sequence_hlng",
       "name": "Bạn Bè",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -364,7 +364,8 @@
               "timeout": 10,
               "offsetX": 0,
               "offsetY": 0
-            }
+            },
+            "delayBefore": 3
           },
           {
             "id": "nek3kzdq",
@@ -421,7 +422,7 @@
       "id": "sequence_kc43",
       "name": "Nhận Thư",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [

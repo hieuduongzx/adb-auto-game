@@ -1066,10 +1066,14 @@ class WorkflowEngine:
             self._vars = self._seed_vars(act)
             self._last_pos = None
             self._break_loop = False
+            self._emit("on_activity_start", act)
+            ok = True
             try:
                 self._run_graph(act.get("graph", {}) or {})
             except Exception as e:
+                ok = False
                 log_error(f"[workflow] [bg] '{name}' error: {e}")
+            self._emit("on_activity_complete", act, ok)
             interval = max(0.05, float(act.get("pollInterval", 1.0) or 1.0))
             end = time.time() + interval
             while time.time() < end and not stop_ev.is_set() and not self._stop.is_set():

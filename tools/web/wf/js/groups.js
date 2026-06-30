@@ -324,6 +324,18 @@ function wfInitCanvas(){
   document.querySelectorAll(".wf-layout-item").forEach(btn=>{
     btn.onclick=(e)=>{ e.stopPropagation(); wfAutoLayout(btn.dataset.layout); wfCloseLayoutMenu(); };
   });
+  // ── Activity panel: stop wheel from zooming the canvas ──────────────────
+  const actBody=document.querySelector(".wf-act-panel-body");
+  if(actBody) actBody.addEventListener("wheel", e=>e.stopPropagation(), {passive:true});
+  // ── Inspector body: stop wheel from zooming the canvas ──────────────────
+  const inspBody=$("wf-insp-body");
+  if(inspBody) inspBody.addEventListener("wheel", e=>e.stopPropagation(), {passive:true});
+  // ── Vars panel body: stop wheel from zooming the canvas ─────────────────
+  const varsBody=$("wf-vars-body");
+  if(varsBody) varsBody.addEventListener("wheel", e=>e.stopPropagation(), {passive:true});
+  // ── Side palette: stop wheel from zooming the canvas ────────────────────
+  const palette=$("wf-palette");
+  if(palette) palette.addEventListener("wheel", e=>e.stopPropagation(), {passive:true});
   canvas.addEventListener("wheel",e=>{
     e.preventDefault();
     const r=canvas.getBoundingClientRect();

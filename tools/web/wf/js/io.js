@@ -79,6 +79,9 @@ function wfSetRunning(on){
     wfRunNode=null; wfRunStopped=true;
     wfMarkUnreached();
     wfLiveVars={}; wfFreshVar=null;
+    // Clear any activity still blinking "running" (stopped mid-activity), but
+    // keep the solid-red "errored" markers so failed activities stay visible.
+    for(const id in wfActStatus){ if(wfActStatus[id]==="running") wfSetActStatus(id, null); }
   }
   if(b){
     b.innerHTML = on?WF_ICO_STOP:WF_ICO_PLAY;

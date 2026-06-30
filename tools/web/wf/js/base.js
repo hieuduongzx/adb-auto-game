@@ -27,6 +27,25 @@ let wfRunStopped=false; // true once a finished run's trail is on display (greys
 let wfSkipIds=null;     // ids greyed out as "not reached", captured once when the run stops
 const wfRan={};       // nodeId -> "ok" | "fail"
 const wfRanPort={};   // nodeId -> output port actually taken
+// Activity run-status tracker: activityId -> "running" | "errored".
+// Drives the blinking-green / solid-red indicator on each activity row in the
+// bottom-right panel. Cleared at the start of a run and updated live from the
+// engine's on_activity_start / on_activity_complete callbacks.
+const wfActStatus={};
+// Apply a status class to a single activity row (without a full re-render) so
+// the indicator updates instantly when an event arrives.
+function wfSetActStatus(id, status){
+  if(status){ wfActStatus[id]=status; } else { delete wfActStatus[id]; }
+  const el=document.querySelector(`.wf-act[data-id="${id}"]`);
+  if(el){
+    el.classList.toggle("running", status==="running");
+    el.classList.toggle("errored", status==="errored");
+  }
+}
+// Clear every activity's run-status (called when a run starts or stops).
+function wfResetActStatus(){
+  for(const id in wfActStatus) wfSetActStatus(id, null);
+}
 function wfNodeElById(id){ return id ? document.querySelector(`.wf-node[data-node="${id}"]`) : null; }
 let wfRunLitAt=0;            // when the current amber node lit up (ms)
 const WF_RUN_MIN_MS=220;    // floor on amber dwell, so instant blocks (nếu ảnh…) still flash yellow
@@ -101,6 +120,7 @@ function wfResetRunViz(){
   wfRunNode=null; wfRunStopped=false; wfSkipIds=null;
   for(const k in wfRan) delete wfRan[k];
   for(const k in wfRanPort) delete wfRanPort[k];
+  wfResetActStatus();
   document.querySelectorAll(".wf-node.running,.wf-node.ran-ok,.wf-node.ran-fail,.wf-node.ran-skip")
     .forEach(el=>el.classList.remove("running","ran-ok","ran-fail","ran-skip"));
   document.querySelectorAll("#wf-wires path.took-wire,#wf-wires path.nottook-wire")

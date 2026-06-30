@@ -20,9 +20,14 @@ function wfRenderActivities(){
   function rowInto(wrap, act){
     const sel = WF.edit.kind==="activity" && act.id===WF.edit.id;
     const el=document.createElement("div");
-    el.className="wf-act"+(sel?" sel":""); el.dataset.id=act.id;
+    // Apply run-status classes (running / errored) from the live tracker so
+    // the row keeps its indicator across re-renders during a test run.
+    const st=wfActStatus[act.id];
+    el.className="wf-act"+(sel?" sel":"")+(st==="running"?" running":"")+(st==="errored"?" errored":"");
+    el.dataset.id=act.id;
     el.innerHTML=
-      `<span class="wf-act-grip" title="Kéo để đổi thứ tự">${WF_GRIP}</span>
+      `<span class="wf-act-runbar"></span>
+       <span class="wf-act-grip" title="Kéo để đổi thứ tự">${WF_GRIP}</span>
        <span class="wf-act-cb ${act.enabled?"checked":""}">${check}</span>
        <span class="wf-act-name">${escHtml(act.name)}</span>
        <button class="wf-act-del" title="Xoá">${wfIco("x")}</button>`;
@@ -420,7 +425,7 @@ function wfNodeEl(n){
   const tplField = wfTplField(n.type);
   const isTpls = tplField && tplField.t==="tpls";
   const hasTpl = !!tplField;
-  const showThumb = hasTpl && (wfPreviewAll || n.showPreview);
+  const showThumb = hasTpl && (wfPreviewAll || n.showPreview !== false);
   const eyeBtn = hasTpl ? `<button class="wf-node-eye${n.showPreview?" on":""}" title="Xem trước ảnh (block này)">${wfIco("eye")}</button>` : "";
   const noteHtml = n.note ? `<div class="wf-node-note">${wfIco("edit")}<span>${escHtml(n.note)}</span></div>` : "";
   const logHtml = n.log ? `<div class="wf-node-log">${escHtml(n.log)}</div>` : "";
