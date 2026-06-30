@@ -425,14 +425,14 @@ function wfNodeEl(n){
   const tplField = wfTplField(n.type);
   const isTpls = tplField && tplField.t==="tpls";
   const hasTpl = !!tplField;
-  const showThumb = hasTpl && (wfPreviewAll || n.showPreview !== false);
+  const showThumb = hasTpl && (wfPreviewAll || n.showPreview);
   const eyeBtn = hasTpl ? `<button class="wf-node-eye${n.showPreview?" on":""}" title="Xem trước ảnh (block này)">${wfIco("eye")}</button>` : "";
   const noteHtml = n.note ? `<div class="wf-node-note">${wfIco("edit")}<span>${escHtml(n.note)}</span></div>` : "";
   const logHtml = n.log ? `<div class="wf-node-log">${escHtml(n.log)}</div>` : "";
   const dp=[];
-  if(n.delayBefore) dp.push(`Chờ ${n.delayBefore}s`);
-  if(n.delayAfter)  dp.push(`Đợi ${n.delayAfter}s`);
-  const delayHtml = dp.length ? `<div class="wf-node-delay">${wfIco("timer")}<span>${dp.join(" · ")}</span></div>` : "";
+  if(n.delayBefore) dp.push(`${wfIco("clock")}<span>Chờ ${n.delayBefore}s</span>`);
+  if(n.delayAfter)  dp.push(`${wfIco("timer")}<span>Đợi ${n.delayAfter}s</span>`);
+  const delayHtml = dp.length ? `<div class="wf-node-delay">${dp.join("")}</div>` : "";
   // tpls → a strip of small thumbnails (one per listed image); single tpl → one.
   const thumbHtml = showThumb ? (isTpls
     ? `<div class="wf-node-thumbs"></div>`

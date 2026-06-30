@@ -166,15 +166,15 @@ function wfTimingField(node){
 function wfUpdNodeTiming(node){
   const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
   const dp=[];
-  if(node.delayBefore) dp.push(`Chờ ${node.delayBefore}s`);
-  if(node.delayAfter)  dp.push(`Đợi ${node.delayAfter}s`);
+  if(node.delayBefore) dp.push(`${wfIco("clock")}<span>Chờ ${node.delayBefore}s</span>`);
+  if(node.delayAfter)  dp.push(`${wfIco("timer")}<span>Đợi ${node.delayAfter}s</span>`);
   let n=el.querySelector(".wf-node-delay");
   if(dp.length){
     if(!n){ n=document.createElement("div"); n.className="wf-node-delay";
-      const thumb=el.querySelector(".wf-node-thumb,.wf-node-thumbs");
-      if(thumb) el.insertBefore(n, thumb); else el.appendChild(n);
+      const prevrow=el.querySelector(".wf-node-prevrow"); const sum=el.querySelector(".wf-node-sum");
+      const anchor=prevrow||sum; if(anchor) anchor.after(n); else el.appendChild(n);
       el.classList.remove("collapsed"); }
-    n.innerHTML=wfIco("timer")+`<span>${dp.join(" · ")}</span>`;
+    n.innerHTML=dp.join("");
   } else if(n){ n.remove(); }
 }
 

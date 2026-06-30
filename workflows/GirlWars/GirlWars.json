@@ -31,10 +31,10 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 30,
-              "delay": 3,
               "offsetX": 0,
               "offsetY": 0
-            }
+            },
+            "delayBefore": 3
           }
         ],
         "edges": [
@@ -129,7 +129,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 2,
-              "delay": 0,
               "mode": "sequential",
               "offsetX": 0,
               "offsetY": 0
@@ -208,8 +207,7 @@
             "params": {
               "template": "templates/crop_20260629_012810_490x20.png",
               "threshold": 0.85,
-              "timeout": 10,
-              "delay": 0
+              "timeout": 10
             }
           },
           {
@@ -242,9 +240,9 @@
             "params": {
               "template": "templates/crop_20260628_224231_47x40.png",
               "threshold": 0.85,
-              "timeout": 10,
-              "delay": 2
-            }
+              "timeout": 10
+            },
+            "delayBefore": 2
           },
           {
             "id": "n1it38n6",
@@ -347,15 +345,15 @@
           {
             "id": "nsfwqmvn",
             "type": "start",
-            "x": 60,
-            "y": 60,
+            "x": 40,
+            "y": 40,
             "params": {}
           },
           {
             "id": "n3z6f0gy",
             "type": "call",
-            "x": 260,
-            "y": 60,
+            "x": 234,
+            "y": 40,
             "params": {
               "fn": "fn_yt9m6"
             }
@@ -363,29 +361,29 @@
           {
             "id": "nau3vmjd",
             "type": "tap_image",
-            "x": 460,
-            "y": 60,
+            "x": 428,
+            "y": 40,
             "params": {
               "template": "templates/crop_20260629_164052_48x33.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
-            }
+            },
+            "delayBefore": 1,
+            "delayAfter": 2
           },
           {
             "id": "nlyvsk2o",
             "type": "tap_image",
-            "x": 640,
-            "y": 60,
+            "x": 622,
+            "y": 40,
             "params": {
               "template": "templates/crop_20260629_164104_154x40.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -393,8 +391,8 @@
           {
             "id": "nzywv8kw",
             "type": "call",
-            "x": 820,
-            "y": 60,
+            "x": 816,
+            "y": 40,
             "params": {
               "fn": "fn_hh4kj"
             }
@@ -458,7 +456,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0,
               "regionW": 0,
@@ -477,7 +474,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0,
               "regionW": 540,
@@ -494,7 +490,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -531,7 +526,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0,
               "regionW": 0,
@@ -557,8 +551,7 @@
             "params": {
               "template": "templates/crop_20260628_223206_255x45.png",
               "threshold": 0.85,
-              "timeout": 10,
-              "delay": 0
+              "timeout": 10
             }
           },
           {
@@ -580,8 +573,7 @@
             "params": {
               "template": "templates/crop_20260628_223341_272x31.png",
               "threshold": 0.85,
-              "timeout": 10,
-              "delay": 0
+              "timeout": 10
             }
           },
           {
@@ -644,9 +636,9 @@
             "params": {
               "template": "templates/crop_20260628_224231_47x40.png",
               "threshold": 0.85,
-              "timeout": 10,
-              "delay": 2
-            }
+              "timeout": 10
+            },
+            "delayBefore": 2
           },
           {
             "id": "nq3eh1uc",
@@ -687,7 +679,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -702,7 +693,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -728,10 +718,10 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 2,
               "offsetX": 0,
               "offsetY": 0
-            }
+            },
+            "delayBefore": 2
           },
           {
             "id": "n9e8v89j",
@@ -741,8 +731,7 @@
             "params": {
               "template": "templates/crop_20260628_223206_255x45.png",
               "threshold": 0.85,
-              "timeout": 10,
-              "delay": 0
+              "timeout": 10
             }
           },
           {
@@ -785,9 +774,9 @@
             "params": {
               "template": "templates/crop_20260628_224231_47x40.png",
               "threshold": 0.85,
-              "timeout": 10,
-              "delay": 2
-            }
+              "timeout": 10
+            },
+            "delayBefore": 2
           },
           {
             "id": "nw6fedez",
@@ -808,8 +797,7 @@
             "params": {
               "template": "templates/crop_20260628_231016_311x38.png",
               "threshold": 0.85,
-              "timeout": 10,
-              "delay": 0
+              "timeout": 10
             }
           },
           {
@@ -853,7 +841,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             },
@@ -1150,7 +1137,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1165,7 +1151,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1200,7 +1185,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1215,7 +1199,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1230,7 +1213,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1245,7 +1227,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1280,7 +1261,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1295,7 +1275,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             },
@@ -1354,7 +1333,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             },
@@ -1388,7 +1366,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             },
@@ -1566,7 +1543,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1581,7 +1557,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1616,7 +1591,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1631,7 +1605,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1646,7 +1619,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1661,7 +1633,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1676,7 +1647,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1691,7 +1661,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1706,7 +1675,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1721,7 +1689,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1747,7 +1714,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1773,7 +1739,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1799,7 +1764,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1835,7 +1799,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1850,7 +1813,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1919,7 +1881,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1967,7 +1928,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -1982,7 +1942,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2236,7 +2195,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2295,8 +2253,7 @@
             "params": {
               "template": "templates/crop_20260629_002015_58x62.png",
               "threshold": 0.85,
-              "timeout": 10,
-              "delay": 0
+              "timeout": 10
             }
           },
           {
@@ -2309,7 +2266,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2324,7 +2280,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2339,7 +2294,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2354,7 +2308,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2369,7 +2322,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 30,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2404,7 +2356,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2419,10 +2370,10 @@
               "taps": "2",
               "threshold": 0.85,
               "timeout": 30,
-              "delay": 3,
               "offsetX": 0,
               "offsetY": 0
-            }
+            },
+            "delayBefore": 3
           },
           {
             "id": "na7tjo3z",
@@ -2447,7 +2398,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "mode": "sequential",
               "offsetX": 0,
               "offsetY": 0
@@ -2476,7 +2426,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "mode": "sequential",
               "offsetX": 0,
               "offsetY": 0
@@ -2492,7 +2441,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2661,7 +2609,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2676,7 +2623,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 50
             }
@@ -2691,7 +2637,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2706,10 +2651,10 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 5,
               "offsetX": 0,
               "offsetY": 0
-            }
+            },
+            "delayBefore": 5
           },
           {
             "id": "n6qcdml0",
@@ -2721,7 +2666,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2736,10 +2680,10 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 5,
               "offsetX": 0,
               "offsetY": 0
-            }
+            },
+            "delayBefore": 5
           },
           {
             "id": "nifgpqfg",
@@ -2751,10 +2695,10 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 3,
               "offsetX": 0,
               "offsetY": 0
-            }
+            },
+            "delayBefore": 3
           },
           {
             "id": "n1si36gb",
@@ -2766,10 +2710,10 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 3,
               "offsetX": 0,
               "offsetY": 0
-            }
+            },
+            "delayBefore": 3
           }
         ],
         "edges": [
@@ -2857,7 +2801,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2872,7 +2815,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2887,7 +2829,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2902,7 +2843,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -2998,7 +2938,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3013,7 +2952,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0,
               "regionW": 0,
@@ -3032,7 +2970,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3099,7 +3036,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 120,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0,
               "regionW": 0,
@@ -3118,7 +3054,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 120,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3133,7 +3068,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 120,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3176,7 +3110,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "mode": "sequential",
               "offsetX": 0,
               "offsetY": 0
@@ -3194,7 +3127,6 @@
               ],
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "mode": "sequential"
             }
           },
@@ -3217,7 +3149,6 @@
               "taps": "1",
               "threshold": 0.5,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3232,7 +3163,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3247,7 +3177,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3281,7 +3210,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 30,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3296,7 +3224,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 30,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3324,7 +3251,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "mode": "sequential",
               "offsetX": 0,
               "offsetY": 0
@@ -3354,7 +3280,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0,
               "regionW": 0,
@@ -3372,8 +3297,7 @@
             "params": {
               "template": "templates/crop_20260629_162634_191x30.png",
               "threshold": 0.85,
-              "timeout": 10,
-              "delay": 0
+              "timeout": 10
             }
           },
           {
@@ -3615,7 +3539,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3662,7 +3585,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3687,7 +3609,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": -50
             }
@@ -3702,7 +3623,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -3726,10 +3646,10 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
-              "delay": 5,
               "offsetX": 0,
               "offsetY": 0
-            }
+            },
+            "delayBefore": 5
           },
           {
             "id": "nv9eep4j",
@@ -3741,10 +3661,10 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 15,
-              "delay": 5,
               "offsetX": 0,
               "offsetY": 0
-            }
+            },
+            "delayBefore": 5
           },
           {
             "id": "ndya77j8",
@@ -3907,7 +3827,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0,
               "regionX": 0,
@@ -3926,14 +3845,14 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 1,
               "offsetX": 0,
               "offsetY": 0,
               "regionX": 0,
               "regionY": 0,
               "regionW": 0,
               "regionH": 0
-            }
+            },
+            "delayBefore": 1
           },
           {
             "id": "n7hmq4b9",
@@ -3945,14 +3864,14 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 1,
               "offsetX": 0,
               "offsetY": 0,
               "regionX": 1659,
               "regionY": 824,
               "regionW": 71,
               "regionH": 60
-            }
+            },
+            "delayBefore": 1
           },
           {
             "id": "nk5q9wwd",
@@ -4029,7 +3948,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4044,7 +3962,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4094,7 +4011,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4109,7 +4025,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4133,7 +4048,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 2,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4148,7 +4062,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 2,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4163,7 +4076,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 2,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4178,7 +4090,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 2,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4193,7 +4104,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 2,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4206,8 +4116,7 @@
             "params": {
               "template": "templates/crop_20260629_224044_833_135_266_31.png",
               "threshold": 0.85,
-              "timeout": 3,
-              "delay": 0
+              "timeout": 3
             }
           },
           {
@@ -4220,7 +4129,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4254,7 +4162,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4279,7 +4186,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4294,7 +4200,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }
@@ -4309,7 +4214,6 @@
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
-              "delay": 0,
               "offsetX": 0,
               "offsetY": 0
             }

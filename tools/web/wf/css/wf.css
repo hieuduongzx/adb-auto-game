@@ -496,7 +496,7 @@
 /* Default per-block summary line (the auto description under the title). Reads as
    a quiet readable caption — bumped from low-contrast 9.5px mono-muted to a
    clearer tone/size so the block's gist is legible without squinting. */
-.wf-node-sum { font-family:var(--mono); font-size:10px; color:var(--dim); padding:4px 9px 6px;
+.wf-node-sum { font-family:var(--mono); font-size:8.5px; color:var(--dim); padding:4px 9px 6px;
   line-height:1.4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wf-node-note { display:flex; align-items:flex-start; gap:5px; font-size:9.5px; font-style:italic;
   color:var(--muted); background:transparent; border-top:1px solid var(--line);
@@ -508,11 +508,12 @@
   border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:4px 9px; white-space:normal; word-break:break-word; }
 .wf-node-log::before { content:""; display:inline-block; width:11px; height:11px; vertical-align:-1px; margin-right:4px; background:currentColor; -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; }
 
-/* Timing indicator: pause before / after this block (delayBefore / delayAfter). */
-.wf-node-delay { display:flex; align-items:center; gap:4px; font-size:9.5px; font-weight:600;
-  color:var(--warn); background:var(--warn-bg); border-top:1px solid var(--line);
-  padding:3px 8px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.wf-node-delay svg { width:10px; height:10px; flex-shrink:0; opacity:.7; }
+/* Timing indicator: pause before / after this block (delayBefore / delayAfter).
+   Compact row below the summary — two tiny icons + label side by side. */
+.wf-node-delay { display:flex; align-items:center; gap:2px; font-size:7.5px; font-weight:600;
+  color:var(--warn); padding:1px 9px 3px; }
+.wf-node-delay svg { width:9px; height:9px; flex-shrink:0; opacity:.7; }
+.wf-node-delay span { margin-right:6px; }
 
 /* Ports — directional by fill: OUTPUT is a solid dot tinted with the node's
    category accent (a "source"); INPUT is a hollow grey ring (a "socket"). The
