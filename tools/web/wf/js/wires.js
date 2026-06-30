@@ -36,11 +36,11 @@ const WF_WIRE_DEFS = (function(){
 function wfBezier(a,b){
   const dx=b.x-a.x, dy=b.y-a.y, adx=Math.abs(dx), ady=Math.abs(dy);
 
-  // ── Backward ngang (dy nhỏ): U-turn gọn — ra phải, xuống dưới, sang trái, vào ─
-  if(dx < -10 && ady < 40){
-    const h=Math.max(15, Math.min(adx*0.25, 30));
+  // ── Backward (target behind source): U-turn gọn — ra phải, vòng dọc, sang trái, vào ─
+  if(dx < -10){
+    const h=Math.max(30, Math.min(adx*0.25, 60));
     const outX=a.x+h, inX=b.x-h;
-    const vOff=45;
+    const vOff=Math.max(45, ady*0.4+20);
     const midY=(a.y+b.y)/2 + vOff;
     return `M${a.x},${a.y} L${outX},${a.y} L${outX},${midY} L${inX},${midY} L${inX},${b.y} L${b.x},${b.y}`;
   }
