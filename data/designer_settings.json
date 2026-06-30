@@ -1,6 +1,6 @@
 {
   "snap": true,
-  "previewAll": false,
+  "previewAll": true,
   "logOpen": false,
   "sideW": 285,
   "inspW": 321,
