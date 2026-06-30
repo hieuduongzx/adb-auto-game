@@ -105,6 +105,7 @@ function wfDrawWires(){
 }
 function wfDeleteWire(ed){
   const g=wfGraph(); if(!g||!ed) return;
+  wfPushUndo();
   const i=g.edges.indexOf(ed); if(i>=0) g.edges.splice(i,1);
   wfRenderCanvas();
 }

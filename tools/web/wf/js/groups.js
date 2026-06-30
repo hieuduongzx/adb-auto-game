@@ -28,11 +28,12 @@ function wfAddGroup(x,y,w,h){
   groups.push(gr); wfRenderCanvas(); setStatus(`Đã tạo "${gr.name}" — kéo tiêu đề để di chuyển cả nhóm`);
   return gr;
 }
-function wfDeleteGroup(id){ const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); } }
-function wfRenameGroup(gr){ const nm=prompt("Tên nhóm:", gr.name||""); if(nm!==null){ gr.name=(nm.trim()||gr.name); wfRenderCanvas(); } }
+function wfDeleteGroup(id){ wfPushUndo(); const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); } }
+function wfRenameGroup(gr){ wfPushUndo(); const nm=prompt("Tên nhóm:", gr.name||""); if(nm!==null){ gr.name=(nm.trim()||gr.name); wfRenderCanvas(); } }
 // Create a group hugging the current multi-selection (toolbar button shortcut).
 function wfGroupSelection(){
   const ids=WF.sel.slice(); if(ids.length<1) return false;
+  wfPushUndo();
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
   ids.forEach(id=>{ const n=wfNode(id); if(!n) return;
     const el=document.querySelector(`.wf-node[data-node="${id}"]`);
@@ -189,6 +190,7 @@ function wfToggleGroupMode(){
 // "Set as default" rewires start.out to point at the chosen block.
 // The visual pill (::before) is applied after every canvas render.
 function wfSetAsDefault(nodeId){
+  wfPushUndo();
   const g=wfGraph(); if(!g) return;
   const n=wfNode(nodeId); if(!n||n.type==="start") return;
   const startNode=g.nodes.find(nd=>nd.type==="start"); if(!startNode) return;
@@ -333,6 +335,7 @@ function wfInitCanvas(){
     const g=wfGraph(); if(!g){ alert("Chọn hoặc thêm một hoạt động/function trước."); wfPaletteDrag=null; return; }
     const wr=$("wf-world").getBoundingClientRect();
     const x=wfSnap((e.clientX-wr.left)/wfZoom-70), y=wfSnap((e.clientY-wr.top)/wfZoom-14);
+    wfPushUndo();
     let node;
     if(wfPaletteDrag.startsWith("call:")){ node=wfNewNode("call",x,y); node.params={fn:wfPaletteDrag.slice(5)}; }
     else if(wfPaletteDrag.startsWith("var:")){ const p=wfPaletteDrag.split(":"); const vtype=p[1], vname=p.slice(2).join(":");
@@ -405,16 +408,16 @@ function wfInitCanvas(){
       wfClearTemp(); wfHighlightTarget(null);
       // A new wire changes which nodes are "wired in" → rebuild so the warning
       // badges refresh; otherwise just redraw the wires (cheaper, no node change).
-      if(connected) wfRenderCanvas(); else wfDrawWires();
+      if(connected){ wfPushUndo(); wfRenderCanvas(); } else wfDrawWires();
     } else if(wfGesture.mode==="groupresize"){
-      wfRenderCanvas();
+      wfPushUndo(); wfRenderCanvas();
     } else if(wfGesture.mode==="groupdraw"){
       const box=$("wf-selbox"); const gst=wfGesture;
       if(box) box.remove();
       const wr=$("wf-world").getBoundingClientRect();
       const cx=(e.clientX-wr.left)/wfZoom, cy=(e.clientY-wr.top)/wfZoom;
       const x=Math.min(cx,gst.sx), y=Math.min(cy,gst.sy), w=Math.abs(cx-gst.sx), h=Math.abs(cy-gst.sy);
-      if(w>40 && h>40) wfAddGroup(x,y,w,h);   // ignore tiny accidental drags
+      if(w>40 && h>40){ wfPushUndo(); wfAddGroup(x,y,w,h); }   // ignore tiny accidental drags
       wfSetGroupMode(false);
     } else if(wfGesture.mode==="box"){
       const box=$("wf-selbox"); if(box) box.remove();
@@ -424,7 +427,8 @@ function wfInitCanvas(){
       // Dropping a single lone block flush above/below another merges them.
       wfClearMergeHint();
       const moved=Math.abs(e.clientX-wfGesture.sx)+Math.abs(e.clientY-wfGesture.sy)>3;
-      if(moved && wfGesture.items.length===1 && wfGesture.mergeOk) wfTryMerge(wfGesture.dragId);
+      if(moved && wfGesture.items.length===1 && wfGesture.mergeOk){ wfPushUndo(); wfTryMerge(wfGesture.dragId); }
+      else if(moved) wfPushUndo();  // plain move — push before the final render
     } else if(wfGesture.mode==="pan"){
       $("wf-canvas").classList.remove("panning");
     }

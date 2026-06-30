@@ -283,6 +283,7 @@ function wfRenderVarsPanel(){
 let wfGlobsOpen=false;
 function wfAddQuickGlobal(){
   if(!Array.isArray(WF.globals)) WF.globals=[];
+  wfPushUndoDebounced();
   const n=WF.globals.length+1;
   WF.globals.push({name:"g"+n, label:"Toàn cục "+n, type:"bool", value:false});
   wfRenderVarsPanel();
@@ -312,7 +313,7 @@ function wfShowGlobsEditor(){
     WF.globals.forEach((v,idx)=> body.appendChild(wfGlobRow(v,idx,render)));
     const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Thêm";
     add.style.marginTop="2px";
-    add.onclick=()=>{ const n=WF.globals.length+1; WF.globals.push({name:"g"+n, label:"Toàn cục "+n, type:"bool", value:false}); render(); wfRenderVarsPanel(); };
+    add.onclick=()=>{ wfPushUndoDebounced(); const n=WF.globals.length+1; WF.globals.push({name:"g"+n, label:"Toàn cục "+n, type:"bool", value:false}); render(); wfRenderVarsPanel(); };
     body.appendChild(add);
   }
   render();
@@ -333,22 +334,23 @@ function wfGlobRow(v,idx,render){
   r1.style.alignItems="center";
   const tag=document.createElement("span"); tag.className="wf-glob-tag"; tag.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>TOÀN CỤC';
   const del=document.createElement("button"); del.className="wf-glob-del"; del.textContent="−"; del.title="Xoá biến toàn cục";
-  del.onclick=(e)=>{ e.stopPropagation(); WF.globals.splice(idx,1); render(); wfRenderVarsPanel(); };
+  del.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); WF.globals.splice(idx,1); render(); wfRenderVarsPanel(); };
   const sp=document.createElement("span"); sp.style.flex="1";
   r1.appendChild(tag); r1.appendChild(sp); r1.appendChild(del);
   card.appendChild(r1);
   const r1b=document.createElement("div"); r1b.className="wf-var-row";
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Tiêu đề"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
-  lbl.oninput=()=>{ v.label=lbl.value; };
+  lbl.oninput=()=>{ wfPushUndoDebounced(); v.label=lbl.value; };
   r1b.appendChild(lbl);
   card.appendChild(r1b);
   const r2=document.createElement("div"); r2.className="wf-var-row";
   const nm=document.createElement("input"); nm.type="text"; nm.value=v.name||""; nm.placeholder="biến"; nm.style.flex="1"; nm.style.minWidth="0"; nm.style.fontSize="10.5px"; nm.style.fontFamily="var(--mono)";
-  nm.oninput=()=>{ v.name=nm.value; wfRenderVarsPanel(); };
+  nm.oninput=()=>{ wfPushUndoDebounced(); v.name=nm.value; wfRenderVarsPanel(); };
   r2.appendChild(nm);
   const ty=document.createElement("select");
   [["bool","bool"],["number","số"],["text","chữ"],["select","chọn"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
   ty.onchange=()=>{
+    wfPushUndoDebounced();
     v.type=ty.value;
     if(ty.value==="select"){ if(!v.options||!v.options.length) v.options=["A","B"]; v.value=v.options[0]; }
     else v.value = ty.value==="bool"?false : ty.value==="number"?0 : "";
@@ -361,7 +363,7 @@ function wfGlobRow(v,idx,render){
     const r3=document.createElement("div"); r3.className="wf-var-row";
     const l=document.createElement("label"); l.textContent="options"; l.style.fontSize="10px"; r3.appendChild(l);
     const opt=document.createElement("input"); opt.type="text"; opt.value=(v.options||[]).join(", "); opt.placeholder="A, B, C"; opt.style.flex="1"; opt.style.minWidth="0"; opt.style.fontSize="10px";
-    opt.onchange=()=>{ v.options=opt.value.split(",").map(s=>s.trim()).filter(Boolean); if(!v.options.includes(v.value)) v.value=v.options[0]||""; render(); wfRenderVarsPanel(); };
+    opt.onchange=()=>{ wfPushUndoDebounced(); v.options=opt.value.split(",").map(s=>s.trim()).filter(Boolean); if(!v.options.includes(v.value)) v.value=v.options[0]||""; render(); wfRenderVarsPanel(); };
     r3.appendChild(opt); card.appendChild(r3);
   }
   return card;
@@ -494,7 +496,7 @@ function wfNodeEl(n){
   // Double-click a call node → jump into that function's graph.
   if(n.type==="call"){ el.addEventListener("dblclick",e=>{ e.stopPropagation(); if(n.params&&n.params.fn&&wfFnById(n.params.fn)) wfEditFunction(n.params.fn); }); }
   const eye=el.querySelector(".wf-node-eye");
-  if(eye){ eye.addEventListener("mousedown",e=>e.stopPropagation()); eye.addEventListener("click",e=>{ e.stopPropagation(); n.showPreview=!n.showPreview; wfRenderCanvas(); }); }
+  if(eye){ eye.addEventListener("mousedown",e=>e.stopPropagation()); eye.addEventListener("click",e=>{ e.stopPropagation(); wfPushUndoDebounced(); n.showPreview=!n.showPreview; wfRenderCanvas(); }); }
   el.querySelectorAll(".wf-port.out").forEach(p=>p.addEventListener("mousedown",e=>wfStartConnect(e,n.id,p.dataset.port)));
   // Connection completion is handled globally (drop anywhere on a node = connect).
   return el;

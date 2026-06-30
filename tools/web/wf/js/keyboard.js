@@ -8,6 +8,10 @@ window.addEventListener("keydown", e => {
     if(wfPvActive && wfPvRegion){ pvQuickCrop(); return; }
     wfSave(); return;
   }
+  // Undo/Redo — works even while typing in inputs (global shortcuts).
+  if((e.key==="z"||e.key==="Z") && (e.ctrlKey||e.metaKey) && !e.shiftKey){ e.preventDefault(); wfUndo(); return; }
+  if(((e.key==="z"||e.key==="Z") && (e.ctrlKey||e.metaKey) && e.shiftKey) || ((e.key==="y"||e.key==="Y") && (e.ctrlKey||e.metaKey))){ e.preventDefault(); wfRedo(); return; }
+
   if(typing) return;   // below here: canvas shortcuts only (let inputs keep native Ctrl+C/V)
   // Tab — toggle Canvas ↔ Preview view (skipped while typing in an input).
   if(e.key==="Tab"){ e.preventDefault(); wfSwitchView(wfPvActive?"canvas":"preview"); return; }
@@ -30,4 +34,7 @@ window.addEventListener("keydown", e => {
     return;
   }
 });
-window.addEventListener("keyup", e => { if(e.key===" ") wfSpace=false; });
+window.addEventListener("keyup", e => { if(e.key===" ") wfSpace=false;
+  // Push undo on arrow-key nudge release (batch all nudging into one undo step).
+  if(e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown"){ if(WF.sel.length && typeof wfPushUndo==="function") wfPushUndo(); }
+});

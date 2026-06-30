@@ -9,6 +9,7 @@ function wfDeleteNodes(ids){
   const g=wfGraph(); if(!g) return;
   const del=ids.filter(id=>{ const n=g.nodes.find(x=>x.id===id); return n && n.type!=="start"; });
   if(!del.length) return;
+  wfPushUndo();
   g.nodes=g.nodes.filter(n=>!del.includes(n.id));
   g.edges=g.edges.filter(e=>!del.includes(e.from)&&!del.includes(e.to));
   // A merge with only one block left is no longer a stack — dissolve it.
@@ -48,6 +49,7 @@ function wfDuplicate(){ if(wfCopy()) wfPaste(); }   // copy + cascade-offset pas
 function wfPaste(opts){
   const g=wfGraph(); if(!g){ alert("Chọn hoặc thêm một hoạt động trước."); return; }
   if(!wfClipboard||!wfClipboard.nodes.length) return;
+  wfPushUndo();
   const clip=wfClipboard;
   let dx, dy;
   if(opts && opts.clientX!==undefined){

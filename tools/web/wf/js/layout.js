@@ -126,6 +126,7 @@ function wfLayoutCompact(g){
 }
 function wfAutoLayout(kind){
   const g=wfGraph(); if(!g) return;
+  wfPushUndo();
   if(kind==="vertical")   wfLayoutVertical(g);
   else if(kind==="horizontal") wfLayoutHorizontal(g);
   else if(kind==="tree")  wfLayoutTree(g);

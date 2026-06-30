@@ -62,6 +62,7 @@ function wfReflowStacks(){
 // Insert dragged node D adjacent to target T ("after" = below, "before" = above),
 // rewiring so the surrounding chain stays intact, then tag both into one stack.
 function wfMergeInsert(dragId, targetId, where){
+  wfPushUndo();
   const g=wfGraph(); if(!g) return;
   const D=wfNode(dragId), T=wfNode(targetId); if(!D||!T) return;
   g.edges=g.edges.filter(e=>e.from!==dragId&&e.to!==dragId);   // D starts free
@@ -122,6 +123,7 @@ function wfShowMergeHint(dragId){
 // Split a stack: clear membership (edges kept so the flow still runs) and spread
 // the blocks apart so each is independently editable again.
 function wfUnmerge(sid){
+  wfPushUndo();
   const g=wfGraph(); if(!g) return;
   const chain=wfStackChain(sid); if(!chain.length) return;
   const x=chain[0].x; let y=chain[0].y;
@@ -133,6 +135,7 @@ function wfUnmerge(sid){
 }
 
 function wfAddActivity(type){
+  wfPushUndo();
   const n=WF.activities.filter(a=>a.type===type).length+1;
   const id=type+"_"+wfUid().slice(1,5);
   const act={id, name:(type==="background"?"Tác vụ nền ":"Hoạt động ")+n, type,
@@ -145,17 +148,19 @@ function wfDeleteActivity(id,ev){
   ev&&ev.stopPropagation();
   const i=WF.activities.findIndex(a=>a.id===id); if(i<0)return;
   if(!confirm(`Xoá hoạt động "${WF.activities[i].name}"?`))return;
+  wfPushUndo();
   WF.activities.splice(i,1);
   if(WF.edit.kind==="activity"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
   wfRenderAll();
 }
 function wfSelectActivity(id){ WF.edit={kind:"activity",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1; wfRenderAll(); }
-function wfToggleActivity(id,ev){ ev&&ev.stopPropagation(); const a=wfActById(id); if(a){ a.enabled=!a.enabled; wfRenderActivities(); } }
+function wfToggleActivity(id,ev){ ev&&ev.stopPropagation(); const a=wfActById(id); if(a){ wfPushUndo(); a.enabled=!a.enabled; wfRenderActivities(); } }
 
 // ── Functions (reusable subroutines, used via a "call" node) ──────────────────
 function wfAddFunction(){
   const name=(prompt("Tên function (vd: Về Home):","")||"").trim();
   if(!name) return;
+  wfPushUndo();
   const id="fn_"+wfUid().slice(1,6);
   WF.functions.push({id,name,graph:wfNewGraph()});
   WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
@@ -167,6 +172,7 @@ function wfDeleteFunction(id,ev){
   ev&&ev.stopPropagation();
   const i=WF.functions.findIndex(f=>f.id===id); if(i<0)return;
   if(!confirm(`Xoá function "${WF.functions[i].name}"? Các node gọi nó sẽ bị vô hiệu.`))return;
+  wfPushUndo();
   WF.functions.splice(i,1);
   if(WF.edit.kind==="function"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
   wfRenderAll();

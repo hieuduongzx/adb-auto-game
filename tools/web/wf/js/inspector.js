@@ -56,12 +56,12 @@ function wfRenderInspector(){
     const alignBlock=wfInspBlock("Căn chỉnh");
     const alignGrid=document.createElement("div"); alignGrid.className="wf-insp-grid";
     const mkAlign=(lbl,fn)=>{ const b=document.createElement("button"); b.className="btn sm"; b.textContent=lbl; b.title=lbl; b.onclick=fn; return b; };
-    alignGrid.appendChild(mkAlign("← Trái", ()=>{ if(!g||!selNodes.length) return; const minX=Math.min(...selNodes.map(n=>n.x)); selNodes.forEach(n=>n.x=minX); wfRenderCanvas(); }));
-    alignGrid.appendChild(mkAlign("→ Phải",()=>{ if(!g||!selNodes.length) return; const maxX=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=maxX-(el?el.offsetWidth:158); }); wfRenderCanvas(); }));
-    alignGrid.appendChild(mkAlign("↑ Trên", ()=>{ if(!g||!selNodes.length) return; const minY=Math.min(...selNodes.map(n=>n.y)); selNodes.forEach(n=>n.y=minY); wfRenderCanvas(); }));
-    alignGrid.appendChild(mkAlign("↓ Dưới",()=>{ if(!g||!selNodes.length) return; const maxY=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=maxY-(el?el.offsetHeight:46); }); wfRenderCanvas(); }));
-    alignGrid.appendChild(mkAlign("↔ Giữa X",()=>{ if(!g||!selNodes.length) return; const cx=(Math.min(...selNodes.map(n=>n.x))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=cx-(el?el.offsetWidth:158)/2; }); wfRenderCanvas(); }));
-    alignGrid.appendChild(mkAlign("↕ Giữa Y",()=>{ if(!g||!selNodes.length) return; const cy=(Math.min(...selNodes.map(n=>n.y))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=cy-(el?el.offsetHeight:46)/2; }); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("← Trái", ()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const minX=Math.min(...selNodes.map(n=>n.x)); selNodes.forEach(n=>n.x=minX); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("→ Phải",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const maxX=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=maxX-(el?el.offsetWidth:158); }); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("↑ Trên", ()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const minY=Math.min(...selNodes.map(n=>n.y)); selNodes.forEach(n=>n.y=minY); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("↓ Dưới",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const maxY=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=maxY-(el?el.offsetHeight:46); }); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("↔ Giữa X",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const cx=(Math.min(...selNodes.map(n=>n.x))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=cx-(el?el.offsetWidth:158)/2; }); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("↕ Giữa Y",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const cy=(Math.min(...selNodes.map(n=>n.y))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=cy-(el?el.offsetHeight:46)/2; }); wfRenderCanvas(); }));
     alignBlock.appendChild(alignGrid); body.appendChild(alignBlock);
 
     const actBlock=wfInspBlock("Thao tác");
@@ -136,7 +136,7 @@ function wfCallPicker(node){
   const sel=document.createElement("select");
   if(!WF.functions.length){ const o=document.createElement("option"); o.value=""; o.textContent="(chưa có function)"; sel.appendChild(o); }
   WF.functions.forEach(fn=>{ const o=document.createElement("option"); o.value=fn.id; o.textContent=fn.name; if(fn.id===node.params.fn)o.selected=true; sel.appendChild(o); });
-  sel.onchange=()=>{ node.params.fn=sel.value; wfRenderCanvas(); };
+  sel.onchange=()=>{ wfPushUndoDebounced(); node.params.fn=sel.value; wfRenderCanvas(); };
   row.appendChild(sel); return row;
 }
 
@@ -151,7 +151,7 @@ function wfTimingField(node){
     const inp=document.createElement("input"); inp.type="number"; inp.min="0"; inp.step="0.5";
     inp.value=(node[key]!==undefined&&node[key]!==null&&node[key]!==0)?node[key]:"";
     inp.placeholder="0";
-    inp.oninput=()=>{ node[key]=parseFloat(inp.value)||0; wfUpdNodeTiming(node); };
+    inp.oninput=()=>{ wfPushUndoDebounced(); node[key]=parseFloat(inp.value)||0; wfUpdNodeTiming(node); };
     row.appendChild(inp);
     const unit=document.createElement("span"); unit.className="hz-unit"; unit.textContent="giây"; row.appendChild(unit);
     return row;
@@ -182,7 +182,7 @@ function wfNoteField(node){
   const b=wfInspBlock("Ghi chú");
   const inp=document.createElement("input"); inp.type="text"; inp.className="wf-insp-input";
   inp.placeholder="ghi chú cho node này…"; inp.value=node.note||"";
-  inp.oninput=()=>{ node.note=inp.value; wfUpdNodeNote(node); };
+  inp.oninput=()=>{ wfPushUndoDebounced(); node.note=inp.value; wfUpdNodeNote(node); };
   b.appendChild(inp);
   return b;
 }
@@ -199,7 +199,7 @@ function wfLogField(node){
   const b=wfInspBlock("Log khi chạy");
   const inp=document.createElement("input"); inp.type="text"; inp.className="wf-insp-input";
   inp.placeholder="tự ghi log mỗi lần chạy node…"; inp.value=node.log||"";
-  inp.oninput=()=>{ node.log=inp.value; wfUpdNodeLog(node); };
+  inp.oninput=()=>{ wfPushUndoDebounced(); node.log=inp.value; wfUpdNodeLog(node); };
   b.appendChild(inp);
   const hint=document.createElement("div"); hint.className="wf-insp-tip";
   hint.innerHTML='Có thể chèn biến: <code>{tên_biến}</code>';
@@ -222,7 +222,7 @@ function wfActField(label,t,val,onset){
   const row=document.createElement("div"); row.className="wf-field";
   const l=document.createElement("label"); l.textContent=label; row.appendChild(l);
   const inp=document.createElement("input"); inp.type=t==="num"?"number":"text"; inp.value=val;
-  inp.oninput=()=>onset(inp.value); row.appendChild(inp); return row;
+  inp.oninput=()=>{ wfPushUndoDebounced(); onset(inp.value); }; row.appendChild(inp); return row;
 }
 
 // Per-activity variables.
@@ -231,7 +231,7 @@ function wfVarsSection(act){
   const b=wfInspBlock("Biến hoạt động", act.vars.length);
   act.vars.forEach((v,idx)=>b.appendChild(wfVarRow(act,v,idx)));
   const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Biến"; add.style.alignSelf="flex-start";
-  add.onclick=()=>{ const n=act.vars.length+1; act.vars.push({name:"var"+n, label:"Setting "+n, type:"bool", value:false}); wfRenderInspector(); };
+  add.onclick=()=>{ wfPushUndoDebounced(); const n=act.vars.length+1; act.vars.push({name:"var"+n, label:"Setting "+n, type:"bool", value:false}); wfRenderInspector(); };
   b.appendChild(add);
   return b;
 }
@@ -245,19 +245,20 @@ function wfVarRow(act,v,idx){
   chip.addEventListener("dragend",()=>{ wfPaletteDrag=null; });
   r1.appendChild(chip);
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Tiêu đề (hiện trong settings)"; lbl.style.cssText="flex:1;min-width:0;font-weight:600;";
-  lbl.oninput=()=>{ v.label=lbl.value; };
+  lbl.oninput=()=>{ wfPushUndoDebounced(); v.label=lbl.value; };
   r1.appendChild(lbl);
   const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá biến";
-  del.onclick=()=>{ act.vars.splice(idx,1); wfRenderInspector(); };
+  del.onclick=()=>{ wfPushUndoDebounced(); act.vars.splice(idx,1); wfRenderInspector(); };
   r1.appendChild(del);
   // Line 2: name + type + default value.
   const r2=document.createElement("div"); r2.className="wf-var-row";
   const nm=document.createElement("input"); nm.type="text"; nm.value=v.name||""; nm.placeholder="biến (vd isClaim)"; nm.style.cssText="flex:1;min-width:0;font-size:10.5px;font-family:var(--mono);";
-  nm.oninput=()=>{ v.name=nm.value; };
+  nm.oninput=()=>{ wfPushUndoDebounced(); v.name=nm.value; };
   r2.appendChild(nm);
   const ty=document.createElement("select");
   [["bool","bool"],["number","số"],["text","chữ"],["select","chọn"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
   ty.onchange=()=>{
+    wfPushUndoDebounced();
     v.type=ty.value;
     if(ty.value==="select"){ if(!v.options||!v.options.length) v.options=["A","B"]; v.value=v.options[0]; }
     else v.value = ty.value==="bool"?false : ty.value==="number"?0 : "";
@@ -271,7 +272,7 @@ function wfVarRow(act,v,idx){
     const r3=document.createElement("div"); r3.className="wf-var-row";
     const opt=document.createElement("input"); opt.type="text"; opt.placeholder="lựa chọn: A, B, C"; opt.value=(v.options||[]).join(", ");
     opt.style.cssText="flex:1;min-width:0;font-size:10.5px;";
-    opt.onchange=()=>{ v.options=opt.value.split(",").map(s=>s.trim()).filter(Boolean); if(!v.options.includes(v.value)) v.value=v.options[0]||""; wfRenderInspector(); };
+    opt.onchange=()=>{ wfPushUndoDebounced(); v.options=opt.value.split(",").map(s=>s.trim()).filter(Boolean); if(!v.options.includes(v.value)) v.value=v.options[0]||""; wfRenderInspector(); };
     r3.appendChild(opt); card.appendChild(r3);
   }
   return card;
@@ -280,18 +281,18 @@ function wfVarValue(v){
   if((v.type||"bool")==="bool"){
     const cb=document.createElement("span"); cb.className="cb"+(v.value?" checked":""); cb.title="Giá trị mặc định";
     cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
-    cb.onclick=()=>{ v.value=!v.value; cb.classList.toggle("checked",v.value); };
+    cb.onclick=()=>{ wfPushUndoDebounced(); v.value=!v.value; cb.classList.toggle("checked",v.value); };
     return cb;
   }
   if(v.type==="select"){
     const sel=document.createElement("select"); sel.style.maxWidth="86px";
     (v.options||[]).forEach(o=>{ const op=document.createElement("option"); op.value=op.textContent=o; if(String(v.value)===String(o))op.selected=true; sel.appendChild(op); });
-    sel.onchange=()=>{ v.value=sel.value; };
+    sel.onchange=()=>{ wfPushUndoDebounced(); v.value=sel.value; };
     return sel;
   }
   const inp=document.createElement("input"); inp.type=v.type==="number"?"number":"text";
   inp.value=v.value!==undefined&&v.value!==null?v.value:""; inp.style.width="58px";
-  inp.oninput=()=>{ v.value = v.type==="number"?(parseFloat(inp.value)||0):inp.value; };
+  inp.oninput=()=>{ wfPushUndoDebounced(); v.value = v.type==="number"?(parseFloat(inp.value)||0):inp.value; };
   return inp;
 }
 
@@ -304,6 +305,7 @@ function wfAttachCoordPaste(node, f, inp){
     const m=txt.match(/^\s*\(?\s*(-?\d+(?:\.\d+)?)\s*[, ]+\s*(-?\d+(?:\.\d+)?)\s*(?:[, ]+\s*(-?\d+(?:\.\d+)?)\s*(?:[, ]+\s*(-?\d+(?:\.\d+)?)\s*)?)?\)?\s*$/);
     if(!m) return;
     e.preventDefault();
+    wfPushUndoDebounced();
     const nums=[m[1],m[2],m[3],m[4]].filter(v=>v!==undefined).map(parseFloat);
     const def=WF_NODES[node.type];
     const have=new Set((def&&def.fields||[]).filter(ff=>ff.t==="num"&&WF_COORD_KEYS.includes(ff.k)).map(ff=>ff.k));
@@ -332,14 +334,14 @@ function wfFieldEl(node,f){
   if(f.t==="bool"){
     const cb=document.createElement("span"); cb.className="cb"+(node.params[f.k]?" checked":"");
     cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
-    cb.onclick=()=>{ node.params[f.k]=!node.params[f.k]; cb.classList.toggle("checked",node.params[f.k]); wfUpdNodeSum(node); };
+    cb.onclick=()=>{ wfPushUndoDebounced(); node.params[f.k]=!node.params[f.k]; cb.classList.toggle("checked",node.params[f.k]); wfUpdNodeSum(node); };
     row.appendChild(cb); return row;
   }
   if(f.t==="select"){
     const sel=document.createElement("select");
     (f.opts||[]).forEach(o=>{ const v=(o&&o.v!==undefined)?o.v:o, t=(o&&o.t!==undefined)?o.t:o;
       const op=document.createElement("option"); op.value=v; op.textContent=t; if(node.params[f.k]===v)op.selected=true; sel.appendChild(op); });
-    sel.onchange=()=>{ node.params[f.k]=sel.value; wfUpdNodeSum(node); };
+    sel.onchange=()=>{ wfPushUndoDebounced(); node.params[f.k]=sel.value; wfUpdNodeSum(node); };
     row.appendChild(sel); return row;
   }
   if(f.t==="tpls") return wfTplsField(node,f);
@@ -350,7 +352,7 @@ function wfFieldEl(node,f){
     const inp=document.createElement("input"); inp.type="text";
     inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
     inp.setAttribute("list","wf-varlist");
-    inp.oninput=()=>{ node.params[f.k]=inp.value; wfUpdNodeSum(node); wfRenderVarsPanel(); };
+    inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]=inp.value; wfUpdNodeSum(node); wfRenderVarsPanel(); };
     row.appendChild(inp);
     if(names.length){
       let dl=document.getElementById("wf-varlist");
@@ -363,7 +365,7 @@ function wfFieldEl(node,f){
   const inp=document.createElement("input");
   inp.type=f.t==="num"?"number":"text"; if(f.t==="num"&&f.step) inp.step=f.step;
   inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
-  inp.oninput=()=>{ node.params[f.k]= f.t==="num"?(parseFloat(inp.value)||0):inp.value; wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); };
+  inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]= f.t==="num"?(parseFloat(inp.value)||0):inp.value; wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); };
   wfAttachCoordPaste(node, f, inp);
   row.appendChild(inp);
 
@@ -372,7 +374,7 @@ function wfFieldEl(node,f){
     const btn=document.createElement("button"); btn.className="btn sm"; btn.textContent="Chọn…";
     const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img, node.params[f.k]);
     row.appendChild(btn); row.appendChild(img);   // thumb beside the picker button
-    const refresh=v=>{ node.params[f.k]=v; wfUpdNodeSum(node); wfLoadThumb(img,v); wfUpdNodePreview(node); wfRenderCanvas(); };
+    const refresh=v=>{ wfPushUndoDebounced(); node.params[f.k]=v; wfUpdNodeSum(node); wfLoadThumb(img,v); wfUpdNodePreview(node); wfRenderCanvas(); };
     inp.oninput=()=>refresh(inp.value);
     btn.onclick=async()=>{ const p=await api().pick_template(); if(p){ inp.value=p; refresh(p); } };
     return row;
@@ -398,10 +400,10 @@ function wfTplsField(node,f,row){
       const pick=document.createElement("button"); pick.className="btn sm"; pick.textContent="Chọn…";
       const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá ảnh";
       const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img, path);
-      const commit=v=>{ arr()[idx]=v; wfUpdNodeSum(node); wfUpdNodePreview(node); wfLoadThumb(img,v); wfRenderCanvas(); };
+      const commit=v=>{ wfPushUndoDebounced(); arr()[idx]=v; wfUpdNodeSum(node); wfUpdNodePreview(node); wfLoadThumb(img,v); wfRenderCanvas(); };
       inp.oninput=()=>commit(inp.value);
       pick.onclick=async()=>{ const pp=await api().pick_template(); if(pp){ inp.value=pp; commit(pp); } };
-      del.onclick=()=>{ arr().splice(idx,1); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
+      del.onclick=()=>{ wfPushUndoDebounced(); arr().splice(idx,1); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
       r.appendChild(num); r.appendChild(inp); r.appendChild(pick); r.appendChild(del); r.appendChild(img);
       item.appendChild(r); list.appendChild(item);
     });
@@ -409,7 +411,7 @@ function wfTplsField(node,f,row){
   }
   renderList();
   const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Ảnh";
-  add.onclick=async()=>{ const pp=await api().pick_template(); arr().push(pp||""); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
+  add.onclick=async()=>{ wfPushUndoDebounced(); const pp=await api().pick_template(); arr().push(pp||""); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
   wrap.appendChild(list); wrap.appendChild(add);
   return wrap;
 }
@@ -429,7 +431,7 @@ function wfRegionField(node,f){
   const makeCell=(key,ph)=>{
     const i=document.createElement("input"); i.type="number"; i.min="0"; i.placeholder=ph;
     i.value=node.params[key]!==undefined?node.params[key]:"";
-    i.oninput=()=>{ node.params[key]=parseFloat(i.value)||0; };
+    i.oninput=()=>{ wfPushUndoDebounced(); node.params[key]=parseFloat(i.value)||0; };
     return {input:i};
   };
   const x=makeCell("regionX","X"), y=makeCell("regionY","Y"),
@@ -440,6 +442,7 @@ function wfRegionField(node,f){
   const sync=()=>{ const on=enabled(); cb.classList.toggle("checked",on); panel.style.display=on?"":"none"; };
   sync();
   cb.onclick=()=>{
+    wfPushUndoDebounced();
     if(enabled()){
       node.params.regionX=0; node.params.regionY=0; node.params.regionW=0; node.params.regionH=0;
       x.input.value=y.input.value=w.input.value=h.input.value="";
@@ -472,9 +475,9 @@ function wfBranchCountControl(label, count, onSet, onAdd, min=1){
   const lab=document.createElement("label"); lab.textContent=label; row.appendChild(lab);
   const inp=document.createElement("input"); inp.type="number"; inp.min=String(min); inp.step="1"; inp.value=count;
   inp.title="Nhập số nhánh để thêm/xoá nhanh";
-  inp.onchange=()=>{ const n=wfNormalizeCount(inp.value, count, min); inp.value=n; onSet(n); };
+  inp.onchange=()=>{ wfPushUndoDebounced(); const n=wfNormalizeCount(inp.value, count, min); inp.value=n; onSet(n); };
   const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Nhánh"; add.title="Thêm một nhánh";
-  add.onclick=()=>onAdd();
+  add.onclick=()=>{ wfPushUndoDebounced(); onAdd(); };
   row.appendChild(inp); row.appendChild(add);
   return row;
 }
@@ -506,7 +509,7 @@ function wfCountBranchesEditor(node){
 function wfSwitchCasesEditor(node){
   const wrap=document.createElement("div");
   const cases=()=> Array.isArray(node.params.cases)?node.params.cases:(node.params.cases=[]);
-  const addCase=()=>cases().push({type:"if_image", params:wfDefaults("if_image")});
+  const addCase=()=>{ wfPushUndoDebounced(); cases().push({type:"if_image", params:wfDefaults("if_image")}); };
   const setCaseCount=n=>{
     const cs=cases();
     while(cs.length<n) addCase();
@@ -525,13 +528,13 @@ function wfSwitchCasesEditor(node){
       const sel=document.createElement("select");
       WF_SWITCH_CASE_TYPES.forEach(t=>{ const op=document.createElement("option"); op.value=t;
         op.textContent=WF_NODES[t].label; if(c.type===t)op.selected=true; sel.appendChild(op); });
-      sel.onchange=()=>{ c.type=sel.value; c.params=wfDefaults(sel.value); render(); wfUpdNodeSum(node); };
+      sel.onchange=()=>{ wfPushUndoDebounced(); c.type=sel.value; c.params=wfDefaults(sel.value); render(); wfUpdNodeSum(node); };
       const up=document.createElement("button"); up.className="btn sm ico"; up.innerHTML=wfIco("chevron_up"); up.title="Lên"; up.disabled=idx===0;
-      up.onclick=()=>{ wfReorderSwitchCase(node, idx, idx-1); render(); wfRenderCanvas(); };
+      up.onclick=()=>{ wfPushUndoDebounced(); wfReorderSwitchCase(node, idx, idx-1); render(); wfRenderCanvas(); };
       const dn=document.createElement("button"); dn.className="btn sm ico"; dn.innerHTML=wfIco("chevron_dn"); dn.title="Xuống"; dn.disabled=idx===cases().length-1;
-      dn.onclick=()=>{ wfReorderSwitchCase(node, idx, idx+1); render(); wfRenderCanvas(); };
+      dn.onclick=()=>{ wfPushUndoDebounced(); wfReorderSwitchCase(node, idx, idx+1); render(); wfRenderCanvas(); };
       const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá nhánh";
-      del.onclick=()=>{ wfRemoveSwitchCase(node, idx); render(); wfRenderCanvas(); };
+      del.onclick=()=>{ wfPushUndoDebounced(); wfRemoveSwitchCase(node, idx); render(); wfRenderCanvas(); };
       hd.appendChild(num); hd.appendChild(sel); hd.appendChild(up); hd.appendChild(dn); hd.appendChild(del);
       item.appendChild(hd);
       const proxy={ id:node.id+"__c"+idx, type:c.type, params:c.params };
