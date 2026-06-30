@@ -249,8 +249,8 @@
           {
             "id": "n8x6kc30",
             "type": "tap_image",
-            "x": 640,
-            "y": 40,
+            "x": 460,
+            "y": -40,
             "params": {
               "template": "templates/crop_20260630_205319_1649_974_206_38.png",
               "taps": "1",
@@ -263,8 +263,8 @@
           {
             "id": "ng1j7p4o",
             "type": "tap_image",
-            "x": 840,
-            "y": 40,
+            "x": 1020,
+            "y": 80,
             "params": {
               "template": "templates/crop_20260630_205322_1542_974_107_41.png",
               "taps": "1",
@@ -286,7 +286,7 @@
           {
             "id": "ntbvxgu1",
             "type": "tap",
-            "x": 1200,
+            "x": 1320,
             "y": 40,
             "params": {
               "target": "pos",
