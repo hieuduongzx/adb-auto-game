@@ -36,13 +36,24 @@ const WF_WIRE_DEFS = (function(){
 function wfBezier(a,b){
   const dx=b.x-a.x, dy=b.y-a.y, adx=Math.abs(dx), ady=Math.abs(dy);
 
-  // ── Backward (target behind source): U-turn gọn — ra phải, vòng dọc, sang trái, vào ─
+  // ── Backward (target behind source) ──────────────────────────────────────────
   if(dx < -10){
-    const h=Math.max(30, Math.min(adx*0.25, 1));
-    const outX=a.x+h, inX=b.x-h;
-    const vOff=Math.max(45, ady*0.4+20);
-    const midY=(a.y+b.y)/2 + vOff;
-    return `M${a.x},${a.y} L${outX},${a.y} L${outX},${midY} L${inX},${midY} L${inX},${b.y} L${b.x},${b.y}`;
+    // Near-horizontal (dy nhỏ): U-turn gọn — ra phải, xuống, sang trái, vào.
+    if(ady < 60){
+      const h=Math.max(15, Math.min(adx*0.25, 30));
+      const outX=a.x+h, inX=b.x-h;
+      const vOff=45;
+      const midY=(a.y+b.y)/2 + vOff;
+      return `M${a.x},${a.y} L${outX},${a.y} L${outX},${midY} L${inX},${midY} L${inX},${b.y} L${b.x},${b.y}`;
+    }
+    // Target ở dưới/trên rõ rệt: route vòng ra ngoài phải target rồi quay
+    // lại bên trái, tránh cắt ngang block. outX clears target's right edge;
+    // sideY clears target's vertical span; inX sits left of target's left edge.
+    const NW=158, gap=15;
+    const outX=Math.max(a.x+15, b.x+NW+gap);
+    const inX=b.x-15;
+    const sideY=b.y + (dy>0?50:-50);
+    return `M${a.x},${a.y} L${outX},${a.y} L${outX},${sideY} L${inX},${sideY} L${inX},${b.y} L${b.x},${b.y}`;
   }
 
   // ── Near-vertical: target is mostly below/above — orthogonal L-shape.

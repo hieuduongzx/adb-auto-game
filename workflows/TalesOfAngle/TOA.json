@@ -848,7 +848,7 @@
           {
             "id": "nqq5uqhi",
             "type": "tap_image",
-            "x": 1660,
+            "x": 1600,
             "y": 40,
             "params": {
               "template": "templates/crop_20260628_094026_184x51.png",
@@ -860,7 +860,7 @@
           {
             "id": "nropbwkp",
             "type": "tap_image",
-            "x": 2320,
+            "x": 2260,
             "y": -120,
             "params": {
               "template": "templates/crop_20260628_132414_213x39.png",
@@ -882,7 +882,7 @@
           {
             "id": "nsjvuudw",
             "type": "loop",
-            "x": 1900,
+            "x": 1800,
             "y": 40,
             "params": {
               "count": 3,
@@ -892,8 +892,8 @@
           {
             "id": "nckfghu8",
             "type": "end",
-            "x": 2800,
-            "y": -80,
+            "x": 2620,
+            "y": -100,
             "params": {}
           },
           {
@@ -935,7 +935,7 @@
           {
             "id": "n6ajcw9n",
             "type": "parallel",
-            "x": 2080,
+            "x": 2020,
             "y": -120,
             "params": {
               "count": 3
@@ -944,8 +944,8 @@
           {
             "id": "ntf795d4",
             "type": "loop",
-            "x": 2140,
-            "y": 100,
+            "x": 2040,
+            "y": 80,
             "params": {
               "count": 3,
               "infinite": true
@@ -954,8 +954,8 @@
           {
             "id": "njwarb4k",
             "type": "if_image",
-            "x": 2380,
-            "y": 100,
+            "x": 2220,
+            "y": 80,
             "params": {
               "template": "templates/crop_20260630_160638_35_94_207_59.png",
               "threshold": 0.85,
@@ -965,7 +965,7 @@
           {
             "id": "n8if4g1y",
             "type": "tap_image",
-            "x": 2580,
+            "x": 2420,
             "y": 80,
             "params": {
               "template": "templates/crop_20260630_160743_143_1699_148_27.png",
@@ -1329,7 +1329,7 @@
           {
             "id": "nm5zmsb7",
             "type": "tap_image",
-            "x": 1400,
+            "x": 1380,
             "y": 40,
             "params": {
               "template": "templates/crop_20260630_022319_772_1264_180_41.png",
@@ -1369,7 +1369,7 @@
           {
             "id": "nfb2tkgr",
             "type": "call",
-            "x": 1592,
+            "x": 1600,
             "y": 40,
             "params": {
               "fn": "fn_cojj1"
@@ -1378,8 +1378,8 @@
           {
             "id": "n5fmwx3s",
             "type": "tap_image",
-            "x": 1786,
-            "y": 40,
+            "x": 1920,
+            "y": -60,
             "params": {
               "template": "templates/crop_20260630_023339_464_1820_162_42.png",
               "taps": "1",
@@ -1391,14 +1391,14 @@
           {
             "id": "narbnc6d",
             "type": "try_chain",
-            "x": 1980,
+            "x": 1920,
             "y": 40,
             "params": {}
           },
           {
             "id": "nan97v7j",
             "type": "tap_image",
-            "x": 2174,
+            "x": 2140,
             "y": 40,
             "params": {
               "template": "templates/crop_20260630_023514_956_1628_59_32.png",
@@ -1412,8 +1412,8 @@
           {
             "id": "n2weh4jz",
             "type": "tap_image",
-            "x": 1140,
-            "y": 300,
+            "x": 1180,
+            "y": 180,
             "params": {
               "template": "templates/crop_20260630_023604_275_1777_108_27.png",
               "taps": "1",
@@ -1436,7 +1436,7 @@
           {
             "id": "n3slg143",
             "type": "tap_image",
-            "x": 2368,
+            "x": 2340,
             "y": 40,
             "params": {
               "template": "templates/crop_20260630_023604_275_1777_108_27.png",
@@ -1451,7 +1451,7 @@
             "id": "nlor2i46",
             "type": "read_var",
             "x": 1600,
-            "y": -153,
+            "y": -80,
             "params": {
               "name": "ticket",
               "x": 847,
@@ -1465,7 +1465,7 @@
             "id": "nj0yq59s",
             "type": "if_var",
             "x": 1600,
-            "y": -100,
+            "y": -27,
             "params": {
               "name": "ticket",
               "op": ">",
@@ -1476,8 +1476,8 @@
           {
             "id": "nxnwwunc",
             "type": "tap_image",
-            "x": 1560,
-            "y": 240,
+            "x": 1600,
+            "y": 200,
             "params": {
               "template": "templates/crop_20260630_024717_764_1035_187_40.png",
               "taps": "1",
