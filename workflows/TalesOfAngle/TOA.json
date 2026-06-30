@@ -849,7 +849,7 @@
             "id": "nqq5uqhi",
             "type": "tap_image",
             "x": 1580,
-            "y": 40,
+            "y": 200,
             "params": {
               "template": "templates/crop_20260628_094026_184x51.png",
               "taps": "1",
@@ -860,8 +860,8 @@
           {
             "id": "nropbwkp",
             "type": "tap_image",
-            "x": 2160,
-            "y": -60,
+            "x": 2180,
+            "y": -100,
             "params": {
               "template": "templates/crop_20260628_132414_213x39.png",
               "taps": "1",
@@ -882,8 +882,8 @@
           {
             "id": "nsjvuudw",
             "type": "loop",
-            "x": 1780,
-            "y": 40,
+            "x": 1800,
+            "y": 80,
             "params": {
               "count": 3,
               "infinite": true
@@ -892,8 +892,8 @@
           {
             "id": "nckfghu8",
             "type": "end",
-            "x": 2620,
-            "y": 40,
+            "x": 2800,
+            "y": -40,
             "params": {}
           },
           {
@@ -935,8 +935,8 @@
           {
             "id": "n6ajcw9n",
             "type": "parallel",
-            "x": 1960,
-            "y": 40,
+            "x": 1940,
+            "y": -100,
             "params": {
               "count": 3
             }
@@ -965,8 +965,8 @@
           {
             "id": "n8if4g1y",
             "type": "tap_image",
-            "x": 2620,
-            "y": -40,
+            "x": 2480,
+            "y": -100,
             "params": {
               "template": "templates/crop_20260630_160743_143_1699_148_27.png",
               "taps": "1",

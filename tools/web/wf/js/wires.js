@@ -36,20 +36,20 @@ const WF_WIRE_DEFS = (function(){
 function wfBezier(a,b){
   const dx=b.x-a.x, dy=b.y-a.y, adx=Math.abs(dx), ady=Math.abs(dy);
 
-  // ── Backward: orthogonal U-turn (target is behind source) ──────────────────
-  if(dx < -10){
-    const h=Math.max(40, Math.min(adx*0.4, 120));
+  // ── Backward ngang (dy nhỏ): U-turn gọn — ra phải, xuống dưới, sang trái, vào ─
+  if(dx < -10 && ady < 40){
+    const h=Math.max(55, Math.min(adx*0.35, 120));
     const outX=a.x+h, inX=b.x-h;
-    const sign=dy>=0?1:-1;
-    const vOff=Math.max(35, ady*0.08+8);
-    const midY=(a.y+b.y)/2 + sign*vOff;
+    const vOff=35;
+    const midY=(a.y+b.y)/2 + vOff;
     return `M${a.x},${a.y} L${outX},${a.y} L${outX},${midY} L${inX},${midY} L${inX},${b.y} L${b.x},${b.y}`;
   }
 
-  // ── Near-vertical: target is mostly below/above, small horizontal gap ──────
-  // Orthogonal L-shape — out right past the block, vertical, then right into target.
-  if(adx < 70 && ady > adx * 1.4){
-    const h=Math.max(55, adx*0.5);
+  // ── Near-vertical: target is mostly below/above — orthogonal L-shape.
+  // Covers cases where the horizontal gap is within ~1 node width and the
+  // vertical span dominates, so the wire doesn't sweep in a wide bezier arc.
+  if(adx < 160 && ady > adx * 1.2){
+    const h=Math.max(20, Math.min(adx*0.55, 50));
     const midX=a.x+h;
     return `M${a.x},${a.y} L${midX},${a.y} L${midX},${b.y} L${b.x},${b.y}`;
   }
