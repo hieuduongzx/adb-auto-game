@@ -1,8 +1,8 @@
 {
   "snap": true,
   "previewAll": true,
-  "logOpen": false,
-  "sideW": 285,
+  "logOpen": true,
+  "sideW": 342,
   "inspW": 321,
-  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\TalesOfAngle\\TOA.json"
+  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\Cherry_Tale\\Cherry_Tale.json"
 }

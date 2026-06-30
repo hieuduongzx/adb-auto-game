@@ -484,14 +484,14 @@
           {
             "id": "n3m2uvat",
             "type": "start",
-            "x": 20,
+            "x": 40,
             "y": 40,
             "params": {}
           },
           {
             "id": "n1bc508v",
             "type": "tap_image",
-            "x": 1010,
+            "x": 1204,
             "y": 40,
             "params": {
               "template": "templates/crop_20260628_094026_184x51.png",
@@ -504,7 +504,7 @@
           {
             "id": "nzlnnqqf",
             "type": "tap",
-            "x": 816,
+            "x": 1010,
             "y": 40,
             "params": {
               "target": "pos",
@@ -515,8 +515,8 @@
           {
             "id": "nahmpri5",
             "type": "tap",
-            "x": 2460,
-            "y": 40,
+            "x": 2756,
+            "y": 129,
             "params": {
               "target": "pos",
               "x": 892,
@@ -526,7 +526,7 @@
           {
             "id": "n4pphsh8",
             "type": "loop",
-            "x": 400,
+            "x": 622,
             "y": 40,
             "params": {
               "count": 3,
@@ -536,8 +536,8 @@
           {
             "id": "non82rd1",
             "type": "wait_image",
-            "x": 2260,
-            "y": 160,
+            "x": 2562,
+            "y": 40,
             "params": {
               "template": "templates/crop_20260628_101155_294x50.png",
               "threshold": 0.85,
@@ -548,7 +548,7 @@
           {
             "id": "nt9a33t8",
             "type": "tap_image",
-            "x": 200,
+            "x": 428,
             "y": 40,
             "params": {
               "template": "templates/crop_20260628_125529_167x38.png",
@@ -561,8 +561,8 @@
           {
             "id": "n44ty3u5",
             "type": "tap_image",
-            "x": 2060,
-            "y": 160,
+            "x": 2368,
+            "y": 40,
             "params": {
               "template": "templates/crop_20260628_100639_157x32.png",
               "taps": "1",
@@ -574,7 +574,7 @@
           {
             "id": "n907yb0r",
             "type": "if_image",
-            "x": 1780,
+            "x": 1980,
             "y": 92,
             "params": {
               "template": "templates/crop_20260628_132414_213x39.png",
@@ -586,7 +586,7 @@
           {
             "id": "nu0z2e71",
             "type": "wait_image",
-            "x": 1398,
+            "x": 1592,
             "y": 40,
             "params": {
               "template": "templates/crop_20260628_100714_44x35.png",
@@ -598,7 +598,7 @@
           {
             "id": "nzlccjdm",
             "type": "loop",
-            "x": 1204,
+            "x": 1398,
             "y": 40,
             "params": {
               "count": 3,
@@ -608,7 +608,7 @@
           {
             "id": "nwhiv10o",
             "type": "if_image_any",
-            "x": 580,
+            "x": 816,
             "y": 40,
             "params": {
               "templates": [
@@ -622,8 +622,8 @@
           {
             "id": "na08d1lc",
             "type": "tap",
-            "x": 2060,
-            "y": 40,
+            "x": 2368,
+            "y": 157,
             "params": {
               "target": "found",
               "x": 0,
@@ -633,8 +633,8 @@
           {
             "id": "nijwi0t9",
             "type": "wait_image",
-            "x": 2260,
-            "y": 40,
+            "x": 2562,
+            "y": 157,
             "params": {
               "template": "templates/crop_20260628_101155_294x50.png",
               "threshold": 0.85,
@@ -645,8 +645,8 @@
           {
             "id": "ntni1ml1",
             "type": "tap",
-            "x": 2460,
-            "y": 160,
+            "x": 2756,
+            "y": 40,
             "params": {
               "target": "pos",
               "x": 892,
@@ -656,7 +656,7 @@
           {
             "id": "n6zy27iq",
             "type": "wait",
-            "x": 1780,
+            "x": 1980,
             "y": 40,
             "params": {
               "seconds": 3
@@ -666,7 +666,7 @@
           {
             "id": "nk25jo6i",
             "type": "wait_image",
-            "x": 1592,
+            "x": 1786,
             "y": 40,
             "params": {
               "template": "templates/crop_20260628_100621_196x60.png",
@@ -678,8 +678,8 @@
           {
             "id": "ny2q4yc2",
             "type": "call",
-            "x": 20,
-            "y": 80,
+            "x": 234,
+            "y": 40,
             "params": {
               "fn": "fn_znmtg"
             }

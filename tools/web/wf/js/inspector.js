@@ -1,4 +1,31 @@
 // ── Inspector ──────────────────────────────────────────────────────────────
+// Flat, sectioned layout: a sticky identity header names the selection, then
+// hairline-separated blocks group its parameters / note / log. No nested cards.
+
+// Sticky identity header — icon chip + title + optional sublabel / count badge.
+function wfInspId(iconName,title,sub,count){
+  const id=document.createElement("div"); id.className="wf-insp-id";
+  let html=`<span class="ic">${wfIco(iconName||"box")}</span>`
+         + `<span class="meta"><span class="title">${escHtml(title||"")}</span>`;
+  if(sub) html+=`<span class="sub">${escHtml(sub)}</span>`;
+  html+="</span>";
+  if(count!==undefined&&count!==null&&count!=="") html+=`<span class="count">${escHtml(String(count))}</span>`;
+  id.innerHTML=html;
+  return id;
+}
+
+// One flat section: optional uppercase label (+ count) then its content rows.
+function wfInspBlock(label,count){
+  const b=document.createElement("div"); b.className="wf-insp-block";
+  if(label){
+    const s=document.createElement("div"); s.className="wf-insp-sec";
+    s.innerHTML=`<span>${escHtml(label)}</span>`;
+    if(count!==undefined&&count!==null&&count!=="") s.innerHTML+=`<span class="sec-count">${escHtml(String(count))}</span>`;
+    b.appendChild(s);
+  }
+  return b;
+}
+
 function wfRenderInspector(){
   const body=$("wf-insp-body"); body.innerHTML="";
   wfRenderVarsPanel();
@@ -8,27 +35,25 @@ function wfRenderInspector(){
     const g=wfGraph();
     const selNodes=g?WF.sel.map(id=>g.nodes.find(n=>n.id===id)).filter(Boolean):[];
 
-    const card=document.createElement("div"); card.className="wf-insp-card";
-    const hdr=document.createElement("div"); hdr.className="wf-insp-hdr";
-    hdr.innerHTML=`<span class="ico">${wfIco("box")}</span><span class="title">${WF.sel.length} block được chọn</span>`;
-    card.appendChild(hdr);
+    body.appendChild(wfInspId("box", WF.sel.length+" block được chọn", null, WF.sel.length));
 
-    const list=document.createElement("div"); list.style.cssText="display:flex;flex-direction:column;gap:2px;";
+    const listBlock=wfInspBlock();
+    const list=document.createElement("div"); list.style.cssText="display:flex;flex-direction:column;gap:3px;";
     selNodes.slice(0,8).forEach(n=>{
       const def=WF_NODES[n.type]||{};
       const row=document.createElement("div");
-      row.style.cssText="font-size:11px;color:var(--dim);padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+      row.style.cssText="font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
       row.textContent=(def.label||n.type)+(n.label?` · ${n.label}`:"");
       list.appendChild(row);
     });
     if(selNodes.length>8){
       const more=document.createElement("div");
-      more.style.cssText="font-size:10px;color:var(--muted);padding:1px 4px;";
+      more.style.cssText="font-size:10px;color:var(--muted);";
       more.textContent=`+${selNodes.length-8} nữa…`; list.appendChild(more);
     }
-    card.appendChild(list);
+    listBlock.appendChild(list); body.appendChild(listBlock);
 
-    const alignSec=document.createElement("div"); alignSec.className="wf-insp-sec"; alignSec.textContent="Căn chỉnh"; card.appendChild(alignSec);
+    const alignBlock=wfInspBlock("Căn chỉnh");
     const alignGrid=document.createElement("div"); alignGrid.className="wf-insp-grid";
     const mkAlign=(lbl,fn)=>{ const b=document.createElement("button"); b.className="btn sm"; b.textContent=lbl; b.title=lbl; b.onclick=fn; return b; };
     alignGrid.appendChild(mkAlign("← Trái", ()=>{ if(!g||!selNodes.length) return; const minX=Math.min(...selNodes.map(n=>n.x)); selNodes.forEach(n=>n.x=minX); wfRenderCanvas(); }));
@@ -37,83 +62,72 @@ function wfRenderInspector(){
     alignGrid.appendChild(mkAlign("↓ Dưới",()=>{ if(!g||!selNodes.length) return; const maxY=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=maxY-(el?el.offsetHeight:46); }); wfRenderCanvas(); }));
     alignGrid.appendChild(mkAlign("↔ Giữa X",()=>{ if(!g||!selNodes.length) return; const cx=(Math.min(...selNodes.map(n=>n.x))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=cx-(el?el.offsetWidth:158)/2; }); wfRenderCanvas(); }));
     alignGrid.appendChild(mkAlign("↕ Giữa Y",()=>{ if(!g||!selNodes.length) return; const cy=(Math.min(...selNodes.map(n=>n.y))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=cy-(el?el.offsetHeight:46)/2; }); wfRenderCanvas(); }));
-    card.appendChild(alignGrid);
+    alignBlock.appendChild(alignGrid); body.appendChild(alignBlock);
 
-    const actSec=document.createElement("div"); actSec.className="wf-insp-sec"; actSec.textContent="Thao tác"; card.appendChild(actSec);
+    const actBlock=wfInspBlock("Thao tác");
     const actGrid=document.createElement("div"); actGrid.className="wf-insp-grid";
     const dupBtn=document.createElement("button"); dupBtn.className="btn sm"; dupBtn.textContent="Nhân bản"; dupBtn.title="Ctrl+D"; dupBtn.onclick=()=>wfDuplicate(); actGrid.appendChild(dupBtn);
     const grpBtn=document.createElement("button"); grpBtn.className="btn sm"; grpBtn.textContent="Tạo nhóm"; grpBtn.onclick=()=>wfGroupSelection(); actGrid.appendChild(grpBtn);
     const delBtn=document.createElement("button"); delBtn.className="btn sm err"; delBtn.textContent="Xoá"; delBtn.onclick=()=>wfDeleteSelected(); actGrid.appendChild(delBtn);
-    card.appendChild(actGrid);
+    actBlock.appendChild(actGrid); body.appendChild(actBlock);
 
+    const tipBlock=wfInspBlock();
     const tip=document.createElement("div"); tip.className="wf-insp-tip";
     tip.textContent="Ctrl+click / Shift+click để thêm/bớt chọn. Phím ← → ↑ ↓ di chuyển (Shift = 10px).";
-    card.appendChild(tip);
-    body.appendChild(card);
+    tipBlock.appendChild(tip); body.appendChild(tipBlock);
     return;
   }
 
   const node=wfNode(WF.selectedNode), act=wfCurAct(), fn=wfCurFn();
   if(node){
     const def=WF_NODES[node.type]||{label:node.type,fields:[]};
+    body.appendChild(wfInspId(def.ico||"box", def.label||node.type, node.type));
 
-    // Header card.
-    const hdrCard=document.createElement("div"); hdrCard.className="wf-insp-card";
-    const hdr=document.createElement("div"); hdr.className="wf-insp-hdr";
-    hdr.innerHTML=`<span class="ico">${wfIco(def.ico||"box")}</span><span class="title">${def.label||node.type}</span>`;
-    hdrCard.appendChild(hdr);
-    body.appendChild(hdrCard);
-
-    // Parameters.
-    if(node.type==="call"){ body.appendChild(wfCallPicker(node)); }
-    else if(node.type==="switch" || node.type==="try_chain"){ body.appendChild(wfBranchCountEditor(node)); }
+    const pblock=wfInspBlock("Tham số");
+    if(node.type==="call"){ pblock.appendChild(wfCallPicker(node)); }
+    else if(node.type==="switch" || node.type==="try_chain"){ pblock.appendChild(wfBranchCountEditor(node)); }
     else {
       if(!(def.fields||[]).length){
-        const d=document.createElement("div"); d.className="wf-insp-tip"; d.textContent="Node này không có tham số."; body.appendChild(d);
+        const d=document.createElement("div"); d.className="wf-insp-tip"; d.textContent="Node này không có tham số."; pblock.appendChild(d);
       }
-      (def.fields||[]).forEach(f=>body.appendChild(wfFieldEl(node,f)));
+      (def.fields||[]).forEach(f=>pblock.appendChild(wfFieldEl(node,f)));
     }
+    body.appendChild(pblock);
 
-    // Note & Log cards.
+    if(node.type!=="note" && node.type!=="start") body.appendChild(wfTimingField(node));
     if(node.type!=="note") body.appendChild(wfNoteField(node));
     if(node.type!=="note" && node.type!=="start") body.appendChild(wfLogField(node));
     return;
   }
 
   if(fn){
-    const card=document.createElement("div"); card.className="wf-insp-card";
-    const hdr=document.createElement("div"); hdr.className="wf-insp-hdr";
-    hdr.innerHTML=`<span class="ico">${wfIco("function")}</span><span class="title">ƒ Function</span>`;
-    card.appendChild(hdr);
-    card.appendChild(wfActField("Tên","text",fn.name,v=>{ fn.name=v; wfRenderFunctions(); wfRenderPalette(); $("wf-cur-act").textContent="ƒ "+v; }));
-    const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Xếp node cho function này. Nó dùng được như một node trong mọi hoạt động (kéo từ mục Function)."; card.appendChild(tip);
-    body.appendChild(card);
+    body.appendChild(wfInspId("function","Function","ƒ "+(fn.name||"")));
+    const b=wfInspBlock("Tên function");
+    b.appendChild(wfActField("Tên","text",fn.name,v=>{ fn.name=v; wfRenderFunctions(); wfRenderPalette(); $("wf-cur-act").textContent="ƒ "+v; }));
+    const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Xếp node cho function này. Nó dùng được như một node trong mọi hoạt động (kéo từ mục Function).";
+    b.appendChild(tip);
+    body.appendChild(b);
     return;
   }
 
   if(act){
-    const card=document.createElement("div"); card.className="wf-insp-card";
-    const hdr=document.createElement("div"); hdr.className="wf-insp-hdr";
     const typeLabel=act.type==="background"?"Hoạt động nền":"Hoạt động tuần tự";
-    hdr.innerHTML=`<span class="ico">${wfIco(act.type==="background"?"layers":"play")}</span><span class="title">${typeLabel}</span>`;
-    card.appendChild(hdr);
-    card.appendChild(wfActField("Tên","text",act.name,v=>{ act.name=v; wfRenderActivities(); $("wf-cur-act").textContent=v; }));
-    if(act.type==="background") card.appendChild(wfActField("Chu kỳ (s)","num",act.pollInterval,v=>act.pollInterval=parseFloat(v)||1));
-    else card.appendChild(wfActField("Số lần thử","num",act.maxRetries,v=>act.maxRetries=parseInt(v)||1));
-    card.appendChild(wfVarsSection(act));
-    const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Bấm một node trên canvas để sửa tham số của nó."; card.appendChild(tip);
-    body.appendChild(card);
+    body.appendChild(wfInspId(act.type==="background"?"layers":"play", typeLabel, act.name||""));
+
+    const b=wfInspBlock("Cấu hình");
+    b.appendChild(wfActField("Tên","text",act.name,v=>{ act.name=v; wfRenderActivities(); $("wf-cur-act").textContent=v; }));
+    if(act.type==="background") b.appendChild(wfActField("Chu kỳ (s)","num",act.pollInterval,v=>act.pollInterval=parseFloat(v)||1));
+    else b.appendChild(wfActField("Số lần thử","num",act.maxRetries,v=>act.maxRetries=parseInt(v)||1));
+    body.appendChild(b);
+
+    body.appendChild(wfVarsSection(act));
+
+    const tipBlock=wfInspBlock();
+    const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Bấm một node trên canvas để sửa tham số của nó.";
+    tipBlock.appendChild(tip); body.appendChild(tipBlock);
     return;
   }
   body.innerHTML='<div class="wf-insp-empty">Chưa chọn hoạt động.</div>';
-}
-
-function wfInspHdr(iconName,title,sub){
-  const hdr=document.createElement("div"); hdr.className="wf-insp-hdr";
-  let html=`<span class="ico">${wfIco(iconName)}</span><span class="title">${title}</span>`;
-  if(sub) html+=`<span class="badge">${sub}</span>`;
-  hdr.innerHTML=html;
-  return hdr;
 }
 
 function wfCallPicker(node){
@@ -126,14 +140,51 @@ function wfCallPicker(node){
   row.appendChild(sel); return row;
 }
 
+// Universal per-node timing: a pause before the block runs and a pause after it
+// finishes (before the next block). Stored top-level like note/log, applied by
+// the engine around every block — see src/workflow/engine.py _walk.
+function wfTimingField(node){
+  const b=wfInspBlock("Thời gian chờ");
+  const mk=(key,label,hint)=>{
+    const row=document.createElement("div"); row.className="wf-field";
+    const l=document.createElement("label"); l.textContent=label; l.title=hint; row.appendChild(l);
+    const inp=document.createElement("input"); inp.type="number"; inp.min="0"; inp.step="0.5";
+    inp.value=(node[key]!==undefined&&node[key]!==null&&node[key]!==0)?node[key]:"";
+    inp.placeholder="0";
+    inp.oninput=()=>{ node[key]=parseFloat(inp.value)||0; wfUpdNodeTiming(node); };
+    row.appendChild(inp);
+    const unit=document.createElement("span"); unit.className="hz-unit"; unit.textContent="giây"; row.appendChild(unit);
+    return row;
+  };
+  b.appendChild(mk("delayBefore","Chờ","Chờ bấy nhiêu giây rồi mới chạy block này (vd đợi màn hình ổn định rồi mới tìm ảnh)."));
+  b.appendChild(mk("delayAfter","Đợi","Chạy xong block này rồi đợi thêm bấy nhiêu giây mới sang block kế tiếp."));
+  const hint=document.createElement("div"); hint.className="wf-insp-tip";
+  hint.innerHTML="<b>Chờ</b> X giây = đợi rồi mới chạy block. <b>Đợi</b> X giây = chạy xong rồi mới sang block kế. Giống block “Chờ” nhưng gắn sẵn vào block này.";
+  b.appendChild(hint);
+  return b;
+}
+function wfUpdNodeTiming(node){
+  const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
+  const dp=[];
+  if(node.delayBefore) dp.push(`Chờ ${node.delayBefore}s`);
+  if(node.delayAfter)  dp.push(`Đợi ${node.delayAfter}s`);
+  let n=el.querySelector(".wf-node-delay");
+  if(dp.length){
+    if(!n){ n=document.createElement("div"); n.className="wf-node-delay";
+      const thumb=el.querySelector(".wf-node-thumb,.wf-node-thumbs");
+      if(thumb) el.insertBefore(n, thumb); else el.appendChild(n);
+      el.classList.remove("collapsed"); }
+    n.innerHTML=wfIco("timer")+`<span>${dp.join(" · ")}</span>`;
+  } else if(n){ n.remove(); }
+}
+
 function wfNoteField(node){
-  const card=document.createElement("div"); card.className="wf-insp-card";
-  card.appendChild(wfInspHdr("edit","Ghi chú"));
+  const b=wfInspBlock("Ghi chú");
   const inp=document.createElement("input"); inp.type="text"; inp.className="wf-insp-input";
   inp.placeholder="ghi chú cho node này…"; inp.value=node.note||"";
   inp.oninput=()=>{ node.note=inp.value; wfUpdNodeNote(node); };
-  card.appendChild(inp);
-  return card;
+  b.appendChild(inp);
+  return b;
 }
 function wfUpdNodeNote(node){
   const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
@@ -145,16 +196,15 @@ function wfUpdNodeNote(node){
 }
 
 function wfLogField(node){
-  const card=document.createElement("div"); card.className="wf-insp-card";
-  card.appendChild(wfInspHdr("log","Log khi chạy"));
+  const b=wfInspBlock("Log khi chạy");
   const inp=document.createElement("input"); inp.type="text"; inp.className="wf-insp-input";
   inp.placeholder="tự ghi log mỗi lần chạy node…"; inp.value=node.log||"";
   inp.oninput=()=>{ node.log=inp.value; wfUpdNodeLog(node); };
-  card.appendChild(inp);
+  b.appendChild(inp);
   const hint=document.createElement("div"); hint.className="wf-insp-tip";
-  hint.innerHTML='Có thể chèn biến: <code style="background:var(--alt);padding:1px 4px;border-radius:4px;">{tên_biến}</code>';
-  card.appendChild(hint);
-  return card;
+  hint.innerHTML='Có thể chèn biến: <code>{tên_biến}</code>';
+  b.appendChild(hint);
+  return b;
 }
 function wfUpdNodeLog(node){
   const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
@@ -178,13 +228,12 @@ function wfActField(label,t,val,onset){
 // Per-activity variables.
 function wfVarsSection(act){
   if(!act.vars) act.vars=[];
-  const wrap=document.createElement("div");
-  wrap.appendChild(wfInspHdr("pin","Biến hoạt động", String(act.vars.length)));
-  act.vars.forEach((v,idx)=>wrap.appendChild(wfVarRow(act,v,idx)));
-  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Biến"; add.style.marginTop="4px";
+  const b=wfInspBlock("Biến hoạt động", act.vars.length);
+  act.vars.forEach((v,idx)=>b.appendChild(wfVarRow(act,v,idx)));
+  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Biến"; add.style.alignSelf="flex-start";
   add.onclick=()=>{ const n=act.vars.length+1; act.vars.push({name:"var"+n, label:"Setting "+n, type:"bool", value:false}); wfRenderInspector(); };
-  wrap.appendChild(add);
-  return wrap;
+  b.appendChild(add);
+  return b;
 }
 function wfVarRow(act,v,idx){
   const card=document.createElement("div"); card.className="wf-var-card";

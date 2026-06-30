@@ -11,53 +11,62 @@
 <div id="app">
 
 <div id="toolbar" class="card">
-  <div class="tb-group">
-    <button class="btn ok ico" id="wf-run-btn" onclick="wfToggleRun()" title="Chạy thử"></button>
-    <button class="btn ico" onclick="wfRunGui()" title="Chạy GUI — mở Runner với workflow hiện tại">
-      <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
+  <!-- Left zone: document operations + run-status pill (pinned to the right edge
+       so it sits just beside the centred run controls). -->
+  <div class="tb-zone tb-left">
+    <div class="tb-group">
+      <button class="btn ico" onclick="wfNew()" title="Mới — tạo workflow trống">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
+      <button class="btn ico" onclick="wfImport()" title="Mở… — workflow từ file JSON">
+        <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+      <button class="btn accent ico" id="wf-save-btn" onclick="wfSave()" title="Lưu vào file đang mở (Ctrl+S)">
+        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
+      <button class="btn ico" onclick="wfExport()" title="Lưu thành… — file JSON mới">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+    </div>
+    <!-- Running status pill — reflects whether the workflow engine is executing. -->
+    <div id="wf-run-status" class="wf-run-status" title="Trạng thái chạy">
+      <span class="wf-run-dot"></span>
+      <span class="wf-run-txt">Sẵn sàng</span>
+    </div>
   </div>
-  <span class="tb-divider"></span>
-  <div class="tb-group">
-    <button class="btn ico" onclick="wfNew()" title="Mới — tạo workflow trống">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
-    <button class="btn ico" onclick="wfImport()" title="Mở… — workflow từ file JSON">
-      <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
-    <button class="btn accent ico" id="wf-save-btn" onclick="wfSave()" title="Lưu vào file đang mở (Ctrl+S)">
-      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
-    <button class="btn ico" onclick="wfExport()" title="Lưu thành… — file JSON mới">
-      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+
+  <!-- Center zone: primary run controls — the focal point of the toolbar. -->
+  <div class="tb-zone tb-center">
+    <div class="tb-group tb-run">
+      <button class="btn ok ico" id="wf-run-btn" onclick="wfToggleRun()" title="Chạy thử"></button>
+      <button class="btn ico" onclick="wfRunGui()" title="Chạy GUI — mở Runner với workflow hiện tại">
+        <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
+    </div>
   </div>
-  <span class="tb-divider"></span>
-  <!-- Running status pill — reflects whether the workflow engine is executing. -->
-  <div id="wf-run-status" class="wf-run-status" title="Trạng thái chạy">
-    <span class="wf-run-dot"></span>
-    <span class="wf-run-txt">Sẵn sàng</span>
-  </div>
-  <span class="spacer"></span>
-  <div class="device-wrap" title="Thiết bị đang kết nối">
-    <span id="device-dot"></span>
-    <select id="device-select" onchange="onDeviceChange(this.value)">
-      <option value="">Đang quét…</option>
-    </select>
-    <svg width="10" height="6" viewBox="0 0 12 7" fill="#9aa3ae" style="flex-shrink:0;pointer-events:none;"><path d="M0 0l6 7 6-7z"/></svg>
-  </div>
-  <div class="tb-group">
-    <button class="btn sm ico" onclick="onRefreshDevices()" title="Làm mới — quét lại thiết bị đã kết nối">
-      <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg></button>
-    <button class="btn sm ico" onclick="onScanPorts()" title="Quét cổng — dò mọi cổng giả lập đã biết">
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
-    <button class="btn sm ico" onclick="onRestartAdb()" title="Khởi động lại ADB server">
-      <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
-  </div>
-  <span class="tb-divider"></span>
-  <button class="btn" onclick="openDevHelper()" title="DevScope — chụp/đo region, ảnh lưu thẳng vào templates của workflow hiện tại">
-    <svg width="15" height="15" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.3L3 18l3 3 6.4-6.3a4 4 0 0 0 5.3-5.4l-2.6 2.6-2.5-.4-.4-2.5z"/></svg>DevScope</button>
-  <div class="device-wrap wf-source-wrap" title="Nguồn ảnh dùng cho Chạy thử, screenshot, OCR và khớp mẫu · scrcpy nhanh/headless · ADB screencap ổn định" style="max-width:172px;">
-    <span style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;">Nguồn ảnh</span>
-    <select id="capture-backend" onchange="onCaptureBackendChange(this.value)">
-      <option value="scrcpy">scrcpy (nhanh)</option>
-      <option value="adb">ADB screencap</option>
-    </select>
+
+  <!-- Right zone: device selection + capture tools. -->
+  <div class="tb-zone tb-right">
+    <div class="device-wrap" title="Thiết bị đang kết nối">
+      <span id="device-dot"></span>
+      <select id="device-select" onchange="onDeviceChange(this.value)">
+        <option value="">Đang quét…</option>
+      </select>
+      <svg width="10" height="6" viewBox="0 0 12 7" fill="#9aa3ae" style="flex-shrink:0;pointer-events:none;"><path d="M0 0l6 7 6-7z"/></svg>
+    </div>
+    <div class="tb-group">
+      <button class="btn sm ico" onclick="onRefreshDevices()" title="Làm mới — quét lại thiết bị đã kết nối">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg></button>
+      <button class="btn sm ico" onclick="onScanPorts()" title="Quét cổng — dò mọi cổng giả lập đã biết">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+      <button class="btn sm ico" onclick="onRestartAdb()" title="Khởi động lại ADB server">
+        <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
+    </div>
+    <span class="tb-divider"></span>
+    <button class="btn" onclick="openDevHelper()" title="DevScope — chụp/đo region, ảnh lưu thẳng vào templates của workflow hiện tại">
+      <svg width="15" height="15" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.3L3 18l3 3 6.4-6.3a4 4 0 0 0 5.3-5.4l-2.6 2.6-2.5-.4-.4-2.5z"/></svg>DevScope</button>
+    <div class="device-wrap wf-source-wrap" title="Nguồn ảnh dùng cho Chạy thử, screenshot, OCR và khớp mẫu · scrcpy nhanh/headless · ADB screencap ổn định" style="max-width:172px;">
+      <span style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;">Nguồn ảnh</span>
+      <select id="capture-backend" onchange="onCaptureBackendChange(this.value)">
+        <option value="scrcpy">scrcpy (nhanh)</option>
+        <option value="adb">ADB screencap</option>
+      </select>
+    </div>
   </div>
 </div>
 
@@ -75,12 +84,15 @@
     <div id="wf-bar">
       <input id="wf-name" type="text" placeholder="Tên workflow" value="My Workflow">
       <span class="wf-cur-act" id="wf-cur-act">—</span>
-      <button class="btn sm ico" id="wf-snap-btn" onclick="wfToggleSnap()" title="Bám lưới: Tắt">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></button>
-      <button class="btn sm ico" id="wf-preview-btn" onclick="wfTogglePreview()" title="Preview ảnh: Tắt">
-        <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-      <button class="btn sm ico" id="wf-group-btn" onclick="wfToggleGroupMode()" title="Tạo nhóm: Tắt — bấm rồi kéo để vẽ khung (hoặc chọn vài node trước rồi bấm)">
-        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="4 3"/></svg></button>
+      <!-- Canvas edit toggles, grouped in a segmented tray. -->
+      <span class="wf-tool-tray">
+        <button class="btn sm ico" id="wf-snap-btn" onclick="wfToggleSnap()" title="Bám lưới: Tắt">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></button>
+        <button class="btn sm ico" id="wf-preview-btn" onclick="wfTogglePreview()" title="Preview ảnh: Tắt">
+          <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        <button class="btn sm ico" id="wf-group-btn" onclick="wfToggleGroupMode()" title="Tạo nhóm: Tắt — bấm rồi kéo để vẽ khung (hoặc chọn vài node trước rồi bấm)">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="4 3"/></svg></button>
+      </span>
       <span class="tb-divider"></span>
       <div id="wf-speed-group" class="wf-speed-group" title="Speed hack — tách riêng khỏi Chạy thử">
         <span class="wf-speed-title">Speed hack</span>
@@ -91,15 +103,16 @@
         <input id="wf-speed-pkg" type="text" placeholder="package game" title="Package game để inject speedhack" style="width:150px" onchange="wfSpeedFromUI()">
         <button class="btn sm ico ok" id="wf-speed-run-btn" onclick="wfSpeedRun()" title="Bật speed hack" style="display:none"></button>
       </div>
-      <span class="tb-divider"></span>
+      <span class="spacer"></span>
+      <span class="wf-hint" title="Cuộn chuột = zoom · Kéo = di chuyển khối · Chuột phải = menu (tạo nhóm/sao chép/xoá) hoặc xoá dây (trên dây nối) · Space hoặc chuột giữa = kéo nền">Cuộn = zoom · Kéo = di chuyển · Chuột phải = menu · Space = kéo nền</span>
+      <!-- View controls grouped at the right: zoom + Canvas/Preview switch. -->
       <span class="wf-zoom">
         <button class="btn sm" title="Thu nhỏ">−</button>
         <span id="wf-zoom-lbl" title="Đặt lại 100%">100%</span>
         <button class="btn sm" title="Phóng to">+</button>
         <button class="btn sm ico" title="Vừa khung — hiện toàn bộ block (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/></svg></button>
       </span>
-      <span class="spacer"></span>
-      <span class="wf-hint" title="Cuộn chuột = zoom · Kéo = di chuyển khối · Chuột phải = menu (tạo nhóm/sao chép/xoá) hoặc xoá dây (trên dây nối) · Space hoặc chuột giữa = kéo nền">Cuộn = zoom · Kéo = di chuyển · Chuột phải = menu · Space = kéo nền</span>
+      <span class="tb-divider"></span>
       <div id="wf-view-tabs" class="wf-view-tabs">
         <button class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Canvas (Tab)">Canvas</button>
         <button class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview (Tab)">Preview</button>

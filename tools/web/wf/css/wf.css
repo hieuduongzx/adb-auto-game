@@ -1,4 +1,26 @@
 /* ── Workflow designer (node-graph view) ───────────────────────────────────── */
+/* Toolbar as a 3-zone grid: file ops (left) · run controls (true centre) ·
+   device + capture tools (right). 1fr / auto / 1fr keeps the run cluster pinned
+   to the geometric centre regardless of how wide the side zones grow. */
+#toolbar { display:grid; grid-template-columns:1fr auto 1fr; gap:var(--s4); }
+.tb-zone { display:flex; align-items:center; gap:var(--s2); min-width:0; }
+.tb-left  { justify-self:stretch; gap:var(--s3); }
+.tb-left .wf-run-status { margin-left:auto; }   /* hug the centred run cluster */
+.tb-center{ justify-self:center; gap:var(--s3); }
+.tb-right { justify-self:end; gap:var(--s3); }
+/* Run cluster gets a subtle tray so the centred primary actions read as a unit. */
+.tb-run { gap:5px; padding:3px; border-radius:10px; background:var(--alt); border:1px solid var(--border); }
+.tb-run .btn { height:32px; }
+.tb-run .btn.ico { width:32px; }
+
+/* Segmented tray for the canvas edit toggles (snap / preview / group) on #wf-bar.
+   Buttons read as one unit; borders are suppressed until hover / active. */
+.wf-tool-tray { display:inline-flex; align-items:center; gap:3px; padding:3px;
+  border-radius:9px; background:var(--alt); border:1px solid var(--border); flex-shrink:0; }
+.wf-tool-tray .btn { border-color:transparent; background:transparent; }
+.wf-tool-tray .btn:hover { background:var(--panel); border-color:var(--border2); }
+.wf-tool-tray .btn.on { background:var(--accent-bg); border-color:var(--accent-bd); color:var(--accent); }
+
 #mode-tabs { display:flex; gap:2px; background:var(--alt); border-radius:8px; padding:3px; }
 .mode-btn { padding:5px 14px; border-radius:6px; font-size:12px; font-weight:700; color:var(--dim); transition:background .15s, color .15s; }
 .mode-btn:hover:not(.active) { color:var(--ink); }
@@ -35,7 +57,7 @@
 #workflow-view { flex:1; display:flex; gap:7px; min-height:0; overflow:hidden; }
 
 /* Left sidebar: activities + palette */
-#wf-side { width:212px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
+#wf-side { width:254px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
 /* Drag handle to resize the left sidebar. A wide hit-area with a thin visible spine. */
 #wf-side-resizer { width:7px; flex-shrink:0; cursor:col-resize; position:relative; align-self:stretch; }
 #wf-side-resizer::before { content:""; position:absolute; left:2px; top:0; bottom:0; width:3px; border-radius:3px;
@@ -142,13 +164,13 @@
   cursor:pointer; stroke-linecap:round; }
 /* Default forward flow — thin neutral line that recedes into the background.
     T/F branch wires and the run trail are thicker so they immediately pop. */
-#wf-wires path.wire { fill:none; stroke:#9aaec2; stroke-width:1.25; pointer-events:none;
+#wf-wires path.wire { fill:none; stroke:#94a6ba; stroke-width:1.5; pointer-events:none;
   stroke-linecap:round; stroke-linejoin:round; marker-end:url(#wf-ah);
-  stroke-opacity:0.75; transition:stroke .12s, stroke-width .12s, stroke-opacity .12s; }
+  stroke-opacity:0.85; transition:stroke .12s, stroke-width .12s, stroke-opacity .12s; }
 /* True/False branch wires: bolder and fully opaque — the decision fork is the
    the most information-dense part of the graph and must read first. */
-#wf-wires path.wire.t { stroke:#25a05a; stroke-width:1.6; stroke-opacity:1; marker-end:url(#wf-ah-t); }
-#wf-wires path.wire.f { stroke:#e07428; stroke-width:1.6; stroke-opacity:1; marker-end:url(#wf-ah-f); }
+#wf-wires path.wire.t { stroke:#1f9d57; stroke-width:1.9; stroke-opacity:1; marker-end:url(#wf-ah-t); }
+#wf-wires path.wire.f { stroke:#e0792e; stroke-width:1.9; stroke-opacity:1; marker-end:url(#wf-ah-f); }
 /* Stack wire: structural, not a data flow — very faint dotted rule, no arrowhead. */
 #wf-wires path.wire.stack { stroke:#b8c6d4; stroke-width:1.0; stroke-opacity:0.45;
   stroke-dasharray:2.5 3; marker-end:none; }
@@ -157,15 +179,15 @@
   stroke-dasharray:9 5; marker-end:url(#wf-ah-loop); }
 /* Hover: lift the targeted wire sharply above the crowd — full opacity, accent colour,
    modest weight gain (avoids a thick band that obscures nearby nodes). */
-#wf-wires .wire-grp:hover path.wire { stroke:var(--accent); stroke-width:2.0; stroke-opacity:1;
+#wf-wires .wire-grp:hover path.wire { stroke:var(--accent); stroke-width:2.3; stroke-opacity:1;
   marker-end:url(#wf-ah-temp); }
 #wf-wires .wire-grp:hover { filter:drop-shadow(0 1px 4px rgba(47,111,237,.32)); }
 /* While wiring up a connection, wires ignore the pointer so the drop lands on the
    node underneath rather than being swallowed by a wire's hit-path. */
 #wf-canvas.wf-connecting .wire-hit { pointer-events:none; }
 /* Run trail on wires: the path taken (bright green) vs the skipped branch (faint red). */
-#wf-wires path.wire.took-wire    { stroke:#2fa55a !important; stroke-width:2.1; stroke-opacity:1 !important; marker-end:url(#wf-ah-t) !important; }
-#wf-wires path.wire.nottook-wire { stroke:#cf4b43 !important; stroke-opacity:.38 !important; stroke-width:1.25; marker-end:url(#wf-ah-nottook) !important; }
+#wf-wires path.wire.took-wire    { stroke:#1f9d57 !important; stroke-width:2.4; stroke-opacity:1 !important; marker-end:url(#wf-ah-t) !important; }
+#wf-wires path.wire.nottook-wire { stroke:#d6483f !important; stroke-opacity:.34 !important; stroke-width:1.4; marker-end:url(#wf-ah-nottook) !important; }
 #wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:1.5; stroke-dasharray:6 4;
   stroke-linecap:round; pointer-events:none; marker-end:url(#wf-ah-temp); }
 #wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -298,24 +320,31 @@
   border-radius:var(--node-r); box-shadow:var(--sh-md); user-select:none; }
 .wf-node.sel { border-color:var(--accent); border-top-color:var(--accent);
   box-shadow:0 0 0 2px var(--accent-bd), var(--sh-md); }
-.wf-node.wf-entry::before { content:"▶ mặc định"; position:absolute; bottom:100%; left:50%;
-  transform:translateX(-50%); margin-bottom:3px; font-size:8px; font-weight:800; letter-spacing:.04em;
-  color:var(--accent); background:var(--accent-bg); border:1px solid var(--accent-bd);
-  border-radius:4px; padding:1px 7px; white-space:nowrap; pointer-events:none; }
+/* Entry marker — the block this activity runs first. A solid accent pill with a
+   little downward pointer reads as a flag planted on the starting block, far
+   clearer than the old faint 8px outline label. */
+.wf-node.wf-entry::before { content:"▶ Mặc định"; position:absolute; bottom:100%; left:50%;
+  transform:translateX(-50%); margin-bottom:6px; font-size:9px; font-weight:700; letter-spacing:.02em;
+  color:#fff; background:var(--accent); border:none; border-radius:999px; padding:2px 10px;
+  white-space:nowrap; pointer-events:none; box-shadow:0 2px 7px rgba(47,111,237,.4); z-index:4; }
+.wf-node.wf-entry::after { content:""; position:absolute; bottom:100%; left:50%;
+  transform:translateX(-50%); margin-bottom:2px; width:0; height:0;
+  border:4px solid transparent; border-top-color:var(--accent); pointer-events:none; z-index:4; }
 /* Run trail: a node that finished this run (green = ran ok, red = action failed).
    Defined before .running so the live amber glow still wins on the active node. */
-.wf-node.ran-ok   { border-color:#2fa55a; box-shadow:0 0 0 1px #2fa55a, 0 2px 6px rgba(31,146,84,.18); }
-.wf-node.ran-fail { border-color:#cf4b43; box-shadow:0 0 0 1px #cf4b43, 0 2px 6px rgba(207,75,67,.20); }
+.wf-node.ran-ok   { border-color:#1f9d57; box-shadow:0 0 0 1.5px rgba(31,157,87,.55), 0 2px 7px rgba(31,157,87,.16); }
+.wf-node.ran-fail { border-color:#d6483f; box-shadow:0 0 0 1.5px rgba(214,72,63,.55), 0 2px 7px rgba(214,72,63,.18); }
 /* Reached-but-not blocks: a finished run never entered these (a branch not
    taken). Their top accent bar reds out and the whole block dims, so the path
    that DID run stays the bright green trail and the skipped paths recede. */
 .wf-node.ran-skip { border-top-color:#cf4b43 !important; opacity:.5; }
 /* Structural kinds set their own accent colour. Terminals (start/end/stop) also
    keep a faint header tint so the flow's entry/exit points stand out. */
-.wf-node.start { --node-accent:var(--ok); }
-.wf-node.start .wf-node-hd { background:var(--ok-bg); }
-.wf-node.end, .wf-node.stop { --node-accent:var(--err); }
-.wf-node.end .wf-node-hd, .wf-node.stop .wf-node-hd { background:var(--err-bg); }
+/* Terminals read as bold, unmistakable entry/exit points: start = green,
+   end/stop = red — accent, title and header tint all aligned to one hue so the
+   block's role is obvious without reading the label. */
+.wf-node.start { --node-accent:#16a34a; --ntitle:#15803d; --nhd-bg:#dcfce7; --nhd-bd:#a3e0bb; }
+.wf-node.end, .wf-node.stop { --node-accent:#dc2626; --ntitle:#b42318; --nhd-bg:#fee2e2; --nhd-bd:#f4b8b2; }
 .wf-node.condition { --node-accent:#9a78e6; }
 .wf-node.loop { --node-accent:#e0a64b; }
 .wf-node.call { --node-accent:#7c3aed; }
@@ -370,23 +399,27 @@
   box-shadow:0 0 0 3px rgba(249,115,22,.45), 0 0 18px rgba(249,115,22,.65) !important; animation:wfRun 1s ease-in-out infinite; }
 .wf-node.running .wf-node-hd { background:#ffedd5; border-bottom-color:#fdba74; }
 .wf-node.running .wf-node-title { color:#9a3412; }
-.wf-node-eye { color:var(--muted); line-height:0; padding:2px; border-radius:4px; flex-shrink:0; cursor:pointer; display:flex; align-items:center; }
+/* Preview-toggle eye: stays hidden until you hover the node (keeps the header
+   clean), but remains visible whenever preview is on so the active state shows. */
+.wf-node-eye { color:var(--muted); line-height:0; padding:2px; border-radius:4px; flex-shrink:0;
+  cursor:pointer; display:flex; align-items:center; opacity:0;
+  transition:opacity .12s, color .1s, background .1s; }
+.wf-node:hover .wf-node-eye, .wf-node-eye.on { opacity:1; }
 .wf-node-eye svg { width:13px; height:13px; display:block; }
 .wf-node-eye:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-node-eye.on { color:var(--accent); }
-/* Compact preview band — a subtle inline thumbnail tucked at the bottom of the
-   node. Reduced height + soft checkerboard so it reads as a faint reference,
-   not a loud image block; scale-down never upscales so tiny crops stay crisp. */
-.wf-node-thumb { display:block; width:auto; max-width:120px; height:22px; object-fit:scale-down;
-  margin:3px auto 1px;
-  background:#eef1f5 repeating-conic-gradient(#e2e6ec 0% 25%, transparent 0% 50%) 50%/6px 6px;
-  border:1px solid var(--line); border-radius:4px; padding:1px; opacity:.92; }
-/* Multi-template strip: tight row of small thumbnails, one per OR-image. */
-.wf-node-thumbs { display:flex; flex-wrap:wrap; align-items:center; gap:2px; padding:3px 4px;
-  background:#eef1f5 repeating-conic-gradient(#e2e6ec 0% 25%, transparent 0% 50%) 50%/6px 6px;
-  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); min-height:22px; }
-.wf-node-thumb-sm { width:24px; height:18px; object-fit:scale-down; border:1px solid var(--border);
-  border-radius:3px; background:var(--panel); flex-shrink:0; opacity:.92; }
+/* Image preview — a small square tucked at the LEFT of the body, sitting beside
+   the summary on one row. Roughly body-height so the block barely grows (no tall
+   full-width band opening downward). object-fit:contain shows the whole crop. */
+.wf-node-prevrow { display:flex; align-items:center; gap:7px; padding:2px 9px; }
+.wf-node-prevrow .wf-node-sum { padding:0; flex:1; min-width:0; }
+.wf-node-thumb { flex-shrink:0; width:20px; height:20px; object-fit:contain;
+  background:#fff repeating-conic-gradient(#e6e9ee 0% 25%, transparent 0% 50%) 50%/6px 6px;
+  border:1px solid var(--border2); border-radius:4px; padding:1px; }
+/* Multi-template (OR) preview: a tight row of small squares, one per image. */
+.wf-node-thumbs { flex-shrink:0; display:flex; align-items:center; gap:3px; }
+.wf-node-thumb-sm { width:18px; height:18px; object-fit:contain; border:1px solid var(--border);
+  border-radius:3px; background:#fff repeating-conic-gradient(#e6e9ee 0% 25%, transparent 0% 50%) 50%/5px 5px; flex-shrink:0; }
 /* On hover the node rises above neighbours so the thumbnail is not obscured. */
 .wf-node.has-thumb:hover { z-index:var(--z-node-hover); }
 .wf-tpl-preview { display:block; max-width:100%; max-height:150px; object-fit:contain; margin-top:6px;
@@ -410,15 +443,17 @@
 .wf-node { cursor:grab; }
 .wf-node:active { cursor:grabbing; }
   /* Node header: tinted per-category via --nhd-bg/--nhd-bd CSS vars; default keeps existing light-purple for uncategorised nodes. */
-  .wf-node-hd { display:flex; align-items:center; gap:6px; padding:7px 9px;
+  /* min-height gives body-less (collapsed) blocks real presence and guarantees a
+     header-only block stands as tall as the header of a block that has a body. */
+  .wf-node-hd { display:flex; align-items:center; gap:5px; padding:4px 8px; min-height:30px;
     border-bottom:1px solid var(--nhd-bd,#ece3fb); background:var(--nhd-bg,#f4eefe);
     border-radius:var(--node-r) var(--node-r) 0 0; transition: background .15s, border-bottom-color .15s; }
   .wf-node.collapsed .wf-node-hd { border-bottom:none; border-radius:var(--node-r); }
-.wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:15px; height:15px; }
-.wf-node .ico svg { width:15px; height:15px; display:block; }
+.wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:14px; height:14px; }
+.wf-node .ico svg { width:14px; height:14px; display:block; }
 .wf-node.call .ico { font-style:italic; font-weight:700; }
 /* Node title: driven by --ntitle (set per-category); falls back to purple for structural kinds. */
-.wf-node-title { font-size:11.5px; font-weight:700; color:var(--ntitle,#7c3aed); flex:1; min-width:0;
+.wf-node-title { font-size:11px; font-weight:700; color:var(--ntitle,#7c3aed); flex:1; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Keep the title clear of the top-right "T"/"F" port labels on branch nodes. */
 .wf-node.has-tf .wf-node-title { padding-right:14px; }
@@ -441,8 +476,11 @@
   background:#f3b51a; color:#3a2c05; font-size:10px; font-weight:800; line-height:16px; text-align:center;
   box-shadow:0 1px 3px rgba(20,30,45,.3); z-index:3; cursor:help; }
 .wf-node.has-warn { border-color:#e6a417; }
-.wf-node-sum { font-family:var(--mono); font-size:9.5px; color:var(--muted); padding:5px 9px;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Default per-block summary line (the auto description under the title). Reads as
+   a quiet readable caption — bumped from low-contrast 9.5px mono-muted to a
+   clearer tone/size so the block's gist is legible without squinting. */
+.wf-node-sum { font-family:var(--mono); font-size:10px; color:var(--dim); padding:4px 9px 6px;
+  line-height:1.4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wf-node-note { display:flex; align-items:flex-start; gap:5px; font-size:9.5px; font-style:italic;
   color:var(--muted); background:transparent; border-top:1px solid var(--line);
   border-radius:0 0 var(--node-r) var(--node-r); padding:4px 8px 5px; white-space:normal;
@@ -453,12 +491,22 @@
   border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:4px 9px; white-space:normal; word-break:break-word; }
 .wf-node-log::before { content:""; display:inline-block; width:11px; height:11px; vertical-align:-1px; margin-right:4px; background:currentColor; -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; }
 
-/* Ports */
-.wf-port { position:absolute; width:13px; height:13px; border-radius:50%; background:var(--panel);
-  border:2px solid var(--muted); cursor:crosshair; z-index:2; }
-.wf-port:hover { border-color:var(--accent); background:var(--accent-bg); }
+/* Timing indicator: pause before / after this block (delayBefore / delayAfter). */
+.wf-node-delay { display:flex; align-items:center; gap:4px; font-size:9.5px; font-weight:600;
+  color:var(--warn); background:var(--warn-bg); border-top:1px solid var(--line);
+  padding:3px 8px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wf-node-delay svg { width:10px; height:10px; flex-shrink:0; opacity:.7; }
+
+/* Ports — directional by fill: OUTPUT is a solid dot tinted with the node's
+   category accent (a "source"); INPUT is a hollow grey ring (a "socket"). The
+   two ends reading differently makes flow direction obvious at a glance. */
+.wf-port { position:absolute; width:12px; height:12px; border-radius:50%; background:var(--panel);
+  border:2px solid #aab6c4; cursor:crosshair; z-index:2;
+  transition:border-color .12s, background .12s, transform .12s; }
+.wf-port:hover { border-color:var(--accent); transform:scale(1.25); }
 .wf-port.in  { left:-7px; top:9px; }
-.wf-port.out { right:-7px; }
+.wf-port.in:hover { background:var(--accent-bg); }
+.wf-port.out { right:-7px; background:var(--node-accent,#8597ab); border-color:var(--node-accent,#8597ab); }
 /* A loop's second input — the 'lặp' (loop-back) port — is amber-ringed so it
    reads as the place a block wires back to, distinct from the plain 'vào' entry. */
 .wf-port.in.loop { border-color:#e0a64b; background:#fff7ea; }
@@ -469,11 +517,14 @@
    right-side output labels), so 'vào' / 'lặp' don't collide with node content. */
 .wf-port-lbl.in { right:auto; left:-34px; width:28px; text-align:right; }
 .wf-port-lbl.in.loop { color:#c2841f; }
-.wf-port.out.t { border-color:#2fa55a; } .wf-port.out.f { border-color:#e07428; }
+/* True/False outputs: solid green / orange dots so the decision fork's two exits
+   are colour-coded the same as their branch wires. */
+.wf-port.out.t { border-color:#1f9d57; background:#1f9d57; }
+.wf-port.out.f { border-color:#e0792e; background:#e0792e; }
 /* Run trail on ports: the output taken this run (filled green) vs the skipped
    true/false sibling (filled red). */
-.wf-port.out.took    { border-color:#2fa55a; background:#2fa55a; }
-.wf-port.out.nottook { border-color:#cf4b43; background:#cf4b43; }
+.wf-port.out.took    { border-color:#1f9d57; background:#1f9d57; }
+.wf-port.out.nottook { border-color:#d6483f; background:#d6483f; }
 
 /* Right inspector */
 #wf-inspector { width:280px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
@@ -481,27 +532,42 @@
 #wf-insp-resizer::before { content:""; position:absolute; right:2px; top:0; bottom:0; width:3px; border-radius:3px;
   background:transparent; transition:background .12s; }
 #wf-insp-resizer:hover::before, #wf-insp-resizer.drag::before { background:var(--accent); }
-#wf-insp-body { flex:1; min-height:0; overflow-y:auto; padding:4px 12px 12px; display:flex; flex-direction:column; gap:8px; }
-.wf-insp-empty { font-size:11.5px; color:var(--muted); line-height:1.6; padding-top:6px; }
+#wf-insp-body { flex:1; min-height:0; overflow-y:auto; padding:0; display:flex; flex-direction:column; gap:0; }
+.wf-insp-empty { font-size:11.5px; color:var(--muted); line-height:1.6; padding:16px 12px; }
+
+/* ── Inspector 3.0 — flat, sectioned layout (no nested cards) ────────────────
+   A sticky identity header names the selection; flat blocks separated by
+   hairlines group parameters / note / log. Repeated list items (templates /
+   vars / cases) keep their own light containers — that nesting is structural,
+   not decorative. */
+.wf-insp-id { position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:9px;
+  padding:10px 12px; background:var(--panel); border-bottom:1px solid var(--border); }
+.wf-insp-id .ic { width:30px; height:30px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  border-radius:8px; background:var(--accent-bg); border:1px solid var(--accent-bd); color:var(--accent); }
+.wf-insp-id .ic svg { width:16px; height:16px; }
+.wf-insp-id .meta { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.wf-insp-id .title { font-size:13px; font-weight:700; color:var(--ink); line-height:1.25;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wf-insp-id .sub { font-family:var(--mono); font-size:10px; color:var(--muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wf-insp-id .count { flex-shrink:0; font-family:var(--mono); font-size:10px; font-weight:700; color:var(--accent);
+  background:var(--accent-bg); border:1px solid var(--accent-bd); border-radius:999px; padding:2px 9px; }
+
+.wf-insp-block { display:flex; flex-direction:column; gap:7px; padding:11px 12px; }
+.wf-insp-block + .wf-insp-block { border-top:1px solid var(--line); }
+.wf-insp-sec { display:flex; align-items:center; gap:6px; margin:0;
+  font-size:10px; font-weight:700; letter-spacing:.06em; color:var(--muted); text-transform:uppercase; }
+.wf-insp-sec .sec-count { letter-spacing:0; font-family:var(--mono); font-size:9.5px; font-weight:600;
+  color:var(--muted); background:var(--alt); border-radius:999px; padding:1px 6px; }
+.wf-insp-tip { font-size:10.5px; color:var(--muted); line-height:1.55; }
+.wf-insp-tip code { background:var(--alt); padding:1px 4px; border-radius:4px; font-size:10px; font-family:var(--mono); }
+.wf-insp-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+
+/* Field row — single canonical definition (was duplicated). */
 .wf-field { display:flex; align-items:center; gap:6px; }
 .wf-field > label { font-size:10.5px; color:var(--dim); font-weight:600; min-width:58px; flex-shrink:0; }
-.wf-field > input[type=text], .wf-field > input[type=number] { flex:1; min-width:0; }
-.wf-field .cb { width:17px; height:17px; border-radius:5px; border:1.5px solid #cfd5dd; background:var(--panel);
-  display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
-.wf-field .cb.checked { background:var(--accent); border-color:var(--accent); }
-.wf-field .cb svg { opacity:0; } .wf-field .cb.checked svg { opacity:1; }
-.wf-insp-sec { font-size:10px; font-weight:700; letter-spacing:.05em; color:var(--muted); text-transform:uppercase; margin-top:4px; }
-/* Inspector 2.0 — tighter, card-based sections that read as distinct groups. */
-.wf-insp-card { border:1px solid var(--border2); border-radius:8px; padding:8px; background:var(--surface); display:flex; flex-direction:column; gap:6px; }
-.wf-insp-hdr { display:flex; align-items:center; gap:6px; }
-.wf-insp-hdr .ico { color:var(--accent); }
-.wf-insp-hdr .title { font-size:12px; font-weight:700; color:var(--ink); }
-.wf-insp-hdr .badge { font-size:9px; font-weight:700; color:var(--muted); background:var(--alt); border-radius:999px; padding:1px 6px; text-transform:none; letter-spacing:0; }
-.wf-insp-tip { font-size:10.5px; color:var(--muted); line-height:1.55; }
-.wf-insp-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
-.wf-field { display:flex; align-items:center; gap:5px; }
-.wf-field > label { font-size:10.5px; color:var(--dim); font-weight:600; min-width:58px; flex-shrink:0; }
-.wf-field > input[type=text], .wf-field > input[type=number], .wf-field > select { flex:1; min-width:0; font-size:11px; padding:5px 7px; border-radius:var(--r-sm); }
+.wf-field > input[type=text], .wf-field > input[type=number], .wf-field > select {
+  flex:1; min-width:0; font-size:11px; padding:5px 7px; border-radius:var(--r-sm); }
 .wf-field .cb { width:17px; height:17px; border-radius:5px; border:1.5px solid #cfd5dd; background:var(--panel);
   display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
 .wf-field .cb.checked { background:var(--accent); border-color:var(--accent); }

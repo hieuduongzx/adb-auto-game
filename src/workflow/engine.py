@@ -521,6 +521,13 @@ class WorkflowEngine:
             kind = spec.get("kind") if spec else None
             params = node.get("params", {}) or {}
 
+            # Universal pre-block pause ("Chờ trước"): wait, THEN run the block
+            # (e.g. let the screen settle before searching for an image). The
+            # legacy single `delay` param is read here as delayBefore.
+            db = self._delay_val(node, "delayBefore", params)
+            if db > 0:
+                self._sleep(db)
+
             if kind == "stop":
                 log_info("[workflow] Dừng theo node Stop")
                 self._emit("on_node_done", nid, "ok", None)
@@ -682,6 +689,13 @@ class WorkflowEngine:
                 if self._try_chain_mode and not ok_act:
                     break
                 cur = self._next(adj, cur, "out")
+
+            # Universal post-block pause ("Chờ sau"): block done → wait → then on
+            # to the next block. Skipped on branches that `break` above (end /
+            # stop / parallel / join / try_chain), which already terminate here.
+            da = self._delay_val(node, "delayAfter", params)
+            if da > 0 and cur and not self._stop.is_set():
+                self._sleep(da)
         return True
 
     def _run_parallel(self, nodes, adj, node_id, depth):
@@ -917,7 +931,6 @@ class WorkflowEngine:
             if hit:
                 self._last_pos = hit
                 log_info(f"[workflow] 🔍 thấy ảnh ({hit[0]}, {hit[1]})")
-                self._sleep(float(params.get("delay", 0)))  # wait after seeing, before continuing
             return hit is not None
         if ntype == "tap_image_any":
             templates = self._templates_list(params)
@@ -928,7 +941,6 @@ class WorkflowEngine:
             if not hit:
                 return False  # no match — false branch fires; no log (tap-miss is expected)
             self._last_pos = hit
-            self._sleep(float(params.get("delay", 0)))  # wait after seeing, before tap
             return self._tap_at(hit[0], hit[1], params, label="ảnh")
         if ntype == "tap_image":
             # Find (with timeout), remember position, optionally wait, then tap.
@@ -941,7 +953,6 @@ class WorkflowEngine:
             if not res:
                 return False  # not found — false branch fires; no log (tap-miss is expected)
             self._last_pos = (res[0], res[1])
-            self._sleep(float(params.get("delay", 0)))  # wait after seeing, before tap
             return self._tap_at(res[0], res[1], params, label=os.path.basename(tpl))
         if ntype == "wait_image":
             tpl = self._resolve_template(params.get("template", ""))
@@ -953,7 +964,6 @@ class WorkflowEngine:
             if res:
                 self._last_pos = (res[0], res[1])
                 log_info(f"[workflow] 🔍 thấy ảnh {os.path.basename(tpl)} ({res[0]}, {res[1]})")
-                self._sleep(float(params.get("delay", 0)))  # wait after seeing, before continuing
             return res is not None
         if ntype == "wait_text":
             return bool(self.auto.wait_for_text_in_region(
@@ -1285,6 +1295,18 @@ class WorkflowEngine:
             mgr.detach()
         except Exception as e:
             log_warning(f"[speedhack] lỗi khi tắt: {e}")
+
+    def _delay_val(self, node: Dict, key: str, params: Dict) -> float:
+        """Per-node pause (seconds) for delayBefore / delayAfter. Falls back to
+        the legacy single ``delay`` param (read as delayBefore) so workflows
+        saved before the split keep working without a rewrite."""
+        v = node.get(key)
+        if v is None and key == "delayBefore":
+            v = params.get("delay")
+        try:
+            return max(0.0, float(v or 0))
+        except (TypeError, ValueError):
+            return 0.0
 
     def _sleep(self, seconds: float) -> None:
         """Pause-aware, stop-aware sleep."""

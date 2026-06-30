@@ -25,8 +25,8 @@ const WF_WIRE_DEFS = (function(){
   // Elongated filled chevron: 8×7.5 in userspace, notch at 22% depth.
   // refX=8 aligns the sharp tip exactly to the path endpoint.
   const mk=(id,c)=>`<marker id="${id}" markerWidth="7" markerHeight="7" refX="5.6" refY="2.6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0.4 L5.6,2.6 L0,4.8 L1.3,2.6 Z" fill="${c}" fill-opacity="0.95"/></marker>`;
-  return "<defs>"+mk("wf-ah","#9aaec2")+mk("wf-ah-h","#bb3a33")+mk("wf-ah-t","#25a05a")
-    +mk("wf-ah-f","#e07428")+mk("wf-ah-nottook","#cf4b43")+mk("wf-ah-loop","#d09030")+mk("wf-ah-temp","#2f6fed")+"</defs>";
+  return "<defs>"+mk("wf-ah","#94a6ba")+mk("wf-ah-h","#bb3a33")+mk("wf-ah-t","#1f9d57")
+    +mk("wf-ah-f","#e0792e")+mk("wf-ah-nottook","#d6483f")+mk("wf-ah-loop","#d09030")+mk("wf-ah-temp","#2f6fed")+"</defs>";
 })();
 // ── Wire routing ──────────────────────────────────────────────────────────────
 // Three regimes ordered by a single invariant:
@@ -65,11 +65,11 @@ function wfBezier(a,b){
   }
 
   // ── Forward S-curve ─────────────────────────────────────────────────────────
-  // hx is capped at dx/2 (hard invariant: prevents crossing = prevents spirals).
-  // Below that cap it scales with dx + a small ady contribution so the wire
-  // exits horizontally even when the target is far below/above.
-  const preferred=dx * 0.46 + ady * 0.06;
-  const hx=Math.min(dx / 2, Math.min(170, Math.max(dx * 0.28, preferred)));
+  // A firmer, symmetric S that reads like pro node editors: each end leaves/arrives
+  // dead-horizontal ("cứng" — stiff), then eases through the middle ("mềm" — soft).
+  // hx stays ≤ dx/2 (hard invariant: prevents the control points crossing = no
+  // spiral) and is capped so far-apart nodes don't sweep into a loose, lazy arc.
+  const hx=Math.min(dx / 2, 150);
   return `M${a.x},${a.y} C${a.x+hx},${a.y} ${b.x-hx},${b.y} ${b.x},${b.y}`;
 }
 function wfDrawWires(){

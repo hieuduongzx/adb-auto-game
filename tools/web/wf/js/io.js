@@ -1,7 +1,7 @@
 // ── Export / import / run ────────────────────────────────────────────────────
 function wfCleanGraph(g){
   return {
-    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.showPreview) o.showPreview=true; if(n.stack) o.stack=n.stack; return o; }),
+    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.delayBefore) o.delayBefore=n.delayBefore; if(n.delayAfter) o.delayAfter=n.delayAfter; if(n.showPreview) o.showPreview=true; if(n.stack) o.stack=n.stack; return o; }),
     edges:(g.edges||[]).map(e=>{ const o={from:e.from,fromPort:e.fromPort,to:e.to}; if(e.toPort&&e.toPort!=="in") o.toPort=e.toPort; return o; }),
     groups:(g.groups||[]).map(gr=>({id:gr.id,name:gr.name,x:Math.round(gr.x),y:Math.round(gr.y),w:Math.round(gr.w),h:Math.round(gr.h),color:gr.color||0})),
   };
@@ -24,7 +24,17 @@ function wfSerialize(){
 }
 function wfHydrateGraph(g){
   g=g||{nodes:[],edges:[]};
-  let nodes=(g.nodes||[]).map(n=>({id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params:n.params||wfDefaults(n.type),note:n.note||"",log:n.log||"",showPreview:!!n.showPreview,stack:n.stack||null}));
+  let nodes=(g.nodes||[]).map(n=>{
+    const params=n.params||wfDefaults(n.type);
+    // Migrate the legacy single `delay` (find-then-wait) → delayBefore
+    // (wait-then-find), then drop it so it doesn't linger in params.
+    let delayBefore=n.delayBefore;
+    if(delayBefore===undefined && params && params.delay!==undefined) delayBefore=params.delay;
+    if(params && params.delay!==undefined) delete params.delay;
+    return {id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params,note:n.note||"",log:n.log||"",
+      delayBefore:parseFloat(delayBefore)||0, delayAfter:parseFloat(n.delayAfter)||0,
+      showPreview:!!n.showPreview,stack:n.stack||null};
+  });
   if(!nodes.some(n=>n.type==="start")) nodes.unshift({id:wfUid(),type:"start",x:40,y:40,params:{}});
   const groups=(g.groups||[]).map(gr=>({id:gr.id||("g"+wfUid().slice(1)),name:gr.name||"Nhóm",x:gr.x||0,y:gr.y||0,w:gr.w||200,h:gr.h||140,color:gr.color||0}));
   return { nodes, edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort||"out",to:e.to,toPort:e.toPort||"in"})), groups };

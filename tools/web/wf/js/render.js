@@ -413,7 +413,7 @@ function wfNodeEl(n){
     if(intIn) el.classList.add("wf-stk-jtop"); if(intOut) el.classList.add("wf-stk-jbot"); }
   // A call node shows the referenced function's name as its title.
   let title=def.label, sum="";
-  if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?("ƒ "+fn.name):"ƒ (thiếu)"; }
+  if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?fn.name:"(chưa chọn function)"; }
   else { try{ sum=def.sum?def.sum(n.params):""; }catch{} }
   const tplField = wfTplField(n.type);
   const isTpls = tplField && tplField.t==="tpls";
@@ -422,14 +422,21 @@ function wfNodeEl(n){
   const eyeBtn = hasTpl ? `<button class="wf-node-eye${n.showPreview?" on":""}" title="Xem trước ảnh (block này)">${wfIco("eye")}</button>` : "";
   const noteHtml = n.note ? `<div class="wf-node-note">${wfIco("edit")}<span>${escHtml(n.note)}</span></div>` : "";
   const logHtml = n.log ? `<div class="wf-node-log">${escHtml(n.log)}</div>` : "";
+  const dp=[];
+  if(n.delayBefore) dp.push(`Chờ ${n.delayBefore}s`);
+  if(n.delayAfter)  dp.push(`Đợi ${n.delayAfter}s`);
+  const delayHtml = dp.length ? `<div class="wf-node-delay">${wfIco("timer")}<span>${dp.join(" · ")}</span></div>` : "";
   // tpls → a strip of small thumbnails (one per listed image); single tpl → one.
   const thumbHtml = showThumb ? (isTpls
     ? `<div class="wf-node-thumbs"></div>`
     : `<img class="wf-node-thumb">`) : "";
+  const sumHtml = sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"";
+  // Preview is a small square at the left of the body, on one row with the summary.
+  const topRow = thumbHtml ? `<div class="wf-node-prevrow">${thumbHtml}${sumHtml}</div>` : sumHtml;
   el.innerHTML=
     `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span>${eyeBtn}<span class="wf-node-title">${escHtml(title)}</span></div>`+
-    (sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"")+noteHtml+logHtml+thumbHtml;
-  if(!sum && !n.note && !n.log && !thumbHtml) el.classList.add("collapsed");
+    topRow+delayHtml+noteHtml+logHtml;
+  if(!sum && !n.note && !n.log && !delayHtml && !thumbHtml) el.classList.add("collapsed");
   if(thumbHtml){
     el.classList.add("has-thumb");
     if(isTpls){
