@@ -293,7 +293,7 @@ function wfFieldEl(node,f){
     sel.onchange=()=>{ node.params[f.k]=sel.value; wfUpdNodeSum(node); };
     row.appendChild(sel); return row;
   }
-  if(f.t==="tpls") return wfTplsField(node,f,row);
+  if(f.t==="tpls") return wfTplsField(node,f);
 
   // Variable-picker text field backed by datalist.
   if(f.var && f.t!=="num"){
@@ -321,19 +321,22 @@ function wfFieldEl(node,f){
   if(f.t==="tpl"){
     inp.style.fontSize="10px";
     const btn=document.createElement("button"); btn.className="btn sm"; btn.textContent="Chọn…";
-    row.appendChild(btn);
-    const wrap=document.createElement("div"); wrap.appendChild(row);
-    const img=document.createElement("img"); img.className="wf-tpl-preview"; wrap.appendChild(img);
-    wfLoadThumb(img, node.params[f.k]);
-      const refresh=v=>{ node.params[f.k]=v; wfUpdNodeSum(node); wfLoadThumb(img,v); wfUpdNodePreview(node); wfRenderCanvas(); };
+    const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img, node.params[f.k]);
+    row.appendChild(btn); row.appendChild(img);   // thumb beside the picker button
+    const refresh=v=>{ node.params[f.k]=v; wfUpdNodeSum(node); wfLoadThumb(img,v); wfUpdNodePreview(node); wfRenderCanvas(); };
     inp.oninput=()=>refresh(inp.value);
     btn.onclick=async()=>{ const p=await api().pick_template(); if(p){ inp.value=p; refresh(p); } };
-    return wrap;
+    return row;
   }
   return row;
 }
 
 function wfTplsField(node,f,row){
+  // The multi-template list is a vertical stack — it needs full width, so wrap
+  // it in a .wf-field.full block (label on top) instead of the default
+  // label+control row which squeezes the list to the right of the label.
+  const wrap=document.createElement("div"); wrap.className="wf-field full";
+  const lab=document.createElement("label"); lab.textContent=f.lbl||f.k; lab.title=f.k; wrap.appendChild(lab);
   const arr=()=> Array.isArray(node.params[f.k])?node.params[f.k]:(node.params[f.k]=[]);
   const list=document.createElement("div"); list.className="wf-tpls-list";
   function renderList(){
@@ -350,16 +353,16 @@ function wfTplsField(node,f,row){
       inp.oninput=()=>commit(inp.value);
       pick.onclick=async()=>{ const pp=await api().pick_template(); if(pp){ inp.value=pp; commit(pp); } };
       del.onclick=()=>{ arr().splice(idx,1); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
-      r.appendChild(num); r.appendChild(inp); r.appendChild(pick); r.appendChild(del);
-      item.appendChild(r); item.appendChild(img); list.appendChild(item);
+      r.appendChild(num); r.appendChild(inp); r.appendChild(pick); r.appendChild(del); r.appendChild(img);
+      item.appendChild(r); list.appendChild(item);
     });
     if(!arr().length){ const e=document.createElement("div"); e.className="wf-tpls-empty"; e.textContent="Chưa có ảnh — thêm ít nhất 2 để dùng \"hoặc\"."; list.appendChild(e); }
   }
   renderList();
   const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Ảnh";
   add.onclick=async()=>{ const pp=await api().pick_template(); arr().push(pp||""); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
-  row.appendChild(list); row.appendChild(add);
-  return row;
+  wrap.appendChild(list); wrap.appendChild(add);
+  return wrap;
 }
 
 function wfRegionField(node,f){

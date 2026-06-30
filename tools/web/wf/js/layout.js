@@ -130,9 +130,62 @@ function wfAutoLayout(kind){
   else if(kind==="horizontal") wfLayoutHorizontal(g);
   else if(kind==="tree")  wfLayoutTree(g);
   else if(kind==="compact") wfLayoutCompact(g);
+  else if(kind==="zigzag") wfLayoutZigzag(g);
+  else if(kind==="radial") wfLayoutRadial(g);
   wfRenderCanvas();
   wfFit();
   setStatus("Đã sắp xếp: "+kind);
+}
+// Layout menu — toggle open/closed; click outside to close (wired in wfInitCanvas).
+function wfToggleLayoutMenu(e){
+  if(e) e.stopPropagation();
+  const bar=document.getElementById("wf-layout-bar");
+  if(bar) bar.classList.toggle("open");
+}
+function wfCloseLayoutMenu(){
+  const bar=document.getElementById("wf-layout-bar");
+  if(bar) bar.classList.remove("open");
+}
+// Layout: zigzag — vertical columns that alternate left/right per layer, so a
+// long sequential flow reads as a boustrophedon (snake) instead of one tall tower.
+function wfLayoutZigzag(g){
+  const layers=wfTopoLayers(g);
+  let y=40;
+  const cw=WF_LAY_NODE_W;
+  layers.forEach((layer,i)=>{
+    // Odd layers sit one column to the right; even to the left, giving the snake.
+    const xBase=40 + (i%2?cw+WF_LAY_GAP_X:0);
+    let x=xBase, rowMaxH=0;
+    layer.forEach(id=>{
+      const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
+      n.x=x; n.y=y;
+      const h=wfNodeH(n); if(h>rowMaxH) rowMaxH=h;
+      x+=wfNodeW(n)+20;
+    });
+    y+=rowMaxH+28;
+  });
+}
+// Layout: radial — start node at the centre, each topo layer on a ring whose
+// radius grows with depth. Nice for hub-and-spoke graphs (many branches).
+function wfLayoutRadial(g){
+  const layers=wfTopoLayers(g);
+  const cx=400, cy=350;
+  const ringGap=210;
+  layers.forEach((layer,depth)=>{
+    if(!depth){ // centre
+      layer.forEach(id=>{ const n=g.nodes.find(n=>n.id===id); if(n&&n.type!=="note"){ n.x=cx-wfNodeW(n)/2; n.y=cy-20; } });
+      return;
+    }
+    const r=depth*ringGap;
+    const step=layer.length;
+    layer.forEach((id,i)=>{
+      const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
+      // spread the ring evenly; offset so depth-1 starts at top.
+      const ang=(i/Math.max(1,step))*Math.PI*2 - Math.PI/2;
+      n.x=cx + Math.cos(ang)*r - wfNodeW(n)/2;
+      n.y=cy + Math.sin(ang)*r - 15;
+    });
+  });
 }
 let wfGesture=null;     // {mode:'pan'|'move'|'connect', ...}
 let wfPaletteDrag=null; // node type being dragged from palette

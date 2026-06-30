@@ -11,6 +11,29 @@
 <div id="app">
 
 <div id="toolbar" class="card">
+  <div class="tb-group">
+    <button class="btn ok ico" id="wf-run-btn" onclick="wfToggleRun()" title="Chạy thử"></button>
+    <button class="btn ico" onclick="wfRunGui()" title="Chạy GUI — mở Runner với workflow hiện tại">
+      <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
+  </div>
+  <span class="tb-divider"></span>
+  <div class="tb-group">
+    <button class="btn ico" onclick="wfNew()" title="Mới — tạo workflow trống">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
+    <button class="btn ico" onclick="wfImport()" title="Mở… — workflow từ file JSON">
+      <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+    <button class="btn accent ico" id="wf-save-btn" onclick="wfSave()" title="Lưu vào file đang mở (Ctrl+S)">
+      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
+    <button class="btn ico" onclick="wfExport()" title="Lưu thành… — file JSON mới">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+  </div>
+  <span class="tb-divider"></span>
+  <!-- Running status pill — reflects whether the workflow engine is executing. -->
+  <div id="wf-run-status" class="wf-run-status" title="Trạng thái chạy">
+    <span class="wf-run-dot"></span>
+    <span class="wf-run-txt">Sẵn sàng</span>
+  </div>
+  <span class="spacer"></span>
   <div class="device-wrap" title="Thiết bị đang kết nối">
     <span id="device-dot"></span>
     <select id="device-select" onchange="onDeviceChange(this.value)">
@@ -24,34 +47,17 @@
     <button class="btn sm ico" onclick="onScanPorts()" title="Quét cổng — dò mọi cổng giả lập đã biết">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
     <button class="btn sm ico" onclick="onRestartAdb()" title="Khởi động lại ADB server">
-      <svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg></button>
+      <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
   </div>
   <span class="tb-divider"></span>
   <button class="btn" onclick="openDevHelper()" title="DevScope — chụp/đo region, ảnh lưu thẳng vào templates của workflow hiện tại">
     <svg width="15" height="15" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.3L3 18l3 3 6.4-6.3a4 4 0 0 0 5.3-5.4l-2.6 2.6-2.5-.4-.4-2.5z"/></svg>DevScope</button>
-  <div class="device-wrap" title="Nguồn ảnh dùng cho Chạy thử, screenshot, OCR và khớp mẫu · scrcpy nhanh/headless · ADB screencap ổn định" style="max-width:172px;">
+  <div class="device-wrap wf-source-wrap" title="Nguồn ảnh dùng cho Chạy thử, screenshot, OCR và khớp mẫu · scrcpy nhanh/headless · ADB screencap ổn định" style="max-width:172px;">
     <span style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;">Nguồn ảnh</span>
     <select id="capture-backend" onchange="onCaptureBackendChange(this.value)">
       <option value="scrcpy">scrcpy (nhanh)</option>
       <option value="adb">ADB screencap</option>
     </select>
-  </div>
-  <span class="spacer"></span>
-  <div class="tb-group">
-    <button class="btn ico" onclick="wfNew()" title="Mới — tạo workflow trống">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
-    <button class="btn ico" onclick="wfImport()" title="Mở… — workflow từ file JSON">
-      <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
-    <button class="btn accent ico" id="wf-save-btn" onclick="wfSave()" title="Lưu vào file đang mở (Ctrl+S)">
-      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
-    <button class="btn ico" onclick="wfExport()" title="Lưu thành… — file JSON mới">
-      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
-  </div>
-  <span class="tb-divider"></span>
-  <div class="tb-group">
-    <button class="btn ok ico" id="wf-run-btn" onclick="wfToggleRun()" title="Chạy thử"></button>
-    <button class="btn ico" onclick="wfRunGui()" title="Chạy GUI — mở Runner với workflow hiện tại">
-      <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
   </div>
 </div>
 
@@ -87,19 +93,41 @@
       </div>
       <span class="tb-divider"></span>
       <span class="wf-zoom">
-        <button class="btn sm" onclick="wfZoomBy(1/1.1)" title="Thu nhỏ">−</button>
-        <span id="wf-zoom-lbl" onclick="wfZoomReset()" title="Đặt lại 100%">100%</span>
-        <button class="btn sm" onclick="wfZoomBy(1.1)" title="Phóng to">+</button>
-        <button class="btn sm ico" onclick="wfFit()" title="Vừa khung — hiện toàn bộ block (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/></svg></button>
+        <button class="btn sm" title="Thu nhỏ">−</button>
+        <span id="wf-zoom-lbl" title="Đặt lại 100%">100%</span>
+        <button class="btn sm" title="Phóng to">+</button>
+        <button class="btn sm ico" title="Vừa khung — hiện toàn bộ block (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/></svg></button>
       </span>
       <span class="spacer"></span>
       <span class="wf-hint" title="Cuộn chuột = zoom · Kéo = di chuyển khối · Chuột phải = menu (tạo nhóm/sao chép/xoá) hoặc xoá dây (trên dây nối) · Space hoặc chuột giữa = kéo nền">Cuộn = zoom · Kéo = di chuyển · Chuột phải = menu · Space = kéo nền</span>
+      <div id="wf-view-tabs" class="wf-view-tabs">
+        <button class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Canvas (Tab)">Canvas</button>
+        <button class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview (Tab)">Preview</button>
+      </div>
     </div>
     <div id="wf-canvas">
       <div id="wf-world">
         <svg id="wf-wires"></svg>
       </div>
       <div id="wf-canvas-empty" class="wf-empty-note">Chọn hoặc thêm một hoạt động để mở canvas.</div>
+      <!-- Live device mirror — only captures while this tab is active (scope-like). -->
+      <div id="wf-preview-pane" class="wf-preview-pane" style="display:none">
+        <div class="wf-pv-bar">
+          <button class="btn sm" id="wf-pv-capture" title="Chụp một khung">Chụp</button>
+          <button class="pill-wrap" id="wf-pv-auto" title="Tự động làm mới">
+            <span class="wf-pv-cb on"><span class="wf-pv-thumb"></span></span>
+            <span class="pill-label">Tự động</span>
+          </button>
+          <div class="hz-wrap">
+            <input id="wf-pv-hz" type="number" min="0.2" max="30" step="0.5" value="10" title="Tần số làm mới (Hz)">
+            <span class="hz-unit">Hz</span>
+          </div>
+          <span class="spacer"></span>
+          <span id="wf-pv-res" class="wf-pv-res"></span>
+          <span id="wf-pv-hint" class="wf-pv-hint">bấm vào ảnh để chạm thiết bị</span>
+        </div>
+        <div id="wf-pv-wrap"><canvas id="wf-pv-canvas"></canvas></div>
+      </div>
       <div id="wf-vars-panel" class="wf-vars-panel">
         <div class="wf-vars-hdr" onclick="wfToggleVarsPanel(event)">
           <span class="wf-vars-title">Biến</span>
@@ -126,30 +154,306 @@
             <button class="wf-act-hdr-add" id="wf-act-add" title="Thêm hoạt động">+</button>
           </div>
           <div class="wf-act-tab-row">
-            <button class="wf-act-tab sel" data-tab="acts" id="wf-tab-acts">Hoạt động <span class="side-count" id="wf-act-count"></span></button>
+            <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequent <span class="side-count" id="wf-act-count"></span></button>
+            <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
             <button class="wf-act-tab" data-tab="fns" id="wf-tab-fns">Function <span class="side-count" id="wf-fn-count"></span></button>
           </div>
         </div>
         <div class="wf-act-panel-body">
           <div id="wf-activities" class="wf-act-list"></div>
+          <div id="wf-activities-bg" class="wf-act-list" style="display:none"></div>
           <div id="wf-functions" class="wf-act-list" style="display:none"></div>
         </div>
       </div>
-      <!-- Auto-layout toolbar — pinned bottom-left of the canvas. One button per
-           layout strategy; each tidies the whole graph then fits it to view. -->
+      <!-- Auto-layout — one button that opens a menu of layout strategies.
+           Click again (or outside) to collapse. Each tidies the graph + fits. -->
       <div id="wf-layout-bar" class="wf-layout-bar">
-        <button class="wf-layout-btn" data-layout="vertical" title="Xếp dọc — luồng từ trên xuống"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></button>
-        <button class="wf-layout-btn" data-layout="horizontal" title="Xếp ngang — luồng từ trái sang"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
-        <button class="wf-layout-btn" data-layout="tree" title="Xếp cây — rẽ nhánh trải ra"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v18"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></button>
-        <button class="wf-layout-btn" data-layout="compact" title="Xếp gọn — tối thiểu khoảng cách"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="12" x2="21" y2="12"/></svg></button>
+        <button class="wf-layout-toggle" id="wf-layout-toggle" onclick="wfToggleLayoutMenu(event)" title="Sắp xếp block">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        </button>
+        <div class="wf-layout-menu" id="wf-layout-menu">
+          <button class="wf-layout-item" data-layout="vertical"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span><span class="lbl"><b>Xếp dọc</b><i>luồng từ trên xuống</i></span></button>
+          <button class="wf-layout-item" data-layout="horizontal"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span><span class="lbl"><b>Xếp ngang</b><i>luồng từ trái sang</i></span></button>
+          <button class="wf-layout-item" data-layout="tree"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v18"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span><span class="lbl"><b>Xếp cây</b><i>nhánh trải ra</i></span></button>
+          <button class="wf-layout-item" data-layout="zigzag"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 12 7 12 17 20 17"/></svg></span><span class="lbl"><b>Xếp zigzag</b><i>luồng rắn uốn qua lại</i></span></button>
+          <button class="wf-layout-item" data-layout="radial"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg></span><span class="lbl"><b>Xếp tròn</b><i>bức xạ từ đầu ra</i></span></button>
+          <button class="wf-layout-item" data-layout="compact"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="12" x2="21" y2="12"/></svg></span><span class="lbl"><b>Xếp gọn</b><i>lưới gần vuông</i></span></button>
+        </div>
       </div>
     </div>
   </div>
   <div id="wf-insp-resizer" title="Kéo để đổi độ rộng cột phải"></div>
-  <!-- Right: inspector -->
+  <!-- Right: inspector (node properties in Canvas mode) -->
   <div id="wf-inspector" class="card" style="width:280px;">
-    <div class="wf-side-hdr"><span>Thuộc tính</span></div>
+    <div class="wf-side-hdr" id="wf-insp-hdr"><span id="wf-insp-title">Thuộc tính</span></div>
     <div id="wf-insp-body"></div>
+    <!-- Scope tool panel — shown only in Preview mode. Mirrors DevScope so the
+         Preview tab doubles as a region picker / action tester. -->
+    <div id="wf-scope-panel" style="display:none;flex:1;min-height:0;flex-direction:column;">
+      <div id="pv-tabs-bar">
+        <button class="tab-btn active" data-tab="inspect"  onclick="pvSwitchTab('inspect')">Kiểm tra</button>
+        <button class="tab-btn"        data-tab="template" onclick="pvSwitchTab('template')">Khớp mẫu</button>
+        <button class="tab-btn"        data-tab="device"   onclick="pvSwitchTab('device')">Thiết bị</button>
+        <button class="tab-btn"        data-tab="library"  onclick="pvSwitchTab('library')">Thư viện</button>
+      </div>
+
+      <!-- Kiểm tra -->
+      <div class="tab-pane active" id="pv-tab-inspect">
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Ảnh chụp</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="btns">
+              <button class="btn sm" onclick="pvSaveFull()">Lưu toàn bộ</button>
+              <button class="btn sm" onclick="pvCapture()">Chụp lại</button>
+            </div>
+            <div class="row"><span class="lbl">Tên</span>
+              <input id="pv-full-name" type="text" placeholder="tên tệp (tuỳ chọn)"></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Điểm &amp; Màu</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="row">
+              <span class="lbl">Điểm</span>
+              <input id="pv-pt-x" type="text" readonly style="text-align:center;">
+              <input id="pv-pt-y" type="text" readonly style="text-align:center;">
+              <button class="icon-btn" onclick="pvCopyText($('pv-pt-x').value+', '+$('pv-pt-y').value, this)" title="Sao chép x,y">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+            <div class="row">
+              <span class="lbl">Màu</span>
+              <input id="pv-pt-hex" type="text" readonly>
+              <button class="icon-btn" onclick="pvCopyEl('pv-pt-hex', this)" title="Sao chép HEX">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+              <div id="pv-color-swatch"></div>
+            </div>
+            <div class="row">
+              <span class="lbl">RGB</span>
+              <input id="pv-pt-rgb" type="text" readonly>
+              <button class="icon-btn" onclick="pvCopyEl('pv-pt-rgb', this)" title="Sao chép RGB">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+            <div class="row" style="justify-content:flex-end;">
+              <button class="btn sm accent" onclick="pvTapPoint()">Chạm điểm</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group closed">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Kiểm tra màu</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="row">
+              <span class="lbl">Điểm</span>
+              <input id="pv-cc-x" type="number" min="0" value="0" style="text-align:center;">
+              <input id="pv-cc-y" type="number" min="0" value="0" style="text-align:center;">
+            </div>
+            <div class="row">
+              <span class="lbl">Màu mẫu</span>
+              <input id="pv-cc-hex" type="text" placeholder="#RRGGBB" oninput="$('pv-cc-swatch').style.background=this.value">
+              <div id="pv-cc-swatch"></div>
+            </div>
+            <div class="row">
+              <span class="lbl">Tolerance</span>
+              <input id="pv-cc-tol" type="number" min="0" max="255" value="10" style="width:56px;flex:none;text-align:right;">
+              <span class="hz-unit">≤ max(ΔR,ΔG,ΔB)</span>
+              <button class="btn sm accent" style="margin-left:auto;" onclick="pvCheckColor()">Kiểm tra</button>
+            </div>
+            <div id="pv-cc-result" class="cc-result"></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Vùng chọn</span>
+            <span class="badge cyan" id="pv-region-badge" style="display:none;"><span class="bd"></span>đang chọn</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="row">
+              <span class="lbl">Vị trí</span>
+              <input id="pv-rg-x" type="number" min="0" value="0" style="text-align:center;">
+              <input id="pv-rg-y" type="number" min="0" value="0" style="text-align:center;">
+              <button class="icon-btn" onclick="pvCopyText($('pv-rg-x').value+', '+$('pv-rg-y').value+', '+$('pv-rg-w').value+', '+$('pv-rg-h').value, this)" title="Sao chép x,y,w,h">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+            <div class="row">
+              <span class="lbl">Kích thước</span>
+              <input id="pv-rg-w" type="number" min="0" value="0" style="text-align:center;">
+              <input id="pv-rg-h" type="number" min="0" value="0" style="text-align:center;">
+            </div>
+            <div class="row"><span class="lbl">Tên</span>
+              <input id="pv-crop-name" type="text" placeholder="tên vùng (tuỳ chọn)"></div>
+            <div class="row" style="gap:4px;">
+              <span class="lbl">Thư mục</span>
+              <span id="pv-out-dir-label" style="flex:1;min-width:0;font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);" title=""></span>
+            </div>
+            <div class="btns">
+              <button class="btn sm ok" onclick="pvQuickCrop()" title="Lưu vùng vào templates/ (Ctrl+S)">Chụp vùng</button>
+              <button class="btn sm err" onclick="pvClearRegion()">Xoá</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Đọc chữ (OCR)</span>
+            <span id="pv-ocr-engine" style="margin-left:4px;">not loaded</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="row"><span class="lbl">Bộ máy</span>
+              <select id="pv-ocr-backend" onchange="pvOcrBackendChange(this.value)" style="flex:1;min-width:0;"></select></div>
+            <div class="row">
+              <input id="pv-ocr-result" type="text" readonly placeholder="(chưa đọc)" style="flex:1;background:var(--surface);font-size:13px;">
+              <button class="icon-btn" onclick="pvCopyEl('pv-ocr-result', this)" title="Sao chép kết quả">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <input id="pv-ocr-wl" type="text" placeholder="Whitelist vd: 0-9/" style="flex:1;min-width:0;font-size:11px;">
+              <button class="btn h30 accent" onclick="pvReadText()">Đọc</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Thao tác</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">Chạm</span>
+              <input id="pv-tap-x" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+              <input id="pv-tap-y" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+              <button class="btn sm" onclick="pvSendTap()">Gửi</button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">Giữ</span>
+              <input id="pv-lp-x"   type="number" min="0"   value="0"   style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+              <input id="pv-lp-y"   type="number" min="0"   value="0"   style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+              <input id="pv-lp-dur" type="number" min="100" value="800" step="100" style="width:56px;flex:none;text-align:right;padding:5px 3px;font-size:11px;">
+              <span class="hz-unit">ms</span>
+              <button class="btn sm" onclick="pvSendLongPress()">Gửi</button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">Vuốt</span>
+              <input id="pv-sw-x1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+              <input id="pv-sw-y1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+              <span style="font-size:13px;color:var(--muted);">→</span>
+              <input id="pv-sw-x2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+              <input id="pv-sw-y2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+              <button class="btn sm" onclick="pvSendSwipe()">Gửi</button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">T.lượng</span>
+              <input id="pv-sw-dur" type="number" min="50" max="100000" step="50" value="300" style="width:72px;flex:none;text-align:right;">
+              <span class="hz-unit">ms</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="group closed">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Phím &amp; Text</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="key-strip">
+              <button class="btn" onclick="api().send_key('BACK')">Back</button>
+              <button class="btn" onclick="api().send_key('HOME')">Home</button>
+              <button class="btn" onclick="api().send_key('ENTER')">Enter</button>
+              <button class="btn" onclick="api().send_key('APP_SWITCH')">Recents</button>
+              <button class="btn" onclick="api().send_key('VOLUME_UP')">Vol +</button>
+              <button class="btn" onclick="api().send_key('VOLUME_DOWN')">Vol −</button>
+              <button class="btn" onclick="api().send_key('POWER')">Power</button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">Custom</span>
+              <input id="pv-key-custom" type="text" placeholder="KEYCODE hoặc số" style="flex:1;min-width:0;">
+              <button class="btn sm" onclick="api().send_key($('pv-key-custom').value.trim())">Gửi</button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">Text</span>
+              <input id="pv-inp-text" type="text" placeholder="Nhập văn bản…" style="flex:1;min-width:0;">
+              <button class="btn sm" onclick="pvSendText()">Gửi</button>
+            </div>
+          </div>
+        </div>
+      </div><!-- /pv-tab-inspect -->
+
+      <!-- Khớp mẫu -->
+      <div class="tab-pane" id="pv-tab-template">
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Khớp mẫu</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <p style="font-size:11.5px;color:var(--dim);line-height:1.5;">Chọn ảnh mẫu PNG rồi chạy khớp trên ảnh chụp hiện tại.</p>
+            <div class="row" style="gap:6px;">
+              <input id="pv-tpl-path" type="text" placeholder="Đường dẫn template PNG" style="flex:1;min-width:0;font-size:11px;">
+              <button class="btn h30" onclick="pvBrowseTpl()">Chọn…</button>
+            </div>
+            <div class="row"><span class="lbl" style="min-width:64px;">Ngưỡng</span>
+              <input id="pv-tpl-thr" type="number" min="0.1" max="0.999" step="0.05" value="0.85" style="width:80px;flex:none;text-align:right;"></div>
+            <label class="cb-line" onclick="$('pv-cb-gray').classList.toggle('checked')">
+              <span class="cb" id="pv-cb-gray"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg></span>
+              Thang xám</label>
+            <label class="cb-line" onclick="$('pv-cb-multiscale').classList.toggle('checked')">
+              <span class="cb" id="pv-cb-multiscale"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg></span>
+              Đa tỉ lệ (0.8 .. 1.2)</label>
+            <div class="btns">
+              <button class="btn h30 accent" onclick="pvRunMatch(false)">Tìm khớp tốt nhất</button>
+              <button class="btn h30" onclick="pvRunMatch(true)">Tìm tất cả</button>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button class="btn sm" onclick="pvClearOverlay()">Xoá lớp phủ</button>
+            </div>
+            <div class="tpl-result empty" id="pv-tpl-result">Chưa có kết quả.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thiết bị -->
+      <div class="tab-pane" id="pv-tab-device">
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Thông tin thiết bị</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="info-grid">
+              <span class="k">Trạng thái</span><span class="v" id="pv-i-status">-</span>
+              <span class="k">Serial</span>      <span class="v" id="pv-i-serial">-</span>
+              <span class="k">Model</span>       <span class="v" id="pv-i-model">-</span>
+              <span class="k">Hãng</span>        <span class="v" id="pv-i-brand">-</span>
+              <span class="k">Android</span>    <span class="v" id="pv-i-android">-</span>
+              <span class="k">ABI</span>         <span class="v" id="pv-i-abi">-</span>
+              <span class="k">Độ phân giải</span><span class="v" id="pv-i-screen">-</span>
+              <span class="k">Mật độ</span>     <span class="v" id="pv-i-density">-</span>
+              <span class="k">Pin</span>         <span class="v" id="pv-i-battery">-</span>
+              <span class="k">IP</span>          <span class="v" id="pv-i-ip">-</span>
+              <span class="k">Uptime</span>      <span class="v" id="pv-i-uptime">-</span>
+              <span class="k">Ứng dụng</span>   <span class="v" id="pv-i-app">-</span>
+            </div>
+            <div class="btns">
+              <button class="btn sm" onclick="api().refresh_info()">Làm mới</button>
+              <button class="btn sm" onclick="api().copy_info()">Sao chép</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thư viện -->
+      <div class="tab-pane" id="pv-tab-library">
+        <div style="display:flex;align-items:center;gap:7px;padding:0 1px 2px;">
+          <span id="pv-lib-out-label" style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;" title="">./out/</span>
+          <span class="spacer"></span>
+          <button class="btn sm" onclick="pvRefreshAssets()">Làm mới</button>
+          <button class="btn sm err" id="pv-btn-del-asset" style="display:none;" onclick="pvDeleteAsset()">Xoá</button>
+        </div>
+        <div class="asset-grid" id="pv-asset-grid">
+          <div style="font-size:11.5px;color:var(--muted);padding:4px 0;">Chưa có ảnh.</div>
+        </div>
+      </div>
+    </div><!-- /wf-scope-panel -->
   </div>
 </div>
 <div id="wf-ctxmenu"></div>
@@ -172,6 +476,8 @@
   <span id="footer-dot"></span>
   <span id="status-text">Sẵn sàng</span>
   <span class="spacer"></span>
+  <span id="hover-pos" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:88px;text-align:right;">—</span>
+  <span style="color:var(--border);margin:0 3px;">·</span>
   <span id="footer-out" style="font-size:11px;color:var(--log-muted);font-family:var(--mono);">workflow → data/flows/</span>
 </div>
 
@@ -188,6 +494,8 @@
 <script src="js/wires.js"></script>
 <script src="js/groups.js"></script>
 <script src="js/inspector.js"></script>
+<script src="js/preview.js"></script>
+<script src="js/scope-tools.js"></script>
 <script src="js/io.js"></script>
 </body>
 </html>

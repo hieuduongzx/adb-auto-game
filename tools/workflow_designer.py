@@ -27,7 +27,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -42,10 +42,13 @@ import webview
 from src.core.adb import ADBController, DeviceScanner
 from src.core.adb.auto.scrcpy_capture import (
     CAPTURE_BACKENDS,
+    capture_screen as capture_screen_frame,
     get_capture_backend,
     set_capture_backend,
     stop_scrcpy_sources,
 )
+from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
+from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.game_core.frida_speedhack import FridaSpeedhackManager
 from src.workflow import NODE_TYPES, WorkflowEngine
 from src.utils import (
@@ -94,6 +97,40 @@ def _sanitize_name(raw: str) -> str:
     return cleaned.strip("._-")
 
 
+def _ts() -> str:
+    return time.strftime("%Y%m%d_%H%M%S")
+
+
+def _shell(device, cmd: str) -> str:
+    try:
+        return (device.shell(cmd) or "").strip()
+    except Exception:
+        return ""
+
+
+def _safe_detect_app(device) -> Optional[str]:
+    try:
+        from src.core.adb.controller import _detect_current_app
+        return _detect_current_app(device)
+    except Exception:
+        return None
+
+
+# Properties fetched for the device info panel (mirrors DevScope).
+_DEVICE_INFO_PROPS = (
+    "ro.product.model",
+    "ro.product.manufacturer",
+    "ro.product.brand",
+    "ro.product.device",
+    "ro.product.cpu.abi",
+    "ro.build.version.release",
+    "ro.build.version.sdk",
+    "ro.build.version.security_patch",
+    "ro.build.display.id",
+    "ro.serialno",
+)
+
+
 class WorkflowDesignerAPI:
     """Methods exposed to JavaScript as ``window.pywebview.api.*``."""
 
@@ -113,6 +150,30 @@ class WorkflowDesignerAPI:
         self._selected_serial: Optional[str] = None
         self._connected_serial: Optional[str] = None
 
+        # Live Preview tab state (mirrors DevScope). Auto-refresh defaults OFF so
+        # no capture work happens until the user opens the Preview tab.
+        self._screen: Optional[np.ndarray] = None
+        self._screen_w = 0
+        self._screen_h = 0
+        self._capture_lock = threading.Lock()
+        self._capture_in_flight = False
+        self._auto_refresh_enabled = False
+        self._refresh_hz = 10.0
+        self._last_auto_capture = 0.0
+
+        # DevScope-style tool state shared with the Preview tab's tool panel:
+        # the last picked point / drag region / template-match overlay, plus the
+        # OCR + matcher backends. Crops land in the open workflow's templates
+        # folder so they're immediately usable as node templates.
+        self._ocr_reader: Optional[OCRReader] = None
+        self._matcher = TemplateMatcher(cache_size=64)
+        self._last_point: Optional[Tuple[int, int]] = None
+        self._region: Optional[Tuple[int, int, int, int]] = None
+        self._overlay: List[Tuple[int, int, int, int, float]] = []
+        self._scope_out_dir: Optional[str] = None
+        self._info_lock = threading.Lock()
+        self._info_in_flight = False
+
         # Standalone speed hack — fully decoupled from the test run. The designer's
         # "Run test" never injects Frida; speedhack is its own manual ▶ action, so
         # it owns its own manager/retry-thread rather than riding the engine run.
@@ -126,6 +187,7 @@ class WorkflowDesignerAPI:
         add_log_subscriber(self._on_log)
         threading.Thread(target=self._device_worker, daemon=True).start()
         threading.Thread(target=self._device_poll, daemon=True).start()
+        threading.Thread(target=self._auto_refresh_loop, daemon=True).start()
 
     # ── Log + push ───────────────────────────────────────────────────────────
 
@@ -155,6 +217,8 @@ class WorkflowDesignerAPI:
             "selectedSerial": self._selected_serial,
             "captureBackend": get_capture_backend(),
             "captureBackends": list(CAPTURE_BACKENDS),
+            "ocrBackends": list(KNOWN_BACKENDS),
+            "outDir": self._scope_out_dir or "",
             "log": self._log_buffer[-300:],
         }
 
@@ -162,6 +226,547 @@ class WorkflowDesignerAPI:
         selected = set_capture_backend(backend)
         self._push("capture_backend", {"backend": selected})
         return {"backend": selected, "backends": list(CAPTURE_BACKENDS)}
+
+    # ── Live Preview capture (mirrors DevScope) ─────────────────────────────
+    # Only the Preview tab drives these; auto-refresh is OFF by default and the
+    # JS side turns it on/off when the tab is shown/hidden, so captures only run
+    # while the user is actually looking at the mirror.
+
+    def _push_frame(self, bgr: np.ndarray) -> None:
+        """Send a JPEG screenshot frame to JS as a data URL."""
+        if self._window is None or self._closing:
+            return
+        try:
+            ok, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            if not ok:
+                return
+            b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+            self._window.evaluate_js(
+                f'window.__recvFrame("data:image/jpeg;base64,{b64}",'
+                f'{self._screen_w},{self._screen_h})')
+        except Exception:
+            pass
+
+    def capture(self) -> bool:
+        if self.controller.device is None:
+            self._push("capture_failed", {"error": "No device selected"})
+            return False
+        with self._capture_lock:
+            if self._capture_in_flight:
+                return False
+            self._capture_in_flight = True
+        threading.Thread(target=self._capture_worker, daemon=True).start()
+        return True
+
+    def _capture_worker(self) -> None:
+        try:
+            img = capture_screen_frame(self.controller)
+            if img is None:
+                self._push("capture_failed", {"error": "Failed to capture screen"})
+                return
+            h, w = img.shape[:2]
+            self._screen = img
+            self._screen_w = w
+            self._screen_h = h
+            self._push_frame(img)
+        except Exception as exc:
+            self._push("capture_failed", {"error": str(exc)})
+        finally:
+            with self._capture_lock:
+                self._capture_in_flight = False
+
+    def _auto_refresh_loop(self) -> None:
+        while not self._closing:
+            time.sleep(0.1)
+            if not self._auto_refresh_enabled or self._closing:
+                continue
+            now = time.monotonic()
+            period = 1.0 / max(0.1, self._refresh_hz)
+            if now - self._last_auto_capture >= period:
+                self._last_auto_capture = now
+                self.capture()
+
+    def set_auto_refresh(self, enabled: bool) -> bool:
+        self._auto_refresh_enabled = bool(enabled)
+        self._last_auto_capture = time.monotonic()
+        return True
+
+    def set_refresh_hz(self, hz: float) -> bool:
+        self._refresh_hz = max(0.2, min(30.0, float(hz)))
+        return True
+
+    def tap(self, x: int, y: int) -> bool:
+        if self.controller.device is None:
+            return False
+        return bool(self.controller.tap(int(x), int(y)))
+
+    # ── Scope toolset: selection / color / crop / OCR / match / actions ──────
+    # Mirrors DevScope's DevHelperAPI so the Preview tab doubles as a region
+    # picker + action tester. Crops land in the open workflow's ``templates/``
+    # folder (resolved on demand) so they're picked up by image nodes directly.
+
+    def _scope_out(self) -> str:
+        """Resolve (and cache) the folder where preview crops/screenshots save.
+
+        Falls back to the project ``out/`` dir when no workflow context exists.
+        """
+        if self._scope_out_dir and os.path.isdir(self._scope_out_dir):
+            return self._scope_out_dir
+        try:
+            dest = self._workflow_templates_dir("")
+        except Exception:
+            dest = None
+        if not dest:
+            dest = os.path.join(_PROJECT_ROOT, "out")
+        os.makedirs(dest, exist_ok=True)
+        self._scope_out_dir = dest
+        return dest
+
+    def _scope_refresh_out(self) -> None:
+        """Drop the cached output dir so the next crop re-resolves (e.g. after
+        a save-as moved the workflow into a new folder)."""
+        self._scope_out_dir = None
+
+    def scope_out_dir(self) -> str:
+        """Resolve (lazily) and announce the folder where preview crops save.
+
+        Called by JS when entering the Preview tab so the Vùng chọn / Thư viện
+        labels reflect the current workflow's templates folder.
+        """
+        path = self._scope_out()
+        self._push("out_dir", {"path": path})
+        return path
+
+    def set_point(self, x: int, y: int) -> dict:
+        self._last_point = (int(x), int(y))
+        self._region = None
+        color = self._pixel_color(int(x), int(y))
+        return {"x": int(x), "y": int(y), **color}
+
+    def set_region(self, x: int, y: int, w: int, h: int) -> dict:
+        self._region = (int(x), int(y), int(w), int(h))
+        self._last_point = None
+        cx = int(x) + int(w) // 2
+        cy = int(y) + int(h) // 2
+        color = self._pixel_color(cx, cy)
+        return {"x": int(x), "y": int(y), "w": int(w), "h": int(h),
+                "centerX": cx, "centerY": cy, **color}
+
+    def _pixel_color(self, x: int, y: int) -> dict:
+        img = self._screen
+        if img is None or not (0 <= y < self._screen_h and 0 <= x < self._screen_w):
+            return {"hex": "", "rgb": ""}
+        b, g, r = img[y, x][:3]
+        r, g, b = int(r), int(g), int(b)
+        return {"hex": f"#{r:02X}{g:02X}{b:02X}", "rgb": f"{r}, {g}, {b}"}
+
+    def clear_selection(self) -> bool:
+        self._region = None
+        self._last_point = None
+        self._overlay = []
+        self._push("selection_cleared", {})
+        return True
+
+    def check_color(self, x: int, y: int, hex_color: str, tolerance: int = 10) -> dict:
+        if self._screen is None:
+            return {"match": False, "error": "No screenshot"}
+        x, y, tolerance = int(x), int(y), int(tolerance)
+        if not (0 <= y < self._screen_h and 0 <= x < self._screen_w):
+            return {"match": False, "error": "Out of bounds"}
+        b, g, r = self._screen[y, x][:3]
+        r, g, b = int(r), int(g), int(b)
+        actual_hex = f"#{r:02X}{g:02X}{b:02X}"
+        target = hex_color.lstrip("#")
+        if len(target) != 6:
+            return {"match": False, "error": "Invalid hex"}
+        try:
+            tr = int(target[0:2], 16)
+            tg = int(target[2:4], 16)
+            tb = int(target[4:6], 16)
+        except ValueError:
+            return {"match": False, "error": "Invalid hex"}
+        dist = max(abs(r - tr), abs(g - tg), abs(b - tb))
+        return {"match": dist <= tolerance, "actual": actual_hex,
+                "dist": dist, "actual_rgb": f"{r}, {g}, {b}"}
+
+    def swipe(self, x1: int, y1: int, x2: int, y2: int, dur: int) -> bool:
+        if self.controller.device is None:
+            return False
+        return bool(self.controller.swipe(int(x1), int(y1), int(x2), int(y2), int(dur)))
+
+    def long_press(self, x: int, y: int, duration: int = 800) -> bool:
+        if self.controller.device is None:
+            return False
+        try:
+            self.controller.device.shell(
+                f"input swipe {int(x)} {int(y)} {int(x)} {int(y)} {int(duration)}")
+            return True
+        except Exception:
+            return False
+
+    def send_key(self, keycode) -> bool:
+        if self.controller.device is None:
+            return False
+        try:
+            self.controller.device.shell(f"input keyevent {keycode}")
+            return True
+        except Exception:
+            return False
+
+    def input_text(self, text: str) -> bool:
+        if self.controller.device is None or not text:
+            return False
+        try:
+            safe = (text.replace("\\", "\\\\").replace('"', '\\"')
+                    .replace("$", "\\$").replace("`", "\\`").replace(" ", "%s"))
+            self.controller.device.shell(f'input text "{safe}"')
+            return True
+        except Exception:
+            return False
+
+    # ── Crop / save ───────────────────────────────────────────────────────────
+
+    def save_full(self, name: str = "") -> bool:
+        if self._screen is None:
+            return False
+        out_dir = self._scope_out()
+        clean = _sanitize_name(name)
+        fname = (f"{clean}_{_ts()}.png" if clean else f"screenshot_{_ts()}.png")
+        path = os.path.join(out_dir, fname)
+        return bool(cv2.imwrite(path, self._screen))
+
+    def _ensure_region_in_filename(self, path: str, x, y, w, h) -> str:
+        base, ext = os.path.splitext(path)
+        suffix = f"_{x}_{y}_{w}_{h}"
+        if re.search(r"_\d+_\d+_\d+_\d+(?:\.\d+)?$", base):
+            return path
+        return f"{base}{suffix}{ext}"
+
+    def save_crop_dialog(self, name: str = "") -> bool:
+        region = self._region
+        if self._screen is None or not region:
+            return False
+        x, y, w, h = region
+        crop = self._screen[y:y + h, x:x + w].copy()
+        clean = _sanitize_name(name)
+        default = (f"{clean}_{x}_{y}_{w}_{h}.png" if clean
+                   else f"region_{_ts()}_{x}_{y}_{w}_{h}.png")
+        out_dir = self._scope_out()
+        path = None
+        win = self._win()
+        try:
+            if win:
+                paths = win.create_file_dialog(
+                    webview.SAVE_DIALOG, directory=out_dir, save_filename=default,
+                    file_types=("PNG (*.png)", "JPEG (*.jpg;*.jpeg)", "All files (*.*)"))
+                if paths:
+                    path = paths[0] if isinstance(paths, (list, tuple)) else paths
+        except Exception:
+            path = None
+        if not path:
+            path = os.path.join(out_dir, default)
+        if not path.lower().endswith((".png", ".jpg", ".jpeg")):
+            path += ".png"
+        path = self._ensure_region_in_filename(path, x, y, w, h)
+        return bool(cv2.imwrite(path, crop))
+
+    def quick_crop(self, name: str = "") -> str:
+        """Save the current region crop into the open workflow's templates folder.
+
+        Always lands in the resolved workflow ``templates/`` dir (e.g.
+        ``workflows/Cherry_Tale/templates/``) so the crop is immediately usable as
+        a node template. Returns the saved path; "" on failure (no screen/region).
+        """
+        region = self._region
+        if self._screen is None or not region:
+            return ""
+        x, y, w, h = region
+        crop = self._screen[y:y + h, x:x + w].copy()
+        out_dir = self._scope_out()
+        clean = _sanitize_name(name)
+        if clean:
+            fname = f"{clean}_{x}_{y}_{w}_{h}.png"
+            if os.path.exists(os.path.join(out_dir, fname)):
+                fname = f"{clean}_{_ts()}_{x}_{y}_{w}_{h}.png"
+        else:
+            fname = f"crop_{_ts()}_{x}_{y}_{w}_{h}.png"
+        path = os.path.join(out_dir, fname)
+        if cv2.imwrite(path, crop):
+            log_success(f"Chụp vùng: {path}")
+            return path
+        return ""
+
+    def pick_out_dir(self) -> str:
+        win = self._win()
+        try:
+            if win:
+                paths = win.create_file_dialog(
+                    webview.FOLDER_DIALOG, directory=self._scope_out())
+                if paths:
+                    path = paths[0] if isinstance(paths, (list, tuple)) else paths
+                    if path and os.path.isdir(str(path)):
+                        self._scope_out_dir = str(path)
+                        self._push("out_dir", {"path": self._scope_out_dir})
+        except Exception:
+            pass
+        return self._scope_out()
+
+    # ── Template matching ─────────────────────────────────────────────────────
+
+    def pick_template(self) -> str:
+        """Open a file dialog to pick a template image.
+
+        Always opens in the current workflow's ``templates/`` folder first —
+        that's where image-node templates belong, so it should be the default
+        every time, not whatever folder the last dialog landed in. Falls back to
+        the project ``out/`` dir if no workflow context exists.
+        """
+        win = self._win()
+        if win is None:
+            return ""
+        # Resolve the workflow's templates dir (NOT via _start_dir — that would
+        # honour a stale remembered dir and miss the templates folder).
+        try:
+            start_dir = self._scope_out()
+        except Exception:
+            start_dir = ""
+        if not start_dir or not os.path.isdir(start_dir):
+            start_dir = os.path.join(_PROJECT_ROOT, "out")
+            os.makedirs(start_dir, exist_ok=True)
+        try:
+            paths = win.create_file_dialog(
+                webview.OPEN_DIALOG, directory=start_dir, allow_multiple=False,
+                file_types=("Images (*.png;*.jpg;*.jpeg;*.bmp)", "All files (*.*)"),
+            )
+        except Exception as exc:
+            log_warning(f"Dialog error: {exc}")
+            return ""
+        if not paths:
+            return ""
+        path = paths[0] if isinstance(paths, (list, tuple)) else paths
+        return str(path)
+
+    def match_template(self, template_path: str, threshold: float,
+                       grayscale: bool, multiscale: bool, all_matches: bool) -> dict:
+        if self._screen is None:
+            return {"error": "Capture a screenshot first"}
+        path = (template_path or "").strip()
+        if not path or not os.path.exists(path):
+            return {"error": "Pick a valid template path"}
+        grayscale = bool(grayscale)
+        threshold = float(threshold)
+        tpl = self._matcher.load(path, grayscale=grayscale)
+        if tpl is None:
+            return {"error": "Could not load template"}
+        th, tw = tpl.shape[:2]
+        rects: List[List[float]] = []
+        if all_matches:
+            results = self._matcher.match_all(
+                self._screen, tpl, threshold=threshold, use_grayscale=grayscale)
+            for cx, cy, conf in results:
+                rects.append([max(0, cx - tw // 2), max(0, cy - th // 2), tw, th, float(conf)])
+            summary = f"Found {len(results)} match(es)."
+        else:
+            scales = [0.8, 0.9, 1.0, 1.1, 1.2] if multiscale else None
+            res = self._matcher.match(
+                self._screen, tpl, threshold=threshold, use_grayscale=grayscale,
+                multi_scale=multiscale, scales=scales)
+            if res is None:
+                self._overlay = []
+                self._push("overlay", {"rects": []})
+                return {"summary": f"No match >= {threshold:.2f}.", "rects": []}
+            cx, cy, conf, scale = res
+            sw, sh = int(tw * scale), int(th * scale)
+            rects.append([max(0, cx - sw // 2), max(0, cy - sh // 2), sw, sh, float(conf)])
+            summary = f"Match: center=({cx},{cy}) conf={conf:.3f} scale={scale:.2f}"
+        self._overlay = [(r[0], r[1], r[2], r[3], r[4]) for r in rects]
+        self._push("overlay", {"rects": rects})
+        return {"summary": summary, "rects": rects}
+
+    def clear_overlay(self) -> bool:
+        self._overlay = []
+        self._push("overlay", {"rects": []})
+        return True
+
+    # ── OCR ───────────────────────────────────────────────────────────────────
+
+    def set_ocr_backend(self, name: str) -> dict:
+        try:
+            if self._ocr_reader is None:
+                self._ocr_reader = OCRReader(backend=name)
+            else:
+                self._ocr_reader.set_backend(name)
+            engine = self._ocr_reader.backend_name
+            available = bool(self._ocr_reader.available)
+            return {"engine": engine if engine != "none" else "n/a", "available": available}
+        except Exception as exc:
+            return {"engine": "n/a", "available": False}
+
+    def read_text(self, whitelist: str = "") -> str:
+        if self._screen is None:
+            return ""
+        region = self._region
+        if not region:
+            return ""
+        if self._ocr_reader is None:
+            self._ocr_reader = OCRReader(backend=KNOWN_BACKENDS[0])
+        if not self._ocr_reader.available:
+            return ""
+        wl = (whitelist or "").strip() or None
+        return self._ocr_reader.read_text(self._screen, region=region, whitelist=wl) or ""
+
+    # ── Asset library ─────────────────────────────────────────────────────────
+
+    def list_assets(self) -> list:
+        out_dir = self._scope_out()
+        if not os.path.exists(out_dir):
+            return []
+        exts = (".png", ".jpg", ".jpeg", ".bmp")
+        items = []
+        for root, _dirs, files in os.walk(out_dir):
+            for fname in files:
+                if not fname.lower().endswith(exts):
+                    continue
+                path = os.path.join(root, fname)
+                try:
+                    st = os.stat(path)
+                except OSError:
+                    continue
+                rel = os.path.relpath(path, out_dir).replace("\\", "/")
+                items.append({"name": rel, "path": path.replace("\\", "/"),
+                              "size": st.st_size})
+        items.sort(key=lambda it: it.get("size", 0), reverse=True)
+        return items[:200]
+
+    def get_asset_thumbnail(self, path: str) -> str:
+        try:
+            img = cv2.imread(path)
+            if img is None:
+                return ""
+            h, w = img.shape[:2]
+            tw = 96
+            th = max(1, int(h * tw / w))
+            thumb = cv2.resize(img, (tw, th), interpolation=cv2.INTER_AREA)
+            ok, buf = cv2.imencode(".jpg", thumb, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            if not ok:
+                return ""
+            return "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode("ascii")
+        except Exception:
+            return ""
+
+    def delete_asset(self, path: str) -> bool:
+        try:
+            from pathlib import Path
+            p = Path(path)
+            if p.exists() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp"}:
+                p.unlink()
+                return True
+        except Exception:
+            pass
+        return False
+
+    # ── Device info (mirrors DevScope) ────────────────────────────────────────
+
+    def refresh_info(self) -> None:
+        threading.Thread(target=self._info_worker, daemon=True).start()
+
+    def _info_worker(self) -> None:
+        with self._info_lock:
+            if self._info_in_flight:
+                return
+            self._info_in_flight = True
+        try:
+            device = self.controller.device
+            if device is None:
+                self._push("device_info", {
+                    "status": "Disconnected", "serial": "-", "model": "-",
+                    "brand": "-", "android": "-", "abi": "-", "screen_size": "-",
+                    "density": "-", "app": "-", "battery": "-", "ip": "-", "uptime": "-"})
+                return
+            info: Dict[str, Any] = {"serial": device.serial, "status": "Connected"}
+            cmd = " ; ".join(f"getprop {p}" for p in _DEVICE_INFO_PROPS)
+            values = [v.strip() for v in _shell(device, cmd).splitlines()]
+            while len(values) < len(_DEVICE_INFO_PROPS):
+                values.append("")
+            for key, val in zip(_DEVICE_INFO_PROPS, values):
+                info[key] = val or "-"
+            size_str = "-"
+            for line in _shell(device, "wm size").splitlines():
+                if ":" in line:
+                    size_str = line.split(":", 1)[1].strip()
+                    break
+            info["screen_size"] = size_str or "-"
+            density_str = "-"
+            for line in _shell(device, "wm density").splitlines():
+                if ":" in line:
+                    density_str = line.split(":", 1)[1].strip()
+                    break
+            info["screen_density"] = density_str or "-"
+            batt = {"level": "-", "status": "-", "temperature": "-",
+                    "AC powered": "-", "USB powered": "-"}
+            for line in _shell(device, "dumpsys battery").splitlines():
+                line = line.strip()
+                for key in list(batt.keys()):
+                    if line.startswith(f"{key}:"):
+                        batt[key] = line[len(key) + 1:].strip()
+            status_map = {"1": "Unknown", "2": "Charging", "3": "Discharging",
+                          "4": "Not charging", "5": "Full"}
+            status_text = status_map.get(batt["status"], batt["status"])
+            temp_c = "-"
+            try:
+                temp_c = f"{int(batt['temperature']) / 10:.1f}C"
+            except (TypeError, ValueError):
+                pass
+            powered = []
+            if batt["AC powered"].lower() == "true":
+                powered.append("AC")
+            if batt["USB powered"].lower() == "true":
+                powered.append("USB")
+            powered_str = ", ".join(powered) if powered else "battery"
+            info["battery"] = f"{batt['level']}% ({status_text}, {powered_str}, {temp_c})"
+            pkg = _safe_detect_app(device)
+            app_str = "-"
+            if pkg:
+                app_str = pkg
+            info["app"] = app_str
+            ip_addr = "-"
+            for line in _shell(device, "ip route").splitlines():
+                if " src " in line:
+                    parts = line.split(" src ")
+                    if len(parts) > 1:
+                        ip_addr = parts[1].split()[0]
+                        break
+            info["ip"] = ip_addr or "-"
+            uptime_str = "-"
+            try:
+                secs = float(_shell(device, "cat /proc/uptime").split()[0])
+                hours, rem = divmod(int(secs), 3600)
+                mins, _ = divmod(rem, 60)
+                uptime_str = f"{hours}h {mins}m"
+            except (ValueError, IndexError):
+                pass
+            info["uptime"] = uptime_str
+            android = info.get("ro.build.version.release", "-")
+            sdk = info.get("ro.build.version.sdk", "-")
+            android_str = (f"{android} (SDK {sdk})" if sdk and sdk != "-" else android)
+            brand = info.get("ro.product.brand", "-")
+            self._push("device_info", {
+                "status": "Connected", "serial": info.get("serial", "-"),
+                "model": info.get("ro.product.model", "-"), "brand": brand,
+                "android": android_str, "abi": info.get("ro.product.cpu.abi", "-"),
+                "screen_size": info.get("screen_size", "-"),
+                "density": info.get("screen_density", "-"), "app": app_str,
+                "battery": info.get("battery", "-"), "ip": info.get("ip", "-"),
+                "uptime": info.get("uptime", "-")})
+        except Exception:
+            pass
+        finally:
+            with self._info_lock:
+                self._info_in_flight = False
+
+    def copy_info(self) -> bool:
+        self._push("copy_device_info", {})
+        return True
 
     def clear_log(self) -> bool:
         self._log_buffer.clear()
@@ -375,28 +980,6 @@ class WorkflowDesignerAPI:
         except Exception:
             return ""
 
-    # ── Template picker (for image nodes) ──────────────────────────────────────
-
-    def pick_template(self) -> str:
-        win = self._win()
-        if win is None:
-            return ""
-        out_dir = os.path.join(_PROJECT_ROOT, "out")
-        start_dir = self._start_dir(out_dir if os.path.isdir(out_dir) else _PROJECT_ROOT)
-        try:
-            paths = win.create_file_dialog(
-                webview.OPEN_DIALOG, directory=start_dir, allow_multiple=False,
-                file_types=("Images (*.png;*.jpg;*.jpeg;*.bmp)", "All files (*.*)"),
-            )
-        except Exception as exc:
-            log_warning(f"Dialog error: {exc}")
-            return ""
-        if not paths:
-            return ""
-        path = paths[0] if isinstance(paths, (list, tuple)) else paths
-        self._remember_dir(path)
-        return str(path)
-
     # ── Template bundling (portable game folder) ───────────────────────────────
 
     @staticmethod
@@ -512,6 +1095,7 @@ class WorkflowDesignerAPI:
         (``workflows/<name>/<name>.json``)."""
         self._wf_path = None
         self._remember_last_workflow(None)   # a fresh doc shouldn't reopen the old one
+        self._scope_refresh_out()
         return True
 
     def _default_flow_path(self, name: str) -> str:
@@ -553,6 +1137,7 @@ class WorkflowDesignerAPI:
             self._wf_path = path
             self._remember_dir(path)
             self._remember_last_workflow(path)
+            self._scope_refresh_out()
             log_success(f"Đã lưu workflow: {path}")
             return True
         except Exception as exc:
@@ -568,6 +1153,7 @@ class WorkflowDesignerAPI:
             self._wf_path = path
             self._remember_dir(path)
             self._remember_last_workflow(path)
+            self._scope_refresh_out()
             log_success(f"Đã lưu: {path}")
             return {"ok": True, "path": path}
         except Exception as exc:
@@ -596,6 +1182,7 @@ class WorkflowDesignerAPI:
             self._wf_path = str(path)
             self._remember_dir(path)
             self._remember_last_workflow(str(path))
+            self._scope_refresh_out()
             log_info(f"Đã mở workflow: {path}")
             return text
         except Exception as exc:

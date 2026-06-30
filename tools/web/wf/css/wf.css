@@ -4,6 +4,22 @@
 .mode-btn:hover:not(.active) { color:var(--ink); }
 .mode-btn.active { background:var(--panel); color:var(--accent); box-shadow:0 1px 2px rgba(0,0,0,.06); }
 .tb-divider { width:1px; height:20px; background:var(--border2); flex-shrink:0; }
+
+/* Running status pill — sits between the file ops and the device cluster.
+   Grey "Sẵn sàng" at rest, amber pulse "Đang chạy" while the engine executes. */
+.wf-run-status { display:flex; align-items:center; gap:6px; padding:4px 11px;
+  border-radius:999px; background:var(--alt); border:1px solid var(--border);
+  font-size:11px; font-weight:600; color:var(--dim); flex-shrink:0;
+  transition:background .15s, border-color .15s, color .15s; }
+.wf-run-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex-shrink:0; transition:background .15s; }
+.wf-run-status.running { background:#fff7ed; border-color:#fdba74; color:#c2610f; }
+.wf-run-status.running .wf-run-dot { background:#f97316; animation:wfRunPulse 1.1s ease-in-out infinite; }
+@keyframes wfRunPulse { 0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,.5)} 50%{box-shadow:0 0 0 4px rgba(249,115,22,0)} }
+
+/* Nguồn ảnh picker — borderless so it reads as a labelled inline select,
+   not a boxed cluster like the device picker. */
+.device-wrap.wf-source-wrap { border:none; background:transparent; padding:0 4px;
+  min-width:0; gap:6px; }
 /* Speed-hack control cluster: its own bordered box so it reads as a separate,
    manual tool — independent of "Chạy thử". Turns amber when enabled. */
 .wf-speed-group { display:flex; align-items:center; gap:5px; padding:3px 7px;
@@ -155,15 +171,29 @@
 #wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   color:var(--muted); font-size:12px; pointer-events:none; }
 
-/* Auto-layout toolbar — pinned bottom-left of the canvas. A small floating
-   cluster of buttons, one per layout strategy. */
-.wf-layout-bar { position:absolute; left:10px; bottom:10px; display:flex; gap:4px;
+/* Auto-layout — a single toggle button (bottom-left). Opens a labelled menu
+   of layout strategies above it; click again or outside to collapse. */
+.wf-layout-bar { position:absolute; left:10px; bottom:10px; z-index:5; }
+.wf-layout-toggle { width:34px; height:34px; padding:0; border:1px solid var(--border2);
+  border-radius:8px; background:var(--panel); color:var(--dim); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; box-shadow:var(--sh-md);
+  transition:color .1s, border-color .1s, background .1s; }
+.wf-layout-toggle:hover, .wf-layout-bar.open .wf-layout-toggle { color:var(--accent); border-color:var(--accent-bd); background:var(--accent-bg); }
+.wf-layout-menu { position:absolute; left:0; bottom:42px; min-width:188px;
   background:var(--panel); border:1px solid var(--border2); border-radius:9px;
-  box-shadow:var(--sh-md); padding:5px; z-index:5; }
-  .wf-layout-btn { width:30px; height:30px; padding:0; border:1px solid transparent;
-    border-radius:6px; background:var(--alt); color:var(--dim); cursor:pointer;
-    font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center; transition:color .1s, border-color .1s, background .1s; }
-.wf-layout-btn:hover { color:var(--accent); background:var(--accent-bg); border-color:var(--accent-bd); }
+  box-shadow:var(--sh-lg); padding:5px; display:none; flex-direction:column; gap:1px; }
+.wf-layout-bar.open .wf-layout-menu { display:flex; animation:wfPop .12s var(--ease); }
+@keyframes wfPop { from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+.wf-layout-item { display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:6px;
+  border:none; background:none; color:var(--ink); cursor:pointer; text-align:left;
+  transition:background .1s, color .1s; }
+.wf-layout-item:hover { background:var(--accent-bg); color:var(--accent); }
+.wf-layout-item .ico { display:flex; align-items:center; justify-content:center; color:var(--muted); flex-shrink:0; }
+.wf-layout-item:hover .ico { color:var(--accent); }
+.wf-layout-item .lbl { display:flex; flex-direction:column; line-height:1.25; min-width:0; }
+.wf-layout-item .lbl b { font-size:11.5px; font-weight:600; }
+.wf-layout-item .lbl i { font-size:10px; font-style:normal; color:var(--muted); }
+.wf-layout-item:hover .lbl i { color:var(--accent); opacity:.8; }
 
 /* Activities + Functions panel — pinned bottom-right of the canvas.
    Header = title row (chevron + label + add btn) stacked above a tab bar.
@@ -344,17 +374,19 @@
 .wf-node-eye svg { width:13px; height:13px; display:block; }
 .wf-node-eye:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-node-eye.on { color:var(--accent); }
-/* Compact preview band — sits flush at the bottom of the node. Reduced from 68px
-   to keep nodes small; scale-down never upscales so tiny crops stay crisp. */
-.wf-node-thumb { display:block; width:100%; height:44px; object-fit:scale-down;
-  background:#f0f2f5 repeating-conic-gradient(#e6e9ef 0% 25%, transparent 0% 50%) 50%/8px 8px;
-  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:2px; }
-/* Multi-template strip: tighter row of thumbnails, one per OR-image. */
-.wf-node-thumbs { display:flex; flex-wrap:wrap; align-items:center; gap:2px; padding:3px;
-  background:#f0f2f5 repeating-conic-gradient(#e6e9ef 0% 25%, transparent 0% 50%) 50%/8px 8px;
-  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); min-height:28px; }
-.wf-node-thumb-sm { width:32px; height:24px; object-fit:scale-down; border:1px solid var(--border);
-  border-radius:3px; background:var(--panel); flex-shrink:0; }
+/* Compact preview band — a subtle inline thumbnail tucked at the bottom of the
+   node. Reduced height + soft checkerboard so it reads as a faint reference,
+   not a loud image block; scale-down never upscales so tiny crops stay crisp. */
+.wf-node-thumb { display:block; width:auto; max-width:120px; height:22px; object-fit:scale-down;
+  margin:3px auto 1px;
+  background:#eef1f5 repeating-conic-gradient(#e2e6ec 0% 25%, transparent 0% 50%) 50%/6px 6px;
+  border:1px solid var(--line); border-radius:4px; padding:1px; opacity:.92; }
+/* Multi-template strip: tight row of small thumbnails, one per OR-image. */
+.wf-node-thumbs { display:flex; flex-wrap:wrap; align-items:center; gap:2px; padding:3px 4px;
+  background:#eef1f5 repeating-conic-gradient(#e2e6ec 0% 25%, transparent 0% 50%) 50%/6px 6px;
+  border-top:1px solid var(--line); border-radius:0 0 var(--node-r) var(--node-r); min-height:22px; }
+.wf-node-thumb-sm { width:24px; height:18px; object-fit:scale-down; border:1px solid var(--border);
+  border-radius:3px; background:var(--panel); flex-shrink:0; opacity:.92; }
 /* On hover the node rises above neighbours so the thumbnail is not obscured. */
 .wf-node.has-thumb:hover { z-index:var(--z-node-hover); }
 .wf-tpl-preview { display:block; max-width:100%; max-height:150px; object-fit:contain; margin-top:6px;
@@ -481,10 +513,12 @@
 .wf-field.full > input, .wf-field.full > select { width:100%; }
 /* Wide input (note/log/activity name) */
 .wf-insp-input { width:100%; font-size:11.5px; padding:6px 8px; border-radius:var(--r-sm); }
-/* Template field: inline path + picker + preview. */
+/* Template field: path + picker + compact thumbnail, all on one row so the
+   preview stays small and beside the controls (not a tall block below). */
 .wf-tpl-row { display:flex; align-items:center; gap:5px; }
 .wf-tpl-row input { flex:1; min-width:0; font-size:10px; }
-.wf-tpl-preview { display:block; max-width:100%; max-height:140px; object-fit:contain; margin-top:5px; border:1px solid var(--border2); border-radius:6px; background:#1a1d21; }
+.wf-tpl-preview { display:block; width:36px; height:36px; object-fit:contain; flex-shrink:0;
+  margin:0; border:1px solid var(--border2); border-radius:5px; background:#1a1d21; }
 /* Multi-template list */
 .wf-tpls-list { display:flex; flex-direction:column; gap:6px; }
 .wf-tpls-item { border:1px solid var(--border2); border-radius:7px; padding:5px; background:var(--panel); display:flex; flex-direction:column; gap:4px; }
@@ -509,3 +543,53 @@
 .wf-region-cell { display:flex; }
 .wf-region-cell input { width:100%; min-width:0; box-sizing:border-box; text-align:center; padding:2px 1px; font-size:10px; height:20px; background:var(--panel); }
 .wf-empty-note { font-size:11.5px; color:var(--muted); padding:6px 2px; text-align:center; }
+
+/* ── Activities panel: 3 tabs share the row evenly ────────────────────────────
+   Three tabs (Sequent / Background / Function) split the 248px panel width;
+   each flexes so labels stay readable and counts stay visible. */
+.wf-act-tab-row .wf-act-tab { flex:1 1 0; justify-content:center; padding:6px 4px 5px; }
+.wf-act-tab-row .wf-act-tab .side-count { margin-left:3px; }
+
+/* ── Canvas view tabs (Canvas / Preview) — right end of the toolbar ─────────
+   Lives in #wf-bar (not pinned over the canvas) so it never overlaps the graph
+   or the Preview control bar. Only the Preview tab spins up the live mirror. */
+.wf-view-tabs { display:flex; gap:2px; background:var(--alt); border:1px solid var(--border2);
+  border-radius:8px; padding:3px; flex-shrink:0; box-shadow:var(--sh-sm); }
+.wf-view-tab { padding:4px 14px; border-radius:6px; font-size:11.5px; font-weight:700;
+  color:var(--dim); background:none; border:none; cursor:pointer;
+  transition:background .15s, color .15s; }
+.wf-view-tab:hover:not(.sel) { color:var(--ink); }
+.wf-view-tab.sel { background:var(--panel); color:var(--accent); box-shadow:0 1px 2px rgba(0,0,0,.06); }
+
+/* ── Live preview pane (Preview tab) ──────────────────────────────────────────
+   Fills the canvas area; only the canvas is interactive. The bar mirrors the
+   DevScope capture controls (capture / auto / Hz) so behaviour is familiar. */
+#wf-preview-pane { position:absolute; inset:0; z-index:6; display:flex; flex-direction:column;
+  background:var(--bg); overflow:hidden; }
+.wf-pv-bar { display:flex; align-items:center; gap:7px; padding:7px 12px;
+  background:var(--panel); border-bottom:1px solid var(--line); flex-shrink:0; }
+.wf-pv-bar .btn.sm { height:28px; }
+.wf-pv-res { font-family:var(--mono); font-size:11px; color:var(--muted); flex-shrink:0; }
+.wf-pv-hint { font-size:10.5px; color:var(--muted); }
+#wf-pv-hz { width:50px; height:28px; text-align:right; padding:0 6px; }
+#wf-pv-wrap { flex:1; position:relative; background:#121316; overflow:hidden; min-height:0; }
+#wf-pv-canvas { display:block; position:absolute; inset:0; width:100%; height:100%; cursor:crosshair; }
+/* Auto toggle pill (same look as DevScope's #auto-cb but namespaced). */
+.wf-pv-cb { width:36px; height:21px; border-radius:999px; background:#d3d9e0; position:relative;
+  transition:background .2s; flex-shrink:0; display:block; }
+.wf-pv-cb.on { background:var(--accent); }
+.wf-pv-thumb { position:absolute; top:2px; left:2px; width:17px; height:17px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:left .2s; }
+.wf-pv-cb.on .wf-pv-thumb { left:17px; }
+
+/* ── Scope tool panel (Preview-mode inspector) ───────────────────────────────
+   Shown in place of the node inspector while the Preview tab is active. Reuses
+   the shared component classes (.group/.row/.btn/.tab-pane) so it reads exactly
+   like DevScope. Its own tab bar mirrors #tabs-bar. */
+#wf-scope-panel { display:none; flex:1; min-height:0; flex-direction:column; }
+#pv-tabs-bar { display:flex; align-items:center; gap:1px; padding:0 2px;
+  border-bottom:1px solid var(--border); flex-shrink:0; }
+#wf-scope-panel .tab-pane { padding:8px; }
+#wf-scope-panel .group { margin-bottom:6px; }
+/* Scope panel needs its own scroll surface (the inspector is overflow:hidden). */
+#wf-scope-panel .tab-pane.active { overflow-y:auto; }

@@ -83,6 +83,12 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--dim);
   cursor: pointer; -webkit-appearance: none; appearance: none; padding: 0; }
 #device-select:focus { outline: none; }
+/* Capture-backend select (Nguồn ảnh) — constrained so it never overflows its
+   borderless wrapper. Mirrors the device-select sizing rules. */
+#capture-backend { flex: 1; min-width: 0; max-width: 120px; border: 1px solid var(--border2);
+  border-radius: 6px; background: var(--panel); font-family: var(--sans); font-size: 11.5px;
+  font-weight: 500; color: var(--dim); cursor: pointer; padding: 4px 6px; }
+#capture-backend:focus { outline: none; border-color: var(--accent); }
 
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
     height: 30px; border-radius: 8px; font-weight: 600; font-size: 11.5px;

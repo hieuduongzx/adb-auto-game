@@ -1,8 +1,16 @@
 // ── Keyboard (workflow shortcuts) ─────────────────────────────────────────────
 window.addEventListener("keydown", e => {
   const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
-  if((e.key==="s"||e.key==="S") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); wfSave(); return; }
+  if((e.key==="s"||e.key==="S") && (e.ctrlKey||e.metaKey)){
+    e.preventDefault();
+    // In Preview mode with a selected region, Ctrl+S = "Chụp vùng" (quick crop)
+    // straight into the workflow's templates/ folder. Otherwise it saves the flow.
+    if(wfPvActive && wfPvRegion){ pvQuickCrop(); return; }
+    wfSave(); return;
+  }
   if(typing) return;   // below here: canvas shortcuts only (let inputs keep native Ctrl+C/V)
+  // Tab — toggle Canvas ↔ Preview view (skipped while typing in an input).
+  if(e.key==="Tab"){ e.preventDefault(); wfSwitchView(wfPvActive?"canvas":"preview"); return; }
   if((e.key==="c"||e.key==="C") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCopy(); } return; }
   if((e.key==="x"||e.key==="X") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCut(); } return; }
   if((e.key==="v"||e.key==="V") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); wfPaste(wfPointer.inside?{clientX:wfPointer.x,clientY:wfPointer.y}:null); return; }

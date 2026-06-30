@@ -138,6 +138,7 @@ function wfAddActivity(type){
   const act={id, name:(type==="background"?"Tác vụ nền ":"Hoạt động ")+n, type,
     enabled:true, maxRetries:1, pollInterval:1.0, vars:[], graph:wfNewGraph()};
   WF.activities.push(act); WF.edit={kind:"activity",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+  if(typeof wfActTab==="function") wfActTab(type==="background"?"bg":"seq");
   wfRenderAll();
 }
 function wfDeleteActivity(id,ev){
@@ -158,6 +159,7 @@ function wfAddFunction(){
   const id="fn_"+wfUid().slice(1,6);
   WF.functions.push({id,name,graph:wfNewGraph()});
   WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+  if(typeof wfActTab==="function") wfActTab("fns");
   wfRenderAll();
 }
 function wfEditFunction(id,ev){ ev&&ev.stopPropagation(); WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1; wfRenderAll(); }

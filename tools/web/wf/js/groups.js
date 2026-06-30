@@ -289,6 +289,8 @@ function wfInitCanvas(){
   canvas.addEventListener("mousemove",e=>{ wfPointer.x=e.clientX; wfPointer.y=e.clientY; wfPointer.inside=true; });
   canvas.addEventListener("mouseleave",()=>{ wfPointer.inside=false; });
   canvas.addEventListener("contextmenu",e=>{
+    // Preview tab owns its own right-click (tap device); skip the graph menu.
+    if(wfPvActive) return;
     e.preventDefault();
     // Right-click on a wire → offer to delete just that wire.
     const wireGrp=e.target.closest("g.wire-grp");
@@ -299,7 +301,7 @@ function wfInitCanvas(){
     if(ne && !WF.sel.includes(ne.dataset.node)){ wfSelectOne(ne.dataset.node); wfMarkSel(); wfRenderInspector(); }
     wfShowMenu(e.clientX, e.clientY);
   });
-  document.addEventListener("mousedown",e=>{ if(!e.target.closest("#wf-ctxmenu")) wfHideMenu(); if(!e.target.closest("#wf-globs-pop") && !e.target.closest("#wf-vars-mgr") && !e.target.closest("#wf-vars-add")) wfHideGlobsEditor(); }, true);
+  document.addEventListener("mousedown",e=>{ if(!e.target.closest("#wf-ctxmenu")) wfHideMenu(); if(!e.target.closest("#wf-globs-pop") && !e.target.closest("#wf-vars-mgr") && !e.target.closest("#wf-vars-add")) wfHideGlobsEditor(); if(!e.target.closest("#wf-layout-bar")) wfCloseLayoutMenu(); }, true);
   // Vars panel header toggles collapse (click-through to drag is fine on body).
   const vhdr=document.querySelector("#wf-vars-panel .wf-vars-hdr");
   if(vhdr) vhdr.onclick=(e)=>{ if(e.target.closest(".wf-vars-actions")) return; wfVarsCollapsed=!wfVarsCollapsed; wfRenderVarsPanel(); };
@@ -316,9 +318,9 @@ function wfInitCanvas(){
   // Only the title row (not the tab bar) is the collapse trigger.
   const ahdr=document.querySelector("#wf-act-hdr-row");
   if(ahdr) ahdr.onclick=(e)=>{ if(e.target.closest(".wf-act-hdr-add")) return; wfActCollapsed=!wfActCollapsed; wfToggleActPanel(); };
-  // Auto-layout buttons (bottom-left toolbar).
-  document.querySelectorAll(".wf-layout-btn").forEach(btn=>{
-    btn.onclick=(e)=>{ e.stopPropagation(); wfAutoLayout(btn.dataset.layout); };
+  // Auto-layout menu (bottom-left): toggle open/closed + run a strategy on pick.
+  document.querySelectorAll(".wf-layout-item").forEach(btn=>{
+    btn.onclick=(e)=>{ e.stopPropagation(); wfAutoLayout(btn.dataset.layout); wfCloseLayoutMenu(); };
   });
   canvas.addEventListener("wheel",e=>{
     e.preventDefault();

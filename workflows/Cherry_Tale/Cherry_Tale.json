@@ -72,7 +72,7 @@
           {
             "id": "ny49hsac",
             "type": "if_image",
-            "x": 0,
+            "x": 40,
             "y": -20,
             "params": {
               "template": "templates/isHome_20260629_020356_32x32.png",

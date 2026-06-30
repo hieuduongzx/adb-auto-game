@@ -6,18 +6,24 @@ function wfRenderAll(){
 }
 
 function wfRenderActivities(){
-  const wrap=$("wf-activities"); if(!wrap) return; wrap.innerHTML="";
-  const cnt=$("wf-act-count"); if(cnt) cnt.textContent = WF.activities.length? String(WF.activities.length):"";
-  if(!WF.activities.length){ wrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có hoạt động.</div>'; return; }
+  // Two buckets of activities share one array but render into separate lists
+  // (Sequent vs Background), each shown under its own tab.
+  const seqWrap=$("wf-activities"), bgWrap=$("wf-activities-bg");
+  const seqCnt=$("wf-act-count"), bgCnt=$("wf-bg-count");
+  if(seqWrap) seqWrap.innerHTML="";
+  if(bgWrap) bgWrap.innerHTML="";
+  const seqActs=WF.activities.filter(a=>a.type!=="background");
+  const bgActs =WF.activities.filter(a=>a.type==="background");
+  if(seqCnt) seqCnt.textContent = seqActs.length? String(seqActs.length):"";
+  if(bgCnt)  bgCnt.textContent = bgActs.length ? String(bgActs.length) :"";
   const check=`<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>`;
-  WF.activities.forEach(act=>{
+  function rowInto(wrap, act){
     const sel = WF.edit.kind==="activity" && act.id===WF.edit.id;
     const el=document.createElement("div");
     el.className="wf-act"+(sel?" sel":""); el.dataset.id=act.id;
     el.innerHTML=
       `<span class="wf-act-grip" title="Kéo để đổi thứ tự">${WF_GRIP}</span>
        <span class="wf-act-cb ${act.enabled?"checked":""}">${check}</span>
-       <span class="wf-badge ${act.type==="background"?"bg":"seq"}">${act.type==="background"?"BG":"SEQ"}</span>
        <span class="wf-act-name">${escHtml(act.name)}</span>
        <button class="wf-act-del" title="Xoá">${wfIco("x")}</button>`;
     el.querySelector(".wf-act-cb").addEventListener("click",e=>wfToggleActivity(act.id,e));
@@ -25,7 +31,15 @@ function wfRenderActivities(){
     el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-cb,.wf-act-del,.wf-act-grip"))return; wfSelectActivity(act.id); });
     wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.activities);
     wrap.appendChild(el);
-  });
+  }
+  if(seqWrap){
+    if(!seqActs.length){ seqWrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có hoạt động tuần tự.</div>'; }
+    else seqActs.forEach(a=>rowInto(seqWrap, a));
+  }
+  if(bgWrap){
+    if(!bgActs.length){ bgWrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">Chưa có tác vụ nền.</div>'; }
+    else bgActs.forEach(a=>rowInto(bgWrap, a));
+  }
 }
 
 function wfRenderFunctions(){
@@ -49,20 +63,23 @@ function wfRenderFunctions(){
 }
 
 // ── Activities/Functions panel tabs (in-canvas bottom-left) ──────────────────
-let wfActTabCur="acts";
+// Three tabs: "seq" (sequence activities), "bg" (background activities), "fns".
+let wfActTabCur="seq";
 function wfActTab(which){
   wfActTabCur=which;
   document.querySelectorAll(".wf-act-tab").forEach(t=>t.classList.toggle("sel", t.dataset.tab===which));
-  const acts=$("wf-activities"), fns=$("wf-functions");
-  if(acts) acts.style.display = which==="acts"?"":"none";
-  if(fns) fns.style.display  = which==="fns" ?"":"none";
+  const acts=$("wf-activities"), bg=$("wf-activities-bg"), fns=$("wf-functions");
+  if(acts) acts.style.display = which==="seq"?"":"none";
+  if(bg)   bg.style.display   = which==="bg" ?"":"none";
+  if(fns)  fns.style.display  = which==="fns"?"":"none";
   const add=$("wf-act-add");
-  if(add) add.title = which==="fns"?"Tạo function mới":"Thêm hoạt động";
+  if(add) add.title = which==="fns"?"Tạo function mới":which==="bg"?"Thêm tác vụ nền":"Thêm hoạt động";
   const title=$("wf-act-hdr-title");
-  if(title) title.textContent = which==="fns" ? "Functions" : "Hoạt động";
+  if(title) title.textContent = which==="fns"?"Functions":which==="bg"?"Tác vụ nền":"Hoạt động";
 }
 function wfActAddCurrent(){
   if(wfActTabCur==="fns") wfAddFunction();
+  else if(wfActTabCur==="bg") wfAddActivity("background");
   else wfAddActivity("sequence");
 }
 function wfToggleActPanel(){
@@ -123,7 +140,19 @@ function wfSetupSortable(listEl){
 
 function wfCommitReorder(listEl, arr){
   const ids=[...listEl.querySelectorAll(".wf-act")].map(e=>e.dataset.id);
-  arr.sort((a,b)=> ids.indexOf(a.id) - ids.indexOf(b.id));
+  if(!ids.length){ wfRenderAll(); return; }
+  if(ids.length>=arr.length){
+    // The list holds the whole array (functions tab, or full activity list) — sort it.
+    arr.sort((a,b)=> ids.indexOf(a.id) - ids.indexOf(b.id));
+  } else {
+    // Filtered subset (Sequent or Background tab): reorder only the matching
+    // items in place, leaving the other bucket exactly where it was.
+    const idSet=new Set(ids);
+    const ord=new Map(ids.map((id,i)=>[id,i]));
+    const matched=arr.filter(a=>idSet.has(a.id)).sort((a,b)=>ord.get(a.id)-ord.get(b.id));
+    let mi=0;
+    for(let i=0;i<arr.length;i++){ if(idSet.has(arr[i].id)) arr[i]=matched[mi++]; }
+  }
   wfRenderAll();
 }
 

@@ -13,6 +13,37 @@ window.__recv = function(raw){
     return;
   }
   if(type==="workflow_state"){ wfSetRunning(!!data.running); return; }
+  if(type==="capture_failed"){
+    // From the Preview tab's live mirror — surface the error and refresh the empty state.
+    setStatus(`Chụp thất bại: ${data.error||""}`);
+    if(typeof wfPvErr!=="undefined"){ wfPvErr=String(data.error||""); if(!wfPvImg && wfPvActive) wfPvDrawEmpty(); }
+    return;
+  }
+  // ── Scope tool events (Preview tab inspector) ───────────────────────────────
+  if(type==="captured"){ const rl=$("wf-pv-res"); if(rl) rl.textContent=`${data.w} × ${data.h}`; return; }
+  if(type==="overlay"){
+    if(typeof wfPvOverlay!=="undefined"){ wfPvOverlay=data.rects||[]; if(typeof wfPvDraw==="function") wfPvDraw(); }
+    return;
+  }
+  if(type==="selection_cleared"){
+    if(typeof wfPvRegion!=="undefined"){ wfPvRegion=null; wfPvPoint=null; wfPvOverlay=[]; pvSetRegionBadge(false); if(typeof wfPvDraw==="function") wfPvDraw(); }
+    return;
+  }
+  if(type==="out_dir"){ if(typeof pvUpdateOutDir==="function") pvUpdateOutDir(data.path); return; }
+  if(type==="device_info"){
+    const D={status:"pv-i-status",serial:"pv-i-serial",model:"pv-i-model",brand:"pv-i-brand",
+      android:"pv-i-android",abi:"pv-i-abi",screen_size:"pv-i-screen",density:"pv-i-density",
+      app:"pv-i-app",battery:"pv-i-battery",ip:"pv-i-ip",uptime:"pv-i-uptime"};
+    Object.keys(D).forEach(k=>{ const e=$(D[k]); if(e) e.textContent=data[k]||"-"; });
+    return;
+  }
+  if(type==="copy_device_info"){
+    const D={status:"pv-i-status",serial:"pv-i-serial",model:"pv-i-model",brand:"pv-i-brand",
+      android:"pv-i-android",abi:"pv-i-abi",screen_size:"pv-i-screen",density:"pv-i-density",
+      app:"pv-i-app",battery:"pv-i-battery",ip:"pv-i-ip",uptime:"pv-i-uptime"};
+    navigator.clipboard.writeText(Object.keys(D).map(k=>`${k}: ${$(D[k]).textContent}`).join("\n"));
+    setStatus("Đã sao chép thông tin thiết bị"); return;
+  }
   // Ignore node events for a graph we're not viewing (e.g. a function's internal
   // nodes while a call node runs) so the call block stays lit instead of the
   // highlight vanishing into the off-screen function graph. Also drop late events

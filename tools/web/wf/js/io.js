@@ -75,6 +75,13 @@ function wfSetRunning(on){
     b.title = on?"Dừng":"Chạy thử";
     b.classList.toggle("ok",!on); b.classList.toggle("err",on);
   }
+  // Running status pill: amber "Đang chạy" while executing, grey "Sẵn sàng" at rest.
+  const pill=$("wf-run-status");
+  if(pill){
+    pill.classList.toggle("running", !!on);
+    const txt=pill.querySelector(".wf-run-txt");
+    if(txt) txt.textContent = on ? "Đang chạy" : (wfRunStopped ? "Đã dừng" : "Sẵn sàng");
+  }
   wfRenderVarsPanel();
 }
 async function wfToggleRun(){
@@ -114,6 +121,7 @@ async function init(){
   wfInitSideResizer();
   wfInitInspResizer();
   wfSetupSortable($("wf-activities"));
+  if($("wf-activities-bg")) wfSetupSortable($("wf-activities-bg"));
   if($("wf-functions")) wfSetupSortable($("wf-functions"));
   wfSyncToggleBtns();
   wfSetRunning(false);   // seed the run button's play icon
@@ -128,6 +136,7 @@ async function init(){
   // wfHydrate and wfAddActivity both call wfRenderAll() themselves; only fall back here.
   if(!WF.activities.length){ wfAddActivity("sequence"); didRender=true; }
   if(!didRender) wfRenderAll();
+  wfZoomApplyMode("canvas");  // ensure the shared zoom cluster targets the graph on load
   setStatus(reopened ? ("Đã mở lại: "+reopened) : "Sẵn sàng");
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
