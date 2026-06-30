@@ -805,7 +805,7 @@
             "id": "ndsfyaan",
             "type": "start",
             "x": 60,
-            "y": 0,
+            "y": 40,
             "params": {}
           },
           {
@@ -848,8 +848,8 @@
           {
             "id": "nqq5uqhi",
             "type": "tap_image",
-            "x": 1600,
-            "y": 60,
+            "x": 1660,
+            "y": 40,
             "params": {
               "template": "templates/crop_20260628_094026_184x51.png",
               "taps": "1",
@@ -860,7 +860,7 @@
           {
             "id": "nropbwkp",
             "type": "tap_image",
-            "x": 2240,
+            "x": 2320,
             "y": -120,
             "params": {
               "template": "templates/crop_20260628_132414_213x39.png",
@@ -872,7 +872,7 @@
           {
             "id": "n2dwmct2",
             "type": "loop",
-            "x": 1200,
+            "x": 1220,
             "y": -20,
             "params": {
               "count": 3,
@@ -882,8 +882,8 @@
           {
             "id": "nsjvuudw",
             "type": "loop",
-            "x": 1800,
-            "y": 60,
+            "x": 1900,
+            "y": 40,
             "params": {
               "count": 3,
               "infinite": true
@@ -900,7 +900,7 @@
             "id": "nne6fwms",
             "type": "call",
             "x": 260,
-            "y": 0,
+            "y": 40,
             "params": {
               "fn": "fn_znmtg"
             }
@@ -935,7 +935,7 @@
           {
             "id": "n6ajcw9n",
             "type": "parallel",
-            "x": 2000,
+            "x": 2080,
             "y": -120,
             "params": {
               "count": 3
@@ -944,8 +944,8 @@
           {
             "id": "ntf795d4",
             "type": "loop",
-            "x": 2200,
-            "y": 80,
+            "x": 2140,
+            "y": 100,
             "params": {
               "count": 3,
               "infinite": true
@@ -955,7 +955,7 @@
             "id": "njwarb4k",
             "type": "if_image",
             "x": 2380,
-            "y": 80,
+            "y": 100,
             "params": {
               "template": "templates/crop_20260630_160638_35_94_207_59.png",
               "threshold": 0.85,

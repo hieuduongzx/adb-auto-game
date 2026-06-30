@@ -38,7 +38,7 @@ function wfBezier(a,b){
 
   // ── Backward (target behind source): U-turn gọn — ra phải, vòng dọc, sang trái, vào ─
   if(dx < -10){
-    const h=Math.max(30, Math.min(adx*0.25, 60));
+    const h=Math.max(30, Math.min(adx*0.25, 1));
     const outX=a.x+h, inX=b.x-h;
     const vOff=Math.max(45, ady*0.4+20);
     const midY=(a.y+b.y)/2 + vOff;
