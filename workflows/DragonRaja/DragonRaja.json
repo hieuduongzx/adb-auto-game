@@ -219,15 +219,15 @@
           {
             "id": "n24cl8fx",
             "type": "start",
-            "x": 100,
-            "y": 40,
+            "x": 60,
+            "y": 20,
             "params": {}
           },
           {
             "id": "n6mnrwmg",
             "type": "call",
-            "x": 280,
-            "y": 40,
+            "x": 260,
+            "y": 20,
             "params": {
               "fn": "fn_nd3oj"
             }
@@ -236,7 +236,7 @@
             "id": "n62x2k6o",
             "type": "tap_image",
             "x": 460,
-            "y": 40,
+            "y": 20,
             "params": {
               "template": "templates/crop_20260630_205315_1368_319_296_38.png",
               "taps": "1",
@@ -250,7 +250,7 @@
             "id": "n8x6kc30",
             "type": "tap_image",
             "x": 460,
-            "y": -40,
+            "y": 100,
             "params": {
               "template": "templates/crop_20260630_205319_1649_974_206_38.png",
               "taps": "1",
@@ -263,8 +263,8 @@
           {
             "id": "ng1j7p4o",
             "type": "tap_image",
-            "x": 1020,
-            "y": 80,
+            "x": 760,
+            "y": 100,
             "params": {
               "template": "templates/crop_20260630_205322_1542_974_107_41.png",
               "taps": "1",
@@ -277,8 +277,8 @@
           {
             "id": "nrnrnjut",
             "type": "call",
-            "x": 1020,
-            "y": 40,
+            "x": 960,
+            "y": 100,
             "params": {
               "fn": "fn_b6am3"
             }
@@ -286,8 +286,8 @@
           {
             "id": "ntbvxgu1",
             "type": "tap",
-            "x": 1320,
-            "y": 40,
+            "x": 1160,
+            "y": 100,
             "params": {
               "target": "pos",
               "x": 922,

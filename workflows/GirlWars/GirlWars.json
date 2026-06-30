@@ -434,7 +434,8 @@
           "name": "fixMissingStar",
           "label": "Đánh lại star bị thiếu",
           "type": "bool",
-          "value": true
+          "value": true,
+          "options": []
         }
       ],
       "graph": {
@@ -443,13 +444,13 @@
             "id": "ncijn572",
             "type": "start",
             "x": -140,
-            "y": -220,
+            "y": -240,
             "params": {}
           },
           {
             "id": "n9aawlyj",
             "type": "tap_image",
-            "x": 80,
+            "x": 220,
             "y": -20,
             "params": {
               "template": "templates/crop_20260628_222549_80x76.png",
@@ -467,7 +468,7 @@
           {
             "id": "n0ula8uu",
             "type": "tap_image",
-            "x": 80,
+            "x": 220,
             "y": 40,
             "params": {
               "template": "templates/crop_20260628_222639_249x113.png",
@@ -483,8 +484,8 @@
           {
             "id": "ncpyerfm",
             "type": "tap_image",
-            "x": 280,
-            "y": -100,
+            "x": 240,
+            "y": -240,
             "params": {
               "template": "templates/crop_20260628_222729_102x31.png",
               "taps": "1",
@@ -498,7 +499,7 @@
             "id": "n8hdlfe3",
             "type": "if_image",
             "x": 640,
-            "y": -100,
+            "y": -240,
             "params": {
               "template": "templates/crop_20260628_222818_212x29.png",
               "threshold": 0.85,
@@ -508,8 +509,8 @@
           {
             "id": "naq5m86b",
             "type": "tap",
-            "x": 840,
-            "y": -100,
+            "x": 820,
+            "y": -280,
             "params": {
               "target": "pos",
               "x": 853,
@@ -519,8 +520,8 @@
           {
             "id": "n0yhbzwo",
             "type": "tap_image",
-            "x": 1165,
-            "y": 65,
+            "x": 1140,
+            "y": 60,
             "params": {
               "template": "templates/crop_20260628_223040_97x44.png",
               "taps": "1",
@@ -538,7 +539,7 @@
             "id": "n9p1rhlz",
             "type": "wait",
             "x": 460,
-            "y": -100,
+            "y": -240,
             "params": {
               "seconds": 1
             }
@@ -590,7 +591,7 @@
           {
             "id": "nnfg8k9x",
             "type": "call",
-            "x": 80,
+            "x": 220,
             "y": -60,
             "params": {
               "fn": "fn_yt9m6"
@@ -599,8 +600,8 @@
           {
             "id": "n10tligp",
             "type": "loop",
-            "x": 1342,
-            "y": 64,
+            "x": 1340,
+            "y": 60,
             "params": {
               "count": 3,
               "infinite": true
@@ -643,8 +644,8 @@
           {
             "id": "nq3eh1uc",
             "type": "if_var",
-            "x": 840,
-            "y": -40,
+            "x": 820,
+            "y": -180,
             "params": {
               "name": "fixMissingStar",
               "op": "==",
@@ -700,8 +701,8 @@
           {
             "id": "nkyvc7tr",
             "type": "if_image",
-            "x": 60,
-            "y": -220,
+            "x": 40,
+            "y": -240,
             "params": {
               "template": "templates/crop_20260628_230152_237x42.png",
               "threshold": 0.85,
@@ -816,7 +817,7 @@
             "id": "nx77gs1h",
             "type": "wait",
             "x": 3020,
-            "y": -307,
+            "y": -309,
             "params": {
               "seconds": 5
             },
@@ -1084,7 +1085,7 @@
           {
             "id": "gt9hdsn1",
             "name": "Join",
-            "x": 60,
+            "x": 200,
             "y": -100,
             "w": 200,
             "h": 260,
@@ -2889,13 +2890,15 @@
           "name": "school",
           "label": "School",
           "type": "bool",
-          "value": true
+          "value": true,
+          "options": []
         },
         {
           "name": "claim_resouce",
           "label": "Calim Resource",
           "type": "bool",
-          "value": true
+          "value": true,
+          "options": []
         }
       ],
       "graph": {
