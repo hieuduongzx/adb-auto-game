@@ -1,4 +1,6 @@
 // ── Export / import / run ────────────────────────────────────────────────────
+function wfSerialVars(vars){ return vars.map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[], children:v.children&&v.children.length?wfSerialVars(v.children):undefined})); }
+function wfHydVars(vars){ return (vars||[]).map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[], children:v.children?wfHydVars(v.children):[]})); }
 function wfCleanGraph(g){
   return {
     nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.delayBefore) o.delayBefore=n.delayBefore; if(n.delayAfter) o.delayAfter=n.delayAfter; if(n.showPreview) o.showPreview=true; if(n.stack) o.stack=n.stack; return o; }),
@@ -12,11 +14,11 @@ function wfSerialize(){
   return {
     name:$("wf-name").value||"workflow", version:2, templatesDir:WF.templatesDir||"templates",
     speedhack:{ enabled:!!sh.enabled, speed:sh.speed||2.0, package:(sh.package||"").trim() },
-    globals:(WF.globals||[]).map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[]})),
+    globals: wfSerialVars(WF.globals||[]),
     functions: WF.functions.map(f=>({ id:f.id, name:f.name, graph:wfCleanGraph(f.graph) })),
     activities: WF.activities.map(a=>{
       const o={ id:a.id, name:a.name, type:a.type, enabled:a.enabled,
-        vars:(a.vars||[]).map(v=>({name:v.name,label:v.label||"",type:v.type,value:v.value, options:v.type==="select"?(v.options||[]):undefined})), graph:wfCleanGraph(a.graph) };
+        vars: wfSerialVars(a.vars||[]), graph:wfCleanGraph(a.graph) };
       if(a.type==="background") o.pollInterval=a.pollInterval; else o.maxRetries=a.maxRetries;
       return o;
     }),
@@ -43,12 +45,12 @@ function wfHydrate(flow){
   WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"templates";
   const sh=flow.speedhack||{}; WF.speedhack={enabled:!!sh.enabled, speed:(parseFloat(sh.speed)||2.0), package:(sh.package||"").trim()};
   WF.functions=(flow.functions||[]).map(f=>({ id:f.id||("fn_"+wfUid().slice(1,6)), name:f.name||"function", graph:wfHydrateGraph(f.graph) }));
-  WF.globals=(flow.globals||[]).map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[]}));
+  WF.globals = wfHydVars(flow.globals||[]);
   WF.activities=(flow.activities||[]).map(a=>({
     id:a.id||("act_"+wfUid().slice(1,5)), name:a.name||a.id||"activity",
     type:a.type==="background"?"background":"sequence", enabled:a.enabled!==false,
     maxRetries:a.maxRetries||1, pollInterval:a.pollInterval||1.0,
-    vars:(a.vars||[]).map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[]})),
+    vars: wfHydVars(a.vars||[]),
     graph:wfHydrateGraph(a.graph),
   }));
   WF.edit={kind:"activity", id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;

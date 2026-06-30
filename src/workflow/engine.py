@@ -790,24 +790,30 @@ class WorkflowEngine:
     def _seed_vars(self, act: Dict) -> Dict[str, Any]:
         """Initial variable values for a thread: globals first, then the
         activity's own declared ``vars`` (which may override a same-named
-        global for this run)."""
+        global for this run). Nested children are flattened with dotted keys."""
         out: Dict[str, Any] = {}
         for v in (self._globals or {}).items():
             out[v[0]] = v[1]
         for v in (act.get("vars") or []):
-            nm = str(v.get("name", "")).strip()
-            if not nm:
-                continue
-            t = v.get("type", "text")
-            val = v.get("value")
-            if t == "bool":
-                out[nm] = self._truthy(val)
-            elif t == "number":
-                c = self._coerce(val)
-                out[nm] = c if isinstance(c, (int, float)) and not isinstance(c, bool) else 0
-            else:  # text / select → string
-                out[nm] = "" if val is None else str(val)
+            self._seed_var(v, out)
         return out
+
+    def _seed_var(self, v: Dict, out: Dict[str, Any], prefix: str = "") -> None:
+        nm = str(v.get("name", "")).strip()
+        if not nm:
+            return
+        full = f"{prefix}.{nm}" if prefix else nm
+        t = v.get("type", "text")
+        val = v.get("value")
+        if t == "bool":
+            out[full] = self._truthy(val)
+        elif t == "number":
+            c = self._coerce(val)
+            out[full] = c if isinstance(c, (int, float)) and not isinstance(c, bool) else 0
+        else:
+            out[full] = "" if val is None else str(val)
+        for child in (v.get("children") or []):
+            self._seed_var(child, out, full)
 
     @staticmethod
     def _region(params: Dict) -> tuple:

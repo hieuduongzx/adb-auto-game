@@ -19,57 +19,43 @@ function wfPortPt(nodeId,port){
   return { x:(r.left+r.width/2-wr.left)/wfZoom, y:(r.top+r.height/2-wr.top)/wfZoom };
 }
 // Arrowhead markers, one per wire colour (CSS picks the right one via marker-end).
-// Compact chevrons (not chunky triangles) so they read as direction hints, not
-// dots. Re-inserted on every full redraw because wfDrawWires clears the <svg>.
+// Compact chevrons — for orthogonal wires, marker orients on the last segment.
 const WF_WIRE_DEFS = (function(){
-  // Elongated filled chevron: 8×7.5 in userspace, notch at 22% depth.
-  // refX=8 aligns the sharp tip exactly to the path endpoint.
-  const mk=(id,c)=>`<marker id="${id}" markerWidth="7" markerHeight="7" refX="5.6" refY="2.6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0.4 L5.6,2.6 L0,4.8 L1.3,2.6 Z" fill="${c}" fill-opacity="0.95"/></marker>`;
+  const mk=(id,c)=>`<marker id="${id}" markerWidth="7" markerHeight="7" refX="0" refY="2.6" orient="auto" markerUnits="userSpaceOnUse"><path d="M5.6,0.4 L0,2.6 L5.6,4.8 L4.3,2.6 Z" fill="${c}" fill-opacity="0.95"/></marker>`;
   return "<defs>"+mk("wf-ah","#94a6ba")+mk("wf-ah-h","#bb3a33")+mk("wf-ah-t","#1f9d57")
     +mk("wf-ah-f","#e0792e")+mk("wf-ah-nottook","#d6483f")+mk("wf-ah-loop","#d09030")+mk("wf-ah-temp","#2f6fed")+"</defs>";
 })();
 // ── Wire routing ──────────────────────────────────────────────────────────────
-// Three regimes ordered by a single invariant:
-//   • Forward (dx ≥ 0): horizontal S-curve.
-//       KEY RULE: hx ≤ dx/2. When this is violated the two control points cross
-//       each other → the bezier folds back on itself → the "spiral" artefact.
-//       At small dx the wire becomes a nearly-straight line, which is correct.
-//   • Near-vertical (|dx| < 55 AND dy is the dominant dimension): vertical
-//       S-curve so the wire exits/arrives straight down instead of diagonal.
-//       Only fires when ady > adx*1.8 to avoid false-triggering on diagonal wires.
-//   • Backward (dx < 0, not near-vertical): U-bow sized by the actual span
-//       between the two ports so close nodes get a tight arc and far nodes a
-//       wide one — avoids the "huge arch over two adjacent blocks" problem.
+// Hybrid: bezier for forward horizontal flow (soft, natural), orthogonal
+// right-angle bends when the target is above/below or behind — no more
+// looping curves that cross over themselves.
+//
+//   • Straight / near-horizontal: bezier S-curve.
+//   • Target directly below/above (small dx, large dy): orthogonal L-shape.
+//   • Backward (dx < 0): orthogonal U-turn via a vertical leg.
 function wfBezier(a,b){
   const dx=b.x-a.x, dy=b.y-a.y, adx=Math.abs(dx), ady=Math.abs(dy);
 
-  // ── Near-vertical (applies to both forward and slightly-backward) ───────────
-  // Condition: small horizontal gap AND vertical is the dominant direction.
-  if(adx < 55 && ady > adx * 1.8){
-    const h=Math.max(48, ady * 0.44);
-    const ys=Math.sign(dy)||1;
-    return `M${a.x},${a.y} C${a.x},${a.y+ys*h} ${b.x},${b.y-ys*h} ${b.x},${b.y}`;
+  // ── Backward: orthogonal U-turn (target is behind source) ──────────────────
+  if(dx < -10){
+    const h=Math.max(40, Math.min(adx*0.4, 120));
+    const outX=a.x+h, inX=b.x-h;
+    const sign=dy>=0?1:-1;
+    const vOff=Math.max(30, ady*0.15+12);
+    const midY=(a.y+b.y)/2 + sign*vOff;
+    return `M${a.x},${a.y} L${outX},${a.y} L${outX},${midY} L${inX},${midY} L${inX},${b.y} L${b.x},${b.y}`;
   }
 
-  // ── Backward: U-bow ─────────────────────────────────────────────────────────
-  if(dx < 0){
-    // hx: horizontal kick from each port before the bow starts.
-    const hx=Math.min(155, Math.max(42, adx * 0.38 + 28));
-    // bow: perpendicular offset, scaled by the diagonal span so adjacent nodes
-    // get a tight arc and far-apart nodes get a wide, comfortable arc.
-    const span=Math.hypot(adx, ady);
-    const bow=Math.min(195, Math.max(48, span * 0.44 + 36));
-    // Bow away from the midline: downward when target is above, upward when below.
-    const bowSign=dy < 0 ? 1 : -1;
-    return `M${a.x},${a.y} C${a.x+hx},${a.y+bowSign*bow} ${b.x-hx},${b.y+bowSign*bow} ${b.x},${b.y}`;
+  // ── Near-vertical: target is mostly below/above, small horizontal gap ──────
+  // Orthogonal L-shape — out right past the block, vertical, then right into target.
+  if(adx < 70 && ady > adx * 1.4){
+    const h=Math.max(55, adx*0.5);
+    const midX=a.x+h;
+    return `M${a.x},${a.y} L${midX},${a.y} L${midX},${b.y} L${b.x},${b.y}`;
   }
 
-  // ── Forward S-curve ─────────────────────────────────────────────────────────
-  // A firmer, symmetric S that reads like pro node editors: each end leaves/arrives
-  // dead-horizontal ("cứng" — stiff), then eases through the middle ("mềm" — soft).
-  // hx stays ≤ dx/2 (hard invariant: prevents the control points crossing = no
-  // spiral) and is capped so far-apart nodes don't sweep into a loose, lazy arc.
-  const hx=Math.min(dx / 2, 150);
+  // ── Forward / diagonal: soft bezier S-curve ─────────────────────────────────
+  const hx=Math.min(dx/2, 150);
   return `M${a.x},${a.y} C${a.x+hx},${a.y} ${b.x-hx},${b.y} ${b.x},${b.y}`;
 }
 function wfDrawWires(){

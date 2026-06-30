@@ -155,9 +155,9 @@
 #wf-world { position:absolute; left:0; top:0; width:4000px; height:3000px; transform:translate(0px,0px); transform-origin:0 0; }
 #wf-wires { position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
 /* Wires carry a directional arrowhead (markers defined per-colour in <defs>, see
-   WF_WIRE_DEFS) so the flow direction reads at a glance. Rounded caps/joins keep
-   the curves smooth. A wider transparent stroke under each path widens the
-   click/hover target without thickening the visible line. */
+   WF_WIRE_DEFS) so the flow direction reads at a glance. Rounded joins keep
+   the orthogonal bends clean. A wider transparent stroke under each path
+   widens the click/hover target without thickening the visible line. */
 /* A fat invisible hit-path sits under each wire so it's easy to hover / right-
    click without thickening the visible line. The visible wire is click-through. */
 #wf-wires .wire-hit { fill:none; stroke:transparent; stroke-width:18; pointer-events:stroke;

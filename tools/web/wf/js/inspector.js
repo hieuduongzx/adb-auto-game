@@ -229,15 +229,39 @@ function wfActField(label,t,val,onset){
 function wfVarsSection(act){
   if(!act.vars) act.vars=[];
   const b=wfInspBlock("Biến hoạt động", act.vars.length);
-  act.vars.forEach((v,idx)=>b.appendChild(wfVarRow(act,v,idx)));
-  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Biến"; add.style.alignSelf="flex-start";
-  add.onclick=()=>{ wfPushUndoDebounced(); const n=act.vars.length+1; act.vars.push({name:"var"+n, label:"Setting "+n, type:"bool", value:false}); wfRenderInspector(); };
-  b.appendChild(add);
+  b.style.gap="2px";
+  act.vars.forEach((v,idx)=>wfBuildVarTree(act,v,idx,b));
+  b.appendChild(wfVarAddBtn(act));
   return b;
 }
-function wfVarRow(act,v,idx){
+function wfVarAddBtn(act, parentVar, parentIdx){
+  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Biến"; add.style.alignSelf="flex-start";
+  add.onclick=()=>{
+    wfPushUndoDebounced();
+    const arr=parentVar?parentVar.children:(act.vars);
+    const n=arr.length+1; const prefix=parentVar?(parentVar.name||"sub")+"_":"";
+    arr.push({name:prefix+"var"+n, label:"Setting "+n, type:"bool", value:false, children:[]});
+    wfRenderInspector();
+  };
+  return add;
+}
+function wfBuildVarTree(act,v,idx,container,depth){
+  depth=depth||0;
+  v.children=v.children||[];
+  const card=wfVarRow(act,v,idx,depth);
+  container.appendChild(card);
+  v.children.forEach((cv,ci)=>{
+    cv.children=cv.children||[];
+    const subCard=wfVarRow(act,cv,ci,depth+1);
+    container.appendChild(subCard);
+    cv.children.forEach((ccv,cci)=>{ ccv.children=ccv.children||[]; container.appendChild(wfVarRow(act,ccv,cci,depth+2)); });
+  });
+}
+function wfVarRow(act,v,idx,depth){
+  depth=depth||0;
   const card=document.createElement("div"); card.className="wf-var-card";
-  // Line 1: drag-chip + title + delete.
+  if(depth>0) card.style.marginLeft=(depth*14)+"px";
+  // Line 1: drag-chip + title + delete + add-child button.
   const r1=document.createElement("div"); r1.className="wf-var-row";
   const chip=document.createElement("span"); chip.className="wf-var-chip"; chip.draggable=true;
   chip.textContent="🔖"; chip.title="Kéo vào canvas để tạo node kiểm tra";
@@ -247,8 +271,18 @@ function wfVarRow(act,v,idx){
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Tiêu đề (hiện trong settings)"; lbl.style.cssText="flex:1;min-width:0;font-weight:600;";
   lbl.oninput=()=>{ wfPushUndoDebounced(); v.label=lbl.value; };
   r1.appendChild(lbl);
+  const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Con"; addChild.title="Thêm biến con (nested)";
+  addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); wfRenderInspector(); };
+  r1.appendChild(addChild);
   const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Xoá biến";
-  del.onclick=()=>{ wfPushUndoDebounced(); act.vars.splice(idx,1); wfRenderInspector(); };
+  del.onclick=()=>{
+    wfPushUndoDebounced();
+    // Find parent array and remove this var
+    const parentArr = depth>0 ? (findParentVarArr(act.vars, idx, depth)||act.vars) : act.vars;
+    if(depth>0){ const pi=findParentVarIdx(act.vars, idx, depth); if(pi>=0) parentArr.splice(pi,1); }
+    else act.vars.splice(idx,1);
+    wfRenderInspector();
+  };
   r1.appendChild(del);
   // Line 2: name + type + default value.
   const r2=document.createElement("div"); r2.className="wf-var-row";
@@ -276,6 +310,25 @@ function wfVarRow(act,v,idx){
     r3.appendChild(opt); card.appendChild(r3);
   }
   return card;
+}
+// ── Helpers for nested variable deletion ───────────────────────────────────
+function wfFindVarInArr(arr, idx, depth, level){
+  if(level===depth) return {arr, i:idx};
+  for(const v of arr){
+    if(v.children&&v.children.length){
+      const found=wfFindVarInArr(v.children, idx, depth, level+1);
+      if(found) return found;
+    }
+  }
+  return null;
+}
+function findParentVarArr(arr, idx, depth){
+  const result=wfFindVarInArr(arr, idx, depth, 0);
+  return result?result.arr:arr;
+}
+function findParentVarIdx(arr, idx, depth){
+  const result=wfFindVarInArr(arr, idx, depth, 0);
+  return result?result.i:-1;
 }
 function wfVarValue(v){
   if((v.type||"bool")==="bool"){

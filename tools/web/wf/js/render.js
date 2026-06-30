@@ -205,12 +205,10 @@ function wfRenderCanvas(){
 // pushed during a test run. Live values override declared defaults.
 function wfDeclaredVars(){
   const out={};
-  // Globals first (declared at flow level, visible everywhere).
-  (WF.globals||[]).forEach(v=>{ const nm=(v.name||"").trim(); if(nm) out[nm]=v.value; });
+  const walk=(vars,prefix)=>{ (vars||[]).forEach(v=>{ const nm=(v.name||"").trim(); if(!nm) return; const full=prefix?prefix+"."+nm:nm; out[full]=v.value; walk(v.children,full); }); };
+  walk(WF.globals,"");
   const act=wfCurAct();
-  if(act && Array.isArray(act.vars)){
-    act.vars.forEach(v=>{ const nm=(v.name||"").trim(); if(nm) out[nm]=v.value; });
-  }
+  if(act) walk(act.vars,"");
   return out;
 }
 // All known variable names across the whole flow (every activity + functions),
@@ -231,8 +229,9 @@ function wfGraphVarNames(g){
 }
 function wfAllVarNames(){
   const s=new Set();
-  (WF.globals||[]).forEach(v=>{ const n=(v.name||"").trim(); if(n)s.add(n); });
-  (WF.activities||[]).forEach(a=>{ (a.vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(n)s.add(n); }); });
+  const walk=(vars,prefix)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; s.add(full); walk(v.children,full); }); };
+  walk(WF.globals,"");
+  (WF.activities||[]).forEach(a=>{ walk(a.vars,""); });
   // Vars produced by nodes anywhere in the flow count as defaults too.
   (WF.activities||[]).forEach(a=>{ wfGraphVarNames(a.graph).forEach(n=>s.add(n)); });
   (WF.functions||[]).forEach(fn=>{ wfGraphVarNames(fn.graph).forEach(n=>s.add(n)); });
@@ -245,9 +244,13 @@ function wfRenderVarsPanel(){
   panel.classList.toggle("live", Object.keys(wfLiveVars).length>0);
   const declared=wfDeclaredVars();
   // Buckets: globals → activity-declared → node-produced → live-only extras.
-  const globalNames=[]; (WF.globals||[]).forEach(v=>{ const n=(v.name||"").trim(); if(n) globalNames.push(n); });
-  const actDeclared={}; const act=wfCurAct(); (act&&act.vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(n&&!globalNames.includes(n)) actDeclared[n]=v.value; });
-  const actNames=Object.keys(actDeclared);
+  // Walk nested vars to collect all names (dotted for children).
+  const globalNames=[];
+  const walkNames=(vars,prefix)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; globalNames.push(full); walkNames(v.children,full); }); };
+  walkNames(WF.globals,"");
+  const actDeclared={}; const act=wfCurAct(); const actNames=[];
+  const walkAct=(vars,prefix)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; if(!globalNames.includes(full)){ actDeclared[full]=v.value; actNames.push(full); } walkAct(v.children,full); }); };
+  if(act) walkAct(act.vars,"");
   const g=wfGraph();
   const nodeNames=[]; wfGraphVarNames(g).forEach(n=>{ if(!globalNames.includes(n)&&!actNames.includes(n)) nodeNames.push(n); });
   const liveExtra=[]; Object.keys(wfLiveVars).forEach(n=>{ if(!globalNames.includes(n)&&!actNames.includes(n)&&!nodeNames.includes(n)) liveExtra.push(n); });
@@ -315,10 +318,10 @@ function wfShowGlobsEditor(){
       e.textContent="Chưa có biến toàn cục. Bấm \"+ Thêm\".";
       body.appendChild(e);
     }
-    WF.globals.forEach((v,idx)=> body.appendChild(wfGlobRow(v,idx,render)));
+    WF.globals.forEach((v,idx)=> { body.appendChild(wfGlobRow(v,idx,render)); wfBuildGlobChildren(v,body,render); });
     const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Thêm";
     add.style.marginTop="2px";
-    add.onclick=()=>{ wfPushUndoDebounced(); const n=WF.globals.length+1; WF.globals.push({name:"g"+n, label:"Toàn cục "+n, type:"bool", value:false}); render(); wfRenderVarsPanel(); };
+    add.onclick=()=>{ wfPushUndoDebounced(); const n=WF.globals.length+1; WF.globals.push({name:"g"+n, label:"Toàn cục "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
     body.appendChild(add);
   }
   render();
@@ -338,10 +341,12 @@ function wfGlobRow(v,idx,render){
   const r1=document.createElement("div"); r1.className="wf-var-row";
   r1.style.alignItems="center";
   const tag=document.createElement("span"); tag.className="wf-glob-tag"; tag.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>TOÀN CỤC';
+  const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Con"; addChild.title="Thêm biến con";
+  addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
   const del=document.createElement("button"); del.className="wf-glob-del"; del.textContent="−"; del.title="Xoá biến toàn cục";
   del.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); WF.globals.splice(idx,1); render(); wfRenderVarsPanel(); };
   const sp=document.createElement("span"); sp.style.flex="1";
-  r1.appendChild(tag); r1.appendChild(sp); r1.appendChild(del);
+  r1.appendChild(tag); r1.appendChild(sp); r1.appendChild(addChild); r1.appendChild(del);
   card.appendChild(r1);
   const r1b=document.createElement("div"); r1b.className="wf-var-row";
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Tiêu đề"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
@@ -372,6 +377,16 @@ function wfGlobRow(v,idx,render){
     r3.appendChild(opt); card.appendChild(r3);
   }
   return card;
+}
+function wfBuildGlobChildren(v,container,render,depth){
+  depth=depth||0;
+  v.children=v.children||[];
+  v.children.forEach((cv,ci)=>{
+    const childCard=wfGlobRow(cv,ci,render);
+    childCard.style.marginLeft=((depth+1)*14)+"px";
+    container.appendChild(childCard);
+    if(cv.children&&cv.children.length) wfBuildGlobChildren(cv,container,render,depth+1);
+  });
 }
 
 // Lightweight static checks surfaced as a "!" badge on the node — catches the two
