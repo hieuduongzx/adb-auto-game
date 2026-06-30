@@ -860,8 +860,8 @@
           {
             "id": "nropbwkp",
             "type": "tap_image",
-            "x": 2200,
-            "y": -100,
+            "x": 2240,
+            "y": -120,
             "params": {
               "template": "templates/crop_20260628_132414_213x39.png",
               "taps": "1",
@@ -936,7 +936,7 @@
             "id": "n6ajcw9n",
             "type": "parallel",
             "x": 2000,
-            "y": -100,
+            "y": -120,
             "params": {
               "count": 3
             }
