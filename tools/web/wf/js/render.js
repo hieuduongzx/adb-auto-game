@@ -410,6 +410,7 @@ function wfNodeWarnings(n, def, g){
 }
 function wfNodeEl(n){
   const def=WF_NODES[n.type]||{label:n.type,ico:"help",kind:"action",outs:["out"],fields:[]};
+  const g=wfGraph();
   const el=document.createElement("div");
   // Category tint (only for the bulk action/condition blocks — structural kinds
   // start/end/stop/loop/call/note keep their own distinct styling).
@@ -420,12 +421,12 @@ function wfNodeEl(n){
   el.className="wf-node "+def.kind+catCls+tfCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"");
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
   // Dynamic output ports — grow the card so they all sit inside it (ports stack
-  // at top = 9 + i*19).
+  // from top=3 with 16px spacing; last port needs room below it).
   if(n.type==="switch"||n.type==="try_chain"){
     const portCount = n.type==="switch"
       ? ((n.params&&n.params.cases)||[]).length+1
       : Math.max(1,parseInt(n.params&&n.params.count)||3)+1;
-    el.style.minHeight=(9 + (portCount-1)*19 + 16)+"px";
+    el.style.minHeight=(3 + (portCount-1)*16 + 14)+"px";
   }
   // Merged-block membership: hide the join port at the joined edge and flatten
   // that corner so the stack reads as one block.
@@ -449,18 +450,21 @@ function wfNodeEl(n){
   if(n.delayAfter)  dp.push(`${wfIco("timer")}<span>Đợi ${n.delayAfter}s</span>`);
   const delayHtml = dp.length ? `<div class="wf-node-delay">${dp.join("")}</div>` : "";
   // tpls → a strip of small thumbnails (one per listed image); single tpl → one.
-  const thumbHtml = showThumb ? (isTpls
+  // The preview row is always rendered (so block height is stable) but the image
+  // is hidden via CSS until showPreview / wfPreviewAll turns it on.
+  const hasRealThumb = hasTpl && (wfPreviewAll || n.showPreview);
+  const thumbHtml = hasTpl ? (isTpls
     ? `<div class="wf-node-thumbs"></div>`
     : `<img class="wf-node-thumb">`) : "";
   const sumHtml = sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"";
-  // Preview is a small square at the left of the body, on one row with the summary.
-  const topRow = thumbHtml ? `<div class="wf-node-prevrow">${thumbHtml}${sumHtml}</div>` : sumHtml;
+  const topRow = hasTpl ? `<div class="wf-node-prevrow">${thumbHtml}${sumHtml}</div>` : sumHtml;
+  el.classList.toggle("showing-thumb", hasRealThumb);
+  el.classList.toggle("has-thumb", hasTpl);
   el.innerHTML=
     `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span>${eyeBtn}<span class="wf-node-title">${escHtml(title)}</span></div>`+
     topRow+delayHtml+noteHtml+logHtml;
-  if(!sum && !n.note && !n.log && !delayHtml && !thumbHtml) el.classList.add("collapsed");
-  if(thumbHtml){
-    el.classList.add("has-thumb");
+  if(!sum && !n.note && !n.log && !delayHtml && !hasTpl) el.classList.add("collapsed");
+  if(hasTpl){
     if(isTpls){
       const strip=el.querySelector(".wf-node-thumbs");
       const arr=Array.isArray(n.params[tplField.k])?n.params[tplField.k].filter(p=>String(p||"").trim()):[];
@@ -476,13 +480,21 @@ function wfNodeEl(n){
   if(def.kind!=="start" && def.kind!=="note" && !intIn){
     const ins=wfIns(n.type);
     ins.forEach((port,i)=>{
-      const top = ins.length<=1 ? 9 : 9 + i*21;
+      // First input is vertically centered on the header (same 6px as the first
+      // output) so the two sides line up; subsequent inputs stack below.
+      const top = ins.length<=1 ? 6 : 6 + i*17;
       const ip=document.createElement("span");
-      ip.className="wf-port in"+(port==="loop"?" loop":"");
+      // Color the destination input to match the source port's semantic colour.
+      const incoming = g && (g.edges||[]).find(e=>e.to===n.id && (e.toPort||"in")===port);
+      const srcPort = incoming ? incoming.fromPort : null;
+      const isConnected = !!incoming;
+      ip.className="wf-port in"+(port==="loop"?" loop":"")+
+        (srcPort==="true"?" t":srcPort==="false"?" f":"")+
+        (isConnected?" connected":"");
       ip.dataset.node=n.id; ip.dataset.port=port; ip.style.top=top+"px";
       el.appendChild(ip);
       if(ins.length>1){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl in"+(port==="loop"?" loop":"");
-        lbl.style.top=(top+1)+"px"; lbl.textContent=WF_IN_LBL[port]||port; el.appendChild(lbl); }
+        lbl.style.top=(top+0)+"px"; lbl.textContent=WF_IN_LBL[port]||port; el.appendChild(lbl); }
     });
   }
   // output ports (hidden when this member feeds the next block in its stack).
@@ -495,16 +507,19 @@ function wfNodeEl(n){
   else if(n.type==="parallel"||n.type==="random_branch") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||(n.type==="parallel"?3:2))},(_,i)=>String(i+1));
   else outs=(def.outs||[]);
   outs.forEach((port,i)=>{
-    const top = outs.length<=1 ? 9 : 9 + i*19;
+    // Vertically align the first output with the first input (both centred in
+    // the 22px header), then stack additional outputs downward.
+    const top = outs.length<=1 ? 6 : 6 + i*16;
     const op=document.createElement("span");
-    op.className="wf-port out"+(port==="true"?" t":port==="false"?" f":"");
+    const isConnected = g && (g.edges||[]).some(e=>e.from===n.id && e.fromPort===port);
+    op.className="wf-port out"+(port==="true"?" t":port==="false"?" f":"")+(isConnected?" connected":"");
     op.dataset.node=n.id; op.dataset.port=port; op.style.top=top+"px";
     el.appendChild(op);
     let lblTxt;
     if(n.type==="switch") lblTxt = (port==="default") ? "khác" : "#"+(i+1);
     else if(n.type==="parallel"||n.type==="random_branch"||n.type==="try_chain") lblTxt = port;
     else lblTxt = WF_PORT_LBL[port];
-    if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+1)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl); }
+    if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+0)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl); }
   });
   // Validation badge (missing template / not wired in) so broken flows show before a run.
   const warns=wfNodeWarnings(n,def,wfGraph());
@@ -515,6 +530,26 @@ function wfNodeEl(n){
   el.addEventListener("mousedown",e=>wfStartMove(e,n));
   // Double-click a call node → jump into that function's graph.
   if(n.type==="call"){ el.addEventListener("dblclick",e=>{ e.stopPropagation(); if(n.params&&n.params.fn&&wfFnById(n.params.fn)) wfEditFunction(n.params.fn); }); }
+  // Double-click any image-related block to pick its template(s) directly.
+  if(hasTpl){
+    el.addEventListener("dblclick",async e=>{
+      if(e.target.closest(".wf-port,.wf-node-eye")) return;
+      e.stopPropagation();
+      const f=wfTplField(n.type);
+      if(!f) return;
+      if(f.t==="tpls"){
+        const pp=await api().pick_template(); if(!pp) return;
+        wfPushUndoDebounced();
+        const arr=Array.isArray(n.params[f.k])?n.params[f.k]:(n.params[f.k]=[]);
+        arr.push(pp);
+      } else {
+        const pp=await api().pick_template(); if(!pp) return;
+        wfPushUndoDebounced();
+        n.params[f.k]=pp;
+      }
+      wfUpdNodeSum(n); wfUpdNodePreview(n); wfRenderCanvas(); wfRenderInspector();
+    });
+  }
   const eye=el.querySelector(".wf-node-eye");
   if(eye){ eye.addEventListener("mousedown",e=>e.stopPropagation()); eye.addEventListener("click",e=>{ e.stopPropagation(); wfPushUndoDebounced(); n.showPreview=!n.showPreview; wfRenderCanvas(); }); }
   el.querySelectorAll(".wf-port.out").forEach(p=>p.addEventListener("mousedown",e=>wfStartConnect(e,n.id,p.dataset.port)));
