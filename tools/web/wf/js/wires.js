@@ -41,7 +41,7 @@ function wfBezier(a,b){
     const h=Math.max(40, Math.min(adx*0.4, 120));
     const outX=a.x+h, inX=b.x-h;
     const sign=dy>=0?1:-1;
-    const vOff=Math.max(30, ady*0.15+12);
+    const vOff=Math.max(35, ady*0.08+8);
     const midY=(a.y+b.y)/2 + sign*vOff;
     return `M${a.x},${a.y} L${outX},${a.y} L${outX},${midY} L${inX},${midY} L${inX},${b.y} L${b.x},${b.y}`;
   }
