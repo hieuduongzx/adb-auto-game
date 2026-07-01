@@ -158,7 +158,7 @@ function wfAutoLayout(kind){
 function wfAnimateLayout(g, from){
   const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const nodes=g.nodes.filter(n=>from[n.id] && (from[n.id].x!==n.x || from[n.id].y!==n.y));
-  if(reduce || !nodes.length){ wfRenderCanvas(); wfFit(); return; }
+  if(reduce || !nodes.length || (typeof wfPvActive!=="undefined" && wfPvActive)){ wfRenderCanvas(); wfFit(); return; }
   // Pre-fit to the FINAL layout so the camera is already framed; we then animate
   // nodes inside that stable frame (no simultaneous pan/zoom + node motion).
   wfRenderCanvas();

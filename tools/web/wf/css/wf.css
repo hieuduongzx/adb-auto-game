@@ -728,7 +728,45 @@
 .wf-field.full { flex-direction:column; align-items:stretch; gap:4px; }
 .wf-field.full > label { min-width:auto; }
 .wf-field.full > input, .wf-field.full > select { width:100%; }
-/* Wide input (note/log/activity name) */
+
+/* ── Variable picker: combobox fields + floating menu + insert button ─────── */
+.wf-var-field { align-items:center; }
+.wf-var-field > .wf-var-input { flex:1; min-width:0; font-size:11px; padding:4px 7px; border-radius:var(--r-sm); }
+.btn.sm.ico.wf-var-pick { width:24px; height:24px; padding:0; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; }
+.btn.sm.ico.wf-var-pick svg { width:13px; height:13px; }
+.btn.sm.ico.wf-var-pick:hover { color:var(--accent); border-color:var(--accent); }
+/* Live/declared value + type chip shown beside a variable-bound field. */
+.wf-var-badge { display:inline-flex; align-items:center; gap:4px; flex-shrink:0; max-width:120px; }
+.wf-var-badge .t { font-size:8.5px; font-weight:800; letter-spacing:.03em; text-transform:uppercase;
+  color:var(--muted); background:var(--alt); border:1px solid var(--border2); border-radius:4px; padding:1px 4px; }
+.wf-var-badge .v { font-family:var(--mono); font-size:10px; color:var(--accent); max-width:76px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-var-badge .v.live { color:#2fa55a; font-weight:600; }
+/* Floating variable menu (opened by the picker / insert buttons). */
+.wf-varmenu { position:fixed; z-index:9999; background:var(--panel); border:1px solid var(--border2);
+  border-radius:9px; box-shadow:0 12px 34px rgba(0,0,0,.35); display:flex; flex-direction:column;
+  max-height:260px; overflow:hidden; min-width:220px; }
+.wf-varmenu-search { margin:7px 7px 4px; font-size:11px; padding:5px 8px; border-radius:6px;
+  border:1px solid var(--border2); background:var(--surface); color:var(--ink); }
+.wf-varmenu-search:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-bd); }
+.wf-varmenu-list { flex:1; overflow-y:auto; padding:2px 4px; }
+.wf-varmenu-empty { font-size:10.5px; color:var(--muted); padding:8px 6px; }
+.wf-varmenu-sep { font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); padding:6px 6px 2px; }
+.wf-varmenu-item { display:flex; align-items:baseline; gap:7px; width:100%; text-align:left;
+  border:none; background:none; cursor:pointer; padding:4px 7px; border-radius:6px; color:var(--ink); }
+.wf-varmenu-item:hover { background:var(--accent-bg); }
+.wf-varmenu-item .vn { font-family:var(--mono); font-size:11px; flex:1; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-varmenu-item .vt { font-size:8.5px; font-weight:700; text-transform:uppercase; color:var(--muted); flex-shrink:0; }
+.wf-varmenu-item .vv { font-family:var(--mono); font-size:9.5px; color:var(--accent); max-width:70px; flex-shrink:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-varmenu-add { display:flex; align-items:center; gap:6px; width:100%; border:none; cursor:pointer;
+  border-top:1px solid var(--line); background:var(--surface); color:var(--accent); font-size:11px;
+  font-weight:600; padding:7px 9px; }
+.wf-varmenu-add:hover { background:var(--accent-bg); }
+.wf-varmenu-add svg { width:13px; height:13px; }
+
 .wf-insp-input { width:100%; font-size:11.5px; padding:6px 8px; border-radius:var(--r-sm); }
 /* Template field: path + picker + compact thumbnail, all on one row so the
    preview stays small and beside the controls (not a tall block below). */

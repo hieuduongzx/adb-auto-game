@@ -20,12 +20,10 @@ function pvInitDeviceInfoCopy(){
     if(!cell || !grid.contains(cell)) return;
     const cells=[...grid.children];
     const idx=cells.indexOf(cell);
-    const key=cells[idx%2===0?idx:idx-1];
     const val=cells[idx%2===0?idx+1:idx];
-    if(!key||!val) return;
-    const text=`${key.textContent.trim()}: ${val.textContent.trim()}`;
-    pvCopyText(text);
-    setStatus(`Copied ${key.textContent.trim()}`);
+    if(!val) return;
+    pvCopyText(val.textContent.trim());
+    setStatus("Copied");
   });
 }
 

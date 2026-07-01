@@ -5,7 +5,7 @@
   "speedhack": {
     "enabled": true,
     "speed": 2,
-    "package": "com.y2sgames.girlwarsbignewen"
+    "package": "App: com.wemadeconnect.aos.lostdgl"
   },
   "globals": [],
   "functions": [
@@ -502,14 +502,14 @@
             "id": "nrtqbat0",
             "type": "start",
             "x": 40,
-            "y": 106,
+            "y": 112,
             "params": {}
           },
           {
             "id": "no1fcyqq",
             "type": "call",
             "x": 100,
-            "y": 116,
+            "y": 72,
             "params": {
               "fn": "fn_yt9m6"
             }
@@ -573,8 +573,8 @@
           {
             "id": "nk5q9wwd",
             "type": "call",
-            "x": 1060,
-            "y": 60,
+            "x": 1050,
+            "y": 47,
             "params": {
               "fn": "fn_hh4kj"
             }
@@ -608,8 +608,8 @@
           {
             "id": "n16ire5t",
             "type": "call",
-            "x": 1060,
-            "y": 117,
+            "x": 1050,
+            "y": 97,
             "params": {
               "fn": "fn_uft8v"
             }
@@ -617,8 +617,8 @@
           {
             "id": "nt1pti0b",
             "type": "if_image",
-            "x": 1060,
-            "y": 157,
+            "x": 1050,
+            "y": 147,
             "params": {
               "template": "templates/crop_20260701_094544_1872_439_35_45.png",
               "threshold": 0.85,
@@ -629,11 +629,21 @@
             "id": "n4jjtwvp",
             "type": "tap",
             "x": 1240,
-            "y": 157,
+            "y": 97,
             "params": {
               "target": "found",
               "x": 0,
               "y": 0
+            }
+          },
+          {
+            "id": "n3v8s4fn",
+            "type": "loop",
+            "x": 100,
+            "y": 122,
+            "params": {
+              "infinite": true,
+              "count": ""
             }
           }
         ],
@@ -4881,7 +4891,7 @@
       "id": "background_8g8s",
       "name": "Background task 1",
       "type": "background",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [

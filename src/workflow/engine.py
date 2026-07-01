@@ -614,7 +614,7 @@ class WorkflowEngine:
                     loop_port = "body"
                 else:
                     done = counters.get(cur, 0)
-                    count = max(0, int(params.get("count", 1)))
+                    count = self._resolve_count(params.get("count", 1), default=1)
                     if done < count:
                         counters[cur] = done + 1
                         loop_port = "body"
@@ -1095,7 +1095,8 @@ class WorkflowEngine:
             return bool(found) != negate
         if ntype == "if_var":
             cur = self._vars.get(str(params.get("name", "")))
-            return self._compare(cur, str(params.get("op", "==")), params.get("value", ""))
+            rhs = self._resolve_value(params.get("value", ""))
+            return self._compare(cur, str(params.get("op", "==")), rhs)
         if ntype == "scroll_find":
             template  = self._resolve_template(params.get("template", ""))
             direction = str(params.get("direction", "up")).lower()
@@ -1570,10 +1571,39 @@ class WorkflowEngine:
         v = self._coerce(s)
         return float(v) if isinstance(v, (int, float)) else 0.0
 
+    def _resolve_value(self, raw: Any) -> Any:
+        """Resolve a param that may reference variables.
+
+        Precedence: a bare variable name (the whole value equals a known var) →
+        that variable's live value; a string containing ``{name}`` placeholders →
+        filled from the current vars (like the Log field); otherwise the literal,
+        best-effort number-coerced. Lets value fields (Set variable, If variable,
+        loop count…) point at another variable instead of a fixed literal.
+        """
+        if isinstance(raw, (int, float, bool)):
+            return raw
+        s = str(raw)
+        stripped = s.strip()
+        if not stripped:
+            return ""
+        if stripped in self._vars:
+            return self._vars[stripped]
+        if "{" in s and "}" in s:
+            return self._coerce(self._format_msg(s))
+        return self._coerce(s)
+
+    def _resolve_count(self, raw: Any, default: int = 0) -> int:
+        """A loop/branch count that may be a number literal or a variable name."""
+        val = self._resolve_value(raw)
+        try:
+            return max(0, int(float(val)))
+        except (TypeError, ValueError):
+            return default
+
     def _a_set_var(self, node, p) -> bool:
         name = str(p.get("name", "")).strip()
         if name:
-            self._set_var(name, self._coerce(p.get("value", "")))
+            self._set_var(name, self._resolve_value(p.get("value", "")))
             log_info(f"[workflow] set {name} = {self._vars[name]!r}")
         return True
 

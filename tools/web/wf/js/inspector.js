@@ -174,6 +174,166 @@ function wfRenderInspector(){
   body.innerHTML='<div class="wf-insp-empty">No activity selected.</div>';
 }
 
+// ── Variable picker infrastructure ───────────────────────────────────────────
+// A single source of truth describing every variable the user can reference,
+// with its declared type, scope (global/activity/node) and best-known value.
+// Powers the combobox pickers on variable fields and the "insert variable"
+// dropdown on text fields (log, message, format string…).
+function wfVarInfoMap(){
+  const map={};
+  const walk=(vars,prefix,scope)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; if(!map[full]) map[full]={type:v.type||"bool", scope, value:v.value}; walk(v.children,full,scope); }); };
+  walk(WF.globals,"","global");
+  const act=wfCurAct(); if(act) walk(act.vars,"","activity");
+  const g=wfGraph(); wfGraphVarNames(g).forEach(n=>{ if(!map[n]) map[n]={type:"text", scope:"node", value:undefined}; });
+  Object.keys(wfLiveVars).forEach(n=>{ if(!map[n]) map[n]={type:"text", scope:"live", value:wfLiveVars[n]}; });
+  return map;
+}
+// Live-or-declared value + a short type hint for one variable name.
+function wfVarBadgeInfo(name){
+  const nm=String(name||"").trim(); if(!nm) return null;
+  const map=wfVarInfoMap(); const info=map[nm]; if(!info) return null;
+  const live=wfLiveVars[nm];
+  const val=(live!==undefined)?live:info.value;
+  return {type:info.type, scope:info.scope, value:val, live:live!==undefined};
+}
+const WF_VAR_SCOPE_LBL={global:"Global", activity:"Activity", node:"Node", live:"Live"};
+// Floating dropdown listing every known variable (grouped by scope, filterable).
+// `onPick(name)` fires with the chosen variable name. A "+ New global" row lets
+// the user declare one on the spot without leaving the field.
+let wfVarMenuEl=null;
+function wfCloseVarMenu(){ if(wfVarMenuEl){ wfVarMenuEl.remove(); wfVarMenuEl=null; document.removeEventListener("mousedown",wfVarMenuOutside,true); } }
+function wfVarMenuOutside(e){ if(wfVarMenuEl && !e.target.closest(".wf-varmenu") && !e.target.closest(".wf-var-pick")) wfCloseVarMenu(); }
+function wfShowVarMenu(anchor,onPick){
+  wfCloseVarMenu();
+  const menu=document.createElement("div"); menu.className="wf-varmenu"; wfVarMenuEl=menu;
+  const search=document.createElement("input"); search.type="text"; search.className="wf-varmenu-search";
+  search.placeholder="Search variables…"; search.spellcheck=false; search.autocomplete="off";
+  menu.appendChild(search);
+  const list=document.createElement("div"); list.className="wf-varmenu-list"; menu.appendChild(list);
+  const map=wfVarInfoMap();
+  const names=Object.keys(map).sort();
+  function render(filter){
+    list.innerHTML="";
+    const f=(filter||"").trim().toLowerCase();
+    const shown=names.filter(n=>!f||n.toLowerCase().includes(f));
+    if(!shown.length){ const e=document.createElement("div"); e.className="wf-varmenu-empty"; e.textContent=names.length?"No match.":"No variables yet."; list.appendChild(e); }
+    let lastScope=null;
+    shown.forEach(n=>{
+      const info=map[n];
+      if(info.scope!==lastScope){ lastScope=info.scope; const s=document.createElement("div"); s.className="wf-varmenu-sep"; s.textContent=WF_VAR_SCOPE_LBL[info.scope]||info.scope; list.appendChild(s); }
+      const row=document.createElement("button"); row.type="button"; row.className="wf-varmenu-item";
+      const badge=wfVarBadgeInfo(n);
+      const val=badge&&badge.value!==undefined&&badge.value!==null&&badge.value!==""?String(badge.value):"";
+      row.innerHTML=`<span class="vn">${escHtml(n)}</span><span class="vt">${escHtml(info.type||"")}</span>`+(val?`<span class="vv">${escHtml(val)}</span>`:"");
+      row.onclick=()=>{ onPick(n); wfCloseVarMenu(); };
+      list.appendChild(row);
+    });
+  }
+  render("");
+  const addRow=document.createElement("button"); addRow.type="button"; addRow.className="wf-varmenu-add";
+  addRow.innerHTML=`${wfIco("pin")}<span>New global variable…</span>`;
+  addRow.onclick=()=>{
+    const nm=(prompt("New global variable name:")||"").trim();
+    if(!nm) return;
+    wfPushUndoDebounced();
+    if(!Array.isArray(WF.globals)) WF.globals=[];
+    if(!WF.globals.some(v=>v.name===nm)) WF.globals.push({name:nm, label:nm, type:"text", value:"", children:[]});
+    wfRenderVarsPanel(); onPick(nm); wfCloseVarMenu();
+  };
+  menu.appendChild(addRow);
+  document.body.appendChild(menu);
+  const r=anchor.getBoundingClientRect();
+  const mw=Math.max(220, r.width);
+  menu.style.width=mw+"px";
+  let left=Math.min(r.left, window.innerWidth-mw-8);
+  let top=r.bottom+4;
+  if(top+260>window.innerHeight) top=Math.max(8, r.top-264);
+  menu.style.left=Math.max(8,left)+"px"; menu.style.top=top+"px";
+  search.oninput=()=>render(search.value);
+  setTimeout(()=>{ search.focus(); document.addEventListener("mousedown",wfVarMenuOutside,true); },0);
+}
+// Small "𝑥" button that opens the variable menu beside a field.
+function wfVarPickBtn(onPick,title){
+  const b=document.createElement("button"); b.type="button"; b.className="btn sm ico wf-var-pick";
+  b.title=title||"Pick a variable";
+  b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16M20 4L4 20"/></svg>';
+  b.onclick=(e)=>{ e.stopPropagation(); wfShowVarMenu(b,onPick); };
+  return b;
+}
+// Live value / type badge shown beside a variable-bound field. Returns the
+// element (updates in place via .refresh(name)).
+function wfVarBadge(){
+  const bd=document.createElement("span"); bd.className="wf-var-badge";
+  bd.refresh=(name)=>{
+    const info=wfVarBadgeInfo(name);
+    if(!info){ bd.style.display="none"; bd.innerHTML=""; return; }
+    bd.style.display="";
+    const val=(info.value===undefined||info.value===null||info.value==="")?"∅":String(info.value);
+    bd.innerHTML=`<span class="t">${escHtml(info.type||"")}</span><span class="v${info.live?" live":""}">${escHtml(val)}</span>`;
+    bd.title=`${name} · ${WF_VAR_SCOPE_LBL[info.scope]||info.scope}`+(info.live?" · runtime value":" · declared value");
+  };
+  return bd;
+}
+
+// A field that NAMES a variable to write/read (set_var name, read_var name…).
+// Combobox: free-text input + variable menu button + a live type/value badge.
+function wfVarNameField(node,f){
+  const row=document.createElement("div"); row.className="wf-field wf-var-field";
+  const lab=document.createElement("label"); lab.textContent=f.lbl||f.k; lab.title=f.k; row.appendChild(lab);
+  const inp=document.createElement("input"); inp.type="text"; inp.className="wf-var-input";
+  inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
+  inp.placeholder=f.ph||"variable name";
+  const badge=wfVarBadge();
+  const sync=()=>badge.refresh(inp.value);
+  inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]=inp.value; wfUpdNodeSum(node); wfRenderVarsPanel(); sync(); };
+  const pick=wfVarPickBtn(name=>{ inp.value=name; node.params[f.k]=name; wfPushUndoDebounced(); wfUpdNodeSum(node); wfRenderVarsPanel(); sync(); }, "Choose an existing variable");
+  row.appendChild(inp); row.appendChild(pick); row.appendChild(badge);
+  sync();
+  return row;
+}
+
+// A VALUE field that may be a literal OR a reference to another variable
+// (loop count, set_var value, if_var value, calc_var value). Picking a variable
+// replaces the whole value with its name — the engine resolves a bare name to
+// that variable's live value at run time.
+function wfVarRefField(node,f){
+  const row=document.createElement("div"); row.className="wf-field wf-var-field";
+  const lab=document.createElement("label"); lab.textContent=f.lbl||f.k; lab.title=f.k; row.appendChild(lab);
+  const inp=document.createElement("input"); inp.type=f.t==="num"?"text":"text";  // text so a var name is typeable even on numeric fields
+  inp.className="wf-var-input"; inp.inputMode=f.t==="num"?"numeric":"text";
+  inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
+  inp.placeholder=f.ph||(f.t==="num"?"number or variable":"value or variable");
+  const badge=wfVarBadge();
+  const sync=()=>{ const s=String(inp.value||"").trim(); badge.refresh(wfVarBadgeInfo(s)?s:""); };
+  const commit=refresh=>{ wfPushUndoDebounced();
+    // Keep numeric literals as numbers; leave variable names / expressions as text.
+    const s=inp.value;
+    node.params[f.k]= (f.t==="num" && s!=="" && !isNaN(s) && wfVarBadgeInfo(String(s).trim())===null) ? parseFloat(s) : s;
+    wfUpdNodeSum(node); if(refresh) wfRenderCanvas(); sync(); };
+  inp.oninput=()=>commit(!!f.refresh);
+  const pick=wfVarPickBtn(name=>{ inp.value=name; commit(!!f.refresh); }, "Use a variable as this value");
+  row.appendChild(inp); row.appendChild(pick); row.appendChild(badge);
+  sync();
+  return row;
+}
+
+// "insert {variable}" button for free-text fields that support {name}
+// placeholder substitution (log message, format string, notify…). Inserts at
+// the caret so the user can weave variables into a sentence.
+function wfInsertVarBtn(inp){
+  const b=document.createElement("button"); b.type="button"; b.className="btn sm ico wf-var-pick";
+  b.title="Insert a variable placeholder {name}";
+  b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4H5a1 1 0 0 0-1 1v5a1 1 0 0 1-1 1 1 1 0 0 1 1 1v5a1 1 0 0 0 1 1h2"/><path d="M17 4h2a1 1 0 0 1 1 1v5a1 1 0 0 0 1 1 1 1 0 0 0-1 1v5a1 1 0 0 1-1 1h-2"/></svg>';
+  b.onclick=(e)=>{ e.stopPropagation(); wfShowVarMenu(b,name=>{
+    const token="{"+name+"}";
+    const s=inp.value||""; const a=inp.selectionStart??s.length, z=inp.selectionEnd??s.length;
+    inp.value=s.slice(0,a)+token+s.slice(z);
+    const pos=a+token.length; inp.focus(); try{ inp.setSelectionRange(pos,pos); }catch{}
+    inp.dispatchEvent(new Event("input",{bubbles:true}));
+  }); };
+  return b;
+}
+
 function wfCallPicker(node){
   const row=document.createElement("div"); row.className="wf-field";
   const l=document.createElement("label"); l.textContent="function"; row.appendChild(l);
@@ -275,12 +435,15 @@ function wfUpdNodeNote(node){
 
 function wfLogField(node){
   const b=wfInspBlock("Run log");
+  const row=document.createElement("div"); row.className="wf-field full";
+  const inpRow=document.createElement("div"); inpRow.style.cssText="display:flex;gap:5px;align-items:center;";
   const inp=document.createElement("input"); inp.type="text"; inp.className="wf-insp-input";
   inp.placeholder="write a log each time this node runs…"; inp.value=node.log||"";
   inp.oninput=()=>{ wfPushUndoDebounced(); node.log=inp.value; wfUpdNodeLog(node); };
-  b.appendChild(inp);
+  inpRow.appendChild(inp); inpRow.appendChild(wfInsertVarBtn(inp));
+  row.appendChild(inpRow); b.appendChild(row);
   const hint=document.createElement("div"); hint.className="wf-insp-tip";
-  hint.innerHTML='You can insert variables: <code>{variable_name}</code>';
+  hint.innerHTML='Insert variables with <code>{variable_name}</code>.';
   b.appendChild(hint);
   return b;
 }
@@ -479,7 +642,10 @@ function wfFieldEl(node,f){
   if(f.t==="bool"){
     const cb=document.createElement("span"); cb.className="cb"+(node.params[f.k]?" checked":"");
     cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
-    cb.onclick=()=>{ wfPushUndoDebounced(); node.params[f.k]=!node.params[f.k]; cb.classList.toggle("checked",node.params[f.k]); wfUpdNodeSum(node); };
+    // A bool that another field gates on (showWhen) must re-render the inspector
+    // so the dependent field appears/disappears (e.g. loop infinite ↔ count).
+    const gates=(WF_NODES[node.type]&&WF_NODES[node.type].fields||[]).some(ff=>ff.showWhen&&ff.showWhen[f.k]!==undefined);
+    cb.onclick=()=>{ wfPushUndoDebounced(); node.params[f.k]=!node.params[f.k]; cb.classList.toggle("checked",node.params[f.k]); wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); if(gates) wfRenderInspector(); };
     row.appendChild(cb); return row;
   }
   if(f.t==="select"){
@@ -494,21 +660,10 @@ function wfFieldEl(node,f){
   }
   if(f.t==="tpls") return wfTplsField(node,f);
 
-  // Variable-picker text field backed by datalist.
-  if(f.var && f.t!=="num"){
-    const names=wfAllVarNames();
-    const inp=document.createElement("input"); inp.type="text";
-    inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
-    inp.setAttribute("list","wf-varlist");
-    inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]=inp.value; wfUpdNodeSum(node); wfRenderVarsPanel(); };
-    row.appendChild(inp);
-    if(names.length){
-      let dl=document.getElementById("wf-varlist");
-      if(!dl){ dl=document.createElement("datalist"); dl.id="wf-varlist"; document.body.appendChild(dl); }
-      dl.innerHTML=""; names.forEach(n=>{ const o=document.createElement("option"); o.value=n; dl.appendChild(o); });
-    }
-    return row;
-  }
+  // Variable NAME field (declares/targets a variable) → combobox picker.
+  if(f.var){ return wfVarNameField(node,f); }
+  // Variable-or-literal VALUE field (loop count, set/if value…) → ref picker.
+  if(f.varRef){ return wfVarRefField(node,f); }
 
   const inp=document.createElement("input");
   inp.type=f.t==="num"?"number":"text"; if(f.t==="num"&&f.step) inp.step=f.step;
@@ -516,6 +671,9 @@ function wfFieldEl(node,f){
   inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]= f.t==="num"?(parseFloat(inp.value)||0):inp.value; wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); };
   wfAttachCoordPaste(node, f, inp);
   row.appendChild(inp);
+
+  // Free-text fields that expand {name} placeholders get an insert-variable btn.
+  if(f.t==="text" && f.insertVar){ row.appendChild(wfInsertVarBtn(inp)); }
 
   if(f.t==="tpl"){
     inp.style.fontSize="10px";
