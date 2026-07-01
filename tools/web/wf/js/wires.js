@@ -30,11 +30,31 @@ const WF_WIRE_DEFS = (function(){
 function wfWireKey(ed){ return [ed.from,ed.fromPort||"out",ed.to,ed.toPort||"in"].join("|"); }
 function wfWireClamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
 function wfWireLayer(ed,a,b){ return 1; }
-function wfLaneMap(edges,pts){ return new Map(); }
+function wfLaneMap(edges,pts){
+  const lanes = new Map();
+  const backEdges = edges.filter(ed => {
+    const p = pts.get(wfWireKey(ed));
+    return p && p.b.x < p.a.x;
+  });
+  backEdges.sort((x,y) => {
+    const px = pts.get(wfWireKey(x)), py = pts.get(wfWireKey(y));
+    return Math.abs(px.b.x - px.a.x) - Math.abs(py.b.x - py.a.x);
+  });
+  backEdges.forEach((ed, i) => lanes.set(wfWireKey(ed), i));
+  return lanes;
+}
 function wfWirePath(a,b,ed,lane){
   const dx=b.x-a.x, dy=b.y-a.y;
-  const pull=wfWireClamp(Math.abs(dx)*0.5+Math.abs(dy)*0.08, 48, 180);
-  return `M${a.x},${a.y} C${a.x+pull},${a.y} ${b.x-pull},${b.y} ${b.x},${b.y}`;
+  if (dx > -20) {
+    const pull = Math.max(Math.abs(dx) * 0.4, Math.abs(dy) * 0.2, 20);
+    return `M${a.x},${a.y} C${a.x+pull},${a.y} ${b.x-pull},${b.y} ${b.x},${b.y}`;
+  } else {
+    const pullX = Math.max(Math.abs(dx) * 0.4, 60);
+    const signY = dy >= 0 ? 1 : -1;
+    const pushY = Math.max(0, 80 - Math.abs(dy) * 0.5) + (lane || 0) * 20;
+    const oy = a.y + dy / 2 + signY * pushY;
+    return `M${a.x},${a.y} C${a.x+pullX},${a.y} ${a.x+pullX},${oy} ${a.x+dx/2},${oy} S${b.x-pullX},${b.y} ${b.x},${b.y}`;
+  }
 }
 
 function wfDrawWires(){
