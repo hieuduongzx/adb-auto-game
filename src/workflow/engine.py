@@ -739,6 +739,7 @@ class WorkflowEngine:
                 nxt = self._next(adj, cur, taken)
                 cur = nxt if nxt is not None else self._next(adj, cur, "default")
             elif kind == "call":
+                self._emit("on_node", cur)  # highlight the call block while its function runs
                 fid = params.get("fn")
                 fn = self._functions.get(fid)
                 if fn is None:

@@ -165,20 +165,18 @@
 /* Wire styles — n8n/ComfyUI-style soft splines: no bulky white underlay, just a
    crisp directional stroke with enough opacity to read over the dot grid. */
 #wf-wires path.wire { fill:none; stroke:#8493a7; stroke-width:1.6; pointer-events:none;
-  stroke-linecap:round; stroke-linejoin:round; marker-end:none;
+  stroke-linecap:round; stroke-linejoin:round;
   stroke-opacity:0.82; transition:stroke .12s, stroke-width .12s, stroke-opacity .12s; }
-/* True/False branch wires: slightly bolder and fully opaque. */
-#wf-wires path.wire.t { stroke:#1f9d57; stroke-width:1.8; stroke-opacity:.96; marker-end:none; }
-#wf-wires path.wire.f { stroke:#e0792e; stroke-width:1.8; stroke-opacity:.96; marker-end:none; }
-/* Stack wire: structural, not a data flow — very faint dotted rule, no arrowhead. */
+/* True/False branch wires: removed — wires are now a single neutral colour.
+   Port dots carry the semantic colour instead (green=true, orange=false). */
+/* Stack wire: structural, not a data flow — very faint dotted rule. */
 #wf-wires path.wire.stack { stroke:#b8c6d4; stroke-width:1.0; stroke-opacity:0.45;
-  stroke-dasharray:2.5 3; marker-end:none; }
+  stroke-dasharray:2.5 3; }
 /* Loop-back wire: amber dashed — "going back" reads visually different from forward flow. */
 #wf-wires path.wire.loopback { stroke:#d09030; stroke-width:1.7; stroke-opacity:.92;
-  stroke-dasharray:7 5; marker-end:none; }
+  stroke-dasharray:7 5; }
 /* Hover: only the actual wire lifts, matching professional graph editors. */
-#wf-wires .wire-grp:hover path.wire { stroke:var(--accent); stroke-width:2.2; stroke-opacity:1;
-  marker-end:none; }
+#wf-wires .wire-grp:hover path.wire { stroke:var(--accent); stroke-width:2.2; stroke-opacity:1; }
 #wf-wires .wire-grp:hover { filter:drop-shadow(0 1px 2px rgba(47,111,237,.22)); }
 /* While wiring up a connection, wires ignore the pointer so the drop lands on the
    node underneath rather than being swallowed by a wire's hit-path. */
