@@ -8,6 +8,25 @@ function wfCleanGraph(g){
     groups:(g.groups||[]).map(gr=>({id:gr.id,name:gr.name,x:Math.round(gr.x),y:Math.round(gr.y),w:Math.round(gr.w),h:Math.round(gr.h),color:gr.color||0})),
   };
 }
+// ── Per-entity serializers (debug / copy) ────────────────────────────────────
+// Emit the same JSON shape the engine consumes, but for a SINGLE activity or
+// function — handy for copying one piece out to debug in isolation.
+function wfSerializeActivity(a){
+  if(!a) return null;
+  const o={ id:a.id, name:a.name, type:a.type, enabled:a.enabled,
+    vars: wfSerialVars(a.vars||[]), graph:wfCleanGraph(a.graph) };
+  if(a.type==="background") o.pollInterval=a.pollInterval; else o.maxRetries=a.maxRetries;
+  return o;
+}
+function wfSerializeFunction(f){
+  if(!f) return null;
+  return { id:f.id, name:f.name, graph:wfCleanGraph(f.graph) };
+}
+// A single node (with its params + per-node options), as stored in a graph.
+function wfSerializeNode(n){
+  if(!n) return null;
+  return wfCleanGraph({nodes:[n],edges:[]}).nodes[0];
+}
 function wfSerialize(){
   wfSpeedFromUI();
   const sh=WF.speedhack||{enabled:false,speed:2.0,package:""};

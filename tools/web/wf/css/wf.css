@@ -2,16 +2,28 @@
 /* Toolbar as a 3-zone grid: file ops (left) · run controls (true centre) ·
    device + capture tools (right). 1fr / auto / 1fr keeps the run cluster pinned
    to the geometric centre regardless of how wide the side zones grow. */
-#toolbar { display:grid; grid-template-columns:1fr auto 1fr; gap:var(--s4); }
-.tb-zone { display:flex; align-items:center; gap:var(--s2); min-width:0; }
-.tb-left  { justify-self:stretch; gap:var(--s3); }
+#toolbar { display:grid; grid-template-columns:1fr auto 1fr; gap:var(--s4); align-items:center; }
+.tb-zone { display:flex; align-items:center; gap:var(--s3); min-width:0; }
+.tb-left  { justify-self:stretch; }
 .tb-left .wf-run-status { margin-left:auto; }   /* hug the centred run cluster */
-.tb-center{ justify-self:center; gap:var(--s3); }
-.tb-right { justify-self:end; gap:var(--s3); }
-/* Run cluster gets a subtle tray so the centred primary actions read as a unit. */
-.tb-run { gap:5px; padding:3px; border-radius:10px; background:var(--alt); border:1px solid var(--border); }
-.tb-run .btn { height:32px; }
-.tb-run .btn.ico { width:32px; }
+.tb-center{ justify-self:center; }
+.tb-right { justify-self:end; }
+/* Unified tray — every grouped cluster of icon buttons (file ops, run controls,
+   device actions) reads as one segmented unit: a soft inset panel with hairline
+   internal separators. Keeps the three toolbar zones visually consistent. */
+.tb-tray { display:inline-flex; align-items:center; gap:3px; padding:3px;
+  border-radius:10px; background:var(--alt); border:1px solid var(--border); }
+.tb-tray .btn { border-color:transparent; background:transparent; height:32px; }
+.tb-tray .btn.ico { width:32px; }
+.tb-tray .btn:hover { background:var(--panel); border-color:var(--border2); }
+.tb-tray .btn.accent { background:var(--accent); border-color:var(--accent); color:#fff; }
+.tb-tray .btn.accent:hover { background:#2559c7; }
+.tb-tray .btn.ok { background:var(--ok); border-color:var(--ok); color:#fff; }
+.tb-tray .btn.ok:hover { background:#1b8049; }
+/* Hairline separator between logical sub-groups inside a tray. */
+.tb-tray-sep { width:1px; align-self:stretch; margin:3px 2px; background:var(--border2); flex-shrink:0; }
+/* The run cluster is the toolbar's focal point — nudge its glyphs a touch bolder. */
+.tb-run .btn svg { stroke-width:2.1; }
 
 /* Segmented tray for the canvas edit toggles (snap / preview / group) on #wf-bar.
    Buttons read as one unit; borders are suppressed until hover / active. */
@@ -26,10 +38,13 @@
 .mode-btn:hover:not(.active) { color:var(--ink); }
 .mode-btn.active { background:var(--panel); color:var(--accent); box-shadow:0 1px 2px rgba(0,0,0,.06); }
 .tb-divider { width:1px; height:20px; background:var(--border2); flex-shrink:0; }
+/* Standalone toolbar buttons (DevScope) match the tray/pill 38px baseline so
+   the whole header sits on one clean line. */
+#toolbar > .tb-zone > .btn { height:38px; padding:0 13px; }
 
 /* Running status pill — sits between the file ops and the device cluster.
-   Grey "Sẵn sàng" at rest, amber pulse "Đang chạy" while the engine executes. */
-.wf-run-status { display:flex; align-items:center; gap:6px; padding:4px 11px;
+   Grey "Ready" at rest, amber pulse while the engine executes. */
+.wf-run-status { display:flex; align-items:center; gap:6px; height:38px; padding:0 13px;
   border-radius:999px; background:var(--alt); border:1px solid var(--border);
   font-size:11px; font-weight:600; color:var(--dim); flex-shrink:0;
   transition:background .15s, border-color .15s, color .15s; }
@@ -41,7 +56,9 @@
 /* Nguồn ảnh picker — borderless so it reads as a labelled inline select,
    not a boxed cluster like the device picker. */
 .device-wrap.wf-source-wrap { border:none; background:transparent; padding:0 4px;
-  min-width:0; gap:6px; }
+  min-width:0; gap:6px; max-width:172px; }
+.wf-source-lbl { font-size:11px; font-weight:700; color:var(--muted); white-space:nowrap;
+  text-transform:uppercase; letter-spacing:.03em; }
 /* Speed-hack control cluster: its own bordered box so it reads as a separate,
    manual tool — independent of "Chạy thử". Turns amber when enabled. */
 .wf-speed-group { display:flex; align-items:center; gap:5px; padding:3px 7px;
@@ -72,11 +89,29 @@
   background:var(--alt); border-radius:999px; padding:1px 6px; letter-spacing:0; }
 .side-count:empty { display:none; }
 #wf-side .wf-palette { padding:0 9px 10px; overflow-y:auto; }
+/* Palette search — a compact rounded field pinned under the sidebar header.
+   The magnifier sits inside on the left; a clear (×) button appears on the
+   right only while a query is active. */
+.wf-pal-search { position:relative; display:flex; align-items:center; margin:8px 9px; }
+.wf-pal-search-ico { position:absolute; left:9px; width:13px; height:13px; color:var(--muted);
+  pointer-events:none; }
+#wf-pal-search-inp { flex:1; min-width:0; font-family:var(--sans); font-size:12px;
+  padding:6px 26px 6px 27px; border:1px solid var(--border2); border-radius:7px;
+  background:var(--surface); color:var(--ink); transition:border-color .12s, box-shadow .12s, background .12s; }
+#wf-pal-search-inp::placeholder { color:var(--muted); }
+#wf-pal-search-inp:focus { outline:none; border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-bd); background:var(--panel); }
+.wf-pal-search-clr { position:absolute; right:5px; width:19px; height:19px; padding:0; border:none;
+  border-radius:5px; background:none; color:var(--muted); cursor:pointer; display:flex;
+  align-items:center; justify-content:center; transition:color .1s, background .1s; }
+.wf-pal-search-clr svg { width:12px; height:12px; }
+.wf-pal-search-clr:hover { color:var(--err); background:var(--err-bg); }
+.wf-pal-none { font-size:11.5px; color:var(--muted); text-align:center; padding:16px 6px; }
 
 .wf-act { display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--border);
-  border-radius:7px; cursor:pointer; transition:border-color .1s, background .1s; }
+  border-radius:7px; cursor:pointer; transition:border-color .1s, background .1s, box-shadow .1s; }
 .wf-act:hover { background:var(--alt); }
-.wf-act.sel { border-color:var(--accent); background:var(--accent-bg); }
+.wf-act.sel { border-color:var(--accent); background:var(--accent-bg); box-shadow:0 0 0 1px var(--accent-bd); }
 .wf-badge { font-size:8.5px; font-weight:700; letter-spacing:.03em; border-radius:4px; padding:2px 4px; flex-shrink:0; }
 .wf-badge.seq { color:#2559c7; background:#eef5ff; border:1px solid var(--accent-bd); }
 .wf-badge.bg  { color:#9c6c12; background:var(--warn-bg); border:1px solid #e7d5a4; }
@@ -102,6 +137,9 @@
     border-radius:5px; color:var(--dim); }
   .wf-pal-cat::before { content:""; width:6px; height:6px; border-radius:50%; flex-shrink:0;
     background:currentColor; display:block; }
+  .wf-pal-cat > span:first-of-type { flex:1; min-width:0; }
+  .wf-pal-cat-n { font-family:var(--mono); font-size:9px; font-weight:700; opacity:.7;
+    background:rgba(0,0,0,.06); border-radius:999px; padding:1px 6px; }
 .wf-pal-cat.cat-basic { color:#2d64cc; background:#eef5ff; }
 .wf-pal-cat.cat-input { color:#4338ca; background:#eef0ff; }
 .wf-pal-cat.cat-image { color:#0f766e; background:#ecfdf9; }
@@ -109,7 +147,7 @@
 .wf-pal-cat.cat-flow  { color:#b45309; background:#fffbeb; }
 .wf-pal-cat.cat-logic { color:#6d28d9; background:#f5f3ff; }
 .wf-pal-cat.cat-misc  { color:#4b5563; background:#f3f4f6; }
-.wf-pal-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.wf-pal-grid { display:grid; grid-template-columns:1fr 1fr; gap:3px; }
 .wf-fn { cursor:pointer; }
 .wf-badge.fn { display:inline-flex; align-items:center; justify-content:center; color:#fff;
   background:#7c3aed; border:none; font-size:9.5px; font-weight:800;
@@ -213,51 +251,73 @@
 .wf-layout-item .lbl i { font-size:10px; font-style:normal; color:var(--muted); }
 .wf-layout-item:hover .lbl i { color:var(--accent); opacity:.8; }
 
-/* Activities + Functions panel — pinned bottom-right of the canvas.
+/* Top-right corner stack — holds the Activities panel above the Variables
+   panel. Both panels are static inside this flex column, so they anchor to each
+   other: collapse Activities and Variables rises with it, growing/shrinking
+   from the shared top-right corner. */
+.wf-corner-stack { position:absolute; right:10px; top:10px; z-index:5;
+  display:flex; flex-direction:column; gap:8px; align-items:stretch;
+  width:248px; max-height:calc(100% - 20px); }
+/* Activities + Functions panel.
    Header = title row (chevron + label + add btn) stacked above a tab bar.
    Collapsing hides the tab bar + body; only the title row stays visible. */
-  .wf-act-panel { position:absolute; right:10px; bottom:10px; width:248px; max-height:50%;
-      background:var(--panel); border:1px solid var(--border2); border-radius:9px;
-      box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5; overflow:hidden; transition: max-height 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
-  .wf-act-panel.collapsed { max-height:34px; }
+  .wf-act-panel { flex:0 1 auto; min-height:38px;
+      background:var(--panel); border:1px solid var(--border2); border-radius:10px;
+      box-shadow:var(--sh-md); display:flex; flex-direction:column; overflow:hidden;
+      transition:max-height .2s cubic-bezier(0.16, 1, 0.3, 1); max-height:60vh; }
+  .wf-act-panel.collapsed { max-height:38px; flex:0 0 auto; }
   .wf-act-panel-hdr { display:flex; flex-direction:column; flex-shrink:0; }
-  /* Title row: chevron + label + add button */
-  .wf-act-hdr-row { display:flex; align-items:center; gap:6px; padding:6px 10px;
-    background:var(--surface); border-bottom:1px solid var(--border2);
-    cursor:pointer; user-select:none; transition:background .1s; min-height:32px; }
+  /* Title row: chevron + label + count + add button */
+  .wf-act-hdr-row { display:flex; align-items:center; gap:7px; padding:0 8px 0 11px;
+    background:linear-gradient(var(--surface),var(--panel));
+    cursor:pointer; user-select:none; transition:background .1s; min-height:38px; }
 .wf-act-hdr-row:hover { background:var(--alt); }
 .wf-act-hdr-chevron { color:var(--muted); display:flex; align-items:center; flex-shrink:0;
   transition:transform .15s var(--ease); }
 .wf-act-panel.collapsed .wf-act-hdr-chevron { transform:rotate(-90deg); }
-.wf-act-hdr-title { font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
-  color:var(--dim); flex:1; min-width:0; }
-.wf-act-hdr-add { width:22px; height:22px; padding:0; border:1px solid var(--border2);
-  border-radius:6px; background:var(--panel); color:var(--dim); cursor:pointer; font-size:16px;
+.wf-act-hdr-title { font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--ink2); flex:1; min-width:0; }
+.wf-act-hdr-add { width:24px; height:24px; padding:0; border:1px solid var(--border2);
+  border-radius:7px; background:var(--panel); color:var(--dim); cursor:pointer; font-size:17px;
   font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;
-  line-height:1; transition:color .1s, border-color .1s, background .1s; }
+  line-height:1; transition:color .1s, border-color .1s, background .1s, transform .1s; }
 .wf-act-hdr-add:hover { color:var(--accent); border-color:var(--accent); background:var(--accent-bg); }
-/* Tab bar — hidden when collapsed */
-.wf-act-tab-row { display:flex; align-items:stretch; background:var(--panel); flex-shrink:0; }
+.wf-act-hdr-add:active { transform:scale(.92); }
+/* Focus toggle — follows the running block; on = accent tint, off = muted. */
+.wf-act-hdr-focus { width:24px; height:24px; padding:0; border:1px solid var(--border2);
+  border-radius:7px; background:var(--panel); color:var(--muted); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  transition:color .1s, border-color .1s, background .1s, transform .1s; }
+.wf-act-hdr-focus svg { width:14px; height:14px; display:block; }
+.wf-act-hdr-focus:hover { border-color:var(--border2); background:var(--alt); }
+.wf-act-hdr-focus:active { transform:scale(.92); }
+.wf-act-hdr-focus.on { color:var(--accent); border-color:var(--accent-bd); background:var(--accent-bg); }
+.wf-act-hdr-focus.on:hover { background:var(--accent-bg); border-color:var(--accent); }
+/* Tab bar — a segmented control on a tinted track; hidden when collapsed */
+.wf-act-tab-row { display:flex; align-items:stretch; gap:2px; margin:0 8px 7px; padding:3px;
+  background:var(--alt); border-radius:8px; flex-shrink:0; }
 .wf-act-panel.collapsed .wf-act-tab-row { display:none; }
-.wf-act-tab { font-size:11px; font-weight:600; color:var(--muted); background:none; border:none;
-  cursor:pointer; padding:6px 10px 5px; display:flex; align-items:center; gap:4px;
-  letter-spacing:0; text-transform:none; position:relative; flex-shrink:0; }
-.wf-act-tab::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px;
-  background:transparent; border-radius:2px 2px 0 0; transition:background .15s; }
-.wf-act-tab.sel { color:var(--accent); }
-.wf-act-tab.sel::after { background:var(--accent); }
-.wf-act-tab:hover:not(.sel) { color:var(--ink); background:var(--alt); }
+.wf-act-tab { flex:1 1 0; font-size:11px; font-weight:600; color:var(--muted); background:none; border:none;
+  cursor:pointer; padding:5px 4px; display:flex; align-items:center; justify-content:center; gap:5px;
+  letter-spacing:0; text-transform:none; position:relative; border-radius:6px;
+  transition:color .12s, background .12s, box-shadow .12s; }
+.wf-act-tab.sel { color:var(--accent); background:var(--panel); box-shadow:0 1px 2px rgba(20,30,45,.12); }
+.wf-act-tab:hover:not(.sel) { color:var(--ink); }
 /* Legacy .wf-act-add (hidden — replaced by .wf-act-hdr-add above) */
 .wf-act-add { display:none; }
-.wf-act-panel-body { overflow-y:auto; padding:5px 7px 7px; border-top:1px solid var(--line); }
+/* Body scrolls; capped so only ~6 activity rows show by default and the rest
+   scroll. Row ≈ 30px (6px×2 padding + ~15px content + 1px×2 border) + 4px gap,
+   so 6 rows ≈ 6×30 + 5×4 = 200px. */
+.wf-act-panel-body { flex:1; min-height:0; max-height:200px; overflow-y:auto; padding:0 8px 8px; }
+.wf-act-panel-body::-webkit-scrollbar { width:7px; }
+.wf-act-panel-body::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:4px;
+  border:2px solid transparent; background-clip:padding-box; }
+.wf-act-panel-body::-webkit-scrollbar-thumb:hover { background-color:#94a3b8; }
+.wf-act-panel-body::-webkit-scrollbar-track { background:transparent; }
 .wf-act-list { display:flex; flex-direction:column; gap:4px; }
-/* Cap each list at 8 visible rows; overflow scrolls instead of expanding
-   the whole panel. 8 rows × ~32px + 7 gaps × 4px ≈ 284px. */
-#wf-activities, #wf-activities-bg, #wf-functions { padding:0; max-height:284px; overflow-y:auto; }
-/* Thin scrollbar for the activity lists (WebKit). */
-#wf-activities::-webkit-scrollbar, #wf-activities-bg::-webkit-scrollbar, #wf-functions::-webkit-scrollbar { width:6px; }
-#wf-activities::-webkit-scrollbar-thumb, #wf-activities-bg::-webkit-scrollbar-thumb, #wf-functions::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
-#wf-activities::-webkit-scrollbar-track, #wf-activities-bg::-webkit-scrollbar-track, #wf-functions::-webkit-scrollbar-track { background:transparent; }
+/* The lists flow inside the panel body, which scrolls as one; no per-list cap
+   so the panel uses the available canvas height (bounded by its max-height). */
+#wf-activities, #wf-activities-bg, #wf-functions { padding:0; }
 /* Run-status indicators on activity rows.
    .running  → blinking green left bar (engine is executing this activity)
    .errored  → solid red left bar (activity finished with failure) */
@@ -270,14 +330,15 @@
 .wf-act.errored { border-color:#d6483f; }
 @keyframes wfActBlink { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-/* Live variables panel — pinned top-right of the canvas. Shows the vars
-   declared on the current activity (declared value) overlaid with live runtime
-   values pushed from the engine during a test run. Collapsible. */
-  .wf-vars-panel { position:absolute; right:10px; top:10px; width:232px; max-height:50%;
+/* Live variables panel — sits below Activities in the bottom-right corner
+   stack. Shows the vars declared on the current activity (declared value)
+   overlaid with live runtime values pushed from the engine during a test run.
+   Collapsible. */
+  .wf-vars-panel { flex:0 1 auto; min-height:34px;
       background:var(--panel); border:1px solid var(--border2); border-radius:9px;
-      box-shadow:var(--sh-md); display:flex; flex-direction:column; z-index:5;
-      font-size:11px; overflow:hidden; transition: max-height 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
-  .wf-vars-panel.collapsed { max-height:34px; }
+      box-shadow:var(--sh-md); display:flex; flex-direction:column;
+      font-size:11px; overflow:hidden; transition:max-height .2s cubic-bezier(0.16, 1, 0.3, 1); max-height:50vh; }
+  .wf-vars-panel.collapsed { max-height:34px; flex:0 0 auto; }
   .wf-vars-hdr { display:flex; align-items:center; gap:5px;
       padding:6px 10px; cursor:pointer; background:var(--surface); border-bottom:1px solid var(--border2);
       user-select:none; min-height:32px; transition: background .1s; }
@@ -311,7 +372,7 @@
 .wf-glob-del:hover { background:var(--err-bg); border-color:var(--err); }
 .wf-vars-panel.live .wf-vars-live { color:#2fa55a; animation:wfPulse 1.4s ease-in-out infinite; }
 @keyframes wfPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-.wf-vars-body { overflow-y:auto; padding:4px 7px 7px; }
+.wf-vars-body { flex:1; min-height:0; overflow-y:auto; padding:4px 7px 7px; }
 .wf-vars-empty { color:var(--muted); padding:7px 5px; font-size:10.5px; }
 /* Section separator inside the vars panel body */
 .wf-vars-sep { font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
@@ -328,9 +389,15 @@
 /* Node — a clean rectangular card with one uniform neutral border. Category is
    hinted only by the icon colour (--node-accent); the run colours (green/red/
    amber) recolour the whole border so a run still reads at a glance. */
-.wf-node { position:absolute; width:168px; background:var(--panel);
+.wf-node { position:absolute; width:160px; background:var(--panel);
            border:1px solid var(--border2);
            border-radius:var(--node-r); box-shadow:var(--sh-md); user-select:none; }
+/* Header 20px + body 40px = 60px default block height. Collapsed blocks,
+   stack members, free-form notes and terminals are exempt. */
+.wf-node:not(.collapsed):not(.wf-stacked):not(.note):not(.start):not(.end) { min-height:60px; }
+/* start/end keep the normal card look (bg/border/radius/shadow below still
+   applies) but swap header+body for a play/stop triangle — see the dedicated
+   ruleset further down. */
 .wf-node.sel { border-color:var(--accent); border-top-color:var(--accent);
   box-shadow:0 0 0 2px var(--accent-bd), var(--sh-md); }
 /* Entry marker — a subtle top accent bar on the default starting block.
@@ -352,8 +419,9 @@
 /* Terminals read as bold, unmistakable entry/exit points: start = green,
    end/stop = red — accent, title and header tint all aligned to one hue so the
    block's role is obvious without reading the label. */
-.wf-node.start { --node-accent:#16a34a; --ntitle:#15803d; --nhd-bg:#dcfce7; --nhd-bd:#a3e0bb; }
-.wf-node.end, .wf-node.stop { --node-accent:#dc2626; --ntitle:#b42318; --nhd-bg:#fee2e2; --nhd-bd:#f4b8b2; }
+.wf-node.start { --node-accent:#16a34a; --ntitle:#15803d; }
+.wf-node.end { --node-accent:#dc2626; --ntitle:#b42318; }
+.wf-node.stop { --node-accent:#dc2626; --ntitle:#b42318; --nhd-bg:#fee2e2; --nhd-bd:#f4b8b2; }
 .wf-node.condition { --node-accent:#9a78e6; }
 .wf-node.loop { --node-accent:#e0a64b; }
 .wf-node.call { --node-accent:#7c3aed; }
@@ -408,6 +476,36 @@
   box-shadow:0 0 0 3px rgba(249,115,22,.45), 0 0 18px rgba(249,115,22,.65) !important; animation:wfRun 1s ease-in-out infinite; }
 .wf-node.running .wf-node-hd { background:#ffedd5; border-bottom-color:#fdba74; }
 .wf-node.running .wf-node-title { color:#9a3412; }
+/* ── Terminals (start/end) — an icon-sized round chip carrying a white glyph,
+   matching the rounded, icon-first language of every other block instead of a
+   bare geometric triangle. The card is a 30px circle so the sel/running/ran-*
+   state rings (box-shadow) read as concentric halos, and the port dot — which
+   docks at the card edge like on any block — lands on the disc's rim. */
+.wf-node.start, .wf-node.end { width:30px; height:30px; min-height:30px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; background:transparent; }
+/* The base .wf-node rule's border+shadow would draw a faint square frame around
+   the round chip — strip both for the plain state; .sel/.running/.ran-ok/
+   .ran-fail set their own border-color/box-shadow (now circular via the
+   border-radius above) and are excluded so those states still show. */
+.wf-node.start:not(.sel):not(.running):not(.ran-ok):not(.ran-fail),
+.wf-node.end:not(.sel):not(.running):not(.ran-ok):not(.ran-fail) {
+  border:none; box-shadow:none;
+}
+/* .running sets its own background (!important) for the amber glow — reset it
+   back to transparent for terminals so the same white/cream patch doesn't
+   reappear behind the chip while the block is actively running. */
+.wf-node.start.running, .wf-node.end.running { background:transparent !important; }
+/* The terminal glyph: a filled accent disc with a white icon (play for start,
+   stop-square for end) — same rounded, icon-first language as every other
+   block, so start/end no longer read as bare geometric triangles. The disc
+   fills the 30px card edge-to-edge so the port dot still docks on its rim. */
+.wf-node-tri { position:absolute; inset:0; border-radius:50%; background:var(--node-accent);
+  display:flex; align-items:center; justify-content:center; color:#fff;
+  box-shadow:0 1px 3px rgba(20,30,45,.28), inset 0 0 0 1.5px rgba(255,255,255,.28); }
+.wf-node-tri svg { width:16px; height:16px; display:block; }
+.wf-node.start .wf-node-tri svg { margin-left:1px; }
+.wf-node-tri-lbl { position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:3px;
+  font-size:8px; font-weight:700; letter-spacing:.02em; color:var(--ntitle); line-height:1; white-space:nowrap; }
 /* Preview-toggle eye: stays hidden until you hover the node (keeps the header
    clean), but remains visible whenever preview is on so the active state shows. */
 .wf-node-eye { color:var(--muted); line-height:0; padding:2px; border-radius:4px; flex-shrink:0;
@@ -420,9 +518,9 @@
 /* Image preview — compact square on the right of the body. The preview row
    reserves a fixed min-height so blocks don't jump when toggling; the image
    collapses to zero width when hidden so body text reflows naturally. */
-.wf-node-prevrow { display:flex; align-items:center; gap:8px; padding:5px 8px; min-height:36px; }
+.wf-node-prevrow { display:flex; align-items:center; gap:7px; padding:4px 8px; min-height:32px; }
 .wf-node-prevrow .wf-node-sum { padding:0; flex:1; min-width:0; }
-.wf-node-thumb { flex-shrink:0; width:28px; height:28px; object-fit:contain;
+.wf-node-thumb { flex-shrink:0; width:26px; height:26px; object-fit:contain;
   background:#fff repeating-conic-gradient(#e6e9ee 0% 25%, transparent 0% 50%) 50%/5px 5px;
   border:1px solid var(--border2); border-radius:4px; padding:1px; }
 .wf-node:not(.showing-thumb) .wf-node-thumb,
@@ -435,7 +533,7 @@
 .wf-node:not(.showing-thumb) .wf-node-prevrow { gap:0; }
 /* Multi-template (OR) preview: a tight row of small squares, one per image. */
 .wf-node-thumbs { flex-shrink:0; display:flex; align-items:center; gap:3px; }
-.wf-node-thumb-sm { width:24px; height:24px; object-fit:contain; border:1px solid var(--border);
+.wf-node-thumb-sm { width:22px; height:22px; object-fit:contain; border:1px solid var(--border);
   border-radius:3px; background:#fff repeating-conic-gradient(#e6e9ee 0% 25%, transparent 0% 50%) 50%/5px 5px; flex-shrink:0; }
 /* On hover the node rises above neighbours so the thumbnail is not obscured. */
 .wf-node.has-thumb:hover { z-index:var(--z-node-hover); }
@@ -461,7 +559,8 @@
 .wf-node:active { cursor:grabbing; }
   /* Node header: tinted per-category via --nhd-bg/--nhd-bd CSS vars; default keeps existing light-purple for uncategorised nodes. */
   /* Tighter header so the body (and preview image) dominates the block. */
-  .wf-node-hd { display:flex; align-items:center; gap:4px; padding:2px 7px; min-height:22px;
+  /* Header spans exactly 1 grid cell (20px). */
+  .wf-node-hd { display:flex; align-items:center; gap:5px; padding:0 8px; height:20px;
     border-bottom:1px solid var(--nhd-bd,#ece3fb); background:var(--nhd-bg,#f4eefe);
     border-radius:var(--node-r) var(--node-r) 0 0; transition: background .15s, border-bottom-color .15s; }
   .wf-node.collapsed .wf-node-hd { border-bottom:none; border-radius:var(--node-r); }
@@ -495,22 +594,22 @@
 /* Default per-block summary line (the auto description under the title). Reads as
    a quiet readable caption — bumped from low-contrast 9.5px mono-muted to a
    clearer tone/size so the block's gist is legible without squinting. */
-.wf-node-sum { font-family:var(--mono); font-size:10px; color:var(--dim); padding:5px 8px 6px;
-  line-height:1.4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-node-sum { font-family:var(--mono); font-size:10px; color:var(--dim); padding:4px 8px 5px;
+  line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wf-node-note { display:flex; align-items:flex-start; gap:5px; font-size:10px; font-style:italic;
   color:var(--muted); background:transparent; border-top:1px solid var(--line);
-  border-radius:0 0 var(--node-r) var(--node-r); padding:5px 8px 6px; white-space:normal;
-  word-break:break-word; line-height:1.4; }
+  border-radius:0 0 var(--node-r) var(--node-r); padding:4px 8px 5px; white-space:normal;
+  word-break:break-word; line-height:1.35; }
 .wf-node-note svg { width:9px; height:9px; flex-shrink:0; margin-top:1.5px; opacity:.4; }
 /* Runtime log line: text auto-emitted to the log panel each time this block runs. */
 .wf-node-log { font-size:9.5px; color:#2f6b8f; background:#eef6fb;
-  border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:4px 8px; white-space:normal; word-break:break-word; }
+  border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:3px 8px; white-space:normal; word-break:break-word; }
 .wf-node-log::before { content:""; display:inline-block; width:11px; height:11px; vertical-align:-1px; margin-right:4px; background:currentColor; -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; }
 
 /* Timing indicator: pause before / after this block (delayBefore / delayAfter).
    Compact row below the summary — two tiny icons + label side by side. */
-.wf-node-delay { display:flex; align-items:center; gap:2px; font-size:7.5px; font-weight:600;
-  color:var(--warn); padding:3px 8px 3px; }
+.wf-node-delay { display:flex; align-items:center; gap:3px; font-size:9px; font-weight:600;
+  color:var(--warn); padding:2px 8px 3px; }
 .wf-node-delay svg { width:9px; height:9px; flex-shrink:0; opacity:.7; }
 .wf-node-delay span { margin-right:6px; }
 
@@ -520,6 +619,9 @@
 .wf-port { position:absolute; width:9px; height:9px; border-radius:50%; background:#e0e5eb;
   border:1.5px solid #c5cdd6; cursor:crosshair; z-index:2;
   transition:border-color .12s, background .12s, transform .12s; box-sizing:border-box; }
+/* An invisible padded hit-area around each port dot so it's easy to grab / drop
+   onto without pixel-hunting the 9px dot. */
+.wf-port::before { content:""; position:absolute; inset:-6px; border-radius:50%; }
 .wf-port:hover { border-color:var(--accent); transform:scale(1.35); }
 .wf-port.in  { left:-5px; }
 .wf-port.in:hover { background:var(--accent-bg); }
@@ -565,7 +667,7 @@
    vars / cases) keep their own light containers — that nesting is structural,
    not decorative. */
 .wf-insp-id { position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:9px;
-  padding:10px 12px; background:var(--panel); border-bottom:1px solid var(--border); }
+  padding:9px 12px; background:var(--panel); border-bottom:1px solid var(--border); }
 .wf-insp-id .ic { width:30px; height:30px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
   border-radius:8px; background:var(--accent-bg); border:1px solid var(--accent-bd); color:var(--accent); }
 .wf-insp-id .ic svg { width:16px; height:16px; }
@@ -577,7 +679,7 @@
 .wf-insp-id .count { flex-shrink:0; font-family:var(--mono); font-size:10px; font-weight:700; color:var(--accent);
   background:var(--accent-bg); border:1px solid var(--accent-bd); border-radius:999px; padding:2px 9px; }
 
-.wf-insp-block { display:flex; flex-direction:column; gap:7px; padding:11px 12px; }
+.wf-insp-block { display:flex; flex-direction:column; gap:6px; padding:9px 12px; }
 .wf-insp-block + .wf-insp-block { border-top:1px solid var(--line); }
 .wf-insp-sec { display:flex; align-items:center; gap:6px; margin:0;
   font-size:10px; font-weight:700; letter-spacing:.06em; color:var(--muted); text-transform:uppercase; }
@@ -587,11 +689,33 @@
 .wf-insp-tip code { background:var(--alt); padding:1px 4px; border-radius:4px; font-size:10px; font-family:var(--mono); }
 .wf-insp-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
 
+/* Debug-JSON tool in the inspector: a preview toggle + Copy button, with an
+   expandable read-only JSON textarea below. */
+.wf-json-tool { display:flex; flex-direction:column; gap:6px; }
+.wf-json-bar { display:flex; align-items:center; gap:6px; }
+.wf-json-toggle { flex:1; min-width:0; display:flex; align-items:center; gap:6px;
+  font-size:11px; font-weight:600; color:var(--dim); background:var(--alt);
+  border:1px solid var(--border2); border-radius:var(--r-sm); padding:5px 9px;
+  cursor:pointer; transition:color .1s, border-color .1s, background .1s; }
+.wf-json-toggle:hover { color:var(--ink); border-color:var(--accent-bd); background:var(--accent-bg); }
+.wf-json-toggle span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-json-chev { flex-shrink:0; color:var(--muted); transition:transform .15s var(--ease); }
+.wf-json-tool.open .wf-json-chev { transform:rotate(0deg); }
+.wf-json-tool:not(.open) .wf-json-chev { transform:rotate(-90deg); }
+.wf-json-bar .btn.sm { flex-shrink:0; }
+.wf-json-bar .btn.sm.flash { background:var(--ok); border-color:var(--ok); color:#fff; }
+.wf-json-bar .btn.sm svg { width:13px; height:13px; }
+.wf-json-pre { width:100%; height:220px; resize:vertical; font-family:var(--mono);
+  font-size:10.5px; line-height:1.5; color:var(--ink2); background:var(--surface);
+  border:1px solid var(--border2); border-radius:var(--r-sm); padding:8px 9px;
+  white-space:pre; overflow:auto; tab-size:2; }
+.wf-json-pre:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-bd); }
+
 /* Field row — single canonical definition (was duplicated). */
 .wf-field { display:flex; align-items:center; gap:6px; }
 .wf-field > label { font-size:10.5px; color:var(--dim); font-weight:600; min-width:58px; flex-shrink:0; }
 .wf-field > input[type=text], .wf-field > input[type=number], .wf-field > select {
-  flex:1; min-width:0; font-size:11px; padding:5px 7px; border-radius:var(--r-sm); }
+  flex:1; min-width:0; font-size:11px; padding:4px 7px; border-radius:var(--r-sm); }
 .wf-field .cb { width:17px; height:17px; border-radius:5px; border:1.5px solid #cfd5dd; background:var(--panel);
   display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
 .wf-field .cb.checked { background:var(--accent); border-color:var(--accent); }
@@ -616,7 +740,7 @@
 .wf-tpls-list { display:flex; flex-direction:column; gap:6px; }
 .wf-tpls-item { border:1px solid var(--border2); border-radius:7px; padding:5px; background:var(--panel); display:flex; flex-direction:column; gap:4px; }
 .wf-tpls-hdr { display:flex; align-items:center; gap:4px; }
-.wf-tpls-hdr .num { font-size:10px; color:var(--accent); font-weight:700; min-width:16px; }
+.wf-tpls-hdr .num { font-size:10px; color:var(--accent); font-weight:700; min-width:14px; }
 .wf-tpls-hdr input { flex:1; min-width:0; font-size:10px; }
 .wf-tpls-hdr .btn.sm { height:22px; padding:0 6px; font-size:10px; }
 .wf-tpls-empty { font-size:10.5px; color:var(--muted); font-style:italic; padding:2px 0; }
@@ -638,10 +762,12 @@
 .wf-empty-note { font-size:11.5px; color:var(--muted); padding:6px 2px; text-align:center; }
 
 /* ── Activities panel: 3 tabs share the row evenly ────────────────────────────
-   Three tabs (Sequent / Background / Function) split the 248px panel width;
-   each flexes so labels stay readable and counts stay visible. */
-.wf-act-tab-row .wf-act-tab { flex:1 1 0; justify-content:center; padding:6px 4px 5px; }
-.wf-act-tab-row .wf-act-tab .side-count { margin-left:3px; }
+   Three tabs (Sequent / Background / Function) split the panel width; each
+   flexes so labels stay readable and counts stay visible. */
+.wf-act-tab-row .wf-act-tab { flex:1 1 0; justify-content:center; padding:5px 3px; }
+.wf-act-tab .side-count { margin-left:2px; padding:0 5px; font-size:9px;
+  background:var(--alt); color:var(--muted); }
+.wf-act-tab.sel .side-count { background:var(--accent-bg); color:var(--accent); }
 
 /* ── Canvas view tabs (Canvas / Preview) — right end of the toolbar ─────────
    Lives in #wf-bar (not pinned over the canvas) so it never overlaps the graph

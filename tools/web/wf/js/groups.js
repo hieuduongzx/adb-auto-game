@@ -16,7 +16,7 @@ function wfNodesInGroup(gr){
   const g=wfGraph(); if(!g) return [];
   return g.nodes.filter(n=>{
     const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
-    const w=el?el.offsetWidth:158, h=el?el.offsetHeight:52;
+    const w=el?el.offsetWidth:156, h=el?el.offsetHeight:48;
     const cx=n.x+w/2, cy=n.y+h/2;
     return cx>=gr.x && cx<=gr.x+gr.w && cy>=gr.y && cy<=gr.y+gr.h;
   });
@@ -91,6 +91,35 @@ function wfStartGroupMove(e,gr){
 function wfStartGroupResize(e,gr){
   if(e.button!==0) return; e.stopPropagation();
   wfGesture={mode:"groupresize", gr, ow:gr.w, oh:gr.h, sx:e.clientX, sy:e.clientY};
+}
+
+// Vertical port-alignment snap. Given the dragged block id and a proposed top
+// (world Y), return an adjusted top so that — if any of the block's port dots
+// falls within WF_PORT_SNAP px of another block's port dot — the two dots line
+// up exactly. Ports are measured from the live DOM (offsetTop within the node),
+// so this works for every kind: it lets a start/end triangle's lone dot (which
+// sits at the triangle centre, higher than a full block's body-centred dot)
+// snap level with the neighbour it's wiring to. Single-node drags only.
+const WF_PORT_SNAP = 7;   // world px pull range
+function wfPortAlignSnapY(dragId, topY){
+  const dEl=wfNodeElById(dragId); if(!dEl) return topY;
+  const dOff=[...dEl.querySelectorAll(".wf-port")].map(p=>p.offsetTop+p.offsetHeight/2);
+  if(!dOff.length) return topY;
+  const g=wfGraph(); if(!g) return topY;
+  let bestTop=topY, bestDist=WF_PORT_SNAP+0.001, found=false;
+  for(const other of g.nodes){
+    if(other.id===dragId) continue;
+    const oEl=wfNodeElById(other.id); if(!oEl) continue;
+    const oAbs=[...oEl.querySelectorAll(".wf-port")].map(p=>other.y+p.offsetTop+p.offsetHeight/2);
+    for(const off of dOff){
+      for(const oy of oAbs){
+        const need=oy-off;                 // the top that would align this pair
+        const dist=Math.abs(need-topY);
+        if(dist<bestDist){ bestDist=dist; bestTop=need; found=true; }
+      }
+    }
+  }
+  return found ? Math.round(bestTop) : topY;
 }
 
 function wfStartMove(e,n){
@@ -317,9 +346,11 @@ function wfInitCanvas(){
   });
   const aadd=$("wf-act-add");
   if(aadd) aadd.onclick=(e)=>{ e.stopPropagation(); wfActAddCurrent(); };
-  // Only the title row (not the tab bar) is the collapse trigger.
+  const afocus=$("wf-act-focus");
+  if(afocus) afocus.onclick=(e)=>{ e.stopPropagation(); wfToggleFocus(); };
+  // Only the title row (not the tab bar / header buttons) is the collapse trigger.
   const ahdr=document.querySelector("#wf-act-hdr-row");
-  if(ahdr) ahdr.onclick=(e)=>{ if(e.target.closest(".wf-act-hdr-add")) return; wfActCollapsed=!wfActCollapsed; wfToggleActPanel(); };
+  if(ahdr) ahdr.onclick=(e)=>{ if(e.target.closest(".wf-act-hdr-add,.wf-act-hdr-focus")) return; wfActCollapsed=!wfActCollapsed; wfToggleActPanel(); };
   // Auto-layout menu (bottom-left): toggle open/closed + run a strategy on pick.
   document.querySelectorAll(".wf-layout-item").forEach(btn=>{
     btn.onclick=(e)=>{ e.stopPropagation(); wfAutoLayout(btn.dataset.layout); wfCloseLayoutMenu(); };
@@ -362,8 +393,13 @@ function wfInitCanvas(){
       // Snap the lead node, then shift the whole selection by the SAME delta.
       const lead=wfGesture.items.find(it=>it.id===wfGesture.dragId)||wfGesture.items[0];
       if(!lead) return;
-      const sx=wfSnap(lead.ox+(e.clientX-wfGesture.sx)/wfZoom);
-      const sy=wfSnap(lead.oy+(e.clientY-wfGesture.sy)/wfZoom);
+      let sx=wfSnap(lead.ox+(e.clientX-wfGesture.sx)/wfZoom);
+      let sy=wfSnap(lead.oy+(e.clientY-wfGesture.sy)/wfZoom);
+      // Port-alignment snap (single node only): if a port of the dragged block
+      // lands within a few px of another block's port row, pin the block so the
+      // two dots line up exactly and the wire runs dead-straight. Handles the
+      // start/end triangles whose lone dot sits higher than a full block's dot.
+      if(wfGesture.items.length===1){ sy=wfPortAlignSnapY(wfGesture.dragId, sy); }
       const dx=sx-lead.ox, dy=sy-lead.oy;
       wfGesture.items.forEach(it=>{
         const n=wfNode(it.id); if(!n) return;

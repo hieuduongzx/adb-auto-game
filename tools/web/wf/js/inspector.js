@@ -26,6 +26,43 @@ function wfInspBlock(label,count){
   return b;
 }
 
+// Debug block: a collapsible JSON preview of the current selection plus a
+// Copy button. `getObj` is called lazily so the JSON is always current when the
+// user copies / expands. `label` names the entity (Activity / Function / Node).
+function wfInspJsonBlock(label, getObj){
+  const b=wfInspBlock("Debug JSON");
+  const wrap=document.createElement("div"); wrap.className="wf-json-tool";
+
+  const bar=document.createElement("div"); bar.className="wf-json-bar";
+  const toggle=document.createElement("button"); toggle.className="wf-json-toggle"; toggle.type="button";
+  toggle.innerHTML=`<svg class="wf-json-chev" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg><span>Preview ${escHtml(label)} JSON</span>`;
+  const copyBtn=document.createElement("button"); copyBtn.className="btn sm"; copyBtn.type="button";
+  copyBtn.innerHTML=`${wfIco("clipboard")}<span>Copy JSON</span>`;
+  copyBtn.title="Copy this "+label+"'s JSON to the clipboard";
+  bar.appendChild(toggle); bar.appendChild(copyBtn);
+
+  const pre=document.createElement("textarea"); pre.className="wf-json-pre"; pre.readOnly=true; pre.spellcheck=false;
+  pre.style.display="none";
+
+  const json=()=>{ try{ return JSON.stringify(getObj(),null,2); }catch{ return "// (unavailable)"; } };
+  toggle.onclick=()=>{
+    const open=pre.style.display==="none";
+    if(open){ pre.value=json(); pre.style.display="block"; wrap.classList.add("open"); }
+    else { pre.style.display="none"; wrap.classList.remove("open"); }
+  };
+  copyBtn.onclick=async()=>{
+    const txt=json();
+    try{ await navigator.clipboard.writeText(txt); }
+    catch{ pre.style.display="block"; pre.value=txt; pre.select(); document.execCommand&&document.execCommand("copy"); }
+    copyBtn.classList.add("flash");
+    const lbl=copyBtn.querySelector("span"); const old=lbl.textContent; lbl.textContent="Copied!";
+    setTimeout(()=>{ copyBtn.classList.remove("flash"); lbl.textContent=old; },900);
+  };
+
+  wrap.appendChild(bar); wrap.appendChild(pre); b.appendChild(wrap);
+  return b;
+}
+
 function wfRenderInspector(){
   const body=$("wf-insp-body"); body.innerHTML="";
   wfRenderVarsPanel();
@@ -90,7 +127,9 @@ function wfRenderInspector(){
       if(!(def.fields||[]).length){
         const d=document.createElement("div"); d.className="wf-insp-tip"; d.textContent="This node has no parameters."; pblock.appendChild(d);
       }
-      (def.fields||[]).forEach(f=>pblock.appendChild(wfFieldEl(node,f)));
+      // Fields may declare showWhen:{key:val|[vals]} to appear only when another
+      // param has a given value (e.g. Tap's x/y hide when target = found image).
+      (def.fields||[]).filter(f=>wfFieldVisible(node,f)).forEach(f=>pblock.appendChild(wfFieldEl(node,f)));
     }
     body.appendChild(pblock);
 
@@ -98,6 +137,7 @@ function wfRenderInspector(){
     if(node.type!=="note" && node.type!=="start") body.appendChild(wfRetryField(node));
     if(node.type!=="note") body.appendChild(wfNoteField(node));
     if(node.type!=="note" && node.type!=="start") body.appendChild(wfLogField(node));
+    body.appendChild(wfInspJsonBlock("Node", ()=>wfSerializeNode(node)));
     return;
   }
 
@@ -108,6 +148,7 @@ function wfRenderInspector(){
     const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Arrange nodes for this function. It can be used as a node in any activity (drag from Functions).";
     b.appendChild(tip);
     body.appendChild(b);
+    body.appendChild(wfInspJsonBlock("Function", ()=>wfSerializeFunction(fn)));
     return;
   }
 
@@ -122,6 +163,8 @@ function wfRenderInspector(){
     body.appendChild(b);
 
     body.appendChild(wfVarsSection(act));
+
+    body.appendChild(wfInspJsonBlock(act.type==="background"?"Background":"Activity", ()=>wfSerializeActivity(act)));
 
     const tipBlock=wfInspBlock();
     const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Click a node on the canvas to edit its parameters.";
@@ -412,6 +455,17 @@ function wfAttachCoordPaste(node, f, inp){
   });
 }
 
+// A field is visible unless its showWhen:{key:val|[vals]} gate fails. Lets a
+// block hide params that don't apply to the current mode (e.g. Tap's x/y when
+// aiming at the last-found image instead of fixed coordinates).
+function wfFieldVisible(node,f){
+  if(!f.showWhen) return true;
+  return Object.entries(f.showWhen).every(([k,want])=>{
+    const cur=node.params[k];
+    return Array.isArray(want) ? want.includes(cur) : cur===want;
+  });
+}
+
 function wfFieldEl(node,f){
   // Region is a special block (already styled as a panel).
   if(f.t==="region") return wfRegionField(node,f);
@@ -429,7 +483,10 @@ function wfFieldEl(node,f){
     const sel=document.createElement("select");
     (f.opts||[]).forEach(o=>{ const v=(o&&o.v!==undefined)?o.v:o, t=(o&&o.t!==undefined)?o.t:o;
       const op=document.createElement("option"); op.value=v; op.textContent=t; if(node.params[f.k]===v)op.selected=true; sel.appendChild(op); });
-    sel.onchange=()=>{ wfPushUndoDebounced(); node.params[f.k]=sel.value; wfUpdNodeSum(node); };
+    // If any sibling field gates on this one (showWhen), re-render the inspector
+    // so gated fields appear/disappear as the selection changes.
+    const gates=(WF_NODES[node.type]&&WF_NODES[node.type].fields||[]).some(ff=>ff.showWhen&&ff.showWhen[f.k]!==undefined);
+    sel.onchange=()=>{ wfPushUndoDebounced(); node.params[f.k]=sel.value; wfUpdNodeSum(node); if(gates) wfRenderInspector(); };
     row.appendChild(sel); return row;
   }
   if(f.t==="tpls") return wfTplsField(node,f);

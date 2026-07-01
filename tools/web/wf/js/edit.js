@@ -6,6 +6,63 @@ function wfCurAct(){ return WF.edit.kind==="activity" ? wfActById(WF.edit.id) : 
 function wfCurFn(){ return WF.edit.kind==="function" ? wfFnById(WF.edit.id) : null; }
 function wfGraph(){ const t=wfEditTarget(); return t?t.graph:null; }
 function wfNode(id){ const g=wfGraph(); return g?g.nodes.find(n=>n.id===id):null; }
+
+// ── Follow-focus ─────────────────────────────────────────────────────────────
+// When ON (default), the canvas auto-centres on the node the engine is running.
+// If the flow steps into a function's graph (or back out into an activity), the
+// editor switches to that graph too — so focus follows execution across the
+// call boundary. The toggle lives on the activity panel header.
+let wfFocusOn = false;
+// Locate which activity or function graph contains a node id → {kind,id,node}.
+function wfFindNodeOwner(nodeId){
+  if(!nodeId) return null;
+  for(const a of WF.activities){
+    const n=(a.graph&&a.graph.nodes||[]).find(n=>n.id===nodeId);
+    if(n) return {kind:"activity", id:a.id, node:n};
+  }
+  for(const f of WF.functions){
+    const n=(f.graph&&f.graph.nodes||[]).find(n=>n.id===nodeId);
+    if(n) return {kind:"function", id:f.id, node:n};
+  }
+  return null;
+}
+// Switch the edit target WITHOUT resetting pan/zoom (unlike wfSelectActivity /
+// wfEditFunction which reset the camera). Used by focus so following execution
+// keeps the current zoom level and just re-centres on the running node.
+function wfFocusSwitchTarget(kind, id){
+  if(WF.edit.kind===kind && WF.edit.id===id) return false;
+  WF.edit={kind, id};
+  wfClearSel();
+  wfRenderAll();
+  return true;
+}
+// Follow the engine to `nodeId`: switch graphs if the node lives in another
+// activity/function, then centre the viewport on it. No-op when focus is off.
+function wfFocusFollow(nodeId){
+  if(!wfFocusOn || !nodeId) return;
+  const owner=wfFindNodeOwner(nodeId);
+  if(!owner) return;
+  const switched=wfFocusSwitchTarget(owner.kind, owner.id);
+  const n = switched ? owner.node : (wfNode(nodeId)||owner.node);
+  if(n) wfCenterOnNode(n);
+}
+// Reflect the focus flag on the header toggle button (on/off tint).
+function wfSyncFocusBtn(){
+  const b=$("wf-act-focus");
+  if(b){ b.classList.toggle("on", wfFocusOn); b.title = wfFocusOn
+    ? "Focus: ON — auto-centre on the running block (follows into/out of functions). Click to turn off."
+    : "Focus: OFF — canvas stays put during a run. Click to turn on."; }
+}
+// Toggle follow-focus. When turned on mid-run, immediately snap to the block
+// that's running right now — using the engine's true current node (wfLiveNode),
+// which may live in an off-screen function graph, not just the last node lit in
+// the viewed graph (wfRunNode).
+function wfToggleFocus(){
+  wfFocusOn=!wfFocusOn;
+  wfSyncFocusBtn();
+  setStatus("Focus "+(wfFocusOn?"on":"off"));
+  if(wfFocusOn){ const id=wfLiveNode||wfRunNode; if(id) wfFocusFollow(id); }
+}
 function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",delayBefore:0,delayAfter:0,retryCount:0,retryDelay:0,screenshotOnFail:false,showPreview:false,stack:null}; }
 function wfNewGraph(){ return { nodes:[{id:wfUid(),type:"start",x:60,y:70,params:{}}], edges:[], groups:[] }; }
 

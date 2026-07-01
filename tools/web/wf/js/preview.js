@@ -24,8 +24,7 @@ function wfSwitchView(view){
   const empty = document.getElementById("wf-canvas-empty");
   // Graph-only chrome: hide the pinned panels + empty hint while previewing.
   const graphOnly = [world, empty,
-    document.getElementById("wf-vars-panel"),
-    document.getElementById("wf-act-panel"),
+    document.getElementById("wf-corner-stack"),
     document.getElementById("wf-layout-bar")];
 
   if(view==="preview"){

@@ -23,6 +23,7 @@ async function wfLoadThumb(img, path){
 // and reds the one it didn't. This is why fast blocks now stay visible — they keep
 // the trail colour after the amber moves on.
 let wfRunNode=null;
+let wfLiveNode=null;    // the engine's true current node id (even if in an off-screen graph); drives focus-on-toggle
 let wfRunStopped=false; // true once a finished run's trail is on display (greys-out skipped blocks)
 let wfSkipIds=null;     // ids greyed out as "not reached", captured once when the run stops
 const wfRan={};       // nodeId -> "ok" | "fail"
@@ -117,7 +118,7 @@ function wfReapplyRunViz(){
   if(wfRunStopped) wfMarkUnreached();
 }
 function wfResetRunViz(){
-  wfRunNode=null; wfRunStopped=false; wfSkipIds=null;
+  wfRunNode=null; wfLiveNode=null; wfRunStopped=false; wfSkipIds=null;
   for(const k in wfRan) delete wfRan[k];
   for(const k in wfRanPort) delete wfRanPort[k];
   wfResetActStatus();

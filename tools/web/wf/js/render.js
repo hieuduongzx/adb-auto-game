@@ -163,17 +163,41 @@ function wfCommitReorder(listEl, arr){
 
 function wfRenderPalette(){
   const pal=$("wf-palette"); pal.innerHTML="";
-  // Node types grouped by category.
+  const q=(wfPaletteQuery||"").trim().toLowerCase();
+  let shown=0;
+  // Node types grouped by category. When a query is active, only matching
+  // types render and their category header shows a live hit count.
   WF_CATS.forEach(cat=>{
-    const types=Object.keys(WF_NODES).filter(t=>WF_NODES[t].cat===cat.key);
+    let types=Object.keys(WF_NODES).filter(t=>WF_NODES[t].cat===cat.key);
+    if(q) types=types.filter(t=>(WF_NODES[t].label+" "+t).toLowerCase().includes(q));
     if(!types.length) return;
-    const hdr=document.createElement("div"); hdr.className="wf-pal-cat cat-"+cat.key; hdr.textContent=cat.label; pal.appendChild(hdr);
+    shown+=types.length;
+    const hdr=document.createElement("div"); hdr.className="wf-pal-cat cat-"+cat.key;
+    hdr.innerHTML=`<span>${escHtml(cat.label)}</span>`+(q?`<span class="wf-pal-cat-n">${types.length}</span>`:"");
+    pal.appendChild(hdr);
     const grid=document.createElement("div"); grid.className="wf-pal-grid";
     types.forEach(type=>grid.appendChild(wfChip(WF_NODES[type].ico, WF_NODES[type].label, type, cat.key)));
     pal.appendChild(grid);
   });
+  if(!shown){
+    const none=document.createElement("div"); none.className="wf-pal-none";
+    none.textContent=q?`No nodes match “${wfPaletteQuery.trim()}”`:"No nodes.";
+    pal.appendChild(none);
+  }
   // Function calls live in the Function list at the top of the sidebar — drag a
   // row from there straight onto the canvas to insert a call node.
+}
+// Palette search — filter node chips by label/type as the user types.
+let wfPaletteQuery="";
+function wfPaletteFilter(v){
+  wfPaletteQuery=v||"";
+  const clr=$("wf-pal-search-clr"); if(clr) clr.style.display=wfPaletteQuery?"flex":"none";
+  wfRenderPalette();
+}
+function wfPaletteFilterClear(){
+  wfPaletteQuery=""; const inp=$("wf-pal-search-inp"); if(inp){ inp.value=""; inp.focus(); }
+  const clr=$("wf-pal-search-clr"); if(clr) clr.style.display="none";
+  wfRenderPalette();
 }
 function wfChip(ico,label,dragType,catKey){
   const chip=document.createElement("div");
@@ -426,14 +450,15 @@ function wfNodeEl(n){
   const tfCls = ((def.outs||[]).includes("true") || n.type==="switch") ? " has-tf" : "";
   el.className="wf-node "+def.kind+catCls+tfCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"");
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
-  // Dynamic output ports — grow the card so they all sit inside it (ports stack
-  // from top=3 with 16px spacing; last port needs room below it).
-  if(n.type==="switch"||n.type==="try_chain"){
-    const portCount = n.type==="switch"
-      ? ((n.params&&n.params.cases)||[]).length+1
-      : Math.max(1,parseInt(n.params&&n.params.count)||3)+1;
-    el.style.minHeight=(3 + (portCount-1)*16 + 14)+"px";
-  }
+  // Dynamic output ports — grow the card so they all sit inside it. Multi-port
+  // blocks stack their ports in the body starting at top=26, 16px apart; the last
+  // port needs room below it. Never shorter than the standard 60px block.
+  let dynOutCount=0;
+  if(n.type==="switch") dynOutCount=((n.params&&n.params.cases)||[]).length+1;
+  else if(n.type==="try_chain") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3)+1;
+  else if(n.type==="parallel") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3);
+  else if(n.type==="random_branch") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||2);
+  if(dynOutCount>2) el.style.minHeight=Math.max(60, 26 + (dynOutCount-1)*16 + 14)+"px";
   // Merged-block membership: hide the join port at the joined edge and flatten
   // that corner so the stack reads as one block.
   const intIn = n.stack ? wfHasInternalIn(n) : false;
@@ -466,14 +491,48 @@ function wfNodeEl(n){
   const thumbHtml = hasTpl ? (isTpls
     ? `<div class="wf-node-thumbs"></div>`
     : `<img class="wf-node-thumb">`) : "";
+  // start/end render as a small play/stop triangle, not a header+body card.
+  const isTerminal = def.kind==="start"||def.kind==="end";
   const sumHtml = sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"";
   const topRow = hasTpl ? `<div class="wf-node-prevrow">${thumbHtml}${sumHtml}</div>` : sumHtml;
   el.classList.toggle("showing-thumb", hasRealThumb);
   el.classList.toggle("has-thumb", hasTpl);
-  el.innerHTML=
-    `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span>${eyeBtn}<span class="wf-node-title">${escHtml(title)}</span></div>`+
-    topRow+delayHtml+retryHtml+noteHtml+logHtml;
-  if(!sum && !n.note && !n.log && !delayHtml && !retryHtml && !hasTpl) el.classList.add("collapsed");
+  if(isTerminal){
+    const termIco = def.kind==="end" ? '<rect x="7" y="7" width="10" height="10" rx="2"/>' : '<polygon points="8 5 19 12 8 19 8 5"/>';
+    el.innerHTML = `<span class="wf-node-tri"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none">${termIco}</svg></span><span class="wf-node-tri-lbl">${escHtml(def.label)}</span>`;
+  } else {
+    el.innerHTML=
+      `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span>${eyeBtn}<span class="wf-node-title">${escHtml(title)}</span></div>`+
+      topRow+delayHtml+retryHtml+noteHtml+logHtml;
+    if(!sum && !n.note && !n.log && !delayHtml && !retryHtml && !hasTpl) el.classList.add("collapsed");
+  }
+  // Output ports are placed first; input ports mirror the output row of the
+  // same index so a block's in/out wires start level. Switch builds its ports
+  // from the case list: c0..c{n-1} (one per case, including "else") + the
+  // shared "default" fallback port.
+  let outs;
+  if(intOut) outs=[];
+  else if(n.type==="switch") outs=((n.params&&n.params.cases)||[]).map((_,i)=>"c"+i).concat(["default"]);
+  else if(n.type==="try_chain") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1)).concat(["fail"]);
+  else if(n.type==="parallel"||n.type==="random_branch") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||(n.type==="parallel"?3:2))},(_,i)=>String(i+1));
+  else outs=(def.outs||[]);
+  const isCollapsed = el.classList.contains("collapsed");
+  const nodeH = isTerminal ? 30 : isCollapsed ? 20 : (parseInt(el.style.minHeight,10)||60);
+  // Primary port row — the single input and the first output share this y, so a
+  // block's in/out sit on one straight horizontal line and chaining any block's
+  // primary output into the next block's input stays perfectly level. For a full
+  // block it's row 26 (the card's vertical centre, below the 20px header); a
+  // terminal centres in its 30px chip, a collapsed block in its 20px header.
+  // Extra ports (branch outputs true/false…, the loop's second "loop" input)
+  // stack 16px below this row; the card grows when there are many outputs.
+  const rowTop = isTerminal ? Math.round(30/2-4.5)
+    : isCollapsed ? Math.round(20/2-4.5)
+    : 26;
+  const outTop = i => rowTop + (outs.length>1 ? i*16 : 0);
+  // Single input → the shared primary row (level with the first output). The
+  // loop's in/loop pair stacks from that row downward.
+  const nIns = wfIns(n.type).length;
+  const inTop = i => rowTop + (nIns>1 ? i*16 : 0);
   if(hasTpl){
     if(isTpls){
       const strip=el.querySelector(".wf-node-thumbs");
@@ -490,9 +549,7 @@ function wfNodeEl(n){
   if(def.kind!=="start" && def.kind!=="note" && !intIn){
     const ins=wfIns(n.type);
     ins.forEach((port,i)=>{
-      // First input is vertically centered on the header (same 6px as the first
-      // output) so the two sides line up; subsequent inputs stack below.
-      const top = ins.length<=1 ? 6 : 6 + i*16;
+      const top = inTop(i);
       const ip=document.createElement("span");
       // Color the destination input to match the source port's semantic colour.
       const incoming = g && (g.edges||[]).find(e=>e.to===n.id && (e.toPort||"in")===port);
@@ -508,18 +565,8 @@ function wfNodeEl(n){
     });
   }
   // output ports (hidden when this member feeds the next block in its stack).
-  // Switch builds its ports from the case list: c0..c{n-1} (one per case,
-  // including "else") + the shared "default" fallback port.
-  let outs;
-  if(intOut) outs=[];
-  else if(n.type==="switch") outs=((n.params&&n.params.cases)||[]).map((_,i)=>"c"+i).concat(["default"]);
-  else if(n.type==="try_chain") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1)).concat(["fail"]);
-  else if(n.type==="parallel"||n.type==="random_branch") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||(n.type==="parallel"?3:2))},(_,i)=>String(i+1));
-  else outs=(def.outs||[]);
   outs.forEach((port,i)=>{
-    // Vertically align the first output with the first input (both centred in
-    // the 22px header), then stack additional outputs downward.
-    const top = outs.length<=1 ? 6 : 6 + i*16;
+    const top = outTop(i);
     const op=document.createElement("span");
     const isConnected = g && (g.edges||[]).some(e=>e.from===n.id && e.fromPort===port);
     op.className="wf-port out"+(port==="true"?" t":port==="false"?" f":"")+(isConnected?" connected":"");

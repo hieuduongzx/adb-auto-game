@@ -43,6 +43,45 @@ function wfLaneMap(edges,pts){
   backEdges.forEach((ed, i) => lanes.set(wfWireKey(ed), i));
   return lanes;
 }
+// Bounding box of a node in world coords (left/top/right/bottom), or null.
+function wfNodeBox(id){
+  const el=wfNodeElById(id);
+  if(!el) return null;
+  return { left:el.offsetLeft, top:el.offsetTop,
+           right:el.offsetLeft+el.offsetWidth, bottom:el.offsetTop+el.offsetHeight };
+}
+// Cache of every node box for the current draw pass — so the router can test a
+// candidate horizontal channel against ALL blocks, not just the two endpoints.
+// Rebuilt once per wfDrawWires() call (wfWireBoxesRebuild) to stay cheap.
+let wfWireBoxes=[];
+function wfWireBoxesRebuild(){
+  const g=wfGraph(); wfWireBoxes=[];
+  if(!g) return;
+  (g.nodes||[]).forEach(n=>{ const b=wfNodeBox(n.id); if(b) wfWireBoxes.push(b); });
+}
+// Given a horizontal segment y=chanY spanning [x0,x1], is any node in the way?
+// pad keeps a little breathing room so wires don't kiss a block's edge.
+function wfChannelBlocked(chanY, x0, x1, pad){
+  const lo=Math.min(x0,x1)-pad, hi=Math.max(x0,x1)+pad;
+  for(const box of wfWireBoxes){
+    if(box.right<lo || box.left>hi) continue;                 // no x-overlap
+    if(chanY>=box.top-pad && chanY<=box.bottom+pad) return box; // channel cuts this box
+  }
+  return null;
+}
+// Find a clear horizontal channel starting at chanY and stepping in `dir`
+// (+1 down / -1 up) until no node blocks the span, or we give up after a few
+// tries (then just return the last candidate — better a drawn wire than none).
+function wfClearChannel(chanY, x0, x1, dir, pad){
+  let y=chanY;
+  for(let i=0;i<40;i++){
+    const hit=wfChannelBlocked(y, x0, x1, pad);
+    if(!hit) return y;
+    // Jump just past the blocking box in the travel direction, plus padding.
+    y = dir>0 ? hit.bottom+pad+6 : hit.top-pad-6;
+  }
+  return y;
+}
 function wfWirePath(a,b,ed,lane){
   const dx=b.x-a.x, dy=b.y-a.y;
   
@@ -61,24 +100,38 @@ function wfWirePath(a,b,ed,lane){
   const pullY = 25 + (lane || 0) * 12; // Tighter vertical offset
   const r = 8; // Corner radius
   
-  // Decide if we route above or below based on the higher/lower node
-  const minY = Math.min(a.y, b.y);
-  const maxY = Math.max(a.y, b.y);
+  // Geometry-aware side choice: the horizontal channel (routeY) must clear the
+  // union of BOTH involved node boxes so it never cuts across a block. We then
+  // pick the side (above/below) whose approach INTO the target port is shortest
+  // — this steers the wire toward the target and stops it climbing the full
+  // height beside a block or looping back over the source node.
+  const sBox = ed ? wfNodeBox(ed.from) : null;
+  const tBox = ed ? wfNodeBox(ed.to)   : null;
+  let topClear    = Math.min(sBox?sBox.top:a.y,    tBox?tBox.top:b.y)    - pullY;
+  let bottomClear = Math.max(sBox?sBox.bottom:a.y, tBox?tBox.bottom:b.y) + pullY;
+
+  // Upgrade: the horizontal run travels between the two vertical risers at
+  // x = a.x+pullX and x = b.x-pullX. Push each candidate channel out until it
+  // clears EVERY node in that x-span (not just the endpoints), so the wire
+  // routes around intermediate blocks instead of slicing through them.
+  const runX0 = a.x + pullX, runX1 = b.x - pullX;
+  const pad = 7;
+  topClear    = wfClearChannel(topClear,    runX0, runX1, -1, pad);
+  bottomClear = wfClearChannel(bottomClear, runX0, runX1, +1, pad);
   
-  // Try to route smartly: if 'a' is below 'b', going up might be better, else down.
-  // We'll calculate a unified Y routing line.
   let routeY, signY1, signY2;
-  
-  if (a.y >= b.y) {
-    // Route BELOW the bottom-most node
-    routeY = maxY + pullY;
-    signY1 = 1;  // 'a' goes DOWN to routeY
-    signY2 = -1; // routeY goes UP to 'b'
+  const approachUp   = Math.abs(b.y - topClear);      // vertical run into target if routed above
+  const approachDown = Math.abs(bottomClear - b.y);   // …if routed below
+  if (approachDown <= approachUp) {
+    // Route BELOW both nodes: a goes DOWN to routeY, then UP into b.
+    routeY = bottomClear;
+    signY1 = 1;
+    signY2 = -1;
   } else {
-    // Route ABOVE the top-most node
-    routeY = minY - pullY;
-    signY1 = -1; // 'a' goes UP to routeY
-    signY2 = 1;  // routeY goes DOWN to 'b'
+    // Route ABOVE both nodes: a goes UP to routeY, then DOWN into b.
+    routeY = topClear;
+    signY1 = -1;
+    signY2 = 1;
   }
   
   // Handle edge cases where dy is too small for the corner radius
@@ -103,6 +156,7 @@ function wfDrawWires(){
   svg.innerHTML=WF_WIRE_DEFS; if(temp) svg.appendChild(temp);
   if(!g) return;
   const NS="http://www.w3.org/2000/svg";
+  wfWireBoxesRebuild();   // snapshot node boxes so the router can dodge intermediates
 
   // Layers: 1) loop-backs under, 2) normal/branch, 3) backward arcs on top.
   const edges=(g.edges||[]).slice().filter(ed=>!wfSameStack(ed.from,ed.to));
@@ -151,6 +205,7 @@ function wfDrawTempWire(mx,my){
   const b={ x:(mx-wr.left)/wfZoom, y:(my-wr.top)/wfZoom };
   const svg=$("wf-wires"); let t=svg.querySelector(".temp");
   if(!t){ t=document.createElementNS("http://www.w3.org/2000/svg","path"); t.setAttribute("class","temp"); svg.appendChild(t); }
+  if(!wfWireBoxes.length) wfWireBoxesRebuild();
   t.setAttribute("d",wfWirePath(a,b,{from:wfGesture.from,fromPort:wfGesture.port,to:"__temp",toPort:"in"},0));
 }
 

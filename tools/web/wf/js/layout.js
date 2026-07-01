@@ -2,7 +2,7 @@
 // Each rearranges every node in the current graph into a tidy arrangement, then
 // fits the result to view. Notes are excluded (they float free). Nodes keep their
 // x/y in world coords; stacks/groups are not touched (members follow their head).
-const WF_LAY_NODE_W=158, WF_LAY_NODE_H=52, WF_LAY_GAP_X=36, WF_LAY_GAP_Y=36;
+const WF_LAY_NODE_W=160, WF_LAY_NODE_H=60, WF_LAY_GAP_X=30, WF_LAY_GAP_Y=28;
 // Approximate node height: real DOM height when available, else the default.
 function wfNodeH(n){
   const el=wfNodeElById(n.id); return el?el.offsetHeight:WF_LAY_NODE_H;
@@ -47,59 +47,72 @@ function wfTopoLayers(g){
   if(left.length) layers.push(left);
   return layers;
 }
-// Layout: vertical columns (top-to-bottom flow), one column per topo layer.
+// Layout: vertical columns (top-to-bottom flow), one row per topo layer, each
+// layer centred on a shared axis so a linear chain forms a straight vertical
+// line and forks fan out symmetrically.
 function wfLayoutVertical(g){
   const layers=wfTopoLayers(g);
+  // Pre-measure each layer's total width so we can centre them all on one axis.
+  const rows=layers.map(layer=>{
+    const items=layer.map(id=>g.nodes.find(n=>n.id===id)).filter(n=>n&&n.type!=="note");
+    const w=items.reduce((s,n)=>s+wfNodeW(n),0)+Math.max(0,items.length-1)*WF_LAY_GAP_X;
+    const h=items.length?Math.max(...items.map(wfNodeH)):WF_LAY_NODE_H;
+    return {items,w,h};
+  });
+  const axis=Math.max(...rows.map(r=>r.w), WF_LAY_NODE_W)/2 + 40;
   let y=40;
-  layers.forEach(layer=>{
-    let x=40;
-    let maxW=0;
-    layer.forEach(id=>{
-      const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
-      n.x=x; n.y=y;
-      const w=wfNodeW(n); if(w>maxW) maxW=w;
-      x+=w+WF_LAY_GAP_X;
-    });
-    // tallest node in this row → advance y
-    const maxH=Math.max(...layer.map(id=>{ const n=g.nodes.find(n=>n.id===id); return n?wfNodeH(n):WF_LAY_NODE_H; }));
-    y+=maxH+WF_LAY_GAP_Y;
+  rows.forEach(row=>{
+    let x=axis-row.w/2;
+    row.items.forEach(n=>{ n.x=Math.round(x); n.y=Math.round(y); x+=wfNodeW(n)+WF_LAY_GAP_X; });
+    y+=row.h+WF_LAY_GAP_Y;
   });
 }
-// Layout: horizontal rows (left-to-right flow), one row per topo layer.
+// Layout: horizontal rows (left-to-right flow), one column per topo layer, each
+// column centred vertically on a shared axis.
 function wfLayoutHorizontal(g){
   const layers=wfTopoLayers(g);
+  const cols=layers.map(layer=>{
+    const items=layer.map(id=>g.nodes.find(n=>n.id===id)).filter(n=>n&&n.type!=="note");
+    const h=items.reduce((s,n)=>s+wfNodeH(n),0)+Math.max(0,items.length-1)*WF_LAY_GAP_Y;
+    const w=items.length?Math.max(...items.map(wfNodeW)):WF_LAY_NODE_W;
+    return {items,w,h};
+  });
+  const axis=Math.max(...cols.map(c=>c.h), WF_LAY_NODE_H)/2 + 40;
   let x=40;
-  layers.forEach(layer=>{
-    let y=40;
-    layer.forEach(id=>{
-      const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
-      n.x=x; n.y=y;
-      y+=wfNodeH(n)+WF_LAY_GAP_Y;
-    });
-    const maxW=Math.max(...layer.map(id=>{ const n=g.nodes.find(n=>n.id===id); return n?wfNodeW(n):WF_LAY_NODE_W; }));
-    x+=maxW+WF_LAY_GAP_X;
+  cols.forEach(col=>{
+    let y=axis-col.h/2;
+    col.items.forEach(n=>{ n.x=Math.round(x); n.y=Math.round(y); y+=wfNodeH(n)+WF_LAY_GAP_Y; });
+    x+=col.w+WF_LAY_GAP_X;
   });
 }
-// Layout: tree — layers as columns, but each branch's children centered under
-// their parent, so forks fan out like a tree.
+// Layout: tree — layers as rows, each branch's children centred under their
+// parent. Subtree width counts each node once (first parent wins) so shared
+// children don't inflate the span.
 function wfLayoutTree(g){
   const layers=wfTopoLayers(g);
   const adj=wfAdjForward(g);
-  // Compute subtree width (leaf count) per node.
+  const inLayers=id=>layers.some(l=>l.includes(id));
+  // Assign each node to a single parent (the first that reaches it) so the tree
+  // is a true tree — shared descendants aren't counted under every parent.
+  const claimed=new Set();
+  const kidsOf={};
+  layers.forEach(layer=>layer.forEach(id=>{
+    kidsOf[id]=(adj[id]||[]).filter(t=>inLayers(t)&&!claimed.has(t));
+    kidsOf[id].forEach(t=>claimed.add(t));
+  }));
   const widths={};
   function wOf(id){ if(widths[id]!==undefined) return widths[id];
-    const kids=(adj[id]||[]).filter(t=>layers.some(l=>l.includes(t)));
+    const kids=kidsOf[id]||[];
     if(!kids.length) return widths[id]=1;
     return widths[id]=kids.reduce((s,k)=>s+wOf(k),0); }
   const colW=WF_LAY_NODE_W+WF_LAY_GAP_X;
   let x=40;
   layers.forEach((layer,i)=>{
     let cursor=x;
-    // Position each node, reserving subtree width; center it over its span.
     layer.forEach(id=>{
       const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
       const w=wOf(id);
-      n.x=cursor+(w*colW-WF_LAY_NODE_W)/2;
+      n.x=Math.round(cursor+(w*colW-WF_LAY_NODE_W)/2);
       n.y=40+i*(WF_LAY_NODE_H+WF_LAY_GAP_Y);
       cursor+=w*colW;
     });
@@ -127,15 +140,44 @@ function wfLayoutCompact(g){
 function wfAutoLayout(kind){
   const g=wfGraph(); if(!g) return;
   wfPushUndo();
+  // Snapshot current positions so we can animate from old → new.
+  const from={}; g.nodes.forEach(n=>{ from[n.id]={x:n.x,y:n.y}; });
   if(kind==="vertical")   wfLayoutVertical(g);
   else if(kind==="horizontal") wfLayoutHorizontal(g);
   else if(kind==="tree")  wfLayoutTree(g);
   else if(kind==="compact") wfLayoutCompact(g);
   else if(kind==="zigzag") wfLayoutZigzag(g);
   else if(kind==="radial") wfLayoutRadial(g);
+  wfAnimateLayout(g, from);
+  setStatus("Layout applied: "+kind);
+}
+// Animate every node from its previous position to the freshly-computed one,
+// redrawing wires on each frame, then fit the view. Respects reduced-motion:
+// falls back to an instant render+fit. Uses a single rAF loop with an ease-out
+// curve so the rearrange reads as one smooth settle instead of a hard jump.
+function wfAnimateLayout(g, from){
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const nodes=g.nodes.filter(n=>from[n.id] && (from[n.id].x!==n.x || from[n.id].y!==n.y));
+  if(reduce || !nodes.length){ wfRenderCanvas(); wfFit(); return; }
+  // Pre-fit to the FINAL layout so the camera is already framed; we then animate
+  // nodes inside that stable frame (no simultaneous pan/zoom + node motion).
   wfRenderCanvas();
   wfFit();
-  setStatus("Layout applied: "+kind);
+  const els=new Map();
+  nodes.forEach(n=>{ const el=wfNodeElById(n.id); if(el) els.set(n, {el, x0:from[n.id].x, y0:from[n.id].y, x1:n.x, y1:n.y}); });
+  const dur=380, t0=performance.now();
+  const ease=t=>1-Math.pow(1-t,3);   // cubic ease-out
+  function frame(now){
+    const t=Math.min(1,(now-t0)/dur), k=ease(t);
+    els.forEach(({el,x0,y0,x1,y1},n)=>{
+      const cx=x0+(x1-x0)*k, cy=y0+(y1-y0)*k;
+      el.style.left=cx+"px"; el.style.top=cy+"px";
+    });
+    wfDrawWires();
+    if(t<1) requestAnimationFrame(frame);
+    else { wfRenderCanvas(); }   // final authoritative render (ports/wires exact)
+  }
+  requestAnimationFrame(frame);
 }
 // Layout menu — toggle open/closed; click outside to close (wired in wfInitCanvas).
 function wfToggleLayoutMenu(e){

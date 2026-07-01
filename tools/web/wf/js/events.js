@@ -48,7 +48,20 @@ window.__recv = function(raw){
   // nodes while a call node runs) so the call block stays lit instead of the
   // highlight vanishing into the off-screen function graph. Also drop late events
   // that land after the run already stopped.
-  if(type==="node_active"){ if(!wfRunning) return; if(data.id && !wfNode(data.id)) return; wfSetRunningNode(data.id); return; }
+  // Follow-focus overrides the off-graph guard: when focus is on, we switch to
+  // the node's own graph (activity or function) and centre on it, so execution
+  // is followed across call boundaries in and out.
+  if(type==="node_active"){
+    if(!wfRunning) return;
+    if(data.id) wfLiveNode=data.id;   // the true running node, even if in an off-screen graph
+    // Follow-focus first: if the running node lives in another graph (a function
+    // we stepped into, or the activity we stepped back out to), switch to it and
+    // centre. This rebuilds the canvas so the node is now present for the guard.
+    if(data.id && wfFocusOn) wfFocusFollow(data.id);
+    if(data.id && !wfNode(data.id)) return;   // off-graph & focus off → leave call block lit
+    wfSetRunningNode(data.id);
+    return;
+  }
   if(type==="node_result"){ if(!wfRunning) return; if(data.id && !wfNode(data.id)) return; wfMarkNodeResult(data.id, data.status, data.port); if(typeof wfDebugAutoStep==="function") wfDebugAutoStep(); return; }
   // Activity-level run status: mark the row blinking-green while the engine
   // executes it, then solid-red if it finished with failure. Cleared on the
