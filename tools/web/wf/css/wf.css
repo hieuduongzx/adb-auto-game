@@ -328,9 +328,9 @@
 /* Node — a clean rectangular card with one uniform neutral border. Category is
    hinted only by the icon colour (--node-accent); the run colours (green/red/
    amber) recolour the whole border so a run still reads at a glance. */
-.wf-node { position:absolute; width:158px; background:var(--panel);
-  border:1px solid var(--border2);
-  border-radius:var(--node-r); box-shadow:var(--sh-md); user-select:none; }
+.wf-node { position:absolute; width:168px; background:var(--panel);
+           border:1px solid var(--border2);
+           border-radius:var(--node-r); box-shadow:var(--sh-md); user-select:none; }
 .wf-node.sel { border-color:var(--accent); border-top-color:var(--accent);
   box-shadow:0 0 0 2px var(--accent-bd), var(--sh-md); }
 /* Entry marker — a subtle top accent bar on the default starting block.
@@ -417,16 +417,22 @@
 .wf-node-eye svg { width:13px; height:13px; display:block; }
 .wf-node-eye:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-node-eye.on { color:var(--accent); }
-/* Image preview — compact square on the right of the body. It never changes the
-   block's height because a fixed body row reserves the space whether the image
-   is visible or not; only its opacity/visibility toggles. */
+/* Image preview — compact square on the right of the body. The preview row
+   reserves a fixed min-height so blocks don't jump when toggling; the image
+   collapses to zero width when hidden so body text reflows naturally. */
 .wf-node-prevrow { display:flex; align-items:center; gap:8px; padding:5px 8px; min-height:36px; }
 .wf-node-prevrow .wf-node-sum { padding:0; flex:1; min-width:0; }
 .wf-node-thumb { flex-shrink:0; width:28px; height:28px; object-fit:contain;
   background:#fff repeating-conic-gradient(#e6e9ee 0% 25%, transparent 0% 50%) 50%/5px 5px;
   border:1px solid var(--border2); border-radius:4px; padding:1px; }
 .wf-node:not(.showing-thumb) .wf-node-thumb,
-.wf-node:not(.showing-thumb) .wf-node-thumb-sm { opacity:0; visibility:hidden; }
+.wf-node:not(.showing-thumb) .wf-node-thumb-sm { opacity:0; visibility:hidden; width:0; height:0; flex-shrink:1; padding:0; border:none; margin:0; }
+/* When there's a multi-thumb strip, collapse the whole strip when hidden so
+   the summary text beside it reflows naturally. */
+.wf-node:not(.showing-thumb) .wf-node-thumbs { width:0; height:0; overflow:hidden; flex-shrink:1; }
+/* Gap between thumb and summary should also collapse when thumb is hidden.
+   Achieve this by zeroing the gap on the prevrow container itself. */
+.wf-node:not(.showing-thumb) .wf-node-prevrow { gap:0; }
 /* Multi-template (OR) preview: a tight row of small squares, one per image. */
 .wf-node-thumbs { flex-shrink:0; display:flex; align-items:center; gap:3px; }
 .wf-node-thumb-sm { width:24px; height:24px; object-fit:contain; border:1px solid var(--border);
@@ -466,7 +472,7 @@
 .wf-node-title { font-size:10px; font-weight:700; color:var(--ntitle,#7c3aed); flex:1; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Keep the title clear of the top-right "T"/"F" port labels on branch nodes. */
-.wf-node.has-tf .wf-node-title { padding-right:14px; }
+.wf-node.has-tf .wf-node-title { padding-right:18px; }
 /* Per-category node header+title (action/condition nodes only — structural kinds keep own styling above) */
 .wf-node.cat-basic  { --nhd-bg:#eef5ff; --nhd-bd:#c5d8f5; --ntitle:#2d64cc; }
 .wf-node.cat-input  { --nhd-bg:#eef0ff; --nhd-bd:#c4c6f5; --ntitle:#4338ca; }
@@ -489,7 +495,7 @@
 /* Default per-block summary line (the auto description under the title). Reads as
    a quiet readable caption — bumped from low-contrast 9.5px mono-muted to a
    clearer tone/size so the block's gist is legible without squinting. */
-.wf-node-sum { font-family:var(--mono); font-size:10px; color:var(--dim); padding:6px 9px 8px;
+.wf-node-sum { font-family:var(--mono); font-size:10px; color:var(--dim); padding:5px 8px 6px;
   line-height:1.4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wf-node-note { display:flex; align-items:flex-start; gap:5px; font-size:10px; font-style:italic;
   color:var(--muted); background:transparent; border-top:1px solid var(--line);
@@ -498,13 +504,13 @@
 .wf-node-note svg { width:9px; height:9px; flex-shrink:0; margin-top:1.5px; opacity:.4; }
 /* Runtime log line: text auto-emitted to the log panel each time this block runs. */
 .wf-node-log { font-size:9.5px; color:#2f6b8f; background:#eef6fb;
-  border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:4px 9px; white-space:normal; word-break:break-word; }
+  border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:4px 8px; white-space:normal; word-break:break-word; }
 .wf-node-log::before { content:""; display:inline-block; width:11px; height:11px; vertical-align:-1px; margin-right:4px; background:currentColor; -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3v4h4'/><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'/><line x1='8' y1='13' x2='16' y2='13'/><line x1='8' y1='17' x2='13' y2='17'/></svg>") center/contain no-repeat; }
 
 /* Timing indicator: pause before / after this block (delayBefore / delayAfter).
    Compact row below the summary — two tiny icons + label side by side. */
 .wf-node-delay { display:flex; align-items:center; gap:2px; font-size:7.5px; font-weight:600;
-  color:var(--warn); padding:1px 9px 3px; }
+  color:var(--warn); padding:3px 8px 3px; }
 .wf-node-delay svg { width:9px; height:9px; flex-shrink:0; opacity:.7; }
 .wf-node-delay span { margin-right:6px; }
 
@@ -591,7 +597,7 @@
 .wf-field .cb.checked { background:var(--accent); border-color:var(--accent); }
 .wf-field .cb svg { opacity:0; } .wf-field .cb.checked svg { opacity:1; }
 .wf-field .btn.sm { height:24px; padding:0 8px; font-size:10.5px; }
-.wf-node-retry { margin:4px 10px 0; display:flex; gap:6px; flex-wrap:wrap; color:var(--muted); font-size:10px; }
+.wf-node-retry { padding:3px 8px; margin:0; display:flex; gap:6px; flex-wrap:wrap; color:var(--muted); font-size:10px; }
 .wf-node-retry span { display:inline-flex; align-items:center; gap:3px; background:var(--alt); border:1px solid var(--border2); border-radius:999px; padding:1px 6px; }
 .wf-node-retry svg { width:10px; height:10px; }
 /* Full-width field variants */

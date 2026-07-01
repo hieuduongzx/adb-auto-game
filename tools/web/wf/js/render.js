@@ -492,7 +492,7 @@ function wfNodeEl(n){
     ins.forEach((port,i)=>{
       // First input is vertically centered on the header (same 6px as the first
       // output) so the two sides line up; subsequent inputs stack below.
-      const top = ins.length<=1 ? 6 : 6 + i*17;
+      const top = ins.length<=1 ? 6 : 6 + i*16;
       const ip=document.createElement("span");
       // Color the destination input to match the source port's semantic colour.
       const incoming = g && (g.edges||[]).find(e=>e.to===n.id && (e.toPort||"in")===port);
