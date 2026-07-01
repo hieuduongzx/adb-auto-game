@@ -45,16 +45,56 @@ function wfLaneMap(edges,pts){
 }
 function wfWirePath(a,b,ed,lane){
   const dx=b.x-a.x, dy=b.y-a.y;
+  
+  // Straight/forward connection
   if (dx > -20) {
+    if (Math.abs(dy) < 5) {
+        // Almost horizontal, draw a straight line
+        return `M${a.x},${a.y} L${b.x},${b.y}`;
+    }
     const pull = Math.max(Math.abs(dx) * 0.4, Math.abs(dy) * 0.2, 20);
     return `M${a.x},${a.y} C${a.x+pull},${a.y} ${b.x-pull},${b.y} ${b.x},${b.y}`;
+  } 
+  
+  // Backward / Loop connection - Hybrid orthogonal + curves
+  const pullX = 30 + (lane || 0) * 15; // Extend out from output
+  const pullY = 40 + (lane || 0) * 15; // Vertical offset
+  const r = 10; // Corner radius
+  
+  // Decide if we route above or below based on the higher/lower node
+  const minY = Math.min(a.y, b.y);
+  const maxY = Math.max(a.y, b.y);
+  
+  // Try to route smartly: if 'a' is below 'b', going up might be better, else down.
+  // We'll calculate a unified Y routing line.
+  let routeY, signY1, signY2;
+  
+  if (a.y >= b.y) {
+    // Route BELOW the bottom-most node
+    routeY = maxY + pullY;
+    signY1 = 1;  // 'a' goes DOWN to routeY
+    signY2 = -1; // routeY goes UP to 'b'
   } else {
-    const pullX = Math.max(Math.abs(dx) * 0.4, 60);
-    const signY = dy >= 0 ? 1 : -1;
-    const pushY = Math.max(0, 80 - Math.abs(dy) * 0.5) + (lane || 0) * 20;
-    const oy = a.y + dy / 2 + signY * pushY;
-    return `M${a.x},${a.y} C${a.x+pullX},${a.y} ${a.x+pullX},${oy} ${a.x+dx/2},${oy} S${b.x-pullX},${b.y} ${b.x},${b.y}`;
+    // Route ABOVE the top-most node
+    routeY = minY - pullY;
+    signY1 = -1; // 'a' goes UP to routeY
+    signY2 = 1;  // routeY goes DOWN to 'b'
   }
+  
+  // Handle edge cases where dy is too small for the corner radius
+  const safeR1 = Math.min(r, Math.abs(routeY - a.y) / 2, Math.abs(pullX) / 2);
+  const safeR2 = Math.min(r, Math.abs(routeY - b.y) / 2, Math.abs(pullX) / 2);
+
+  return `M${a.x},${a.y} 
+          L${a.x+pullX-safeR1},${a.y}
+          Q${a.x+pullX},${a.y} ${a.x+pullX},${a.y+signY1*safeR1}
+          L${a.x+pullX},${routeY-signY1*safeR1}
+          Q${a.x+pullX},${routeY} ${a.x+pullX-safeR1},${routeY}
+          L${b.x-pullX+safeR2},${routeY}
+          Q${b.x-pullX},${routeY} ${b.x-pullX},${routeY+signY2*safeR2}
+          L${b.x-pullX},${b.y-signY2*safeR2}
+          Q${b.x-pullX},${b.y} ${b.x-pullX+safeR2},${b.y}
+          L${b.x},${b.y}`;
 }
 
 function wfDrawWires(){
