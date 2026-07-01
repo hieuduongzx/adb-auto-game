@@ -57,9 +57,9 @@ function wfWirePath(a,b,ed,lane){
   } 
   
   // Backward / Loop connection - Hybrid orthogonal + curves
-  const pullX = 30 + (lane || 0) * 15; // Extend out from output
-  const pullY = 40 + (lane || 0) * 15; // Vertical offset
-  const r = 10; // Corner radius
+  const pullX = 16 + (lane || 0) * 10; // Tighter extend out from output/input
+  const pullY = 25 + (lane || 0) * 12; // Tighter vertical offset
+  const r = 8; // Corner radius
   
   // Decide if we route above or below based on the higher/lower node
   const minY = Math.min(a.y, b.y);
