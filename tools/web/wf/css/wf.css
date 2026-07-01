@@ -593,6 +593,9 @@
 .wf-field .cb.checked { background:var(--accent); border-color:var(--accent); }
 .wf-field .cb svg { opacity:0; } .wf-field .cb.checked svg { opacity:1; }
 .wf-field .btn.sm { height:24px; padding:0 8px; font-size:10.5px; }
+.wf-node-retry { margin:4px 10px 0; display:flex; gap:6px; flex-wrap:wrap; color:var(--muted); font-size:10px; }
+.wf-node-retry span { display:inline-flex; align-items:center; gap:3px; background:var(--alt); border:1px solid var(--border2); border-radius:999px; padding:1px 6px; }
+.wf-node-retry svg { width:10px; height:10px; }
 /* Full-width field variants */
 .wf-field.full { flex-direction:column; align-items:stretch; gap:4px; }
 .wf-field.full > label { min-width:auto; }

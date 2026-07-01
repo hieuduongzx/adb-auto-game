@@ -455,6 +455,10 @@ function wfNodeEl(n){
   if(n.delayBefore) dp.push(`${wfIco("clock")}<span>Wait ${n.delayBefore}s</span>`);
   if(n.delayAfter)  dp.push(`${wfIco("timer")}<span>After wait ${n.delayAfter}s</span>`);
   const delayHtml = dp.length ? `<div class="wf-node-delay">${dp.join("")}</div>` : "";
+  const rp=[];
+  if(n.retryCount) rp.push(`${wfIco("loop")}<span>Retry ${n.retryCount}×</span>`);
+  if(n.screenshotOnFail) rp.push(`${wfIco("camera")}<span>Screenshot on fail</span>`);
+  const retryHtml = rp.length ? `<div class="wf-node-retry">${rp.join("")}</div>` : "";
   // tpls → a strip of small thumbnails (one per listed image); single tpl → one.
   // The preview row is always rendered (so block height is stable) but the image
   // is hidden via CSS until showPreview / wfPreviewAll turns it on.
@@ -468,8 +472,8 @@ function wfNodeEl(n){
   el.classList.toggle("has-thumb", hasTpl);
   el.innerHTML=
     `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span>${eyeBtn}<span class="wf-node-title">${escHtml(title)}</span></div>`+
-    topRow+delayHtml+noteHtml+logHtml;
-  if(!sum && !n.note && !n.log && !delayHtml && !hasTpl) el.classList.add("collapsed");
+    topRow+delayHtml+retryHtml+noteHtml+logHtml;
+  if(!sum && !n.note && !n.log && !delayHtml && !retryHtml && !hasTpl) el.classList.add("collapsed");
   if(hasTpl){
     if(isTpls){
       const strip=el.querySelector(".wf-node-thumbs");

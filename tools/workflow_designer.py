@@ -1214,19 +1214,8 @@ class WorkflowDesignerAPI:
             log_warning(f"Không thể chọn thiết bị cho engine: {exc}")
         anchor = self._wf_path or os.path.join(_PROJECT_ROOT, "flow.json")
         self._engine.load(flow, flow_path=anchor)
-        self._engine.callbacks["on_stop"] = [lambda: self._push("workflow_state", {"running": False})]
-        self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
-        self._engine.callbacks["on_node_done"] = [
-            lambda nid, st, port: self._push("node_result", {"id": nid, "status": st, "port": port})]
-        self._engine.callbacks["on_var"] = [
-            lambda name, value: self._push("var_update", {"name": name, "value": value})]
-        # Activity-level status: drives the blinking-green / solid-red indicator
-        # on each activity row in the bottom-right panel.
-        self._engine.callbacks["on_activity_start"] = [
-            lambda act: self._push("activity_active", {"id": act.get("id")})]
-        self._engine.callbacks["on_activity_complete"] = [
-            lambda act, ok: self._push("activity_result",
-                                       {"id": act.get("id"), "status": "ok" if ok else "fail"})]
+        self._engine.failure_screenshot_dir = os.path.join(_PROJECT_ROOT, "out", "workflow_failures")
+        self._bind_workflow_callbacks()
         # Test runs never auto-apply speedhack — that's a separate ▶ action.
         ok = self._engine.start(background=True, with_speedhack=False)
         self._push("workflow_state", {"running": ok})
@@ -1243,8 +1232,75 @@ class WorkflowDesignerAPI:
         self._push("workflow_state", {"running": False})
         return True
 
+    def _bind_workflow_callbacks(self) -> None:
+        if self._engine is None:
+            return
+        self._engine.callbacks["on_stop"] = [lambda: self._push("workflow_state", {"running": False})]
+        self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
+        self._engine.callbacks["on_node_done"] = [
+            lambda nid, st, port: self._push("node_result", {"id": nid, "status": st, "port": port})]
+        self._engine.callbacks["on_var"] = [
+            lambda name, value: self._push("var_update", {"name": name, "value": value})]
+        self._engine.callbacks["on_activity_start"] = [
+            lambda act: self._push("activity_active", {"id": act.get("id")})]
+        self._engine.callbacks["on_activity_complete"] = [
+            lambda act, ok: self._push("activity_result",
+                                       {"id": act.get("id"), "status": "ok" if ok else "fail"})]
+
     def workflow_running(self) -> bool:
         return bool(self._engine and self._engine.is_running())
+
+    def workflow_run_from_node(self, flow_json: str, edit_kind: str, edit_id: str, node_id: str, step: bool = False) -> bool:
+        if self.controller.device is None:
+            log_error("Chưa chọn thiết bị để chạy workflow")
+            return False
+        try:
+            flow = json.loads(flow_json)
+        except Exception as exc:
+            log_error(f"JSON workflow không hợp lệ: {exc}")
+            return False
+        if self._engine is None:
+            self._engine = WorkflowEngine()
+        if self._engine.is_running():
+            log_warning("Workflow đang chạy")
+            return False
+        serial = self._connected_serial or self._selected_serial
+        try:
+            if serial:
+                self._engine.auto.adb.device_id = serial
+                self._engine.auto.adb.select_device(serial)
+        except Exception as exc:
+            log_warning(f"Không thể chọn thiết bị cho engine: {exc}")
+        anchor = self._wf_path or os.path.join(_PROJECT_ROOT, "flow.json")
+        self._engine.load(flow, flow_path=anchor)
+        self._engine.failure_screenshot_dir = os.path.join(_PROJECT_ROOT, "out", "workflow_failures")
+        self._bind_workflow_callbacks()
+        graph = None
+        seed_act = {"vars": []}
+        if edit_kind == "function":
+            fn = next((f for f in flow.get("functions", []) or [] if f.get("id") == edit_id), None)
+            graph = (fn or {}).get("graph")
+        else:
+            act = next((a for a in flow.get("activities", []) or [] if a.get("id") == edit_id), None)
+            graph = (act or {}).get("graph")
+            seed_act = act or seed_act
+            if act:
+                self._push("activity_active", {"id": act.get("id")})
+        if not graph:
+            log_error("Không tìm thấy graph để chạy")
+            return False
+        ok = self._engine.start_graph(graph, node_id, seed_act=seed_act, step=bool(step))
+        self._push("workflow_state", {"running": ok})
+        if ok:
+            self._push("vars_snapshot", {"vars": dict(self._engine._globals)})
+            log_success("Workflow debug bắt đầu chạy")
+        return ok
+
+    def workflow_debug_step(self) -> bool:
+        if self._engine:
+            self._engine.debug_next()
+            return True
+        return False
 
     def workflow_run_node(self, node_json: str, flow_json: str = "") -> bool:
         """Run a single node in isolation (no graph walk) — context-menu action.
@@ -1286,9 +1342,8 @@ class WorkflowDesignerAPI:
         except Exception as exc:
             log_warning(f"Không nạp được flow cho block: {exc}")
         # Re-bind the same GUI callbacks a full test run uses.
-        self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
-        self._engine.callbacks["on_node_done"] = [
-            lambda nid, st, port: self._push("node_result", {"id": nid, "status": st, "port": port})]
+        self._engine.failure_screenshot_dir = os.path.join(_PROJECT_ROOT, "out", "workflow_failures")
+        self._bind_workflow_callbacks()
         try:
             self._engine.run_single_node(node)
         except Exception as exc:

@@ -6,7 +6,7 @@ function wfCurAct(){ return WF.edit.kind==="activity" ? wfActById(WF.edit.id) : 
 function wfCurFn(){ return WF.edit.kind==="function" ? wfFnById(WF.edit.id) : null; }
 function wfGraph(){ const t=wfEditTarget(); return t?t.graph:null; }
 function wfNode(id){ const g=wfGraph(); return g?g.nodes.find(n=>n.id===id):null; }
-function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",delayBefore:0,delayAfter:0,showPreview:false,stack:null}; }
+function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",delayBefore:0,delayAfter:0,retryCount:0,retryDelay:0,screenshotOnFail:false,showPreview:false,stack:null}; }
 function wfNewGraph(){ return { nodes:[{id:wfUid(),type:"start",x:60,y:70,params:{}}], edges:[], groups:[] }; }
 
 // ── Merge / stack blocks ─────────────────────────────────────────────────────

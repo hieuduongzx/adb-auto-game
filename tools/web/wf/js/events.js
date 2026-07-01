@@ -49,7 +49,7 @@ window.__recv = function(raw){
   // highlight vanishing into the off-screen function graph. Also drop late events
   // that land after the run already stopped.
   if(type==="node_active"){ if(!wfRunning) return; if(data.id && !wfNode(data.id)) return; wfSetRunningNode(data.id); return; }
-  if(type==="node_result"){ if(!wfRunning) return; if(data.id && !wfNode(data.id)) return; wfMarkNodeResult(data.id, data.status, data.port); return; }
+  if(type==="node_result"){ if(!wfRunning) return; if(data.id && !wfNode(data.id)) return; wfMarkNodeResult(data.id, data.status, data.port); if(typeof wfDebugAutoStep==="function") wfDebugAutoStep(); return; }
   // Activity-level run status: mark the row blinking-green while the engine
   // executes it, then solid-red if it finished with failure. Cleared on the
   // next run start (wfResetActStatus in wfResetRunViz).

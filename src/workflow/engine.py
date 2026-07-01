@@ -176,6 +176,10 @@ class WorkflowEngine:
         # them automatically — see the properties below. A ``call`` runs on the
         # caller's thread, so a function correctly shares its caller's context.
         self._ctx = threading.local()
+        self._debug_step = False
+        self._debug_gate = threading.Event()
+        self._debug_gate.set()
+        self.failure_screenshot_dir: Optional[str] = None
 
         self.running = False
         self._stop = threading.Event()
@@ -413,6 +417,50 @@ class WorkflowEngine:
         self._seq_thread.start()
         return True
 
+    def start_graph(self, graph: Dict[str, Any], start_id: str, seed_act: Optional[Dict[str, Any]] = None, step: bool = False) -> bool:
+        """Run one graph from an arbitrary node, used by designer debug tools."""
+        if self.running:
+            log_warning("[workflow] Already running")
+            return False
+        if not self._ensure_ready():
+            return False
+        self._stop.clear()
+        self.auto._stop_event.clear()
+        self._pause.set()
+        self._debug_step = bool(step)
+        if step:
+            self._debug_gate.clear()
+        else:
+            self._debug_gate.set()
+        self.running = True
+        self._emit("on_start")
+        self._seq_thread = threading.Thread(
+            target=self._run_graph_from_node,
+            args=(graph or {}, start_id, seed_act or {"vars": []}),
+            daemon=True,
+        )
+        self._seq_thread.start()
+        return True
+
+    def _run_graph_from_node(self, graph: Dict[str, Any], start_id: str, seed_act: Dict[str, Any]) -> None:
+        try:
+            self._vars = self._seed_vars(seed_act)
+            self._last_pos = None
+            self._break_loop = False
+            self._branch_failed = False
+            self._try_chain_mode = False
+            for k, v in self._vars.items():
+                self._emit("on_var", k, v)
+            self._run_graph(graph, start_id=start_id)
+        except Exception as e:
+            log_error(f"[workflow] Debug run error: {e}")
+        finally:
+            self._debug_step = False
+            self._debug_gate.set()
+            self.running = False
+            self._emit("on_node", None)
+            self._emit("on_stop")
+
     def _run_sequence(self) -> None:
         try:
             for act in self.activities():
@@ -482,15 +530,22 @@ class WorkflowEngine:
         targets = adj.get((node_id, port))
         return targets[0] if targets else None
 
-    def _run_graph(self, graph: Dict[str, Any], depth: int = 0) -> bool:
+    def _run_graph(self, graph: Dict[str, Any], depth: int = 0, start_id: Optional[str] = None) -> bool:
         nodes = {n.get("id"): n for n in graph.get("nodes", []) or []}
         adj = self._build_adjacency(graph.get("edges", []) or [])
-        start = next((n for n in nodes.values() if n.get("type") == "start"), None)
-        if start is None:
-            log_warning("[workflow] Graph has no start node")
-            return False
-        self._walk(nodes, adj, self._next(adj, start.get("id"), "out"), {}, depth)
-        return True
+        if start_id:
+            cur = start_id if start_id in nodes else None
+            if cur is None:
+                log_warning(f"[workflow] Start node id not found: {start_id}")
+                return False
+        else:
+            start = next((n for n in nodes.values() if n.get("type") == "start"), None)
+            if start is None:
+                log_warning("[workflow] Graph has no start node")
+                return False
+            cur = self._next(adj, start.get("id"), "out")
+        self._walk(nodes, adj, cur, {}, depth)
+        return not self._branch_failed
 
     def _walk(self, nodes, adj, cur, counters, depth):
         """Follow edges from ``cur`` until a dead-end / end node / stop.
@@ -500,6 +555,9 @@ class WorkflowEngine:
         steps = 0
         while cur and not self._stop.is_set():
             self._pause.wait()
+            if self._debug_step:
+                self._debug_gate.wait()
+                self._debug_gate.clear()
             steps += 1
             if steps > MAX_STEPS:
                 log_warning("[workflow] Step cap reached — stopping graph (cycle?)")
@@ -698,18 +756,11 @@ class WorkflowEngine:
                 ok_act = True
                 handler = self._actions.get(ntype)
                 if handler is not None:
-                    try:
-                        ok_act = handler(node, params) is not False  # only explicit False = fail
-                        if not ok_act:
-                            self._branch_failed = True
-                            label = (NODE_TYPES.get(ntype, {}).get("label") or ntype)
-                            log_warning(f"[workflow] ✖ '{label}' không thực hiện được")
-                    except Exception as e:
-                        log_error(f"[workflow] Node '{ntype}' error: {e}")
-                        ok_act = False
-                        self._branch_failed = True
+                    ok_act = self._run_action_with_retry(node, params, handler)
                 else:
                     log_warning(f"[workflow] Unknown node: {ntype}")
+                    ok_act = False
+                    self._branch_failed = True
                 self._emit("on_node_done", nid, "ok" if ok_act else "fail", "out")
                 if self._try_chain_mode and not ok_act:
                     break
@@ -1166,6 +1217,7 @@ class WorkflowEngine:
         self._stop.set()
         self.auto._stop_event.set()
         self._pause.set()
+        self._debug_gate.set()
         self._stop_speedhack()
         for aid in list(self._bg_threads.keys()):
             self.stop_background(aid)
@@ -1213,7 +1265,7 @@ class WorkflowEngine:
             else:
                 handler = self._actions.get(ntype)
                 if handler is not None:
-                    ok_act = handler(node, params) is not False
+                    ok_act = self._run_action_with_retry(node, params, handler)
                     status = "ok" if ok_act else "fail"
                     port = "out"
                 else:
@@ -1384,6 +1436,53 @@ class WorkflowEngine:
         while time.time() < end and not self._stop.is_set():
             self._pause.wait()
             time.sleep(0.05)
+
+    def debug_next(self) -> None:
+        """Release one node when running in step-debug mode."""
+        self._debug_gate.set()
+
+    def _run_action_with_retry(self, node: Dict, params: Dict, handler: Callable[[Dict, Dict], bool]) -> bool:
+        attempts = max(1, int(node.get("retryCount", 0) or 0) + 1)
+        delay = max(0.0, float(node.get("retryDelay", 0) or 0))
+        label = (NODE_TYPES.get(node.get("type"), {}).get("label") or node.get("type"))
+        ok_act = False
+        last_error: Optional[Exception] = None
+        for attempt in range(1, attempts + 1):
+            try:
+                ok_act = handler(node, params) is not False
+                last_error = None
+            except Exception as e:
+                log_error(f"[workflow] Node '{node.get('type')}' error: {e}")
+                ok_act = False
+                last_error = e
+            if ok_act:
+                return True
+            if attempt < attempts and not self._stop.is_set():
+                log_warning(f"[workflow] ✖ '{label}' fail → retry {attempt}/{attempts - 1}")
+                if delay:
+                    self._sleep(delay)
+        self._branch_failed = True
+        if last_error is None:
+            log_warning(f"[workflow] ✖ '{label}' không thực hiện được")
+        self._save_failure_screenshot(node)
+        return False
+
+    def _save_failure_screenshot(self, node: Dict) -> None:
+        if not node.get("screenshotOnFail"):
+            return
+        try:
+            img = self.auto.capture_screen()
+            if img is None:
+                return
+            import cv2
+            out_dir = self.failure_screenshot_dir or os.path.join(os.getcwd(), "out", "workflow_failures")
+            os.makedirs(out_dir, exist_ok=True)
+            safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(node.get("id") or node.get("type") or "node"))
+            path = os.path.join(out_dir, f"fail_{safe}_{time.strftime('%Y%m%d_%H%M%S')}.png")
+            if cv2.imwrite(path, img):
+                log_warning(f"[workflow] saved failure screenshot: {path}")
+        except Exception as e:
+            log_warning(f"[workflow] save failure screenshot failed: {e}")
 
     # ── Action handlers ──────────────────────────────────────────────────────
 

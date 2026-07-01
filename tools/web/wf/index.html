@@ -34,7 +34,15 @@
   <!-- Center zone: primary run controls — the focal point of the toolbar. -->
   <div class="tb-zone tb-center">
     <div class="tb-group tb-run">
+      <button class="btn ico" onclick="wfValidateShow()" title="Check workflow — find broken wires, missing templates, and bad branch counts">
+        <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></button>
       <button class="btn ok ico" id="wf-run-btn" onclick="wfToggleRun()" title="Test run"></button>
+      <button class="btn ico" onclick="wfRunFromSelected(false)" title="Run from selected block">
+        <svg viewBox="0 0 24 24"><polygon points="7 4 19 12 7 20 7 4"/><path d="M3 5v14"/></svg></button>
+      <button class="btn ico" onclick="wfStartStepRun()" title="Step debug from selected/default block">
+        <svg viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><path d="M18 5v14"/></svg></button>
+      <button class="btn ico" id="wf-step-next-btn" onclick="wfDebugStep()" title="Next step">
+        <svg viewBox="0 0 24 24"><path d="M5 12h12"/><path d="m13 6 6 6-6 6"/></svg></button>
       <button class="btn ico" onclick="wfRunGui()" title="Run GUI — open Runner with the current workflow">
         <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
     </div>
@@ -509,6 +517,7 @@
 <script src="js/inspector.js"></script>
 <script src="js/preview.js"></script>
 <script src="js/scope-tools.js"></script>
+<script src="js/validate.js"></script>
 <script src="js/io.js"></script>
 <script src="js/history.js"></script>
 </body>

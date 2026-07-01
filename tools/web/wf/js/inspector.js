@@ -95,6 +95,7 @@ function wfRenderInspector(){
     body.appendChild(pblock);
 
     if(node.type!=="note" && node.type!=="start") body.appendChild(wfTimingField(node));
+    if(node.type!=="note" && node.type!=="start") body.appendChild(wfRetryField(node));
     if(node.type!=="note") body.appendChild(wfNoteField(node));
     if(node.type!=="note" && node.type!=="start") body.appendChild(wfLogField(node));
     return;
@@ -175,6 +176,40 @@ function wfUpdNodeTiming(node){
       const anchor=prevrow||sum; if(anchor) anchor.after(n); else el.appendChild(n);
       el.classList.remove("collapsed"); }
     n.innerHTML=dp.join("");
+  } else if(n){ n.remove(); }
+}
+
+function wfRetryField(node){
+  const b=wfInspBlock("Failure handling");
+  const mkNum=(key,label,step)=>{
+    const row=document.createElement("div"); row.className="wf-field";
+    const l=document.createElement("label"); l.textContent=label; row.appendChild(l);
+    const inp=document.createElement("input"); inp.type="number"; inp.min="0"; inp.step=step||"1";
+    inp.value=(node[key]!==undefined&&node[key]!==null&&node[key]!==0)?node[key]:"";
+    inp.placeholder="0";
+    inp.oninput=()=>{ wfPushUndoDebounced(); node[key]=key==="retryCount"?(parseInt(inp.value,10)||0):(parseFloat(inp.value)||0); wfUpdNodeRetry(node); };
+    row.appendChild(inp); return row;
+  };
+  b.appendChild(mkNum("retryCount","Retries","1"));
+  b.appendChild(mkNum("retryDelay","Retry wait","0.5"));
+  const row=document.createElement("div"); row.className="wf-field";
+  const l=document.createElement("label"); l.textContent="Screenshot"; row.appendChild(l);
+  const cb=document.createElement("span"); cb.className="cb"+(node.screenshotOnFail?" checked":""); cb.innerHTML='<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
+  cb.onclick=()=>{ wfPushUndoDebounced(); node.screenshotOnFail=!node.screenshotOnFail; cb.classList.toggle("checked", !!node.screenshotOnFail); wfUpdNodeRetry(node); };
+  row.appendChild(cb);
+  const hint=document.createElement("div"); hint.className="wf-insp-tip"; hint.textContent="Retry runs this block again when it fails. Screenshot saves a failure image when the final attempt still fails.";
+  b.appendChild(row); b.appendChild(hint);
+  return b;
+}
+function wfUpdNodeRetry(node){
+  const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
+  const parts=[];
+  if(node.retryCount) parts.push(`${wfIco("loop")}<span>Retry ${node.retryCount}×</span>`);
+  if(node.screenshotOnFail) parts.push(`${wfIco("camera")}<span>Screenshot on fail</span>`);
+  let n=el.querySelector(".wf-node-retry");
+  if(parts.length){
+    if(!n){ n=document.createElement("div"); n.className="wf-node-retry"; const delay=el.querySelector(".wf-node-delay"), sum=el.querySelector(".wf-node-sum"); const anchor=delay||sum; if(anchor) anchor.after(n); else el.appendChild(n); el.classList.remove("collapsed"); }
+    n.innerHTML=parts.join("");
   } else if(n){ n.remove(); }
 }
 
