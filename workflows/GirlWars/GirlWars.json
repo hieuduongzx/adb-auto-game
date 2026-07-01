@@ -477,7 +477,7 @@
       "id": "sequence_tatt",
       "name": "Elite",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [
         {
           "name": "raid",
@@ -502,7 +502,7 @@
             "id": "nrtqbat0",
             "type": "start",
             "x": 40,
-            "y": 112,
+            "y": 106,
             "params": {}
           },
           {
@@ -573,8 +573,8 @@
           {
             "id": "nk5q9wwd",
             "type": "call",
-            "x": 1050,
-            "y": 47,
+            "x": 1060,
+            "y": 60,
             "params": {
               "fn": "fn_hh4kj"
             }
@@ -608,8 +608,8 @@
           {
             "id": "n16ire5t",
             "type": "call",
-            "x": 1050,
-            "y": 97,
+            "x": 1060,
+            "y": 117,
             "params": {
               "fn": "fn_uft8v"
             }
@@ -617,8 +617,8 @@
           {
             "id": "nt1pti0b",
             "type": "if_image",
-            "x": 1050,
-            "y": 147,
+            "x": 1060,
+            "y": 157,
             "params": {
               "template": "templates/crop_20260701_094544_1872_439_35_45.png",
               "threshold": 0.85,
@@ -629,7 +629,7 @@
             "id": "n4jjtwvp",
             "type": "tap",
             "x": 1240,
-            "y": 97,
+            "y": 157,
             "params": {
               "target": "found",
               "x": 0,
@@ -707,7 +707,7 @@
       "id": "sequence_hhiq",
       "name": "Dungeon",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [
         {
           "name": "fixMissingStar",
@@ -730,7 +730,7 @@
             "id": "n9aawlyj",
             "type": "tap_image",
             "x": 200,
-            "y": -40,
+            "y": -60,
             "params": {
               "template": "templates/crop_20260628_222549_80x76.png",
               "taps": "1",
@@ -763,7 +763,7 @@
           {
             "id": "ncpyerfm",
             "type": "tap_image",
-            "x": 180,
+            "x": 200,
             "y": -240,
             "params": {
               "template": "templates/crop_20260628_222729_102x31.png",
@@ -777,7 +777,7 @@
           {
             "id": "n8hdlfe3",
             "type": "if_image",
-            "x": 380,
+            "x": 420,
             "y": -240,
             "params": {
               "template": "templates/crop_20260628_222818_212x29.png",
@@ -853,7 +853,7 @@
             "id": "nnfg8k9x",
             "type": "call",
             "x": 200,
-            "y": -80,
+            "y": -100,
             "params": {
               "fn": "fn_yt9m6"
             }
@@ -4881,7 +4881,7 @@
       "id": "background_8g8s",
       "name": "Background task 1",
       "type": "background",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [

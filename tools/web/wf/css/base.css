@@ -23,6 +23,32 @@
   --err:       #bb3a33;
   --err-bg:    #fcefee;
   --err-bd:    #eecdca;
+  /* Run-trail semantics — one hex per state, shared by CSS and JS (canvas draws,
+     wire coloring, overlay strokes) instead of each spot picking its own green/red/amber. */
+  --run-ok:    #1f9d57;
+  --run-fail:  #d6483f;
+  --run-live:  #f97316;
+  --run-info:  #06b6d4;
+  --run-warn:  #eab308;
+  /* Branch-port semantics (condition true/false, loop back-edge) — one hex per
+     role, shared between the port dots, wires and their SVG arrowheads. */
+  --branch-t:    #1f9d57;
+  --branch-t-bg: #e8f5ed;
+  --branch-t-bd: #9fd4b5;
+  --branch-f:    #e0792e;
+  --branch-f-bg: #fff4e8;
+  --branch-f-bd: #f3c29a;
+  --branch-loop:    #e0a64b;
+  --branch-loop-bg: #fff7ea;
+  --branch-loop-line: #d09030;
+  /* Node-category accents — single source of truth for wf.css's .cat-* node
+     styling AND the group-frame colour palette (js/groups.js), so retuning a
+     category's colour here updates both instead of drifting apart. */
+  --cat-basic: #6f9be8;
+  --cat-image: #2fb0a3;
+  --cat-ocr:   #e0954b;
+  --cat-logic: #9a78e6;
+  --group-red: #cf6b6b;  /* group-only accent — no matching node category */
   --log-bg:    #fbfcfd;
   --log-ink:   #41505f;
   --log-muted: #b3bbc4;
@@ -88,7 +114,7 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
   padding: 0 10px; border: 1px solid var(--border2); border-radius: 8px; background: var(--panel); }
 #device-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
   flex-shrink: 0; transition: background .2s; }
-#device-dot.connected { background: #2fa55a; }
+#device-dot.connected { background: var(--run-ok); }
 #device-select { flex: 1; min-width: 0; border: none; background: transparent; background-image: none;
   font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--dim);
   cursor: pointer; -webkit-appearance: none; appearance: none; padding: 0; }
@@ -292,14 +318,14 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .log-ts  { color: var(--log-muted); flex-shrink: 0; }
 .log-tag { font-weight: 700; flex-shrink: 0; }
 .log-msg { color: var(--log-ink); white-space: normal; }
-.log-info    { color: #5b86c9; } .log-success { color: #2fa55a; }
-.log-warning { color: #c08a1e; } .log-error   { color: #cf4b43; }
+.log-info    { color: #5b86c9; } .log-success { color: var(--run-ok); }
+.log-warning { color: #c08a1e; } .log-error   { color: var(--run-fail); }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
 #footer { display: flex; align-items: center; gap: 6px; padding: 2px 5px 3px; flex-shrink: 0; }
 #footer-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
   flex-shrink: 0; transition: background .2s; }
-#footer-dot.connected { background: #2fa55a; }
+#footer-dot.connected { background: var(--run-ok); }
 #status-text { font-size: 11px; color: var(--dim); font-weight: 500;
   flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #hover-pos  { font-family: var(--mono); font-size: 10.5px; color: var(--muted); min-width: 88px; text-align: right; }

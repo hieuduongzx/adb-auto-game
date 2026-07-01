@@ -211,7 +211,7 @@
 #wf-wires path.wire.stack { stroke:#b8c6d4; stroke-width:1.0; stroke-opacity:0.45;
   stroke-dasharray:2.5 3; }
 /* Loop-back wire: amber dashed — "going back" reads visually different from forward flow. */
-#wf-wires path.wire.loopback { stroke:#d09030; stroke-width:1.7; stroke-opacity:.92;
+#wf-wires path.wire.loopback { stroke:var(--branch-loop-line); stroke-width:1.7; stroke-opacity:.92;
   stroke-dasharray:7 5; }
 /* Hover: only the actual wire lifts, matching professional graph editors. */
 #wf-wires .wire-grp:hover path.wire { stroke:var(--accent); stroke-width:2.2; stroke-opacity:1; }
@@ -220,8 +220,8 @@
    node underneath rather than being swallowed by a wire's hit-path. */
 #wf-canvas.wf-connecting .wire-hit { pointer-events:none; }
 /* Run trail on wires: the path taken (bright green) vs the skipped branch (faint red). */
-#wf-wires path.wire.took-wire    { stroke:#1f9d57 !important; stroke-width:2.3; stroke-opacity:1 !important; marker-end:none !important; }
-#wf-wires path.wire.nottook-wire { stroke:#d6483f !important; stroke-opacity:.34 !important; stroke-width:1.3; marker-end:none !important; }
+#wf-wires path.wire.took-wire    { stroke:var(--run-ok) !important; stroke-width:2.3; stroke-opacity:1 !important; marker-end:none !important; }
+#wf-wires path.wire.nottook-wire { stroke:var(--run-fail) !important; stroke-opacity:.34 !important; stroke-width:1.3; marker-end:none !important; }
 #wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:1.55; stroke-dasharray:6 4;
   stroke-linecap:round; pointer-events:none; marker-end:none; }
 #wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -408,12 +408,12 @@
 .wf-node.wf-entry::after { display:none; }
 /* Run trail: a node that finished this run (green = ran ok, red = action failed).
    Defined before .running so the live amber glow still wins on the active node. */
-.wf-node.ran-ok   { border-color:#1f9d57; box-shadow:0 0 0 1.5px rgba(31,157,87,.55), 0 2px 7px rgba(31,157,87,.16); }
-.wf-node.ran-fail { border-color:#d6483f; box-shadow:0 0 0 1.5px rgba(214,72,63,.55), 0 2px 7px rgba(214,72,63,.18); }
+.wf-node.ran-ok   { border-color:var(--run-ok); box-shadow:0 0 0 1.5px rgba(31,157,87,.55), 0 2px 7px rgba(31,157,87,.16); }
+.wf-node.ran-fail { border-color:var(--run-fail); box-shadow:0 0 0 1.5px rgba(214,72,63,.55), 0 2px 7px rgba(214,72,63,.18); }
 /* Reached-but-not blocks: a finished run never entered these (a branch not
    taken). Their top accent bar reds out and the whole block dims, so the path
    that DID run stays the bright green trail and the skipped paths recede. */
-.wf-node.ran-skip { border-top-color:#cf4b43 !important; opacity:.5; }
+.wf-node.ran-skip { border-top-color:var(--run-fail) !important; opacity:.5; }
 /* Structural kinds set their own accent colour. Terminals (start/end/stop) also
    keep a faint header tint so the flow's entry/exit points stand out. */
 /* Terminals read as bold, unmistakable entry/exit points: start = green,
@@ -427,10 +427,10 @@
 .wf-node.call { --node-accent:#7c3aed; }
 /* Per-category accent colour, placed AFTER the kind rules so it also colours the
    image/ocr/logic condition blocks (action + condition nodes carry a cat class). */
-.wf-node.cat-basic { --node-accent:#6f9be8; }
-.wf-node.cat-image { --node-accent:#2fb0a3; }
-.wf-node.cat-ocr   { --node-accent:#e0954b; }
-.wf-node.cat-logic { --node-accent:#9a78e6; }
+.wf-node.cat-basic { --node-accent:var(--cat-basic); }
+.wf-node.cat-image { --node-accent:var(--cat-image); }
+.wf-node.cat-ocr   { --node-accent:var(--cat-ocr); }
+.wf-node.cat-logic { --node-accent:var(--cat-logic); }
 .wf-node.cat-flow  { --node-accent:#e0a64b; }
 .wf-node.cat-misc  { --node-accent:#9aa6b4; }
 .wf-node.conn-target { box-shadow:0 0 0 2px var(--ok); }
@@ -626,20 +626,20 @@
 .wf-port.in  { left:-5px; }
 .wf-port.in:hover { background:var(--accent-bg); }
 .wf-port.in.connected { background:var(--accent-bg); border-color:var(--accent); }
-.wf-port.in.t.connected { background:#e8f5ed; border-color:#1f9d57; }
-.wf-port.in.f.connected { background:#fff4e8; border-color:#e0792e; }
+.wf-port.in.t.connected { background:var(--branch-t-bg); border-color:var(--branch-t); }
+.wf-port.in.f.connected { background:var(--branch-f-bg); border-color:var(--branch-f); }
 /* Default output: grey when unconnected, accent fill when connected. */
 .wf-port.out { right:-5px; }
 .wf-port.out.connected { background:var(--node-accent,#8597ab); border-color:var(--node-accent,#8597ab); }
 /* True/False outputs: grey fill but colored border when empty; full color when wired. */
-.wf-port.out.t { border-color:#9fd4b5; }
-.wf-port.out.f { border-color:#f3c29a; }
-.wf-port.out.t.connected { background:#1f9d57; border-color:#1f9d57; }
-.wf-port.out.f.connected { background:#e0792e; border-color:#e0792e; }
+.wf-port.out.t { border-color:var(--branch-t-bd); }
+.wf-port.out.f { border-color:var(--branch-f-bd); }
+.wf-port.out.t.connected { background:var(--branch-t); border-color:var(--branch-t); }
+.wf-port.out.f.connected { background:var(--branch-f); border-color:var(--branch-f); }
 /* A loop's second input — the 'lặp' (loop-back) port — is amber-ringed so it
    reads as the place a block wires back to, distinct from the plain 'vào' entry. */
-.wf-port.in.loop { border-color:#e0a64b; background:#fff7ea; }
-.wf-port.in.loop.connected { border-color:#e0a64b; background:#fff7ea; }
+.wf-port.in.loop { border-color:var(--branch-loop); background:var(--branch-loop-bg); }
+.wf-port.in.loop.connected { border-color:var(--branch-loop); background:var(--branch-loop-bg); }
 .wf-port.in.loop:hover { border-color:var(--accent); background:var(--accent-bg); }
 .wf-port-row { position:absolute; right:-5px; display:flex; align-items:center; }
 .wf-port-lbl { position:absolute; right:12px; font-size:8px; font-weight:700; color:var(--muted); white-space:nowrap; }

@@ -3,15 +3,29 @@
 // geometric: a node belongs to a group when its centre is inside the rectangle.
 // Moving the group's header moves every node currently inside it. Groups are
 // purely visual — the engine ignores them (it only runs nodes + edges).
-const WF_GROUP_COLORS = [
-  {b:"#6f9be8", bg:"rgba(111,155,232,.07)"},
-  {b:"#2fb0a3", bg:"rgba(47,176,163,.08)"},
-  {b:"#e0954b", bg:"rgba(224,149,75,.09)"},
-  {b:"#9a78e6", bg:"rgba(154,120,230,.08)"},
-  {b:"#cf6b6b", bg:"rgba(207,107,107,.08)"},
-];
+// Colours read from the shared --cat-*/--group-red vars (base.css :root) — the
+// same palette used for node category accents, so a group frame around, say,
+// image-category nodes doesn't clash with a differently-tuned hardcoded hex.
+const WF_GROUP_COLORS = (function(){
+  const cs=getComputedStyle(document.documentElement);
+  const v=name=>(cs.getPropertyValue(name)||"").trim();
+  const hexToRgb=hex=>{ const m=/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+    return m ? [parseInt(m[1],16),parseInt(m[2],16),parseInt(m[3],16)] : [0,0,0]; };
+  const mk=(hex,alpha)=>{ const [r,g,b]=hexToRgb(hex); return {b:hex, bg:`rgba(${r},${g},${b},${alpha})`}; };
+  return [
+    mk(v("--cat-basic")||"#6f9be8", .07),
+    mk(v("--cat-image")||"#2fb0a3", .08),
+    mk(v("--cat-ocr")  ||"#e0954b", .09),
+    mk(v("--cat-logic")||"#9a78e6", .08),
+    mk(v("--group-red")||"#cf6b6b", .08),
+  ];
+})();
 function wfGroups(){ const t=wfEditTarget(); if(!t) return []; if(!t.graph.groups) t.graph.groups=[]; return t.graph.groups; }
 function wfGroupColor(gr){ return WF_GROUP_COLORS[(gr.color||0) % WF_GROUP_COLORS.length]; }
+// Padding around member nodes when drawing/fitting a group frame, and extra
+// headroom for the floating title tab above it — both on the 4pt spacing scale.
+const WF_GROUP_PAD = 24;   // var(--s6)
+const WF_GROUP_HD  = 24;   // var(--s6) — clears the group's title tab
 function wfNodesInGroup(gr){
   const g=wfGraph(); if(!g) return [];
   return g.nodes.filter(n=>{
@@ -41,8 +55,8 @@ function wfGroupSelection(){
     x0=Math.min(x0,n.x); y0=Math.min(y0,n.y); x1=Math.max(x1,n.x+w); y1=Math.max(y1,n.y+h);
   });
   if(!isFinite(x0)) return false;
-  const pad=22;
-  wfAddGroup(x0-pad, y0-pad-22, (x1-x0)+pad*2, (y1-y0)+pad*2+22);
+  const pad=WF_GROUP_PAD;
+  wfAddGroup(x0-pad, y0-pad-WF_GROUP_HD, (x1-x0)+pad*2, (y1-y0)+pad*2+WF_GROUP_HD);
   return true;
 }
 // Resize an existing group to tightly wrap all its current member nodes.
@@ -56,9 +70,9 @@ function wfFitGroup(gr){
     x0=Math.min(x0,n.x); y0=Math.min(y0,n.y); x1=Math.max(x1,n.x+w); y1=Math.max(y1,n.y+h);
   });
   if(!isFinite(x0)) return;
-  const pad=22;
-  gr.x=wfSnap(x0-pad); gr.y=wfSnap(y0-pad-22);
-  gr.w=wfSnap((x1-x0)+pad*2); gr.h=wfSnap((y1-y0)+pad*2+22);
+  const pad=WF_GROUP_PAD;
+  gr.x=wfSnap(x0-pad); gr.y=wfSnap(y0-pad-WF_GROUP_HD);
+  gr.w=wfSnap((x1-x0)+pad*2); gr.h=wfSnap((y1-y0)+pad*2+WF_GROUP_HD);
   wfRenderCanvas();
   setStatus(`Fit group bounds for "${gr.name}"`);
 }

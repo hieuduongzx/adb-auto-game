@@ -15,6 +15,14 @@ let wfPvCanvas = null;
 let wfPvWrap   = null;
 let wfPvErr    = "";           // last capture error text (shown until next frame)
 
+// Overlay draw colours — pulled from the shared CSS vars (base.css :root) so the
+// canvas overlay stays in sync with the same fail/info/warn hues used elsewhere.
+const WF_PV_COLOR = (function(){
+  const cs=getComputedStyle(document.documentElement);
+  const v=(name,fallback)=>(cs.getPropertyValue(name)||fallback).trim();
+  return { fail:v("--run-fail","#dc2626"), info:v("--run-info","#06b6d4"), warn:v("--run-warn","#eab308") };
+})();
+
 // ── View tab switching ──────────────────────────────────────────────────────
 function wfSwitchView(view){
   document.querySelectorAll(".wf-view-tab").forEach(t=>t.classList.toggle("sel", t.dataset.view===view));
@@ -192,7 +200,7 @@ function wfPvDraw(){
   ctx.drawImage(wfPvImg, x0, y0, x1-x0, y1-y0);
 
   // Template-match overlay rects (red, with confidence label).
-  ctx.strokeStyle="#dc2626"; ctx.lineWidth=2; ctx.fillStyle="#dc2626";
+  ctx.strokeStyle=WF_PV_COLOR.fail; ctx.lineWidth=2; ctx.fillStyle=WF_PV_COLOR.fail;
   ctx.font="11px IBM Plex Mono,monospace"; ctx.textAlign="left";
   for(const r of wfPvOverlay){
     const [cx,cy]=wfPvImgToCanvas(r[0],r[1]), [cx2,cy2]=wfPvImgToCanvas(r[0]+r[2],r[1]+r[3]);
@@ -203,12 +211,12 @@ function wfPvDraw(){
   if(wfPvRegion){
     const [x,y,w,h]=wfPvRegion;
     const [cx,cy]=wfPvImgToCanvas(x,y), [cx2,cy2]=wfPvImgToCanvas(x+w,y+h);
-    ctx.strokeStyle="#06b6d4"; ctx.lineWidth=2; ctx.strokeRect(cx,cy,cx2-cx,cy2-cy);
+    ctx.strokeStyle=WF_PV_COLOR.info; ctx.lineWidth=2; ctx.strokeRect(cx,cy,cx2-cx,cy2-cy);
   }
   // Picked point (yellow crosshair).
   if(wfPvPoint){
     const [cx,cy]=wfPvImgToCanvas(wfPvPoint[0],wfPvPoint[1]);
-    ctx.strokeStyle="#eab308"; ctx.lineWidth=2;
+    ctx.strokeStyle=WF_PV_COLOR.warn; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(cx-8,cy); ctx.lineTo(cx+8,cy);
     ctx.moveTo(cx,cy-8); ctx.lineTo(cx,cy+8); ctx.stroke();
   }

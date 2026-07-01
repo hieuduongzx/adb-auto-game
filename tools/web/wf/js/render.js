@@ -407,7 +407,7 @@ function wfBuildGlobChildren(v,container,render,depth){
   v.children=v.children||[];
   v.children.forEach((cv,ci)=>{
     const childCard=wfGlobRow(cv,ci,render);
-    childCard.style.marginLeft=((depth+1)*14)+"px";
+    childCard.style.marginLeft=((depth+1)*WF_VAR_INDENT)+"px";
     container.appendChild(childCard);
     if(cv.children&&cv.children.length) wfBuildGlobChildren(cv,container,render,depth+1);
   });

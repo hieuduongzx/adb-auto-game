@@ -13,15 +13,18 @@ function wfPortPt(nodeId,port){
   return { x:(r.left+r.width/2-wr.left)/wfZoom, y:(r.top+r.height/2-wr.top)/wfZoom };
 }
 
-// Arrowhead markers
+// Arrowhead markers — colours read from the shared CSS vars (base.css :root) so
+// wires/ports/canvas overlays never drift onto a second hex for the same role.
 const WF_WIRE_DEFS = (function(){
+  const cs=getComputedStyle(document.documentElement);
+  const v=(name,fallback)=>(cs.getPropertyValue(name)||fallback).trim();
   const mk=(id,c)=>`<marker id="${id}" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L7,3.5 L0,7 Z" fill="${c}"/></marker>`;
   return "<defs>"+
     mk("wf-ah","#94a6ba")+
-    mk("wf-ah-t","#1f9d57")+
-    mk("wf-ah-f","#e0792e")+
-    mk("wf-ah-loop","#d09030")+
-    mk("wf-ah-temp","#2f6fed")+
+    mk("wf-ah-t",v("--branch-t","#1f9d57"))+
+    mk("wf-ah-f",v("--branch-f","#e0792e"))+
+    mk("wf-ah-loop",v("--branch-loop-line","#d09030"))+
+    mk("wf-ah-temp",v("--accent","#2f6fed"))+
   "</defs>";
 })();
 

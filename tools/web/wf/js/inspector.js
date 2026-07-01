@@ -323,6 +323,9 @@ function wfVarAddBtn(act, parentVar, parentIdx){
   };
   return add;
 }
+// Nested-variable indent step — one 4pt-scale unit (var(--s4), 12px) per depth,
+// shared with wfBuildGlobChildren (render.js) so activity vars and globals nest identically.
+const WF_VAR_INDENT = 12;
 function wfBuildVarTree(act,v,idx,container,depth){
   depth=depth||0;
   v.children=v.children||[];
@@ -338,7 +341,7 @@ function wfBuildVarTree(act,v,idx,container,depth){
 function wfVarRow(act,v,idx,depth){
   depth=depth||0;
   const card=document.createElement("div"); card.className="wf-var-card";
-  if(depth>0) card.style.marginLeft=(depth*14)+"px";
+  if(depth>0) card.style.marginLeft=(depth*WF_VAR_INDENT)+"px";
   // Line 1: drag-chip + title + delete + add-child button.
   const r1=document.createElement("div"); r1.className="wf-var-row";
   const chip=document.createElement("span"); chip.className="wf-var-chip"; chip.draggable=true;
