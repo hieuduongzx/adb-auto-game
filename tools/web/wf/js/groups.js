@@ -194,6 +194,10 @@ function wfConnectTo(toNodeId, clientX, clientY){
 }
 function wfCanvasMouseDown(e){
   if(e.target.closest(".wf-node")||e.target.closest(".wf-group")) return;
+  // Floating overlays (Activities/Variables corner stack, layout menu) sit above
+  // the canvas — a press there must not clear the selection or start a
+  // rubber-band box (the re-render it triggers would also swallow the click).
+  if(e.target.closest("#wf-corner-stack,.wf-layout-bar")) return;
   // Middle mouse, or Space+left → pan.
   if(e.button===1 || (e.button===0 && wfSpace)){
     e.preventDefault();
@@ -349,12 +353,12 @@ function wfInitCanvas(){
   document.addEventListener("mousedown",e=>{ if(!e.target.closest("#wf-ctxmenu")) wfHideMenu(); if(!e.target.closest("#wf-globs-pop") && !e.target.closest("#wf-vars-mgr") && !e.target.closest("#wf-vars-add")) wfHideGlobsEditor(); if(!e.target.closest("#wf-layout-bar")) wfCloseLayoutMenu(); }, true);
   // Vars panel header toggles collapse (click-through to drag is fine on body).
   const vhdr=document.querySelector("#wf-vars-panel .wf-vars-hdr");
-  if(vhdr) vhdr.onclick=(e)=>{ if(e.target.closest(".wf-vars-actions")) return; wfVarsCollapsed=!wfVarsCollapsed; wfRenderVarsPanel(); };
+  if(vhdr) vhdr.onclick=(e)=>{ if(e.target.closest(".wf-vars-actions")) return; wfVarsCollapsed=!wfVarsCollapsed; wfPersistPanelState(); wfRenderVarsPanel(); };
   const vadd=$("wf-vars-add");
   if(vadd) vadd.onclick=(e)=>{ e.stopPropagation(); wfAddQuickGlobal(); };
   const vmgr=$("wf-vars-mgr");
   if(vmgr) vmgr.onclick=(e)=>{ e.stopPropagation(); wfToggleGlobsEditor(); };
-  // Activities/Functions panel: tab switching + "+" add button + collapse.
+  // Activities panel: tab switching + "+" add button + collapse.
   document.querySelectorAll(".wf-act-tab").forEach(tab=>{
     tab.onclick=(e)=>{ e.stopPropagation(); wfActTab(tab.dataset.tab); };
   });
@@ -364,7 +368,17 @@ function wfInitCanvas(){
   if(afocus) afocus.onclick=(e)=>{ e.stopPropagation(); wfToggleFocus(); };
   // Only the title row (not the tab bar / header buttons) is the collapse trigger.
   const ahdr=document.querySelector("#wf-act-hdr-row");
-  if(ahdr) ahdr.onclick=(e)=>{ if(e.target.closest(".wf-act-hdr-add,.wf-act-hdr-focus")) return; wfActCollapsed=!wfActCollapsed; wfToggleActPanel(); };
+  if(ahdr) ahdr.onclick=(e)=>{ if(e.target.closest(".wf-act-hdr-add,.wf-act-hdr-focus")) return; wfActCollapsed=!wfActCollapsed; wfPersistPanelState(); wfToggleActPanel(); };
+  // Functions section (bottom of the left sidebar): "+" creates, header collapses.
+  const fadd=$("wf-fn-add");
+  if(fadd) fadd.onclick=(e)=>{ e.stopPropagation(); wfAddFunction(); };
+  const fhdr=$("wf-fns-hdr"), fsec=$("wf-side-fns-sec");
+  if(fhdr && fsec){
+    try{ if(localStorage.getItem("wfFnsCollapsed")==="1") fsec.classList.add("collapsed"); }catch{}
+    fhdr.onclick=(e)=>{ if(e.target.closest(".wf-act-hdr-add")) return;
+      const c=fsec.classList.toggle("collapsed");
+      try{ localStorage.setItem("wfFnsCollapsed", c?"1":"0"); }catch{} };
+  }
   // Auto-layout menu (bottom-left): toggle open/closed + run a strategy on pick.
   document.querySelectorAll(".wf-layout-item").forEach(btn=>{
     btn.onclick=(e)=>{ e.stopPropagation(); wfAutoLayout(btn.dataset.layout); wfCloseLayoutMenu(); };

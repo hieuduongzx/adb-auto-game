@@ -159,6 +159,11 @@ async function init(){
   wfSetupSortable($("wf-activities"));
   if($("wf-activities-bg")) wfSetupSortable($("wf-activities-bg"));
   if($("wf-functions")) wfSetupSortable($("wf-functions"));
+  // Double-click a row name to rename in place.
+  const actById=id=>WF.activities.find(a=>a.id===id);
+  wfSetupRename($("wf-activities"), actById);
+  wfSetupRename($("wf-activities-bg"), actById);
+  wfSetupRename($("wf-functions"), id=>WF.functions.find(f=>f.id===id));
   wfSyncToggleBtns();
   wfSetRunning(false);   // seed the run button's play icon
   updateLogCount();

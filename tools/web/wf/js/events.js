@@ -83,6 +83,7 @@ function updateLogCount(){ const c=$("log-count"), b=$("log-body"); if(c&&b) c.t
 function wfToggleVarsPanel(ev){
   if(ev && ev.target.closest(".wf-vars-actions")) return;
   wfVarsCollapsed = !wfVarsCollapsed;
+  if(typeof wfPersistPanelState==="function") wfPersistPanelState();
   wfRenderVarsPanel();
 }
 

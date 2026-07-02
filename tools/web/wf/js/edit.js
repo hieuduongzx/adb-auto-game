@@ -210,7 +210,10 @@ function wfDeleteActivity(id,ev){
   if(WF.edit.kind==="activity"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
   wfRenderAll();
 }
-function wfSelectActivity(id){ WF.edit={kind:"activity",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1; wfRenderAll(); }
+// Re-clicking the already-open activity is a no-op (keeps the camera, and lets
+// the second click of a rename double-click land on a live row).
+function wfSelectActivity(id){ if(WF.edit.kind==="activity"&&WF.edit.id===id) return;
+  WF.edit={kind:"activity",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1; wfRenderAll(); }
 function wfToggleActivity(id,ev){ ev&&ev.stopPropagation(); const a=wfActById(id); if(a){ wfPushUndo(); a.enabled=!a.enabled; wfRenderActivities(); } }
 
 // ── Functions (reusable subroutines, used via a "call" node) ──────────────────
@@ -221,10 +224,17 @@ function wfAddFunction(){
   const id="fn_"+wfUid().slice(1,6);
   WF.functions.push({id,name,graph:wfNewGraph()});
   WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
-  if(typeof wfActTab==="function") wfActTab("fns");
+  // Make sure the sidebar Functions section is open so the new row is visible.
+  const fsec=$("wf-side-fns-sec");
+  if(fsec && fsec.classList.contains("collapsed")){
+    fsec.classList.remove("collapsed");
+    try{ localStorage.setItem("wfFnsCollapsed","0"); }catch{}
+  }
   wfRenderAll();
 }
-function wfEditFunction(id,ev){ ev&&ev.stopPropagation(); WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1; wfRenderAll(); }
+function wfEditFunction(id,ev){ ev&&ev.stopPropagation();
+  if(WF.edit.kind==="function"&&WF.edit.id===id) return;   // already open — keep camera
+  WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1; wfRenderAll(); }
 function wfDeleteFunction(id,ev){
   ev&&ev.stopPropagation();
   const i=WF.functions.findIndex(f=>f.id===id); if(i<0)return;

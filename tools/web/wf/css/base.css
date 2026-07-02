@@ -56,6 +56,8 @@
   --mono: "IBM Plex Mono","Cascadia Code","Consolas",monospace;
   --r-sm: 7px; --r-md: 10px; --r-lg: 14px;
   --node-r: 7px;   /* node card corner — rectangular, only lightly rounded */
+  --node-w: 160px; /* one canonical card width — every block (incl. notes) uses it */
+  --node-h: 60px;  /* canonical card height: 20px header + 40px body */
   /* 4pt spacing scale — every gap/pad pulls from here for consistent rhythm. */
   --s1: 4px; --s2: 6px; --s3: 8px; --s4: 12px; --s5: 16px; --s6: 24px;
   /* Elevation scale — subtle, reinforces hierarchy (sidebar < panel < node < menu). */

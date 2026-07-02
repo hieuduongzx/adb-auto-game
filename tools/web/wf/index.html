@@ -84,7 +84,8 @@
 </div>
 
 <div id="workflow-view" style="display:flex;">
-  <!-- Left: node palette only (activities + functions moved into the canvas) -->
+  <!-- Left: node palette + functions (pinned at the bottom so they're always
+       one drag away — dragging a function row onto the canvas inserts a call). -->
   <div id="wf-side" class="card">
     <div class="wf-side-sec" style="flex:1;min-height:0;display:flex;flex-direction:column;">
       <div class="wf-side-hdr"><span>Node</span></div>
@@ -96,6 +97,18 @@
         </button>
       </div>
       <div id="wf-palette" class="wf-palette"></div>
+    </div>
+    <div class="wf-side-sec" id="wf-side-fns-sec">
+      <div class="wf-side-hdr wf-side-hdr-toggle" id="wf-fns-hdr" title="Collapse/expand functions">
+        <span class="wf-side-chev">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+        </span>
+        <span>Functions</span>
+        <span class="side-count" id="wf-fn-count"></span>
+        <span class="spacer"></span>
+        <button class="wf-act-hdr-add" id="wf-fn-add" title="Create new function">+</button>
+      </div>
+      <div id="wf-functions" class="wf-side-fns wf-act-list"></div>
     </div>
   </div>
   <div id="wf-side-resizer" title="Drag to resize the left column"></div>
@@ -167,8 +180,8 @@
            panels anchor to each other — collapsing Activities lets Variables
            rise with it, since they share this flex column pinned to the corner. -->
       <div id="wf-corner-stack" class="wf-corner-stack">
-      <!-- Activities + Functions panel.
-           Title row (chevron + label + add btn) + tab bar stacked in the header. -->
+      <!-- Activities panel (Sequent / Background tabs — functions live in the
+           left sidebar). Title row (chevron + label + add btn) + tab bar. -->
       <div id="wf-act-panel" class="wf-act-panel">
         <div class="wf-act-panel-hdr">
           <div class="wf-act-hdr-row" id="wf-act-hdr-row">
@@ -184,17 +197,18 @@
           <div class="wf-act-tab-row">
             <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequent <span class="side-count" id="wf-act-count"></span></button>
             <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
-            <button class="wf-act-tab" data-tab="fns" id="wf-tab-fns">Function <span class="side-count" id="wf-fn-count"></span></button>
           </div>
         </div>
         <div class="wf-act-panel-body">
           <div id="wf-activities" class="wf-act-list"></div>
           <div id="wf-activities-bg" class="wf-act-list" style="display:none"></div>
-          <div id="wf-functions" class="wf-act-list" style="display:none"></div>
         </div>
       </div>
       <div id="wf-vars-panel" class="wf-vars-panel">
         <div class="wf-vars-hdr" onclick="wfToggleVarsPanel(event)">
+          <span class="wf-act-hdr-chevron">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+          </span>
           <span class="wf-vars-title">Variables</span>
           <span class="wf-vars-count" id="wf-vars-count"></span>
           <span class="wf-vars-live" id="wf-vars-live" title="● Live — engine is running">●</span>

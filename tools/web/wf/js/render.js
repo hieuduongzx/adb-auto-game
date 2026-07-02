@@ -5,6 +5,39 @@ function wfRenderAll(){
   $("wf-cur-act").textContent = !t ? "—" : (WF.edit.kind==="function" ? "ƒ "+t.name : t.name);
 }
 
+// ── Inline rename (double-click a row name) ──────────────────────────────────
+// Swap the name label for an input; Enter/blur commits, Esc cancels.
+function wfBeginRename(nameEl, obj){
+  const inp=document.createElement("input");
+  inp.type="text"; inp.value=obj.name; inp.className="wf-act-rename";
+  nameEl.replaceWith(inp);
+  inp.focus(); inp.select();
+  let done=false;
+  const commit=ok=>{ if(done) return; done=true;
+    const v=(inp.value||"").trim();
+    if(ok && v && v!==obj.name){ wfPushUndo(); obj.name=v; }
+    wfRenderAll(); };
+  inp.addEventListener("keydown",ev=>{ ev.stopPropagation();
+    if(ev.key==="Enter") commit(true); else if(ev.key==="Escape") commit(false); });
+  inp.addEventListener("blur",()=>commit(true));
+  inp.addEventListener("mousedown",ev=>ev.stopPropagation());
+  inp.addEventListener("click",ev=>ev.stopPropagation());
+}
+// Delegated on the list container (rows are rebuilt on every render, the
+// container isn't) so the double-click survives the re-render the first
+// click triggers via row selection.
+function wfSetupRename(listEl, resolve){
+  if(!listEl || listEl.__renameWired) return; listEl.__renameWired=true;
+  listEl.addEventListener("dblclick",e=>{
+    if(e.target.closest(".wf-act-cb,.wf-act-del,.wf-act-grip,.wf-act-rename")) return;
+    const row=e.target.closest(".wf-act"); if(!row) return;
+    const obj=resolve(row.dataset.id); if(!obj) return;
+    const nameEl=row.querySelector(".wf-act-name"); if(!nameEl) return;
+    e.stopPropagation();
+    wfBeginRename(nameEl, obj);
+  });
+}
+
 function wfRenderActivities(){
   // Two buckets of activities share one array but render into separate lists
   // (Sequent vs Background), each shown under its own tab.
@@ -29,11 +62,11 @@ function wfRenderActivities(){
       `<span class="wf-act-runbar"></span>
        <span class="wf-act-grip" title="Drag to reorder">${WF_GRIP}</span>
        <span class="wf-act-cb ${act.enabled?"checked":""}">${check}</span>
-       <span class="wf-act-name">${escHtml(act.name)}</span>
+       <span class="wf-act-name" title="Double-click to rename">${escHtml(act.name)}</span>
        <button class="wf-act-del" title="Delete">${wfIco("x")}</button>`;
     el.querySelector(".wf-act-cb").addEventListener("click",e=>wfToggleActivity(act.id,e));
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteActivity(act.id,e));
-    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-cb,.wf-act-del,.wf-act-grip"))return; wfSelectActivity(act.id); });
+    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-cb,.wf-act-del,.wf-act-grip,.wf-act-rename"))return; wfSelectActivity(act.id); });
     wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.activities);
     wrap.appendChild(el);
   }
@@ -45,12 +78,13 @@ function wfRenderActivities(){
     if(!bgActs.length){ bgWrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">No background tasks.</div>'; }
     else bgActs.forEach(a=>rowInto(bgWrap, a));
   }
+  wfToggleActPanel();   // re-apply the persisted collapsed state on every render
 }
 
 function wfRenderFunctions(){
   const wrap=$("wf-functions"); if(!wrap) return; wrap.innerHTML="";
   const cnt=$("wf-fn-count"); if(cnt) cnt.textContent = WF.functions.length? String(WF.functions.length):"";
-  if(!WF.functions.length){ wrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">No functions. Click “+ Function”.</div>'; return; }
+  if(!WF.functions.length){ wrap.innerHTML='<div class="wf-insp-empty">No functions. Click “+” to create one.</div>'; return; }
   WF.functions.forEach(fn=>{
     const sel = WF.edit.kind==="function" && fn.id===WF.edit.id;
     const el=document.createElement("div"); el.className="wf-act wf-fn"+(sel?" sel":""); el.dataset.id=fn.id;
@@ -58,33 +92,33 @@ function wfRenderFunctions(){
     el.innerHTML=
       `<span class="wf-act-grip" title="Drag to canvas to use / drag to reorder">${WF_GRIP}</span>
        <span class="wf-badge fn">ƒ</span>
-       <span class="wf-act-name">${escHtml(fn.name)}</span>
+       <span class="wf-act-name" title="Double-click to rename">${escHtml(fn.name)}</span>
        <button class="wf-act-del" title="Delete function">${wfIco("x")}</button>`;
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteFunction(fn.id,e));
-    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-del,.wf-act-grip"))return; wfEditFunction(fn.id); });
+    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-del,.wf-act-grip,.wf-act-rename"))return; wfEditFunction(fn.id); });
     wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.functions, "call:"+fn.id);
     wrap.appendChild(el);
   });
 }
 
-// ── Activities/Functions panel tabs (in-canvas bottom-left) ──────────────────
-// Three tabs: "seq" (sequence activities), "bg" (background activities), "fns".
+// ── Activities panel tabs (in-canvas corner) ─────────────────────────────────
+// Two tabs: "seq" (sequence activities) and "bg" (background activities).
+// Functions live in their own section at the bottom of the left sidebar.
 let wfActTabCur="seq";
 function wfActTab(which){
+  if(which==="fns") which="seq";   // legacy callers — the fns tab moved to the sidebar
   wfActTabCur=which;
   document.querySelectorAll(".wf-act-tab").forEach(t=>t.classList.toggle("sel", t.dataset.tab===which));
-  const acts=$("wf-activities"), bg=$("wf-activities-bg"), fns=$("wf-functions");
+  const acts=$("wf-activities"), bg=$("wf-activities-bg");
   if(acts) acts.style.display = which==="seq"?"":"none";
   if(bg)   bg.style.display   = which==="bg" ?"":"none";
-  if(fns)  fns.style.display  = which==="fns"?"":"none";
   const add=$("wf-act-add");
-  if(add) add.title = which==="fns"?"Create new function":which==="bg"?"Add background task":"Add activity";
+  if(add) add.title = which==="bg"?"Add background task":"Add activity";
   const title=$("wf-act-hdr-title");
-  if(title) title.textContent = which==="fns"?"Functions":which==="bg"?"Background tasks":"Activities";
+  if(title) title.textContent = which==="bg"?"Background tasks":"Activities";
 }
 function wfActAddCurrent(){
-  if(wfActTabCur==="fns") wfAddFunction();
-  else if(wfActTabCur==="bg") wfAddActivity("background");
+  if(wfActTabCur==="bg") wfAddActivity("background");
   else wfAddActivity("sequence");
 }
 function wfToggleActPanel(){
@@ -161,6 +195,16 @@ function wfCommitReorder(listEl, arr){
   wfRenderAll();
 }
 
+// Per-category collapse state, persisted locally so the sidebar reopens the
+// way the user left it. A live search always shows matches (collapse ignored).
+let wfPalCollapsed={};
+try{ wfPalCollapsed=JSON.parse(localStorage.getItem("wfPalCollapsed")||"{}")||{}; }catch{}
+function wfPalToggleCat(key){
+  wfPalCollapsed[key]=!wfPalCollapsed[key];
+  try{ localStorage.setItem("wfPalCollapsed", JSON.stringify(wfPalCollapsed)); }catch{}
+  wfRenderPalette();
+}
+const WF_PAL_CHEV = `<svg class="wf-pal-chev" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>`;
 function wfRenderPalette(){
   const pal=$("wf-palette"); pal.innerHTML="";
   const q=(wfPaletteQuery||"").trim().toLowerCase();
@@ -172,9 +216,13 @@ function wfRenderPalette(){
     if(q) types=types.filter(t=>(WF_NODES[t].label+" "+t).toLowerCase().includes(q));
     if(!types.length) return;
     shown+=types.length;
-    const hdr=document.createElement("div"); hdr.className="wf-pal-cat cat-"+cat.key;
-    hdr.innerHTML=`<span>${escHtml(cat.label)}</span>`+(q?`<span class="wf-pal-cat-n">${types.length}</span>`:"");
+    const closed = !q && !!wfPalCollapsed[cat.key];
+    const hdr=document.createElement("div"); hdr.className="wf-pal-cat cat-"+cat.key+(closed?" closed":"");
+    hdr.title=closed?"Expand category":"Collapse category";
+    hdr.innerHTML=`<span>${escHtml(cat.label)}</span><span class="wf-pal-cat-n">${types.length}</span>${WF_PAL_CHEV}`;
+    hdr.addEventListener("click",()=>{ if(!q) wfPalToggleCat(cat.key); });
     pal.appendChild(hdr);
+    if(closed) return;
     const grid=document.createElement("div"); grid.className="wf-pal-grid";
     types.forEach(type=>grid.appendChild(wfChip(WF_NODES[type].ico, WF_NODES[type].label, type, cat.key)));
     pal.appendChild(grid);
@@ -290,8 +338,11 @@ function wfRenderVarsPanel(){
   function mkSep(label){ const s=document.createElement("span"); s.className="wf-vars-sep"; s.textContent=label; return s; }
   function mkRow(n, isGlobal){
     const row=document.createElement("div"); row.className="wf-var-row-live";
+    // Global rows are a shortcut into the globals editor — one click to edit.
+    if(isGlobal){ row.classList.add("clickable");
+      row.addEventListener("click",()=>{ wfGlobsOpen=true; wfShowGlobsEditor(); }); }
     const nm=document.createElement("span"); nm.className="vn";
-    nm.title=n+(isGlobal?" · global":"");
+    nm.title=n+(isGlobal?" · global · click to edit":"");
     if(isGlobal){
       nm.style.color="var(--accent)";
       nm.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>'+n;
@@ -438,6 +489,15 @@ function wfNodeWarnings(n, def, g){
     w.push("No incoming wire — this block will never run");
   return w;
 }
+// Timing badges (delayBefore / delayAfter) — floating chips anchored under the
+// block's bottom-left corner (absolute), so a delay never stretches the
+// standardized card. Shared by wfNodeEl and the inspector's live update.
+function wfDelayChipsHtml(n){
+  const dp=[];
+  if(n.delayBefore) dp.push(`<span class="wf-delay-chip">${wfIco("clock")}Before ${n.delayBefore}s</span>`);
+  if(n.delayAfter)  dp.push(`<span class="wf-delay-chip">${wfIco("timer")}After ${n.delayAfter}s</span>`);
+  return dp.length ? `<div class="wf-node-delay">${dp.join("")}</div>` : "";
+}
 function wfNodeEl(n){
   const def=WF_NODES[n.type]||{label:n.type,ico:"help",kind:"action",outs:["out"],fields:[]};
   const g=wfGraph();
@@ -467,7 +527,8 @@ function wfNodeEl(n){
     if(intIn) el.classList.add("wf-stk-jtop"); if(intOut) el.classList.add("wf-stk-jbot"); }
   // A call node shows the referenced function's name as its title.
   let title=def.label, sum="";
-  if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?fn.name:"(no function selected)"; }
+  if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?fn.name:"(no function selected)";
+    sum=fn?"ƒ call function":"double-click to pick"; }
   else { try{ sum=def.sum?def.sum(n.params):""; }catch{} }
   const tplField = wfTplField(n.type);
   const isTpls = tplField && tplField.t==="tpls";
@@ -486,10 +547,7 @@ function wfNodeEl(n){
   </div>`;
   const noteHtml = n.note ? `<div class="wf-node-note">${wfIco("edit")}<span>${escHtml(n.note)}</span></div>` : "";
   const logHtml = n.log ? `<div class="wf-node-log">${escHtml(n.log)}</div>` : "";
-  const dp=[];
-  if(n.delayBefore) dp.push(`${wfIco("clock")}<span>Wait ${n.delayBefore}s</span>`);
-  if(n.delayAfter)  dp.push(`${wfIco("timer")}<span>After wait ${n.delayAfter}s</span>`);
-  const delayHtml = dp.length ? `<div class="wf-node-delay">${dp.join("")}</div>` : "";
+  const delayHtml = wfDelayChipsHtml(n);
   const rp=[];
   if(n.retryCount) rp.push(`${wfIco("loop")}<span>Retry ${n.retryCount}×</span>`);
   if(n.screenshotOnFail) rp.push(`${wfIco("camera")}<span>Screenshot on fail</span>`);
@@ -515,7 +573,6 @@ function wfNodeEl(n){
       actBar+
       `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span>${eyeBtn}<span class="wf-node-title">${escHtml(title)}</span></div>`+
       topRow+delayHtml+retryHtml+noteHtml+logHtml;
-    if(!sum && !n.note && !n.log && !delayHtml && !retryHtml && !hasTpl) el.classList.add("collapsed");
   }
   // Output ports are placed first; input ports mirror the output row of the
   // same index so a block's in/out wires start level. Switch builds its ports
@@ -527,18 +584,14 @@ function wfNodeEl(n){
   else if(n.type==="try_chain") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1)).concat(["fail"]);
   else if(n.type==="parallel"||n.type==="random_branch") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||(n.type==="parallel"?3:2))},(_,i)=>String(i+1));
   else outs=(def.outs||[]);
-  const isCollapsed = el.classList.contains("collapsed");
-  const nodeH = isTerminal ? 30 : isCollapsed ? 20 : (parseInt(el.style.minHeight,10)||60);
   // Primary port row — the single input and the first output share this y, so a
   // block's in/out sit on one straight horizontal line and chaining any block's
   // primary output into the next block's input stays perfectly level. For a full
   // block it's row 26 (the card's vertical centre, below the 20px header); a
-  // terminal centres in its 30px chip, a collapsed block in its 20px header.
+  // terminal centres in its 30px chip.
   // Extra ports (branch outputs true/false…, the loop's second "loop" input)
   // stack 16px below this row; the card grows when there are many outputs.
-  const rowTop = isTerminal ? Math.round(30/2-4.5)
-    : isCollapsed ? Math.round(20/2-4.5)
-    : 26;
+  const rowTop = isTerminal ? Math.round(30/2-4.5) : 26;
   const outTop = i => rowTop + (outs.length>1 ? i*16 : 0);
   // Single input → the shared primary row (level with the first output). The
   // loop's in/loop pair stacks from that row downward.

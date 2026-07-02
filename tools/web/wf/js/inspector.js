@@ -369,17 +369,11 @@ function wfTimingField(node){
 }
 function wfUpdNodeTiming(node){
   const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
-  const dp=[];
-  if(node.delayBefore) dp.push(`${wfIco("clock")}<span>Before ${node.delayBefore}s</span>`);
-  if(node.delayAfter)  dp.push(`${wfIco("timer")}<span>After ${node.delayAfter}s</span>`);
-  let n=el.querySelector(".wf-node-delay");
-  if(dp.length){
-    if(!n){ n=document.createElement("div"); n.className="wf-node-delay";
-      const prevrow=el.querySelector(".wf-node-prevrow"); const sum=el.querySelector(".wf-node-sum");
-      const anchor=prevrow||sum; if(anchor) anchor.after(n); else el.appendChild(n);
-      el.classList.remove("collapsed"); }
-    n.innerHTML=dp.join("");
-  } else if(n){ n.remove(); }
+  // The chips are absolutely positioned under the block, so placement in the
+  // DOM doesn't matter — just swap the whole badge row out.
+  const old=el.querySelector(".wf-node-delay"); if(old) old.remove();
+  const html=wfDelayChipsHtml(node);
+  if(html) el.insertAdjacentHTML("beforeend", html);
 }
 
 function wfRetryField(node){

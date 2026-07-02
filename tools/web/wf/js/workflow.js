@@ -180,8 +180,14 @@ let wfPreviewAll=false;   // global: show image thumbnail on every image block
 // Keyed by var name -> current value (stringified for display).
 let wfLiveVars={};
 let wfFreshVar=null;       // name of the most-recently-changed var (brief highlight)
-let wfVarsCollapsed=false;
-let wfActCollapsed=false;
+// Corner-panel collapse states persist locally so the canvas reopens as left.
+let wfVarsCollapsed=false, wfActCollapsed=false;
+try{ wfVarsCollapsed=localStorage.getItem("wfVarsCollapsed")==="1";
+     wfActCollapsed =localStorage.getItem("wfActCollapsed")==="1"; }catch{}
+function wfPersistPanelState(){
+  try{ localStorage.setItem("wfVarsCollapsed", wfVarsCollapsed?"1":"0");
+       localStorage.setItem("wfActCollapsed",  wfActCollapsed ?"1":"0"); }catch{}
+}
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
 function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined, inspW: insp?insp.offsetWidth:undefined}); }catch{} }
 function wfSyncToggleBtns(){
