@@ -23,7 +23,7 @@ window.addEventListener("keydown", e => {
   if(e.key==="Delete"||e.key==="Backspace"){ if(WF.sel.length){ e.preventDefault(); wfDeleteSelected(); return; } }
   if((e.key==="a"||e.key==="A") && (e.ctrlKey||e.metaKey)){ const g=wfGraph(); if(g){ e.preventDefault(); WF.sel=g.nodes.map(n=>n.id); WF.selectedNode=null; wfMarkSel(); wfRenderInspector(); return; } }
   if((e.key==="f"||e.key==="F") && !e.ctrlKey && !e.metaKey){ e.preventDefault(); wfFit(); return; }
-  if(e.key==="Escape"){ if(wfGroupMode) wfSetGroupMode(false); wfClearSel(); wfMarkSel(); wfRenderInspector(); }
+  if(e.key==="Escape"){ if(typeof wfRunning!=="undefined"&&wfRunning){ e.preventDefault(); wfToggleRun(); return; } if(wfGroupMode) wfSetGroupMode(false); wfClearSel(); wfMarkSel(); wfRenderInspector(); }
   if(e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown"){
     if(WF.sel.length){ e.preventDefault();
       const dx=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0;

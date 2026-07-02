@@ -9,6 +9,7 @@ function wfDeleteNodes(ids){
   const g=wfGraph(); if(!g) return;
   const del=ids.filter(id=>{ const n=g.nodes.find(x=>x.id===id); return n && n.type!=="start"; });
   if(!del.length) return;
+  if(!confirm(`Delete ${del.length} node(s)?`)) return;
   wfPushUndo();
   g.nodes=g.nodes.filter(n=>!del.includes(n.id));
   g.edges=g.edges.filter(e=>!del.includes(e.from)&&!del.includes(e.to));

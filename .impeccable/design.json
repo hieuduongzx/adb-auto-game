@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-02T08:35:00Z",
+  "title": "Design System: Workflow2k",
+  "extensions": {
+    "colorMeta": {
+      "ink-primary": { "role": "neutral", "displayName": "Ink", "canonical": "#19222e", "tonalRamp": ["#0a0e14", "#111926", "#19222e", "#2a3a4f", "#41505f", "#5a6573", "#7c8795", "#9aa3ae"] },
+      "ink-secondary": { "role": "neutral", "displayName": "Ink Secondary", "canonical": "#41505f", "tonalRamp": ["#1a2128", "#2a3542", "#41505f", "#5a6573", "#7c8795", "#9aa3ae", "#b3bbc4", "#d1d6dd"] },
+      "dim": { "role": "neutral", "displayName": "Dim", "canonical": "#5a6573", "tonalRamp": ["#2a3037", "#3d4752", "#5a6573", "#7c8795", "#9aa3ae", "#b3bbc4", "#d1d6dd", "#e4e7ec"] },
+      "muted": { "role": "neutral", "displayName": "Muted", "canonical": "#7c8795", "tonalRamp": ["#4a545e", "#6c7884", "#7c8795", "#94a1ad", "#b3bbc4", "#c5cdd6", "#d1d6dd", "#e4e7ec"] },
+      "bg": { "role": "neutral", "displayName": "Background", "canonical": "#eef0f3", "tonalRamp": ["#d1d6dd", "#dde2e8", "#e4e7ec", "#eef0f3", "#f1f3f6", "#f3f5f9", "#f7f9fc", "#fbfcfd"] },
+      "panel": { "role": "neutral", "displayName": "Panel", "canonical": "#ffffff", "tonalRamp": ["#e4e7ec", "#eef0f3", "#f3f5f9", "#f7f9fc", "#fbfcfd", "#ffffff", "#ffffff", "#ffffff"] },
+      "surface": { "role": "neutral", "displayName": "Surface", "canonical": "#f7f9fc", "tonalRamp": ["#dde2e8", "#e4e7ec", "#eef0f3", "#f1f3f6", "#f3f5f9", "#f7f9fc", "#fbfcfd", "#ffffff"] },
+      "alt": { "role": "neutral", "displayName": "Alt", "canonical": "#f3f5f9", "tonalRamp": ["#dde2e8", "#e4e7ec", "#eef0f3", "#f1f3f6", "#f3f5f9", "#f7f9fc", "#fbfcfd", "#ffffff"] },
+      "accent": { "role": "primary", "displayName": "Stable Blue", "canonical": "#2f6fed", "tonalRamp": ["#14327a", "#1c48b0", "#2559c7", "#2f6fed", "#4b86f2", "#6f9be8", "#9dbef2", "#d6e4f5"] },
+      "accent-bg": { "role": "primary", "displayName": "Accent Background", "canonical": "#eef5ff", "tonalRamp": ["#d6e4f5", "#e0ecfa", "#eef5ff", "#f4f8ff", "#f8faff", "#fbfdff", "#ffffff", "#ffffff"] },
+      "ok": { "role": "semantic", "displayName": "OK Green", "canonical": "#1f9254", "tonalRamp": ["#0d3d1f", "#145c30", "#1b8049", "#1f9254", "#2fa55a", "#4dbe75", "#7fd49e", "#cfead9"] },
+      "warn": { "role": "semantic", "displayName": "Warn Amber", "canonical": "#9c6c12", "tonalRamp": ["#3a2c05", "#5c4410", "#7d5b15", "#9c6c12", "#c08a1e", "#e0a64b", "#f4d97a", "#fdf6e9"] },
+      "err": { "role": "semantic", "displayName": "Error Red", "canonical": "#bb3a33", "tonalRamp": ["#4a1510", "#6e2018", "#8f2920", "#bb3a33", "#d6483f", "#e06d66", "#eea09c", "#fcefee"] },
+      "run-ok": { "role": "semantic", "displayName": "Run OK Green", "canonical": "#1f9d57", "tonalRamp": ["#0d3d1f", "#145c30", "#1b8049", "#1f9d57", "#2fa55a", "#4dbe75", "#7fd49e", "#cfead9"] },
+      "run-fail": { "role": "semantic", "displayName": "Run Fail Red", "canonical": "#d6483f", "tonalRamp": ["#4a1510", "#6e2018", "#8f2920", "#bb3a33", "#d6483f", "#e06d66", "#eea09c", "#fcefee"] },
+      "run-live": { "role": "semantic", "displayName": "Run Live Amber", "canonical": "#f97316", "tonalRamp": ["#5c2605", "#80340a", "#b3490e", "#e06712", "#f97316", "#fa8e3d", "#fbaf7a", "#fff7ed"] }
+    },
+    "typographyMeta": {
+      "body": { "displayName": "Body", "purpose": "Primary UI text. Canvas hints, inspector content, button labels." },
+      "label": { "displayName": "Label", "purpose": "Section headers, tray labels, group headers. Uppercase with tracking." },
+      "mono": { "displayName": "Mono", "purpose": "Input text, log lines, coordinates, variable values, JSON." },
+      "display": { "displayName": "Display", "purpose": "Workflow name in the toolbar." },
+      "title": { "displayName": "Title", "purpose": "Section headers, node titles, inspector identity." }
+    },
+    "shadows": [
+      { "name": "shadow-sm", "value": "0 1px 2px rgba(20,30,45,.06)", "purpose": "Cards, toolbar, sidebar containers. Ambient minimum separation." },
+      { "name": "shadow-md", "value": "0 2px 8px rgba(20,30,45,.08)", "purpose": "Nodes on canvas, dropdown menus, corner-stack panels. Structural lift." },
+      { "name": "shadow-lg", "value": "0 10px 30px rgba(20,30,45,.16)", "purpose": "Context menus, layout menus, variable picker popovers. Modal floating layer." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Default easing for state transitions (hover, focus, selection). Ease-out-quart." },
+      { "name": "transition-fast", "value": "150ms", "purpose": "Button hovers, border changes, quick micro-interactions." },
+      { "name": "transition-medium", "value": "200ms", "purpose": "Panel collapse/expand, tab switches, view transitions." },
+      { "name": "wf-pop", "value": "0.12s cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Menu/popover entrance: fade + translateY(4px→0)." },
+      { "name": "wf-run-pulse", "value": "1.1s ease-in-out infinite", "purpose": "Running node amber pulse. Box-shadow oscillation." },
+      { "name": "wf-act-blink", "value": "1s ease-in-out infinite", "purpose": "Activity row running indicator. Opacity 1→0.3→1." },
+      { "name": "wf-pulse-slow", "value": "1.4s ease-in-out infinite", "purpose": "Variables panel live indicator. Opacity 1→0.35→1." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main action button. Used for save, run, and commit actions. Stable Blue with white text.",
+      "html": "<button class=\"ds-btn-primary\">Save</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 30px; border-radius: 8px; font-weight: 600; font-size: 11.5px; border: 1px solid #2f6fed; background: #2f6fed; color: #fff; padding: 0 11px; cursor: pointer; font-family: \"IBM Plex Sans\", system-ui, sans-serif; transition: background .15s; } .ds-btn-primary:hover { background: #2559c7; } .ds-btn-primary:focus-visible { outline: 2px solid #2f6fed; outline-offset: 2px; } .ds-btn-primary:active { transform: scale(.97); }"
+    },
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Secondary actions, toolbar controls. Panel background with dim text and subtle border.",
+      "html": "<button class=\"ds-btn-default\">Cancel</button>",
+      "css": ".ds-btn-default { display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 30px; border-radius: 8px; font-weight: 600; font-size: 11.5px; border: 1px solid #e4e7ec; background: #fff; color: #5a6573; padding: 0 11px; cursor: pointer; font-family: \"IBM Plex Sans\", system-ui, sans-serif; transition: background .15s, color .15s, border-color .15s; } .ds-btn-default:hover { background: #f3f5f9; color: #19222e; border-color: #dde2e8; } .ds-btn-default:focus-visible { outline: 2px solid #2f6fed; outline-offset: 2px; }"
+    },
+    {
+      "name": "Success Button",
+      "kind": "button",
+      "refersTo": "button-success",
+      "description": "Run button, commit actions. Green fill with subtle green shadow for presence.",
+      "html": "<button class=\"ds-btn-success\">\n  <svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polygon points=\"5 3 19 12 5 21 5 3\"/></svg>\n  Run\n</button>",
+      "css": ".ds-btn-success { display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 30px; border-radius: 8px; font-weight: 700; font-size: 12px; border: 1px solid #1f9254; background: #1f9254; color: #fff; padding: 0 11px; cursor: pointer; font-family: \"IBM Plex Sans\", system-ui, sans-serif; box-shadow: 0 1px 2px rgba(31,146,84,.3); transition: background .15s; } .ds-btn-success:hover { background: #1b8049; } .ds-btn-success:focus-visible { outline: 2px solid #2f6fed; outline-offset: 2px; } .ds-btn-success svg { stroke: currentColor; fill: none; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Delete, clear, destructive actions. Red tint background with red text.",
+      "html": "<button class=\"ds-btn-danger\">Delete</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 30px; border-radius: 8px; font-weight: 600; font-size: 11.5px; border: 1px solid #eecdca; background: #fcefee; color: #bb3a33; padding: 0 11px; cursor: pointer; font-family: \"IBM Plex Sans\", system-ui, sans-serif; transition: background .15s; } .ds-btn-danger:hover { background: #fae2e0; } .ds-btn-danger:focus-visible { outline: 2px solid #2f6fed; outline-offset: 2px; }"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "button-icon",
+      "description": "Square toolbar button with icon only. Label lives in the title attribute.",
+      "html": "<button class=\"ds-btn-icon\" title=\"Save\">\n  <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z\"/><polyline points=\"17 21 17 13 7 13 7 21\"/><polyline points=\"7 3 7 8 15 8\"/></svg>\n</button>",
+      "css": ".ds-btn-icon { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 8px; border: 1px solid #e4e7ec; background: #fff; color: #5a6573; cursor: pointer; padding: 0; transition: background .15s, color .15s, border-color .15s; } .ds-btn-icon:hover { background: #f3f5f9; color: #19222e; border-color: #dde2e8; } .ds-btn-icon:focus-visible { outline: 2px solid #2f6fed; outline-offset: 2px; } .ds-btn-icon svg { width: 16px; height: 16px; display: block; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard text/number input. Mono font, panel background, subtle border.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search nodes…\">",
+      "css": ".ds-input { font-family: \"IBM Plex Mono\", \"Cascadia Code\", Consolas, monospace; font-size: 11.5px; background: #fff; color: #19222e; border: 1px solid #dde2e8; border-radius: 7px; padding: 5px 8px; width: 200px; } .ds-input::placeholder { color: #9aa3ae; } .ds-input:focus { outline: none; border-color: #2f6fed; box-shadow: 0 0 0 3px #d6e4f5; }"
+    },
+    {
+      "name": "Card Container",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The primary container surface. White panel with subtle shadow and border.",
+      "html": "<div class=\"ds-card\">\n  <div class=\"ds-card-header\">Section Title</div>\n  <div class=\"ds-card-body\">Content goes here.</div>\n</div>",
+      "css": ".ds-card { background: #fff; border: 1px solid #e4e7ec; border-radius: 10px; box-shadow: 0 1px 2px rgba(20,30,45,.06); overflow: hidden; } .ds-card-header { padding: 12px; border-bottom: 1px solid #f1f3f6; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; color: #5a6573; text-transform: uppercase; font-family: \"IBM Plex Sans\", system-ui, sans-serif; } .ds-card-body { padding: 12px; font-family: \"IBM Plex Sans\", system-ui, sans-serif; font-size: 13px; color: #19222e; }"
+    },
+    {
+      "name": "Context Menu",
+      "kind": "custom",
+      "refersTo": "context-menu",
+      "description": "Right-click context menu. Floating panel with strong shadow.",
+      "html": "<div class=\"ds-ctxmenu\">\n  <button class=\"ds-ctx-item\">\n    <span class=\"ds-ctx-ico\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><line x1=\"3\" y1=\"9\" x2=\"21\" y2=\"9\"/><line x1=\"3\" y1=\"15\" x2=\"21\" y2=\"15\"/></svg></span>\n    Create Group\n  </button>\n  <button class=\"ds-ctx-item\">\n    <span class=\"ds-ctx-ico\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"9\" width=\"13\" height=\"13\" rx=\"2\"/><path d=\"M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1\"/></svg></span>\n    Copy\n  </button>\n  <button class=\"ds-ctx-item\">\n    <span class=\"ds-ctx-ico\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"3 6 5 6 21 6\"/><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/></svg></span>\n    Delete\n  </button>\n</div>",
+      "css": ".ds-ctxmenu { position: fixed; z-index: 50; min-width: 140px; background: #fff; border: 1px solid #dde2e8; border-radius: 8px; box-shadow: 0 10px 30px rgba(20,30,45,.16); padding: 4px; font-family: \"IBM Plex Sans\", system-ui, sans-serif; } .ds-ctx-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; font-size: 12px; color: #19222e; border-radius: 5px; cursor: pointer; white-space: nowrap; border: none; background: none; font-family: inherit; text-align: left; } .ds-ctx-item:hover { background: #eef5ff; color: #2f6fed; } .ds-ctx-ico { display: flex; align-items: center; color: #9aa3ae; } .ds-ctx-item:hover .ds-ctx-ico { color: #2f6fed; } .ds-ctx-ico svg { width: 14px; height: 14px; display: block; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }"
+    },
+    {
+      "name": "Chip / Draggable Node Palette Item",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "A draggable node from the palette. Grab handle with category-colored icon.",
+      "html": "<div class=\"ds-chip\">\n  <span class=\"ds-chip-ico\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"1\"/><path d=\"M20.2 20.2A10 10 0 1 0 3.8 3.8a10 10 0 0 0 16.4 16.4z\"/><line x1=\"12\" y1=\"8\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"16\" x2=\"12.01\" y2=\"16\"/></svg></span>\n  Tap\n</div>",
+      "css": ".ds-chip { display: flex; align-items: center; gap: 6px; padding: 7px 8px; border: 1px solid #dde2e8; border-radius: 7px; background: #fff; cursor: grab; font-size: 12.5px; font-weight: 600; color: #41505f; transition: border-color .1s, background .1s, box-shadow .1s; user-select: none; font-family: \"IBM Plex Sans\", system-ui, sans-serif; } .ds-chip:hover { border-color: #2f6fed; background: #eef5ff; box-shadow: 0 1px 3px rgba(47,111,237,.1); } .ds-chip:active { cursor: grabbing; } .ds-chip-ico { display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; color: #6f9be8; } .ds-chip-ico svg { width: 14px; height: 14px; display: block; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }"
+    },
+    {
+      "name": "Log Entry",
+      "kind": "custom",
+      "refersTo": "log-line",
+      "description": "A single log line in the collapsible log panel. Timestamp + tag + message.",
+      "html": "<div class=\"ds-log-line\">\n  <span class=\"ds-log-ts\">14:32:01</span>\n  <span class=\"ds-log-tag ds-log-info\">INF</span>\n  <span class=\"ds-log-msg\">Workflow started: My Workflow</span>\n</div>\n<div class=\"ds-log-line\">\n  <span class=\"ds-log-ts\">14:32:03</span>\n  <span class=\"ds-log-tag ds-log-success\">OK </span>\n  <span class=\"ds-log-msg\">Tap completed</span>\n</div>\n<div class=\"ds-log-line\">\n  <span class=\"ds-log-ts\">14:32:05</span>\n  <span class=\"ds-log-tag ds-log-error\">ERR</span>\n  <span class=\"ds-log-msg\">Template match failed: threshold too low</span>\n</div>",
+      "css": ".ds-log-line { display: flex; gap: 7px; font-family: \"IBM Plex Mono\", \"Cascadia Code\", Consolas, monospace; font-size: 10.5px; line-height: 1.75; white-space: nowrap; } .ds-log-ts { color: #b3bbc4; flex-shrink: 0; } .ds-log-tag { font-weight: 700; flex-shrink: 0; } .ds-log-msg { color: #41505f; white-space: normal; } .ds-log-info { color: #5b86c9; } .ds-log-success { color: #1f9d57; } .ds-log-error { color: #d6483f; } .ds-log-warning { color: #c08a1e; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Calibrated Instrument",
+    "overview": "Workflow2k is a precision tool. Every visual element exists to serve the user's task — composing, debugging, and executing Android automation workflows. The design system treats the interface like a calibrated instrument: surfaces are clean and cool, accents are deliberate and restrained, and nothing decorative competes with the graph.\n\nThe palette is cool-neutral with a single stable blue accent. IBM Plex Sans carries the UI; IBM Plex Mono holds code, coordinates, and data. Components are tactile and confident — buttons feel like they commit action, nodes feel like they're part of a live circuit. The graph canvas is the center; everything else recedes until needed.\n\nThis system explicitly rejects the design-tool aesthetic: no pastels, no glassmorphism, no soft-focus blur. It's not a dashboard, not a consumer app, and not a terminal-first tool. It's a developer's instrument — precise, efficient, and capable.",
+    "keyCharacteristics": [
+      "Cool-neutral light palette with a single blue accent",
+      "IBM Plex Sans for UI, IBM Plex Mono for code and data",
+      "Tactile buttons and confident cards — nothing feels tentative",
+      "The graph is the center; chrome recedes until needed",
+      "Semantic color roles for run state (green trail, red failure, amber live)",
+      "No decoration without function"
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "The Stable Blue is used on ≤10% of any given screen. Its rarity is the point — it draws the eye to the one thing that matters: the current action, the selected node, the focus ring. When everything is blue, nothing is.", "section": "colors" },
+      { "name": "The Cool-Neutral Floor Rule", "body": "The background is always cool-grey (#eef0f3), never warm (cream/sand/beige/parchment). Warmth is carried by the amber/orange semantic colors (run-live, warn, branch-false), not by the structural palette.", "section": "colors" },
+      { "name": "The Semantic-Only Color Rule", "body": "Ok green, warn amber, and error red appear only when they carry meaning (save succeeded, validation warning, action failed). They are never used as decorative flourishes. A button is green only when it commits; it's red only when it destroys.", "section": "colors" },
+      { "name": "The One Family Rule", "body": "IBM Plex Sans and IBM Plex Mono. No third family. The proportional/monospace contrast is sufficient; adding a serif or display face dilutes the tool's precision.", "section": "typography" },
+      { "name": "The No-Eyebrow Rule", "body": "The uppercase label style is used only when the text actually labels a control or section. It never appears as a decorative kicker above content that doesn't need labeling.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest. Shadows appear only as a response to structure (cards need separation from bg, nodes need lift from canvas) or state (a context menu is floating). No decorative shadow.", "section": "elevation" },
+      { "name": "The Z-Index Scale Rule", "body": "No arbitrary z-index values. The scale is: node (2), selection box (1), node hover (6), menu (50), toast (60). Every z-index in the CSS maps to one of these semantic layers.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use the Stable Blue accent sparingly — it should appear on ≤10% of any screen. Primary buttons, selected states, focus rings only.",
+      "Do use semantic colors (ok green, warn amber, err red) only when they carry meaning — never as decoration.",
+      "Do keep the graph canvas as the visual center. The toolbar, sidebar, and inspector are chrome — they recede until needed.",
+      "Do use the uppercase label style only when the text actually labels a control or section. Never as a decorative kicker.",
+      "Do maintain 4.5:1 contrast for all body text against its background.",
+      "Do use the shadow scale by role: sm for cards, md for nodes/menus, lg for floating panels.",
+      "Do keep the background cool-grey (#eef0f3). Warmth comes from semantic amber/orange.",
+      "Do use IBM Plex Sans for UI, IBM Plex Mono for code/data. No third family."
+    ],
+    "donts": [
+      "Don't use the design-tool aesthetic: no pastels, no glassmorphism, no soft-focus blur, no frosted glass.",
+      "Don't make the interface dark-by-default or dashboard-like. No wall-of-metrics, no chart-heavy panels.",
+      "Don't add playful or consumer-app elements: no illustrations, no gamification, no whimsy.",
+      "Don't use border-left or border-right greater than 1px as a colored accent stripe.",
+      "Don't use gradient text (background-clip: text). Use a single solid color.",
+      "Don't use arbitrary z-index values. Map to the semantic scale.",
+      "Don't warm-tint the background. No cream, sand, beige, parchment, or ivory.",
+      "Don't animate without a reduced-motion fallback.",
+      "Don't introduce a second accent color. The Stable Blue is the only accent."
+    ]
+  }
+}

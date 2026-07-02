@@ -121,7 +121,7 @@
         <button class="btn sm ico ok" id="wf-speed-run-btn" onclick="wfSpeedRun()" title="Enable speed hack" style="display:none"></button>
       </div>
       <span class="spacer"></span>
-      <span class="wf-hint" title="Mouse wheel = zoom · Drag = move blocks · Right-click = menu (create group/copy/delete) or delete wire (on a wire) · Space or middle mouse = pan canvas">Wheel = zoom · Drag = move · Right-click = menu · Space = pan</span>
+      <span class="wf-hint" title="Mouse wheel = zoom · Drag = move blocks · Right-click = menu (create group/copy/delete) or delete wire (on a wire) · Space or middle mouse = pan canvas · Tab = toggle Edit/Preview">Wheel = zoom · Drag = move · Right-click = menu · Space = pan · Tab = Edit↔Preview</span>
       <!-- View controls grouped at the right: zoom tray + Canvas/Preview tabs. -->
       <span class="wf-zoom wf-tool-tray">
         <button class="btn sm ico" title="Zoom out">
@@ -133,8 +133,8 @@
       </span>
       <span class="tb-divider"></span>
       <div id="wf-view-tabs" class="wf-view-tabs">
-        <button class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Canvas (Tab)">Canvas</button>
-        <button class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview (Tab)">Preview</button>
+        <button class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Edit mode — design the workflow graph (Tab)">Edit</button>
+        <button class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview mode — live device mirror + scope tools (Tab)">Preview</button>
       </div>
     </div>
     <div id="wf-canvas">

@@ -473,7 +473,17 @@ function wfNodeEl(n){
   const isTpls = tplField && tplField.t==="tpls";
   const hasTpl = !!tplField;
   const showThumb = hasTpl && (wfPreviewAll || n.showPreview);
-  const eyeBtn = hasTpl ? `<button class="wf-node-eye${n.showPreview?" on":""}" title="Preview image (this block)">${wfIco("eye")}</button>` : "";
+  const eyeBtn = ""; // eye moved to hover action bar
+  // Action bar above the node (hover-only): delete, toggle preview, copy.
+  const delSvg = '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+  const copySvg = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  const actEyeSvg = '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const actBar = `<div class="wf-node-actions">
+    <button class="wf-act-del" title="Delete">${delSvg}</button>
+    <span class="wf-node-act-spacer"></span>
+    ${hasTpl ? `<button class="wf-act-eye${n.showPreview?" on":""}" title="Toggle preview">${actEyeSvg}</button>` : ""}
+    <button class="wf-act-copy" title="Copy">${copySvg}</button>
+  </div>`;
   const noteHtml = n.note ? `<div class="wf-node-note">${wfIco("edit")}<span>${escHtml(n.note)}</span></div>` : "";
   const logHtml = n.log ? `<div class="wf-node-log">${escHtml(n.log)}</div>` : "";
   const dp=[];
@@ -502,6 +512,7 @@ function wfNodeEl(n){
     el.innerHTML = `<span class="wf-node-tri"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none">${termIco}</svg></span><span class="wf-node-tri-lbl">${escHtml(def.label)}</span>`;
   } else {
     el.innerHTML=
+      actBar+
       `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span>${eyeBtn}<span class="wf-node-title">${escHtml(title)}</span></div>`+
       topRow+delayHtml+retryHtml+noteHtml+logHtml;
     if(!sum && !n.note && !n.log && !delayHtml && !retryHtml && !hasTpl) el.classList.add("collapsed");
@@ -608,7 +619,13 @@ function wfNodeEl(n){
     });
   }
   const eye=el.querySelector(".wf-node-eye");
-  if(eye){ eye.addEventListener("mousedown",e=>e.stopPropagation()); eye.addEventListener("click",e=>{ e.stopPropagation(); wfPushUndoDebounced(); n.showPreview=!n.showPreview; wfRenderCanvas(); }); }
+  // Action bar buttons (hover toolbar above node)
+  const actDel=el.querySelector(".wf-act-del");
+  if(actDel){ actDel.addEventListener("mousedown",e=>e.stopPropagation()); actDel.addEventListener("click",e=>{ e.stopPropagation(); wfDeleteNode(n.id); }); }
+  const actEye=el.querySelector(".wf-act-eye");
+  if(actEye){ actEye.addEventListener("mousedown",e=>e.stopPropagation()); actEye.addEventListener("click",e=>{ e.stopPropagation(); wfPushUndoDebounced(); n.showPreview=!n.showPreview; wfRenderCanvas(); }); }
+  const actCopy=el.querySelector(".wf-act-copy");
+  if(actCopy){ actCopy.addEventListener("mousedown",e=>e.stopPropagation()); actCopy.addEventListener("click",e=>{ e.stopPropagation(); wfSelectOne(n.id); wfMarkSel(); wfCopy(); wfPaste({clientX:event.clientX+20,clientY:event.clientY+20}); }); }
   el.querySelectorAll(".wf-port.out").forEach(p=>p.addEventListener("mousedown",e=>wfStartConnect(e,n.id,p.dataset.port)));
   // Connection completion is handled globally (drop anywhere on a node = connect).
   return el;

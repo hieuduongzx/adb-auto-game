@@ -18,7 +18,7 @@ function wfPortPt(nodeId,port){
 const WF_WIRE_DEFS = (function(){
   const cs=getComputedStyle(document.documentElement);
   const v=(name,fallback)=>(cs.getPropertyValue(name)||fallback).trim();
-  const mk=(id,c)=>`<marker id="${id}" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L7,3.5 L0,7 Z" fill="${c}"/></marker>`;
+  const mk=(id,c)=>`<marker id="${id}" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L6,3 L0,6 Z" fill="${c}"/></marker>`;
   return "<defs>"+
     mk("wf-ah","#94a6ba")+
     mk("wf-ah-t",v("--branch-t","#1f9d57"))+
@@ -197,6 +197,7 @@ function wfDrawWires(){
 
 function wfDeleteWire(ed){
   const g=wfGraph(); if(!g||!ed) return;
+  if(!confirm("Remove this wire?")) return;
   wfPushUndo();
   const i=g.edges.indexOf(ed); if(i>=0) g.edges.splice(i,1);
   wfRenderCanvas();

@@ -42,7 +42,7 @@ function wfAddGroup(x,y,w,h){
   groups.push(gr); wfRenderCanvas(); setStatus(`Created "${gr.name}" — drag the title to move the whole group`);
   return gr;
 }
-function wfDeleteGroup(id){ wfPushUndo(); const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); } }
+function wfDeleteGroup(id){ if(!confirm("Delete this group? Nodes inside will not be removed.")) return; wfPushUndo(); const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); } }
 function wfRenameGroup(gr){ wfPushUndo(); const nm=prompt("Group name:", gr.name||""); if(nm!==null){ gr.name=(nm.trim()||gr.name); wfRenderCanvas(); } }
 // Create a group hugging the current multi-selection (toolbar button shortcut).
 function wfGroupSelection(){
