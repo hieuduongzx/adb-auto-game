@@ -5,48 +5,10 @@
   "speedhack": {
     "enabled": true,
     "speed": 2,
-    "package": "App: com.wemadeconnect.aos.lostdgl"
+    "package": "com.y2sgames.girlwarsbignewen"
   },
   "globals": [],
   "functions": [
-    {
-      "id": "fn_hh4kj",
-      "name": "TapToContinue",
-      "graph": {
-        "nodes": [
-          {
-            "id": "n3opahqa",
-            "type": "start",
-            "x": 60,
-            "y": 60,
-            "params": {}
-          },
-          {
-            "id": "ntzq6qn0",
-            "type": "tap_image",
-            "x": 240,
-            "y": 60,
-            "params": {
-              "template": "templates/crop_20260628_232825_249x36_3.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 30,
-              "offsetX": 0,
-              "offsetY": 0
-            },
-            "delayBefore": 3
-          }
-        ],
-        "edges": [
-          {
-            "from": "n3opahqa",
-            "fromPort": "out",
-            "to": "ntzq6qn0"
-          }
-        ],
-        "groups": []
-      }
-    },
     {
       "id": "fn_uft8v",
       "name": "HandleBattle",
@@ -65,7 +27,7 @@
             "x": 280,
             "y": 80,
             "params": {
-              "template": "templates/crop_20260628_223206_255x45.png",
+              "template": "templates/crop_20260702_234952_717_819_484_24.png",
               "threshold": 0.85,
               "timeout": 10
             }
@@ -77,9 +39,10 @@
             "y": 80,
             "params": {
               "target": "pos",
-              "x": 958,
-              "y": 447
-            }
+              "x": 972,
+              "y": 509
+            },
+            "delayBefore": 2
           },
           {
             "id": "nvh9jw7w",
@@ -280,6 +243,44 @@
             "from": "nxmlsilx",
             "fromPort": "true",
             "to": "nhpbc8nw"
+          }
+        ],
+        "groups": []
+      }
+    },
+    {
+      "id": "fn_hh4kj",
+      "name": "TapToContinue",
+      "graph": {
+        "nodes": [
+          {
+            "id": "n3opahqa",
+            "type": "start",
+            "x": 60,
+            "y": 60,
+            "params": {}
+          },
+          {
+            "id": "ntzq6qn0",
+            "type": "tap_image",
+            "x": 240,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260628_232825_249x36_3.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 30,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 3
+          }
+        ],
+        "edges": [
+          {
+            "from": "n3opahqa",
+            "fromPort": "out",
+            "to": "ntzq6qn0"
           }
         ],
         "groups": []
@@ -811,7 +812,7 @@
       "id": "sequence_hhiq",
       "name": "Dungeon",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [
         {
           "name": "fixMissingStar",
@@ -3084,7 +3085,7 @@
             "id": "n7xw0wxg",
             "type": "tap_image",
             "x": 860,
-            "y": -40,
+            "y": -24,
             "params": {
               "template": "templates/crop_20260629_004140_107x38.png",
               "taps": "1",
@@ -3098,7 +3099,7 @@
             "id": "n773m0dp",
             "type": "tap_image",
             "x": 1040,
-            "y": -60,
+            "y": -24,
             "params": {
               "template": "templates/crop_20260628_232825_249x36_2.png",
               "taps": "1",
@@ -3113,7 +3114,7 @@
             "id": "n6qcdml0",
             "type": "tap_image",
             "x": 1220,
-            "y": -60,
+            "y": -40,
             "params": {
               "template": "templates/crop_20260629_004322_41x53.png",
               "taps": "1",
@@ -3171,12 +3172,35 @@
           {
             "id": "nqx1mmhh",
             "type": "if_var",
-            "x": 680,
-            "y": -40,
+            "x": 660,
+            "y": 47,
             "params": {
               "name": "raid.5x",
               "op": "==",
               "value": "true"
+            }
+          },
+          {
+            "id": "n1s91ywo",
+            "type": "tap_image",
+            "x": 860,
+            "y": 100,
+            "params": {
+              "template": "templates/crop_20260702_234837_153_839_158_37.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n6ei3q8u",
+            "type": "call",
+            "x": 1040,
+            "y": 100,
+            "params": {
+              "fn": "fn_uft8v"
             }
           }
         ],
@@ -3217,11 +3241,6 @@
             "to": "n1si36gb"
           },
           {
-            "from": "nyevc8bu",
-            "fromPort": "out",
-            "to": "n5nl9kv0"
-          },
-          {
             "from": "nupweqg5",
             "fromPort": "true",
             "to": "nqx1mmhh"
@@ -3230,6 +3249,21 @@
             "from": "nqx1mmhh",
             "fromPort": "true",
             "to": "n7xw0wxg"
+          },
+          {
+            "from": "nqx1mmhh",
+            "fromPort": "false",
+            "to": "n1s91ywo"
+          },
+          {
+            "from": "n1s91ywo",
+            "fromPort": "true",
+            "to": "n6ei3q8u"
+          },
+          {
+            "from": "nyevc8bu",
+            "fromPort": "out",
+            "to": "nqx1mmhh"
           }
         ],
         "groups": []
@@ -3449,7 +3483,7 @@
             "id": "na9kx2au",
             "type": "if_image",
             "x": 1502,
-            "y": -905,
+            "y": -912,
             "params": {
               "template": "templates/crop_20260629_005543_127x40.png",
               "threshold": 0.85,
@@ -3996,22 +4030,22 @@
       "id": "sequence_u92u",
       "name": "Hoạt động 8",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
           {
             "id": "n420suy6",
             "type": "start",
-            "x": 1040,
-            "y": 160,
+            "x": 200,
+            "y": -5,
             "params": {}
           },
           {
             "id": "nahenqtc",
             "type": "tap_image",
             "x": 460,
-            "y": 140,
+            "y": 40,
             "params": {
               "template": "templates/crop_20260628_222549_80x76_1.png",
               "taps": "1",
@@ -4024,8 +4058,8 @@
           {
             "id": "n89lt37l",
             "type": "call",
-            "x": 440,
-            "y": 80,
+            "x": 280,
+            "y": 40,
             "params": {
               "fn": "fn_yt9m6"
             }
@@ -4034,7 +4068,7 @@
             "id": "nrscb95y",
             "type": "if_image",
             "x": 280,
-            "y": -4,
+            "y": -20,
             "params": {
               "template": "templates/crop_20260628_232249_198x35.png",
               "threshold": 0.85,
@@ -4044,20 +4078,20 @@
           {
             "id": "nxxuezj3",
             "type": "swipe_dir",
-            "x": 660,
-            "y": 80,
+            "x": 680,
+            "y": -20,
             "params": {
               "direction": "left",
               "distance": 1000,
               "duration": 300
             },
-            "stack": "st4sw6wm"
+            "delayAfter": 2
           },
           {
             "id": "n3mq1h2h",
             "type": "tap_image",
-            "x": 840,
-            "y": 80,
+            "x": 860,
+            "y": -20,
             "params": {
               "template": "templates/crop_20260629_012246_99x143.png",
               "taps": "1",
@@ -4068,34 +4102,10 @@
             }
           },
           {
-            "id": "nyum92nr",
-            "type": "wait",
-            "x": 660,
-            "y": 124,
-            "params": {
-              "seconds": 2
-            },
-            "stack": "st4sw6wm"
-          },
-          {
-            "id": "nwpkky3j",
-            "type": "tap_image",
-            "x": 1480,
-            "y": -20,
-            "params": {
-              "template": "templates/crop_20260629_014506_118x14.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 5,
-              "offsetX": 0,
-              "offsetY": -50
-            }
-          },
-          {
             "id": "ntpxsbsj",
             "type": "tap_image",
-            "x": 1660,
-            "y": -20,
+            "x": 1640,
+            "y": -100,
             "params": {
               "template": "templates/crop_20260629_012442_195x42.png",
               "taps": "1",
@@ -4109,7 +4119,7 @@
             "id": "ndwk584o",
             "type": "call",
             "x": 1840,
-            "y": -20,
+            "y": -100,
             "params": {
               "fn": "fn_uft8v"
             }
@@ -4117,8 +4127,8 @@
           {
             "id": "nv1pyqkz",
             "type": "tap_image",
-            "x": 2020,
-            "y": -20,
+            "x": 2040,
+            "y": -100,
             "params": {
               "template": "templates/crop_20260628_232825_249x36_3.png",
               "taps": "1",
@@ -4132,22 +4142,22 @@
           {
             "id": "nv9eep4j",
             "type": "tap_image",
-            "x": 2200,
-            "y": -20,
+            "x": 2780,
+            "y": -100,
             "params": {
               "template": "templates/crop_20260628_232825_249x36_3.png",
               "taps": "1",
               "threshold": 0.85,
-              "timeout": 15,
+              "timeout": 5,
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 5
+            "delayBefore": 1
           },
           {
             "id": "ndya77j8",
             "type": "loop",
-            "x": 1280,
+            "x": 1080,
             "y": -20,
             "params": {
               "count": 3,
@@ -4155,10 +4165,57 @@
             }
           },
           {
-            "id": "nb6t3077",
+            "id": "n2ofa9lc",
+            "type": "if_image",
+            "x": 2220,
+            "y": -100,
+            "params": {
+              "template": "templates/crop_20260702_235846_105_155_491_17.png",
+              "threshold": 0.85,
+              "negate": false
+            },
+            "delayBefore": 2
+          },
+          {
+            "id": "nau6yy5r",
             "type": "tap",
-            "x": 1660,
-            "y": 140,
+            "x": 2400,
+            "y": -100,
+            "params": {
+              "target": "pos",
+              "x": 942,
+              "y": 478
+            }
+          },
+          {
+            "id": "nwhllyv4",
+            "type": "tap_image",
+            "x": 2580,
+            "y": -100,
+            "params": {
+              "template": "templates/crop_20260702_235942_917_880_122_28.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 15,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n7vhg7qq",
+            "type": "loop",
+            "x": 1460,
+            "y": 56,
+            "params": {
+              "infinite": false,
+              "count": 10
+            }
+          },
+          {
+            "id": "n9wcc0ag",
+            "type": "tap",
+            "x": 1440,
+            "y": -100,
             "params": {
               "target": "found",
               "x": 0,
@@ -4166,20 +4223,83 @@
             }
           },
           {
-            "id": "nvtfq1eb",
-            "type": "if_image_any",
-            "x": 1480,
-            "y": 140,
+            "id": "ni3wq7ms",
+            "type": "tap_image_any",
+            "x": 1640,
+            "y": 56,
             "params": {
               "templates": [
-                "templates/crop_20260629_013558_172x111.png",
-                "templates/crop_20260629_013923_144x79.png",
-                "templates/crop_20260629_013928_145x66.png",
-                "templates/crop_20260629_013930_122x53.png",
-                "templates/crop_20260629_014053_106x27.png"
+                "templates/crop_20260703_003535_592_494_182_134.png",
+                "templates/crop_20260703_003634_806_369_165_110.png",
+                "templates/crop_20260703_003641_1009_506_170_119.png",
+                "templates/crop_20260703_003914_1004_383_152_90.png",
+                "templates/crop_20260703_003916_1173_276_148_75.png",
+                "templates/crop_20260703_003922_1401_391_113_71.png",
+                "templates/crop_20260703_004024_179_660_126_71.png",
+                "templates/crop_20260703_004026_458_391_108_70.png",
+                "templates/crop_20260703_004028_855_281_103_38.png",
+                "templates/crop_20260703_004106_179_658_125_106.png",
+                "templates/crop_20260703_004109_1526_281_111_50.png",
+                "templates/crop_20260703_004110_1574_377_92_76.png"
               ],
-              "threshold": 0.75,
-              "negate": false
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "mode": "parallel",
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n5wo71gw",
+            "type": "if_image_any",
+            "x": 1260,
+            "y": -100,
+            "params": {
+              "templates": [
+                "templates/crop_20260703_002315_1420_385_24_37.png",
+                "templates/crop_20260703_001310_1420_382_16_24.png",
+                "templates/crop_20260703_003353_863_378_27_36.png",
+                "templates/crop_20260703_004233_1292_677_18_20.png"
+              ],
+              "threshold": 0.85,
+              "negate": false,
+              "mode": "sequential"
+            }
+          },
+          {
+            "id": "nlm3lb7i",
+            "type": "try_chain",
+            "x": 1840,
+            "y": 140,
+            "params": {}
+          },
+          {
+            "id": "npbo4by7",
+            "type": "tap_image",
+            "x": 2040,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260703_004524_840_542_50_48.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 3,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n0gona2i",
+            "type": "tap_image",
+            "x": 2040,
+            "y": 156,
+            "params": {
+              "template": "templates/crop_20260703_004621_1068_523_21_50.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 3,
+              "offsetX": 0,
+              "offsetY": 0
             }
           }
         ],
@@ -4195,16 +4315,6 @@
             "to": "n89lt37l"
           },
           {
-            "from": "nyum92nr",
-            "fromPort": "out",
-            "to": "n3mq1h2h"
-          },
-          {
-            "from": "nxxuezj3",
-            "fromPort": "out",
-            "to": "nyum92nr"
-          },
-          {
             "from": "nrscb95y",
             "fromPort": "true",
             "to": "nxxuezj3"
@@ -4213,11 +4323,6 @@
             "from": "nahenqtc",
             "fromPort": "true",
             "to": "nxxuezj3"
-          },
-          {
-            "from": "nwpkky3j",
-            "fromPort": "true",
-            "to": "ntpxsbsj"
           },
           {
             "from": "ntpxsbsj",
@@ -4230,7 +4335,38 @@
             "to": "nv1pyqkz"
           },
           {
+            "from": "nv9eep4j",
+            "fromPort": "true",
+            "to": "ndya77j8",
+            "toPort": "loop"
+          },
+          {
+            "from": "nxxuezj3",
+            "fromPort": "out",
+            "to": "n3mq1h2h"
+          },
+          {
+            "from": "n3mq1h2h",
+            "fromPort": "true",
+            "to": "ndya77j8"
+          },
+          {
             "from": "nv1pyqkz",
+            "fromPort": "true",
+            "to": "n2ofa9lc"
+          },
+          {
+            "from": "n2ofa9lc",
+            "fromPort": "true",
+            "to": "nau6yy5r"
+          },
+          {
+            "from": "nau6yy5r",
+            "fromPort": "out",
+            "to": "nwhllyv4"
+          },
+          {
+            "from": "nwhllyv4",
             "fromPort": "true",
             "to": "nv9eep4j"
           },
@@ -4240,31 +4376,65 @@
             "to": "ndya77j8"
           },
           {
-            "from": "nvtfq1eb",
+            "from": "n9wcc0ag",
+            "fromPort": "out",
+            "to": "ntpxsbsj"
+          },
+          {
+            "from": "n7vhg7qq",
+            "fromPort": "body",
+            "to": "ni3wq7ms"
+          },
+          {
+            "from": "n5wo71gw",
+            "fromPort": "false",
+            "to": "n7vhg7qq"
+          },
+          {
+            "from": "n5wo71gw",
             "fromPort": "true",
-            "to": "nb6t3077"
+            "to": "n9wcc0ag"
           },
           {
             "from": "ndya77j8",
             "fromPort": "body",
-            "to": "nwpkky3j"
+            "to": "n5wo71gw"
           },
           {
-            "from": "nwpkky3j",
+            "from": "nv1pyqkz",
             "fromPort": "false",
-            "to": "nvtfq1eb"
+            "to": "n7vhg7qq"
           },
           {
-            "from": "nb6t3077",
-            "fromPort": "out",
-            "to": "ndya77j8",
-            "toPort": "loop"
-          },
-          {
-            "from": "nv9eep4j",
+            "from": "ni3wq7ms",
             "fromPort": "true",
-            "to": "ndya77j8",
+            "to": "n7vhg7qq",
             "toPort": "loop"
+          },
+          {
+            "from": "nlm3lb7i",
+            "fromPort": "1",
+            "to": "npbo4by7"
+          },
+          {
+            "from": "ni3wq7ms",
+            "fromPort": "false",
+            "to": "nlm3lb7i"
+          },
+          {
+            "from": "nlm3lb7i",
+            "fromPort": "2",
+            "to": "n0gona2i"
+          },
+          {
+            "from": "npbo4by7",
+            "fromPort": "false",
+            "to": "n0gona2i"
+          },
+          {
+            "from": "npbo4by7",
+            "fromPort": "true",
+            "to": "n0gona2i"
           }
         ],
         "groups": []

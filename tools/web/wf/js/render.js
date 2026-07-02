@@ -472,6 +472,7 @@ function wfNodeWarnings(n, def, g){
   for(const f of (def.fields||[])){
     if(f.t==="tpl" && !String(n.params[f.k]||"").trim()) w.push("No template image selected");
     if(f.t==="tpls"){ const a=n.params[f.k]; if(!Array.isArray(a)||!a.filter(x=>String(x||"").trim()).length) w.push("No images in the list"); }
+    if(f.t==="color" && !/^#[0-9a-fA-F]{6}$/.test(String(n.params[f.k]||""))) w.push("Invalid color — need #RRGGBB");
   }
   if(n.type==="switch"){
     const cs=(n.params&&n.params.cases)||[];
@@ -489,6 +490,15 @@ function wfNodeWarnings(n, def, g){
     w.push("No incoming wire — this block will never run");
   return w;
 }
+// Swatch dot for the node summary of color nodes (t:"color" field) — shows the
+// picked colour itself, so the block reads at a glance without parsing hex.
+function wfColorDotHtml(n,def){
+  const cf=(def.fields||[]).find(f=>f.t==="color");
+  if(!cf) return "";
+  const v=String((n.params||{})[cf.k]||"");
+  return /^#[0-9a-fA-F]{6}$/.test(v) ? `<span class="wf-node-colordot" style="background:${v}"></span>` : "";
+}
+
 // Timing badges (delayBefore / delayAfter) — floating chips anchored under the
 // block's bottom-left corner (absolute), so a delay never stretches the
 // standardized card. Shared by wfNodeEl and the inspector's live update.
@@ -561,7 +571,8 @@ function wfNodeEl(n){
     : `<img class="wf-node-thumb">`) : "";
   // start/end render as a small play/stop triangle, not a header+body card.
   const isTerminal = def.kind==="start"||def.kind==="end";
-  const sumHtml = sum?`<div class="wf-node-sum">${escHtml(sum)}</div>`:"";
+  // Color nodes get a live swatch dot in front of the summary text.
+  const sumHtml = sum?`<div class="wf-node-sum">${wfColorDotHtml(n,def)}${escHtml(sum)}</div>`:"";
   const topRow = hasTpl ? `<div class="wf-node-prevrow">${thumbHtml}${sumHtml}</div>` : sumHtml;
   el.classList.toggle("showing-thumb", hasRealThumb);
   el.classList.toggle("has-thumb", hasTpl);

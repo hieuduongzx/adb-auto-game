@@ -654,6 +654,22 @@ function wfFieldEl(node,f){
   }
   if(f.t==="tpls") return wfTplsField(node,f);
 
+  // Color field: native swatch picker + hex text kept in sync both ways.
+  if(f.t==="color"){
+    const pick=document.createElement("input"); pick.type="color"; pick.className="wf-color-pick";
+    const inp=document.createElement("input"); inp.type="text"; inp.placeholder="#RRGGBB";
+    inp.style.fontFamily="var(--mono)"; inp.style.flex="1"; inp.style.minWidth="0";
+    const valid=v=>/^#[0-9a-fA-F]{6}$/.test(v);
+    const cur=node.params[f.k]!==undefined?String(node.params[f.k]):(f.d||"#ff0000");
+    inp.value=cur; if(valid(cur)) pick.value=cur;
+    const commit=v=>{ wfPushUndoDebounced(); node.params[f.k]=v; wfUpdNodeSum(node); };
+    pick.oninput=()=>{ inp.value=pick.value; commit(pick.value); };
+    inp.oninput=()=>{ let v=inp.value.trim(); if(v && v[0]!=="#") v="#"+v;
+      if(valid(v)) pick.value=v; commit(v); };
+    row.appendChild(pick); row.appendChild(inp);
+    return row;
+  }
+
   // Variable NAME field (declares/targets a variable) → combobox picker.
   if(f.var){ return wfVarNameField(node,f); }
   // Variable-or-literal VALUE field (loop count, set/if value…) → ref picker.
@@ -859,7 +875,9 @@ function wfUpdNodeSum(node){
   const def=WF_NODES[node.type]; if(!def||!def.sum) return;
   const el=document.querySelector(`.wf-node[data-node="${node.id}"] .wf-node-sum`);
   let s=""; try{ s=def.sum(node.params); }catch{}
-  if(el) el.textContent=s;
+  if(!el) return;
+  const dot=typeof wfColorDotHtml==="function"?wfColorDotHtml(node,def):"";
+  if(dot) el.innerHTML=dot+escHtml(s); else el.textContent=s;
 }
 
 // Image-template helpers.

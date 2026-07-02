@@ -90,6 +90,13 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "tap_image_any":  {"label": "Chạm 1 trong ảnh", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     "wait_image_any": {"label": "Chờ 1 trong ảnh",  "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     "wait_text":  {"label": "Chờ chữ",       "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    # ── Color (pixel) nodes — match a pixel/region against a #RRGGBB colour
+    # with a per-channel tolerance (same semantics as DevScope's Inspect color:
+    # match when max(ΔR,ΔG,ΔB) <= tolerance).
+    "tap_color":  {"label": "Chạm màu",      "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    "wait_color": {"label": "Chờ màu",       "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    "if_color":   {"label": "Nếu thấy màu",  "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    "read_color": {"label": "Đọc màu → biến","kind": "action",    "ins": 1, "outs": ["out"]},
     "send_text":  {"label": "Nhập văn bản",  "kind": "action",    "ins": 1, "outs": ["out"]},
     "key":        {"label": "Phím",          "kind": "action",    "ins": 1, "outs": ["out"]},
     "back":       {"label": "Back",          "kind": "action",    "ins": 1, "outs": ["out"]},
@@ -137,7 +144,7 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
 # Condition node types a switch case may use — only the *instant* ones (no
 # wait_* timeout blocking, no tap_* side-effect), so evaluating one case never
 # stalls the others. Kept in sync with the designer's case-type dropdown.
-SWITCH_CASE_TYPES = ("if_image", "if_image_any", "if_text", "if_var", "if_time")
+SWITCH_CASE_TYPES = ("if_image", "if_image_any", "if_text", "if_var", "if_time", "if_color")
 
 
 class WorkflowEngine:
@@ -241,6 +248,7 @@ class WorkflowEngine:
             "wait_until":   self._a_wait_until,
             "device_info":  self._a_device_info,
             "screen_power": self._a_screen_power,
+            "read_color":   self._a_read_color,
         }
 
     # ── Per-thread execution context ─────────────────────────────────────────
@@ -1034,7 +1042,113 @@ class WorkflowEngine:
             time.sleep(0.25)
         return None
 
+    # ── Color (pixel) helpers ────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_hex_color(raw: Any) -> Optional[tuple]:
+        """``#RRGGBB`` (hash optional) → an ``(b, g, r)`` tuple, or ``None``."""
+        s = str(raw or "").strip().lstrip("#")
+        if not re.fullmatch(r"[0-9a-fA-F]{6}", s):
+            return None
+        return (int(s[4:6], 16), int(s[2:4], 16), int(s[0:2], 16))
+
+    @staticmethod
+    def _bgr_to_hex(px) -> str:
+        return "#{:02x}{:02x}{:02x}".format(int(px[2]), int(px[1]), int(px[0]))
+
+    def _pixel_at(self, x: int, y: int) -> Optional[tuple]:
+        """The screen's BGR pixel at (x, y), or ``None`` (no frame / off-screen)."""
+        screen = self.auto.capture_screen()
+        if screen is None:
+            return None
+        h, w = screen.shape[:2]
+        if not (0 <= x < w and 0 <= y < h):
+            log_warning(f"[workflow] điểm ({x}, {y}) nằm ngoài màn hình {w}×{h}")
+            return None
+        return tuple(int(c) for c in screen[y, x][:3])
+
+    @staticmethod
+    def _color_close(px: tuple, target: tuple, tol: int) -> bool:
+        """True when every BGR channel differs by at most ``tol``."""
+        return all(abs(int(a) - int(b)) <= tol for a, b in zip(px, target))
+
+    def _find_color(self, target: tuple, tol: int, region=None) -> Optional[tuple]:
+        """(x, y) of the first pixel matching ``target``±``tol``, or ``None``.
+
+        Scans top-to-bottom / left-to-right (first match wins) over the whole
+        frame or an optional ``(x, y, w, h)`` crop.
+        """
+        import numpy as np
+        screen = self.auto.capture_screen()
+        if screen is None:
+            return None
+        ox = oy = 0
+        if region:
+            rx, ry, rw, rh = region
+            h, w = screen.shape[:2]
+            rx, ry = max(0, rx), max(0, ry)
+            screen = screen[ry:min(h, ry + rh), rx:min(w, rx + rw)]
+            if screen.size == 0:
+                return None
+            ox, oy = rx, ry
+        mask = np.all(np.abs(screen[:, :, :3].astype(np.int16) - np.int16(target)) <= tol, axis=2)
+        hits = np.argwhere(mask)
+        if not len(hits):
+            return None
+        y, x = hits[0]
+        return (int(x) + ox, int(y) + oy)
+
+    def _eval_color_condition(self, ntype: str, params: Dict) -> bool:
+        target = self._parse_hex_color(params.get("color"))
+        if target is None:
+            log_warning(f"[workflow] '{ntype}': màu không hợp lệ ({params.get('color')!r}) — cần #RRGGBB")
+            return False
+        tol = max(0, int(params.get("tolerance", 10) or 0))
+        if ntype == "if_color":
+            negate = bool(params.get("negate", False))
+            px = self._pixel_at(int(params.get("x", 0)), int(params.get("y", 0)))
+            ok = px is not None and self._color_close(px, target, tol)
+            return ok != negate
+        if ntype == "wait_color":
+            x, y = int(params.get("x", 0)), int(params.get("y", 0))
+            end = time.time() + max(0.0, float(params.get("timeout", 10.0)))
+            while not self._stop.is_set():
+                self._pause.wait()
+                px = self._pixel_at(x, y)
+                if px is not None and self._color_close(px, target, tol):
+                    log_info(f"[workflow] 🎨 thấy màu {self._bgr_to_hex(target)} tại ({x}, {y})")
+                    return True
+                if time.time() >= end:
+                    return False
+                time.sleep(0.25)
+            return False
+        if ntype == "tap_color":
+            region = self._search_region(params)
+            end = time.time() + max(0.0, float(params.get("timeout", 10.0)))
+            while not self._stop.is_set():
+                self._pause.wait()
+                hit = self._find_color(target, tol, region=region)
+                if hit:
+                    self._last_pos = hit
+                    return self._tap_at(hit[0], hit[1], params, label=f"màu {self._bgr_to_hex(target)}")
+                if time.time() >= end:
+                    return False  # colour never appeared — false branch fires
+                time.sleep(0.25)
+            return False
+        return False
+
+    def _a_read_color(self, node, p) -> bool:
+        name = str(p.get("name", "")).strip()
+        px = self._pixel_at(int(p.get("x", 0)), int(p.get("y", 0)))
+        value = self._bgr_to_hex(px) if px is not None else ""
+        if name:
+            self._set_var(name, value)
+            log_info(f"[workflow] 🎨 {name} = {value or '(không đọc được)'}")
+        return True
+
     def _eval_condition(self, ntype: str, params: Dict) -> bool:
+        if ntype in ("if_color", "wait_color", "tap_color"):
+            return self._eval_color_condition(ntype, params)
         if ntype == "if_image":
             tpl = self._resolve_template(params.get("template", ""))
             threshold = float(params.get("threshold", 0.85))

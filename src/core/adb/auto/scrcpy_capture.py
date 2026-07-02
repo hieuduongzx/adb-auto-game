@@ -122,6 +122,30 @@ def stop_scrcpy_sources() -> None:
         src.stop()
 
 
+def warm_scrcpy_source(controller_or_serial) -> bool:
+    """Pre-start the headless scrcpy client for a device.
+
+    The client needs ~1-2s after start before its first frame arrives; calling
+    this as soon as a device connects means a later workflow run (or DevScope
+    capture) reads a frame instantly instead of paying that warm-up on Play.
+    Idempotent and cheap: an already-running source is left untouched.
+    Returns True when the source's client is up.
+    """
+    if _capture_backend() != "scrcpy" or not os.path.isfile(_SCRCPY_EXE):
+        return False
+    serial = (controller_or_serial if isinstance(controller_or_serial, str)
+              else _serial_of(controller_or_serial))
+    if not serial:
+        return False
+    with _SOURCES_LOCK:
+        src = _SOURCES.get(serial)
+        if src is None:
+            src = ScrcpyFrameSource(serial=serial)
+            _SOURCES[serial] = src
+    src.start()
+    return src._client is not None
+
+
 class ScrcpyFrameSource:
     """Headless scrcpy-client frame source for one device serial."""
 

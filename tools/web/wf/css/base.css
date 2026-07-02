@@ -46,6 +46,7 @@
      category's colour here updates both instead of drifting apart. */
   --cat-basic: #6f9be8;
   --cat-image: #2fb0a3;
+  --cat-color: #d6608f;
   --cat-ocr:   #e0954b;
   --cat-logic: #9a78e6;
   --group-red: #cf6b6b;  /* group-only accent — no matching node category */

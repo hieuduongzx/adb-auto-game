@@ -38,6 +38,9 @@ const WF_ICONS = {
   scan_text:  '<path d="M4 7V5a2 2 0 0 1 2-2h2"/><path d="M16 3h2a2 2 0 0 1 2 2v2"/><path d="M4 17v2a2 2 0 0 0 2 2h2"/><path d="M16 21h2a2 2 0 0 0 2-2v-2"/><line x1="4" y1="12" x2="20" y2="12"/>',
   search:     '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/>',
   scissors:   '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><line x1="8" y1="8" x2="20" y2="18"/><line x1="8" y1="16" x2="20" y2="6"/>',
+  // color
+  droplet:    '<path d="M12 2s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
+  pipette:    '<path d="m2 22 1-1h2l9-9"/><path d="M3 21v-2l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4z"/>',
   // logic
   pin:        '<path d="M12 17v5"/><path d="M7 3h10l-2 7h4l-7 7-7-7h4L7 3z"/>',
   calculator: '<rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="12" x2="8" y2="12"/><line x1="12" y1="12" x2="12" y2="12"/><line x1="16" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="12" y1="16" x2="12" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>',
@@ -101,6 +104,12 @@ const WF_NODES = {
   if_text:    {label:"If text",   ico:"type",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text"},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}contains "${p.text||""}"`},
   read_var:   {label:"Read → variable",ico:"search",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80}], sum:p=>`→ ${p.name||"?"}`},
   parse_var:  {label:"Parse → variable",ico:"scissors",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"OCR region"},{v:"var",t:"From variable"}],d:"region"},{k:"fromVar",lbl:"Source variable",t:"text",d:"",var:true,showWhen:{source:"var"}},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num",showWhen:{source:"region"}},{k:"y",t:"num",showWhen:{source:"region"}},{k:"w",t:"num",d:200,showWhen:{source:"region"}},{k:"h",t:"num",d:80,showWhen:{source:"region"}}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
+  // ── Color (pixel) nodes — compare screen pixels against a #RRGGBB colour.
+  // Tolerance = max per-channel difference (same rule as DevScope's Inspect color).
+  tap_color:  {label:"Tap color", ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"timeout",t:"num",d:10},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.color||"?"} ±${p.tolerance??10}`+(p.taps=="2"?" ×2":"")},
+  wait_color: {label:"Wait color",ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"x",t:"num"},{k:"y",t:"num"},{k:"timeout",t:"num",d:10}], sum:p=>`(${p.x||0},${p.y||0}) = ${p.color||"?"}`},
+  if_color:   {label:"If color",  ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"x",t:"num"},{k:"y",t:"num"},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}(${p.x||0},${p.y||0}) ≈ ${p.color||"?"}`},
+  read_color: {label:"Read color → variable",ico:"pipette",kind:"action",cat:"color", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"color",var:true},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>`${p.name||"?"} = px(${p.x||0},${p.y||0})`},
   loop:       {label:"Repeat",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"infinite",t:"bool",d:true},{k:"count",lbl:"Repeat count",t:"num",varRef:true,d:3,showWhen:{infinite:false}}], sum:p=>p.infinite?"∞ infinite":`${p.count}×`},
   parallel:   {label:"Parallel", ico:"parallel",kind:"parallel",cat:"flow", outs:[], fields:[{k:"count",lbl:"Thread count",t:"num",d:3,refresh:true}], sum:p=>`${p.count||3} parallel threads`},
   try_chain:  {label:"Try in order",ico:"git_branch",kind:"try_chain",cat:"flow", outs:[], fields:[], sum:p=>`${p.count||3} branches · on fail try next branch`},
@@ -131,7 +140,7 @@ const WF_NODES = {
   device_info:   {label:"Device info → variable", ico:"smartphone", kind:"action", cat:"device", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"info",var:true},{k:"prop",lbl:"Property",t:"select",opts:[{v:"battery",t:"Battery level (%)"},{v:"current_app",t:"Current app package"},{v:"width",t:"Screen width"},{v:"height",t:"Screen height"},{v:"model",t:"Model"},{v:"brand",t:"Brand"},{v:"android",t:"Android version"},{v:"sdk",t:"SDK level"},{v:"serial",t:"Serial"},{v:"ip",t:"IP address"}],d:"battery"}], sum:p=>`${p.name||"?"} = ${p.prop||"battery"}`},
   screen_power:  {label:"Screen power", ico:"power", kind:"action", cat:"device", outs:["out"], fields:[{k:"action",lbl:"Action",t:"select",opts:[{v:"on",t:"Wake / On"},{v:"off",t:"Sleep / Off"},{v:"toggle",t:"Toggle (power key)"}],d:"on"}], sum:p=>`🖥 ${({on:"wake",off:"sleep",toggle:"toggle"})[p.action||"on"]}`},
 };
-const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"input",label:"Keys & Input"}, {key:"image",label:"Image"}, {key:"ocr",label:"Text (OCR)"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"device",label:"Device & Time"}, {key:"misc",label:"Other"} ];
+const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"input",label:"Keys & Input"}, {key:"image",label:"Image"}, {key:"color",label:"Color"}, {key:"ocr",label:"Text (OCR)"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"device",label:"Device & Time"}, {key:"misc",label:"Other"} ];
 const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"loop", done:"done", fail:"fail", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
 const WF_IN_LBL = { in:"in", loop:"loop" };

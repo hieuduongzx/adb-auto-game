@@ -170,6 +170,7 @@
 .wf-pal-cat.cat-basic { color:#2d64cc; background:#eef5ff; }
 .wf-pal-cat.cat-input { color:#4338ca; background:#eef0ff; }
 .wf-pal-cat.cat-image { color:#0f766e; background:#ecfdf9; }
+.wf-pal-cat.cat-color { color:#be185d; background:#fdf2f8; }
 .wf-pal-cat.cat-ocr   { color:#c2610f; background:#fff7ed; }
 .wf-pal-cat.cat-flow  { color:#b45309; background:#fffbeb; }
 .wf-pal-cat.cat-logic { color:#6d28d9; background:#f5f3ff; }
@@ -191,6 +192,7 @@
 .wf-chip.cat-basic .ico { color:#2d64cc; }
 .wf-chip.cat-input .ico { color:#4338ca; }
 .wf-chip.cat-image .ico { color:#0f766e; }
+.wf-chip.cat-color .ico { color:#be185d; }
 .wf-chip.cat-ocr   .ico { color:#c2610f; }
 .wf-chip.cat-flow  .ico { color:#b45309; }
 .wf-chip.cat-logic .ico { color:#6d28d9; }
@@ -490,6 +492,7 @@
    image/ocr/logic condition blocks (action + condition nodes carry a cat class). */
 .wf-node.cat-basic { --node-accent:var(--cat-basic); }
 .wf-node.cat-image { --node-accent:var(--cat-image); }
+.wf-node.cat-color { --node-accent:var(--cat-color); }
 .wf-node.cat-ocr   { --node-accent:var(--cat-ocr); }
 .wf-node.cat-logic { --node-accent:var(--cat-logic); }
 .wf-node.cat-flow  { --node-accent:#e0a64b; }
@@ -656,6 +659,7 @@
 .wf-node.cat-basic  { --nhd-bg:#eef5ff; --nhd-bd:#c5d8f5; --ntitle:#2d64cc; }
 .wf-node.cat-input  { --nhd-bg:#eef0ff; --nhd-bd:#c4c6f5; --ntitle:#4338ca; }
 .wf-node.cat-image  { --nhd-bg:#ecfdf9; --nhd-bd:#99e6d4; --ntitle:#0f766e; }
+.wf-node.cat-color  { --nhd-bg:#fdf2f8; --nhd-bd:#f5c1da; --ntitle:#be185d; }
 .wf-node.cat-ocr    { --nhd-bg:#fff7ed; --nhd-bd:#fbc99a; --ntitle:#c2610f; }
 .wf-node.cat-flow   { --nhd-bg:#fffbeb; --nhd-bd:#f7d97e; --ntitle:#b45309; }
 .wf-node.cat-logic  { --nhd-bg:#f5f3ff; --nhd-bd:#d8c8f7; --ntitle:#6d28d9; }
@@ -676,6 +680,9 @@
    clearer tone/size so the block's gist is legible without squinting. */
 .wf-node-sum { font-family:var(--mono); font-size:10px; color:var(--dim); padding:4px 8px 5px;
   line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Live colour swatch in a color node's summary line. */
+.wf-node-colordot { display:inline-block; width:8px; height:8px; border-radius:2px;
+  margin-right:4px; vertical-align:-1px; border:1px solid rgba(20,30,45,.18); }
 .wf-node-note { display:flex; align-items:flex-start; gap:5px; font-size:10px; font-style:italic;
   color:var(--muted); background:transparent; border-top:1px solid var(--line);
   border-radius:0 0 var(--node-r) var(--node-r); padding:4px 8px 5px; white-space:normal;
@@ -809,6 +816,12 @@
 .wf-field .cb.checked { background:var(--accent); border-color:var(--accent); }
 .wf-field .cb svg { opacity:0; } .wf-field .cb.checked svg { opacity:1; }
 .wf-field .btn.sm { height:24px; padding:0 8px; font-size:10.5px; }
+/* Color-field swatch picker: a compact square that opens the native picker. */
+.wf-color-pick { width:28px; height:24px; padding:0; flex-shrink:0; border:1px solid var(--border2);
+  border-radius:6px; background:var(--panel); cursor:pointer; }
+.wf-color-pick::-webkit-color-swatch-wrapper { padding:2px; }
+.wf-color-pick::-webkit-color-swatch { border:none; border-radius:4px; }
+.wf-color-pick:hover { border-color:var(--accent); }
 .wf-node-retry { padding:3px 8px; margin:0; display:flex; gap:6px; flex-wrap:wrap; color:var(--muted); font-size:10px; }
 .wf-node-retry span { display:inline-flex; align-items:center; gap:3px; background:var(--alt); border:1px solid var(--border2); border-radius:999px; padding:1px 6px; }
 .wf-node-retry svg { width:10px; height:10px; }

@@ -243,7 +243,7 @@ const wfBaseAny=t=>{ const a=(Array.isArray(t)?t:[]).filter(Boolean); if(!a.leng
 
 // Condition types a switch case may use — instant checks only (no wait_* timeout,
 // no tap_* side-effect). Kept in sync with SWITCH_CASE_TYPES in engine.py.
-const WF_SWITCH_CASE_TYPES = ["if_image","if_image_any","if_text","if_var","if_time"];
+const WF_SWITCH_CASE_TYPES = ["if_image","if_image_any","if_text","if_var","if_time","if_color"];
 function wfDefaults(type){
   const def=WF_NODES[type]||{fields:[]}; const p={};
   (def.fields||[]).forEach(f=>{

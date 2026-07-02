@@ -46,6 +46,7 @@ from src.core.adb.auto.scrcpy_capture import (
     get_capture_backend,
     set_capture_backend,
     stop_scrcpy_sources,
+    warm_scrcpy_source,
 )
 from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
@@ -225,6 +226,10 @@ class WorkflowDesignerAPI:
     def set_capture_backend(self, backend: str) -> dict:
         selected = set_capture_backend(backend)
         self._push("capture_backend", {"backend": selected})
+        # Switching backends stops all scrcpy sources — re-warm right away so
+        # the next run doesn't pay the client warm-up again.
+        if selected == "scrcpy":
+            self._warm_capture_async()
         return {"backend": selected, "backends": list(CAPTURE_BACKENDS)}
 
     # ── Live Preview capture (mirrors DevScope) ─────────────────────────────
@@ -868,8 +873,21 @@ class WorkflowDesignerAPI:
                 "serial": s.get("device_id"),
                 "name": s.get("device_name") or serial,
             })
+            self._warm_capture_async()
         except Exception as e:
             log_error(f"Connect device error: {e}")
+
+    def _warm_capture_async(self) -> None:
+        """Pre-start the scrcpy frame source for the connected device.
+
+        Runs right after a device connects (not on Play), so by the time the
+        user starts a test run the client already has frames and the first
+        block executes immediately instead of waiting out the scrcpy warm-up.
+        """
+        serial = self._connected_serial or self._selected_serial
+        if not serial:
+            return
+        threading.Thread(target=warm_scrcpy_source, args=(serial,), daemon=True).start()
 
     def _device_worker(self) -> None:
         with self._device_lock:
@@ -895,6 +913,8 @@ class WorkflowDesignerAPI:
                         "serial": s.get("device_id"),
                         "name": s.get("device_name") or "",
                     })
+                    if self._connected_serial:
+                        self._warm_capture_async()
             except Exception:
                 self._push("devices_update", {"devices": []})
 
