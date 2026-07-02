@@ -1090,16 +1090,16 @@ class WorkflowDesignerAPI:
         return {k: {"label": v["label"], "kind": v["kind"], "outs": v["outs"]}
                 for k, v in NODE_TYPES.items()}
 
-    def workflow_new(self) -> bool:
-        """Forget the open file so the next 'Lưu' saves to the default folder
-        (``workflows/<name>/<name>.json``)."""
+    def workflow_new(self, name: str = "") -> bool:
+        """Forget the open file so the next save creates
+        ``workflows/<name>/workflow.json``."""
         self._wf_path = None
         self._remember_last_workflow(None)   # a fresh doc shouldn't reopen the old one
         self._scope_refresh_out()
         return True
 
     def _default_flow_path(self, name: str) -> str:
-        """Default save target: ``<workflows>/<name>/<name>.json``.
+        """Default save target: ``<workflows>/<name>/workflow.json``.
 
         Used whenever the user doesn't pick an explicit location. Each workflow
         gets its own folder so ``_write_flow`` can bundle a sibling
@@ -1108,7 +1108,7 @@ class WorkflowDesignerAPI:
         clean = _sanitize_name(name) or "workflow"
         folder = os.path.join(_WORKFLOWS_DIR, clean)
         os.makedirs(folder, exist_ok=True)
-        return os.path.join(folder, f"{clean}.json")
+        return os.path.join(folder, "workflow.json")
 
     def workflow_export(self, flow_json: str, name: str = "") -> bool:
         os.makedirs(_WORKFLOWS_DIR, exist_ok=True)

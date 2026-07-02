@@ -1,0 +1,340 @@
+{
+  "name": "Onsen And Girl",
+  "version": 2,
+  "templatesDir": "templates",
+  "speedhack": {
+    "enabled": false,
+    "speed": 2,
+    "package": ""
+  },
+  "globals": [],
+  "functions": [
+    {
+      "id": "fn_x3plf",
+      "name": "GoGhome",
+      "graph": {
+        "nodes": [
+          {
+            "id": "n2bfkyli",
+            "type": "start",
+            "x": 60,
+            "y": 95,
+            "params": {}
+          },
+          {
+            "id": "n86ilvs4",
+            "type": "if_image",
+            "x": 140,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260702_162345_911_1790_79_64.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nam3rraw",
+            "type": "tap_image_any",
+            "x": 340,
+            "y": 80,
+            "params": {
+              "templates": [
+                "templates/crop_20260702_162352_75_1822_69_54.png"
+              ],
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "mode": "sequential",
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "npgjyxkh",
+            "type": "end",
+            "x": 60,
+            "y": 20,
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": "n2bfkyli",
+            "fromPort": "out",
+            "to": "n86ilvs4"
+          },
+          {
+            "from": "n86ilvs4",
+            "fromPort": "false",
+            "to": "nam3rraw"
+          },
+          {
+            "from": "n86ilvs4",
+            "fromPort": "true",
+            "to": "npgjyxkh"
+          }
+        ],
+        "groups": []
+      }
+    }
+  ],
+  "activities": [
+    {
+      "id": "sequence_vf3r",
+      "name": "Activity 1",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "npeo7h5j",
+            "type": "start",
+            "x": 60,
+            "y": 35,
+            "params": {}
+          },
+          {
+            "id": "nbka3iar",
+            "type": "call",
+            "x": 120,
+            "y": 40,
+            "params": {
+              "fn": "fn_x3plf"
+            }
+          },
+          {
+            "id": "nnda5hrs",
+            "type": "tap_image",
+            "x": 300,
+            "y": 39,
+            "params": {
+              "template": "templates/crop_20260702_162737_878_1874_137_23.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nk1d8sip",
+            "type": "tap_image",
+            "x": 480,
+            "y": 39,
+            "params": {
+              "template": "templates/crop_20260702_162744_859_1658_54_39.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nizpi1u8",
+            "type": "tap_image",
+            "x": 660,
+            "y": 39,
+            "params": {
+              "template": "templates/crop_20260702_162812_439_1830_211_41.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n87q7i33",
+            "type": "wait_image",
+            "x": 860,
+            "y": -20,
+            "params": {
+              "template": "templates/crop_20260702_162857_646_212_316_79.png",
+              "threshold": 0.85,
+              "timeout": 120
+            }
+          },
+          {
+            "id": "nzqh8lz9",
+            "type": "tap_image",
+            "x": 1060,
+            "y": -20,
+            "params": {
+              "template": "templates/crop_20260702_163158_820_1784_219_53.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 5,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 2
+          },
+          {
+            "id": "n7fnr713",
+            "type": "tap_image",
+            "x": 1240,
+            "y": -20,
+            "params": {
+              "template": "templates/crop_20260702_162911_547_1798_168_31.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 2
+          }
+        ],
+        "edges": [
+          {
+            "from": "npeo7h5j",
+            "fromPort": "out",
+            "to": "nbka3iar"
+          },
+          {
+            "from": "nbka3iar",
+            "fromPort": "out",
+            "to": "nnda5hrs"
+          },
+          {
+            "from": "nnda5hrs",
+            "fromPort": "true",
+            "to": "nk1d8sip"
+          },
+          {
+            "from": "nk1d8sip",
+            "fromPort": "true",
+            "to": "nizpi1u8"
+          },
+          {
+            "from": "nizpi1u8",
+            "fromPort": "true",
+            "to": "n87q7i33"
+          },
+          {
+            "from": "n87q7i33",
+            "fromPort": "true",
+            "to": "nzqh8lz9"
+          },
+          {
+            "from": "nzqh8lz9",
+            "fromPort": "false",
+            "to": "n7fnr713"
+          },
+          {
+            "from": "nzqh8lz9",
+            "fromPort": "true",
+            "to": "n87q7i33"
+          },
+          {
+            "from": "n7fnr713",
+            "fromPort": "true",
+            "to": "nnda5hrs"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "background_r4jb",
+      "name": "Skip Dialog",
+      "type": "background",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nalz79mz",
+            "type": "start",
+            "x": 60,
+            "y": 70,
+            "params": {}
+          },
+          {
+            "id": "ny2uf49v",
+            "type": "tap_image",
+            "x": 160,
+            "y": 55,
+            "params": {
+              "template": "templates/crop_20260702_162132_879_110_109_48.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 3,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nalz79mz",
+            "fromPort": "out",
+            "to": "ny2uf49v"
+          }
+        ],
+        "groups": []
+      },
+      "pollInterval": 1
+    },
+    {
+      "id": "background_rwxx",
+      "name": "Tap To Continue",
+      "type": "background",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nc58mct0",
+            "type": "start",
+            "x": 60,
+            "y": 70,
+            "params": {}
+          },
+          {
+            "id": "niuh9jmh",
+            "type": "wait_text",
+            "x": 160,
+            "y": 55,
+            "params": {
+              "text": "",
+              "x": 336,
+              "y": 1392,
+              "w": 417,
+              "h": 39,
+              "timeout": 10
+            }
+          },
+          {
+            "id": "nw88ij6t",
+            "type": "tap",
+            "x": 340,
+            "y": 55,
+            "params": {
+              "target": "pos",
+              "x": 564,
+              "y": 1424
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nc58mct0",
+            "fromPort": "out",
+            "to": "niuh9jmh"
+          },
+          {
+            "from": "niuh9jmh",
+            "fromPort": "true",
+            "to": "nw88ij6t"
+          }
+        ],
+        "groups": []
+      },
+      "pollInterval": 1
+    }
+  ]
+}

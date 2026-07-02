@@ -1,5 +1,5 @@
 {
-  "name": "My Workflow",
+  "name": "Test",
   "version": 2,
   "templatesDir": "templates",
   "speedhack": {
@@ -11,7 +11,7 @@
   "functions": [],
   "activities": [
     {
-      "id": "sequence_kt27",
+      "id": "sequence_3j0a",
       "name": "Activity 1",
       "type": "sequence",
       "enabled": true,
@@ -19,7 +19,7 @@
       "graph": {
         "nodes": [
           {
-            "id": "nhndq70d",
+            "id": "nqwcdyx2",
             "type": "start",
             "x": 60,
             "y": 70,

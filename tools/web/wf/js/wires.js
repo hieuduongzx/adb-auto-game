@@ -160,11 +160,25 @@ function wfWirePath(a,b,ed,lane){
   topY = wfClearChannel(topY, xIn, xOut, -1, pad);
   botY = wfClearChannel(botY, xIn, xOut, +1, pad);
 
-  // Side choice: shortest approach INTO the target port — steers the wire
-  // toward the target instead of climbing the full height beside a block.
-  const below  = Math.abs(botY - b.y) <= Math.abs(b.y - topY);
-  const dir    = below ? +1 : -1;
-  let routeY = below ? botY : topY;
+  // Side choice: prefer a channel that sits between the two endpoints
+  // (the "gap" between rows) if clear — it produces a shorter total path
+  // and keeps the wire visually tighter to its nodes. Fall back to the
+  // classic shortest-approach-to-target heuristic when the mid-gap is blocked.
+  const midY   = (a.y + b.y) / 2;
+  const midLow = Math.min(a.y, b.y);
+  const midHigh = Math.max(a.y, b.y);
+  let below;
+  let routeY;
+
+  // Check if a horizontal span at midY is clear (inside the y-range of both endpoints).
+  if (midY > midLow + 12 && midY < midHigh - 12 && !wfChannelBlocked(midY, xIn, xOut, pad)) {
+    routeY = midY;
+    below = routeY > b.y;  // drive the riser toward the target for corner direction
+  } else {
+    below  = Math.abs(botY - b.y) <= Math.abs(b.y - topY);
+    routeY = below ? botY : topY;
+  }
+  const dir = below ? +1 : -1;
 
   // Fan out from corridors already taken, then re-verify the nudged channel.
   routeY = wfChannelSeparate(routeY, xIn, xOut, dir);

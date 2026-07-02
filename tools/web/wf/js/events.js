@@ -119,13 +119,17 @@ async function openDevHelper(){ try{ await api().open_dev_helper(JSON.stringify(
 async function wfNew(){
   if((WF.activities.length || WF.functions.length) &&
      !confirm("Create a new workflow? Unsaved changes will be lost.")) return;
-  WF.name="My Workflow"; WF.version=2; WF.templatesDir="templates";
+  const name = prompt("Workflow name:", "My Workflow");
+  if(name===null) return; // cancelled
+  WF.name = name.trim() || "My Workflow";
+  WF.version=2; WF.templatesDir="templates";
   WF.speedhack={enabled:false, speed:2.0, package:""};
   WF.activities=[]; WF.functions=[]; WF.edit={kind:"activity",id:null};
   WF.sel=[]; WF.selectedNode=null; wfPan={x:0,y:0}; wfZoom=1; wfRunNode=null;
   const nm=$("wf-name"); if(nm) nm.value=WF.name;
   wfSyncSpeedUI();
-  try{ await api().workflow_new(); }catch{}
+  try{ await api().workflow_new(WF.name); }catch{}
   wfAddActivity("sequence");   // seed one activity so the canvas isn't empty
-  setStatus("New workflow");
+  await wfSave();              // auto-create workflow.json inside the named folder
+  setStatus("New workflow: " + WF.name);
 }
