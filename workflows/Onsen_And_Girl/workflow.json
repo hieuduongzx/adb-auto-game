@@ -123,7 +123,7 @@
             "x": 480,
             "y": 39,
             "params": {
-              "template": "templates/crop_20260702_162744_859_1658_54_39.png",
+              "template": "templates/crop_20260703_013121_863_1665_123_32.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
@@ -189,11 +189,6 @@
         ],
         "edges": [
           {
-            "from": "npeo7h5j",
-            "fromPort": "out",
-            "to": "nbka3iar"
-          },
-          {
             "from": "nbka3iar",
             "fromPort": "out",
             "to": "nnda5hrs"
@@ -232,6 +227,11 @@
             "from": "n7fnr713",
             "fromPort": "true",
             "to": "nnda5hrs"
+          },
+          {
+            "from": "npeo7h5j",
+            "fromPort": "out",
+            "to": "nbka3iar"
           }
         ],
         "groups": []
@@ -283,7 +283,7 @@
       "id": "background_rwxx",
       "name": "Tap To Continue",
       "type": "background",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [

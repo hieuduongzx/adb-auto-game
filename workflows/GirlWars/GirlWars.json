@@ -4,11 +4,49 @@
   "templatesDir": "templates",
   "speedhack": {
     "enabled": true,
-    "speed": 2,
+    "speed": 3,
     "package": "com.y2sgames.girlwarsbignewen"
   },
   "globals": [],
   "functions": [
+    {
+      "id": "fn_hh4kj",
+      "name": "TapToContinue",
+      "graph": {
+        "nodes": [
+          {
+            "id": "n3opahqa",
+            "type": "start",
+            "x": 60,
+            "y": 60,
+            "params": {}
+          },
+          {
+            "id": "ntzq6qn0",
+            "type": "tap_image",
+            "x": 240,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260628_232825_249x36_3.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 30,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 3
+          }
+        ],
+        "edges": [
+          {
+            "from": "n3opahqa",
+            "fromPort": "out",
+            "to": "ntzq6qn0"
+          }
+        ],
+        "groups": []
+      }
+    },
     {
       "id": "fn_uft8v",
       "name": "HandleBattle",
@@ -243,44 +281,6 @@
             "from": "nxmlsilx",
             "fromPort": "true",
             "to": "nhpbc8nw"
-          }
-        ],
-        "groups": []
-      }
-    },
-    {
-      "id": "fn_hh4kj",
-      "name": "TapToContinue",
-      "graph": {
-        "nodes": [
-          {
-            "id": "n3opahqa",
-            "type": "start",
-            "x": 60,
-            "y": 60,
-            "params": {}
-          },
-          {
-            "id": "ntzq6qn0",
-            "type": "tap_image",
-            "x": 240,
-            "y": 60,
-            "params": {
-              "template": "templates/crop_20260628_232825_249x36_3.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 30,
-              "offsetX": 0,
-              "offsetY": 0
-            },
-            "delayBefore": 3
-          }
-        ],
-        "edges": [
-          {
-            "from": "n3opahqa",
-            "fromPort": "out",
-            "to": "ntzq6qn0"
           }
         ],
         "groups": []
@@ -4030,7 +4030,7 @@
       "id": "sequence_u92u",
       "name": "Hoạt động 8",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -4038,14 +4038,14 @@
             "id": "n420suy6",
             "type": "start",
             "x": 200,
-            "y": -5,
+            "y": -45,
             "params": {}
           },
           {
             "id": "nahenqtc",
             "type": "tap_image",
-            "x": 460,
-            "y": 40,
+            "x": 440,
+            "y": 20,
             "params": {
               "template": "templates/crop_20260628_222549_80x76_1.png",
               "taps": "1",
@@ -4058,8 +4058,8 @@
           {
             "id": "n89lt37l",
             "type": "call",
-            "x": 280,
-            "y": 40,
+            "x": 260,
+            "y": 20,
             "params": {
               "fn": "fn_yt9m6"
             }
@@ -4067,8 +4067,8 @@
           {
             "id": "nrscb95y",
             "type": "if_image",
-            "x": 280,
-            "y": -20,
+            "x": 260,
+            "y": -60,
             "params": {
               "template": "templates/crop_20260628_232249_198x35.png",
               "threshold": 0.85,
@@ -4078,8 +4078,8 @@
           {
             "id": "nxxuezj3",
             "type": "swipe_dir",
-            "x": 680,
-            "y": -20,
+            "x": 620,
+            "y": -60,
             "params": {
               "direction": "left",
               "distance": 1000,
@@ -4090,8 +4090,8 @@
           {
             "id": "n3mq1h2h",
             "type": "tap_image",
-            "x": 860,
-            "y": -20,
+            "x": 800,
+            "y": -60,
             "params": {
               "template": "templates/crop_20260629_012246_99x143.png",
               "taps": "1",
@@ -4104,7 +4104,7 @@
           {
             "id": "ntpxsbsj",
             "type": "tap_image",
-            "x": 1640,
+            "x": 1620,
             "y": -100,
             "params": {
               "template": "templates/crop_20260629_012442_195x42.png",
@@ -4118,7 +4118,7 @@
           {
             "id": "ndwk584o",
             "type": "call",
-            "x": 1840,
+            "x": 1800,
             "y": -100,
             "params": {
               "fn": "fn_uft8v"
@@ -4127,7 +4127,7 @@
           {
             "id": "nv1pyqkz",
             "type": "tap_image",
-            "x": 2040,
+            "x": 1980,
             "y": -100,
             "params": {
               "template": "templates/crop_20260628_232825_249x36_3.png",
@@ -4142,7 +4142,7 @@
           {
             "id": "nv9eep4j",
             "type": "tap_image",
-            "x": 2780,
+            "x": 2700,
             "y": -100,
             "params": {
               "template": "templates/crop_20260628_232825_249x36_3.png",
@@ -4157,8 +4157,8 @@
           {
             "id": "ndya77j8",
             "type": "loop",
-            "x": 1080,
-            "y": -20,
+            "x": 1040,
+            "y": -60,
             "params": {
               "count": 3,
               "infinite": true
@@ -4167,7 +4167,7 @@
           {
             "id": "n2ofa9lc",
             "type": "if_image",
-            "x": 2220,
+            "x": 2160,
             "y": -100,
             "params": {
               "template": "templates/crop_20260702_235846_105_155_491_17.png",
@@ -4179,7 +4179,7 @@
           {
             "id": "nau6yy5r",
             "type": "tap",
-            "x": 2400,
+            "x": 2340,
             "y": -100,
             "params": {
               "target": "pos",
@@ -4190,7 +4190,7 @@
           {
             "id": "nwhllyv4",
             "type": "tap_image",
-            "x": 2580,
+            "x": 2520,
             "y": -100,
             "params": {
               "template": "templates/crop_20260702_235942_917_880_122_28.png",
@@ -4204,8 +4204,8 @@
           {
             "id": "n7vhg7qq",
             "type": "loop",
-            "x": 1460,
-            "y": 56,
+            "x": 1440,
+            "y": 4,
             "params": {
               "infinite": false,
               "count": 10
@@ -4226,7 +4226,7 @@
             "id": "ni3wq7ms",
             "type": "tap_image_any",
             "x": 1640,
-            "y": 56,
+            "y": 4,
             "params": {
               "templates": [
                 "templates/crop_20260703_003535_592_494_182_134.png",
@@ -4270,15 +4270,15 @@
           {
             "id": "nlm3lb7i",
             "type": "try_chain",
-            "x": 1840,
-            "y": 140,
+            "x": 1860,
+            "y": 4,
             "params": {}
           },
           {
             "id": "npbo4by7",
             "type": "tap_image",
-            "x": 2040,
-            "y": 80,
+            "x": 2060,
+            "y": 4,
             "params": {
               "template": "templates/crop_20260703_004524_840_542_50_48.png",
               "taps": "1",
@@ -4291,8 +4291,8 @@
           {
             "id": "n0gona2i",
             "type": "tap_image",
-            "x": 2040,
-            "y": 156,
+            "x": 2060,
+            "y": 80,
             "params": {
               "template": "templates/crop_20260703_004621_1068_523_21_50.png",
               "taps": "1",
@@ -4371,11 +4371,6 @@
             "to": "nv9eep4j"
           },
           {
-            "from": "n420suy6",
-            "fromPort": "out",
-            "to": "ndya77j8"
-          },
-          {
             "from": "n9wcc0ag",
             "fromPort": "out",
             "to": "ntpxsbsj"
@@ -4435,6 +4430,11 @@
             "from": "npbo4by7",
             "fromPort": "true",
             "to": "n0gona2i"
+          },
+          {
+            "from": "n420suy6",
+            "fromPort": "out",
+            "to": "nrscb95y"
           }
         ],
         "groups": []
@@ -5127,6 +5127,176 @@
         "groups": []
       },
       "pollInterval": 1
+    },
+    {
+      "id": "sequence_04j0",
+      "name": "Activity 13",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nfhu1tp6",
+            "type": "start",
+            "x": 60,
+            "y": 70,
+            "params": {}
+          },
+          {
+            "id": "nyjp5f12",
+            "type": "tap_image",
+            "x": 140,
+            "y": 55,
+            "params": {
+              "template": "templates/crop_20260703_010912_927_679_70_93.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "ninrm0dy",
+            "type": "try_chain",
+            "x": 320,
+            "y": 56,
+            "params": {
+              "count": 4
+            }
+          },
+          {
+            "id": "n20px8ko",
+            "type": "if_image",
+            "x": 520,
+            "y": -16,
+            "params": {
+              "template": "templates/crop_20260703_011013_902_816_130_29.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "npg7ss58",
+            "type": "call",
+            "x": 900,
+            "y": 80,
+            "params": {
+              "fn": "fn_hh4kj"
+            }
+          },
+          {
+            "id": "ng6nv0d5",
+            "type": "if_image",
+            "x": 520,
+            "y": 55,
+            "params": {
+              "template": "templates/crop_20260703_011049_871_808_201_40.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nixykpnw",
+            "type": "tap",
+            "x": 720,
+            "y": 80,
+            "params": {
+              "target": "found",
+              "x": 0,
+              "y": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "n5lqxiof",
+            "type": "if_image",
+            "x": 520,
+            "y": 120,
+            "params": {
+              "template": "templates/crop_20260703_011136_904_860_119_38.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "n700dym5",
+            "type": "if_image",
+            "x": 520,
+            "y": 200,
+            "params": {
+              "template": "templates/crop_20260703_011339_1579_88_38_32.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nyjp5f12",
+            "fromPort": "true",
+            "to": "ninrm0dy"
+          },
+          {
+            "from": "ninrm0dy",
+            "fromPort": "1",
+            "to": "n20px8ko"
+          },
+          {
+            "from": "ninrm0dy",
+            "fromPort": "2",
+            "to": "ng6nv0d5"
+          },
+          {
+            "from": "ng6nv0d5",
+            "fromPort": "true",
+            "to": "nixykpnw"
+          },
+          {
+            "from": "nixykpnw",
+            "fromPort": "out",
+            "to": "npg7ss58"
+          },
+          {
+            "from": "n20px8ko",
+            "fromPort": "true",
+            "to": "nixykpnw"
+          },
+          {
+            "from": "ninrm0dy",
+            "fromPort": "3",
+            "to": "n5lqxiof"
+          },
+          {
+            "from": "npg7ss58",
+            "fromPort": "out",
+            "to": "nyjp5f12"
+          },
+          {
+            "from": "ninrm0dy",
+            "fromPort": "4",
+            "to": "n700dym5"
+          },
+          {
+            "from": "n700dym5",
+            "fromPort": "true",
+            "to": "nixykpnw"
+          },
+          {
+            "from": "n5lqxiof",
+            "fromPort": "true",
+            "to": "nixykpnw"
+          },
+          {
+            "from": "nfhu1tp6",
+            "fromPort": "out",
+            "to": "nyjp5f12"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
     }
   ]
 }
