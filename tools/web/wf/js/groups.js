@@ -496,8 +496,10 @@ function wfInitCanvas(){
       // Dropping a single lone block flush above/below another merges them.
       wfClearMergeHint();
       document.querySelectorAll(".wf-node.wf-dragging").forEach(el=>el.classList.remove("wf-dragging"));
-      wfGesture.items.forEach(it=>{ const el=document.querySelector(`.wf-node[data-node="${it.id}"]`); if(el) el.classList.add("wf-dragdone"); });
       const moved=Math.abs(e.clientX-wfGesture.sx)+Math.abs(e.clientY-wfGesture.sy)>3;
+      // Only a real drag suppresses the action bar (wf-dragdone). A plain click
+      // must leave the bar visible on the freshly selected block.
+      if(moved) wfGesture.items.forEach(it=>{ const el=document.querySelector(`.wf-node[data-node="${it.id}"]`); if(el) el.classList.add("wf-dragdone"); });
       if(moved && wfGesture.items.length===1 && wfGesture.mergeOk){ wfPushUndo(); wfTryMerge(wfGesture.dragId); }
       else if(moved) wfPushUndo();  // plain move — push before the final render
     } else if(wfGesture.mode==="pan"){

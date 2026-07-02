@@ -89,71 +89,111 @@ function wfClearChannel(chanY, x0, x1, dir, pad){
   }
   return y;
 }
+// Vertical twin of the channel test: does a riser x=riserX spanning [y0,y1]
+// cut through any block?
+function wfRiserBlocked(riserX, y0, y1, pad){
+  const lo=Math.min(y0,y1)-pad, hi=Math.max(y0,y1)+pad;
+  for(const box of wfWireBoxes){
+    if(box.bottom<lo || box.top>hi) continue;                    // no y-overlap
+    if(riserX>=box.left-pad && riserX<=box.right+pad) return box;
+  }
+  return null;
+}
+// Slide a vertical riser sideways (dir +1 right / -1 left) until it clears
+// every block in its span — mirrors wfClearChannel for the two vertical legs.
+function wfClearRiser(riserX, y0, y1, dir, pad){
+  let x=riserX;
+  for(let i=0;i<40;i++){
+    const hit=wfRiserBlocked(x, y0, y1, pad);
+    if(!hit) return x;
+    x = dir>0 ? hit.right+pad+6 : hit.left-pad-6;
+  }
+  return x;
+}
+// Nudge a channel away from corridors other wires already claimed this pass,
+// so stacked back-runs fan out into parallel lanes instead of overdrawing.
+const WF_CHAN_GAP=9;
+function wfChannelSeparate(chanY, x0, x1, dir){
+  let y=chanY;
+  for(let guard=0;guard<20;guard++){
+    const clash=wfWireChannels.find(c=> Math.max(x0,c.x0)<=Math.min(x1,c.x1)
+                                     && Math.abs(y-c.y)<WF_CHAN_GAP);
+    if(!clash) return y;
+    y = clash.y + dir*WF_CHAN_GAP;
+  }
+  return y;
+}
 function wfWirePath(a,b,ed,lane){
   const dx=b.x-a.x, dy=b.y-a.y;
-  
-  // Straight/forward connection
+
+  // ── Forward flow: one calm spline ──────────────────────────────────────────
   if (dx > -20) {
     if (Math.abs(dy) < 5) {
         // Almost horizontal, draw a straight line
         return `M${a.x},${a.y} L${b.x},${b.y}`;
     }
-    const pull = Math.max(Math.abs(dx) * 0.4, Math.abs(dy) * 0.2, 20);
+    // Tension grows with distance but is clamped: long jumps stay taut instead
+    // of ballooning, and short drops still leave the port horizontally.
+    const pull = wfWireClamp(Math.abs(dx)*0.45 + Math.abs(dy)*0.12, 24, 130);
     return `M${a.x},${a.y} C${a.x+pull},${a.y} ${b.x-pull},${b.y} ${b.x},${b.y}`;
-  } 
-  
-  // Backward / Loop connection - Hybrid orthogonal + curves
-  const pullX = 16 + (lane || 0) * 10; // Tighter extend out from output/input
-  const pullY = 25 + (lane || 0) * 12; // Tighter vertical offset
-  const r = 8; // Corner radius
-  
-  // Geometry-aware side choice: the horizontal channel (routeY) must clear the
-  // union of BOTH involved node boxes so it never cuts across a block. We then
-  // pick the side (above/below) whose approach INTO the target port is shortest
-  // — this steers the wire toward the target and stops it climbing the full
-  // height beside a block or looping back over the source node.
-  const sBox = ed ? wfNodeBox(ed.from) : null;
-  const tBox = ed ? wfNodeBox(ed.to)   : null;
-  let topClear    = Math.min(sBox?sBox.top:a.y,    tBox?tBox.top:b.y)    - pullY;
-  let bottomClear = Math.max(sBox?sBox.bottom:a.y, tBox?tBox.bottom:b.y) + pullY;
-
-  // Upgrade: the horizontal run travels between the two vertical risers at
-  // x = a.x+pullX and x = b.x-pullX. Push each candidate channel out until it
-  // clears EVERY node in that x-span (not just the endpoints), so the wire
-  // routes around intermediate blocks instead of slicing through them.
-  const runX0 = a.x + pullX, runX1 = b.x - pullX;
-  const pad = 7;
-  topClear    = wfClearChannel(topClear,    runX0, runX1, -1, pad);
-  bottomClear = wfClearChannel(bottomClear, runX0, runX1, +1, pad);
-  
-  let routeY, signY1, signY2;
-  const approachUp   = Math.abs(b.y - topClear);      // vertical run into target if routed above
-  const approachDown = Math.abs(bottomClear - b.y);   // …if routed below
-  if (approachDown <= approachUp) {
-    // Route BELOW both nodes: a goes DOWN to routeY, then UP into b.
-    routeY = bottomClear;
-    signY1 = 1;
-    signY2 = -1;
-  } else {
-    // Route ABOVE both nodes: a goes UP to routeY, then DOWN into b.
-    routeY = topClear;
-    signY1 = -1;
-    signY2 = 1;
   }
-  
-  // Handle edge cases where dy is too small for the corner radius
-  const safeR1 = Math.min(r, Math.abs(routeY - a.y) / 2, Math.abs(pullX) / 2);
-  const safeR2 = Math.min(r, Math.abs(routeY - b.y) / 2, Math.abs(pullX) / 2);
 
-  return `M${a.x},${a.y} 
-          L${a.x+pullX-safeR1},${a.y}
-          Q${a.x+pullX},${a.y} ${a.x+pullX},${a.y+signY1*safeR1}
-          L${a.x+pullX},${routeY-signY1*safeR1}
-          Q${a.x+pullX},${routeY} ${a.x+pullX-safeR1},${routeY}
-          L${b.x-pullX+safeR2},${routeY}
-          Q${b.x-pullX},${routeY} ${b.x-pullX},${routeY+signY2*safeR2}
-          L${b.x-pullX},${b.y-signY2*safeR2}
-          Q${b.x-pullX},${b.y} ${b.x-pullX+safeR2},${b.y}
+  // ── Backward / loop: orthogonal detour, fully obstacle-aware ───────────────
+  // Route plan: exit RIGHT of the source to a vertical riser, travel a clear
+  // horizontal channel above or below everything in the way, then a second
+  // riser drops LEFT of the target and drives straight into its port. Every
+  // one of those three legs is pushed until it clears ALL blocks, and the
+  // channel additionally dodges corridors other wires claimed this pass.
+  const isTemp = !ed || ed.to==="__temp";
+  const stub = 16 + (lane || 0) * 10;  // riser distance out from each port
+  const pad  = 7;                      // breathing room kept from block edges
+  const r    = 8;                      // corner radius
+
+  const sBox = ed ? wfNodeBox(ed.from) : null;
+  const tBox = isTemp ? null : wfNodeBox(ed.to);
+  let xOut = a.x + stub, xIn = b.x - stub;
+
+  // Candidate channels just past the union of both endpoint boxes, then pushed
+  // outward until they clear every intermediate block in the span.
+  let topY = Math.min(sBox?sBox.top:a.y,    tBox?tBox.top:b.y)    - 25;
+  let botY = Math.max(sBox?sBox.bottom:a.y, tBox?tBox.bottom:b.y) + 25;
+  topY = wfClearChannel(topY, xIn, xOut, -1, pad);
+  botY = wfClearChannel(botY, xIn, xOut, +1, pad);
+
+  // Side choice: shortest approach INTO the target port — steers the wire
+  // toward the target instead of climbing the full height beside a block.
+  const below  = Math.abs(botY - b.y) <= Math.abs(b.y - topY);
+  const dir    = below ? +1 : -1;
+  let routeY = below ? botY : topY;
+
+  // Fan out from corridors already taken, then re-verify the nudged channel.
+  routeY = wfChannelSeparate(routeY, xIn, xOut, dir);
+  routeY = wfClearChannel(routeY, xIn, xOut, dir, pad);
+
+  // Risers: slide each vertical leg sideways until it cuts no block — the
+  // source leg escapes rightward, the target leg leftward. Widening a riser
+  // stretches the channel span, so settle the channel once more after.
+  xOut = wfClearRiser(xOut, a.y, routeY, +1, pad);
+  xIn  = wfClearRiser(xIn,  routeY, b.y, -1, pad);
+  routeY = wfClearChannel(routeY, xIn, xOut, dir, pad);
+
+  if(!isTemp) wfWireChannels.push({ y:routeY, x0:Math.min(xIn,xOut), x1:Math.max(xIn,xOut) });
+
+  // Corner radii shrink when a leg is too short for the full curve.
+  const s1 = routeY >= a.y ? 1 : -1;   // travel direction of the source leg
+  const s2 = b.y >= routeY ? 1 : -1;   // travel direction of the target leg
+  const safeR1 = Math.min(r, Math.abs(routeY - a.y) / 2, Math.abs(xOut - a.x) / 2);
+  const safeR2 = Math.min(r, Math.abs(routeY - b.y) / 2, Math.abs(b.x - xIn) / 2);
+
+  return `M${a.x},${a.y}
+          L${xOut-safeR1},${a.y}
+          Q${xOut},${a.y} ${xOut},${a.y+s1*safeR1}
+          L${xOut},${routeY-s1*safeR1}
+          Q${xOut},${routeY} ${xOut-safeR1},${routeY}
+          L${xIn+safeR2},${routeY}
+          Q${xIn},${routeY} ${xIn},${routeY+s2*safeR2}
+          L${xIn},${b.y-s2*safeR2}
+          Q${xIn},${b.y} ${xIn+safeR2},${b.y}
           L${b.x},${b.y}`;
 }
 
