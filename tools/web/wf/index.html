@@ -11,10 +11,9 @@
 <div id="app">
 
 <div id="toolbar" class="card">
-  <!-- Left zone: document operations grouped in a tray, plus the run-status
-       pill hugging the centred run controls. -->
+  <!-- ── Left: Project file operations + run status ────────────────────────── -->
   <div class="tb-zone tb-left">
-    <div class="tb-tray">
+    <div class="tb-tray tb-tray-doc">
       <button class="btn ico" onclick="wfNew()" title="New — create an empty workflow">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
       <button class="btn ico" onclick="wfImport()" title="Open… — workflow from JSON file">
@@ -25,59 +24,59 @@
       <button class="btn ico" onclick="wfExport()" title="Save as… — new JSON file">
         <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
     </div>
-    <!-- Running status pill — reflects whether the workflow engine is executing. -->
+    <span class="tb-divider"></span>
     <div id="wf-run-status" class="wf-run-status" title="Run status">
       <span class="wf-run-dot"></span>
       <span class="wf-run-txt">Ready</span>
     </div>
   </div>
 
-  <!-- Center zone: primary run controls — the focal point of the toolbar. -->
+  <!-- ── Center: primary run controls — the focal point ───────────────────── -->
   <div class="tb-zone tb-center">
+    <button class="btn ico" onclick="wfValidateShow()" title="Check workflow — find broken wires, missing templates, and bad branch counts">
+      <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></button>
     <div class="tb-tray tb-run">
-      <button class="btn ico" onclick="wfValidateShow()" title="Check workflow — find broken wires, missing templates, and bad branch counts">
-        <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></button>
-      <span class="tb-tray-sep"></span>
       <button class="btn ok ico" id="wf-run-btn" onclick="wfToggleRun()" title="Test run"></button>
+    </div>
+    <div class="tb-tray">
       <button class="btn ico" onclick="wfRunFromSelected(false)" title="Run from selected block">
         <svg viewBox="0 0 24 24"><polygon points="7 4 19 12 7 20 7 4"/><path d="M3 5v14"/></svg></button>
       <button class="btn ico" onclick="wfStartStepRun()" title="Step debug from selected/default block">
         <svg viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><path d="M18 5v14"/></svg></button>
       <button class="btn ico" id="wf-step-next-btn" onclick="wfDebugStep()" title="Next step">
         <svg viewBox="0 0 24 24"><path d="M5 12h12"/><path d="m13 6 6 6-6 6"/></svg></button>
-      <span class="tb-tray-sep"></span>
-      <button class="btn ico" onclick="wfRunGui()" title="Run GUI — open Runner with the current workflow">
-        <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
     </div>
+    <button class="btn ico" onclick="wfRunGui()" title="Run GUI — open Runner with the current workflow">
+      <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
   </div>
 
-  <!-- Right zone: device selection + capture tools. -->
+  <!-- ── Right: device + capture source + DevScope ─────────────────────────── -->
   <div class="tb-zone tb-right">
-    <div class="device-wrap" title="Connected device">
-      <span id="device-dot"></span>
+    <div class="tb-tray tb-tray-device">
+      <span class="tb-tray-label">Device</span>
+      <span class="tb-tray-sep"></span>
+      <span id="device-dot" class="tb-device-dot"></span>
       <select id="device-select" onchange="onDeviceChange(this.value)">
         <option value="">Scanning…</option>
       </select>
-      <svg width="10" height="6" viewBox="0 0 12 7" fill="#9aa3ae" style="flex-shrink:0;pointer-events:none;"><path d="M0 0l6 7 6-7z"/></svg>
-    </div>
-    <div class="tb-tray">
-      <button class="btn ico" onclick="onRefreshDevices()" title="Refresh — rescan connected devices">
+      <button class="btn ico sm" onclick="onRefreshDevices()" title="Refresh — rescan connected devices">
         <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg></button>
-      <button class="btn ico" onclick="onScanPorts()" title="Scan ports — probe known emulator ports">
+      <button class="btn ico sm" onclick="onScanPorts()" title="Scan ports — probe known emulator ports">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
-      <button class="btn ico" onclick="onRestartAdb()" title="Restart ADB server">
+      <button class="btn ico sm" onclick="onRestartAdb()" title="Restart ADB server">
         <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
+    </div>
+    <div class="tb-tray tb-tray-source">
+      <span class="tb-tray-label">Source</span>
+      <span class="tb-tray-sep"></span>
+      <select id="capture-backend" onchange="onCaptureBackendChange(this.value)">
+        <option value="scrcpy">scrcpy</option>
+        <option value="adb">ADB</option>
+      </select>
     </div>
     <span class="tb-divider"></span>
     <button class="btn" onclick="openDevHelper()" title="DevScope — capture/measure regions, save images directly to the current workflow templates">
       <svg width="15" height="15" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.3L3 18l3 3 6.4-6.3a4 4 0 0 0 5.3-5.4l-2.6 2.6-2.5-.4-.4-2.5z"/></svg>DevScope</button>
-    <div class="device-wrap wf-source-wrap" title="Capture source for Test run, screenshots, OCR, and template matching · scrcpy fast/headless · ADB screencap stable">
-      <span class="wf-source-lbl">Capture source</span>
-      <select id="capture-backend" onchange="onCaptureBackendChange(this.value)">
-        <option value="scrcpy">scrcpy (fast)</option>
-        <option value="adb">ADB screencap</option>
-      </select>
-    </div>
   </div>
 </div>
 
@@ -123,11 +122,13 @@
       </div>
       <span class="spacer"></span>
       <span class="wf-hint" title="Mouse wheel = zoom · Drag = move blocks · Right-click = menu (create group/copy/delete) or delete wire (on a wire) · Space or middle mouse = pan canvas">Wheel = zoom · Drag = move · Right-click = menu · Space = pan</span>
-      <!-- View controls grouped at the right: zoom + Canvas/Preview switch. -->
-      <span class="wf-zoom">
-        <button class="btn sm" title="Zoom out">−</button>
-        <span id="wf-zoom-lbl" title="Reset 100%">100%</span>
-        <button class="btn sm" title="Zoom in">+</button>
+      <!-- View controls grouped at the right: zoom tray + Canvas/Preview tabs. -->
+      <span class="wf-zoom wf-tool-tray">
+        <button class="btn sm ico" title="Zoom out">
+          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <span id="wf-zoom-lbl" title="Reset 100%" style="min-width:38px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--dim);cursor:pointer;">100%</span>
+        <button class="btn sm ico" title="Zoom in">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         <button class="btn sm ico" title="Fit view — show all blocks (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/></svg></button>
       </span>
       <span class="tb-divider"></span>

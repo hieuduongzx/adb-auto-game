@@ -3,7 +3,11 @@ function setStatus(msg){ $("status-text").textContent=msg; }
 function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function api(){ return window.pywebview.api; }
 function setRegionBadge(on){ $("region-badge").style.display=on?"inline-flex":"none"; }
-function setConnected(on){ $("device-dot").className=$("footer-dot").className=on?"connected":""; }
+function setConnected(on){ 
+  const d=$("device-dot"), f=$("footer-dot");
+  if(d) d.classList.toggle("connected", on);
+  if(f) f.classList.toggle("connected", on);
+}
 
 function copyText(text, btn){
   navigator.clipboard.writeText(text);

@@ -11,39 +11,47 @@
 
 <!-- ── Toolbar ──────────────────────────────────────────────────────────── -->
 <div id="toolbar" class="card">
-  <span class="tb-label">Thiết bị</span>
-  <div class="device-wrap">
-    <span id="device-dot"></span>
-    <select id="device-select" onchange="onDeviceChange(this.value)">
-      <option value="">Đang quét…</option>
-    </select>
-    <svg width="10" height="6" viewBox="0 0 12 7" fill="#9aa3ae" style="flex-shrink:0;pointer-events:none;"><path d="M0 0l6 7 6-7z"/></svg>
+  <div class="tb-zone tb-left">
+    <div class="tb-tray tb-tray-device">
+      <span class="tb-tray-label">Thiết bị</span>
+      <span class="tb-tray-sep"></span>
+      <span id="device-dot" class="tb-device-dot"></span>
+      <select id="device-select" onchange="onDeviceChange(this.value)">
+        <option value="">Đang quét…</option>
+      </select>
+      <button class="btn ico sm" onclick="onRefreshDevices()" title="Làm mới — quét lại thiết bị đã kết nối">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg></button>
+      <button class="btn ico sm" onclick="onScanPorts()" title="Quét cổng — dò mọi cổng giả lập đã biết">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+      <button class="btn ico sm" onclick="onRestartAdb()" title="Khởi động lại ADB server">
+        <svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg></button>
+    </div>
+    <span class="tb-divider"></span>
+    <button class="btn ico" onclick="openWorkflowDesigner()" title="Workflow2k — mở (cửa sổ mới)">
+      <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></button>
   </div>
-  <button class="btn ico" onclick="onRefreshDevices()" title="Làm mới — quét lại thiết bị đã kết nối">
-    <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg></button>
-  <button class="btn ico" onclick="onScanPorts()" title="Quét cổng — dò mọi cổng giả lập đã biết">
-    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
-  <button class="btn ico" onclick="onRestartAdb()" title="Khởi động lại ADB server">
-    <svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg></button>
-  <span class="tb-divider" style="width:1px;height:20px;background:var(--border2);flex-shrink:0;"></span>
-  <button class="btn ico" onclick="openWorkflowDesigner()" title="Workflow2k — mở (cửa sổ mới)">
-    <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></button>
   <span class="spacer"></span>
-  <span class="tb-label" title="Nguồn ảnh dùng cho preview, screenshot, OCR và khớp mẫu">Nguồn ảnh</span>
-  <select id="capture-backend" onchange="onCaptureBackendChange(this.value)" title="scrcpy: nhanh/headless · ADB screencap: chậm hơn nhưng ổn định">
-    <option value="scrcpy">scrcpy (nhanh)</option>
-    <option value="adb">ADB screencap</option>
-  </select>
-  <div class="hz-wrap">
-    <input id="hz-spin" type="number" min="0.2" max="30" step="0.5" value="5" onchange="onHzChange(this.value)">
-    <span class="hz-unit">Hz</span>
+  <div class="tb-zone tb-right">
+    <div class="tb-tray tb-tray-source">
+      <span class="tb-tray-label">Nguồn</span>
+      <span class="tb-tray-sep"></span>
+      <select id="capture-backend" onchange="onCaptureBackendChange(this.value)" title="scrcpy: nhanh/headless · ADB screencap: chậm hơn nhưng ổn định">
+        <option value="scrcpy">scrcpy</option>
+        <option value="adb">ADB</option>
+      </select>
+    </div>
+    <div class="hz-wrap">
+      <input id="hz-spin" type="number" min="0.2" max="30" step="0.5" value="5" onchange="onHzChange(this.value)">
+      <span class="hz-unit">Hz</span>
+    </div>
+    <button class="pill-wrap" onclick="onToggleAuto()">
+      <span id="auto-cb"><span id="auto-thumb"></span></span>
+      <span class="pill-label">Tự động</span>
+    </button>
+    <span class="tb-divider"></span>
+    <button class="btn ok ico" onclick="onCapture()" title="Chụp màn hình (F5)">
+      <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
   </div>
-  <button class="pill-wrap" onclick="onToggleAuto()">
-    <span id="auto-cb"><span id="auto-thumb"></span></span>
-    <span class="pill-label">Tự động</span>
-  </button>
-  <button class="btn ok ico" onclick="onCapture()" title="Chụp màn hình (F5)">
-    <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
 </div>
 
 <!-- ── Main split ────────────────────────────────────────────────────────── -->
@@ -369,7 +377,7 @@
 <!-- ── Log ──────────────────────────────────────────────────────────────── -->
 <div id="log-card" class="card">
   <div class="log-hdr" onclick="toggleLog(event)" title="Bấm để thu gọn/mở nhật ký">
-    <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
+    <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
     <span class="log-label">Nhật ký</span>
     <span class="log-count" id="log-count"></span>
     <span class="spacer"></span>

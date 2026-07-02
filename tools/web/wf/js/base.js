@@ -5,7 +5,7 @@ const LOG_TAG = {info:"INF",success:"OK ",warning:"WRN",error:"ERR"};
 const S = { devices:[], connectedSerial:null, captureBackend:"scrcpy" };
 function setStatus(msg){ const e=$("status-text"); if(e) e.textContent=msg; }
 function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-function setConnected(on){ const a=$("device-dot"),b=$("footer-dot"); if(a)a.className=on?"connected":""; if(b)b.className=on?"connected":""; }
+function setConnected(on){ const a=$("device-dot"),b=$("footer-dot"); if(a)a.classList.toggle("connected",on); if(b)b.classList.toggle("connected",on); }
 
 // Load a template thumbnail (data-URL from Python) into an <img>, hide if none.
 async function wfLoadThumb(img, path){
