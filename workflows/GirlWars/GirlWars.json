@@ -635,16 +635,6 @@
               "x": 0,
               "y": 0
             }
-          },
-          {
-            "id": "n3v8s4fn",
-            "type": "loop",
-            "x": 100,
-            "y": 122,
-            "params": {
-              "infinite": true,
-              "count": ""
-            }
           }
         ],
         "edges": [

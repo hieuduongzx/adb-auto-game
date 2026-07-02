@@ -43,14 +43,16 @@
   -webkit-appearance:none; appearance:none; background-image:none; }
 .tb-tray-source select:focus { outline:none; box-shadow:none; }
 
-/* The run cluster is the toolbar's focal point — its primary button is larger. */
-.tb-run .btn.ico { width:36px; height:36px; }
-.tb-run .btn.ico svg { width:18px; height:18px; }
-.tb-run .btn.ok  { box-shadow:0 1px 4px rgba(31,146,84,.35); }
-.tb-run .btn.err { box-shadow:0 1px 4px rgba(187,58,51,.35); }
-/* Standalone toolbar buttons (Validate, Run GUI) sitting beside trays — match
-   the tray button height for visual alignment. */
-#toolbar .tb-center > .btn.ico { height:36px; width:36px; }
+/* The Run button is the toolbar's one focal point — standalone (no tray box),
+   green, and a touch wider than a tray slot so it reads as primary while still
+   sharing the 38px control height everything else uses. */
+#toolbar .tb-run-btn { width:46px; height:38px; border-radius:9px; }
+#toolbar .tb-run-btn svg { width:19px; height:19px; }
+#toolbar .tb-run-btn.ok  { box-shadow:0 1px 5px rgba(31,146,84,.4); }
+#toolbar .tb-run-btn.err { box-shadow:0 1px 5px rgba(187,58,51,.4); }
+/* Any standalone button sitting directly in a zone (e.g. DevScope) shares the
+   38px baseline so it lines up with the trays and pill beside it. */
+#toolbar .tb-zone > .btn { height:38px; }
 
 /* Segmented tray for the canvas edit toggles (snap / preview / group) on #wf-bar.
    Buttons read as one unit; borders are suppressed until hover / active. */

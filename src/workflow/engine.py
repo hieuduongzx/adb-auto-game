@@ -124,12 +124,20 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "random_branch":{"label":"Chọn ngẫu nhiên","kind": "random",    "ins": 1, "outs": []},
     "format_var":  {"label": "Định dạng chuỗi","kind": "action",    "ins": 1, "outs": ["out"]},
     "notify":      {"label": "Thông báo",       "kind": "action",    "ins": 1, "outs": ["out"]},
+    # ── Device / time ────────────────────────────────────────────────────────
+    # Read the wall clock, wait until a clock time, gate on a time window, and
+    # read live device properties (battery, current app, resolution…) into a var.
+    "get_time":    {"label": "Lấy giờ → biến",  "kind": "action",    "ins": 1, "outs": ["out"]},
+    "wait_until":  {"label": "Hẹn giờ",          "kind": "action",    "ins": 1, "outs": ["out"]},
+    "if_time":     {"label": "Nếu trong khung giờ","kind": "condition","ins": 1, "outs": ["true", "false"]},
+    "device_info": {"label": "Thông tin thiết bị → biến","kind": "action","ins": 1, "outs": ["out"]},
+    "screen_power":{"label": "Bật/tắt màn hình", "kind": "action",    "ins": 1, "outs": ["out"]},
 }
 
 # Condition node types a switch case may use — only the *instant* ones (no
 # wait_* timeout blocking, no tap_* side-effect), so evaluating one case never
 # stalls the others. Kept in sync with the designer's case-type dropdown.
-SWITCH_CASE_TYPES = ("if_image", "if_image_any", "if_text", "if_var")
+SWITCH_CASE_TYPES = ("if_image", "if_image_any", "if_text", "if_var", "if_time")
 
 
 class WorkflowEngine:
@@ -229,6 +237,10 @@ class WorkflowEngine:
             "break":      self._a_break,
             "format_var": self._a_format_var,
             "notify":     self._a_notify,
+            "get_time":     self._a_get_time,
+            "wait_until":   self._a_wait_until,
+            "device_info":  self._a_device_info,
+            "screen_power": self._a_screen_power,
         }
 
     # ── Per-thread execution context ─────────────────────────────────────────
@@ -1124,7 +1136,25 @@ class WorkflowEngine:
                 self.auto.swipe(cx, cy, cx + delta[0], cy + delta[1], duration)
                 self._sleep(0.4)
             return False
+        if ntype == "if_time":
+            negate = bool(params.get("negate", False))
+            now = time.localtime()
+            cur = now.tm_hour * 60 + now.tm_min
+            a = self._parse_hhmm(params.get("from"), 0)
+            b = self._parse_hhmm(params.get("to"), 24 * 60 - 1)
+            # a <= b: a normal window in one day. a > b: the window wraps past
+            # midnight (e.g. 22:00–06:00), so "inside" means before b OR after a.
+            inside = (a <= cur <= b) if a <= b else (cur >= a or cur <= b)
+            return inside != negate
         return False
+
+    @staticmethod
+    def _parse_hhmm(raw: Any, default: int) -> int:
+        """Parse a ``HH:MM`` string to minutes-since-midnight; ``default`` if bad."""
+        m = re.match(r"^\s*(\d{1,2}):(\d{2})\s*$", str(raw or ""))
+        if not m:
+            return default
+        return int(m.group(1)) * 60 + int(m.group(2))
 
     def _compare(self, cur: Any, op: str, rhs: Any) -> bool:
         # Boolean comparison when the right-hand side is true/false.
@@ -1803,3 +1833,123 @@ class WorkflowEngine:
         except Exception:
             pass
         return True
+
+    # ── Device / time handlers ────────────────────────────────────────────────
+
+    def _a_get_time(self, node, p) -> bool:
+        """Read the current local time into a variable, in the chosen shape."""
+        name = str(p.get("name", "")).strip()
+        part = str(p.get("part", "hm")).strip().lower()
+        now = time.localtime()
+        if part == "timestamp":
+            val: Any = int(time.time())
+        elif part == "hour":
+            val = now.tm_hour
+        elif part == "minute":
+            val = now.tm_min
+        elif part == "second":
+            val = now.tm_sec
+        elif part == "hms":
+            val = time.strftime("%H:%M:%S", now)
+        elif part == "date":
+            val = time.strftime("%Y-%m-%d", now)
+        elif part == "datetime":
+            val = time.strftime("%Y-%m-%d %H:%M:%S", now)
+        elif part == "weekday":
+            val = now.tm_wday + 1  # 1 = Monday … 7 = Sunday
+        elif part == "custom":
+            val = time.strftime(str(p.get("format", "%H:%M")), now)
+        else:  # "hm"
+            val = time.strftime("%H:%M", now)
+        if name:
+            self._set_var(name, val)
+            log_info(f"[workflow] 🕒 {name} = {self._vars[name]!r}")
+        return True
+
+    def _a_wait_until(self, node, p) -> bool:
+        """Block until a wall-clock ``HH:MM`` (or ``HH:MM:SS``). If the time is
+        already past today, wait until the same time tomorrow (unless disabled)."""
+        target = str(p.get("time", "")).strip()
+        m = re.match(r"^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$", target)
+        if not m:
+            log_warning(f"[workflow] ⏰ Hẹn giờ: định dạng không hợp lệ '{target}' (cần HH:MM)")
+            return False
+        hh, mm, ss = int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
+        now = time.localtime()
+        now_secs = now.tm_hour * 3600 + now.tm_min * 60 + now.tm_sec
+        delay = (hh * 3600 + mm * 60 + ss) - now_secs
+        if delay <= 0:
+            if bool(p.get("nextDay", True)):
+                delay += 86400
+            else:
+                log_info(f"[workflow] ⏰ {hh:02d}:{mm:02d} đã qua — bỏ qua chờ")
+                return True
+        log_info(f"[workflow] ⏰ Hẹn giờ đến {hh:02d}:{mm:02d}:{ss:02d} — chờ {delay}s")
+        self._sleep(delay)
+        return True
+
+    def _a_device_info(self, node, p) -> bool:
+        """Read a live device property into a variable (battery, app, size…)."""
+        name = str(p.get("name", "")).strip()
+        prop = str(p.get("prop", "battery")).strip().lower()
+        val = self._read_device_prop(prop)
+        if name:
+            self._set_var(name, val)
+            log_info(f"[workflow] 📱 {name} = {self._vars[name]!r} ({prop})")
+        return True
+
+    def _read_device_prop(self, prop: str) -> Any:
+        dev = getattr(self.auto.adb, "device", None)
+
+        def _sh(cmd: str) -> str:
+            return (dev.shell(cmd) if dev else "") or ""
+
+        try:
+            if prop == "battery":
+                m = re.search(r"level:\s*(\d+)", _sh("dumpsys battery"))
+                return int(m.group(1)) if m else 0
+            if prop == "current_app":
+                return self.auto.adb.get_current_app() or ""
+            if prop in ("width", "height"):
+                w, h = self.auto.adb.get_screen_size()
+                return int(w if prop == "width" else h)
+            if prop == "model":
+                return _sh("getprop ro.product.model").strip()
+            if prop == "brand":
+                return _sh("getprop ro.product.brand").strip()
+            if prop == "android":
+                return _sh("getprop ro.build.version.release").strip()
+            if prop == "sdk":
+                v = _sh("getprop ro.build.version.sdk").strip()
+                return int(v) if v.isdigit() else v
+            if prop == "serial":
+                return str(getattr(self.auto.adb, "device_id", "") or "")
+            if prop == "ip":
+                m = re.search(r"src\s+(\d+\.\d+\.\d+\.\d+)", _sh("ip route"))
+                return m.group(1) if m else ""
+        except Exception as exc:
+            log_warning(f"[workflow] device_info '{prop}' lỗi: {exc}")
+        return ""
+
+    def _a_screen_power(self, node, p) -> bool:
+        """Wake, sleep, or toggle the device screen via key events."""
+        action = str(p.get("action", "on")).strip().lower()
+        dev = getattr(self.auto.adb, "device", None)
+        if not dev:
+            return False
+        # KEYCODE_POWER 26 · KEYCODE_SLEEP 223 · KEYCODE_WAKEUP 224
+        try:
+            if action == "toggle":
+                dev.shell("input keyevent 26")
+            else:
+                out = dev.shell("dumpsys power") or ""
+                is_on = ("mWakefulness=Awake" in out) or ("Display Power: state=ON" in out)
+                if action == "on" and not is_on:
+                    dev.shell("input keyevent 224")
+                elif action == "off" and is_on:
+                    dev.shell("input keyevent 223")
+            log_info(f"[workflow] 🖥 màn hình: {action}")
+            return True
+        except Exception as exc:
+            log_warning(f"[workflow] screen_power '{action}' lỗi: {exc}")
+            return False

@@ -2681,15 +2681,15 @@
           {
             "id": "nkab045s",
             "type": "start",
-            "x": -160,
-            "y": -85,
+            "x": -140,
+            "y": -165,
             "params": {}
           },
           {
             "id": "nul2tpw9",
             "type": "call",
-            "x": -100,
-            "y": -80,
+            "x": -80,
+            "y": -160,
             "params": {
               "fn": "fn_ppung"
             }
@@ -2697,8 +2697,8 @@
           {
             "id": "nr5siouv",
             "type": "tap_image",
-            "x": 80,
-            "y": -100,
+            "x": 100,
+            "y": -180,
             "params": {
               "template": "templates/crop_20260629_103650_72x20.png",
               "taps": "1",
@@ -2816,7 +2816,7 @@
             "id": "n9nuvupv",
             "type": "try_chain",
             "x": 280,
-            "y": -200,
+            "y": -180,
             "params": {}
           },
           {

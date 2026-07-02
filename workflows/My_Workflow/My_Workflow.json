@@ -1,0 +1,35 @@
+{
+  "name": "My Workflow",
+  "version": 2,
+  "templatesDir": "templates",
+  "speedhack": {
+    "enabled": false,
+    "speed": 2,
+    "package": ""
+  },
+  "globals": [],
+  "functions": [],
+  "activities": [
+    {
+      "id": "sequence_kt27",
+      "name": "Activity 1",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nhndq70d",
+            "type": "start",
+            "x": 60,
+            "y": 70,
+            "params": {}
+          }
+        ],
+        "edges": [],
+        "groups": []
+      },
+      "maxRetries": 1
+    }
+  ]
+}

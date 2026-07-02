@@ -17,6 +17,11 @@ const WF_ICONS = {
   timer:      '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M9 2h6"/>',
   clock:      '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>',
   hourglass:  '<path d="M6 3h12"/><path d="M6 21h12"/><path d="M6 3c0 5 6 6 6 9s-6 4-6 9"/><path d="M18 3c0 5-6 6-6 9s6 4 6 9"/>',
+  alarm:      '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5"/><path d="M5 3 2 6"/><path d="M22 6l-3-3"/>',
+  calendar:   '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/>',
+  smartphone: '<rect x="6" y="2" width="12" height="20" rx="2"/><line x1="10" y1="18" x2="14" y2="18"/>',
+  power:      '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>',
+  battery:    '<rect x="2" y="7" width="16" height="10" rx="2"/><line x1="22" y1="11" x2="22" y2="13"/>',
   arrow_down: '<line x1="12" y1="4" x2="12" y2="20"/><polyline points="7 15 12 20 17 15"/>',
   // input
   keyboard:   '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M7 14h10"/>',
@@ -119,8 +124,14 @@ const WF_NODES = {
   random_branch: {label:"Random branch",ico:"dice",   kind:"random",    cat:"flow",   outs:[],              fields:[{k:"count",lbl:"Branch count",t:"num",d:2,refresh:true}], sum:p=>`🎲 ${p.count||2} even branches`},
   format_var:    {label:"Format string",ico:"type",   kind:"action",    cat:"logic",  outs:["out"],         fields:[{k:"name",lbl:"Target variable",t:"text",d:"text",var:true},{k:"template",lbl:"Template string",t:"text",insertVar:true,d:"Round {round}/{total}"}], sum:p=>`${p.name||"?"} = "${p.template||""}"`},
   notify:        {label:"Notify",      ico:"bell",   kind:"action",    cat:"misc",   outs:["out"],         fields:[{k:"title",lbl:"Title",t:"text",insertVar:true,d:"Workflow"},{k:"message",lbl:"Message",t:"text",insertVar:true,d:"Completed!"},{k:"sound",lbl:"Play sound",t:"bool",d:true}], sum:p=>`🔔 [${p.title||"Workflow"}] ${p.message||""}`},
+  // ── Device / time ──────────────────────────────────────────────────────────
+  get_time:      {label:"Get time → variable", ico:"clock", kind:"action", cat:"device", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"now",var:true},{k:"part",lbl:"Value",t:"select",opts:[{v:"hm",t:"HH:MM"},{v:"hms",t:"HH:MM:SS"},{v:"hour",t:"Hour (0-23)"},{v:"minute",t:"Minute"},{v:"second",t:"Second"},{v:"date",t:"Date YYYY-MM-DD"},{v:"datetime",t:"Date & time"},{v:"weekday",t:"Weekday (1=Mon…7=Sun)"},{v:"timestamp",t:"Unix timestamp"},{v:"custom",t:"Custom (strftime)"}],d:"hm"},{k:"format",lbl:"strftime format",t:"text",d:"%H:%M",showWhen:{part:"custom"}}], sum:p=>`${p.name||"?"} = ${({hm:"HH:MM",hms:"HH:MM:SS",hour:"hour",minute:"minute",second:"second",date:"date",datetime:"datetime",weekday:"weekday",timestamp:"timestamp",custom:p.format||"?"})[p.part||"hm"]}`},
+  wait_until:    {label:"Wait until time", ico:"alarm", kind:"action", cat:"device", outs:["out"], fields:[{k:"time",lbl:"Time (HH:MM)",t:"text",d:"08:00"},{k:"nextDay",lbl:"If passed → wait next day",t:"bool",d:true}], sum:p=>`⏰ ${p.time||"08:00"}`},
+  if_time:       {label:"If within time", ico:"clock", kind:"condition", cat:"device", outs:["true","false"], fields:[{k:"from",lbl:"From (HH:MM)",t:"text",d:"08:00"},{k:"to",lbl:"To (HH:MM)",t:"text",d:"22:00"},{k:"negate",lbl:"Negate (outside window)",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}${p.from||"00:00"}–${p.to||"23:59"}`},
+  device_info:   {label:"Device info → variable", ico:"smartphone", kind:"action", cat:"device", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"info",var:true},{k:"prop",lbl:"Property",t:"select",opts:[{v:"battery",t:"Battery level (%)"},{v:"current_app",t:"Current app package"},{v:"width",t:"Screen width"},{v:"height",t:"Screen height"},{v:"model",t:"Model"},{v:"brand",t:"Brand"},{v:"android",t:"Android version"},{v:"sdk",t:"SDK level"},{v:"serial",t:"Serial"},{v:"ip",t:"IP address"}],d:"battery"}], sum:p=>`${p.name||"?"} = ${p.prop||"battery"}`},
+  screen_power:  {label:"Screen power", ico:"power", kind:"action", cat:"device", outs:["out"], fields:[{k:"action",lbl:"Action",t:"select",opts:[{v:"on",t:"Wake / On"},{v:"off",t:"Sleep / Off"},{v:"toggle",t:"Toggle (power key)"}],d:"on"}], sum:p=>`🖥 ${({on:"wake",off:"sleep",toggle:"toggle"})[p.action||"on"]}`},
 };
-const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"input",label:"Keys & Input"}, {key:"image",label:"Image"}, {key:"ocr",label:"Text (OCR)"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"misc",label:"Other"} ];
+const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"input",label:"Keys & Input"}, {key:"image",label:"Image"}, {key:"ocr",label:"Text (OCR)"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"device",label:"Device & Time"}, {key:"misc",label:"Other"} ];
 const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"loop", done:"done", fail:"fail", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
 const WF_IN_LBL = { in:"in", loop:"loop" };
