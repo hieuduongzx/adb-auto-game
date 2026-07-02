@@ -32,7 +32,8 @@ const WF_WIRE_DEFS = (function(){
 // Keep wires simple: one soft cubic curve from output dot to input dot.
 function wfWireKey(ed){ return [ed.from,ed.fromPort||"out",ed.to,ed.toPort||"in"].join("|"); }
 function wfWireClamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-function wfWireLayer(ed,a,b){ return 1; }
+// Backward arcs paint on top of forward flow so a loop-back is never buried.
+function wfWireLayer(ed,a,b){ return (b.x-a.x > -20) ? 1 : 2; }
 function wfLaneMap(edges,pts){
   const lanes = new Map();
   const backEdges = edges.filter(ed => {
@@ -57,8 +58,11 @@ function wfNodeBox(id){
 // candidate horizontal channel against ALL blocks, not just the two endpoints.
 // Rebuilt once per wfDrawWires() call (wfWireBoxesRebuild) to stay cheap.
 let wfWireBoxes=[];
+// Registry of horizontal channels already claimed this draw pass — parallel
+// back-runs consult it so two wires never travel the exact same corridor.
+let wfWireChannels=[];
 function wfWireBoxesRebuild(){
-  const g=wfGraph(); wfWireBoxes=[];
+  const g=wfGraph(); wfWireBoxes=[]; wfWireChannels=[];
   if(!g) return;
   (g.nodes||[]).forEach(n=>{ const b=wfNodeBox(n.id); if(b) wfWireBoxes.push(b); });
 }

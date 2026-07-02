@@ -407,6 +407,13 @@ function wfInitCanvas(){
       // Snap the lead node, then shift the whole selection by the SAME delta.
       const lead=wfGesture.items.find(it=>it.id===wfGesture.dragId)||wfGesture.items[0];
       if(!lead) return;
+      const dx0=(e.clientX-wfGesture.sx)/wfZoom, dy0=(e.clientY-wfGesture.sy)/wfZoom;
+      // Only flag as dragging after a real move (not just a click).
+      if(!wfGesture._moving && (Math.abs(dx0)>1||Math.abs(dy0)>1)){
+        wfGesture._moving=true;
+        wfGesture.items.forEach(it=>{ const el=document.querySelector(`.wf-node[data-node="${it.id}"]`); if(el) el.classList.add("wf-dragging"); });
+      }
+      if(!wfGesture._moving) return;
       let sx=wfSnap(lead.ox+(e.clientX-wfGesture.sx)/wfZoom);
       let sy=wfSnap(lead.oy+(e.clientY-wfGesture.sy)/wfZoom);
       // Port-alignment snap (single node only): if a port of the dragged block
@@ -488,6 +495,8 @@ function wfInitCanvas(){
     } else if(wfGesture.mode==="move"){
       // Dropping a single lone block flush above/below another merges them.
       wfClearMergeHint();
+      document.querySelectorAll(".wf-node.wf-dragging").forEach(el=>el.classList.remove("wf-dragging"));
+      wfGesture.items.forEach(it=>{ const el=document.querySelector(`.wf-node[data-node="${it.id}"]`); if(el) el.classList.add("wf-dragdone"); });
       const moved=Math.abs(e.clientX-wfGesture.sx)+Math.abs(e.clientY-wfGesture.sy)>3;
       if(moved && wfGesture.items.length===1 && wfGesture.mergeOk){ wfPushUndo(); wfTryMerge(wfGesture.dragId); }
       else if(moved) wfPushUndo();  // plain move — push before the final render

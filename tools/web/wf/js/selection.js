@@ -1,6 +1,6 @@
 // ── Selection ────────────────────────────────────────────────────────────────
 function wfMarkSel(){ document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("sel",WF.sel.includes(el.dataset.node))); }
-function wfSelectOne(id){ WF.sel=id?[id]:[]; WF.selectedNode=id||null; }
+function wfSelectOne(id){ WF.sel=id?[id]:[]; WF.selectedNode=id||null; document.querySelectorAll(".wf-node.wf-dragdone").forEach(el=>el.classList.remove("wf-dragdone")); }
 function wfToggleSel(id){ const i=WF.sel.indexOf(id); if(i>=0)WF.sel.splice(i,1); else WF.sel.push(id); WF.selectedNode=WF.sel.length?id:null; }
 function wfClearSel(){ WF.sel=[]; WF.selectedNode=null; }
 function wfDeleteNode(id){ wfDeleteNodes([id]); }

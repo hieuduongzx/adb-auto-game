@@ -547,7 +547,7 @@
   display:none; align-items:center; gap:0; padding:0 2px;
   border-radius:4px 4px 0 0;
   background:rgba(190,197,210,.62); }
-.wf-node.sel .wf-node-actions { display:flex; }
+.wf-node.sel:not(.wf-dragging):not(.wf-dragdone) .wf-node-actions { display:flex; }
 .wf-node-actions button { display:inline-flex; align-items:center; justify-content:center;
   width:14px; height:14px; padding:0; border:none; border-radius:2px; background:transparent;
   color:rgba(50,60,75,.5); cursor:pointer; transition:background .1s, color .1s; }
