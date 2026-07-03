@@ -125,10 +125,12 @@ async function wfNew(){
   WF.name = name.trim() || "My Workflow";
   WF.version=2; WF.templatesDir="templates";
   WF.speedhack={enabled:false, speed:2.0, package:""};
+  WF.controller="adb"; WF.win32={window:"", matchBy:"title", inputMode:"background"};
   WF.activities=[]; WF.functions=[]; WF.edit={kind:"activity",id:null};
   WF.sel=[]; WF.selectedNode=null; wfPan={x:0,y:0}; wfZoom=1; wfRunNode=null;
   const nm=$("wf-name"); if(nm) nm.value=WF.name;
   wfSyncSpeedUI();
+  if(typeof wfSyncControllerUI==="function") wfSyncControllerUI();
   try{ await api().workflow_new(WF.name); }catch{}
   wfAddActivity("sequence");   // seed one activity so the canvas isn't empty
   await wfSave();              // auto-create workflow.json inside the named folder

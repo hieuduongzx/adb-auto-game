@@ -145,6 +145,13 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # can, on its own, sit idle until 07:00 then boot the emulator (no Task
     # Scheduler / PC-wake needed — the PC is already on running this tool).
     "launch_emulator": {"label": "Mở giả lập", "kind": "action", "ins": 1, "outs": ["out"]},
+    # ── Win32 (điều khiển cửa sổ chương trình PC) ─────────────────────────────
+    # Only meaningful when the flow's controller is "win32". Tap/swipe/image/
+    # color/OCR nodes already work on Win32 via the shared capture pipeline;
+    # these cover the window-lifecycle actions ADB nodes can't express.
+    "win_launch":   {"label": "Mở chương trình", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_activate": {"label": "Đưa cửa sổ lên trước", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_close":    {"label": "Đóng cửa sổ", "kind": "action", "ins": 1, "outs": ["out"]},
 }
 
 # ── Emulator launch specs ─────────────────────────────────────────────────────
@@ -300,6 +307,9 @@ class WorkflowEngine:
             "screen_power": self._a_screen_power,
             "read_color":   self._a_read_color,
             "launch_emulator": self._a_launch_emulator,
+            "win_launch":   self._a_win_launch,
+            "win_activate": self._a_win_activate,
+            "win_close":    self._a_win_close,
         }
 
     # ── Per-thread execution context ─────────────────────────────────────────
@@ -390,6 +400,11 @@ class WorkflowEngine:
         """Install a parsed flow dict. ``flow_path`` anchors relative templates."""
         self.flow = flow or {}
         self.flow_path = flow_path
+        # Which backend drives the flow: "adb" (Android device/emulator) or
+        # "win32" (a native Windows program window). Selected in the designer's
+        # project settings and honoured by _ensure_ready().
+        self._controller = str(self.flow.get("controller") or "adb").strip().lower()
+        self._win32_cfg = dict(self.flow.get("win32") or {})
         self.speedhack_cfg = dict(self.flow.get("speedhack") or {})
         self._functions = {f.get("id"): f for f in (self.flow.get("functions") or []) if f.get("id")}
         # Global vars: declared at flow top level (``globals``), seeded into every
@@ -445,7 +460,9 @@ class WorkflowEngine:
     # ── Lifecycle ────────────────────────────────────────────────────────────
 
     def _ensure_ready(self) -> bool:
-        """Connect ADB + start continuous capture if needed."""
+        """Connect the selected backend + start continuous capture if needed."""
+        if getattr(self, "_controller", "adb") == "win32":
+            return self._ensure_ready_win32()
         try:
             if not self.auto.adb.device:
                 self.auto.adb.check_adb_connection()
@@ -458,6 +475,38 @@ class WorkflowEngine:
             return True
         except Exception as e:
             log_error(f"[workflow] Not ready: {e}")
+            return False
+
+    def _ensure_ready_win32(self) -> bool:
+        """Attach to the target window + start window capture (Win32 backend).
+
+        Swaps ``self.auto`` to a :class:`Win32GameAutomation` on first use (the
+        engine builds an ADB backend by default in __init__), then attaches to
+        the configured window."""
+        try:
+            from src.core.win32 import Win32GameAutomation
+            if not isinstance(self.auto, Win32GameAutomation):
+                try:
+                    self.auto.stop_continuous_capture()
+                except Exception:
+                    pass
+                self.auto = Win32GameAutomation(cfg=self._win32_cfg)
+            else:
+                self.auto.configure(self._win32_cfg)
+            if not self.auto.adb.device:
+                self.auto.adb.check_adb_connection()  # attach window
+            if not self.auto.adb.device:
+                log_error(
+                    f"[workflow] Win32: không tìm thấy cửa sổ "
+                    f"'{self._win32_cfg.get('window','')}' — kiểm tra Project settings"
+                )
+                return False
+            self.auto._update_screen_size()
+            if not getattr(self.auto, "capture_running", False):
+                self.auto.start_continuous_capture()
+            return True
+        except Exception as e:
+            log_error(f"[workflow] Win32 not ready: {e}")
             return False
 
     def start(self, background: bool = True, with_speedhack: bool = True) -> bool:
@@ -1553,6 +1602,10 @@ class WorkflowEngine:
         cfg = self.speedhack_cfg or {}
         if not self._truthy(cfg.get("enabled", False)):
             return
+        # Frida speedhack is Android/ADB-only — not applicable to a Win32 window.
+        if getattr(self, "_controller", "adb") == "win32":
+            log_info("[speedhack] bỏ qua — dự án Win32 không dùng Frida/ADB")
+            return
         if self._speedhack is not None:
             return
         package = str(cfg.get("package") or "").strip() or self._auto_package()
@@ -2102,6 +2155,9 @@ class WorkflowEngine:
 
     def _a_screen_power(self, node, p) -> bool:
         """Wake, sleep, or toggle the device screen via key events."""
+        if getattr(self, "_controller", "adb") == "win32":
+            log_warning("[workflow] 🖥 Bật/tắt màn hình không áp dụng cho dự án Win32 — bỏ qua")
+            return True
         action = str(p.get("action", "on")).strip().lower()
         dev = getattr(self.auto.adb, "device", None)
         if not dev:
@@ -2253,3 +2309,52 @@ class WorkflowEngine:
                 pass
             time.sleep(1.0)
         log_warning(f"[workflow] ▶ Chưa thấy ADB {host} sau {wait:.0f}s")
+
+    # ── Win32 handlers ─────────────────────────────────────────────────────────
+
+    def _win32_ctrl(self):
+        """Return the Win32 controller if this is a Win32 flow, else None."""
+        if getattr(self, "_controller", "adb") != "win32":
+            log_warning("[workflow] Node Win32 chỉ chạy trong dự án Win32 (đổi Controller ở Project settings)")
+            return None
+        return getattr(self.auto, "adb", None)
+
+    def _a_win_launch(self, node, p) -> bool:
+        """Start a program (exe path + optional args) or focus its window; then
+        optionally wait until a matching window title appears and attach to it."""
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        path = str(p.get("path", "")).strip()
+        args = str(p.get("args", "")).strip()
+        cmd = f'"{path}" {args}'.strip() if args else path
+        if not ctrl.launch_app(cmd):
+            return False
+        window = str(p.get("window", "")).strip()
+        wait = float(p.get("wait", 0) or 0)
+        if window and wait > 0:
+            end = time.time() + wait
+            while time.time() < end and not self._stop.is_set():
+                self._pause.wait()
+                hwnd = ctrl._find_hwnd(window, "title")
+                if hwnd:
+                    ctrl.hwnd = hwnd
+                    log_success(f"[workflow] 🪟 Cửa sổ '{window}' đã mở")
+                    return True
+                time.sleep(0.5)
+            log_warning(f"[workflow] 🪟 Chưa thấy cửa sổ '{window}' sau {wait:.0f}s")
+        return True
+
+    def _a_win_activate(self, node, p) -> bool:
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        if not ctrl.device:
+            ctrl.attach()
+        return bool(ctrl.activate())
+
+    def _a_win_close(self, node, p) -> bool:
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        return bool(ctrl.close_window())

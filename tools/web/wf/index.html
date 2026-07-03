@@ -116,6 +116,26 @@
   <div id="wf-main" class="card">
     <div id="wf-bar">
       <input id="wf-name" type="text" placeholder="Workflow name" value="My Workflow">
+      <!-- Project controller: ADB device/emulator vs a native Win32 window. -->
+      <div id="wf-controller-group" class="wf-speed-group" title="Loại dự án: ADB (thiết bị/giả lập) hay Win32 (cửa sổ chương trình PC)">
+        <select id="wf-controller" onchange="wfControllerChanged()" title="Controller">
+          <option value="adb">ADB</option>
+          <option value="win32">Win32</option>
+        </select>
+        <span id="wf-win32-group" style="display:none;align-items:center;gap:4px">
+          <input id="wf-win32-window" type="text" placeholder="Tên/lớp cửa sổ (VD Genshin*)" title="Cửa sổ mục tiêu" style="width:170px" onchange="wfWin32FromUI()">
+          <button class="btn sm ico wf-var-pick" id="wf-win32-pick" title="Chọn cửa sổ đang mở" onclick="wfPickWindow(event)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg></button>
+          <select id="wf-win32-matchby" title="Khớp theo" onchange="wfWin32FromUI()">
+            <option value="title">Title</option>
+            <option value="class">Class</option>
+          </select>
+          <select id="wf-win32-mode" title="Chế độ điều khiển: Nền (chạy ẩn) hay Trước (chiếm chuột)" onchange="wfWin32FromUI()">
+            <option value="background">Nền</option>
+            <option value="foreground">Trước</option>
+          </select>
+        </span>
+      </div>
       <span class="wf-cur-act" id="wf-cur-act">—</span>
       <!-- Canvas edit toggles, grouped in a segmented tray. -->
       <span class="wf-tool-tray">

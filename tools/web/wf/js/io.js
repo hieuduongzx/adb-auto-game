@@ -30,8 +30,11 @@ function wfSerializeNode(n){
 function wfSerialize(){
   wfSpeedFromUI();
   const sh=WF.speedhack||{enabled:false,speed:2.0,package:""};
+  const w=WF.win32||{window:"",matchBy:"title",inputMode:"background"};
   return {
     name:$("wf-name").value||"workflow", version:2, templatesDir:WF.templatesDir||"templates",
+    controller:(WF.controller==="win32")?"win32":"adb",
+    win32:{ window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:w.inputMode||"background" },
     speedhack:{ enabled:!!sh.enabled, speed:sh.speed||2.0, package:(sh.package||"").trim() },
     globals: wfSerialVars(WF.globals||[]),
     functions: WF.functions.map(f=>({ id:f.id, name:f.name, graph:wfCleanGraph(f.graph) })),
@@ -64,6 +67,8 @@ function wfHydrateGraph(g){
 function wfHydrate(flow){
   WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"templates";
   const sh=flow.speedhack||{}; WF.speedhack={enabled:!!sh.enabled, speed:(parseFloat(sh.speed)||2.0), package:(sh.package||"").trim()};
+  WF.controller=(flow.controller==="win32")?"win32":"adb";
+  const w=flow.win32||{}; WF.win32={window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:w.inputMode||"background"};
   WF.functions=(flow.functions||[]).map(f=>({ id:f.id||("fn_"+wfUid().slice(1,6)), name:f.name||"function", graph:wfHydrateGraph(f.graph) }));
   WF.globals = wfHydVars(flow.globals||[]);
   WF.activities=(flow.activities||[]).map(a=>({
@@ -76,6 +81,7 @@ function wfHydrate(flow){
   WF.edit={kind:"activity", id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
   $("wf-name").value=WF.name;
   wfSyncSpeedUI();
+  if(typeof wfSyncControllerUI==="function") wfSyncControllerUI();
   wfRenderAll();
 }
 
@@ -165,6 +171,7 @@ async function init(){
   wfSetupRename($("wf-activities-bg"), actById);
   wfSetupRename($("wf-functions"), id=>WF.functions.find(f=>f.id===id));
   wfSyncToggleBtns();
+  if(typeof wfSyncControllerUI==="function") wfSyncControllerUI();
   wfSetRunning(false);   // seed the run button's play icon
   updateLogCount();
   wfInitCanvas();

@@ -28,6 +28,10 @@ paddlepaddle>=3.0.0
 PySide6>=6.6.0         # Native Qt UI
 qtawesome>=1.4.2       # FontAwesome icons for Qt UI
 
+# Win32 desktop control (native program-window backend, alternative to ADB).
+# Windows-only; provides PrintWindow capture + PostMessage/SendInput input.
+pywin32>=306 ; sys_platform == "win32"
+
 # Mobile automation
 pure-python-adb>=0.3.0.dev0
 # Optional scrcpy-backed screenshot/frame capture:

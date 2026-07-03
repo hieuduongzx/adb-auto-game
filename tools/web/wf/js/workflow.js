@@ -154,8 +154,19 @@ const WF_NODES = {
     {k:"wait",lbl:"Wait for ADB ready (s)",t:"num",d:60},
     {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
   ], sum:p=>`▶ ${p.emulator||"ldplayer"}${(p.index?(" #"+p.index):"")}${p.at?(" ⏰"+p.at):""}`},
+  // ── Win32 (điều khiển cửa sổ chương trình PC) ────────────────────────────────
+  // Chỉ dùng khi Controller của dự án = Win32. Các node tap/swipe/ảnh/màu/OCR
+  // vẫn chạy được trên Win32 nhờ dùng chung pipeline chụp màn hình.
+  win_launch:   {label:"Launch program", ico:"rocket", kind:"action", cat:"win32", outs:["out"], fields:[
+    {k:"path",lbl:"Program (.exe) path",t:"text",d:"",pickFolder:false},
+    {k:"args",lbl:"Arguments (optional)",t:"text",d:""},
+    {k:"window",lbl:"Wait for window title (optional)",t:"text",d:""},
+    {k:"wait",lbl:"Wait for window (s)",t:"num",d:30},
+  ], sum:p=>`▶ ${(p.path||"(program)").split(/[\\/]/).pop()}`},
+  win_activate: {label:"Activate window", ico:"monitor", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"đưa cửa sổ lên trước"},
+  win_close:    {label:"Close window", ico:"x", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"đóng cửa sổ mục tiêu"},
 };
-const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"input",label:"Keys & Input"}, {key:"image",label:"Image"}, {key:"color",label:"Color"}, {key:"ocr",label:"Text (OCR)"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"device",label:"Device & Time"}, {key:"misc",label:"Other"} ];
+const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"input",label:"Keys & Input"}, {key:"image",label:"Image"}, {key:"color",label:"Color"}, {key:"ocr",label:"Text (OCR)"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"device",label:"Device & Time"}, {key:"win32",label:"Win32 (PC)"}, {key:"misc",label:"Other"} ];
 const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"loop", done:"done", fail:"fail", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
 const WF_IN_LBL = { in:"in", loop:"loop" };
@@ -195,6 +206,9 @@ function wfIns(type){ const def=WF_NODES[type]; return (def&&def.ins)||["in"]; }
 const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities:[], functions:[],
   globals:[],
   speedhack:{enabled:false, speed:2.0, package:""},
+  // Which backend drives the flow: "adb" (device/emulator) or "win32" (PC window).
+  controller:"adb",
+  win32:{window:"", matchBy:"title", inputMode:"background"},
   edit:{kind:"activity", id:null}, sel:[], selectedNode:null };
 let wfSpace=false;  // space held → pan instead of box-select
 const WF_GRID=20;   // grid step; snapping is opt-in (default off)
@@ -268,6 +282,72 @@ async function wfSpeedRun(){
   if(!pkg){ alert("Enter a game package (or add a Launch app node) to enable speed hack."); return; }
   const ok=await api().speedhack_start(sh.speed, pkg);
   if(!ok){ wfSpeedRunning=false; wfSyncSpeedUI(); }
+}
+// ── Project controller (ADB vs Win32) ────────────────────────────────────────
+function wfSyncControllerUI(){
+  const sel=$("wf-controller"); if(sel) sel.value=WF.controller||"adb";
+  const w=WF.win32||(WF.win32={window:"",matchBy:"title",inputMode:"background"});
+  const grp=$("wf-win32-group"); if(grp) grp.style.display=(WF.controller==="win32")?"inline-flex":"none";
+  const win=$("wf-win32-window"); if(win && document.activeElement!==win) win.value=w.window||"";
+  const mb=$("wf-win32-matchby"); if(mb) mb.value=w.matchBy||"title";
+  const md=$("wf-win32-mode"); if(md) md.value=w.inputMode||"background";
+  wfPushCaptureSource();
+}
+// Tell the Python side which source the Preview tab should capture from, so the
+// preview/crop/colour-inspect follow the project's controller (ADB vs Win32).
+function wfPushCaptureSource(){
+  try{ api().set_capture_source(WF.controller||"adb", WF.win32||{}); }catch{}
+}
+function wfControllerChanged(){ WF.controller=($("wf-controller").value==="win32")?"win32":"adb"; wfSyncControllerUI(); wfPushUndoDebounced(); }
+// Window picker: a dropdown of currently-open windows so the user chooses the
+// game window instead of typing its title. Reuses the .wf-varmenu styling.
+let wfWinMenuEl=null;
+function wfCloseWinMenu(){ if(wfWinMenuEl){ wfWinMenuEl.remove(); wfWinMenuEl=null; document.removeEventListener("mousedown",wfWinMenuOutside,true); } }
+function wfWinMenuOutside(e){ if(wfWinMenuEl && !e.target.closest(".wf-varmenu") && !e.target.closest("#wf-win32-pick")) wfCloseWinMenu(); }
+async function wfPickWindow(ev){
+  if(ev) ev.stopPropagation();
+  let wins=[]; try{ wins=await api().list_windows()||[]; }catch{}
+  wfCloseWinMenu();
+  const anchor=$("wf-win32-window");
+  const menu=document.createElement("div"); menu.className="wf-varmenu"; wfWinMenuEl=menu;
+  const search=document.createElement("input"); search.type="text"; search.className="wf-varmenu-search";
+  search.placeholder="Tìm cửa sổ…"; search.spellcheck=false; search.autocomplete="off"; menu.appendChild(search);
+  const list=document.createElement("div"); list.className="wf-varmenu-list"; menu.appendChild(list);
+  function render(filter){
+    list.innerHTML="";
+    const f=(filter||"").trim().toLowerCase();
+    const shown=wins.filter(w=>!f||w.title.toLowerCase().includes(f)||(w.cls||"").toLowerCase().includes(f));
+    if(!shown.length){ const e=document.createElement("div"); e.className="wf-varmenu-empty"; e.textContent=wins.length?"Không khớp.":"Không thấy cửa sổ nào."; list.appendChild(e); return; }
+    shown.forEach(w=>{
+      const row=document.createElement("button"); row.type="button"; row.className="wf-varmenu-item";
+      row.innerHTML=`<span class="vn">${escHtml(w.title)}</span><span class="vt">${escHtml(w.cls||"")}</span>`;
+      row.title=`Title: ${w.title}\nClass: ${w.cls||""}`;
+      row.onclick=()=>{
+        const by=($("wf-win32-matchby").value)||"title";
+        anchor.value = (by==="class") ? (w.cls||w.title) : w.title;
+        wfWin32FromUI(); wfCloseWinMenu();
+      };
+      list.appendChild(row);
+    });
+  }
+  render("");
+  document.body.appendChild(menu);
+  const r=($("wf-win32-pick")||anchor).getBoundingClientRect();
+  const mw=Math.max(300, anchor.getBoundingClientRect().width);
+  menu.style.width=mw+"px";
+  let left=Math.min(r.left, window.innerWidth-mw-8);
+  let top=r.bottom+4; if(top+300>window.innerHeight) top=Math.max(8, r.top-304);
+  menu.style.left=Math.max(8,left)+"px"; menu.style.top=top+"px";
+  search.oninput=()=>render(search.value);
+  setTimeout(()=>{ search.focus(); document.addEventListener("mousedown",wfWinMenuOutside,true); },0);
+}
+function wfWin32FromUI(){
+  const w=WF.win32||(WF.win32={});
+  w.window=($("wf-win32-window").value||"").trim();
+  w.matchBy=$("wf-win32-matchby").value||"title";
+  w.inputMode=$("wf-win32-mode").value||"background";
+  wfPushCaptureSource();
+  wfPushUndoDebounced();
 }
 function wfToggleSnap(){ wfSnapOn=!wfSnapOn; wfSyncToggleBtns(); wfSaveSettings(); }
 function wfTogglePreview(){ wfPreviewAll=!wfPreviewAll; wfSyncToggleBtns(); wfRenderCanvas(); wfSaveSettings(); }

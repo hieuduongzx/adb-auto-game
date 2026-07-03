@@ -151,6 +151,12 @@ class WorkflowDesignerAPI:
         self._selected_serial: Optional[str] = None
         self._connected_serial: Optional[str] = None
 
+        # Capture source for the Preview tab: "adb" (self.controller) or "win32"
+        # (a native window via Win32Controller). Kept in sync from the designer UI
+        # so preview/crop/inspect capture from whatever the project targets.
+        self._capture_kind = "adb"
+        self._win32 = None  # lazily-built Win32Controller
+
         # Live Preview tab state (mirrors DevScope). Auto-refresh defaults OFF so
         # no capture work happens until the user opens the Preview tab.
         self._screen: Optional[np.ndarray] = None
@@ -252,8 +258,31 @@ class WorkflowDesignerAPI:
         except Exception:
             pass
 
+    def set_capture_source(self, kind: str = "adb", cfg: Optional[dict] = None) -> bool:
+        """Point the Preview tab's capture at ADB or a Win32 window.
+
+        Called from the designer whenever the project's controller / target
+        window changes, so preview + crop + colour-inspect all grab from the
+        same source the workflow will run against."""
+        self._capture_kind = "win32" if str(kind) == "win32" else "adb"
+        if self._capture_kind == "win32":
+            try:
+                from src.core.win32 import Win32Controller
+                if self._win32 is None:
+                    self._win32 = Win32Controller(cfg or {})
+                else:
+                    self._win32.configure(cfg or {})
+            except Exception as exc:
+                log_warning(f"Win32 capture source lỗi: {exc}")
+                return False
+        return True
+
     def capture(self) -> bool:
-        if self.controller.device is None:
+        if self._capture_kind == "win32":
+            if self._win32 is None:
+                self._push("capture_failed", {"error": "Chưa đặt cửa sổ Win32"})
+                return False
+        elif self.controller.device is None:
             self._push("capture_failed", {"error": "No device selected"})
             return False
         with self._capture_lock:
@@ -265,7 +294,15 @@ class WorkflowDesignerAPI:
 
     def _capture_worker(self) -> None:
         try:
-            img = capture_screen_frame(self.controller)
+            if self._capture_kind == "win32":
+                if not self._win32.device:
+                    self._win32.attach()
+                if not self._win32.device:
+                    self._push("capture_failed", {"error": "Không tìm thấy cửa sổ Win32 mục tiêu"})
+                    return
+                img = self._win32.capture_frame()
+            else:
+                img = capture_screen_frame(self.controller)
             if img is None:
                 self._push("capture_failed", {"error": "Failed to capture screen"})
                 return
@@ -535,6 +572,39 @@ class WorkflowDesignerAPI:
             return ""
         path = paths[0] if isinstance(paths, (list, tuple)) else paths
         return str(path)
+
+    def list_windows(self) -> list:
+        """List visible top-level windows as ``[{title, cls}]`` for the Win32
+        window picker in the designer. Returns [] if pywin32 is unavailable."""
+        try:
+            import win32gui
+        except Exception:
+            return []
+        out: List[dict] = []
+        seen: set = set()
+
+        def _cb(hwnd, _):
+            try:
+                if not win32gui.IsWindowVisible(hwnd):
+                    return
+                title = (win32gui.GetWindowText(hwnd) or "").strip()
+                if not title:
+                    return
+                cls = win32gui.GetClassName(hwnd) or ""
+                key = (title, cls)
+                if key in seen:
+                    return
+                seen.add(key)
+                out.append({"title": title, "cls": cls})
+            except Exception:
+                pass
+
+        try:
+            win32gui.EnumWindows(_cb, None)
+        except Exception:
+            pass
+        out.sort(key=lambda w: w["title"].lower())
+        return out
 
     # ── Template matching ─────────────────────────────────────────────────────
 
