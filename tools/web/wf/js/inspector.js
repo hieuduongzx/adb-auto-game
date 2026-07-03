@@ -129,7 +129,17 @@ function wfRenderInspector(){
       }
       // Fields may declare showWhen:{key:val|[vals]} to appear only when another
       // param has a given value (e.g. Tap's x/y hide when target = found image).
-      (def.fields||[]).filter(f=>wfFieldVisible(node,f)).forEach(f=>pblock.appendChild(wfFieldEl(node,f)));
+      // Consecutive short coordinate-style numbers (x/y, w/h, x1/y1…) are paired
+      // two-per-row so the panel stays compact instead of one tall column.
+      const vis=(def.fields||[]).filter(f=>wfFieldVisible(node,f));
+      for(let i=0;i<vis.length;i++){
+        const f=vis[i], g=vis[i+1];
+        if(f.t==="num" && WF_PAIR_KEYS.has(f.k) && g && g.t==="num" && WF_PAIR_KEYS.has(g.k)){
+          pblock.appendChild(wfPairRow(node,f,g)); i++;
+        } else {
+          pblock.appendChild(wfFieldEl(node,f));
+        }
+      }
     }
     body.appendChild(pblock);
 
@@ -357,13 +367,15 @@ function wfTimingField(node){
     inp.placeholder="0";
     inp.oninput=()=>{ wfPushUndoDebounced(); node[key]=parseFloat(inp.value)||0; wfUpdNodeTiming(node); };
     row.appendChild(inp);
-    const unit=document.createElement("span"); unit.className="hz-unit"; unit.textContent="seconds"; row.appendChild(unit);
+    const unit=document.createElement("span"); unit.className="hz-unit"; unit.textContent="s"; row.appendChild(unit);
     return row;
   };
-  b.appendChild(mk("delayBefore","Before","Wait this many seconds before running this block (e.g. wait for the screen to stabilize before finding an image)."));
-  b.appendChild(mk("delayAfter","After","After this block runs, wait this many seconds before moving to the next block."));
+  const pair=document.createElement("div"); pair.className="wf-field-pair";
+  pair.appendChild(mk("delayBefore","Before","Wait this many seconds before running this block (e.g. wait for the screen to stabilize before finding an image)."));
+  pair.appendChild(mk("delayAfter","After","After this block runs, wait this many seconds before moving to the next block."));
+  b.appendChild(pair);
   const hint=document.createElement("div"); hint.className="wf-insp-tip";
-  hint.innerHTML="<b>Before</b> X seconds = wait before running this block. <b>After</b> X seconds = wait after it finishes before the next block. Like a Wait block, but attached to this block.";
+  hint.innerHTML="<b>Before</b> = wait before this block runs · <b>After</b> = wait after it finishes, before the next block (seconds).";
   b.appendChild(hint);
   return b;
 }
@@ -387,8 +399,10 @@ function wfRetryField(node){
     inp.oninput=()=>{ wfPushUndoDebounced(); node[key]=key==="retryCount"?(parseInt(inp.value,10)||0):(parseFloat(inp.value)||0); wfUpdNodeRetry(node); };
     row.appendChild(inp); return row;
   };
-  b.appendChild(mkNum("retryCount","Retries","1"));
-  b.appendChild(mkNum("retryDelay","Retry wait","0.5"));
+  const pair=document.createElement("div"); pair.className="wf-field-pair";
+  pair.appendChild(mkNum("retryCount","Retries","1"));
+  pair.appendChild(mkNum("retryDelay","Retry wait","0.5"));
+  b.appendChild(pair);
   const row=document.createElement("div"); row.className="wf-field";
   const l=document.createElement("label"); l.textContent="Screenshot"; row.appendChild(l);
   const cb=document.createElement("span"); cb.className="cb"+(node.screenshotOnFail?" checked":""); cb.innerHTML='<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
@@ -624,6 +638,16 @@ function wfFieldVisible(node,f){
     const cur=node.params[k];
     return Array.isArray(want) ? want.includes(cur) : cur===want;
   });
+}
+
+// Short numeric params that read as a coordinate/size pair — rendered two to a
+// row (label + narrow input, side by side) so the inspector stays compact.
+const WF_PAIR_KEYS = new Set(["x","y","w","h","x1","y1","x2","y2","offsetX","offsetY","min","max"]);
+function wfPairRow(node,fA,fB){
+  const wrap=document.createElement("div"); wrap.className="wf-field-pair";
+  wrap.appendChild(wfFieldEl(node,fA));
+  wrap.appendChild(wfFieldEl(node,fB));
+  return wrap;
 }
 
 function wfFieldEl(node,f){

@@ -4,7 +4,7 @@ The engine wraps an :class:`~src.core.adb.auto.ADBGameAutomation` instance and
 runs the **node graph** of each activity. It is shared by two front-ends:
 
 * the **Run test** button in ``tools/dev_helper.py`` (design-time preview), and
-* the standalone **runner GUI** (``src/gui/workflow_runner_gui.py``).
+* the standalone **runner GUI** (``tools/workflow_runner.py``).
 
 Both feed it the exact same JSON, so a flow that runs in the designer runs
 unchanged in the runner.

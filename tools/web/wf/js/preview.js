@@ -240,13 +240,36 @@ function wfPvNormRect(a,b){
 
 function wfPvDrawEmpty(){
   const cvs=wfPvCanvas; if(!cvs||!wfPvCtx) return;
-  const ctx=wfPvCtx, cw=cvs.width, ch=cvs.height;
+  const ctx=wfPvCtx, cw=cvs.width, ch=cvs.height, cx=cw/2, cy=ch/2;
   ctx.clearRect(0,0,cw,ch);
-  ctx.fillStyle="#121316"; ctx.fillRect(0,0,cw,ch);
-  ctx.fillStyle="#9aa3ae"; ctx.font="13px IBM Plex Sans,Segoe UI,sans-serif";
+  // Soft radial vignette instead of a flat void — reads as a "screen off" panel.
+  const g=ctx.createRadialGradient(cx,cy*0.9,0,cx,cy,Math.max(cw,ch)*0.7);
+  g.addColorStop(0,"#1c2027"); g.addColorStop(1,"#0e1013");
+  ctx.fillStyle=g; ctx.fillRect(0,0,cw,ch);
+
+  const err=!!wfPvErr, busy=!err && !!S.connectedSerial;
+  const accent = err ? "#e0736b" : busy ? "#5aa9e6" : "#5b6675";
+  // Phone-outline glyph, centred just above the text.
+  const iw=44, ih=72, ix=cx-iw/2, iy=cy-ih/2-26;
+  ctx.save();
+  ctx.strokeStyle=accent; ctx.lineWidth=2.4; ctx.lineJoin="round"; ctx.globalAlpha=err?.9:.55;
+  const rr=(x,y,w,h,r)=>{ ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); ctx.stroke(); };
+  rr(ix,iy,iw,ih,8);
+  ctx.globalAlpha=err?.9:.4; ctx.beginPath();
+  ctx.moveTo(cx-6,iy+ih-7); ctx.lineTo(cx+6,iy+ih-7); ctx.stroke();  // home bar
+  ctx.restore();
+
   ctx.textAlign="center";
-  const msg = wfPvErr ? ("Capture error: "+wfPvErr) : (S.connectedSerial ? "Capturing…" : "No device connected.");
-  ctx.fillText(msg, cw/2, ch/2);
+  const title = err ? "Capture error" : busy ? "Capturing…" : "No device connected";
+  const sub   = err ? String(wfPvErr) : busy ? "Waiting for the first frame" : "Connect a device or emulator, then press Capture";
+  ctx.fillStyle = err ? "#eab3ad" : "#c2cad4";
+  ctx.font="600 15px IBM Plex Sans,Segoe UI,sans-serif";
+  ctx.fillText(title, cx, cy+18);
+  ctx.fillStyle="#7c8795";
+  ctx.font="12px IBM Plex Sans,Segoe UI,sans-serif";
+  ctx.fillText(sub.length>70?sub.slice(0,67)+"…":sub, cx, cy+40);
 }
 
 function wfPvResetZoom(){

@@ -6,8 +6,8 @@ designer's *Chạy GUI* button relaunches this same executable in that mode
 (see :func:`src.utils.launch_tool`).
 
 This module is the PyInstaller analysis entry point; the static
-``import workflow_designer`` / ``import src.gui.workflow_runner_gui`` below are
-what pull those tools (and their whole dependency tree) into the build.
+``import workflow_designer`` / ``import workflow_runner`` below are what pull
+those tools (and their whole dependency tree) into the build.
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def main() -> None:
     argv = sys.argv[1:]
     if argv and argv[0] == "--runner":
         flow = argv[1] if len(argv) > 1 else None
-        from src.gui.workflow_runner_gui import run as run_runner
+        from workflow_runner import run as run_runner
         run_runner(flow)
     else:
         import workflow_designer

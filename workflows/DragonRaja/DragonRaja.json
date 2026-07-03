@@ -233,7 +233,7 @@
             "id": "n6mnrwmg",
             "type": "call",
             "x": 120,
-            "y": 25,
+            "y": 5,
             "params": {
               "fn": "fn_nd3oj"
             }
@@ -242,7 +242,7 @@
             "id": "n62x2k6o",
             "type": "tap_image",
             "x": 340,
-            "y": 20,
+            "y": 4,
             "params": {
               "template": "templates/crop_20260630_205315_1368_319_296_38.png",
               "taps": "1",
@@ -256,7 +256,7 @@
             "id": "n8x6kc30",
             "type": "tap_image",
             "x": 520,
-            "y": 20,
+            "y": 4,
             "params": {
               "template": "templates/crop_20260630_205319_1649_974_206_38.png",
               "taps": "1",
@@ -284,7 +284,7 @@
             "id": "nrnrnjut",
             "type": "call",
             "x": 900,
-            "y": 40,
+            "y": 20,
             "params": {
               "fn": "fn_b6am3"
             }

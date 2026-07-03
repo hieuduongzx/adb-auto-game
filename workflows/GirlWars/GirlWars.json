@@ -2,6 +2,12 @@
   "name": "workflow",
   "version": 2,
   "templatesDir": "templates",
+  "controller": "adb",
+  "win32": {
+    "window": "",
+    "matchBy": "title",
+    "inputMode": "background"
+  },
   "speedhack": {
     "enabled": true,
     "speed": 3,
@@ -55,26 +61,15 @@
           {
             "id": "no3ohhex",
             "type": "start",
-            "x": 200,
-            "y": 95,
+            "x": -20,
+            "y": 155,
             "params": {}
-          },
-          {
-            "id": "nvecbhfl",
-            "type": "wait_image",
-            "x": 280,
-            "y": 80,
-            "params": {
-              "template": "templates/crop_20260702_234952_717_819_484_24.png",
-              "threshold": 0.85,
-              "timeout": 10
-            }
           },
           {
             "id": "neipmyyq",
             "type": "tap",
-            "x": 460,
-            "y": 80,
+            "x": 240,
+            "y": 140,
             "params": {
               "target": "pos",
               "x": 972,
@@ -85,7 +80,7 @@
           {
             "id": "nvh9jw7w",
             "type": "wait_image",
-            "x": 280,
+            "x": 240,
             "y": 240,
             "params": {
               "template": "templates/crop_20260628_234656_72x49.png",
@@ -103,8 +98,8 @@
           {
             "id": "nz5r3b59",
             "type": "if_image",
-            "x": 860,
-            "y": 280,
+            "x": 900,
+            "y": 256,
             "params": {
               "template": "templates/crop_20260701_012719_1300_325_163_28.png",
               "threshold": 0.85,
@@ -114,8 +109,8 @@
           {
             "id": "nhpbc8nw",
             "type": "tap_image",
-            "x": 1060,
-            "y": 320,
+            "x": 1100,
+            "y": 336,
             "params": {
               "template": "templates/crop_20260628_232825_249x36_3.png",
               "taps": "1",
@@ -128,8 +123,8 @@
           {
             "id": "nvtdij5z",
             "type": "if_image",
-            "x": 860,
-            "y": 100,
+            "x": 900,
+            "y": 180,
             "params": {
               "template": "templates/crop_20260701_012521_1803_491_73_36.png",
               "threshold": 0.85,
@@ -139,8 +134,8 @@
           {
             "id": "n534lqwn",
             "type": "tap_image",
-            "x": 1060,
-            "y": 100,
+            "x": 1100,
+            "y": 180,
             "params": {
               "template": "templates/crop_20260628_224052_35x27_1.png",
               "taps": "1",
@@ -153,14 +148,14 @@
           {
             "id": "n1dizf2s",
             "type": "end",
-            "x": 1460,
-            "y": 320,
+            "x": 1360,
+            "y": 367,
             "params": {}
           },
           {
             "id": "neem7vrb",
             "type": "loop",
-            "x": 480,
+            "x": 440,
             "y": 240,
             "params": {
               "count": 3,
@@ -170,8 +165,8 @@
           {
             "id": "norc1p8h",
             "type": "if_image",
-            "x": 1260,
-            "y": 100,
+            "x": 1280,
+            "y": 180,
             "params": {
               "template": "templates/crop_20260628_234656_72x49.png",
               "threshold": 0.85,
@@ -182,8 +177,8 @@
           {
             "id": "nxmlsilx",
             "type": "if_image_any",
-            "x": 860,
-            "y": 360,
+            "x": 900,
+            "y": 336,
             "params": {
               "templates": [
                 "templates/crop_20260701_095116_1328_707_155_24.png",
@@ -193,23 +188,31 @@
               "negate": false,
               "mode": "sequential"
             }
+          },
+          {
+            "id": "npmn81zg",
+            "type": "end",
+            "x": 180,
+            "y": 255,
+            "params": {}
+          },
+          {
+            "id": "nkjfw1qf",
+            "type": "wait_image",
+            "x": 60,
+            "y": 140,
+            "params": {
+              "template": "templates/crop_20260703_192932_795_821_321_23.png",
+              "threshold": 0.85,
+              "timeout": 10
+            }
           }
         ],
         "edges": [
           {
-            "from": "nvecbhfl",
-            "fromPort": "true",
-            "to": "neipmyyq"
-          },
-          {
             "from": "neipmyyq",
             "fromPort": "out",
             "to": "nvh9jw7w"
-          },
-          {
-            "from": "no3ohhex",
-            "fromPort": "out",
-            "to": "nvecbhfl"
           },
           {
             "from": "nz5r3b59",
@@ -281,6 +284,21 @@
             "from": "nxmlsilx",
             "fromPort": "true",
             "to": "nhpbc8nw"
+          },
+          {
+            "from": "no3ohhex",
+            "fromPort": "out",
+            "to": "nkjfw1qf"
+          },
+          {
+            "from": "nkjfw1qf",
+            "fromPort": "true",
+            "to": "neipmyyq"
+          },
+          {
+            "from": "nkjfw1qf",
+            "fromPort": "false",
+            "to": "npmn81zg"
           }
         ],
         "groups": []
@@ -606,15 +624,15 @@
           {
             "id": "nrtqbat0",
             "type": "start",
-            "x": 40,
-            "y": 112,
+            "x": 20,
+            "y": 62,
             "params": {}
           },
           {
             "id": "no1fcyqq",
             "type": "call",
             "x": 100,
-            "y": 72,
+            "y": 56,
             "params": {
               "fn": "fn_yt9m6"
             }
@@ -622,8 +640,8 @@
           {
             "id": "nhcl4zcb",
             "type": "tap_image",
-            "x": 290,
-            "y": 97,
+            "x": 300,
+            "y": 56,
             "params": {
               "template": "templates/crop_20260629_220558_1467_670_163_25.png",
               "taps": "1",
@@ -641,7 +659,7 @@
             "id": "n8fj2gs5",
             "type": "tap_image",
             "x": 480,
-            "y": 91,
+            "y": 56,
             "params": {
               "template": "templates/crop_20260629_220630_1567_939_57_45.png",
               "taps": "1",
@@ -659,7 +677,7 @@
           {
             "id": "n7hmq4b9",
             "type": "tap_image",
-            "x": 860,
+            "x": 900,
             "y": 40,
             "params": {
               "template": "templates/crop_20260629_221854_1659_824_71_60.png",
@@ -678,8 +696,8 @@
           {
             "id": "nk5q9wwd",
             "type": "call",
-            "x": 1050,
-            "y": 47,
+            "x": 1100,
+            "y": 40,
             "params": {
               "fn": "fn_hh4kj"
             }
@@ -687,8 +705,8 @@
           {
             "id": "n3cj2qkp",
             "type": "if_var",
-            "x": 670,
-            "y": 97,
+            "x": 660,
+            "y": 56,
             "params": {
               "name": "raid.x5",
               "op": "==",
@@ -698,8 +716,8 @@
           {
             "id": "ncasbdig",
             "type": "tap_image",
-            "x": 920,
-            "y": 240,
+            "x": 900,
+            "y": 120,
             "params": {
               "template": "templates/crop_20260701_094125_1481_829_112_43.png",
               "taps": "1",
@@ -713,8 +731,8 @@
           {
             "id": "n16ire5t",
             "type": "call",
-            "x": 1120,
-            "y": 200,
+            "x": 1100,
+            "y": 120,
             "params": {
               "fn": "fn_uft8v"
             }
@@ -722,8 +740,8 @@
           {
             "id": "nt1pti0b",
             "type": "if_image",
-            "x": 1110,
-            "y": 246,
+            "x": 1060,
+            "y": 256,
             "params": {
               "template": "templates/crop_20260701_094544_1872_439_35_45.png",
               "threshold": 0.85,
@@ -733,7 +751,7 @@
           {
             "id": "n4jjtwvp",
             "type": "tap",
-            "x": 1300,
+            "x": 1260,
             "y": 256,
             "params": {
               "target": "found",
@@ -747,11 +765,6 @@
             "from": "no1fcyqq",
             "fromPort": "out",
             "to": "nhcl4zcb"
-          },
-          {
-            "from": "nrtqbat0",
-            "fromPort": "out",
-            "to": "no1fcyqq"
           },
           {
             "from": "nhcl4zcb",
@@ -802,6 +815,11 @@
             "from": "n16ire5t",
             "fromPort": "out",
             "to": "ncasbdig"
+          },
+          {
+            "from": "nrtqbat0",
+            "fromPort": "out",
+            "to": "no1fcyqq"
           }
         ],
         "groups": []
@@ -2605,22 +2623,22 @@
       "id": "sequence_ih6c",
       "name": "Dragon Queen",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
           {
             "id": "n4kwm7gx",
             "type": "start",
-            "x": -60,
-            "y": -20,
+            "x": -100,
+            "y": 35,
             "params": {}
           },
           {
             "id": "ni39yd36",
             "type": "tap_image",
-            "x": 560,
-            "y": -100,
+            "x": 420,
+            "y": 24,
             "params": {
               "template": "templates/crop_20260628_222549_80x76_1.png",
               "taps": "1",
@@ -2633,8 +2651,8 @@
           {
             "id": "nz024cqd",
             "type": "call",
-            "x": 320,
-            "y": 40,
+            "x": 240,
+            "y": 24,
             "params": {
               "fn": "fn_yt9m6"
             }
@@ -2642,8 +2660,8 @@
           {
             "id": "njn4su51",
             "type": "if_image",
-            "x": 140,
-            "y": -20,
+            "x": -40,
+            "y": 20,
             "params": {
               "template": "templates/crop_20260628_232249_198x35.png",
               "threshold": 0.85,
@@ -2653,20 +2671,21 @@
           {
             "id": "nvrvhnas",
             "type": "swipe_dir",
-            "x": 560,
-            "y": 31,
+            "x": 420,
+            "y": -60,
             "params": {
               "direction": "left",
               "distance": 1000,
               "duration": 300
             },
-            "stack": "str9h2ix"
+            "delayBefore": 2,
+            "delayAfter": 2
           },
           {
             "id": "nb2ox1lq",
             "type": "swipe",
-            "x": 1300,
-            "y": -20,
+            "x": 1180,
+            "y": -60,
             "params": {
               "x1": 362,
               "y1": 285,
@@ -2674,13 +2693,13 @@
               "y2": 0,
               "duration": 300
             },
-            "stack": "stsye9mz"
+            "delayAfter": 2
           },
           {
             "id": "n0zi6fk0",
             "type": "wait_image",
-            "x": 1120,
-            "y": -20,
+            "x": 1000,
+            "y": -60,
             "params": {
               "template": "templates/crop_20260629_002015_58x62.png",
               "threshold": 0.85,
@@ -2690,8 +2709,8 @@
           {
             "id": "njvsxhrz",
             "type": "tap_image",
-            "x": 1480,
-            "y": -20,
+            "x": 1360,
+            "y": -60,
             "params": {
               "template": "templates/crop_20260629_001842_26x65.png",
               "taps": "1",
@@ -2704,8 +2723,8 @@
           {
             "id": "n6px0r8f",
             "type": "tap_image",
-            "x": 1660,
-            "y": -20,
+            "x": 1540,
+            "y": -60,
             "params": {
               "template": "templates/crop_20260629_001612_116x35.png",
               "taps": "1",
@@ -2718,8 +2737,8 @@
           {
             "id": "nhgym5xb",
             "type": "tap_image",
-            "x": 1660,
-            "y": 100,
+            "x": 1540,
+            "y": 24,
             "params": {
               "template": "templates/crop_20260629_001620_176x32.png",
               "taps": "1",
@@ -2732,8 +2751,8 @@
           {
             "id": "n4zcjxw5",
             "type": "tap_image",
-            "x": 1840,
-            "y": 220,
+            "x": 1720,
+            "y": 100,
             "params": {
               "template": "templates/crop_20260629_001631_242x38.png",
               "taps": "1",
@@ -2746,8 +2765,8 @@
           {
             "id": "nec3nlcz",
             "type": "tap_image",
-            "x": 1840,
-            "y": 440,
+            "x": 1720,
+            "y": 260,
             "params": {
               "template": "templates/crop_20260628_224052_35x27_1.png",
               "taps": "1",
@@ -2758,30 +2777,10 @@
             }
           },
           {
-            "id": "n7s951m5",
-            "type": "wait",
-            "x": 560,
-            "y": 82,
-            "params": {
-              "seconds": 2
-            },
-            "stack": "str9h2ix"
-          },
-          {
-            "id": "n3ofwdum",
-            "type": "wait",
-            "x": 1300,
-            "y": 31,
-            "params": {
-              "seconds": 2
-            },
-            "stack": "stsye9mz"
-          },
-          {
             "id": "ntxjx9cs",
             "type": "tap_image",
-            "x": 1840,
-            "y": 100,
+            "x": 1720,
+            "y": 24,
             "params": {
               "template": "templates/crop_20260629_002334_214x34.png",
               "taps": "1",
@@ -2794,8 +2793,8 @@
           {
             "id": "nvu5q396",
             "type": "tap_image",
-            "x": 2020,
-            "y": 440,
+            "x": 1900,
+            "y": 260,
             "params": {
               "template": "templates/crop_20260628_232825_249x36_2.png",
               "taps": "2",
@@ -2809,8 +2808,8 @@
           {
             "id": "na7tjo3z",
             "type": "loop",
-            "x": 940,
-            "y": -20,
+            "x": 800,
+            "y": -60,
             "params": {
               "count": 6,
               "infinite": false
@@ -2819,8 +2818,8 @@
           {
             "id": "n9ln60a4",
             "type": "tap_image_any",
-            "x": 740,
-            "y": -20,
+            "x": 600,
+            "y": -60,
             "params": {
               "templates": [
                 "templates/crop_20260629_000924_132x70.png",
@@ -2836,24 +2835,15 @@
             }
           },
           {
-            "id": "n06s5bg0",
-            "type": "wait",
-            "x": 560,
-            "y": -20,
-            "params": {
-              "seconds": 2
-            },
-            "stack": "str9h2ix"
-          },
-          {
             "id": "n71blg4e",
             "type": "tap_image_any",
-            "x": 1840,
-            "y": 340,
+            "x": 1720,
+            "y": 180,
             "params": {
               "templates": [
                 "templates/crop_20260629_151533_112x33.png",
-                "templates/crop_20260629_001703_151x33.png"
+                "templates/crop_20260629_001703_151x33.png",
+                "templates/crop_20260703_200507_1140_647_162_58.png"
               ],
               "taps": "1",
               "threshold": 0.85,
@@ -2866,8 +2856,8 @@
           {
             "id": "ndhivwqz",
             "type": "tap_image",
-            "x": 2020,
-            "y": 100,
+            "x": 1960,
+            "y": 40,
             "params": {
               "template": "templates/crop_20260629_152052_128x43.png",
               "taps": "1",
@@ -2880,17 +2870,28 @@
           {
             "id": "nirym3mm",
             "type": "end",
-            "x": 2240,
-            "y": 100,
+            "x": 2180,
+            "y": 55,
             "params": {}
           },
           {
             "id": "n97mkfgu",
             "type": "call",
-            "x": 1120,
-            "y": 140,
+            "x": 1000,
+            "y": 100,
             "params": {
               "fn": "fn_yt9m6"
+            }
+          },
+          {
+            "id": "ntfxn9wp",
+            "type": "if_image",
+            "x": 1180,
+            "y": 100,
+            "params": {
+              "template": "templates/crop_20260703_200338_1511_940_244_39.png",
+              "threshold": 0.85,
+              "negate": false
             }
           }
         ],
@@ -2926,16 +2927,6 @@
             "to": "nhgym5xb"
           },
           {
-            "from": "nb2ox1lq",
-            "fromPort": "out",
-            "to": "n3ofwdum"
-          },
-          {
-            "from": "n3ofwdum",
-            "fromPort": "out",
-            "to": "njvsxhrz"
-          },
-          {
             "from": "nhgym5xb",
             "fromPort": "true",
             "to": "ntxjx9cs"
@@ -2951,21 +2942,6 @@
             "to": "nvu5q396"
           },
           {
-            "from": "nvrvhnas",
-            "fromPort": "out",
-            "to": "n7s951m5"
-          },
-          {
-            "from": "njn4su51",
-            "fromPort": "true",
-            "to": "n06s5bg0"
-          },
-          {
-            "from": "ni39yd36",
-            "fromPort": "true",
-            "to": "n06s5bg0"
-          },
-          {
             "from": "na7tjo3z",
             "fromPort": "body",
             "to": "n0zi6fk0"
@@ -2977,19 +2953,9 @@
             "toPort": "loop"
           },
           {
-            "from": "n7s951m5",
-            "fromPort": "out",
-            "to": "n9ln60a4"
-          },
-          {
             "from": "n9ln60a4",
             "fromPort": "true",
             "to": "na7tjo3z"
-          },
-          {
-            "from": "n06s5bg0",
-            "fromPort": "out",
-            "to": "nvrvhnas"
           },
           {
             "from": "n4zcjxw5",
@@ -3015,6 +2981,36 @@
             "from": "na7tjo3z",
             "fromPort": "done",
             "to": "n97mkfgu"
+          },
+          {
+            "from": "ni39yd36",
+            "fromPort": "true",
+            "to": "nvrvhnas"
+          },
+          {
+            "from": "nvrvhnas",
+            "fromPort": "out",
+            "to": "n9ln60a4"
+          },
+          {
+            "from": "njn4su51",
+            "fromPort": "true",
+            "to": "nvrvhnas"
+          },
+          {
+            "from": "nb2ox1lq",
+            "fromPort": "out",
+            "to": "njvsxhrz"
+          },
+          {
+            "from": "n0zi6fk0",
+            "fromPort": "false",
+            "to": "ntfxn9wp"
+          },
+          {
+            "from": "ntfxn9wp",
+            "fromPort": "true",
+            "to": "n4zcjxw5"
           }
         ],
         "groups": []

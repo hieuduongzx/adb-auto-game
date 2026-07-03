@@ -123,6 +123,24 @@ function wfActAddCurrent(){
 }
 function wfToggleActPanel(){
   const p=$("wf-act-panel"); if(p) p.classList.toggle("collapsed", wfActCollapsed);
+  wfEqualizeCornerPanels();
+}
+// The two bottom-right corner panels (Activities + Variables) are content-sized,
+// so they'd otherwise sit at ragged, mismatched heights. When BOTH are expanded,
+// grow the shorter one to match the taller so they read as one tidy pair. A
+// collapsed panel (38px) is left alone so it can hand its space to its sibling.
+function wfEqualizeCornerPanels(){
+  const a=$("wf-act-panel"), v=$("wf-vars-panel"); if(!a||!v) return;
+  a.style.minHeight=""; v.style.minHeight="";            // reset to natural height
+  if(a.classList.contains("collapsed")||v.classList.contains("collapsed")) return;
+  // Reading offsetHeight flushes layout, so the natural heights are accurate
+  // immediately — no rAF needed (and it renders correctly on first paint).
+  const h=Math.max(a.offsetHeight, v.offsetHeight);
+  // Skip when the taller panel is already large (lots of activities/vars): both
+  // would then be big and scroll internally anyway, and forcing equal height
+  // could overflow the canvas. Only tidy up the common small-content case.
+  const cap=Math.round((window.innerHeight||800)*0.5);
+  if(h>0 && h<=cap){ a.style.minHeight=h+"px"; v.style.minHeight=h+"px"; }
 }
 // Dragging is armed only while the grip handle is held, so checkbox / select /
 // delete clicks keep working. Rows shuffle live during dragover; on drop the
@@ -211,7 +229,11 @@ function wfRenderPalette(){
   let shown=0;
   // Node types grouped by category. When a query is active, only matching
   // types render and their category header shows a live hit count.
+  const ctrl = WF.controller||"adb";
   WF_CATS.forEach(cat=>{
+    // Controller-specific categories only appear in their matching project mode
+    // (Device/emulator = ADB, Win32 window nodes = PC).
+    if(cat.ctrl && cat.ctrl!==ctrl) return;
     let types=Object.keys(WF_NODES).filter(t=>WF_NODES[t].cat===cat.key);
     if(q) types=types.filter(t=>(WF_NODES[t].label+" "+t).toLowerCase().includes(q));
     if(!types.length) return;
@@ -333,7 +355,7 @@ function wfRenderVarsPanel(){
   if(!allNames.length){
     const e=document.createElement("div"); e.className="wf-vars-empty";
     e.textContent="No variables. Click + to add a global variable.";
-    body.appendChild(e); return;
+    body.appendChild(e); wfEqualizeCornerPanels(); return;
   }
   function mkSep(label){ const s=document.createElement("span"); s.className="wf-vars-sep"; s.textContent=label; return s; }
   function mkRow(n, isGlobal){
@@ -360,6 +382,7 @@ function wfRenderVarsPanel(){
   if(actNames.length){ body.appendChild(mkSep("Activities")); actNames.forEach(n=>body.appendChild(mkRow(n,false))); }
   if(nodeNames.length){ body.appendChild(mkSep("Node")); nodeNames.forEach(n=>body.appendChild(mkRow(n,false))); }
   if(liveExtra.length){ body.appendChild(mkSep("Live")); liveExtra.forEach(n=>body.appendChild(mkRow(n,false))); }
+  wfEqualizeCornerPanels();
 }
 
 // ── Global variables editor (popover from the vars panel "+") ─────────────────

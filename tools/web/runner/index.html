@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Workflow2k Runner</title>
 <style>
-/* ── Reset & tokens ─────────────────────────────────────────────────────── */
+/* ── Reset & tokens (shared vocabulary with the Designer, base.css) ─────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -14,11 +14,13 @@
   --surface:   #f7f9fc;
   --alt:       #f3f5f9;
   --border:    #e4e7ec;
+  --border2:   #dde2e8;
   --line:      #f1f3f6;
 
   --ink:       #19222e;
+  --ink2:      #41505f;
   --dim:       #5a6573;
-  --muted:     #9aa3ae;
+  --muted:     #7c8795;
 
   --accent:    #2f6fed;
   --accent-bg: #e8f1ff;
@@ -43,7 +45,12 @@
 
   --r-sm: 7px;
   --r-md: 10px;
-  --r-lg: 12px;
+
+  --sh-sm: 0 1px 2px rgba(20,30,45,.06);
+  --sh-md: 0 2px 8px rgba(20,30,45,.08);
+
+  /* Semantic z scale */
+  --z-sticky: 5;
 
   --ease-out: cubic-bezier(0.16,1,0.3,1);
 
@@ -59,12 +66,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-body {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  user-select: none;
-}
+body { display: flex; flex-direction: column; overflow: hidden; user-select: none; }
 
 button {
   font-family: var(--sans);
@@ -77,25 +79,34 @@ button {
   color: inherit;
 }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { cursor: not-allowed; }
 
 input, select {
   font-family: var(--mono);
   font-size: 11.5px;
   background: var(--panel);
   color: var(--ink);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border2);
   border-radius: var(--r-sm);
   padding: 5px 8px;
 }
-input:focus, select:focus { outline: none; border-color: var(--accent); }
+input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bd); }
+select {
+  font-family: var(--sans); font-weight: 500; cursor: pointer;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  padding-right: 24px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237c8795' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat; background-position: right 7px center; background-size: 11px;
+}
+select:hover { background-color: var(--surface); }
+option { font-family: var(--sans); font-size: 13px; color: var(--ink); background: var(--panel); }
 
-/* ── Scrollbar ──────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d3d9e0; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #b8c1cc; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-/* ── Layout ─────────────────────────────────────────────────────────────── */
+/* ── App shell ──────────────────────────────────────────────────────────── */
 #app {
   flex: 1;
   display: flex;
@@ -105,238 +116,210 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   overflow: hidden;
   min-height: 0;
 }
-
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
+  box-shadow: var(--sh-sm);
 }
 
-/* ── Header card ────────────────────────────────────────────────────────── */
-#header-card {
-  padding: 13px 14px 12px;
+/* ── State deck — the whole card tints by run state ─────────────────────── */
+#deck {
+  padding: 12px 13px 13px;
   flex-shrink: 0;
+  transition: background 0.35s, border-color 0.35s;
 }
+#deck.state-running { background: #f1faf5; border-color: #bfe3cd; }
+#deck.state-paused  { background: #fdf8ec; border-color: #e8d5ac; }
 
-.header-top {
+.deck-flow {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 11px;
 }
-.header-title-block { flex: 1; min-width: 0; }
-.app-title {
-  font-size: 16px;
+#flow-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
   font-weight: 700;
   color: var(--ink);
-  line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.app-title.empty { color: var(--muted); }
-.app-subtitle {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-/* Load button (header) */
+#flow-name.empty { color: var(--muted); font-weight: 600; }
 .btn-load {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 28px;
-  padding: 0 11px;
-  border-radius: 7px;
+  height: 27px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
   font-size: 11.5px;
   font-weight: 600;
   color: var(--accent);
   background: var(--accent-bg);
   border: 1px solid var(--accent-bd);
   flex-shrink: 0;
-  transition: background 0.12s;
+  transition: background 0.12s, opacity 0.12s;
 }
-.btn-load:hover { background: #dceaff; }
+.btn-load:hover:not(:disabled) { background: #dceaff; }
+.btn-load:disabled { opacity: 0.5; }
 
-/* Status pill */
-#status-pill {
+/* State line: big status word + what is running right now */
+.deck-state {
   display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 11px;
-  border-radius: 999px;
-  flex-shrink: 0;
-  transition: background 0.2s, border-color 0.2s;
-  border: 1px solid transparent;
+  align-items: baseline;
+  gap: 9px;
+  margin-bottom: 9px;
+  min-width: 0;
 }
-#status-dot {
-  width: 7px; height: 7px;
+.deck-dot {
+  width: 9px; height: 9px;
   border-radius: 50%;
+  background: #b6bec8;
   flex-shrink: 0;
+  align-self: center;
   transition: background 0.3s;
 }
+#deck.state-running .deck-dot { background: var(--ok); animation: pulse 1.6s ease-in-out infinite; }
+#deck.state-paused  .deck-dot { background: var(--warn); }
+@keyframes pulse { 50% { opacity: 0.35; } }
 #status-text {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--dim);
   white-space: nowrap;
+  flex-shrink: 0;
 }
+#deck.state-running #status-text { color: var(--ok); }
+#deck.state-paused  #status-text { color: var(--warn); }
+#deck-now {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#deck-now:empty { display: none; }
 
-/* Progress bar */
-#header-progress {
+/* Progress: bar + counts + elapsed (always visible once a flow is loaded) */
+#deck-progress {
   display: flex;
   align-items: center;
   gap: 9px;
-  margin-bottom: 13px;
+  margin-bottom: 12px;
 }
-.prog-count {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--dim);
-  font-variant-numeric: tabular-nums;
-  min-width: 28px;
-  flex-shrink: 0;
-}
-.prog-bar-track {
+#deck-progress[hidden] { display: none; }
+.prog-track {
   flex: 1;
   height: 6px;
   border-radius: 6px;
-  background: #eaedf1;
+  background: rgba(20,30,45,0.08);
   overflow: hidden;
 }
-.prog-bar-fill {
+#prog-bar {
   height: 100%;
   border-radius: 6px;
   background: var(--ok);
   width: 0%;
-  transition: width 0.4s ease;
+  transition: width 0.4s var(--ease-out), background 0.3s;
 }
-.prog-elapsed {
+#deck.state-paused #prog-bar { background: #d9a62e; }
+#prog-count, #elapsed {
   font-family: var(--mono);
   font-size: 11.5px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--dim);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
-/* Control buttons */
-.header-btns {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.btn {
+/* Controls: one hero Start + compact pause/stop squares */
+.deck-controls { display: flex; align-items: stretch; gap: 7px; }
+.btn-run {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 34px;
+  gap: 7px;
   border-radius: 8px;
   font-weight: 700;
-  font-size: 12.5px;
-  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  transition: background 0.15s, opacity 0.15s, color 0.15s, border-color 0.15s;
   border: 1px solid transparent;
 }
-.btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.btn-start {
-  flex: 2;
+#btn-start {
+  flex: 1;
+  height: 38px;
+  font-size: 13px;
   background: var(--ok);
   color: #fff;
   border-color: var(--ok);
+  box-shadow: 0 1px 2px rgba(31,146,84,.3);
 }
-.btn-start:hover:not(:disabled) { background: #1b8049; }
-.btn-start:active:not(:disabled) { background: #166e3b; }
-
-.btn-pause {
-  flex: 1;
-  background: var(--warn-bg);
+#btn-start:hover:not(:disabled)  { background: #1b8049; }
+#btn-start:active:not(:disabled) { background: #166e3b; }
+/* Explicit disabled colors (not opacity) so state reads unambiguously. */
+#btn-start:disabled { background: #b9cec2; border-color: #b9cec2; box-shadow: none; }
+#btn-pause {
+  width: 46px;
+  background: var(--panel);
   color: var(--warn);
   border-color: var(--warn-bd);
 }
-.btn-pause:hover:not(:disabled) { background: #fbefd6; }
-
-.btn-stop {
-  width: 38px;
-  flex-shrink: 0;
-  background: var(--err-bg);
+#btn-pause:hover:not(:disabled) { background: var(--warn-bg); }
+#btn-stop {
+  width: 46px;
+  background: var(--panel);
   color: var(--err);
   border-color: var(--err-bd);
 }
-.btn-stop:hover:not(:disabled) { background: #fae2e0; }
-
-/* SVG icons */
+#btn-stop:hover:not(:disabled) { background: var(--err-bg); }
+#btn-pause:disabled, #btn-stop:disabled { color: #c2c9d2; border-color: var(--line); background: transparent; }
 .icon { fill: currentColor; flex-shrink: 0; }
 
-/* ── Tabs ───────────────────────────────────────────────────────────────── */
-#tabs-bar {
+/* ── Main column: one scroll, sticky section headers ────────────────────── */
+#main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.sec-hdr {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 0 2px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  gap: 6px;
+  padding: 9px 12px 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
 }
-.tab-btn {
-  position: relative;
-  padding: 8px 11px 9px;
-  font-size: 12px;
+.sec-hdr + .sec-hdr, .sec-block + .sec-block .sec-hdr { border-top: 1px solid var(--line); }
+.sec-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+.sec-count {
+  font-family: var(--mono);
+  font-size: 10px;
   font-weight: 600;
   color: var(--muted);
-  transition: color 0.15s;
+  background: var(--alt);
+  border-radius: 999px;
+  padding: 1px 6px;
+  min-width: 17px;
+  text-align: center;
 }
-.tab-btn::after {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; bottom: -1px;
-  height: 2px;
-  border-radius: 2px;
-  background: transparent;
-  transition: background 0.15s;
-}
-.tab-btn.active { color: var(--accent); }
-.tab-btn.active::after { background: var(--accent); }
-.tab-btn:hover:not(.active) { color: var(--dim); }
-
-/* ── Tab content ────────────────────────────────────────────────────────── */
-.tab-pane { display: none; flex-direction: column; min-height: 0; overflow: hidden; }
-.tab-pane.active { display: flex; }
-
-#tab-wrapper {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.pane-inner {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 6px 4px 2px;
-  gap: 6px;
-  overflow: hidden;
-}
-
-.list-header {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 2px;
-  flex-shrink: 0;
-}
-.list-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  text-transform: uppercase;
-  flex: 1;
-}
+.sec-spacer { flex: 1; }
 .btn-sel {
   font-size: 11px;
   font-weight: 600;
@@ -348,42 +331,64 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .btn-sel:hover { background: var(--accent-bg); }
 .btn-sel.none { color: var(--muted); }
 .btn-sel.none:hover { background: var(--line); color: var(--dim); }
-
-/* scrollable task list */
-.task-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
+.sec-hint {
+  font-size: 11px;
+  color: var(--dim);
+  padding: 7px 12px 0;
 }
 
-/* Activity row */
+/* Big empty state when no flow is loaded */
+#empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 30px 24px;
+  text-align: center;
+}
+#empty-state[hidden] { display: none; }
+#empty-state svg { color: #c9d1db; }
+.empty-title { font-size: 13.5px; font-weight: 700; color: var(--ink2); }
+.empty-desc  { font-size: 12px; color: var(--dim); line-height: 1.6; max-width: 300px; }
+.btn-empty-load {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 16px;
+  margin-top: 2px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  transition: background 0.15s;
+}
+.btn-empty-load:hover { background: #2559c7; }
+
+/* ── Activity rows ──────────────────────────────────────────────────────── */
 .task-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 10px;
+  padding: 8px 11px;
   border-bottom: 1px solid var(--line);
-  transition: background 0.1s;
+  transition: background 0.15s;
 }
-.task-row:last-child { border-bottom: none; }
 .task-row:hover { background: var(--surface); }
-.task-row.task-running {
-  background: #fffdf6 !important;
-  box-shadow: inset 3px 0 0 #e3b341;
-}
+.task-row.task-running { background: var(--warn-bg) !important; }
 
-/* Drag-to-reorder */
 .drag-handle {
-  width: 16px;
+  width: 15px;
   align-self: stretch;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin: -7px 0 -7px -4px;
+  margin: -8px 0 -8px -4px;
   color: #c4cbd4;
   cursor: grab;
   touch-action: none;
@@ -391,14 +396,9 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 }
 .drag-handle:hover { color: var(--dim); }
 .drag-handle:active { cursor: grabbing; }
-.task-row.dragging {
-  opacity: 0.55;
-  background: var(--accent-bg);
-  box-shadow: inset 3px 0 0 var(--accent);
-}
+.task-row.dragging { opacity: 0.55; background: var(--accent-bg); }
 .task-row.drop-target { background: var(--surface); }
 
-/* Custom checkbox */
 .cb {
   width: 17px; height: 17px;
   border-radius: 5px;
@@ -415,7 +415,6 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .cb svg { opacity: 0; transition: opacity 0.1s; }
 .cb.checked svg { opacity: 1; }
 
-/* Name block */
 .task-name-block { flex: 1; min-width: 0; }
 .task-name {
   font-size: 12.5px;
@@ -433,8 +432,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   font-family: var(--mono);
   margin-top: 1px;
 }
+.task-meta:empty { display: none; }
 
-/* Status pill (per-activity) */
 .pill {
   display: inline-flex;
   align-items: center;
@@ -454,60 +453,33 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .pill-completed { background: #e8f5ed; color: #1c7a44; border-color: #cfead9; }
 .pill-failed    { background: #fcefee; color: #b23a33; border-color: #f3d4d1; }
 
-/* Task action buttons */
-.task-btns {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-}
 .btn-icon {
   width: 26px; height: 26px;
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   transition: background 0.12s, color 0.12s;
 }
 .btn-gear { color: var(--muted); }
 .btn-gear.active { color: var(--accent); }
 .btn-gear:hover { background: var(--alt); color: var(--dim); }
 
-/* Background master note */
-#bg-master-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: 11px 13px;
-  flex-shrink: 0;
-  margin: 6px 4px 0;
-}
-.master-text { flex: 1; }
-.master-title { font-size: 12.5px; font-weight: 600; color: var(--ink); }
-.master-desc  { font-size: 11px; color: var(--muted); margin-top: 1px; }
-
-/* Inline settings expansion (per-activity vars / poll) */
+/* Inline per-activity settings */
 .task-settings {
-  padding: 0 11px 11px 59px;
+  padding: 2px 12px 11px 54px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   background: var(--surface);
-  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
-.setting-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.setting-row { display: flex; align-items: center; gap: 8px; padding-top: 8px; }
 .setting-label {
   font-size: 11.5px;
   color: var(--dim);
   font-weight: 500;
-  min-width: 64px;
   flex: 1;
   min-width: 0;
 }
@@ -520,43 +492,32 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 }
 .setting-unit { font-size: 11px; color: var(--muted); }
 .setting-input { width: 80px; text-align: right; flex-shrink: 0; }
-.setting-row select { flex-shrink: 0; max-width: 110px; }
+.setting-row select { flex-shrink: 0; max-width: 130px; }
 
-/* Empty state */
 .empty-note {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--dim);
   text-align: center;
-  padding: 26px 8px;
+  padding: 18px 8px;
   line-height: 1.6;
 }
 
-/* ── Settings tab ───────────────────────────────────────────────────────── */
-#tab-settings .pane-inner { overflow-y: auto; }
-.settings-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: 13px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.settings-section-title {
+/* ── Speed hack section ─────────────────────────────────────────────────── */
+#speed-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 9px; }
+#speed-body[hidden] { display: none; }
+#speed-sum {
+  font-family: var(--mono);
   font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  font-weight: 600;
   color: var(--muted);
-  text-transform: uppercase;
+  background: var(--alt);
+  border-radius: 999px;
+  padding: 1px 7px;
 }
-.toggle-row { display: flex; align-items: center; gap: 10px; }
-.toggle-text { flex: 1; }
-.toggle-name { font-size: 12.5px; font-weight: 500; color: var(--ink); }
-.toggle-hint { font-size: 11px; color: var(--muted); margin-top: 1px; }
-
-/* Toggle switch */
+#speed-sum.on { color: var(--accent); background: var(--accent-bg); }
+.speed-row { display: flex; align-items: center; gap: 10px; }
 .toggle {
-  width: 40px; height: 23px;
+  width: 38px; height: 22px;
   border-radius: 999px;
   background: #d3d9e0;
   flex-shrink: 0;
@@ -568,21 +529,15 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .toggle::after {
   content: '';
   position: absolute;
-  width: 19px; height: 19px;
+  width: 18px; height: 18px;
   border-radius: 50%;
   background: #fff;
   top: 2px; left: 2px;
   transition: left 0.2s var(--ease-out);
   box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }
-.toggle.on::after { left: 19px; }
-
-/* Speed slider row */
-.speed-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+.toggle.on::after { left: 18px; }
+.speed-desc { flex: 1; min-width: 0; font-size: 11.5px; color: var(--dim); }
 #speed-range {
   flex: 1;
   min-width: 0;
@@ -592,6 +547,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   padding: 0;
   border: none;
   background: transparent;
+  box-shadow: none;
 }
 #speed-range:disabled { opacity: 0.4; cursor: not-allowed; }
 #speed-val {
@@ -612,27 +568,34 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   white-space: nowrap;
 }
 
-/* ── Log panel ──────────────────────────────────────────────────────────── */
+/* ── Log card (collapsible) ─────────────────────────────────────────────── */
 #log-card {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  min-height: 140px;
-  max-height: 200px;
+  min-height: 150px;
+  max-height: 210px;
+  transition: min-height 0.2s var(--ease-out), max-height 0.2s var(--ease-out);
 }
-.log-header {
+#log-card.collapsed { min-height: 32px; max-height: 32px; }
+#log-card.collapsed .log-body { display: none; }
+#log-card.collapsed .log-hdr { border-bottom: none; }
+.log-hdr {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 11px;
+  padding: 7px 11px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  cursor: pointer;
 }
+.log-chevron { color: var(--muted); display: inline-flex; transition: transform 0.15s var(--ease-out); }
+#log-card.collapsed .log-chevron { transform: rotate(-90deg); }
 .log-label {
   font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--dim);
   text-transform: uppercase;
 }
 .log-search-wrap {
@@ -645,26 +608,26 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   background: var(--surface);
 }
 #log-search {
-  width: 80px;
+  width: 84px;
   font-family: var(--sans);
   font-size: 11px;
   background: transparent;
   border: none;
-  color: var(--dim);
+  color: var(--ink2);
   padding: 0;
+  box-shadow: none;
 }
 #log-search::placeholder { color: var(--muted); }
-#log-search:focus { outline: none; }
+#log-search:focus { outline: none; box-shadow: none; }
 .btn-log-clear {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--muted);
-  padding: 2px 4px;
+  padding: 2px 5px;
   border-radius: 4px;
   transition: color 0.1s;
 }
 .btn-log-clear:hover { color: var(--dim); }
-
 .log-body {
   flex: 1;
   min-height: 0;
@@ -672,6 +635,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   padding: 7px 10px;
   background: var(--log-bg);
   border-radius: 0 0 var(--r-md) var(--r-md);
+  user-select: text;
+  cursor: text;
 }
 .log-line {
   display: flex;
@@ -690,15 +655,14 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .log-warning { color: #c08a1e; }
 .log-error   { color: #cf4b43; }
 
-/* ── Footer / status bar ────────────────────────────────────────────────── */
+/* ── Footer: device strip ───────────────────────────────────────────────── */
 #footer {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 7px;
   padding: 3px 6px 4px;
   flex-shrink: 0;
 }
-.footer-row { display: flex; align-items: center; gap: 7px; }
 #dev-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
@@ -717,29 +681,16 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   text-overflow: ellipsis;
 }
 #device-select, #capture-backend {
-  font-family: var(--sans);
   font-size: 11px;
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 3px 8px;
-  max-width: 160px;
-  cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239aa3ae'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 7px center;
-  padding-right: 22px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  max-width: 170px;
 }
-#device-select:focus, #capture-backend:focus { outline: none; border-color: var(--accent); }
-#capture-backend { max-width: 88px; }
+#capture-backend { max-width: 80px; }
 .btn-refresh {
-  width: 28px; height: 28px;
-  border-radius: 7px;
-  border: 1px solid var(--border);
+  width: 27px; height: 27px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border2);
   background: var(--panel);
   color: var(--dim);
   display: flex;
@@ -752,21 +703,6 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .btn-refresh.spinning svg { animation: spin 0.6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Status pill states ─────────────────────────────────────────────────── */
-.status-ready   { background: #f1f3f6; border-color: #e6e9ee; }
-.status-running { background: #e8f5ed; border-color: #cfead9; }
-.status-paused  { background: #fdf6e9; border-color: #f0e1c2; }
-.status-stopped { background: #fcefee; border-color: #f3d4d1; }
-.status-ready   #status-dot { background: #9aa3ae; }
-.status-ready   #status-text { color: #697481; }
-.status-running #status-dot { background: #1f9254; }
-.status-running #status-text { color: #1f9254; }
-.status-paused  #status-dot { background: #9c6c12; }
-.status-paused  #status-text { color: #9c6c12; }
-.status-stopped #status-dot { background: #bb3a33; }
-.status-stopped #status-text { color: #bb3a33; }
-
-/* ── Animations ─────────────────────────────────────────────────────────── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -780,145 +716,144 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 <body>
 <div id="app">
 
-  <!-- ── Header card ─────────────────────────────────────────────────── -->
-  <div id="header-card" class="card">
-    <div class="header-top">
-      <div class="header-title-block">
-        <div class="app-title empty" id="flow-name">Workflow2k Runner</div>
-        <div class="app-subtitle" id="flow-sub">Chưa tải workflow</div>
-      </div>
-      <button class="btn-load" onclick="onLoadJson()" title="Tải workflow đã xuất từ Designer">
+  <!-- ── State deck ──────────────────────────────────────────────────── -->
+  <section id="deck" class="card">
+    <div class="deck-flow">
+      <span id="flow-name" class="empty">Chưa tải workflow</span>
+      <button class="btn-load" id="btn-load" onclick="onLoadJson()" title="Tải workflow đã xuất từ Designer">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
         </svg>
         Tải JSON
       </button>
-      <div id="status-pill" class="status-ready">
-        <div id="status-dot"></div>
-        <div id="status-text">SẴN SÀNG</div>
-      </div>
     </div>
 
-    <div id="header-progress" style="display:none">
-      <span class="prog-count" id="prog-count">0/0</span>
-      <div class="prog-bar-track"><div class="prog-bar-fill" id="prog-bar"></div></div>
-      <span class="prog-elapsed" id="elapsed">00:00:00</span>
+    <div class="deck-state">
+      <span class="deck-dot"></span>
+      <span id="status-text">SẴN SÀNG</span>
+      <span id="deck-now"></span>
     </div>
 
-    <div class="header-btns">
-      <button class="btn btn-start" id="btn-start" onclick="onStart()" disabled>
+    <div id="deck-progress" hidden>
+      <span id="prog-count">0/0</span>
+      <div class="prog-track"><div id="prog-bar"></div></div>
+      <span id="elapsed">00:00:00</span>
+    </div>
+
+    <div class="deck-controls">
+      <button class="btn-run" id="btn-start" onclick="onStart()" disabled>
         <svg class="icon" width="10" height="11" viewBox="0 0 10 11"><path d="M1 1.5v8l8-4z"/></svg>
         Bắt đầu
       </button>
-      <button class="btn btn-pause" id="btn-pause" onclick="onPause()" disabled>Tạm dừng</button>
-      <button class="btn btn-stop" id="btn-stop" onclick="onStop()" disabled>
+      <button class="btn-run" id="btn-pause" onclick="onPause()" disabled title="Tạm dừng / Tiếp tục">
+        <svg class="icon" id="pause-ico" width="11" height="12" viewBox="0 0 11 12"><rect x="1" y="1" width="3" height="10" rx="1"/><rect x="7" y="1" width="3" height="10" rx="1"/></svg>
+      </button>
+      <button class="btn-run" id="btn-stop" onclick="onStop()" disabled title="Dừng">
         <svg class="icon" width="10" height="10" viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" rx="1.5"/></svg>
       </button>
     </div>
-  </div>
+  </section>
 
-  <!-- ── Tabs ────────────────────────────────────────────────────────── -->
-  <div id="tabs-bar">
-    <button class="tab-btn active" data-tab="seq"      onclick="switchTab('seq')">Một lần</button>
-    <button class="tab-btn"        data-tab="bg"       onclick="switchTab('bg')">Chạy nền</button>
-    <button class="tab-btn"        data-tab="settings" onclick="switchTab('settings')">Cài đặt</button>
-  </div>
+  <!-- ── Main column: sections in one scroll ─────────────────────────── -->
+  <section id="main" class="card">
 
-  <!-- ── Tab wrapper ─────────────────────────────────────────────────── -->
-  <div id="tab-wrapper">
+    <div id="empty-state">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+      </svg>
+      <div class="empty-title">Chưa có workflow</div>
+      <div class="empty-desc">Mở một file JSON đã xuất từ Workflow2k Designer để xem danh sách hoạt động và bắt đầu chạy.</div>
+      <button class="btn-empty-load" onclick="onLoadJson()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        Tải JSON
+      </button>
+    </div>
 
-    <!-- Sequential tab -->
-    <div class="tab-pane active" id="tab-seq">
-      <div class="pane-inner">
-        <div class="list-header">
-          <span class="list-label">HOẠT ĐỘNG TUẦN TỰ</span>
-          <button class="btn-sel"      onclick="selectAll('sequence',true)">Chọn tất cả</button>
-          <button class="btn-sel none" onclick="selectAll('sequence',false)">Bỏ chọn</button>
+    <div class="sec-block" id="sec-seq" hidden>
+      <div class="sec-hdr">
+        <span class="sec-title">Tuần tự</span>
+        <span class="sec-count" id="seq-count">0</span>
+        <span class="sec-spacer"></span>
+        <button class="btn-sel"      onclick="selectAll('sequence',true)">Chọn hết</button>
+        <button class="btn-sel none" onclick="selectAll('sequence',false)">Bỏ</button>
+      </div>
+      <div id="seq-list"></div>
+    </div>
+
+    <div class="sec-block" id="sec-bg" hidden>
+      <div class="sec-hdr">
+        <span class="sec-title">Chạy nền</span>
+        <span class="sec-count" id="bg-count">0</span>
+        <span class="sec-spacer"></span>
+        <button class="btn-sel"      onclick="selectAll('background',true)">Chọn hết</button>
+        <button class="btn-sel none" onclick="selectAll('background',false)">Bỏ</button>
+      </div>
+      <div class="sec-hint">Chạy song song khi bấm Bắt đầu · bật/tắt từng tác vụ bằng ô chọn</div>
+      <div id="bg-list"></div>
+    </div>
+
+    <div class="sec-block" id="sec-speed" hidden>
+      <div class="sec-hdr">
+        <span class="sec-title">⚡ Tăng tốc</span>
+        <span id="speed-sum">Tắt</span>
+        <span class="sec-spacer"></span>
+        <div class="toggle" id="speed-toggle" onclick="onSpeedToggle()" role="switch" aria-checked="false" title="Bật/tắt speed hack (Frida · cần root)"></div>
+      </div>
+      <div id="speed-body" hidden>
+        <div class="speed-row">
+          <input type="range" id="speed-range" min="0.5" max="5" step="0.1" value="2"
+                 oninput="onSpeedInput(this.value)" onchange="onSpeedCommit(this.value)">
+          <span id="speed-val">2.0x</span>
         </div>
-        <div class="task-list" id="seq-list">
-          <div class="empty-note">Nhấn <b>Tải JSON</b> để mở một workflow đã xuất từ Designer.</div>
-        </div>
+        <div id="speed-pkg">(tự dò package từ node Mở app)</div>
       </div>
     </div>
 
-    <!-- Background tab -->
-    <div class="tab-pane" id="tab-bg">
-      <div id="bg-master-card">
-        <div class="master-text">
-          <div class="master-title">Tác vụ chạy nền</div>
-          <div class="master-desc">Chạy song song khi bấm Bắt đầu · bật/tắt từng tác vụ bằng ô chọn</div>
-        </div>
-      </div>
-      <div class="pane-inner" style="padding-top:4px;">
-        <div class="task-list" id="bg-list">
-          <div class="empty-note">Không có tác vụ nền.</div>
-        </div>
-      </div>
-    </div>
+  </section>
 
-    <!-- Settings tab -->
-    <div class="tab-pane" id="tab-settings">
-      <div class="pane-inner">
-        <div class="settings-card">
-          <div class="settings-section-title">TĂNG TỐC (SPEED HACK)</div>
-          <div class="toggle-row">
-            <div class="toggle" id="speed-toggle" onclick="onSpeedToggle()" role="switch" aria-checked="false"></div>
-            <div class="toggle-text">
-              <div class="toggle-name">⚡ Speed hack</div>
-              <div class="toggle-hint">Tăng tốc game bằng Frida · cần root</div>
-            </div>
-          </div>
-          <div class="speed-row">
-            <input type="range" id="speed-range" min="0.5" max="5" step="0.1" value="2" disabled
-                   oninput="onSpeedInput(this.value)" onchange="onSpeedCommit(this.value)">
-            <span id="speed-val">2.0x</span>
-          </div>
-          <div id="speed-pkg">(tải workflow để cấu hình)</div>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- /tab-wrapper -->
-
-  <!-- ── Log panel ───────────────────────────────────────────────────── -->
-  <div id="log-card" class="card">
-    <div class="log-header">
-      <span class="log-label">NHẬT KÝ</span>
-      <div style="flex:1"></div>
-      <div class="log-search-wrap">
+  <!-- ── Log ─────────────────────────────────────────────────────────── -->
+  <section id="log-card" class="card">
+    <div class="log-hdr" onclick="toggleLog(event)" title="Thu gọn/mở nhật ký">
+      <span class="log-chevron">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+      </span>
+      <span class="log-label">Nhật ký</span>
+      <span class="sec-spacer"></span>
+      <div class="log-search-wrap" onclick="event.stopPropagation()">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-             stroke="#9aa3ae" stroke-width="2.2" stroke-linecap="round">
+             stroke="#7c8795" stroke-width="2.2" stroke-linecap="round">
           <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
         </svg>
         <input id="log-search" type="text" placeholder="Tìm kiếm" oninput="filterLog(this.value)">
       </div>
-      <button class="btn-log-clear" onclick="onClearLog()">Xoá</button>
+      <button class="btn-log-clear" onclick="onClearLog(event)">Xoá</button>
     </div>
     <div class="log-body" id="log-body"></div>
-  </div>
+  </section>
 
-  <!-- ── Footer ──────────────────────────────────────────────────────── -->
-  <div id="footer">
-    <div class="footer-row">
-      <div id="dev-dot"></div>
-      <span id="dev-label">Đang kết nối…</span>
-      <select id="device-select" onchange="onDeviceChange(this.value)">
-        <option value="">Không có thiết bị</option>
-      </select>
-      <span style="font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap;">Nguồn ảnh</span>
-      <select id="capture-backend" onchange="onCaptureBackendChange(this.value)" title="Nguồn ảnh workflow: scrcpy nhanh/headless · ADB screencap chậm hơn nhưng ổn định">
-        <option value="scrcpy">scrcpy (nhanh)</option>
-        <option value="adb">ADB screencap</option>
-      </select>
-      <button class="btn-refresh" id="btn-refresh" onclick="onRefresh()" title="Làm mới thiết bị">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
-        </svg>
-      </button>
-    </div>
-  </div>
+  <!-- ── Footer: device strip ────────────────────────────────────────── -->
+  <footer id="footer">
+    <div id="dev-dot"></div>
+    <span id="dev-label">Đang kết nối…</span>
+    <select id="device-select" onchange="onDeviceChange(this.value)" title="Thiết bị ADB">
+      <option value="">Không có thiết bị</option>
+    </select>
+    <select id="capture-backend" onchange="onCaptureBackendChange(this.value)" title="Nguồn ảnh workflow: scrcpy nhanh/headless · ADB screencap chậm hơn nhưng ổn định">
+      <option value="scrcpy">scrcpy</option>
+      <option value="adb">ADB</option>
+    </select>
+    <button class="btn-refresh" id="btn-refresh" onclick="onRefresh()" title="Làm mới thiết bị">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
+      </svg>
+    </button>
+  </footer>
 
 </div><!-- /app -->
 
@@ -941,6 +876,8 @@ const PILL_TEXT = { pending:"Chưa làm", running:"Đang chạy", completed:"Xon
 const LOG_TAG = { info:"INF", success:"OK ", warning:"WRN", error:"ERR" };
 const CHECK = `<svg class="icon" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>`;
 const GRIP = `<svg width="9" height="14" viewBox="0 0 9 14" fill="currentColor"><circle cx="2" cy="2" r="1.4"/><circle cx="7" cy="2" r="1.4"/><circle cx="2" cy="7" r="1.4"/><circle cx="7" cy="7" r="1.4"/><circle cx="2" cy="12" r="1.4"/><circle cx="7" cy="12" r="1.4"/></svg>`;
+const PAUSE_ICO = `<rect x="1" y="1" width="3" height="10" rx="1"/><rect x="7" y="1" width="3" height="10" rx="1"/>`;
+const PLAY_ICO  = `<path d="M2 1.5v9l7.5-4.5z"/>`;
 
 function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
@@ -968,41 +905,47 @@ function updateProgress(){
   $('prog-bar').style.width = total ? `${Math.round(done/total*100)}%` : '0%';
 }
 
-// ── Status pill ──────────────────────────────────────────────────────────────
-function setStatusPill(key){
-  const pill = $("status-pill"); pill.className = "";
-  if(key==="running"){ pill.classList.add("status-running"); $("status-text").textContent="ĐANG CHẠY"; }
-  else if(key==="paused"){ pill.classList.add("status-paused"); $("status-text").textContent="TẠM DỪNG"; }
-  else if(key==="stopped"){ pill.classList.add("status-stopped"); $("status-text").textContent="ĐÃ DỪNG"; }
-  else { pill.classList.add("status-ready"); $("status-text").textContent="SẴN SÀNG"; }
+// ── Deck state ──────────────────────────────────────────────────────────────
+function setDeckState(){
+  const deck = $("deck");
+  deck.classList.toggle("state-running", S.running && !S.paused);
+  deck.classList.toggle("state-paused",  S.running && S.paused);
+  $("status-text").textContent = S.running ? (S.paused ? "TẠM DỪNG" : "ĐANG CHẠY") : "SẴN SÀNG";
+  if(!S.running) setDeckNow(null);
+}
+// The "what is happening right now" line beside the status word.
+function setDeckNow(name){
+  const el = $("deck-now");
+  if(name){ el.textContent = "→ " + name; el.title = name; }
+  else if(S.loaded){
+    const bg = S.activities.filter(a=>a.type==="background").length;
+    el.textContent = bg ? `${S.activities.length - bg} tuần tự · ${bg} nền` : "";
+    el.title = "";
+  }
+  else { el.textContent = ""; el.title = ""; }
 }
 
-// ── Button states ────────────────────────────────────────────────────────────
 function refreshButtons(){
-  const running = S.running, paused = S.paused;
-  $("btn-start").disabled = running || !S.loaded;
-  $("btn-pause").disabled = !running;
-  $("btn-stop").disabled  = !running;
-  $("btn-pause").textContent = paused ? "Tiếp tục" : "Tạm dừng";
-  setStatusPill(running ? (paused ? "paused" : "running") : "ready");
-}
-
-// ── Tabs ───────────────────────────────────────────────────────────────────
-function switchTab(tab){
-  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active", b.dataset.tab===tab));
-  document.querySelectorAll(".tab-pane").forEach(p=>p.classList.toggle("active", p.id==="tab-"+tab));
+  $("btn-start").disabled = S.running || !S.loaded;
+  $("btn-pause").disabled = !S.running;
+  $("btn-stop").disabled  = !S.running;
+  $("btn-load").disabled  = S.running;   // loading mid-run would stop the engine
+  $("pause-ico").innerHTML = S.paused ? PLAY_ICO : PAUSE_ICO;
+  $("btn-pause").title = S.paused ? "Tiếp tục" : "Tạm dừng";
+  setDeckState();
 }
 
 // ── Build activity rows ──────────────────────────────────────────────────────
 function buildRow(a){
   const isBg = a.type==="background";
   const row = document.createElement("div");
-  row.className = "task-row"; row.dataset.id = a.id;
+  row.className = "task-row" + (a.status==="running" ? " task-running" : "");
+  row.dataset.id = a.id;
 
   const handle = document.createElement("div");
   handle.className = "drag-handle"; handle.title = "Kéo để đổi thứ tự";
   handle.innerHTML = GRIP;
-  attachDragHandle(row, handle, isBg ? "bg-list" : "seq-list");
+  attachDragHandle(row, handle);
 
   const cb = document.createElement("button");
   cb.className = "cb" + (a.enabled ? " checked" : "");
@@ -1042,18 +985,31 @@ function buildRow(a){
   return row;
 }
 
+// Second line under the activity name. Node counts are designer detail — the
+// runner only surfaces what matters at run time: poll cycle / retry policy.
+function actMeta(a){
+  if(a.type==="background") return `mỗi ${a.pollInterval}s`;
+  return a.maxRetries > 1 ? `thử ${a.maxRetries}×` : "";
+}
+
+function gearButton(id){
+  const g = document.createElement("button");
+  g.className = "btn-icon btn-gear"; g.title = "Cài đặt"; g.dataset.gear = id;
+  g.innerHTML = `<svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+  return g;
+}
+
 // ── Drag-to-reorder ──────────────────────────────────────────────────────────
 // The row is only draggable while the grip handle is held, so taps on the
 // checkbox / gear keep working. DOM rows are reordered live during dragover,
 // then the new order is persisted to Python on drop.
-function attachDragHandle(row, handle, listId){
+function attachDragHandle(row, handle){
   handle.addEventListener("mousedown", ()=>{ if(!S.running) row.draggable = true; });
   handle.addEventListener("mouseup",   ()=>{ row.draggable = false; });
 
   row.addEventListener("dragstart", e=>{
     if(S.running){ e.preventDefault(); return; }
-    // Collapse any open settings panel so it doesn't strand mid-list.
-    if(S.expandedId){ toggleSettings(S.expandedId); }
+    if(S.expandedId){ toggleSettings(S.expandedId); }  // collapse open settings first
     row.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
     try{ e.dataTransfer.setData("text/plain", row.dataset.id); }catch(_){}
@@ -1096,19 +1052,6 @@ function commitOrder(){
   try{ api().reorder_activities(ids); }catch(_){}
 }
 
-function actMeta(a){
-  return a.type==="background"
-    ? `${a.nodeCount} node · mỗi ${a.pollInterval}s`
-    : `${a.nodeCount} node · thử ${a.maxRetries}×`;
-}
-
-function gearButton(id){
-  const g = document.createElement("button");
-  g.className = "btn-icon btn-gear"; g.title = "Cài đặt"; g.dataset.gear = id;
-  g.innerHTML = `<svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
-  return g;
-}
-
 // ── Inline settings panel (poll interval + activity vars) ────────────────────
 function buildSettingsPanel(a){
   const panel = document.createElement("div");
@@ -1116,7 +1059,7 @@ function buildSettingsPanel(a){
 
   if(a.type==="background"){
     const row = document.createElement("div");
-    row.className = "setting-row"; row.style.paddingTop = "10px";
+    row.className = "setting-row";
     const lbl = document.createElement("span"); lbl.className = "setting-label"; lbl.textContent = "Chu kỳ";
     const inp = document.createElement("input");
     inp.type = "number"; inp.className = "setting-input";
@@ -1134,7 +1077,7 @@ function buildSettingsPanel(a){
 
   (a.vars||[]).forEach(v=>{
     const row = document.createElement("div");
-    row.className = "setting-row"; row.style.paddingTop = "8px";
+    row.className = "setting-row";
     const lbl = document.createElement("span"); lbl.className = "setting-label";
     lbl.innerHTML = escHtml(v.label||v.name) + (v.label?`<span class="sub">${escHtml(v.name)}</span>`:"");
     row.appendChild(lbl);
@@ -1178,17 +1121,24 @@ function toggleSettings(id){
   else if(row) list.appendChild(panel);
 }
 
-// ── Populate lists ───────────────────────────────────────────────────────────
+// ── Populate sections ────────────────────────────────────────────────────────
 function populateLists(){
   const seqList = $("seq-list"), bgList = $("bg-list");
   seqList.innerHTML = ""; bgList.innerHTML = "";
   const seq = S.activities.filter(a=>a.type!=="background");
   const bg  = S.activities.filter(a=>a.type==="background");
+
+  $("empty-state").hidden = S.loaded;
+  $("sec-seq").hidden   = !S.loaded;
+  $("sec-bg").hidden    = !S.loaded || !bg.length;
+  $("sec-speed").hidden = !S.loaded;
+
   if(seq.length) seq.forEach(a=>seqList.appendChild(buildRow(a)));
   else seqList.innerHTML = '<div class="empty-note">Không có tác vụ tuần tự.</div>';
-  if(bg.length) bg.forEach(a=>bgList.appendChild(buildRow(a)));
-  else bgList.innerHTML = '<div class="empty-note">Không có tác vụ nền.</div>';
-  $("bg-master-card").style.display = bg.length ? "" : "none";
+  bg.forEach(a=>bgList.appendChild(buildRow(a)));
+
+  $("seq-count").textContent = seq.length;
+  $("bg-count").textContent  = bg.length;
 }
 
 function setActStatus(id, status){
@@ -1200,6 +1150,7 @@ function setActStatus(id, status){
     if(pill){ pill.className = "pill pill-"+(status||"pending"); pill.textContent = PILL_TEXT[status]||PILL_TEXT.pending; }
     row.classList.toggle("task-running", status==="running");
   }
+  if(status==="running" && a && a.type!=="background") setDeckNow(a.name);
   updateProgress();
 }
 
@@ -1217,10 +1168,17 @@ function rebuildDevices(devices, connected){
 }
 function setConnected(on, name, serial){
   $("dev-dot").classList.toggle("connected", !!on);
-  $("dev-label").textContent = on ? `Đã kết nối · ${name||serial||"OK"}` : "Không kết nối";
+  // Keep it short — the device select right beside already names the device.
+  const lbl = $("dev-label");
+  lbl.textContent = on ? "Đã kết nối" : "Không kết nối";
+  lbl.title = on ? `${name||""} ${serial||""}`.trim() : "";
 }
 
 // ── Log ──────────────────────────────────────────────────────────────────────
+function toggleLog(e){
+  if(e && (e.target.closest(".log-search-wrap") || e.target.closest(".btn-log-clear"))) return;
+  $("log-card").classList.toggle("collapsed");
+}
 function appendLog(e){
   const body = $("log-body");
   const query = $("log-search").value.trim().toLowerCase();
@@ -1247,9 +1205,14 @@ function filterLog(query){
 function applySpeedhack(info){
   if(!info) return;
   S.speedhack = Object.assign({enabled:false,speed:2.0,package:"",active:false}, info);
-  $("speed-toggle").classList.toggle("on", !!S.speedhack.enabled);
-  $("speed-toggle").setAttribute("aria-checked", String(!!S.speedhack.enabled));
-  const rng = $("speed-range"); rng.value = S.speedhack.speed; rng.disabled = !S.speedhack.enabled;
+  const en = !!S.speedhack.enabled;
+  $("speed-toggle").classList.toggle("on", en);
+  $("speed-toggle").setAttribute("aria-checked", String(en));
+  $("speed-body").hidden = !en;   // slider/package only matter while enabled
+  const sum = $("speed-sum");
+  sum.textContent = en ? (parseFloat(S.speedhack.speed)||1).toFixed(1)+"x" : "Tắt";
+  sum.classList.toggle("on", en);
+  $("speed-range").value = S.speedhack.speed;
   $("speed-val").textContent = (parseFloat(S.speedhack.speed)||1).toFixed(1)+"x";
   $("speed-pkg").textContent = S.speedhack.package ? ("→ "+S.speedhack.package) : "(tự dò package từ node Mở app)";
 }
@@ -1272,14 +1235,11 @@ function applyFlow(data){
   S.loaded = true;
   const nm = $("flow-name");
   nm.textContent = data.name || "(không tên)"; nm.classList.remove("empty");
-  $("flow-sub").textContent = "Workflow2k Runner";
+  nm.title = nm.textContent;
   populateLists();
   updateProgress();
-  // Tab counts
-  const seq = S.activities.filter(a=>a.type!=="background").length;
-  const bg  = S.activities.filter(a=>a.type==="background").length;
-  document.querySelector('[data-tab="seq"]').textContent = `Một lần (${seq})`;
-  document.querySelector('[data-tab="bg"]').textContent  = `Chạy nền (${bg})`;
+  $("deck-progress").hidden = false;
+  setDeckNow(null);
   if(data.speedhack) applySpeedhack(data.speedhack);
   refreshButtons();
 }
@@ -1307,14 +1267,11 @@ window.__recv = function(raw){
   if(type==="flow_loaded"){ applyFlow(data); return; }
   if(type==="running_state"){
     S.running=!!data.running; S.paused=!!data.paused;
-    if(S.running){ $('header-progress').style.display='flex'; if(!_elapsedTimer) startElapsedTimer(); }
+    if(S.running){ if(!_elapsedTimer) startElapsedTimer(); }
     else { stopElapsedTimer(); }
     refreshButtons(); return;
   }
-  if(type==="activity_update"){
-    if(data.status==="pending"){ $('header-progress').style.display='flex'; }
-    setActStatus(data.id, data.status); return;
-  }
+  if(type==="activity_update"){ setActStatus(data.id, data.status); return; }
   if(type==="speedhack_update"){ applySpeedhack(data); return; }
 };
 
@@ -1324,12 +1281,12 @@ async function onLoadJson(){ const r=await api().load_json(); if(r&&r.ok) applyF
 async function onStart(){
   if(!S.loaded) return;
   S.activities.filter(a=>a.type!=="background").forEach(a=>setActStatus(a.id,"pending"));
-  $('header-progress').style.display='flex'; startElapsedTimer(); updateProgress();
+  startElapsedTimer(); updateProgress();
   await api().start();
 }
 async function onStop(){ await api().stop(); }
 async function onPause(){ const r=await api().pause(); S.paused=!!(r&&r.paused); refreshButtons(); }
-async function onClearLog(){ await api().clear_log(); }
+async function onClearLog(e){ if(e) e.stopPropagation(); await api().clear_log(); }
 async function onDeviceChange(serial){ if(serial){ S.connectedSerial=serial; await api().select_device(serial); } }
 async function onCaptureBackendChange(backend){
   const r=await api().set_capture_backend(backend);
@@ -1360,11 +1317,12 @@ async function init(){
   const capSel=$("capture-backend");
   if(capSel){
     capSel.innerHTML="";
-    (st.captureBackends||["scrcpy","adb"]).forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b==="adb"?"ADB screencap":"scrcpy (nhanh)"; capSel.appendChild(o); });
+    (st.captureBackends||["scrcpy","adb"]).forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b==="adb"?"ADB":"scrcpy"; capSel.appendChild(o); });
     capSel.value=S.captureBackend;
   }
   if(st.loaded) applyFlow({name:st.name, activities:st.activities, speedhack:st.speedhack});
   S.running=!!st.running; S.paused=!!st.paused;
+  if(S.running && !_elapsedTimer) startElapsedTimer();
   refreshButtons();
   (st.log||[]).forEach(appendLog);
 }

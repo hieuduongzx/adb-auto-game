@@ -41,6 +41,13 @@
   --branch-loop:    #e0a64b;
   --branch-loop-bg: #fff7ea;
   --branch-loop-line: #d09030;
+  /* Wire palette — the graph's connective tissue. `--wire` is the neutral
+     forward flow; branch/switch wires borrow the semantic hues above. Kept a
+     touch cooler + a hair stronger than the old flat grey so they read cleanly
+     over the dot grid without shouting. */
+  --wire:        #8a9bb3;
+  --wire-switch: #9a78e6;
+  --wire-arrow:  #94a6ba;
   /* Node-category accents — single source of truth for wf.css's .cat-* node
      styling AND the group-frame colour palette (js/groups.js), so retuning a
      category's colour here updates both instead of drifting apart. */
@@ -225,8 +232,8 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
   cursor: pointer; user-select: none; transition: background .1s; }
 .grp-hdr:hover { background: var(--alt); }
 
-.grp-title { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
-  color: var(--muted); text-transform: uppercase; }
+.grp-title { font-size: 11px; font-weight: 800; letter-spacing: .04em;
+  color: var(--ink); text-transform: uppercase; }
 
 .grp-chevron { margin-left: auto; color: var(--muted); flex-shrink: 0;
   transition: transform .15s; }
@@ -244,9 +251,15 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .btns { display: flex; flex-wrap: wrap; gap: 5px; }
 .btns .btn { flex: 1; min-width: 60px; }
 
-/* Readout & swatch */
-#color-swatch, #cc-swatch { width: 28px; height: 26px; border-radius: 6px;
-  border: 1px solid var(--border); flex-shrink: 0; background: #eee; }
+/* Readout & swatch — the live colour preview beside a picked Point / sampled
+   colour. The Preview-tab scope panel uses pv-prefixed ids; they share the same
+   look (previously unstyled → invisible, so no colour showed on pick). A subtle
+   checker underlay shows through translucent samples. */
+#color-swatch, #cc-swatch, #pv-color-swatch, #pv-cc-swatch {
+  width: 28px; height: 26px; border-radius: 6px; flex-shrink: 0;
+  border: 1px solid var(--border2);
+  background: #fff repeating-conic-gradient(#e6e9ee 0% 25%, transparent 0% 50%) 50%/8px 8px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.6); }
 
 /* Badges */
 .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px;

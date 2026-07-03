@@ -53,8 +53,7 @@ hiddenimports += [
 
 # --- bundled web assets ------------------------------------------------------
 # (source folder, destination relative to the bundle root)
-web_designer_only = (os.path.join(ROOT, "src", "gui", "web", "workflow"),
-                     os.path.join("src", "gui", "web", "workflow"))
+# ``tools/web`` holds every tool's HTML/JS/CSS — wf/ (designer), runner/, scope/.
 web_tools = (os.path.join(ROOT, "tools", "web"), "web")
 
 # --- exclude the world we don't ship -----------------------------------------
@@ -79,7 +78,7 @@ _common = dict(
 # ── Workflow2k.exe (Workflow Designer + Runner) ──────────────────────────────
 a_designer = Analysis(
     [os.path.join(ROOT, "packaging", "entry_designer.py")],
-    datas=datas + [web_tools, web_designer_only],
+    datas=datas + [web_tools],
     **_common,
 )
 pyz_designer = PYZ(a_designer.pure)

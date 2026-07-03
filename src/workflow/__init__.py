@@ -10,7 +10,7 @@ tap_image, …). Activities run in one of two modes, mirroring
   seconds; can be toggled on/off while sequence activities run.
 
 The same JSON is produced by the Workflow tab in ``tools/dev_helper.py`` and
-consumed by the standalone runner GUI (``src/gui/workflow_runner_gui.py``).
+consumed by the standalone runner GUI (``tools/workflow_runner.py``).
 """
 from .engine import WorkflowEngine, NODE_TYPES
 

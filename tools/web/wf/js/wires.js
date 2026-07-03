@@ -20,10 +20,12 @@ const WF_WIRE_DEFS = (function(){
   const v=(name,fallback)=>(cs.getPropertyValue(name)||fallback).trim();
   const mk=(id,c)=>`<marker id="${id}" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L6,3 L0,6 Z" fill="${c}"/></marker>`;
   return "<defs>"+
-    mk("wf-ah","#94a6ba")+
+    mk("wf-ah",v("--wire-arrow","#94a6ba"))+
     mk("wf-ah-t",v("--branch-t","#1f9d57"))+
     mk("wf-ah-f",v("--branch-f","#e0792e"))+
+    mk("wf-ah-switch",v("--wire-switch","#9a78e6"))+
     mk("wf-ah-loop",v("--branch-loop-line","#d09030"))+
+    mk("wf-ah-hover",v("--accent","#2f6fed"))+
     mk("wf-ah-temp",v("--accent","#2f6fed"))+
   "</defs>";
 })();

@@ -166,7 +166,10 @@ const WF_NODES = {
   win_activate: {label:"Activate window", ico:"monitor", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"đưa cửa sổ lên trước"},
   win_close:    {label:"Close window", ico:"x", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"đóng cửa sổ mục tiêu"},
 };
-const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"input",label:"Keys & Input"}, {key:"image",label:"Image"}, {key:"color",label:"Color"}, {key:"ocr",label:"Text (OCR)"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"device",label:"Device & Time"}, {key:"win32",label:"Win32 (PC)"}, {key:"misc",label:"Other"} ];
+// `ctrl` restricts a category to one project controller: the Device/emulator
+// nodes are ADB-only, the Win32 window nodes are PC-only. Untagged categories
+// (basic/image/color/ocr/flow/logic/…) work on both and always show.
+const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"input",label:"Keys & Input"}, {key:"image",label:"Image"}, {key:"color",label:"Color"}, {key:"ocr",label:"Text (OCR)"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"device",label:"Device & Time",ctrl:"adb"}, {key:"win32",label:"Win32 (PC)",ctrl:"win32"}, {key:"misc",label:"Other"} ];
 const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"loop", done:"done", fail:"fail", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
 const WF_IN_LBL = { in:"in", loop:"loop" };
@@ -298,7 +301,7 @@ function wfSyncControllerUI(){
 function wfPushCaptureSource(){
   try{ api().set_capture_source(WF.controller||"adb", WF.win32||{}); }catch{}
 }
-function wfControllerChanged(){ WF.controller=($("wf-controller").value==="win32")?"win32":"adb"; wfSyncControllerUI(); wfPushUndoDebounced(); }
+function wfControllerChanged(){ WF.controller=($("wf-controller").value==="win32")?"win32":"adb"; wfSyncControllerUI(); wfRenderPalette(); wfPushUndoDebounced(); }
 // Window picker: a dropdown of currently-open windows so the user chooses the
 // game window instead of typing its title. Reuses the .wf-varmenu styling.
 let wfWinMenuEl=null;
