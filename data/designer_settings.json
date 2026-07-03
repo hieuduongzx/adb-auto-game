@@ -1,8 +1,8 @@
 {
   "snap": true,
   "previewAll": true,
-  "logOpen": false,
+  "logOpen": true,
   "sideW": 315,
   "inspW": 357,
-  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\Onsen_And_Girl\\workflow.json"
+  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\DragonRaja\\DragonRaja.json"
 }

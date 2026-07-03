@@ -20,6 +20,7 @@ const WF_ICONS = {
   alarm:      '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5"/><path d="M5 3 2 6"/><path d="M22 6l-3-3"/>',
   calendar:   '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/>',
   smartphone: '<rect x="6" y="2" width="12" height="20" rx="2"/><line x1="10" y1="18" x2="14" y2="18"/>',
+  monitor:    '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
   power:      '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>',
   battery:    '<rect x="2" y="7" width="16" height="10" rx="2"/><line x1="22" y1="11" x2="22" y2="13"/>',
   arrow_down: '<line x1="12" y1="4" x2="12" y2="20"/><polyline points="7 15 12 20 17 15"/>',
@@ -67,6 +68,7 @@ const WF_ICONS = {
   link_off:   '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 0 1 4 7"/><path d="M8 12h8"/><line x1="3" y1="3" x2="21" y2="21"/>',
   box:        '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="4 3"/>',
   log:        '<path d="M14 3v4h4"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>',
+  folder:     '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
 };
   function wfIco(name){
     const inner = WF_ICONS[name];
@@ -139,6 +141,19 @@ const WF_NODES = {
   if_time:       {label:"If within time", ico:"clock", kind:"condition", cat:"device", outs:["true","false"], fields:[{k:"from",lbl:"From (HH:MM)",t:"text",d:"08:00"},{k:"to",lbl:"To (HH:MM)",t:"text",d:"22:00"},{k:"negate",lbl:"Negate (outside window)",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}${p.from||"00:00"}–${p.to||"23:59"}`},
   device_info:   {label:"Device info → variable", ico:"smartphone", kind:"action", cat:"device", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"info",var:true},{k:"prop",lbl:"Property",t:"select",opts:[{v:"battery",t:"Battery level (%)"},{v:"current_app",t:"Current app package"},{v:"width",t:"Screen width"},{v:"height",t:"Screen height"},{v:"model",t:"Model"},{v:"brand",t:"Brand"},{v:"android",t:"Android version"},{v:"sdk",t:"SDK level"},{v:"serial",t:"Serial"},{v:"ip",t:"IP address"}],d:"battery"}], sum:p=>`${p.name||"?"} = ${p.prop||"battery"}`},
   screen_power:  {label:"Screen power", ico:"power", kind:"action", cat:"device", outs:["out"], fields:[{k:"action",lbl:"Action",t:"select",opts:[{v:"on",t:"Wake / On"},{v:"off",t:"Sleep / Off"},{v:"toggle",t:"Toggle (power key)"}],d:"on"}], sum:p=>`🖥 ${({on:"wake",off:"sleep",toggle:"toggle"})[p.action||"on"]}`},
+  // Launch the emulator PROCESS on the PC (not an app inside it). Optional "at"
+  // waits until a clock time first → "sit idle until 07:00, then boot LDPlayer".
+  launch_emulator:{label:"Launch emulator", ico:"monitor", kind:"action", cat:"device", outs:["out"], fields:[
+    {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"},{v:"custom",t:"Custom command"}],d:"ldplayer"},
+    {k:"index",lbl:"Instance index",t:"num",d:0},
+    {k:"instance",lbl:"Instance name (BlueStacks)",t:"text",d:"",showWhen:{emulator:"bluestacks"}},
+    {k:"path",lbl:"Install folder / console .exe (blank = auto)",t:"text",d:"",pickFolder:true},
+    {k:"command",lbl:"Custom command ({index})",t:"text",d:"",showWhen:{emulator:"custom"}},
+    {k:"at",lbl:"Schedule at (HH:MM, blank = now)",t:"text",d:""},
+    {k:"nextDay",lbl:"If time passed → wait next day",t:"bool",d:true},
+    {k:"wait",lbl:"Wait for ADB ready (s)",t:"num",d:60},
+    {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
+  ], sum:p=>`▶ ${p.emulator||"ldplayer"}${(p.index?(" #"+p.index):"")}${p.at?(" ⏰"+p.at):""}`},
 };
 const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"input",label:"Keys & Input"}, {key:"image",label:"Image"}, {key:"color",label:"Color"}, {key:"ocr",label:"Text (OCR)"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"device",label:"Device & Time"}, {key:"misc",label:"Other"} ];
 const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"loop", done:"done", fail:"fail", "1":"1", "2":"2", "3":"3" };

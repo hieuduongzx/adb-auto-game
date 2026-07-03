@@ -139,6 +139,56 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "if_time":     {"label": "Nếu trong khung giờ","kind": "condition","ins": 1, "outs": ["true", "false"]},
     "device_info": {"label": "Thông tin thiết bị → biến","kind": "action","ins": 1, "outs": ["out"]},
     "screen_power":{"label": "Bật/tắt màn hình", "kind": "action",    "ins": 1, "outs": ["out"]},
+    # Launch the *emulator process itself* (LDPlayer/MuMu/Nox/MEmu/BlueStacks) on
+    # the PC — unlike ``launch_app`` which opens an app *inside* an already-running
+    # device. Optional ``at`` (HH:MM) waits until that clock time first, so a flow
+    # can, on its own, sit idle until 07:00 then boot the emulator (no Task
+    # Scheduler / PC-wake needed — the PC is already on running this tool).
+    "launch_emulator": {"label": "Mở giả lập", "kind": "action", "ins": 1, "outs": ["out"]},
+}
+
+# ── Emulator launch specs ─────────────────────────────────────────────────────
+#
+# Per-family console executable + argv template for booting one instance, plus
+# the default install dirs to auto-discover the console when the user leaves the
+# path blank. ``{index}`` = instance number, ``{instance}`` = BlueStacks instance
+# name. A ``custom`` command (with ``{index}``/``{path}`` placeholders) always
+# overrides these — the escape hatch for non-standard installs. The per-family
+# first-instance ADB port + step mirror src/core/adb/constants.py so a launch can
+# poll the right ``127.0.0.1:PORT`` until the emulator's ADB comes up.
+EMULATOR_CONSOLES: Dict[str, Dict[str, Any]] = {
+    "ldplayer": {
+        "exes": ["ldconsole.exe", "dnconsole.exe"],
+        "args": ["launch", "--index", "{index}"],
+        "dirs": [r"C:\LDPlayer\LDPlayer9", r"C:\LDPlayer\LDPlayer64",
+                 r"C:\ChangZhi\LDPlayer9", r"D:\LDPlayer\LDPlayer9"],
+        "port0": 5555, "step": 2,
+    },
+    "mumu": {
+        "exes": ["MuMuManager.exe"],
+        "args": ["control", "-v", "{index}", "launch"],
+        "dirs": [r"C:\Program Files\Netease\MuMuPlayer-12.0\shell",
+                 r"C:\Program Files\Netease\MuMuPlayerGlobal-12.0\shell"],
+        "port0": 16384, "step": 32,
+    },
+    "nox": {
+        "exes": ["NoxConsole.exe"],
+        "args": ["launch", "-index:{index}"],
+        "dirs": [r"C:\Program Files (x86)\Nox\bin", r"C:\Program Files\Nox\bin"],
+        "port0": 62001, "step": 1,
+    },
+    "memu": {
+        "exes": ["memuc.exe"],
+        "args": ["start", "-i", "{index}"],
+        "dirs": [r"C:\Program Files\Microvirt\MEmu", r"C:\Program Files (x86)\Microvirt\MEmu"],
+        "port0": 21503, "step": 1,
+    },
+    "bluestacks": {
+        "exes": ["HD-Player.exe"],
+        "args": ["--instance", "{instance}"],
+        "dirs": [r"C:\Program Files\BlueStacks_nxt", r"C:\Program Files\BlueStacks"],
+        "port0": 5555, "step": 10,
+    },
 }
 
 # Condition node types a switch case may use — only the *instant* ones (no
@@ -249,6 +299,7 @@ class WorkflowEngine:
             "device_info":  self._a_device_info,
             "screen_power": self._a_screen_power,
             "read_color":   self._a_read_color,
+            "launch_emulator": self._a_launch_emulator,
         }
 
     # ── Per-thread execution context ─────────────────────────────────────────
@@ -1980,10 +2031,11 @@ class WorkflowEngine:
             log_info(f"[workflow] 🕒 {name} = {self._vars[name]!r}")
         return True
 
-    def _a_wait_until(self, node, p) -> bool:
+    def _wait_until_clock(self, target: str, next_day: bool = True) -> bool:
         """Block until a wall-clock ``HH:MM`` (or ``HH:MM:SS``). If the time is
-        already past today, wait until the same time tomorrow (unless disabled)."""
-        target = str(p.get("time", "")).strip()
+        already past today, wait until the same time tomorrow (unless disabled).
+        Returns False only on a malformed time string. Shared by the ``wait_until``
+        node and ``launch_emulator``'s optional ``at`` schedule."""
         m = re.match(r"^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$", target)
         if not m:
             log_warning(f"[workflow] ⏰ Hẹn giờ: định dạng không hợp lệ '{target}' (cần HH:MM)")
@@ -1993,7 +2045,7 @@ class WorkflowEngine:
         now_secs = now.tm_hour * 3600 + now.tm_min * 60 + now.tm_sec
         delay = (hh * 3600 + mm * 60 + ss) - now_secs
         if delay <= 0:
-            if bool(p.get("nextDay", True)):
+            if next_day:
                 delay += 86400
             else:
                 log_info(f"[workflow] ⏰ {hh:02d}:{mm:02d} đã qua — bỏ qua chờ")
@@ -2001,6 +2053,9 @@ class WorkflowEngine:
         log_info(f"[workflow] ⏰ Hẹn giờ đến {hh:02d}:{mm:02d}:{ss:02d} — chờ {delay}s")
         self._sleep(delay)
         return True
+
+    def _a_wait_until(self, node, p) -> bool:
+        return self._wait_until_clock(str(p.get("time", "")).strip(), bool(p.get("nextDay", True)))
 
     def _a_device_info(self, node, p) -> bool:
         """Read a live device property into a variable (battery, app, size…)."""
@@ -2067,3 +2122,134 @@ class WorkflowEngine:
         except Exception as exc:
             log_warning(f"[workflow] screen_power '{action}' lỗi: {exc}")
             return False
+
+    # ── Emulator launch ───────────────────────────────────────────────────────
+
+    def _a_launch_emulator(self, node, p) -> bool:
+        """Boot the emulator *process* on the PC (LDPlayer/MuMu/Nox/MEmu/
+        BlueStacks). Optional ``at`` (HH:MM) waits until that clock time first;
+        optional ``wait`` seconds then polls the instance's ADB port until it is
+        connectable (so the very next node can drive the freshly-booted device).
+        """
+        at = str(p.get("at", "")).strip()
+        if at and not self._wait_until_clock(at, bool(p.get("nextDay", True))):
+            return False  # malformed schedule time
+
+        kind = str(p.get("emulator", "ldplayer")).strip().lower()
+        try:
+            index = int(float(p.get("index", 0) or 0))
+        except (TypeError, ValueError):
+            index = 0
+
+        argv = self._emulator_launch_argv(p, kind, index)
+        if not argv:
+            log_error(
+                f"[workflow] ▶ Không dựng được lệnh mở '{kind}' — đặt 'Đường dẫn' "
+                f"tới thư mục cài / console .exe, hoặc dùng 'Lệnh tùy chỉnh'"
+            )
+            return False
+
+        import subprocess
+        try:
+            log_info(f"[workflow] ▶ Mở giả lập: {' '.join(argv)}")
+            subprocess.Popen(
+                argv,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+            )
+        except Exception as exc:
+            log_error(f"[workflow] ▶ Mở giả lập lỗi: {exc}")
+            return False
+
+        wait = float(p.get("wait", 0) or 0)
+        if wait > 0:
+            port = self._emulator_adb_port(p, kind, index)
+            self._wait_emulator_adb(port, wait)
+        return True
+
+    def _emulator_launch_argv(self, p: Dict, kind: str, index: int) -> Optional[List[str]]:
+        """Build the console argv for booting one instance, or None if it can't be
+        resolved. A custom command always wins; otherwise the per-family console
+        exe is discovered under the given path or the default install dirs."""
+        path = str(p.get("path", "")).strip()
+        custom = str(p.get("command", "")).strip()
+        if kind == "custom" or custom:
+            if not custom:
+                return None
+            cmd = custom.replace("{index}", str(index)).replace("{path}", path)
+            try:
+                import shlex
+                return shlex.split(cmd, posix=False)
+            except Exception:
+                return [cmd]
+
+        spec = EMULATOR_CONSOLES.get(kind)
+        if not spec:
+            return None
+        exe = self._resolve_console_exe(path, spec["exes"], spec["dirs"])
+        if not exe:
+            return None
+        instance = str(p.get("instance", "") or index)
+        args = [a.replace("{index}", str(index)).replace("{instance}", instance)
+                for a in spec["args"]]
+        return [exe] + args
+
+    @staticmethod
+    def _resolve_console_exe(path: str, exes: List[str], dirs: List[str]) -> Optional[str]:
+        """Find the console .exe: an explicit file, else inside an explicit dir,
+        else inside each known default install dir."""
+        if path:
+            if os.path.isfile(path):
+                return path
+            if os.path.isdir(path):
+                for name in exes:
+                    cand = os.path.join(path, name)
+                    if os.path.exists(cand):
+                        return cand
+        for d in dirs:
+            for name in exes:
+                cand = os.path.join(d, name)
+                if os.path.exists(cand):
+                    return cand
+        return None
+
+    def _emulator_adb_port(self, p: Dict, kind: str, index: int) -> Optional[int]:
+        """The instance's ADB port: an explicit ``port`` override, else derived
+        from the family's first-instance port + index*step (mirrors constants.py)."""
+        override = str(p.get("port", "")).strip()
+        if override:
+            try:
+                return int(override)
+            except ValueError:
+                pass
+        spec = EMULATOR_CONSOLES.get(kind)
+        if not spec or "port0" not in spec:
+            return None
+        return spec["port0"] + index * spec["step"]
+
+    def _wait_emulator_adb(self, port: Optional[int], wait: float) -> None:
+        """Poll ``adb connect 127.0.0.1:<port>`` until it succeeds or ``wait`` s
+        elapse. With no known port, just sleep ``wait`` s to let the emulator boot."""
+        if not port:
+            log_info(f"[workflow] ▶ Chờ giả lập khởi động {wait:.0f}s (không rõ cổng ADB)")
+            self._sleep(wait)
+            return
+        from src.core.adb.constants import get_adb_path
+        adb = get_adb_path()
+        host = f"127.0.0.1:{port}"
+        import subprocess
+        end = time.time() + wait
+        while time.time() < end and not self._stop.is_set():
+            self._pause.wait()
+            try:
+                r = subprocess.run(
+                    [adb, "connect", host],
+                    capture_output=True, text=True, timeout=5,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+                )
+                if "connected" in (r.stdout or "").lower():  # "connected to" / "already connected"
+                    log_success(f"[workflow] ▶ Giả lập sẵn sàng — ADB {host}")
+                    return
+            except Exception:
+                pass
+            time.sleep(1.0)
+        log_warning(f"[workflow] ▶ Chưa thấy ADB {host} sau {wait:.0f}s")

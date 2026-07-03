@@ -242,7 +242,7 @@ class WorkflowDesignerAPI:
         if self._window is None or self._closing:
             return
         try:
-            ok, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            ok, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, 92])
             if not ok:
                 return
             b64 = base64.b64encode(buf.tobytes()).decode("ascii")
@@ -515,6 +515,26 @@ class WorkflowDesignerAPI:
         except Exception:
             pass
         return self._scope_out()
+
+    def pick_folder(self, start: str = "") -> str:
+        """Open a folder-picker dialog and return the chosen directory (or "").
+
+        Used by the ``launch_emulator`` node's path field to browse to an
+        emulator install folder. Opens at ``start`` when it is a real directory.
+        """
+        win = self._win()
+        if win is None:
+            return ""
+        start_dir = start if start and os.path.isdir(start) else ""
+        try:
+            paths = win.create_file_dialog(webview.FOLDER_DIALOG, directory=start_dir)
+        except Exception as exc:
+            log_warning(f"Dialog error: {exc}")
+            return ""
+        if not paths:
+            return ""
+        path = paths[0] if isinstance(paths, (list, tuple)) else paths
+        return str(path)
 
     # ── Template matching ─────────────────────────────────────────────────────
 

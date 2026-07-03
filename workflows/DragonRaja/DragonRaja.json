@@ -212,7 +212,7 @@
       "id": "sequence_8bs4",
       "name": "Hoạt động 1",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [

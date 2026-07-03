@@ -685,6 +685,16 @@ function wfFieldEl(node,f){
   // Free-text fields that expand {name} placeholders get an insert-variable btn.
   if(f.t==="text" && f.insertVar){ row.appendChild(wfInsertVarBtn(inp)); }
 
+  // Path fields marked pickFolder get a "browse for a folder" button next to
+  // the text input (e.g. the emulator install dir on launch_emulator).
+  if(f.pickFolder){
+    inp.style.fontSize="10px";
+    const btn=document.createElement("button"); btn.className="btn sm ico"; btn.title="Chọn thư mục…";
+    btn.innerHTML=wfIco("folder");
+    btn.onclick=async()=>{ const p=await api().pick_folder(inp.value||""); if(p){ inp.value=p; wfPushUndoDebounced(); node.params[f.k]=p; wfUpdNodeSum(node); } };
+    row.appendChild(btn);
+  }
+
   if(f.t==="tpl"){
     inp.style.fontSize="10px";
     const btn=document.createElement("button"); btn.className="btn sm"; btn.textContent="Choose…";
