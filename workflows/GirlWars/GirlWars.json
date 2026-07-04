@@ -496,7 +496,7 @@
       "id": "sequence_sw9b",
       "name": "Nhận Thư",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -600,7 +600,7 @@
       "id": "sequence_tatt",
       "name": "Elite",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [
         {
           "name": "raid",
@@ -830,7 +830,7 @@
       "id": "sequence_hhiq",
       "name": "Dungeon",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [
         {
           "name": "fixMissingStar",
@@ -2623,7 +2623,7 @@
       "id": "sequence_ih6c",
       "name": "Dragon Queen",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [

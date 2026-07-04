@@ -2,6 +2,12 @@
   "name": "Cherry Tale",
   "version": 2,
   "templatesDir": "templates",
+  "controller": "adb",
+  "win32": {
+    "window": "",
+    "matchBy": "title",
+    "inputMode": "background"
+  },
   "speedhack": {
     "enabled": false,
     "speed": 2,
@@ -46,7 +52,7 @@
               ],
               "taps": "1",
               "threshold": 0.85,
-              "timeout": 1,
+              "timeout": 3,
               "offsetX": 0,
               "offsetY": 0,
               "mode": "parallel"
@@ -423,7 +429,7 @@
             "id": "npb983wx",
             "type": "tap_image",
             "x": 460,
-            "y": 180,
+            "y": 200,
             "params": {
               "template": "templates/isHome_20260629_020645_36x24.png",
               "taps": "1",
@@ -437,7 +443,7 @@
             "id": "npmt5tuu",
             "type": "tap_image",
             "x": 640,
-            "y": 180,
+            "y": 200,
             "params": {
               "template": "templates/isHome_20260629_020704_175x20.png",
               "taps": "1",
@@ -451,7 +457,7 @@
             "id": "nuw5egc1",
             "type": "tap_image",
             "x": 820,
-            "y": 180,
+            "y": 200,
             "params": {
               "template": "templates/crop_20260629_020144_213x200.png",
               "taps": "1",
@@ -460,7 +466,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 3
+            "delayBefore": 5
           },
           {
             "id": "ns4utvft",
@@ -490,7 +496,7 @@
             "id": "npmenb9e",
             "type": "wait_image",
             "x": 1000,
-            "y": 180,
+            "y": 200,
             "params": {
               "template": "templates/isHome_20260629_020704_175x20.png",
               "threshold": 0.85,
@@ -679,7 +685,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 5,
+            "delayBefore": 3,
             "delayAfter": 1
           },
           {
@@ -1071,7 +1077,7 @@
             "x": 1680,
             "y": 344,
             "params": {
-              "template": "templates/crop_20260629_020144_213x200_1.png",
+              "template": "templates/crop_20260704_085455_824_868_248_148.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
@@ -1661,7 +1667,7 @@
             "id": "nappv4fb",
             "type": "tap_image",
             "x": 860,
-            "y": 78,
+            "y": 82,
             "params": {
               "template": "templates/crop_20260629_093001_87x25.png",
               "taps": "1",
@@ -1670,7 +1676,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 5
+            "delayBefore": 10
           },
           {
             "id": "nb8z5psv",
@@ -2437,7 +2443,7 @@
       "id": "sequence_99fk",
       "name": "Giáng Lâm Quét Event",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -2553,8 +2559,8 @@
           {
             "id": "nnzuym8j",
             "type": "if_image",
-            "x": 1160,
-            "y": 160,
+            "x": 1360,
+            "y": 80,
             "params": {
               "template": "templates/crop_20260629_031437_166x38.png",
               "threshold": 0.85,
@@ -2564,8 +2570,8 @@
           {
             "id": "nnr35qh2",
             "type": "tap_image",
-            "x": 1380,
-            "y": 160,
+            "x": 1540,
+            "y": 80,
             "params": {
               "template": "templates/crop_20260629_031440_29x29.png",
               "taps": "1",
@@ -2578,8 +2584,8 @@
           {
             "id": "nj24nb55",
             "type": "call",
-            "x": 1560,
-            "y": 180,
+            "x": 1720,
+            "y": 80,
             "params": {
               "fn": "fn_ppung"
             }
@@ -3425,7 +3431,7 @@
       "id": "sequence_z3w7",
       "name": "Activity 12",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [

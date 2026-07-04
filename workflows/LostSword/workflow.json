@@ -1,0 +1,41 @@
+{
+  "name": "LostSword",
+  "version": 2,
+  "templatesDir": "templates",
+  "controller": "adb",
+  "win32": {
+    "window": "",
+    "matchBy": "title",
+    "inputMode": "background"
+  },
+  "speedhack": {
+    "enabled": false,
+    "speed": 2,
+    "package": "com.wemadeconnect.aos.lostdgl"
+  },
+  "globals": [],
+  "functions": [],
+  "activities": [
+    {
+      "id": "sequence_lf32",
+      "name": "Activity 1",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "ngc7d2gp",
+            "type": "start",
+            "x": 60,
+            "y": 70,
+            "params": {}
+          }
+        ],
+        "edges": [],
+        "groups": []
+      },
+      "maxRetries": 1
+    }
+  ]
+}

@@ -76,8 +76,9 @@ function wfNewGraph(){ return { nodes:[{id:wfUid(),type:"start",x:60,y:70,params
 const wfStackId=()=>"st"+Math.random().toString(36).slice(2,8);
 function wfMergeable(n){ const d=n&&WF_NODES[n.type]; return !!d && (d.kind==="action"||d.kind==="call"||d.kind==="condition"); }
 // Port used as the sequential "next" link inside a merged stack.
-// Condition nodes continue via their "true" (success) branch; everything else uses "out".
-function wfMergeOutPort(n){ const d=n&&WF_NODES[n.type]; return (d&&d.kind==="condition")?"true":"out"; }
+// Condition and call nodes continue via their "true" (success) branch;
+// everything else uses "out".
+function wfMergeOutPort(n){ const d=n&&WF_NODES[n.type]; return (d&&(d.kind==="condition"||d.kind==="call"))?"true":"out"; }
 function wfStackMembers(sid){ const g=wfGraph(); return g?g.nodes.filter(n=>n.stack===sid):[]; }
 function wfSameStack(aId,bId){ const a=wfNode(aId),b=wfNode(bId); return !!(a&&b&&a.stack&&a.stack===b.stack); }
 function wfHasInternalIn(n){ const g=wfGraph(); return !!(g&&n.stack&&g.edges.some(e=>e.to===n.id&&wfSameStack(e.from,e.to))); }
