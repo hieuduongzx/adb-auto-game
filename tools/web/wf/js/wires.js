@@ -95,6 +95,7 @@ function wfWirePath(a,b,lane){
 }
 
 function wfDrawWires(){
+  if(typeof wfMinimapQueue==="function") wfMinimapQueue();   // node moves redraw wires → keep the map live
   const svg=$("wf-wires"), g=wfGraph();
   const temp=svg.querySelector(".temp");
   svg.innerHTML=WF_WIRE_DEFS; if(temp) svg.appendChild(temp);

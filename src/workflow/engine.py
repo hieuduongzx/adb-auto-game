@@ -1359,8 +1359,13 @@ class WorkflowEngine:
             ))
         if ntype == "if_text":
             negate = bool(params.get("negate", False))
-            found = self.auto.region_contains_text(
-                str(params.get("text", "")), region=self._region(params))
+            needle = str(params.get("text", ""))
+            region = self._region(params)
+            found, read = self.auto.region_find_text(needle, region=region)
+            log_info(
+                f"[workflow] 🔤 if_text vùng {region}: đọc được {read!r} → "
+                f"{'thấy' if found else 'không thấy'} '{needle}'"
+            )
             return bool(found) != negate
         if ntype == "if_var":
             cur = self._vars.get(str(params.get("name", "")))
@@ -1924,10 +1929,14 @@ class WorkflowEngine:
 
     def _a_read_var(self, node, p) -> bool:
         name = str(p.get("name", "")).strip()
-        text = self.auto.read_text(region=self._region(p)) or ""
+        region = self._region(p)
+        text = self.auto.read_text(region=region) or ""
         if name:
             self._set_var(name, self._coerce(text.strip()))
-            log_info(f"[workflow] read {name} = {self._vars[name]!r}")
+            log_info(
+                f"[workflow] 🔤 read {name} = {self._vars[name]!r} "
+                f"(OCR vùng {region}: {text!r})"
+            )
         return True
 
     def _a_parse_var(self, node, p) -> bool:
@@ -1946,8 +1955,10 @@ class WorkflowEngine:
         if src == "var":
             text = str(self._vars.get(str(p.get("fromVar", "")).strip(), ""))
         else:
+            region = self._region(p)
             try:
-                text = self.auto.read_text(region=self._region(p)) or ""
+                text = self.auto.read_text(region=region) or ""
+                log_info(f"[workflow] 🔤 parse_var OCR vùng {region}: {text!r}")
             except Exception as exc:
                 log_warning(f"[workflow] parse_var OCR lỗi: {exc}")
                 text = ""

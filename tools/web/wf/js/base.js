@@ -67,6 +67,7 @@ function wfSetRunningNode(id){
   wfRunNode=id||null;
   wfRunLitAt=now;
   const el=wfNodeElById(wfRunNode); if(el) el.classList.add("running");
+  if(typeof wfMinimapQueue==="function") wfMinimapQueue();   // amber chip follows on the map
 }
 function wfColorBranch(id, takenPort){
   document.querySelectorAll("#wf-wires path.wire").forEach(p=>{

@@ -158,11 +158,11 @@ function wfAutoLayout(kind){
 function wfAnimateLayout(g, from){
   const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const nodes=g.nodes.filter(n=>from[n.id] && (from[n.id].x!==n.x || from[n.id].y!==n.y));
-  if(reduce || !nodes.length || (typeof wfPvActive!=="undefined" && wfPvActive)){ wfRenderCanvas(); wfFit(); return; }
+  if(reduce || !nodes.length || (typeof wfPvActive!=="undefined" && wfPvActive)){ wfRenderCanvas(); wfFit(false); return; }
   // Pre-fit to the FINAL layout so the camera is already framed; we then animate
   // nodes inside that stable frame (no simultaneous pan/zoom + node motion).
   wfRenderCanvas();
-  wfFit();
+  wfFit(false);
   const els=new Map();
   nodes.forEach(n=>{ const el=wfNodeElById(n.id); if(el) els.set(n, {el, x0:from[n.id].x, y0:from[n.id].y, x1:n.x, y1:n.y}); });
   const dur=380, t0=performance.now();

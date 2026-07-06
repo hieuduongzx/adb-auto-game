@@ -108,6 +108,8 @@ const WF_ICO_PLAY = '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 
 const WF_ICO_STOP = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
 function wfSetRunning(on){
   wfRunning=on; const b=$("wf-run-btn");
+  // While live, the taken wires carry a flowing dash (CSS keys off this class).
+  const cvs=$("wf-canvas"); if(cvs) cvs.classList.toggle("wf-running", !!on);
   if(!on){
     if(typeof wfDebugMode!=="undefined") wfDebugMode=false;
     // Keep the green/red trail so the user can see where execution stopped.
@@ -166,6 +168,8 @@ async function init(){
   }
   (state.log||[]).forEach(appendLog);
   try{ const st=await api().get_settings(); wfSnapOn=!!st.snap; wfPreviewAll=!!st.previewAll;
+    wfMinimapOn=!!st.minimap;                 // opt-in — default off
+    wfAlignOn = st.alignGuides!==false;       // opt-out — default on
     if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); }
     if(st.sideW){ const sd=$("wf-side"); if(sd) sd.style.width=Math.max(150,Math.min(480,st.sideW))+"px"; }
     if(st.inspW){ const insp=$("wf-inspector"); if(insp) insp.style.width=Math.max(180,Math.min(520,st.inspW))+"px"; } }catch{}

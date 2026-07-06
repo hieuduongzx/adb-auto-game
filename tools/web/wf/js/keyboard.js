@@ -15,6 +15,13 @@ window.addEventListener("keydown", e => {
   if(typing) return;   // below here: canvas shortcuts only (let inputs keep native Ctrl+C/V)
   // Tab — toggle Canvas ↔ Preview view (skipped while typing in an input).
   if(e.key==="Tab"){ e.preventDefault(); wfSwitchView(wfPvActive?"canvas":"preview"); return; }
+  // Ctrl+= / Ctrl+- / Ctrl+0 — zoom whichever view is active (graph or mirror).
+  if((e.ctrlKey||e.metaKey) && (e.key==="="||e.key==="+")){ e.preventDefault();
+    if(wfPvActive) wfPvZoomBy(1.2); else wfZoomBy(1.2); return; }
+  if((e.ctrlKey||e.metaKey) && e.key==="-"){ e.preventDefault();
+    if(wfPvActive) wfPvZoomBy(1/1.2); else wfZoomBy(1/1.2); return; }
+  if((e.ctrlKey||e.metaKey) && e.key==="0"){ e.preventDefault();
+    if(wfPvActive) wfPvResetZoom(); else wfZoomReset(); return; }
   if((e.key==="c"||e.key==="C") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCopy(); } return; }
   if((e.key==="x"||e.key==="X") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCut(); } return; }
   if((e.key==="v"||e.key==="V") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); wfPaste(wfPointer.inside?{clientX:wfPointer.x,clientY:wfPointer.y}:null); return; }

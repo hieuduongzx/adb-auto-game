@@ -220,6 +220,8 @@ let wfSpace=false;  // space held → pan instead of box-select
 const WF_GRID=20;   // grid step; snapping is opt-in (default off)
 let wfSnapOn=false;
 let wfPreviewAll=false;   // global: show image thumbnail on every image block
+let wfMinimapOn=false;    // minimap is opt-in (default off)
+let wfAlignOn=true;       // Figma-style edge/centre magnetism + guides (Alt = pause)
 // Live runtime variable values pushed from the engine during a test run.
 // Keyed by var name -> current value (stringified for display).
 let wfLiveVars={};
@@ -233,13 +235,23 @@ function wfPersistPanelState(){
        localStorage.setItem("wfActCollapsed",  wfActCollapsed ?"1":"0"); }catch{}
 }
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
-function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined, inspW: insp?insp.offsetWidth:undefined}); }catch{} }
+function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined, inspW: insp?insp.offsetWidth:undefined}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
   const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off"); s.classList.toggle("on",wfSnapOn); }
   const p=$("wf-preview-btn"); if(p){ p.title="Image preview: "+(wfPreviewAll?"On":"Off"); p.classList.toggle("on",wfPreviewAll); }
+  const a=$("wf-align-btn"); if(a){ a.title="Smart align: "+(wfAlignOn?"On":"Off")+" — kéo block tự hít cạnh/cổng block khác (giữ Alt để tắt tạm)"; a.classList.toggle("on",wfAlignOn); }
+  const m=$("wf-minimap-btn"); if(m){ m.title="Minimap: "+(wfMinimapOn?"On":"Off")+" — toàn cảnh đồ thị, click để nhảy camera"; m.classList.toggle("on",wfMinimapOn); }
   if(typeof wfSyncFocusBtn==="function") wfSyncFocusBtn();
   wfSyncSpeedUI();
+}
+function wfToggleAlign(){
+  wfAlignOn=!wfAlignOn; wfSyncToggleBtns(); wfSaveSettings();
+  if(!wfAlignOn && typeof wfHideAlignGuides==="function") wfHideAlignGuides();
+}
+function wfToggleMinimap(){
+  wfMinimapOn=!wfMinimapOn; wfSyncToggleBtns(); wfSaveSettings();
+  if(typeof wfMinimapQueue==="function") wfMinimapQueue();   // shows or hides on next frame
 }
 // ── Speed hack — a standalone manual tool, decoupled from "Test run" ──────────
 // The ⚡ toggle enables the feature (still saved into the flow for the Runner GUI)
@@ -361,9 +373,52 @@ function wfTogglePreview(){ wfPreviewAll=!wfPreviewAll; wfSyncToggleBtns(); wfRe
 let wfRunning=false;
 let wfPan={x:0,y:0};
 let wfZoom=1;           // canvas zoom factor
+// The dot grid is painted on #wf-canvas (outside the transformed world), so it
+// must be re-synced to the camera by hand: position follows the pan, spacing
+// AND dot radius scale with the zoom — the grid is locked to the world instead
+// of sliding beneath it. Below ~55% the fine 20px layer drops out so a zoomed-
+// out graph sits on a calm 100px anchor grid instead of dot noise.
+function wfSyncGrid(){
+  const c=$("wf-canvas"); if(!c) return;
+  const z=wfZoom;
+  const layers=[`radial-gradient(circle, rgba(20,30,45,.10) ${(1.4*z).toFixed(2)}px, transparent ${(1.6*z).toFixed(2)}px)`];
+  const sizes=[`${100*z}px ${100*z}px`];
+  if(z>=0.55){
+    const r=Math.max(.8, z);
+    layers.push(`radial-gradient(circle, #d9dee6 ${r.toFixed(2)}px, transparent ${(r+.2).toFixed(2)}px)`);
+    sizes.push(`${20*z}px ${20*z}px`);
+  }
+  c.style.backgroundImage=layers.join(",");
+  c.style.backgroundSize=sizes.join(",");
+  c.style.backgroundPosition=`${wfPan.x}px ${wfPan.y}px`;
+}
 function wfApplyTransform(){ const w=$("wf-world"); if(w) w.style.transform=`translate(${wfPan.x}px,${wfPan.y}px) scale(${wfZoom})`;
+  wfSyncGrid();
+  if(typeof wfMinimapQueue==="function") wfMinimapQueue();
   const lbl=$("wf-zoom-lbl"); if(lbl) lbl.textContent=Math.round(wfZoom*100)+"%"; }
+// ── Camera animation ─────────────────────────────────────────────────────────
+// One shared tween for every programmatic camera move (fit view, zoom buttons,
+// centre-on-node, focus-follow): ease-out-quart over ~250ms so the graph glides
+// instead of teleporting. Direct manipulation (wheel, drag-pan) stays instant
+// and cancels any tween in flight. Reduced motion → jump cut.
+let wfCamAnim=null;
+function wfCancelCamAnim(){ if(wfCamAnim){ cancelAnimationFrame(wfCamAnim); wfCamAnim=null; } }
+function wfAnimateCamera(tx,ty,tz,ms){
+  wfCancelCamAnim();
+  ms=ms===undefined?250:ms;
+  const reduce=window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(reduce||ms<=0){ wfPan.x=tx; wfPan.y=ty; wfZoom=tz; wfApplyTransform(); return; }
+  const sx=wfPan.x, sy=wfPan.y, sz=wfZoom, t0=performance.now();
+  const step=now=>{
+    const t=Math.min(1,(now-t0)/ms), e=1-Math.pow(1-t,4);
+    wfPan.x=sx+(tx-sx)*e; wfPan.y=sy+(ty-sy)*e; wfZoom=sz+(tz-sz)*e;
+    wfApplyTransform();
+    wfCamAnim = t<1 ? requestAnimationFrame(step) : null;
+  };
+  wfCamAnim=requestAnimationFrame(step);
+}
 function wfSetZoom(z, cx, cy){
+  wfCancelCamAnim();
   z=Math.max(0.3, Math.min(2.5, z));
   const canvas=$("wf-canvas"); if(!canvas) { wfZoom=z; wfApplyTransform(); return; }
   // Keep the point (cx,cy) — relative to the canvas — fixed while zooming.
@@ -374,8 +429,20 @@ function wfSetZoom(z, cx, cy){
   wfApplyTransform();
   const lbl=$("wf-zoom-lbl"); if(lbl) lbl.textContent=Math.round(wfZoom*100)+"%";
 }
-function wfZoomBy(f){ wfSetZoom(wfZoom*f); }
-function wfZoomReset(){ wfSetZoom(1); }
+// Zoom buttons / shortcuts glide around the canvas centre.
+function wfZoomBy(f){
+  const c=$("wf-canvas"); if(!c){ wfSetZoom(wfZoom*f); return; }
+  const z=Math.max(0.3, Math.min(2.5, wfZoom*f));
+  const cx=c.clientWidth/2, cy=c.clientHeight/2;
+  const wx=(cx-wfPan.x)/wfZoom, wy=(cy-wfPan.y)/wfZoom;
+  wfAnimateCamera(cx-wx*z, cy-wy*z, z, 140);
+}
+function wfZoomReset(){
+  const c=$("wf-canvas"); if(!c){ wfSetZoom(1); return; }
+  const cx=c.clientWidth/2, cy=c.clientHeight/2;
+  const wx=(cx-wfPan.x)/wfZoom, wy=(cy-wfPan.y)/wfZoom;
+  wfAnimateCamera(cx-wx, cy-wy, 1, 200);
+}
 // Drag-to-resize the left sidebar; width persists in settings.
 function wfInitSideResizer(){
   const side=$("wf-side"), rez=$("wf-side-resizer"); if(!side||!rez||rez.__wired) return;
@@ -394,7 +461,9 @@ function wfInitInspResizer(){
 }
 // Fit & center all blocks of the current graph into the canvas. Uses the live DOM
 // node bounds (world coords), so it's exact regardless of node heights.
-function wfFit(){
+// Glides there by default; pass animate=false for an instant frame (the
+// auto-layout pre-fit needs a stable camera before it animates the nodes).
+function wfFit(animate){
   const canvas=$("wf-canvas"); if(!canvas) return;
   const els=[...document.querySelectorAll("#wf-world .wf-node")];
   if(!els.length){ wfPan={x:0,y:0}; wfSetZoom(1); return; }
@@ -403,8 +472,7 @@ function wfFit(){
     if(x<minX)minX=x; if(y<minY)minY=y; if(x+w>maxX)maxX=x+w; if(y+h>maxY)maxY=y+h; });
   const pad=70, cw=canvas.clientWidth, ch=canvas.clientHeight;
   const z=Math.max(0.2, Math.min(cw/((maxX-minX)+pad*2), ch/((maxY-minY)+pad*2), 1.5));
-  wfZoom=z;
-  wfPan.x=(cw-(minX+maxX)*z)/2;
-  wfPan.y=(ch-(minY+maxY)*z)/2;
-  wfApplyTransform();
+  const tx=(cw-(minX+maxX)*z)/2, ty=(ch-(minY+maxY)*z)/2;
+  if(animate===false){ wfCancelCamAnim(); wfZoom=z; wfPan.x=tx; wfPan.y=ty; wfApplyTransform(); }
+  else wfAnimateCamera(tx,ty,z,280);
 }

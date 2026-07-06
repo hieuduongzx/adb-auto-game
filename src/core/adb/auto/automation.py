@@ -225,12 +225,31 @@ class ADBGameAutomation:
         Extra ``kwargs`` are forwarded to :meth:`read_text` (``lang``,
         ``config``, ``whitelist``, ``preprocess``, ``psm``).
         """
+        return self.region_find_text(
+            needle, region=region, last_screen=last_screen,
+            case_sensitive=case_sensitive,
+            normalize_whitespace=normalize_whitespace,
+            **kwargs,
+        )[0]
+
+    def region_find_text(
+        self,
+        needle: str,
+        region: Optional[Region] = None,
+        last_screen: bool = False,
+        case_sensitive: bool = False,
+        normalize_whitespace: bool = True,
+        **kwargs,
+    ) -> Tuple[bool, str]:
+        """Like :meth:`region_contains_text`, but also return the raw OCR
+        output as ``(found, raw_text)`` so callers can log what was read.
+        """
         screen = self.get_latest_screen() if last_screen else self.capture_screen()
         if screen is None:
-            return False
-        # Reuse OCRReader.contains_text so the case/whitespace matching rules
+            return False, ""
+        # Reuse OCRReader.find_text so the case/whitespace matching rules
         # live in exactly one place.
-        return self.ocr.contains_text(
+        return self.ocr.find_text(
             screen, needle, region=region,
             case_sensitive=case_sensitive,
             normalize_whitespace=normalize_whitespace,
@@ -263,21 +282,29 @@ class ADBGameAutomation:
         ``"0/5"``). Returns ``True`` on first match, ``False`` on timeout.
         """
         start = time.time()
+        last_text = ""
         while time.time() - start < timeout:
             if self._stop_event.is_set():
                 log_info(f"[OCR] Interrupted waiting for '{needle}'")
                 return False
-            if self.region_contains_text(
+            found, text = self.region_find_text(
                 needle, region=region,
                 case_sensitive=case_sensitive, whitelist=whitelist,
-            ):
+            )
+            if text:
+                last_text = text
+            if found:
                 elapsed = time.time() - start
                 log_info(
-                    f"[OCR] Found '{needle}' in region {region} after {elapsed:.2f}s"
+                    f"[OCR] Found '{needle}' in region {region} "
+                    f"after {elapsed:.2f}s — read: {text!r}"
                 )
                 return True
             time.sleep(interval)
-        log_debug(f"[OCR] Timeout waiting for '{needle}' in region {region}")
+        log_info(
+            f"[OCR] Timeout ({timeout:g}s) waiting for '{needle}' in region "
+            f"{region} — last read: {last_text!r}"
+        )
         return False
 
     def get_screen_size(self) -> Tuple[int, int]:

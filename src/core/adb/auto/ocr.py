@@ -582,6 +582,35 @@ class OCRReader:
 
         return (text or "").strip()
 
+    def find_text(
+        self,
+        screen: np.ndarray,
+        needle: str,
+        region: Optional[Region] = None,
+        case_sensitive: bool = False,
+        normalize_whitespace: bool = True,
+        **kwargs,
+    ) -> Tuple[bool, str]:
+        """Like :meth:`contains_text`, but also return the raw OCR output.
+
+        Returns ``(found, raw_text)`` so callers can log/inspect what the
+        OCR actually read, not just whether the needle matched.
+        ``kwargs`` are forwarded to :meth:`read_text`.
+        """
+        text = self.read_text(screen, region=region, **kwargs)
+        if not text:
+            return False, ""
+
+        haystack = text
+        target = needle
+        if normalize_whitespace:
+            haystack = re.sub(r"\s+", "", haystack)
+            target = re.sub(r"\s+", "", target)
+        if not case_sensitive:
+            haystack = haystack.lower()
+            target = target.lower()
+        return target in haystack, text
+
     def contains_text(
         self,
         screen: np.ndarray,
@@ -595,19 +624,12 @@ class OCRReader:
 
         ``kwargs`` are forwarded to :meth:`read_text`.
         """
-        text = self.read_text(screen, region=region, **kwargs)
-        if not text:
-            return False
-
-        haystack = text
-        target = needle
-        if normalize_whitespace:
-            haystack = re.sub(r"\s+", "", haystack)
-            target = re.sub(r"\s+", "", target)
-        if not case_sensitive:
-            haystack = haystack.lower()
-            target = target.lower()
-        return target in haystack
+        return self.find_text(
+            screen, needle, region=region,
+            case_sensitive=case_sensitive,
+            normalize_whitespace=normalize_whitespace,
+            **kwargs,
+        )[0]
 
     # ----- helpers ---------------------------------------------------------
 

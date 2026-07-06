@@ -115,7 +115,9 @@ function wfStartGroupResize(e,gr){
 // sits at the triangle centre, higher than a full block's body-centred dot)
 // snap level with the neighbour it's wiring to. Single-node drags only.
 const WF_PORT_SNAP = 7;   // world px pull range
+let wfPortSnapHit=null;   // {otherId, y} of the port line last snapped to (for the guide)
 function wfPortAlignSnapY(dragId, topY){
+  wfPortSnapHit=null;
   const dEl=wfNodeElById(dragId); if(!dEl) return topY;
   const dOff=[...dEl.querySelectorAll(".wf-port")].map(p=>p.offsetTop+p.offsetHeight/2);
   if(!dOff.length) return topY;
@@ -129,11 +131,75 @@ function wfPortAlignSnapY(dragId, topY){
       for(const oy of oAbs){
         const need=oy-off;                 // the top that would align this pair
         const dist=Math.abs(need-topY);
-        if(dist<bestDist){ bestDist=dist; bestTop=need; found=true; }
+        if(dist<bestDist){ bestDist=dist; bestTop=need; found=true;
+          wfPortSnapHit={otherId:other.id, y:oy}; }
       }
     }
   }
   return found ? Math.round(bestTop) : topY;
+}
+
+// ── Smart alignment (Figma-style) ─────────────────────────────────────────────
+// While dragging a single block, its edges and centre lines pull onto the
+// edges/centres of every other block within WF_ALIGN_SNAP world px, and a thin
+// accent guide shows exactly what got aligned to what. The Y axis defers to the
+// port snap above (a straight wire beats a straight border); holding Alt
+// disables all magnetism for free-hand placement.
+const WF_ALIGN_SNAP = 6;
+function wfAlignSnap(dragId, x, y, skipY){
+  const out={x, y, v:null, h:null};
+  const dEl=wfNodeElById(dragId), g=wfGraph();
+  if(!dEl||!g) return out;
+  const dw=dEl.offsetWidth, dh=dEl.offsetHeight;
+  let bx=WF_ALIGN_SNAP+.001, by=WF_ALIGN_SNAP+.001;
+  for(const o of g.nodes){
+    if(o.id===dragId) continue;
+    const oEl=wfNodeElById(o.id); if(!oEl) continue;
+    const ow=oEl.offsetWidth, oh=oEl.offsetHeight;
+    const oxs=[o.x, o.x+ow/2, o.x+ow], dxs=[0, dw/2, dw];
+    for(const ox of oxs) for(const dxo of dxs){
+      const d=Math.abs((x+dxo)-ox);
+      if(d<bx){ bx=d; out.x=Math.round(ox-dxo); out.v={x:ox, o, ow, oh}; }
+    }
+    if(skipY) continue;
+    const oys=[o.y, o.y+oh/2, o.y+oh], dys=[0, dh/2, dh];
+    for(const oy of oys) for(const dyo of dys){
+      const d=Math.abs((y+dyo)-oy);
+      if(d<by){ by=d; out.y=Math.round(oy-dyo); out.h={y:oy, o, ow, oh}; }
+    }
+  }
+  return out;
+}
+function wfGuideEl(id, cls){
+  let el=document.getElementById(id);
+  if(!el){ el=document.createElement("div"); el.id=id; el.className="wf-align-guide "+cls;
+    $("wf-world").appendChild(el); }
+  return el;
+}
+function wfHideAlignGuides(){
+  ["wf-guide-v","wf-guide-h"].forEach(id=>{ const el=document.getElementById(id); if(el) el.remove(); });
+}
+// Draw the guides against the node's FINAL (snapped, applied) position.
+function wfShowAlignGuides(dragId, al, portSnapped){
+  const dEl=wfNodeElById(dragId), n=wfNode(dragId);
+  if(!dEl||!n){ wfHideAlignGuides(); return; }
+  const dw=dEl.offsetWidth, dh=dEl.offsetHeight;
+  if(al && al.v){
+    const y0=Math.min(al.v.o.y, n.y)-14, y1=Math.max(al.v.o.y+al.v.oh, n.y+dh)+14;
+    const el=wfGuideEl("wf-guide-v","v");
+    el.style.left=(al.v.x-0.5)+"px"; el.style.top=y0+"px"; el.style.height=(y1-y0)+"px";
+  } else { const el=document.getElementById("wf-guide-v"); if(el) el.remove(); }
+  let h=al && al.h ? {y:al.h.y, o:al.h.o, ow:al.h.ow} : null;
+  // The port snap owns Y — surface ITS line so the user sees why the block stuck.
+  if(!h && portSnapped && wfPortSnapHit){
+    const o=wfNode(wfPortSnapHit.otherId), oEl=wfNodeElById(wfPortSnapHit.otherId);
+    if(o&&oEl) h={y:wfPortSnapHit.y, o, ow:oEl.offsetWidth};
+  }
+  if(h){
+    const x0=Math.min(h.o.x, n.x)-14, x1=Math.max(h.o.x+h.ow, n.x+dw)+14;
+    const el=wfGuideEl("wf-guide-h","h");
+    el.style.top=(h.y-0.5)+"px"; el.style.left=x0+"px"; el.style.width=(x1-x0)+"px";
+  } else { const el=document.getElementById("wf-guide-h"); if(el) el.remove(); }
 }
 
 function wfStartMove(e,n){
@@ -194,13 +260,16 @@ function wfConnectTo(toNodeId, clientX, clientY){
 }
 function wfCanvasMouseDown(e){
   if(e.target.closest(".wf-node")||e.target.closest(".wf-group")) return;
-  // Floating overlays (Activities/Variables corner stack, layout menu) sit above
-  // the canvas — a press there must not clear the selection or start a
-  // rubber-band box (the re-render it triggers would also swallow the click).
-  if(e.target.closest("#wf-corner-stack,.wf-layout-bar")) return;
+  wfCancelCamAnim();   // a press on the canvas takes the camera back by hand
+  // Floating overlays (Activities/Variables corner stack, layout menu, minimap,
+  // empty-state card) sit above the canvas — a press there must not clear the
+  // selection or start a rubber-band box (the re-render it triggers would also
+  // swallow the click).
+  if(e.target.closest("#wf-corner-stack,.wf-layout-bar,.wf-minimap,.wf-empty-card")) return;
   // Middle mouse, or Space+left → pan.
   if(e.button===1 || (e.button===0 && wfSpace)){
     e.preventDefault();
+    wfCancelCamAnim();   // direct manipulation beats any camera tween in flight
     $("wf-canvas").classList.add("panning");
     wfGesture={mode:"pan",sx:e.clientX,sy:e.clientY,ox:wfPan.x,oy:wfPan.y};
     return;
@@ -440,6 +509,7 @@ function wfInitCanvas(){
     else node=wfNewNode(wfPaletteDrag,x,y);
     g.nodes.push(node); wfSelectOne(node.id); wfPaletteDrag=null;
     wfRenderCanvas(); wfRenderInspector();
+    wfPopNodes([node.id]);   // brief arrival fade on the fresh block
   });
   document.addEventListener("mousemove",e=>{
     if(!wfGesture) return;
@@ -460,7 +530,17 @@ function wfInitCanvas(){
       // lands within a few px of another block's port row, pin the block so the
       // two dots line up exactly and the wire runs dead-straight. Handles the
       // start/end triangles whose lone dot sits higher than a full block's dot.
-      if(wfGesture.items.length===1){ sy=wfPortAlignSnapY(wfGesture.dragId, sy); }
+      // Then edge/centre magnetism (Figma-style) with visible guides.
+      // Alt = drag free-hand (no magnetism of any kind).
+      let alignHit=null, portSnapped=false;
+      if(wfGesture.items.length===1 && !e.altKey){
+        const py=wfPortAlignSnapY(wfGesture.dragId, sy);
+        portSnapped = py!==sy; sy=py;
+        if(wfAlignOn){   // Figma-style edge/centre magnetism is a toolbar toggle
+          alignHit=wfAlignSnap(wfGesture.dragId, sx, sy, portSnapped);
+          sx=alignHit.x; sy=alignHit.y;
+        }
+      }
       const dx=sx-lead.ox, dy=sy-lead.oy;
       wfGesture.items.forEach(it=>{
         const n=wfNode(it.id); if(!n) return;
@@ -468,6 +548,8 @@ function wfInitCanvas(){
         const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
         if(el){ el.style.left=n.x+"px"; el.style.top=n.y+"px"; }
       });
+      if(wfGesture.items.length===1 && !e.altKey && wfAlignOn) wfShowAlignGuides(wfGesture.dragId, alignHit, portSnapped);
+      else wfHideAlignGuides();
       wfDrawWires();
       wfGesture.mergeOk=e.ctrlKey;  // live-track Ctrl so user can press it mid-drag
       if(wfGesture.items.length===1 && wfGesture.mergeOk) wfShowMergeHint(wfGesture.dragId);
@@ -535,6 +617,7 @@ function wfInitCanvas(){
     } else if(wfGesture.mode==="move"){
       // Dropping a single lone block flush above/below another merges them.
       wfClearMergeHint();
+      wfHideAlignGuides();
       document.querySelectorAll(".wf-node.wf-dragging").forEach(el=>el.classList.remove("wf-dragging"));
       const moved=Math.abs(e.clientX-wfGesture.sx)+Math.abs(e.clientY-wfGesture.sy)>3;
       // Only a real drag suppresses the action bar (wf-dragdone). A plain click

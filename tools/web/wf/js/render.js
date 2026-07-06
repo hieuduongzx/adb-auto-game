@@ -125,22 +125,14 @@ function wfToggleActPanel(){
   const p=$("wf-act-panel"); if(p) p.classList.toggle("collapsed", wfActCollapsed);
   wfEqualizeCornerPanels();
 }
-// The two bottom-right corner panels (Activities + Variables) are content-sized,
-// so they'd otherwise sit at ragged, mismatched heights. When BOTH are expanded,
-// grow the shorter one to match the taller so they read as one tidy pair. A
-// collapsed panel (38px) is left alone so it can hand its space to its sibling.
+// Both corner panels (Activities + Variables) are content-sized: each hugs its
+// own list — the Variables panel grows row by row up to ~10 vars then scrolls
+// (see .wf-vars-body max-height). The old behaviour stretched the shorter panel
+// to match the taller one, which padded Variables with empty space; kept as a
+// reset-only hook since renders still call it.
 function wfEqualizeCornerPanels(){
   const a=$("wf-act-panel"), v=$("wf-vars-panel"); if(!a||!v) return;
-  a.style.minHeight=""; v.style.minHeight="";            // reset to natural height
-  if(a.classList.contains("collapsed")||v.classList.contains("collapsed")) return;
-  // Reading offsetHeight flushes layout, so the natural heights are accurate
-  // immediately — no rAF needed (and it renders correctly on first paint).
-  const h=Math.max(a.offsetHeight, v.offsetHeight);
-  // Skip when the taller panel is already large (lots of activities/vars): both
-  // would then be big and scroll internally anyway, and forcing equal height
-  // could overflow the canvas. Only tidy up the common small-content case.
-  const cap=Math.round((window.innerHeight||800)*0.5);
-  if(h>0 && h<=cap){ a.style.minHeight=h+"px"; v.style.minHeight=h+"px"; }
+  a.style.minHeight=""; v.style.minHeight="";            // natural (content) height
 }
 // Dragging is armed only while the grip handle is held, so checkbox / select /
 // delete clicks keep working. Rows shuffle live during dragover; on drop the

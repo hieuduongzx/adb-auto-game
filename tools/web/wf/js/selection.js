@@ -1,5 +1,15 @@
 // ── Selection ────────────────────────────────────────────────────────────────
-function wfMarkSel(){ document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("sel",WF.sel.includes(el.dataset.node))); }
+function wfMarkSel(){ document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("sel",WF.sel.includes(el.dataset.node)));
+  if(typeof wfMinimapQueue==="function") wfMinimapQueue(); }
+// Brief arrival fade on freshly created blocks (palette drop / paste) so new
+// material registers without moving any geometry (opacity only — wires stay put).
+function wfPopNodes(ids){
+  (ids||[]).forEach(id=>{ const el=wfNodeElById(id); if(!el) return;
+    el.classList.add("wf-node-new");
+    el.addEventListener("animationend",()=>el.classList.remove("wf-node-new"),{once:true});
+    setTimeout(()=>el.classList.remove("wf-node-new"),400);   // reduced-motion fallback
+  });
+}
 function wfSelectOne(id){ WF.sel=id?[id]:[]; WF.selectedNode=id||null; document.querySelectorAll(".wf-node.wf-dragdone").forEach(el=>el.classList.remove("wf-dragdone")); }
 function wfToggleSel(id){ const i=WF.sel.indexOf(id); if(i>=0)WF.sel.splice(i,1); else WF.sel.push(id); WF.selectedNode=WF.sel.length?id:null; }
 function wfClearSel(){ WF.sel=[]; WF.selectedNode=null; }
@@ -75,5 +85,6 @@ function wfPaste(opts){
   g.nodes.forEach(n=>{ if(n.stack && stkCnt[n.stack]<2) n.stack=null; });
   WF.sel=newIds.slice(); WF.selectedNode=newIds.length===1?newIds[0]:null;
   wfRenderCanvas(); wfMarkSel(); wfRenderInspector();
+  wfPopNodes(newIds);
   setStatus(`Pasted ${newIds.length} node`);
 }

@@ -224,7 +224,13 @@
 #wf-bar { display:flex; align-items:center; gap:var(--s3); padding:var(--s3) var(--s4);
   border-bottom:1px solid var(--border); flex-shrink:0;
   background:linear-gradient(180deg,#ffffff,#fafbfd); }
-#wf-bar > input { font-family:var(--sans); font-size:13px; font-weight:700; width:188px; flex-shrink:0; }
+/* Shrink priority on a narrow window: the hint collapses first (flex-shrink on
+   .wf-hint), then the speed-hack package field, then the name input — so the
+   zoom cluster and the Edit/Preview tabs at the right edge NEVER get clipped. */
+#wf-bar > input { font-family:var(--sans); font-size:13px; font-weight:700;
+  width:188px; flex-shrink:1; min-width:110px; }
+#wf-speed-group { min-width:0; flex-shrink:1; overflow:hidden; }
+#wf-speed-pkg { flex-shrink:1; min-width:56px; }
 .wf-cur-act { font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-bg);
   border:1px solid var(--accent-bd); border-radius:999px; padding:3px 10px; max-width:170px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-shrink:0; }
@@ -291,10 +297,51 @@
 /* Run trail on wires: the path taken (bright green) vs the skipped branch (faint red). */
 #wf-wires path.wire.took-wire    { stroke:var(--run-ok) !important; stroke-width:2.0; stroke-opacity:1 !important; marker-end:none !important; }
 #wf-wires path.wire.nottook-wire { stroke:var(--run-fail) !important; stroke-opacity:.34 !important; stroke-width:1.1; marker-end:none !important; }
-#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:1.55; stroke-dasharray:6 4;
+#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:1.55; stroke-dasharray:7 5;
   stroke-linecap:round; pointer-events:none; marker-end:url(#wf-ah-temp); }
+/* Motion on the connective tissue — state, not decoration. The in-progress
+   connection marches toward the cursor; while the engine runs, the wires it
+   took carry a slow forward current so the live path reads from across the
+   desk. Static (solid / plain dashes) under reduced motion. */
+@media (prefers-reduced-motion: no-preference){
+  #wf-wires path.temp { animation:wfWireFlow .45s linear infinite; }
+  #wf-canvas.wf-running #wf-wires path.wire.took-wire {
+    stroke-dasharray:7 5; animation:wfWireFlow .55s linear infinite; }
+}
+@keyframes wfWireFlow { to { stroke-dashoffset:-12; } }
 #wf-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   color:var(--muted); font-size:12px; pointer-events:none; }
+/* Empty state that teaches: what this surface is, the one action that unblocks
+   it, and the four gestures worth knowing. The card itself is interactive
+   (its parent stays pointer-through so the dot grid keeps panning). */
+.wf-empty-card { pointer-events:auto; display:flex; flex-direction:column; align-items:center;
+  gap:6px; padding:22px 30px 18px; text-align:center;
+  background:rgba(255,255,255,.82); border:1px dashed var(--border2); border-radius:12px; }
+.wf-empty-card > svg { width:30px; height:30px; color:#b3bdc9; margin-bottom:2px; }
+.wf-empty-card .t { font-size:13px; font-weight:700; color:var(--ink2); }
+.wf-empty-card .s { font-size:11.5px; color:var(--dim); max-width:230px; line-height:1.5; }
+.wf-empty-card .btn { margin-top:6px; }
+.wf-empty-card .keys { display:flex; gap:12px; margin-top:10px; }
+.wf-empty-card .keys span { font-size:10px; color:var(--muted); }
+.wf-empty-card .keys b { font-weight:700; color:var(--dim);
+  background:var(--alt); border:1px solid var(--border2); border-radius:4px; padding:1px 5px; margin-right:3px; }
+
+/* ── Minimap ──────────────────────────────────────────────────────────────────
+   Bottom-left, above the layout toggle. Canvas-drawn (js/minimap.js); shows
+   only when the graph outgrows the viewport. Click/drag = move the camera. */
+.wf-minimap { position:absolute; left:10px; bottom:52px; z-index:5;
+  width:176px; height:118px; display:none; cursor:crosshair; overflow:hidden;
+  background:rgba(255,255,255,.93); border:1px solid var(--border2);
+  border-radius:9px; box-shadow:var(--sh-md); }
+.wf-minimap.show { display:block; animation:wfPop .14s var(--ease); }
+.wf-minimap canvas { display:block; width:100%; height:100%; }
+
+/* ── Alignment guides — thin accent lines shown while a dragged block snaps
+   onto another block's edge/centre or port row (js: wfShowAlignGuides). */
+.wf-align-guide { position:absolute; background:var(--accent); opacity:.6;
+  pointer-events:none; z-index:7; }
+.wf-align-guide.v { width:1px; }
+.wf-align-guide.h { height:1px; }
 
 /* Auto-layout — a single toggle button (bottom-left). Opens a labelled menu
    of layout strategies above it; click again or outside to collapse. */
@@ -454,7 +501,15 @@
 .wf-glob-del:hover { background:var(--err-bg); border-color:var(--err); }
 .wf-vars-panel.live .wf-vars-live { color:#2fa55a; animation:wfPulse 1.4s ease-in-out infinite; }
 @keyframes wfPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-.wf-vars-body { flex:1; min-height:0; overflow-y:auto; padding:4px 7px 7px; }
+/* Body grows with the variable list up to ~10 rows (row ≈ 19px + section
+   separators), then scrolls — the panel hugs its content instead of claiming
+   a fixed slab of canvas. Same slim scrollbar as the Activities panel. */
+.wf-vars-body { flex:1; min-height:0; max-height:212px; overflow-y:auto; padding:4px 7px 7px; }
+.wf-vars-body::-webkit-scrollbar { width:7px; }
+.wf-vars-body::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:4px;
+  border:2px solid transparent; background-clip:padding-box; }
+.wf-vars-body::-webkit-scrollbar-thumb:hover { background-color:#94a3b8; }
+.wf-vars-body::-webkit-scrollbar-track { background:transparent; }
 .wf-vars-empty { color:var(--muted); padding:7px 5px; font-size:10.5px; }
 /* Section separator inside the vars panel body */
 .wf-vars-sep { font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
@@ -479,7 +534,16 @@
            border-radius:var(--node-r); user-select:none;
            transition:z-index 0s .1s; }
 .wf-node::after { content:""; position:absolute; inset:0; border-radius:var(--node-r);
-  box-shadow:var(--sh-md); pointer-events:none; z-index:-1; }
+  box-shadow:var(--sh-md); pointer-events:none; z-index:-1; transition:box-shadow .14s var(--ease); }
+/* Hover lift — shadow only (no transform: port dots and wires must not shift). */
+.wf-node:not(.sel):not(.start):not(.end):not(.running):hover::after {
+  box-shadow:0 3px 12px rgba(20,30,45,.14); }
+/* Arrival fade for freshly dropped/pasted blocks (opacity only — geometry
+   untouched, so wires between pasted blocks land exactly right). */
+@media (prefers-reduced-motion: no-preference){
+  .wf-node.wf-node-new { animation:wfNodeIn .18s var(--ease); }
+}
+@keyframes wfNodeIn { from { opacity:0; } }
 /* Every card block shares one canonical footprint: --node-w wide, --node-h tall
    (20px header + 40px body). Only stack members and the round start/end
    terminals are exempt; multi-port blocks grow in fixed 16px port steps. */
@@ -554,9 +618,11 @@
 .wf-group-resize { position:absolute; right:-5px; bottom:-5px; width:14px; height:14px; cursor:nwse-resize; pointer-events:auto;
   border-right:2.5px solid currentColor; border-bottom:2.5px solid currentColor; border-bottom-right-radius:9px; opacity:.6; }
 .wf-group-resize:hover { opacity:1; }
-/* Context menu */
+/* Context menu — replays the same pop the layout menu uses each time it opens
+   (display none→block restarts the animation; reduced-motion squashes it). */
 #wf-ctxmenu { position:fixed; z-index:50; display:none; min-width:140px; background:var(--panel);
-  border:1px solid var(--border2); border-radius:8px; box-shadow:0 6px 22px rgba(20,30,45,.18); padding:4px; }
+  border:1px solid var(--border2); border-radius:8px; box-shadow:0 6px 22px rgba(20,30,45,.18); padding:4px;
+  animation:wfPop .12s var(--ease); }
 .wf-ctx-item { padding:7px 10px; font-size:12px; color:var(--ink); border-radius:5px; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:8px; }
 .wf-ctx-item:hover { background:var(--accent-bg); color:var(--accent); }
 .wf-ctx-ico { display:flex; align-items:center; color:var(--muted); }

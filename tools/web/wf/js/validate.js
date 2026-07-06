@@ -67,9 +67,9 @@ function wfFocusIssue(issue){
 }
 function wfCenterOnNode(n){
   const canvas=$("wf-canvas"); if(!canvas||!n) return;
-  wfPan.x=canvas.clientWidth/2-(n.x+80)*wfZoom;
-  wfPan.y=canvas.clientHeight/2-(n.y+30)*wfZoom;
-  wfApplyTransform(); wfDrawWires();
+  const tx=canvas.clientWidth/2-(n.x+80)*wfZoom;
+  const ty=canvas.clientHeight/2-(n.y+30)*wfZoom;
+  wfAnimateCamera(tx,ty,wfZoom,240);
 }
 function wfValidateShow(){
   const issues=wfValidationIssues();
