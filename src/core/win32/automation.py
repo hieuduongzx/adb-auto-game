@@ -13,6 +13,7 @@ from __future__ import annotations
 import fnmatch
 import os
 import subprocess
+import threading
 import time
 from typing import List, Optional, Tuple
 
@@ -34,7 +35,10 @@ _WM_KEYDOWN       = 0x0100
 _WM_KEYUP         = 0x0101
 _WM_CHAR          = 0x0102
 _WM_CLOSE         = 0x0010
+_WM_ACTIVATE      = 0x0006
+_WA_ACTIVE        = 1
 _MK_LBUTTON       = 0x0001
+_SMTO_ABORTIFHUNG = 0x0002
 _PW_CLIENTONLY        = 0x1
 _PW_RENDERFULLCONTENT = 0x2  # capture DirectComposition/GPU content (Win 8.1+)
 _VK_ESCAPE        = 0x1B
@@ -63,22 +67,39 @@ def _lparam(x: int, y: int) -> int:
 class Win32Controller:
     """ADBController stand-in that talks to a native window instead of a device.
 
-    ``cfg`` keys: ``window`` (title/class to match), ``matchBy`` (``"title"`` |
-    ``"class"``), ``inputMode`` (``"background"`` | ``"foreground"``).
+    ``cfg`` keys: ``window`` (title/class/PID to match), ``matchBy`` (``"title"``
+    | ``"class"`` | ``"pid"``), ``inputMode``:
+      - ``"background"``        — pure PostMessage; never touches the mouse. Many
+        GDI apps accept it, but engines that poll the REAL cursor (Unity/Unreal
+        games such as NIKKE) ignore the message coordinates.
+      - ``"background_cursor"`` — MaaFramework-style ``SendMessageWithCursorPos``:
+        pretend-activate via WM_ACTIVATE, briefly move the hardware cursor to
+        the target, send the messages synchronously, restore the cursor. Works
+        for cursor-polling games while the window stays behind others.
+      - ``"foreground"``        — bring the window forward and use real mouse input.
     """
 
     def __init__(self, cfg: Optional[dict] = None):
         self._w = _import_win32()  # (ctypes, win32gui, win32ui, win32con, win32api, win32process)
         self.hwnd: Optional[int] = None
         self.cfg: dict = dict(cfg or {})
+        # Capture method that last produced a usable frame ("print" | "wgc" |
+        # "blt" | "screen") — probed on first capture, then reused. See
+        # capture_frame.
+        self._cap_method: Optional[str] = None
+        # Windows Graphics Capture session state (lazily started by _cap_wgc).
+        self._wgc: Optional[dict] = None
         # ADBController-compat attributes the engine reads.
         self.device_id = None
 
     # ── config ────────────────────────────────────────────────────────────────
     def configure(self, cfg: dict) -> None:
         self.cfg = dict(cfg or {})
-        # A config change may point at a different window — force a re-attach.
+        # A config change may point at a different window — force a re-attach
+        # and re-probe of the capture method.
         self.hwnd = None
+        self._cap_method = None
+        self._wgc_stop()
 
     @property
     def _match(self) -> Tuple[str, str, str]:
@@ -114,18 +135,75 @@ class Win32Controller:
         self.hwnd = hwnd
         _, win32gui = self._w[0], self._w[1]
         log_info(f"[win32] Gắn cửa sổ 0x{hwnd:X} — '{win32gui.GetWindowText(hwnd)}'")
+        self._warn_if_uipi_blocked()
         return True
 
+    # ── UIPI (integrity level) check ───────────────────────────────────────────
+    # Windows blocks PostMessage/SendInput from a lower-integrity process to a
+    # higher one ("Access is denied", winerror 5). Typical case: the game runs
+    # as Administrator while this tool doesn't — capture still works, input not.
+
+    @staticmethod
+    def _integrity_level(process_handle) -> int:
+        import win32security
+        tok = win32security.OpenProcessToken(process_handle, 0x0008)  # TOKEN_QUERY
+        sid, _ = win32security.GetTokenInformation(tok, win32security.TokenIntegrityLevel)
+        # Integrity SID is S-1-16-<level>: 0x2000 medium, 0x3000 high/admin.
+        return int(win32security.ConvertSidToStringSid(sid).rsplit("-", 1)[1])
+
+    def _warn_if_uipi_blocked(self) -> None:
+        try:
+            win32api, win32process = self._w[4], self._w[5]
+            pid = win32process.GetWindowThreadProcessId(self.hwnd)[1]
+            ph = win32api.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if self._integrity_level(ph) > self._integrity_level(win32api.GetCurrentProcess()):
+                log_error(
+                    "[win32] ⚠ Cửa sổ mục tiêu chạy quyền CAO HƠN tool (Run as "
+                    "Administrator) — Windows (UIPI) sẽ chặn mọi thao tác "
+                    "chuột/phím (Access is denied), chỉ xem/capture được. "
+                    "→ Đóng tool và mở lại bằng 'Run as Administrator'."
+                )
+        except Exception:
+            pass  # best-effort — never block attach on the diagnostics
+
+    def _input_error(self, api: str, exc: Exception) -> None:
+        """Log an input failure; error 5 gets the actionable UIPI explanation."""
+        code = getattr(exc, "winerror", None)
+        if code is None and getattr(exc, "args", None):
+            code = exc.args[0] if isinstance(exc.args[0], int) else None
+        if code == 5:
+            log_error(
+                f"[win32] {api} bị chặn (Access is denied) — game đang chạy quyền "
+                "Admin cao hơn tool. Mở lại tool bằng 'Run as Administrator'."
+            )
+        else:
+            log_error(f"[win32] {api} lỗi: {exc}")
+
     def _find_hwnd(self, pattern: str, by: str) -> Optional[int]:
-        win32gui = self._w[1]
+        win32gui, win32process = self._w[1], self._w[5]
         low = pattern.lower()
         use_glob = any(ch in pattern for ch in "*?[")
+        want_pid: Optional[int] = None
+        if by == "pid":
+            try:
+                want_pid = int(pattern)
+            except (TypeError, ValueError):
+                log_error(f"[win32] PID không hợp lệ: '{pattern}'")
+                return None
         found: List[int] = []
 
         def _cb(hwnd, _):
             if not win32gui.IsWindowVisible(hwnd):
                 return
-            if by == "class":
+            if by == "pid":
+                try:
+                    pid = win32process.GetWindowThreadProcessId(hwnd)[1]
+                except Exception:
+                    return
+                # Only top-level windows with a title, so an invisible helper
+                # window of the same process doesn't win over the real one.
+                ok = (pid == want_pid) and bool(win32gui.GetWindowText(hwnd))
+            elif by == "class":
                 name = win32gui.GetClassName(hwnd) or ""
                 ok = (name == pattern) or (use_glob and fnmatch.fnmatch(name.lower(), low))
             else:
@@ -156,44 +234,195 @@ class Win32Controller:
         except Exception:
             return ""
 
-    # ── capture (PrintWindow → BGR ndarray) ────────────────────────────────────
+    # ── capture (PrintWindow / WGC / BitBlt / screen crop → BGR ndarray) ───────
+    # GPU-composited windows (DirectX/OpenGL games, emulators) often hand one
+    # API a black frame while another works fine:
+    #   print  — PrintWindow(PW_CLIENTONLY|PW_RENDERFULLCONTENT): captures most
+    #            composited windows even when covered; some GPU swapchains → black.
+    #   wgc    — Windows Graphics Capture: reads the DWM composition surface, so
+    #            it captures GPU games (Unity/DirectX) even when covered by other
+    #            windows. Needs the ``windows-capture`` package (Win10 1903+).
+    #            A returned frame is authoritative — a black WGC frame means the
+    #            window really is black, so no fall-through to blt/screen (those
+    #            can "succeed" with the WRONG pixels: whatever covers the window).
+    #   blt    — BitBlt from the window's client DC: classic GDI windows.
+    #   screen — crop the desktop at the window's client rect: always has pixels,
+    #            but the window must be on-screen and not covered by others.
+    # capture_frame probes them in order, caches the first that yields a usable
+    # frame and keeps using it (re-probing if it goes black again).
     def capture_frame(self) -> Optional[np.ndarray]:
         if not self.hwnd:
             return None
-        ctypes, win32gui, win32ui = self._w[0], self._w[1], self._w[2]
+        win32gui, win32con = self._w[1], self._w[3]
         try:
+            if not win32gui.IsWindow(self.hwnd):
+                log_warning("[win32] Cửa sổ mục tiêu đã đóng")
+                self.hwnd = None
+                self._wgc_stop()
+                return None
+            if win32gui.IsIconic(self.hwnd):
+                # A minimized window has no client pixels to copy — restore it
+                # (the one capture case that must touch the window's state).
+                win32gui.ShowWindow(self.hwnd, win32con.SW_RESTORE)
+                time.sleep(0.2)
             l, t, r, b = win32gui.GetClientRect(self.hwnd)
             w, h = r - l, b - t
             if w <= 0 or h <= 0:
                 return None
-            hwnd_dc = win32gui.GetWindowDC(self.hwnd)
-            mfc_dc = win32ui.CreateDCFromHandle(hwnd_dc)
-            save_dc = mfc_dc.CreateCompatibleDC()
-            bmp = win32ui.CreateBitmap()
+        except Exception as exc:
+            log_error(f"[win32] Lỗi chụp cửa sổ: {exc}")
+            return None
+        methods = ["print", "wgc", "blt", "screen"]
+        if self._cap_method in methods:
+            methods.remove(self._cap_method)
+            methods.insert(0, self._cap_method)
+        dark = None
+        for name in methods:
+            try:
+                img = getattr(self, "_cap_" + name)(w, h)
+            except Exception as exc:
+                log_debug(f"[win32] capture '{name}' lỗi: {exc}")
+                img = None
+            if img is None:
+                continue
+            # WGC frames are trusted even when black (see note above); the GDI
+            # methods fall through on a black frame to try the next API.
+            if name != "wgc" and int(img.max()) < 8:
+                if dark is None:
+                    dark = img
+                continue
+            if name != self._cap_method:
+                self._cap_method = name
+                extra = " — cửa sổ phải hiện trên màn hình, không bị che" if name == "screen" else ""
+                log_info(f"[win32] Capture dùng phương pháp '{name}'{extra}")
+            return img
+        # Every method came back black — likely the screen really is black.
+        return dark
+
+    # ── Windows Graphics Capture session (windows-capture package) ─────────────
+    def _wgc_stop(self) -> None:
+        s, self._wgc = self._wgc, None
+        if s and s.get("control") is not None:
+            try:
+                s["control"].stop()
+            except Exception:
+                pass
+
+    def _cap_wgc(self, w, h) -> Optional[np.ndarray]:
+        s = self._wgc
+        if s is not None and s.get("hwnd") != self.hwnd:
+            self._wgc_stop()
+            s = None
+        if s is not None and s.get("dead"):
+            return None
+        if s is None:
+            try:
+                from windows_capture import WindowsCapture
+            except ImportError:
+                log_debug("[win32] gói 'windows-capture' chưa cài (pip install windows-capture)")
+                return None
+            s = {"hwnd": self.hwnd, "lock": threading.Lock(), "frame": None,
+                 "event": threading.Event(), "control": None, "dead": False}
+            # NOTE: draw_border is left untouched — toggling it off needs Win11;
+            # on Win10 the OS draws a yellow border around the captured window.
+            cap = WindowsCapture(cursor_capture=False, window_hwnd=self.hwnd)
+
+            @cap.event
+            def on_frame_arrived(frame, control):  # noqa: ANN001
+                buf = frame.frame_buffer  # BGRA
+                with s["lock"]:
+                    s["frame"] = np.ascontiguousarray(buf[:, :, :3])
+                s["event"].set()
+
+            @cap.event
+            def on_closed():
+                s["dead"] = True
+                s["event"].set()
+
+            try:
+                s["control"] = cap.start_free_threaded()
+            except Exception as exc:
+                log_debug(f"[win32] WGC không khởi động được: {exc}")
+                return None
+            self._wgc = s
+        if not s["event"].wait(timeout=2.0) or s.get("dead"):
+            return None
+        with s["lock"]:
+            frame = s["frame"]
+        if frame is None:
+            return None
+        # WGC frames cover the whole window (title bar + borders included) and
+        # their size varies between the full GetWindowRect bounds and the
+        # visible window, so window-rect offsets can't be trusted. Anchor on
+        # window geometry instead: side/bottom borders are equal, the rest of
+        # the top is the title bar → client sits centred at the bottom.
+        fh, fw = frame.shape[:2]
+        if fw >= w and fh >= h and (fw != w or fh != h):
+            bx = (fw - w) // 2               # left border = right border
+            cy = max(0, fh - h - bx)          # bottom border = side border
+            frame = frame[cy:cy + h, bx:bx + w]
+        return np.ascontiguousarray(frame)
+
+    def _dib(self, src_dc, w, h, blit) -> Optional[np.ndarray]:
+        """Copy ``w×h`` pixels into a DIB via ``blit(save_dc, src_mfc_dc)`` and
+        return them as a BGR ndarray. The caller owns ``src_dc``."""
+        win32gui, win32ui = self._w[1], self._w[2]
+        mfc_dc = win32ui.CreateDCFromHandle(src_dc)
+        save_dc = mfc_dc.CreateCompatibleDC()
+        bmp = win32ui.CreateBitmap()
+        try:
             bmp.CreateCompatibleBitmap(mfc_dc, w, h)
             save_dc.SelectObject(bmp)
-            # PW_CLIENTONLY | PW_RENDERFULLCONTENT captures the client area even
-            # for GPU-composited windows without bringing them to the front.
-            ok = ctypes.windll.user32.PrintWindow(
-                self.hwnd, save_dc.GetSafeHdc(), _PW_CLIENTONLY | _PW_RENDERFULLCONTENT
-            )
+            if not blit(save_dc, mfc_dc):
+                return None
             info = bmp.GetInfo()
             bits = bmp.GetBitmapBits(True)
             img = np.frombuffer(bits, dtype=np.uint8).reshape(
                 (info["bmHeight"], info["bmWidth"], 4)
             )
-            frame = np.ascontiguousarray(img[:, :, :3])  # BGRA → BGR (drop alpha)
-            # cleanup
-            win32gui.DeleteObject(bmp.GetHandle())
+            return np.ascontiguousarray(img[:, :, :3])  # BGRA → BGR (drop alpha)
+        finally:
+            try:
+                win32gui.DeleteObject(bmp.GetHandle())
+            except Exception:
+                pass
             save_dc.DeleteDC()
             mfc_dc.DeleteDC()
-            win32gui.ReleaseDC(self.hwnd, hwnd_dc)
+
+    def _cap_print(self, w, h) -> Optional[np.ndarray]:
+        ctypes, win32gui = self._w[0], self._w[1]
+        hwnd_dc = win32gui.GetWindowDC(self.hwnd)
+
+        def blit(save_dc, _mfc):
+            ok = ctypes.windll.user32.PrintWindow(
+                self.hwnd, save_dc.GetSafeHdc(), _PW_CLIENTONLY | _PW_RENDERFULLCONTENT)
             if not ok:
                 log_debug("[win32] PrintWindow trả về 0 (frame có thể đen)")
-            return frame
-        except Exception as exc:
-            log_error(f"[win32] Lỗi chụp cửa sổ: {exc}")
-            return None
+            return True  # some windows paint fine despite returning 0
+
+        try:
+            return self._dib(hwnd_dc, w, h, blit)
+        finally:
+            win32gui.ReleaseDC(self.hwnd, hwnd_dc)
+
+    def _cap_blt(self, w, h) -> Optional[np.ndarray]:
+        win32gui, win32con = self._w[1], self._w[3]
+        hdc = win32gui.GetDC(self.hwnd)  # client-area DC
+        try:
+            return self._dib(hdc, w, h, lambda save_dc, mfc_dc: (
+                save_dc.BitBlt((0, 0), (w, h), mfc_dc, (0, 0), win32con.SRCCOPY), True)[1])
+        finally:
+            win32gui.ReleaseDC(self.hwnd, hdc)
+
+    def _cap_screen(self, w, h) -> Optional[np.ndarray]:
+        win32gui, win32con = self._w[1], self._w[3]
+        sx, sy = win32gui.ClientToScreen(self.hwnd, (0, 0))
+        desk_dc = win32gui.GetDC(0)
+        try:
+            return self._dib(desk_dc, w, h, lambda save_dc, mfc_dc: (
+                save_dc.BitBlt((0, 0), (w, h), mfc_dc, (sx, sy), win32con.SRCCOPY), True)[1])
+        finally:
+            win32gui.ReleaseDC(0, desk_dc)
 
     # ── window management ──────────────────────────────────────────────────────
     def activate(self) -> bool:
@@ -243,11 +472,21 @@ class Win32Controller:
     def _foreground(self) -> bool:
         return self._match[2] == "foreground"
 
+    def _cursor_mode(self) -> bool:
+        return self._match[2] == "background_cursor"
+
+    def _send(self, msg: int, wparam: int, lparam: int) -> None:
+        """SendMessage with an abort-if-hung timeout so a frozen game can't
+        stall the whole engine thread."""
+        self._w[1].SendMessageTimeout(self.hwnd, msg, wparam, lparam, _SMTO_ABORTIFHUNG, 1000)
+
     def tap(self, x: int, y: int, duration: float = 0.1, tap_count: int = 1) -> bool:
         if not self.hwnd:
             return False
         if self._foreground():
             return self._tap_fg(x, y, duration, tap_count)
+        if self._cursor_mode():
+            return self._tap_bg_cursor(x, y, duration, tap_count)
         return self._tap_bg(x, y, duration, tap_count)
 
     def _tap_bg(self, x, y, duration, tap_count) -> bool:
@@ -264,8 +503,88 @@ class Win32Controller:
                     time.sleep(0.04)
             return True
         except Exception as exc:
-            log_error(f"[win32] tap(bg) lỗi: {exc}")
+            self._input_error("tap(bg)", exc)
             return False
+
+    def _tap_bg_cursor(self, x, y, duration, tap_count) -> bool:
+        """MaaFramework-style ``SendMessageWithCursorPos`` click.
+
+        Games that poll the REAL cursor (Unity/Unreal — NIKKE etc.) take the
+        click position from GetCursorPos, not the message's lParam. Sequence:
+        WM_ACTIVATE (window believes it's active, foreground unchanged) →
+        SetCursorPos to target → WM_MOUSEMOVE → WM_LBUTTONDOWN/UP, all sent
+        synchronously — then restore the cursor. The cursor leaves the user's
+        position for only ~30 ms per click; the window may stay covered."""
+        win32gui, win32api = self._w[1], self._w[4]
+        lp = _lparam(x, y)
+        saved = None
+        try:
+            saved = win32api.GetCursorPos()
+        except Exception:
+            pass
+        try:
+            self._send(_WM_ACTIVATE, _WA_ACTIVE, 0)
+            time.sleep(0.01)
+            sx, sy = win32gui.ClientToScreen(self.hwnd, (int(x), int(y)))
+            for i in range(max(1, int(tap_count))):
+                win32api.SetCursorPos((sx, sy))
+                time.sleep(0.001)
+                self._send(_WM_MOUSEMOVE, 0, lp)
+                time.sleep(0.01)
+                self._send(_WM_LBUTTONDOWN, _MK_LBUTTON, lp)
+                time.sleep(max(0.02, float(duration)))
+                self._send(_WM_LBUTTONUP, 0, lp)
+                if tap_count >= 2:
+                    time.sleep(0.04)
+            return True
+        except Exception as exc:
+            self._input_error("tap(bg+cursor)", exc)
+            return False
+        finally:
+            if saved is not None:
+                try:
+                    win32api.SetCursorPos(saved)
+                except Exception:
+                    pass
+
+    def _swipe_bg_cursor(self, x1, y1, x2, y2, duration) -> bool:
+        """Cursor-pos variant of a background swipe: the hardware cursor traces
+        the gesture (so cursor-polling games see it) while the button messages
+        go to the window — the window itself may stay in the background."""
+        win32gui, win32api = self._w[1], self._w[4]
+        steps = max(2, int(max(1, duration) / 15))
+        saved = None
+        try:
+            saved = win32api.GetCursorPos()
+        except Exception:
+            pass
+        try:
+            self._send(_WM_ACTIVATE, _WA_ACTIVE, 0)
+            time.sleep(0.01)
+            sx, sy = win32gui.ClientToScreen(self.hwnd, (int(x1), int(y1)))
+            win32api.SetCursorPos((sx, sy))
+            time.sleep(0.001)
+            self._send(_WM_MOUSEMOVE, 0, _lparam(x1, y1))
+            time.sleep(0.01)
+            self._send(_WM_LBUTTONDOWN, _MK_LBUTTON, _lparam(x1, y1))
+            for i in range(1, steps + 1):
+                cx = int(x1 + (x2 - x1) * i / steps)
+                cy = int(y1 + (y2 - y1) * i / steps)
+                px, py = win32gui.ClientToScreen(self.hwnd, (cx, cy))
+                win32api.SetCursorPos((px, py))
+                self._send(_WM_MOUSEMOVE, _MK_LBUTTON, _lparam(cx, cy))
+                time.sleep(duration / 1000.0 / steps)
+            self._send(_WM_LBUTTONUP, 0, _lparam(x2, y2))
+            return True
+        except Exception as exc:
+            self._input_error("swipe(bg+cursor)", exc)
+            return False
+        finally:
+            if saved is not None:
+                try:
+                    win32api.SetCursorPos(saved)
+                except Exception:
+                    pass
 
     def _tap_fg(self, x, y, duration, tap_count) -> bool:
         win32gui, win32api = self._w[1], self._w[4]
@@ -280,12 +599,14 @@ class Win32Controller:
                 time.sleep(0.03)
             return True
         except Exception as exc:
-            log_error(f"[win32] tap(fg) lỗi: {exc}")
+            self._input_error("tap(fg)", exc)
             return False
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int, duration: int = 300) -> bool:
         if not self.hwnd:
             return False
+        if self._cursor_mode():
+            return self._swipe_bg_cursor(x1, y1, x2, y2, duration)
         steps = max(2, int(max(1, duration) / 15))
         try:
             if self._foreground():
@@ -312,7 +633,7 @@ class Win32Controller:
                 win32gui.PostMessage(self.hwnd, _WM_LBUTTONUP, 0, _lparam(x2, y2))
             return True
         except Exception as exc:
-            log_error(f"[win32] swipe lỗi: {exc}")
+            self._input_error("swipe", exc)
             return False
 
     def drag(self, x1: int, y1: int, x2: int, y2: int, duration: int = 300) -> bool:
@@ -334,7 +655,7 @@ class Win32Controller:
                 time.sleep(0.005)
             return True
         except Exception as exc:
-            log_error(f"[win32] send_text lỗi: {exc}")
+            self._input_error("send_text", exc)
             return False
 
     def press_key(self, keycode: int) -> bool:
@@ -360,7 +681,7 @@ class Win32Controller:
                 win32gui.PostMessage(self.hwnd, _WM_KEYUP, vk, 0)
             return True
         except Exception as exc:
-            log_error(f"[win32] press_key lỗi: {exc}")
+            self._input_error("press_key", exc)
             return False
 
     def go_back(self) -> bool:

@@ -58,6 +58,7 @@ const WF_ICONS = {
   function:   '<path d="M15 4h-1a3 3 0 0 0-3 3v10a3 3 0 0 1-3 3"/><line x1="8" y1="11.5" x2="16" y2="11.5"/>',
   // ui chrome
   x:          '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
+  check:      '<polyline points="4 12.5 9.5 18 20 6"/>',
   chevron_up: '<polyline points="6 15 12 9 18 15"/>',
   chevron_dn: '<polyline points="6 9 12 15 18 9"/>',
   expand:     '<polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/>',
@@ -321,15 +322,16 @@ async function wfPickWindow(ev){
   function render(filter){
     list.innerHTML="";
     const f=(filter||"").trim().toLowerCase();
-    const shown=wins.filter(w=>!f||w.title.toLowerCase().includes(f)||(w.cls||"").toLowerCase().includes(f));
+    const shown=wins.filter(w=>!f||w.title.toLowerCase().includes(f)||(w.cls||"").toLowerCase().includes(f)||String(w.pid||"").includes(f));
     if(!shown.length){ const e=document.createElement("div"); e.className="wf-varmenu-empty"; e.textContent=wins.length?"Không khớp.":"Không thấy cửa sổ nào."; list.appendChild(e); return; }
     shown.forEach(w=>{
       const row=document.createElement("button"); row.type="button"; row.className="wf-varmenu-item";
-      row.innerHTML=`<span class="vn">${escHtml(w.title)}</span><span class="vt">${escHtml(w.cls||"")}</span>`;
-      row.title=`Title: ${w.title}\nClass: ${w.cls||""}`;
+      const meta=[w.pid?("pid "+w.pid):"", w.cls||""].filter(Boolean).join(" · ");
+      row.innerHTML=`<span class="vn">${escHtml(w.title)}</span><span class="vt">${escHtml(meta)}</span>`;
+      row.title=`Title: ${w.title}\nClass: ${w.cls||""}\nPID: ${w.pid||"?"}`;
       row.onclick=()=>{
         const by=($("wf-win32-matchby").value)||"title";
-        anchor.value = (by==="class") ? (w.cls||w.title) : w.title;
+        anchor.value = (by==="pid") ? String(w.pid||"") : (by==="class") ? (w.cls||w.title) : w.title;
         wfWin32FromUI(); wfCloseWinMenu();
       };
       list.appendChild(row);

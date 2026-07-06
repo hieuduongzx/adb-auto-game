@@ -64,7 +64,13 @@ function wfToggleFocus(){
   if(wfFocusOn){ const id=wfLiveNode||wfRunNode; if(id) wfFocusFollow(id); }
 }
 function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",delayBefore:0,delayAfter:0,retryCount:0,retryDelay:0,screenshotOnFail:false,showPreview:false,stack:null}; }
-function wfNewGraph(){ return { nodes:[{id:wfUid(),type:"start",x:60,y:70,params:{}}], edges:[], groups:[] }; }
+// Every fresh graph seeds both terminals: Start, and an End further right —
+// reaching End is what makes a function call return true, so it should always
+// be there to wire into.
+function wfNewGraph(){ return { nodes:[
+  {id:wfUid(),type:"start",x:60,y:70,params:{}},
+  {id:wfUid(),type:"end",x:420,y:70,params:{}},
+], edges:[], groups:[] }; }
 
 // ── Merge / stack blocks ─────────────────────────────────────────────────────
 // A "merged" block is a vertical stack of nodes shown flush and moved as one.

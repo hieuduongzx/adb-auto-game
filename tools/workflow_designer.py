@@ -338,6 +338,16 @@ class WorkflowDesignerAPI:
         return True
 
     def tap(self, x: int, y: int) -> bool:
+        # Preview right-click tap goes to whatever the preview captures from:
+        # the Win32 target window in a Win32 project, else the ADB device.
+        if self._capture_kind == "win32":
+            if self._win32 is None:
+                return False
+            if not self._win32.device:
+                self._win32.attach()
+            if not self._win32.device:
+                return False
+            return bool(self._win32.tap(int(x), int(y)))
         if self.controller.device is None:
             return False
         return bool(self.controller.tap(int(x), int(y)))
@@ -574,10 +584,12 @@ class WorkflowDesignerAPI:
         return str(path)
 
     def list_windows(self) -> list:
-        """List visible top-level windows as ``[{title, cls}]`` for the Win32
-        window picker in the designer. Returns [] if pywin32 is unavailable."""
+        """List visible top-level windows as ``[{title, cls, pid}]`` for the
+        Win32 window picker in the designer. Returns [] if pywin32 is
+        unavailable."""
         try:
             import win32gui
+            import win32process
         except Exception:
             return []
         out: List[dict] = []
@@ -591,11 +603,15 @@ class WorkflowDesignerAPI:
                 if not title:
                     return
                 cls = win32gui.GetClassName(hwnd) or ""
-                key = (title, cls)
+                try:
+                    pid = win32process.GetWindowThreadProcessId(hwnd)[1]
+                except Exception:
+                    pid = 0
+                key = (title, cls, pid)
                 if key in seen:
                     return
                 seen.add(key)
-                out.append({"title": title, "cls": cls})
+                out.append({"title": title, "cls": cls, "pid": int(pid)})
             except Exception:
                 pass
 
@@ -1301,14 +1317,21 @@ class WorkflowDesignerAPI:
 
     # ── Test run ────────────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _flow_is_win32(flow: Optional[dict]) -> bool:
+        return str((flow or {}).get("controller") or "adb").strip().lower() == "win32"
+
     def workflow_run(self, flow_json: str) -> bool:
-        if self.controller.device is None:
-            log_error("Chưa chọn thiết bị để chạy workflow")
-            return False
         try:
             flow = json.loads(flow_json)
         except Exception as exc:
             log_error(f"JSON workflow không hợp lệ: {exc}")
+            return False
+        # Win32 flows target a native window — no ADB device needed; the engine
+        # attaches to the window itself in _ensure_ready_win32().
+        is_win32 = self._flow_is_win32(flow)
+        if not is_win32 and self.controller.device is None:
+            log_error("Chưa chọn thiết bị để chạy workflow")
             return False
         if self._engine and self._engine.is_running():
             log_warning("Workflow đang chạy")
@@ -1317,7 +1340,7 @@ class WorkflowDesignerAPI:
             self._engine = WorkflowEngine()
         serial = self._connected_serial or self._selected_serial
         try:
-            if serial:
+            if serial and not is_win32:
                 self._engine.auto.adb.device_id = serial
                 self._engine.auto.adb.select_device(serial)
         except Exception as exc:
@@ -1361,13 +1384,14 @@ class WorkflowDesignerAPI:
         return bool(self._engine and self._engine.is_running())
 
     def workflow_run_from_node(self, flow_json: str, edit_kind: str, edit_id: str, node_id: str, step: bool = False) -> bool:
-        if self.controller.device is None:
-            log_error("Chưa chọn thiết bị để chạy workflow")
-            return False
         try:
             flow = json.loads(flow_json)
         except Exception as exc:
             log_error(f"JSON workflow không hợp lệ: {exc}")
+            return False
+        is_win32 = self._flow_is_win32(flow)
+        if not is_win32 and self.controller.device is None:
+            log_error("Chưa chọn thiết bị để chạy workflow")
             return False
         if self._engine is None:
             self._engine = WorkflowEngine()
@@ -1376,7 +1400,7 @@ class WorkflowDesignerAPI:
             return False
         serial = self._connected_serial or self._selected_serial
         try:
-            if serial:
+            if serial and not is_win32:
                 self._engine.auto.adb.device_id = serial
                 self._engine.auto.adb.select_device(serial)
         except Exception as exc:
@@ -1420,14 +1444,15 @@ class WorkflowDesignerAPI:
         thread and emits the same on_node / on_node_done callbacks a real run does,
         so the canvas paints the block amber→green/red.
         """
-        if self.controller.device is None:
-            log_error("Chưa chọn thiết bị để chạy block")
-            return False
         try:
             node = json.loads(node_json)
             flow = json.loads(flow_json) if flow_json else None
         except Exception as exc:
             log_error(f"JSON không hợp lệ: {exc}")
+            return False
+        is_win32 = self._flow_is_win32(flow)
+        if not is_win32 and self.controller.device is None:
+            log_error("Chưa chọn thiết bị để chạy block")
             return False
         if self._engine is None:
             self._engine = WorkflowEngine()
@@ -1436,7 +1461,7 @@ class WorkflowDesignerAPI:
             return False
         serial = self._connected_serial or self._selected_serial
         try:
-            if serial:
+            if serial and not is_win32:
                 self._engine.auto.adb.device_id = serial
                 self._engine.auto.adb.select_device(serial)
         except Exception as exc:

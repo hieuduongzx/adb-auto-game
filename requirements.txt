@@ -31,13 +31,17 @@ qtawesome>=1.4.2       # FontAwesome icons for Qt UI
 # Win32 desktop control (native program-window backend, alternative to ADB).
 # Windows-only; provides PrintWindow capture + PostMessage/SendInput input.
 pywin32>=306 ; sys_platform == "win32"
+# Windows Graphics Capture backend (Win10 1903+): captures GPU-rendered game
+# windows (Unity/DirectX) that PrintWindow can only see as black, even while
+# they're covered by other windows. Optional — capture falls back without it.
+windows-capture>=2.0.0 ; sys_platform == "win32"
 
 # Mobile automation
 pure-python-adb>=0.3.0.dev0
-# Optional scrcpy-backed screenshot/frame capture:
-#   python -m pip install adbutils==1.2.15 scrcpy-client --no-deps
-#   python -m pip install whichcraft cached-property logzero deprecation apkutils2 retry decorator
-# The app reports a clear capture error if scrcpy-client is missing.
+# scrcpy-backed screenshot/frame capture: we talk to vendor/scrcpy/scrcpy-server
+# (4.x) directly over ADB and decode its H.264 stream with PyAV. Optional —
+# capture falls back to ADB screencap if PyAV is missing.
+av>=10.0.0
 # Utilities
 keyboard>=0.13.5      # Keyboard hotkeys (q to quit)
 colorama>=0.4.6       # Coloured console output

@@ -2,7 +2,7 @@
   "name": "DragonRaja",
   "version": 2,
   "templatesDir": "templates",
-  "controller": "win32",
+  "controller": "adb",
   "win32": {
     "window": "#🍕｜foodin | Thích chơi Game - Discord",
     "matchBy": "title",
@@ -10,7 +10,7 @@
   },
   "speedhack": {
     "enabled": true,
-    "speed": 3,
+    "speed": 2,
     "package": "com.vnlz.gp"
   },
   "globals": [],
@@ -310,7 +310,7 @@
           },
           {
             "from": "n6mnrwmg",
-            "fromPort": "out",
+            "fromPort": "true",
             "to": "n62x2k6o"
           },
           {
@@ -330,7 +330,7 @@
           },
           {
             "from": "nrnrnjut",
-            "fromPort": "out",
+            "fromPort": "true",
             "to": "ntbvxgu1"
           },
           {
@@ -347,7 +347,7 @@
       "id": "background_24r2",
       "name": "Auto Skip",
       "type": "background",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -444,7 +444,7 @@
       "id": "sequence_blzz",
       "name": "Activity 2",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [

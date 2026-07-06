@@ -63,11 +63,13 @@ window.__recv = function(raw){
     return;
   }
   if(type==="node_result"){ if(!wfRunning) return; if(data.id && !wfNode(data.id)) return; wfMarkNodeResult(data.id, data.status, data.port); if(typeof wfDebugAutoStep==="function") wfDebugAutoStep(); return; }
-  // Activity-level run status: mark the row blinking-green while the engine
-  // executes it, then solid-red if it finished with failure. Cleared on the
-  // next run start (wfResetActStatus in wfResetRunViz).
-  if(type==="activity_active"){ if(data.id) wfSetActStatus(data.id, "running"); return; }
-  if(type==="activity_result"){ if(data.id) wfSetActStatus(data.id, data.status==="ok" ? null : "errored"); return; }
+  // Activity-level run status: blinking-green while the engine executes it,
+  // then solid-green when it completed (reached End) or solid-red on failure.
+  // The marks persist after the run and only clear on the next run start
+  // (wfResetActStatus in wfResetRunViz). The !wfRunning guard drops late
+  // results after a manual Stop so a half-run activity isn't painted.
+  if(type==="activity_active"){ if(!wfRunning) return; if(data.id) wfSetActStatus(data.id, "running"); return; }
+  if(type==="activity_result"){ if(!wfRunning) return; if(data.id) wfSetActStatus(data.id, data.status==="ok" ? "done" : "errored"); return; }
   if(type==="speedhack_state"){
     wfSpeedRunning=!!data.running; wfSyncSpeedUI();
     if(data.running && data.active) setStatus("Speed hack is running");

@@ -1,0 +1,73 @@
+{
+  "name": "Nikke",
+  "version": 2,
+  "templatesDir": "templates",
+  "controller": "win32",
+  "win32": {
+    "window": "7820",
+    "matchBy": "pid",
+    "inputMode": "background_cursor"
+  },
+  "speedhack": {
+    "enabled": false,
+    "speed": 2,
+    "package": ""
+  },
+  "globals": [],
+  "functions": [],
+  "activities": [
+    {
+      "id": "sequence_plft",
+      "name": "Activity 1",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "n1hkqb9k",
+            "type": "start",
+            "x": 60,
+            "y": 70,
+            "params": {}
+          },
+          {
+            "id": "n46lsefs",
+            "type": "end",
+            "x": 380,
+            "y": 60,
+            "params": {}
+          },
+          {
+            "id": "ncyuuadl",
+            "type": "tap_image",
+            "x": 120,
+            "y": 55,
+            "params": {
+              "template": "templates/crop_20260705_163156_191_1231_22_19.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "n1hkqb9k",
+            "fromPort": "out",
+            "to": "ncyuuadl"
+          },
+          {
+            "from": "ncyuuadl",
+            "fromPort": "true",
+            "to": "n46lsefs"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    }
+  ]
+}

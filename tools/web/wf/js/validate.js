@@ -11,6 +11,13 @@ function wfValidationIssues(){
     const nodes=g.nodes||[], edges=g.edges||[];
     const byId=new Map(nodes.map(n=>[n.id,n]));
     if(!nodes.some(n=>n.type==="start")) add("err","Missing Start node",ctx,null);
+    // Success = "did the walk reach an End node": a function call without one
+    // always returns F (false); a sequence activity without one is always
+    // marked failed (red) after a run. Background tasks poll forever — skip.
+    if(!nodes.some(n=>n.type==="end")){
+      if(ctx.kind==="function") add("warn","Function has no End node — calls will always return F (false)",ctx,null);
+      else if(ctx.owner.type!=="background") add("warn","Activity has no End node — it will always be marked failed (red)",ctx,null);
+    }
     edges.forEach(e=>{
       if(!byId.has(e.from)) add("err",`Wire starts from missing node ${e.from}`,ctx,null);
       if(!byId.has(e.to)) add("err",`Wire points to missing node ${e.to}`,ctx,null);

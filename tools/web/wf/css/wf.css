@@ -389,13 +389,17 @@
 #wf-activities, #wf-activities-bg, #wf-functions { padding:0; }
 /* Run-status indicators on activity rows.
    .running  → blinking green left bar (engine is executing this activity)
-   .errored  → solid red left bar (activity finished with failure) */
+   .done     → solid green left bar (activity completed — reached End)
+   .errored  → solid red left bar (activity finished with failure)
+   done/errored persist after the run; cleared on the next run start. */
 .wf-act { position:relative; }
 .wf-act .wf-act-runbar { position:absolute; left:0; top:0; bottom:0; width:3px; border-radius:7px 0 0 7px;
   background:transparent; transition:background .15s; pointer-events:none; }
 .wf-act.running .wf-act-runbar { background:#1f9d57; animation:wfActBlink 1s ease-in-out infinite; }
+.wf-act.done .wf-act-runbar { background:#1f9d57; }
 .wf-act.errored .wf-act-runbar { background:#d6483f; }
 .wf-act.running { border-color:#1f9d57; }
+.wf-act.done { border-color:#1f9d57; }
 .wf-act.errored { border-color:#d6483f; }
 @keyframes wfActBlink { 0%,100%{opacity:1} 50%{opacity:.3} }
 

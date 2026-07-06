@@ -62,7 +62,15 @@ function wfHydrateGraph(g){
   });
   if(!nodes.some(n=>n.type==="start")) nodes.unshift({id:wfUid(),type:"start",x:40,y:40,params:{}});
   const groups=(g.groups||[]).map(gr=>({id:gr.id||("g"+wfUid().slice(1)),name:gr.name||"Group",x:gr.x||0,y:gr.y||0,w:gr.w||200,h:gr.h||140,color:gr.color||0}));
-  return { nodes, edges:(g.edges||[]).map(e=>({from:e.from,fromPort:e.fromPort||"out",to:e.to,toPort:e.toPort||"in"})), groups };
+  // Migrate legacy call wires: the call node used to have a single "out" port,
+  // now it exposes "true"/"false" — an old "out" wire is the success path.
+  const callIds=new Set(nodes.filter(n=>n.type==="call").map(n=>n.id));
+  const edges=(g.edges||[]).map(e=>{
+    let fp=e.fromPort||"out";
+    if(fp==="out" && callIds.has(e.from)) fp="true";
+    return {from:e.from,fromPort:fp,to:e.to,toPort:e.toPort||"in"};
+  });
+  return { nodes, edges, groups };
 }
 function wfHydrate(flow){
   WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"templates";
@@ -109,7 +117,8 @@ function wfSetRunning(on){
     wfMarkUnreached();
     wfLiveVars={}; wfFreshVar=null;
     // Clear any activity still blinking "running" (stopped mid-activity), but
-    // keep the solid-red "errored" markers so failed activities stay visible.
+    // keep the solid green "done" / red "errored" markers so each activity's
+    // outcome stays visible until the next run resets them.
     for(const id in wfActStatus){ if(wfActStatus[id]==="running") wfSetActStatus(id, null); }
   }
   if(b){

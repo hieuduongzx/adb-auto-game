@@ -315,6 +315,27 @@ function wfShowWireMenu(clientX, clientY, ed){
   d.onclick=()=>{ wfHideMenu(); wfDeleteWire(ed); }; m.appendChild(d);
   m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
 }
+// Right-click menu on the Activities panel: tick / untick the enable checkbox
+// of every activity in the visible tab (sequence or background) at once.
+function wfShowActAllMenu(clientX, clientY){
+  const m=$("wf-ctxmenu"); if(!m) return;
+  const isBg = (typeof wfActTabCur!=="undefined" && wfActTabCur==="bg");
+  const list = WF.activities.filter(a=>(a.type==="background")===isBg);
+  if(!list.length){ wfHideMenu(); return; }
+  const what = isBg?"background tasks":"activities";
+  const setAll=on=>{ wfPushUndo(); list.forEach(a=>a.enabled=on); wfRenderActivities();
+    setStatus((on?"Enabled all ":"Disabled all ")+what); };
+  m.innerHTML="";
+  [{ico:"check", label:"Select all ("+list.length+")",   fn:()=>setAll(true)},
+   {ico:"x",     label:"Deselect all ("+list.length+")", fn:()=>setAll(false)},
+  ].forEach(it=>{
+    const d=document.createElement("div"); d.className="wf-ctx-item";
+    d.innerHTML=`<span class="wf-ctx-ico">${wfIco(it.ico)}</span>${escHtml(it.label)}`;
+    d.onclick=()=>{ wfHideMenu(); it.fn(); }; m.appendChild(d);
+  });
+  m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
+}
+
 function wfShowGroupMenu(clientX, clientY, gr){
   const m=$("wf-ctxmenu"); if(!m) return;
   m.innerHTML="";
@@ -386,6 +407,11 @@ function wfInitCanvas(){
   // ── Activity panel: stop wheel from zooming the canvas ──────────────────
   const actBody=document.querySelector(".wf-act-panel-body");
   if(actBody) actBody.addEventListener("wheel", e=>e.stopPropagation(), {passive:true});
+  // Right-click anywhere in the activity list → select/deselect-all menu.
+  if(actBody) actBody.addEventListener("contextmenu", e=>{
+    e.preventDefault(); e.stopPropagation();
+    wfShowActAllMenu(e.clientX, e.clientY);
+  });
   // ── Inspector body: stop wheel from zooming the canvas ──────────────────
   const inspBody=$("wf-insp-body");
   if(inspBody) inspBody.addEventListener("wheel", e=>e.stopPropagation(), {passive:true});

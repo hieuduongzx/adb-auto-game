@@ -28,10 +28,11 @@ let wfRunStopped=false; // true once a finished run's trail is on display (greys
 let wfSkipIds=null;     // ids greyed out as "not reached", captured once when the run stops
 const wfRan={};       // nodeId -> "ok" | "fail"
 const wfRanPort={};   // nodeId -> output port actually taken
-// Activity run-status tracker: activityId -> "running" | "errored".
-// Drives the blinking-green / solid-red indicator on each activity row in the
-// bottom-right panel. Cleared at the start of a run and updated live from the
-// engine's on_activity_start / on_activity_complete callbacks.
+// Activity run-status tracker: activityId -> "running" | "done" | "errored".
+// Drives the row indicator in the bottom-right panel: blinking green while the
+// engine executes it, solid green once completed, solid red on failure. Cleared
+// at the start of a run and updated live from the engine's
+// on_activity_start / on_activity_complete callbacks.
 const wfActStatus={};
 // Apply a status class to a single activity row (without a full re-render) so
 // the indicator updates instantly when an event arrives.
@@ -40,6 +41,7 @@ function wfSetActStatus(id, status){
   const el=document.querySelector(`.wf-act[data-id="${id}"]`);
   if(el){
     el.classList.toggle("running", status==="running");
+    el.classList.toggle("done",    status==="done");
     el.classList.toggle("errored", status==="errored");
   }
 }

@@ -73,7 +73,9 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "start":      {"label": "Bắt đầu",       "kind": "start",     "ins": 0, "outs": ["out"]},
     "end":        {"label": "Kết thúc",      "kind": "end",       "ins": 1, "outs": []},
     "stop":       {"label": "Dừng tất cả",   "kind": "stop",      "ins": 1, "outs": []},
-    "call":       {"label": "Gọi function",  "kind": "call",      "ins": 1, "outs": ["out"]},
+    # A call returns a boolean: "true" when the function's walk reached an End
+    # node, "false" when it dead-ended (e.g. a node inside timed out).
+    "call":       {"label": "Gọi function",  "kind": "call",      "ins": 1, "outs": ["true", "false"]},
     "note":       {"label": "Ghi chú",       "kind": "note",      "ins": 0, "outs": []},
     "tap":        {"label": "Chạm",          "kind": "action",    "ins": 1, "outs": ["out"]},
     "double_tap": {"label": "Chạm đúp",      "kind": "action",    "ins": 1, "outs": ["out"]},
@@ -373,6 +375,17 @@ class WorkflowEngine:
     def _branch_failed(self, value: bool) -> None:
         self._ctx.branch_failed = value
 
+    # Set True when the current walk reaches an ``end`` node. A ``call`` resets
+    # it before running its function graph and reads it after: reached End →
+    # the call's "true" port, dead-ended (timeout etc.) → "false".
+    @property
+    def _reached_end(self) -> bool:
+        return getattr(self._ctx, "reached_end", False)
+
+    @_reached_end.setter
+    def _reached_end(self, value: bool) -> None:
+        self._ctx.reached_end = value
+
     @property
     def _try_chain_mode(self) -> bool:
         return getattr(self._ctx, "try_chain_mode", False)
@@ -621,7 +634,13 @@ class WorkflowEngine:
             if attempt > 1:
                 log_info(f"[workflow] Retry {name} ({attempt}/{retries})")
             log_info(f"[workflow] ▶ {name}")
+            self._reached_end = False
             ok = self._run_graph(act.get("graph", {}) or {})
+            # Same success rule as a function call: the walk must reach an End
+            # node — a dead-end (e.g. a timed-out image wait with no false path)
+            # is a failure. A stop (user or Stop node) is not painted as one.
+            if ok and not self._stop.is_set():
+                ok = self._reached_end
             if ok:
                 break
         elapsed = time.time() - t0
@@ -689,6 +708,7 @@ class WorkflowEngine:
             nid = cur                    # stable id for the post-run result event
             ntype = node.get("type")
             if ntype == "end":
+                self._reached_end = True
                 self._emit("on_node_done", nid, "ok", None)
                 break
             # Per-node log line (designer's "Log khi chạy" field): auto-emit it
@@ -862,17 +882,31 @@ class WorkflowEngine:
                 self._emit("on_node", cur)  # highlight the call block while its function runs
                 fid = params.get("fn")
                 fn = self._functions.get(fid)
+                ok_call = False
                 if fn is None:
                     log_warning(f"[workflow] call -> unknown function '{fid}'")
                 elif depth >= MAX_CALL_DEPTH:
                     log_warning("[workflow] Max function call depth reached (recursion?)")
                 else:
                     log_info(f"[workflow] ƒ {fn.get('name', fid)}")
+                    outer_end = self._reached_end
+                    self._reached_end = False
                     self._run_graph(fn.get("graph", {}) or {}, depth + 1)
-                self._emit("on_node_done", nid, "ok", "out")
-                if self._try_chain_mode and self._branch_failed:
+                    ok_call = self._reached_end
+                    self._reached_end = outer_end
+                    if not ok_call:
+                        log_warning(f"[workflow] ƒ {fn.get('name', fid)} → false (dead-end, không tới node End)")
+                port = "true" if ok_call else "false"
+                self._emit("on_node_done", nid, "ok" if ok_call else "fail", port)
+                nxt = self._next(adj, cur, port)
+                if nxt is None:
+                    # Legacy flows wired the call's single "out" port — follow it
+                    # regardless of the result so old workflows behave as before.
+                    nxt = self._next(adj, cur, "out")
+                if self._try_chain_mode and (self._branch_failed or (not ok_call and nxt is None)):
+                    self._branch_failed = True
                     break
-                cur = self._next(adj, cur, "out")
+                cur = nxt
             else:  # action (or unknown -> just follow out)
                 ok_act = True
                 handler = self._actions.get(ntype)
@@ -925,6 +959,7 @@ class WorkflowEngine:
             "join_node": None,   # id of the join node all branches converge to
             "barriers": {},      # per-And-node arrival / failure state
             "failed": False,     # any branch failed while running under this fork
+            "reached_end": False,  # any branch hit an End node (function result)
         }
 
         threads = []
@@ -954,6 +989,10 @@ class WorkflowEngine:
         # (The parent _walk call proceeds from wherever _run_parallel returns.)
         if join_ctx.get("failed"):
             self._branch_failed = True
+        # An End node hit on a branch thread counts for the enclosing function's
+        # true/false result — hoist it back onto the forking (caller) thread.
+        if join_ctx.get("reached_end"):
+            self._reached_end = True
 
     def _and_arrive(self, ctx: Dict[str, Any], node_id: str, expected: int, branch_failed: bool):
         """Record one parallel branch arriving at an And barrier."""
@@ -978,12 +1017,16 @@ class WorkflowEngine:
         self._break_loop = False
         self._ctx.join_ctx = join_ctx   # thread-local; cleared when thread exits
         self._branch_failed = False
+        self._reached_end = False
         try:
             self._walk(nodes, adj, tgt, {}, depth)
         finally:
-            if join_ctx is not None and self._branch_failed:
+            if join_ctx is not None:
                 with join_ctx["lock"]:
-                    join_ctx["failed"] = True
+                    if self._branch_failed:
+                        join_ctx["failed"] = True
+                    if self._reached_end:
+                        join_ctx["reached_end"] = True
             self._ctx.join_ctx = None
 
     @staticmethod

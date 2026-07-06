@@ -247,7 +247,11 @@ function wfPvDrawEmpty(){
   g.addColorStop(0,"#1c2027"); g.addColorStop(1,"#0e1013");
   ctx.fillStyle=g; ctx.fillRect(0,0,cw,ch);
 
-  const err=!!wfPvErr, busy=!err && !!S.connectedSerial;
+  // Win32 projects capture a native window — no ADB device required, so the
+  // placeholder must not claim "No device connected" there.
+  const isWin32 = (typeof WF!=="undefined" && WF.controller==="win32");
+  const hasSrc = isWin32 ? !!((WF.win32||{}).window) : !!S.connectedSerial;
+  const err=!!wfPvErr, busy=!err && hasSrc;
   const accent = err ? "#e0736b" : busy ? "#5aa9e6" : "#5b6675";
   // Phone-outline glyph, centred just above the text.
   const iw=44, ih=72, ix=cx-iw/2, iy=cy-ih/2-26;
@@ -262,8 +266,10 @@ function wfPvDrawEmpty(){
   ctx.restore();
 
   ctx.textAlign="center";
-  const title = err ? "Capture error" : busy ? "Capturing…" : "No device connected";
-  const sub   = err ? String(wfPvErr) : busy ? "Waiting for the first frame" : "Connect a device or emulator, then press Capture";
+  const title = err ? "Capture error" : busy ? "Capturing…" : (isWin32 ? "No target window" : "No device connected");
+  const sub   = err ? String(wfPvErr) : busy ? "Waiting for the first frame"
+    : (isWin32 ? "Pick a target window in Project settings, then press Capture"
+               : "Connect a device or emulator, then press Capture");
   ctx.fillStyle = err ? "#eab3ad" : "#c2cad4";
   ctx.font="600 15px IBM Plex Sans,Segoe UI,sans-serif";
   ctx.fillText(title, cx, cy+18);

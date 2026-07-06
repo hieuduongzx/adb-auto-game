@@ -53,10 +53,10 @@ function wfRenderActivities(){
   function rowInto(wrap, act){
     const sel = WF.edit.kind==="activity" && act.id===WF.edit.id;
     const el=document.createElement("div");
-    // Apply run-status classes (running / errored) from the live tracker so
-    // the row keeps its indicator across re-renders during a test run.
+    // Apply run-status classes (running / done / errored) from the live tracker
+    // so the row keeps its indicator across re-renders during a test run.
     const st=wfActStatus[act.id];
-    el.className="wf-act"+(sel?" sel":"")+(st==="running"?" running":"")+(st==="errored"?" errored":"");
+    el.className="wf-act"+(sel?" sel":"")+(st==="running"?" running":"")+(st==="done"?" done":"")+(st==="errored"?" errored":"");
     el.dataset.id=act.id;
     el.innerHTML=
       `<span class="wf-act-runbar"></span>
