@@ -1767,9 +1767,9 @@ class WorkflowEngine:
         cfg = self.speedhack_cfg or {}
         if not self._truthy(cfg.get("enabled", False)):
             return
-        # Frida speedhack is Android/ADB-only — not applicable to a Win32 window.
+        # Win32 projects don't have Frida/ADB — inject the Unity cheat.dll instead.
         if getattr(self, "_controller", "adb") == "win32":
-            log_info("[speedhack] bỏ qua — dự án Win32 không dùng Frida/ADB")
+            self._start_cheat_dll(cfg)
             return
         if self._speedhack is not None:
             return
@@ -1797,6 +1797,64 @@ class WorkflowEngine:
         threading.Thread(
             target=self._speedhack_loop, args=(scale,), daemon=True
         ).start()
+
+    def _start_cheat_dll(self, cfg: Dict[str, Any]) -> None:
+        """Win32/Unity speed hack: inject ``vendor/cheat.dll`` into the game.
+
+        The Win32 backend has no Frida/ADB, so speed comes from a native overlay
+        DLL that hooks ``UnityEngine.Time::set_timeScale``. We attach to the
+        target window, preseed the speed into ``cheat_config.ini`` and inject.
+        Runs in the background and retries until the Unity process is up (the
+        game may still be launching), mirroring the Frida path.
+        """
+        try:
+            scale = float(cfg.get("speed", 2.0) or 2.0)
+        except (TypeError, ValueError):
+            scale = 2.0
+        if scale == 1.0:
+            return
+        try:
+            from pathlib import Path
+            from src.game_core.frida_speedhack import FridaSpeedhackManager
+            dll = FridaSpeedhackManager._project_root() / "vendor" / "cheat.dll"
+        except Exception:
+            dll = None
+        if not dll or not Path(dll).is_file():
+            log_warning("[cheat] không tìm thấy vendor/cheat.dll")
+            return
+        self._speed_scale = scale
+        self._speedhack_stop = threading.Event()
+        threading.Thread(
+            target=self._cheat_loop, args=(str(dll), scale), daemon=True
+        ).start()
+
+    def _cheat_loop(self, dll_path: str, scale: float) -> None:
+        stop_ev = self._speedhack_stop
+        try:
+            from src.core.win32 import inject_unity_cheat, pid_from_hwnd
+        except Exception as exc:
+            log_error(f"[cheat] không nạp được injector Win32: {exc}")
+            return
+        log_info(f"[cheat] sẽ inject cheat.dll (x{scale:g}) khi game Unity chạy…")
+        while (not self._stop.is_set()
+               and stop_ev is not None and not stop_ev.is_set()):
+            hwnd = getattr(getattr(self.auto, "adb", None), "hwnd", None)
+            pid = pid_from_hwnd(hwnd) if hwnd else None
+            if pid:
+                res = inject_unity_cheat(pid, dll_path, speed=scale)
+                if res.get("ok"):
+                    log_success(f"[cheat] {res.get('reason')} — speed x{scale:g}")
+                    return
+                # "not Unity yet" / process still starting → keep retrying;
+                # a hard incompatibility (32-bit, arch) won't fix itself, so stop.
+                if res.get("backend") is None and "32-bit" in res.get("reason", ""):
+                    log_error(f"[cheat] {res.get('reason')}")
+                    return
+                log_warning(f"[cheat] thử lại: {res.get('reason')}")
+            for _ in range(50):  # ~5s, stay responsive to stop
+                if self._stop.is_set() or (stop_ev and stop_ev.is_set()):
+                    return
+                time.sleep(0.1)
 
     def _speedhack_loop(self, scale: float) -> None:
         stop_ev = self._speedhack_stop

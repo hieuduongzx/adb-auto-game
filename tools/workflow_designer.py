@@ -79,6 +79,8 @@ _WORKFLOWS_DIR = os.path.join(_PROJECT_ROOT, "workflows")
 # Transient flow written for the "Chạy GUI" handoff to the runner.
 _RUN_TMP_DIR = os.path.join(_WORKFLOWS_DIR, "_run")
 _SETTINGS_PATH = os.path.join(_PROJECT_ROOT, "data", "designer_settings.json")
+# Unity speed-hack DLL injected into Win32 projects (ADB projects use Frida).
+_CHEAT_DLL = os.path.join(_PROJECT_ROOT, "vendor", "cheat.dll")
 
 # Convention: a saved workflow.json is paired with a sibling assets folder of
 # this name, so the pair (json + folder) is a self-contained, movable bundle —
@@ -186,6 +188,9 @@ class WorkflowDesignerAPI:
         # it owns its own manager/retry-thread rather than riding the engine run.
         self._sh_mgr: Optional[FridaSpeedhackManager] = None
         self._sh_stop: Optional[threading.Event] = None
+        # Win32/Unity speed hack: PID of the process cheat.dll was injected into
+        # (a DLL can't be cleanly unloaded, so "stop" just drops this tracking).
+        self._cheat_pid: Optional[int] = None
 
     # ── Setup ────────────────────────────────────────────────────────────────
 
@@ -1519,7 +1524,13 @@ class WorkflowDesignerAPI:
         self._push("speedhack_state", {"active": active, "running": running})
 
     def speedhack_start(self, speed=2.0, package: str = "") -> bool:
-        """Start (or live-adjust) the speed hack on its own — no workflow needed."""
+        """Start (or live-adjust) the speed hack on its own — no workflow needed.
+
+        Controller-aware: an ADB project uses Frida (below); a Win32 project
+        injects the Unity ``cheat.dll`` into the target window's process instead.
+        """
+        if self._capture_kind == "win32":
+            return self._cheat_start(speed)
         try:
             scale = float(speed)
         except (TypeError, ValueError):
@@ -1572,7 +1583,103 @@ class WorkflowDesignerAPI:
                     return
                 time.sleep(0.1)
 
+    def _cheat_start(self, speed=2.0) -> bool:
+        """Win32/Unity speed hack: inject ``vendor/cheat.dll`` into the game.
+
+        Unlike Frida there is no live re-scale channel — the DLL is an in-game
+        overlay that reads ``cheat_config.ini`` on load and is then driven by its
+        own menu/hotkeys. So we preseed the speed into that config, inject once,
+        and report running. Re-pressing ▶ re-writes the config + re-seeds (the
+        DLL skips a second load since it's already mapped)."""
+        try:
+            from src.core.win32 import inject_unity_cheat, pid_from_hwnd
+        except Exception as exc:
+            log_error(f"[cheat] không nạp được injector Win32: {exc}")
+            return False
+        try:
+            scale = float(speed)
+        except (TypeError, ValueError):
+            scale = 2.0
+        if scale <= 0 or scale == 1.0:
+            log_warning("[cheat] tốc độ phải khác 1.0 để tăng tốc")
+            return False
+        if self._win32 is None:
+            log_error("[cheat] chưa đặt cửa sổ Win32 mục tiêu (Project settings)")
+            return False
+        if not self._win32.device:
+            self._win32.attach()
+        hwnd = self._win32.hwnd
+        if not hwnd:
+            log_error("[cheat] không tìm thấy cửa sổ game — kiểm tra Project settings")
+            return False
+        if not os.path.isfile(_CHEAT_DLL):
+            log_error(f"[cheat] không tìm thấy {_CHEAT_DLL}")
+            return False
+        pid = pid_from_hwnd(hwnd)
+        if not pid:
+            log_error("[cheat] không lấy được PID của game")
+            return False
+        res = inject_unity_cheat(pid, _CHEAT_DLL, speed=scale)
+        if not res.get("ok"):
+            log_error(f"[cheat] {res.get('reason', 'inject thất bại')}")
+            self._sh_push(False, False)
+            return False
+        self._cheat_pid = pid
+        if res.get("already"):
+            log_success(f"[cheat] cheat.dll đã inject sẵn (Unity/{res.get('backend')}) — đã ghi speed x{scale:g}")
+        else:
+            log_success(f"[cheat] {res.get('reason')} — speed x{scale:g}")
+        log_info("[cheat] Bấm F12 trong game để mở/đóng menu overlay · F1 bật/tắt speed hack.")
+        self._sh_push(True, True)
+        return True
+
+    def cheat_launch(self, game_path: str = "", speed: float = 2.0) -> bool:
+        """Launch a Unity game with cheat.dll pre-injected (CREATE_SUSPENDED).
+
+        For games with anti-cheat (mhyprot/ACE/EAC) that kill
+        ``CreateRemoteThread`` in a running process, inject *before* the main
+        thread runs: create the process suspended, inject, then resume. This
+        mirrors GameHook (base_GameHook/main.cpp) and bypasses the post-start
+        anti-cheat hook.
+
+        ``game_path`` is the game .exe; if empty the user must supply it (the
+        JS side opens a file picker).
+        """
+        try:
+            from src.core.win32 import launch_and_inject
+        except Exception as exc:
+            log_error(f"[cheat] không nạp được injector Win32: {exc}")
+            return False
+        gp = (game_path or "").strip().strip('"')
+        if not gp:
+            log_error("[cheat] chưa chọn file game .exe")
+            return False
+        try:
+            scale = float(speed)
+        except (TypeError, ValueError):
+            scale = 2.0
+        if not os.path.isfile(_CHEAT_DLL):
+            log_error(f"[cheat] không tìm thấy {_CHEAT_DLL}")
+            return False
+        res = launch_and_inject(gp, _CHEAT_DLL, speed=scale)
+        if not res.get("ok"):
+            log_error(f"[cheat] {res.get('reason', 'launch+inject thất bại')}")
+            self._sh_push(False, False)
+            return False
+        self._cheat_pid = res.get("pid")
+        log_success(f"[cheat] {res.get('reason')} — speed x{scale:g}")
+        log_info("[cheat] Bấm F12 trong game để mở/đóng menu overlay · F1 bật/tắt speed hack.")
+        self._sh_push(True, True)
+        return True
+
     def speedhack_stop(self) -> bool:
+        # Win32/Unity: cheat.dll can't be safely unloaded once its hooks are in;
+        # its overlay stays and is toggled off from its own in-game menu/hotkey.
+        if self._cheat_pid is not None:
+            log_info("[cheat] cheat.dll vẫn nằm trong game — tắt speed trong menu overlay của nó (không thể gỡ DLL an toàn).")
+            self._cheat_pid = None
+            self._sh_push(False, False)
+            return True
         ev = self._sh_stop
         if ev is not None:
             ev.set()
@@ -1588,7 +1695,32 @@ class WorkflowDesignerAPI:
         return True
 
     def speedhack_running(self) -> bool:
-        return self._sh_mgr is not None
+        return self._sh_mgr is not None or self._cheat_pid is not None
+
+    def pick_game_exe(self) -> str:
+        """Open a file picker for a game .exe (used by the Launch+inject button)."""
+        win = self._win()
+        if win is None:
+            return ""
+        try:
+            paths = win.create_file_dialog(
+                webview.OPEN_DIALOG, allow_multiple=False,
+                file_types=("Executable (*.exe)", "All files (*.*)"),
+            )
+        except Exception as exc:
+            log_warning(f"Dialog error: {exc}")
+            return ""
+        if not paths:
+            return ""
+        path = paths[0] if isinstance(paths, (list, tuple)) else paths
+        return str(path)
+
+    def cheat_launch_from_picker(self, speed: float = 2.0) -> bool:
+        """Pick a game .exe then launch+inject in one click (for anti-cheat games)."""
+        gp = self.pick_game_exe()
+        if not gp:
+            return False
+        return self.cheat_launch(gp, speed=speed)
 
     def _workflow_templates_dir(self, flow_json: str = "") -> Optional[str]:
         """Best-effort path to the current workflow's ``templates/`` folder.

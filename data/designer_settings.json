@@ -6,6 +6,6 @@
   "inspW": 280,
   "minimap": false,
   "alignGuides": true,
-  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\DragonTraveller\\workflow.json",
-  "previewHz": 60
+  "previewHz": 60,
+  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\DragonTraveller\\workflow.json"
 }

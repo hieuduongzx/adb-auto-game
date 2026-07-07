@@ -272,17 +272,39 @@ function wfToggleMinimap(){
 let wfSpeedRunning=false;   // is the standalone injection currently on?
 function wfSyncSpeedUI(){
   const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
-  const b=$("wf-speed-btn"); if(b){ b.title="Speed hack: "+(sh.enabled?"On":"Off")+" (accelerate the game with Frida — root required)"; b.classList.toggle("on",sh.enabled); }
+  const win32=(WF.controller==="win32");
+  // Method depends on the project controller: ADB → Frida clock hook (root),
+  // Win32 → inject vendor/cheat.dll into the Unity game (hooks Time.timeScale).
+  const b=$("wf-speed-btn");
+  if(b){
+    b.title = win32
+      ? "Speed hack: "+(sh.enabled?"On":"Off")+" (inject cheat.dll vào game Unity — hook Time.timeScale)"
+      : "Speed hack: "+(sh.enabled?"On":"Off")+" (accelerate the game with Frida — root required)";
+    b.classList.toggle("on",sh.enabled);
+  }
   const v=$("wf-speed-val"); if(v && document.activeElement!==v) v.value=sh.speed;
-  const pk=$("wf-speed-pkg"); if(pk && document.activeElement!==pk) pk.value=sh.package||"";
+  // Package field is only meaningful for ADB (the Frida target); Win32 uses the
+  // project's target window, so hide it there.
+  const pk=$("wf-speed-pkg");
+  if(pk){
+    pk.style.display = win32 ? "none" : "";
+    if(document.activeElement!==pk) pk.value=sh.package||"";
+  }
   const grp=$("wf-speed-group"); if(grp) grp.classList.toggle("on", sh.enabled);
   const rb=$("wf-speed-run-btn");
   if(rb){
     rb.style.display = sh.enabled ? "inline-flex" : "none";
     rb.innerHTML = wfSpeedRunning ? WF_ICO_STOP : WF_ICO_PLAY;
-    rb.title = wfSpeedRunning ? "Disable speed hack" : "Enable speed hack now (independent of Test run)";
+    rb.title = wfSpeedRunning
+      ? (win32 ? "Speed hack đang chạy (tắt trong menu overlay của cheat.dll)" : "Disable speed hack")
+      : (win32 ? "Inject cheat.dll vào game Unity (độc lập với Test run)" : "Enable speed hack now (independent of Test run)");
     rb.classList.toggle("ok", !wfSpeedRunning); rb.classList.toggle("err", wfSpeedRunning);
   }
+  // The Launch+inject button: Win32-only. Shown when speed hack is enabled.
+  // Use it for games with anti-cheat that kills CreateRemoteThread on a
+  // running process — it starts the game suspended, injects, then resumes.
+  const lb=$("wf-cheat-launch-btn");
+  if(lb) lb.style.display = (win32 && sh.enabled) ? "inline-flex" : "none";
 }
 function wfSpeedFromUI(){
   const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
@@ -309,10 +331,26 @@ async function wfSpeedRun(){
   const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
   wfSpeedFromUI();
   if(wfSpeedRunning){ await api().speedhack_stop(); return; }
+  // Win32 injects cheat.dll into the target window's process — no package needed.
+  if(WF.controller==="win32"){
+    if(!((WF.win32||{}).window||"").trim()){ alert("Đặt cửa sổ game Unity (Project settings) để inject cheat.dll."); return; }
+    const ok=await api().speedhack_start(sh.speed, "");
+    if(!ok){ wfSpeedRunning=false; wfSyncSpeedUI(); }
+    return;
+  }
   const pkg=sh.package||wfAutoPackage();
   if(!pkg){ alert("Enter a game package (or add a Launch app node) to enable speed hack."); return; }
   const ok=await api().speedhack_start(sh.speed, pkg);
   if(!ok){ wfSpeedRunning=false; wfSyncSpeedUI(); }
+}
+// Launch a Unity game .exe with cheat.dll pre-injected (CREATE_SUSPENDED).
+// For anti-cheat games that kill CreateRemoteThread in a running process.
+async function wfCheatLaunch(){
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
+  wfSpeedFromUI();
+  if(!confirm("Chọn file game .exe — game sẽ chạy + inject cheat.dll trước khi anti-cheat khởi động.\nĐảm bảo game CHƯA chạy.")) return;
+  const ok=await api().cheat_launch_from_picker(sh.speed||2.0);
+  if(ok){ wfSpeedRunning=true; wfSyncSpeedUI(); }
 }
 // ── Project controller (ADB vs Win32) ────────────────────────────────────────
 function wfSyncControllerUI(){
@@ -322,6 +360,7 @@ function wfSyncControllerUI(){
   const win=$("wf-win32-window"); if(win && document.activeElement!==win) win.value=w.window||"";
   const mb=$("wf-win32-matchby"); if(mb) mb.value=w.matchBy||"title";
   const md=$("wf-win32-mode"); if(md) md.value=w.inputMode||"background";
+  wfSyncSpeedUI();   // speed-hack method/labels depend on the controller
   wfPushCaptureSource();
 }
 // Tell the Python side which source the Preview tab should capture from, so the
