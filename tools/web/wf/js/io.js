@@ -170,6 +170,7 @@ async function init(){
   try{ const st=await api().get_settings(); wfSnapOn=!!st.snap; wfPreviewAll=!!st.previewAll;
     wfMinimapOn=!!st.minimap;                 // opt-in — default off
     wfAlignOn = st.alignGuides!==false;       // opt-out — default on
+    if(st.previewHz){ wfPvHz=Math.max(0.2, Math.min(60, parseFloat(st.previewHz)||30)); const hz=$("wf-pv-hz"); if(hz) hz.value=wfPvHz; }
     if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); }
     if(st.sideW){ const sd=$("wf-side"); if(sd) sd.style.width=Math.max(150,Math.min(480,st.sideW))+"px"; }
     if(st.inspW){ const insp=$("wf-inspector"); if(insp) insp.style.width=Math.max(180,Math.min(520,st.inspW))+"px"; } }catch{}

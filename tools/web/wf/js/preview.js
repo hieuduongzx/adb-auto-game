@@ -123,8 +123,9 @@ function wfPvInit(){
 
   const hzInput = document.getElementById("wf-pv-hz");
   if(hzInput) hzInput.onchange = ()=>{
-    wfPvHz = Math.max(0.2, Math.min(30, parseFloat(hzInput.value)||30));
+    wfPvHz = Math.max(0.2, Math.min(60, parseFloat(hzInput.value)||30));
     hzInput.value = wfPvHz;
+    if(typeof wfSaveSettings==="function") wfSaveSettings();
     if(wfPvAuto && wfPvActive){ wfPvStopAuto(); wfPvStartAuto(); }
   };
   if(typeof pvInitDeviceInfoCopy==="function") pvInitDeviceInfoCopy();

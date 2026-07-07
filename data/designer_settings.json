@@ -1,10 +1,11 @@
 {
-  "snap": false,
+  "snap": true,
   "previewAll": true,
   "logOpen": true,
   "sideW": 332,
   "inspW": 280,
-  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\Cherry_Tale\\Cherry_Tale.json",
   "minimap": false,
-  "alignGuides": true
+  "alignGuides": true,
+  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\DragonTraveller\\workflow.json",
+  "previewHz": 60
 }

@@ -1,0 +1,4 @@
+# Windows batch files must use CRLF or cmd.exe mis-parses them
+# (LF-only .bat + UTF-8 comments -> "'gner' is not recognized" and broken if/else).
+*.bat text eol=crlf
+*.cmd text eol=crlf

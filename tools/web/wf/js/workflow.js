@@ -248,7 +248,7 @@ function wfPersistPanelState(){
        localStorage.setItem("wfActCollapsed",  wfActCollapsed ?"1":"0"); }catch{}
 }
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
-function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined, inspW: insp?insp.offsetWidth:undefined}); }catch{} }
+function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined, inspW: insp?insp.offsetWidth:undefined}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
   const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off"); s.classList.toggle("on",wfSnapOn); }

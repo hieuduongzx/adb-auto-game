@@ -5319,7 +5319,7 @@
       "id": "sequence_04j0",
       "name": "Activity 13",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -5347,8 +5347,8 @@
           {
             "id": "ninrm0dy",
             "type": "try_chain",
-            "x": 320,
-            "y": 56,
+            "x": 340,
+            "y": 60,
             "params": {
               "count": 4
             }
@@ -5356,8 +5356,8 @@
           {
             "id": "n20px8ko",
             "type": "if_image",
-            "x": 520,
-            "y": -16,
+            "x": 540,
+            "y": -40,
             "params": {
               "template": "templates/crop_20260703_011013_902_816_130_29.png",
               "threshold": 0.85,
@@ -5367,7 +5367,7 @@
           {
             "id": "npg7ss58",
             "type": "call",
-            "x": 900,
+            "x": 920,
             "y": 80,
             "params": {
               "fn": "fn_hh4kj"
@@ -5376,8 +5376,8 @@
           {
             "id": "ng6nv0d5",
             "type": "if_image",
-            "x": 520,
-            "y": 55,
+            "x": 540,
+            "y": 39,
             "params": {
               "template": "templates/crop_20260703_011049_871_808_201_40.png",
               "threshold": 0.85,
@@ -5387,7 +5387,7 @@
           {
             "id": "nixykpnw",
             "type": "tap",
-            "x": 720,
+            "x": 740,
             "y": 80,
             "params": {
               "target": "found",
@@ -5399,8 +5399,8 @@
           {
             "id": "n5lqxiof",
             "type": "if_image",
-            "x": 520,
-            "y": 120,
+            "x": 540,
+            "y": 124,
             "params": {
               "template": "templates/crop_20260703_011136_904_860_119_38.png",
               "threshold": 0.85,
@@ -5410,8 +5410,8 @@
           {
             "id": "n700dym5",
             "type": "if_image",
-            "x": 520,
-            "y": 200,
+            "x": 540,
+            "y": 204,
             "params": {
               "template": "templates/crop_20260703_011339_1579_88_38_32.png",
               "threshold": 0.85,
@@ -5478,6 +5478,26 @@
           {
             "from": "nfhu1tp6",
             "fromPort": "out",
+            "to": "nyjp5f12"
+          },
+          {
+            "from": "n20px8ko",
+            "fromPort": "false",
+            "to": "ng6nv0d5"
+          },
+          {
+            "from": "ng6nv0d5",
+            "fromPort": "false",
+            "to": "n5lqxiof"
+          },
+          {
+            "from": "n5lqxiof",
+            "fromPort": "false",
+            "to": "n700dym5"
+          },
+          {
+            "from": "n700dym5",
+            "fromPort": "false",
             "to": "nyjp5f12"
           }
         ],
