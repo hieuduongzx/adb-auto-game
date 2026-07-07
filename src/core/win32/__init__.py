@@ -17,20 +17,8 @@ Two control modes (chosen per workflow):
   takes over the machine while running.
 """
 from .automation import Win32GameAutomation, Win32Controller
-from .injector import (
-    detect_unity_backend,
-    inject_unity_cheat,
-    launch_and_inject,
-    module_loaded,
-    pid_from_hwnd,
-)
 
 __all__ = [
     "Win32GameAutomation",
     "Win32Controller",
-    "inject_unity_cheat",
-    "launch_and_inject",
-    "detect_unity_backend",
-    "module_loaded",
-    "pid_from_hwnd",
 ]

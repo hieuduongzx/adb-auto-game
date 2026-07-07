@@ -31,11 +31,14 @@ function wfSerialize(){
   wfSpeedFromUI();
   const sh=WF.speedhack||{enabled:false,speed:2.0,package:""};
   const w=WF.win32||{window:"",matchBy:"title",inputMode:"background"};
+  const isWin32=(WF.controller==="win32");
   return {
     name:$("wf-name").value||"workflow", version:2, templatesDir:WF.templatesDir||"templates",
-    controller:(WF.controller==="win32")?"win32":"adb",
+    controller:isWin32?"win32":"adb",
     win32:{ window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:w.inputMode||"background" },
-    speedhack:{ enabled:!!sh.enabled, speed:sh.speed||2.0, package:(sh.package||"").trim() },
+    // Speed hack is ADB-only (Frida). Force it off in Win32 so a stale enabled
+    // flag never makes the Runner try to start a non-existent cheat path.
+    speedhack:{ enabled:isWin32?false:!!sh.enabled, speed:sh.speed||2.0, package:(sh.package||"").trim() },
     globals: wfSerialVars(WF.globals||[]),
     functions: WF.functions.map(f=>({ id:f.id, name:f.name, graph:wfCleanGraph(f.graph) })),
     activities: WF.activities.map(a=>{
@@ -76,6 +79,9 @@ function wfHydrate(flow){
   WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"templates";
   const sh=flow.speedhack||{}; WF.speedhack={enabled:!!sh.enabled, speed:(parseFloat(sh.speed)||2.0), package:(sh.package||"").trim()};
   WF.controller=(flow.controller==="win32")?"win32":"adb";
+  // Force speed hack off in Win32 mode (ADB/Frida only) so a file saved with
+  // enabled=true under the old cheat.dll path can't revive it.
+  if(WF.controller==="win32") WF.speedhack.enabled=false;
   const w=flow.win32||{}; WF.win32={window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:w.inputMode||"background"};
   WF.functions=(flow.functions||[]).map(f=>({ id:f.id||("fn_"+wfUid().slice(1,6)), name:f.name||"function", graph:wfHydrateGraph(f.graph) }));
   WF.globals = wfHydVars(flow.globals||[]);

@@ -2,10 +2,16 @@
   "name": "My Workflow",
   "version": 2,
   "templatesDir": "templates",
+  "controller": "win32",
+  "win32": {
+    "window": "BrownDust II",
+    "matchBy": "title",
+    "inputMode": "background_cursor"
+  },
   "speedhack": {
     "enabled": false,
     "speed": 2,
-    "package": "com.neowizgames.game.browndust2"
+    "package": ""
   },
   "globals": [],
   "functions": [
@@ -18,16 +24,16 @@
             "id": "nb3ntz1z",
             "type": "start",
             "x": 20,
-            "y": 15,
+            "y": 16,
             "params": {}
           },
           {
             "id": "ndy7r2ku",
             "type": "if_image",
             "x": 80,
-            "y": 40,
+            "y": 16,
             "params": {
-              "template": "templates/crop_20260702_130333_303_957_33_24.png",
+              "template": "templates/crop_20260707_140444_255_974_21_24.png",
               "threshold": 0.85,
               "negate": false
             }
@@ -224,22 +230,22 @@
       "id": "sequence_kt27",
       "name": "Activity 1",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
           {
             "id": "nhndq70d",
             "type": "start",
-            "x": -40,
-            "y": 40,
+            "x": 60,
+            "y": 55,
             "params": {}
           },
           {
             "id": "noawggsb",
             "type": "call",
-            "x": 20,
-            "y": 45,
+            "x": 120,
+            "y": 40,
             "params": {
               "fn": "fn_6t5e6"
             }
@@ -250,7 +256,7 @@
             "x": 320,
             "y": 40,
             "params": {
-              "template": "templates/crop_20260702_132450_162_997_66_22.png",
+              "template": "templates/crop_20260707_140513_136_1012_52_17.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
@@ -406,7 +412,7 @@
         "edges": [
           {
             "from": "noawggsb",
-            "fromPort": "out",
+            "fromPort": "true",
             "to": "nesrt6kg"
           },
           {
@@ -473,7 +479,7 @@
       "id": "sequence_ob39",
       "name": "Activity 2",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -497,7 +503,7 @@
             "id": "nhwnm468",
             "type": "tap_image",
             "x": 300,
-            "y": 55,
+            "y": 75,
             "params": {
               "template": "templates/crop_20260702_134213_425_999_42_21.png",
               "taps": "1",
@@ -511,7 +517,7 @@
             "id": "nek4cyvf",
             "type": "tap_image",
             "x": 480,
-            "y": 55,
+            "y": 75,
             "params": {
               "template": "templates/crop_20260702_134241_195_286_33_34.png",
               "taps": "1",
@@ -627,7 +633,7 @@
           },
           {
             "from": "ntsfduvo",
-            "fromPort": "out",
+            "fromPort": "true",
             "to": "nhwnm468"
           },
           {
