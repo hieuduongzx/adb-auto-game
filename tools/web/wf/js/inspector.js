@@ -145,6 +145,7 @@ function wfRenderInspector(){
 
     if(node.type!=="note" && node.type!=="start") body.appendChild(wfTimingField(node));
     if(node.type!=="note" && node.type!=="start") body.appendChild(wfRetryField(node));
+    const failBlk=wfFailShotBlock(node); if(failBlk) body.appendChild(failBlk);
     if(node.type!=="note") body.appendChild(wfNoteField(node));
     if(node.type!=="note" && node.type!=="start") body.appendChild(wfLogField(node));
     body.appendChild(wfInspJsonBlock("Node", ()=>wfSerializeNode(node)));
@@ -422,6 +423,27 @@ function wfUpdNodeRetry(node){
     if(!n){ n=document.createElement("div"); n.className="wf-node-retry"; const delay=el.querySelector(".wf-node-delay"), sum=el.querySelector(".wf-node-sum"); const anchor=delay||sum; if(anchor) anchor.after(n); else el.appendChild(n); el.classList.remove("collapsed"); }
     n.innerHTML=parts.join("");
   } else if(n){ n.remove(); }
+}
+
+// Failure screenshot from the last test run (engine saves one on every action's
+// final failed attempt; see node_fail_shot in events.js). Thumbnail + click or
+// "Mở ảnh" to open full-size in the OS viewer. Cleared when the next run starts.
+function wfFailShotBlock(node){
+  const path=(typeof wfFailShots!=="undefined") ? wfFailShots[node.id] : null;
+  if(!path) return null;
+  const b=wfInspBlock("Ảnh lúc fail");
+  const img=document.createElement("img");
+  img.className="wf-fail-shot"; img.title="Màn hình lúc block này fail — bấm để mở ảnh gốc";
+  img.addEventListener("click",()=>{ try{ api().open_path(path); }catch{} });
+  try{ api().image_thumbnail(path, 460).then(d=>{ if(d) img.src=d; else img.remove(); }); }catch{}
+  b.appendChild(img);
+  const row=document.createElement("div"); row.className="wf-field";
+  const p=document.createElement("span"); p.className="wf-fail-shot-path";
+  p.textContent=path.split(/[\\/]/).pop(); p.title=path;
+  const open=document.createElement("button"); open.className="btn sm"; open.textContent="Mở ảnh";
+  open.onclick=()=>{ try{ api().open_path(path); }catch{} };
+  row.appendChild(p); row.appendChild(open); b.appendChild(row);
+  return b;
 }
 
 function wfNoteField(node){

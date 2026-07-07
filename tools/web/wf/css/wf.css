@@ -294,6 +294,11 @@
 /* While wiring up a connection, wires ignore the pointer so the drop lands on the
    node underneath rather than being swallowed by a wire's hit-path. */
 #wf-canvas.wf-connecting .wire-hit { pointer-events:none; }
+/* Palette-drag hovering a wire: light it up — dropping here splices the new
+   block into this wire (see wfWireInsertSplice). */
+#wf-wires .wire-grp.wire-insert path.wire { stroke:var(--accent) !important; stroke-width:2.6;
+  stroke-opacity:1; marker-end:url(#wf-ah-hover) !important; }
+#wf-wires .wire-grp.wire-insert { filter:drop-shadow(0 1px 4px rgba(47,111,237,.4)); }
 /* Run trail on wires: the path taken (bright green) vs the skipped branch (faint red). */
 #wf-wires path.wire.took-wire    { stroke:var(--run-ok) !important; stroke-width:2.0; stroke-opacity:1 !important; marker-end:none !important; }
 #wf-wires path.wire.nottook-wire { stroke:var(--run-fail) !important; stroke-opacity:.34 !important; stroke-width:1.1; marker-end:none !important; }
@@ -801,6 +806,46 @@
    would cover that block's header, so hide them there (inspector still shows
    the timing). */
 .wf-node.wf-stk-jbot .wf-node-delay { display:none; }
+
+/* Run-duration chip — how long this block took on the last test run (×n = ran
+   n times). Pinned under the bottom-right corner, mirroring the delay chips on
+   the left; painted live from node_result events, cleared on the next run. */
+.wf-node-time { position:absolute; top:100%; right:2px; margin-top:2px;
+  font-family:var(--mono); font-size:9px; line-height:1.3; color:var(--dim);
+  pointer-events:none; white-space:nowrap; z-index:1; }
+.wf-node.ran-fail .wf-node-time { color:var(--run-fail); font-weight:600; }
+.wf-node.wf-stk-jbot .wf-node-time { display:none; }
+
+/* ── Node finder (Ctrl+F) — quick-jump palette over every graph ────────────── */
+.wf-find { position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:8;
+  width:min(420px, calc(100% - 24px)); background:var(--panel);
+  border:1px solid var(--border2); border-radius:10px; box-shadow:var(--sh-lg);
+  display:flex; flex-direction:column; overflow:hidden; animation:wfPop .12s var(--ease); }
+.wf-find-bar { display:flex; align-items:center; gap:7px; padding:8px 10px;
+  border-bottom:1px solid var(--line); }
+.wf-find-bar svg { width:14px; height:14px; color:var(--muted); flex-shrink:0; }
+.wf-find-bar input { flex:1; min-width:0; border:none; background:transparent;
+  font-family:var(--sans); font-size:12.5px; color:var(--ink); padding:0; }
+.wf-find-bar input:focus { outline:none; box-shadow:none; }
+.wf-find-bar .k { font-size:9.5px; font-weight:700; color:var(--muted);
+  background:var(--alt); border:1px solid var(--border2); border-radius:4px; padding:1px 5px; flex-shrink:0; }
+.wf-find-list { max-height:300px; overflow-y:auto; padding:4px; }
+.wf-find-item { display:flex; align-items:baseline; gap:7px; width:100%; text-align:left;
+  border:none; background:none; cursor:pointer; padding:5px 8px; border-radius:6px; color:var(--ink); }
+.wf-find-item:hover, .wf-find-item.sel { background:var(--accent-bg); }
+.wf-find-item .t { font-size:11.5px; font-weight:600; flex-shrink:0; }
+.wf-find-item .s { font-family:var(--mono); font-size:10px; color:var(--dim); flex:1; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-find-item .w { font-size:9.5px; color:var(--muted); flex-shrink:0; margin-left:auto;
+  background:var(--alt); border-radius:999px; padding:1px 7px; }
+.wf-find-item .w.here { color:var(--accent); background:var(--accent-bg); }
+.wf-find-empty { font-size:11px; color:var(--muted); padding:8px 10px; }
+
+/* Failure screenshot in the inspector (last test run). */
+.wf-fail-shot { display:block; width:100%; max-height:210px; object-fit:contain;
+  background:#1a1d21; border:1px solid var(--err-bd); border-radius:7px; cursor:zoom-in; }
+.wf-fail-shot-path { flex:1; min-width:0; font-family:var(--mono); font-size:10px;
+  color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* Ports — compact target dots. Unconnected: pale grey fill with a thin
    colored border. Once wired, the fill lights up and the incoming wire's

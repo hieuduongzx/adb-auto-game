@@ -258,6 +258,41 @@ function wfConnectTo(toNodeId, clientX, clientY){
   }
   return false;
 }
+// ── Insert-on-wire (palette drop) ─────────────────────────────────────────────
+// While dragging a chip from the palette, the wire under the cursor lights up;
+// dropping the chip there splices the new block into that wire: old from→to
+// becomes from→new (in) and new (primary out)→to. Saves the delete-two-wires-
+// reconnect dance when adding a step to the middle of a chain.
+let wfInsWireGrp=null;
+function wfWireInsertHover(x,y){
+  const el=document.elementFromPoint(x,y);
+  const grp=el && el.closest ? el.closest("g.wire-grp") : null;
+  if(wfInsWireGrp && wfInsWireGrp!==grp) wfInsWireGrp.classList.remove("wire-insert");
+  wfInsWireGrp=grp||null;
+  if(grp) grp.classList.add("wire-insert");
+}
+function wfWireInsertClear(){
+  if(wfInsWireGrp){ wfInsWireGrp.classList.remove("wire-insert"); wfInsWireGrp=null; }
+}
+// Primary sequential-out port for a spliced-in node (mirrors wfMergeOutPort).
+function wfSpliceOutPort(node){
+  const def=WF_NODES[node.type]||{};
+  if(def.kind==="condition"||def.kind==="call") return "true";
+  return (def.outs&&def.outs.length) ? def.outs[0] : null;
+}
+function wfWireInsertSplice(g, edge, node){
+  if(!g||!edge||!node) return false;
+  if(!g.edges.includes(edge)) return false;          // stale reference — wire was redrawn
+  const def=WF_NODES[node.type]||{};
+  if(def.kind==="start"||def.kind==="note") return false;   // nothing to wire into
+  const outPort=wfSpliceOutPort(node);
+  const toId=edge.to, toPort=edge.toPort||"in";
+  edge.to=node.id; edge.toPort="in";
+  if(outPort) g.edges.push({from:node.id, fromPort:outPort, to:toId, toPort:toPort});
+  setStatus("Đã chèn block vào giữa dây");
+  return true;
+}
+
 function wfCanvasMouseDown(e){
   if(e.target.closest(".wf-node")||e.target.closest(".wf-group")) return;
   wfCancelCamAnim();   // a press on the canvas takes the camera back by hand
@@ -495,9 +530,13 @@ function wfInitCanvas(){
     const r=canvas.getBoundingClientRect();
     wfSetZoom(wfZoom*(e.deltaY<0?1.1:1/1.1), e.clientX-r.left, e.clientY-r.top);
   }, {passive:false});
-  canvas.addEventListener("dragover",e=>{ if(wfPaletteDrag){ e.preventDefault(); e.dataTransfer.dropEffect="copy"; } });
+  canvas.addEventListener("dragover",e=>{ if(wfPaletteDrag){ e.preventDefault(); e.dataTransfer.dropEffect="copy"; wfWireInsertHover(e.clientX,e.clientY); } });
+  canvas.addEventListener("dragleave",e=>{ if(!e.relatedTarget || !canvas.contains(e.relatedTarget)) wfWireInsertClear(); });
   canvas.addEventListener("drop",e=>{
     if(!wfPaletteDrag) return; e.preventDefault();
+    // Dropped straight onto a wire? Capture its edge so the new block splices in.
+    const insEdge = wfInsWireGrp ? wfInsWireGrp.__edge : null;
+    wfWireInsertClear();
     const g=wfGraph(); if(!g){ alert("Select or add an activity/function first."); wfPaletteDrag=null; return; }
     const wr=$("wf-world").getBoundingClientRect();
     const x=wfSnap((e.clientX-wr.left)/wfZoom-70), y=wfSnap((e.clientY-wr.top)/wfZoom-14);
@@ -507,7 +546,9 @@ function wfInitCanvas(){
     else if(wfPaletteDrag.startsWith("var:")){ const p=wfPaletteDrag.split(":"); const vtype=p[1], vname=p.slice(2).join(":");
       node=wfNewNode("if_var",x,y); node.params={name:vname, op:"==", value: vtype==="bool"?"true":""}; }
     else node=wfNewNode(wfPaletteDrag,x,y);
-    g.nodes.push(node); wfSelectOne(node.id); wfPaletteDrag=null;
+    g.nodes.push(node);
+    wfWireInsertSplice(g, insEdge, node);
+    wfSelectOne(node.id); wfPaletteDrag=null;
     wfRenderCanvas(); wfRenderInspector();
     wfPopNodes([node.id]);   // brief arrival fade on the fresh block
   });

@@ -23,15 +23,15 @@
           {
             "id": "n43hela1",
             "type": "start",
-            "x": -80,
+            "x": 40,
             "y": -220,
             "params": {}
           },
           {
             "id": "njdme2qq",
             "type": "if_image",
-            "x": 600,
-            "y": -120,
+            "x": 620,
+            "y": -235,
             "params": {
               "template": "templates/isHome_20260629_020356_32x32.png",
               "threshold": 0.85,
@@ -41,8 +41,8 @@
           {
             "id": "nasty5ic",
             "type": "tap_image_any",
-            "x": 400,
-            "y": -120,
+            "x": 440,
+            "y": -235,
             "params": {
               "templates": [
                 "templates/isHome_20260629_020427_37x32.png",
@@ -61,8 +61,8 @@
           {
             "id": "nb3rusi6",
             "type": "loop",
-            "x": 220,
-            "y": -120,
+            "x": 260,
+            "y": -235,
             "params": {
               "count": 3,
               "infinite": true
@@ -71,14 +71,14 @@
           {
             "id": "n25sgerm",
             "type": "end",
-            "x": 280,
+            "x": 920,
             "y": -220,
             "params": {}
           },
           {
             "id": "ny49hsac",
             "type": "if_image",
-            "x": 40,
+            "x": 60,
             "y": -235,
             "params": {
               "template": "templates/crop_20260706_070706_1783_743_85_68.png",
@@ -89,8 +89,8 @@
           {
             "id": "nb62nms4",
             "type": "if_image",
-            "x": 400,
-            "y": -40,
+            "x": 620,
+            "y": -160,
             "params": {
               "template": "templates/isHome_20260629_020356_32x32.png",
               "threshold": 0.85,
@@ -254,15 +254,6 @@
             }
           },
           {
-            "id": "n1o1l7q1",
-            "type": "call",
-            "x": 880,
-            "y": 40,
-            "params": {
-              "fn": "fn_ppung"
-            }
-          },
-          {
             "id": "nlb7c6ql",
             "type": "log",
             "x": 700,
@@ -270,6 +261,13 @@
             "params": {
               "message": "Không có để mà nhận"
             }
+          },
+          {
+            "id": "nmsssxb7",
+            "type": "end",
+            "x": 1160,
+            "y": -21,
+            "params": {}
           }
         ],
         "edges": [
@@ -304,14 +302,19 @@
             "to": "nqmf20e6"
           },
           {
-            "from": "n52kitq9",
-            "fromPort": "true",
-            "to": "n1o1l7q1"
-          },
-          {
             "from": "nfbv3qgp",
             "fromPort": "false",
             "to": "nlb7c6ql"
+          },
+          {
+            "from": "nlb7c6ql",
+            "fromPort": "out",
+            "to": "nmsssxb7"
+          },
+          {
+            "from": "n52kitq9",
+            "fromPort": "true",
+            "to": "nmsssxb7"
           }
         ],
         "groups": []
@@ -329,8 +332,8 @@
           {
             "id": "nm2lo3fi",
             "type": "start",
-            "x": 60,
-            "y": 60,
+            "x": 180,
+            "y": 75,
             "params": {}
           },
           {
@@ -449,7 +452,7 @@
         ],
         "groups": []
       },
-      "maxRetries": 1
+      "maxRetries": 2
     },
     {
       "id": "sequence_kc43",
@@ -579,7 +582,7 @@
         ],
         "groups": []
       },
-      "maxRetries": 1
+      "maxRetries": 2
     },
     {
       "id": "sequence_3q1b",
@@ -845,7 +848,7 @@
         ],
         "groups": []
       },
-      "maxRetries": 1
+      "maxRetries": 2
     },
     {
       "id": "sequence_h2uf",
@@ -1004,8 +1007,8 @@
           {
             "id": "n65i9ebt",
             "type": "if_var",
-            "x": 940,
-            "y": 200,
+            "x": 880,
+            "y": 216,
             "params": {
               "name": "count",
               "op": ">",
@@ -1026,8 +1029,8 @@
           {
             "id": "n9j1mhq5",
             "type": "if_image",
-            "x": 940,
-            "y": 280,
+            "x": 880,
+            "y": 360,
             "params": {
               "template": "templates/crop_20260629_085848_55x61.png",
               "threshold": 0.85,
@@ -1037,8 +1040,8 @@
           {
             "id": "nr68b8lj",
             "type": "if_image",
-            "x": 1200,
-            "y": 344,
+            "x": 1080,
+            "y": 420,
             "params": {
               "template": "templates/crop_20260629_085851_38x55.png",
               "threshold": 0.85,
@@ -1064,8 +1067,8 @@
           {
             "id": "n50v3ve0",
             "type": "tap",
-            "x": 1200,
-            "y": 280,
+            "x": 1080,
+            "y": 314,
             "params": {
               "target": "found",
               "x": 0,
@@ -1075,8 +1078,8 @@
           {
             "id": "na11hx8m",
             "type": "tap",
-            "x": 1400,
-            "y": 344,
+            "x": 1280,
+            "y": 376,
             "params": {
               "target": "found",
               "x": 0,
@@ -1086,8 +1089,8 @@
           {
             "id": "nlodubzj",
             "type": "tap_image",
-            "x": 1580,
-            "y": 344,
+            "x": 1480,
+            "y": 436,
             "params": {
               "template": "templates/crop_20260704_085455_824_868_248_148.png",
               "taps": "1",
@@ -1101,8 +1104,8 @@
           {
             "id": "nlro7tji",
             "type": "call",
-            "x": 1400,
-            "y": 420,
+            "x": 1280,
+            "y": 500,
             "params": {
               "fn": "fn_ppung"
             }
@@ -1285,7 +1288,7 @@
         ],
         "groups": []
       },
-      "maxRetries": 1
+      "maxRetries": 2
     },
     {
       "id": "sequence_2v30",
@@ -1644,13 +1647,13 @@
         ],
         "groups": []
       },
-      "maxRetries": 1
+      "maxRetries": 2
     },
     {
       "id": "sequence_3o7b",
       "name": "Thiên Mệnh Đối Quyết",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -2010,7 +2013,7 @@
         ],
         "groups": []
       },
-      "maxRetries": 1
+      "maxRetries": 2
     },
     {
       "id": "sequence_q8yz",
@@ -2096,8 +2099,8 @@
           {
             "id": "n7oeamvb",
             "type": "tap_image",
-            "x": 560,
-            "y": -240,
+            "x": 580,
+            "y": -340,
             "params": {
               "template": "templates/crop_20260629_095604_55x48.png",
               "taps": "1",
@@ -2110,8 +2113,8 @@
           {
             "id": "nmf2rjc5",
             "type": "tap_image",
-            "x": 740,
-            "y": -240,
+            "x": 760,
+            "y": -340,
             "params": {
               "template": "templates/crop_20260703_084446_897_883_161_96.png",
               "taps": "1",
@@ -2223,7 +2226,7 @@
           {
             "id": "nmh5dlz6",
             "type": "tap_random",
-            "x": 2380,
+            "x": 2340,
             "y": 100,
             "params": {
               "x": 0,
@@ -2236,7 +2239,7 @@
           {
             "id": "nr1gmzt8",
             "type": "tap_image",
-            "x": 2560,
+            "x": 2520,
             "y": 100,
             "params": {
               "template": "templates/back_21x27.png",
@@ -2258,8 +2261,8 @@
           {
             "id": "nyrjtjy7",
             "type": "calc_var",
-            "x": 2740,
-            "y": 96,
+            "x": 2700,
+            "y": 100,
             "params": {
               "name": "count",
               "op": "-",
@@ -2281,7 +2284,7 @@
           {
             "id": "nrc9haci",
             "type": "wait_image_any",
-            "x": 2180,
+            "x": 2160,
             "y": 100,
             "params": {
               "templates": [
@@ -2462,21 +2465,21 @@
           {
             "id": "gbmgxk4o",
             "name": "Take Reward",
-            "x": 540,
-            "y": -260,
+            "x": 560,
+            "y": -360,
             "w": 580,
             "h": 140,
             "color": 0
           }
         ]
       },
-      "maxRetries": 1
+      "maxRetries": 2
     },
     {
       "id": "sequence_99fk",
       "name": "Giáng Lâm Quét Event",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -2568,7 +2571,7 @@
               "offsetY": 0
             },
             "delayBefore": 2,
-            "delayAfter": 5
+            "delayAfter": 3
           },
           {
             "id": "n565w5kd",
@@ -2692,7 +2695,7 @@
         ],
         "groups": []
       },
-      "maxRetries": 1
+      "maxRetries": 2
     },
     {
       "id": "sequence_vf95",

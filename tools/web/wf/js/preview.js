@@ -169,6 +169,37 @@ let wfPvRegion=null;                // [x,y,w,h] in image coords
 let wfPvOverlay=[];                 // [[x,y,w,h,conf], ...] match rects
 let wfPvDragging=false, wfPvDragStart=null, wfPvDragEnd=null;
 let wfPvPanning=false, wfPvPanStart=null, wfPvPanBase=null;
+// Hover HUD: image-coords + pixel colour under the cursor, with crosshair
+// guides. The pixel cache is an offscreen copy of the frame, rebuilt lazily
+// (wfPvPixDirty) so 30Hz streaming never pays for it unless the mouse moves.
+let wfPvHover=null, wfPvHoverHex="";
+let wfPvPixCanvas=null, wfPvPixCtx=null, wfPvPixDirty=true;
+// Tap-feedback ripples ({x,y,t0} in image coords) + right-drag swipe gesture.
+let wfPvRipples=[];
+let wfPvRDrag=null;            // {s:[cx,cy], c:[cx,cy]} canvas coords while right-dragging
+let wfPvAnimReq=null;
+
+function wfPvPixelAt(ix,iy){
+  if(!wfPvImg) return "";
+  if(wfPvPixDirty || !wfPvPixCtx){
+    if(!wfPvPixCanvas) wfPvPixCanvas=document.createElement("canvas");
+    wfPvPixCanvas.width=wfPvImgW; wfPvPixCanvas.height=wfPvImgH;
+    wfPvPixCtx=wfPvPixCanvas.getContext("2d",{willReadFrequently:true});
+    wfPvPixCtx.drawImage(wfPvImg,0,0);
+    wfPvPixDirty=false;
+  }
+  try{
+    const d=wfPvPixCtx.getImageData(ix,iy,1,1).data;
+    return "#"+[d[0],d[1],d[2]].map(v=>v.toString(16).padStart(2,"0")).join("").toUpperCase();
+  }catch{ return ""; }
+}
+// Keep redrawing while tap ripples are animating (~380ms each).
+function wfPvAnimLoop(){
+  if(wfPvAnimReq) return;
+  const step=()=>{ wfPvAnimReq=null;
+    if(wfPvRipples.length && wfPvActive){ wfPvDraw(); wfPvAnimReq=requestAnimationFrame(step); } };
+  wfPvAnimReq=requestAnimationFrame(step);
+}
 
 function wfPvRecompute(){
   if(!wfPvImg || !wfPvImgW || !wfPvCanvas){ wfPvScale=1; wfPvOx=0; wfPvOy=0; return; }
@@ -220,11 +251,71 @@ function wfPvDraw(){
     ctx.beginPath(); ctx.moveTo(cx-8,cy); ctx.lineTo(cx+8,cy);
     ctx.moveTo(cx,cy-8); ctx.lineTo(cx,cy+8); ctx.stroke();
   }
-  // Live drag rectangle while selecting a region.
+  // Small dark chip with mono text (size badges, hover HUD).
+  const ef=wfPvScale*wfPvZoom;
+  const chip=(txt,bx,by)=>{
+    ctx.font="10px IBM Plex Mono,monospace";
+    const tw=ctx.measureText(txt).width;
+    const w=tw+10, h=16;
+    bx=Math.max(2, Math.min(cw-w-2, bx)); by=Math.max(2, Math.min(ch-h-2, by));
+    ctx.fillStyle="rgba(15,18,22,.85)";
+    ctx.beginPath(); ctx.roundRect(bx,by,w,h,4); ctx.fill();
+    ctx.fillStyle="#d5e2ee"; ctx.textAlign="left"; ctx.textBaseline="middle";
+    ctx.fillText(txt,bx+5,by+h/2+0.5); ctx.textBaseline="alphabetic";
+    return [bx,by,w,h];
+  };
+  // Size badge on the persistent selected region.
+  if(wfPvRegion){
+    const [x,y,w,h]=wfPvRegion;
+    const [bx,by]=wfPvImgToCanvas(x,y+h);
+    chip(`${w}×${h}`, bx, by+4);
+  }
+  // Live drag rectangle while selecting a region — with a live w×h readout.
   if(wfPvDragging && wfPvDragStart && wfPvDragEnd){
     const r=wfPvNormRect(wfPvDragStart, wfPvDragEnd);
     ctx.strokeStyle="rgba(6,182,212,.8)"; ctx.lineWidth=1;
     ctx.strokeRect(r.x, r.y, r.w, r.h);
+    if(ef) chip(`${Math.round(r.w/ef)}×${Math.round(r.h/ef)}`, r.x+r.w+6, r.y+r.h+6);
+  }
+  // Right-drag swipe gesture: accent arrow from press point to cursor.
+  if(wfPvRDrag){
+    const [sx,sy]=wfPvRDrag.s, [tx,ty]=wfPvRDrag.c;
+    ctx.strokeStyle="#4f8df0"; ctx.fillStyle="#4f8df0"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(tx,ty); ctx.stroke();
+    const ang=Math.atan2(ty-sy,tx-sx);
+    ctx.beginPath(); ctx.moveTo(tx,ty);
+    ctx.lineTo(tx-9*Math.cos(ang-0.42), ty-9*Math.sin(ang-0.42));
+    ctx.lineTo(tx-9*Math.cos(ang+0.42), ty-9*Math.sin(ang+0.42));
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx,sy,3,0,Math.PI*2); ctx.fill();
+    if(ef){ const a=wfPvImgFromCanvas(wfPvRDrag.s), b=wfPvImgFromCanvas(wfPvRDrag.c);
+      if(a&&b) chip(`vuốt (${a[0]},${a[1]}) → (${b[0]},${b[1]})`, tx+10, ty+10); }
+  }
+  // Tap ripples — a ring expanding from the tapped point (~380ms), so a
+  // right-click tap gives visible feedback exactly where it landed.
+  if(wfPvRipples.length){
+    const now=performance.now();
+    const reduce=window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    wfPvRipples=wfPvRipples.filter(rp=>now-rp.t0<380);
+    for(const rp of wfPvRipples){
+      const t=(now-rp.t0)/380;
+      const [cx2,cy2]=wfPvImgToCanvas(rp.x,rp.y);
+      ctx.strokeStyle=`rgba(79,141,240,${(1-t)*0.9})`; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(cx2,cy2, reduce?12:(5+22*t), 0, Math.PI*2); ctx.stroke();
+    }
+  }
+  // Hover crosshair + coord/colour HUD (hidden while any gesture is active).
+  if(wfPvHover && !wfPvDragging && !wfPvPanning && !wfPvRDrag){
+    const [hx,hy]=wfPvImgToCanvas(wfPvHover[0]+0.5, wfPvHover[1]+0.5);
+    ctx.strokeStyle="rgba(255,255,255,.16)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,hy); ctx.lineTo(cw,hy);
+    ctx.moveTo(hx,0); ctx.lineTo(hx,ch); ctx.stroke();
+    const txt=`${wfPvHover[0]}, ${wfPvHover[1]}${wfPvHoverHex?"  "+wfPvHoverHex:""}`;
+    const [bx,by,bw,bh]=chip(txt, hx+14, hy+14);
+    if(wfPvHoverHex){ ctx.fillStyle=wfPvHoverHex;
+      ctx.fillRect(bx+bw+3, by+3, bh-6, bh-6);
+      ctx.strokeStyle="rgba(255,255,255,.45)"; ctx.lineWidth=1;
+      ctx.strokeRect(bx+bw+3.5, by+3.5, bh-7, bh-7); }
   }
   const res=document.getElementById("wf-pv-res");
   if(res) res.textContent = `${wfPvImgW} × ${wfPvImgH}`;
@@ -303,6 +394,9 @@ function wfPvAttachCanvas(){
     // Middle button → pan.
     if(e.button===1){ e.preventDefault(); wfPvPanning=true; wfPvPanStart=wfPvCanvasPos(e);
       wfPvPanBase=[wfPvPanX,wfPvPanY]; c.style.cursor="grab"; return; }
+    // Right button → tap (click) or swipe (drag) — resolved on mouseup.
+    if(e.button===2){ if(!wfPvImg) return; e.preventDefault();
+      const p=wfPvCanvasPos(e); wfPvRDrag={s:p, c:p.slice()}; return; }
     if(!wfPvImg || e.button!==0) return;
     wfPvDragging=true; wfPvDragStart=wfPvCanvasPos(e); wfPvDragEnd=wfPvDragStart.slice();
   });
@@ -312,13 +406,36 @@ function wfPvAttachCanvas(){
     if(wfPvPanning){ wfPvPanX=wfPvPanBase[0]+cx-wfPvPanStart[0];
       wfPvPanY=wfPvPanBase[1]+cy-wfPvPanStart[1]; wfPvDraw(); return; }
     const p=wfPvCanvasToImg(e.clientX,e.clientY);
+    // Hover HUD state: image coords + pixel colour under the cursor.
+    wfPvHover=p;
+    wfPvHoverHex=p?wfPvPixelAt(p[0],p[1]):"";
     const hp=document.getElementById("hover-pos");
-    if(hp) hp.textContent = p?`${p[0]}, ${p[1]}`:"—";
-    if(wfPvDragging){ wfPvDragEnd=[cx,cy]; wfPvDraw(); }
+    if(hp) hp.textContent = p?`${p[0]}, ${p[1]}${wfPvHoverHex?" · "+wfPvHoverHex:""}`:"—";
+    if(wfPvRDrag){ wfPvRDrag.c=[cx,cy]; wfPvDraw(); return; }
+    if(wfPvDragging){ wfPvDragEnd=[cx,cy]; wfPvDraw(); return; }
+    if(wfPvImg) wfPvDraw();   // refresh the crosshair/HUD
   });
 
   c.addEventListener("mouseup", async e=>{
     if(e.button===1){ wfPvPanning=false; c.style.cursor="crosshair"; return; }
+    // Right button released → short = tap · long = swipe on the device.
+    if(e.button===2 && wfPvRDrag){
+      const s=wfPvRDrag.s, t=wfPvCanvasPos(e); wfPvRDrag=null;
+      const a=wfPvImgFromCanvas(s), b=wfPvImgFromCanvas(t);
+      const dist=Math.hypot(t[0]-s[0], t[1]-s[1]);
+      if(dist<6){
+        if(a){ await api().tap(a[0],a[1]);
+          wfPvRipples.push({x:a[0],y:a[1],t0:performance.now()}); wfPvAnimLoop();
+          setStatus(`Tap → (${a[0]}, ${a[1]})`); }
+      } else if(a&&b){
+        const len=Math.hypot(b[0]-a[0], b[1]-a[1]);
+        const dur=Math.max(120, Math.min(800, Math.round(len*0.35)));
+        await api().swipe(a[0],a[1],b[0],b[1],dur);
+        wfPvRipples.push({x:b[0],y:b[1],t0:performance.now()}); wfPvAnimLoop();
+        setStatus(`Vuốt (${a[0]},${a[1]}) → (${b[0]},${b[1]}) · ${dur}ms`);
+      }
+      wfPvDraw(); return;
+    }
     if(e.button!==0 || !wfPvDragging){ wfPvDragging=false; return; }
     wfPvDragging=false;
     const start=wfPvDragStart, end=wfPvDragEnd=wfPvCanvasPos(e);
@@ -346,19 +463,17 @@ function wfPvAttachCanvas(){
   });
 
   c.addEventListener("mouseleave", ()=>{
-    if(wfPvDragging){ wfPvDragging=false; wfPvDraw(); }
+    if(wfPvDragging){ wfPvDragging=false; }
+    if(wfPvRDrag){ wfPvRDrag=null; }
     if(wfPvPanning){ wfPvPanning=false; c.style.cursor="crosshair"; }
+    wfPvHover=null; wfPvHoverHex="";
+    if(wfPvImg) wfPvDraw();
     const hp=document.getElementById("hover-pos"); if(hp) hp.textContent="—";
   });
 
-  // Right-click → tap the device at that point. stopPropagation keeps the
-  // bubble from reaching #wf-canvas's graph context-menu handler.
-  c.addEventListener("contextmenu", async e=>{
-    e.preventDefault(); e.stopPropagation();
-    const p=wfPvCanvasToImg(e.clientX,e.clientY); if(!p) return;
-    await api().tap(p[0],p[1]);
-    setStatus(`Tap → (${p[0]}, ${p[1]})`);
-  });
+  // The tap/swipe now happens on right-mouseup (short = tap, drag = swipe);
+  // contextmenu only suppresses the browser menu + the graph's context handler.
+  c.addEventListener("contextmenu", e=>{ e.preventDefault(); e.stopPropagation(); });
 
   // Wheel → zoom (cursor-anchored).
   c.addEventListener("wheel", e=>{
@@ -402,6 +517,7 @@ window.__recvFrame = function(dataUrl, w, h){
     wfPvImgW = w || img.naturalWidth;
     wfPvImgH = h || img.naturalHeight;
     wfPvErr = "";
+    wfPvPixDirty = true;   // hover-HUD pixel cache rebuilds lazily on next hover
     wfPvDraw();
   };
   img.src = dataUrl;

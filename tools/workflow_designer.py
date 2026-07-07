@@ -442,6 +442,17 @@ class WorkflowDesignerAPI:
                 "dist": dist, "actual_rgb": f"{r}, {g}, {b}"}
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int, dur: int) -> bool:
+        # Like tap(): route to whatever the preview captures from (Win32 window
+        # in a Win32 project, else the ADB device) so right-drag swipes work in
+        # both project kinds.
+        if self._capture_kind == "win32":
+            if self._win32 is None:
+                return False
+            if not self._win32.device:
+                self._win32.attach()
+            if not self._win32.device:
+                return False
+            return bool(self._win32.swipe(int(x1), int(y1), int(x2), int(y2), int(dur)))
         if self.controller.device is None:
             return False
         return bool(self.controller.swipe(int(x1), int(y1), int(x2), int(y2), int(dur)))
@@ -1368,6 +1379,10 @@ class WorkflowDesignerAPI:
     def _bind_workflow_callbacks(self) -> None:
         if self._engine is None:
             return
+        # Designer test runs capture a screenshot on every action's FINAL failure
+        # (no per-node opt-in) so the inspector can show what the screen looked
+        # like when the block failed.
+        self._engine.capture_failures_always = True
         self._engine.callbacks["on_stop"] = [lambda: self._push("workflow_state", {"running": False})]
         self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
         self._engine.callbacks["on_node_done"] = [
@@ -1379,6 +1394,18 @@ class WorkflowDesignerAPI:
         self._engine.callbacks["on_activity_complete"] = [
             lambda act, ok: self._push("activity_result",
                                        {"id": act.get("id"), "status": "ok" if ok else "fail"})]
+        self._engine.callbacks["on_fail_shot"] = [
+            lambda nid, path: self._push("node_fail_shot", {"id": nid, "path": path})]
+
+    def open_path(self, path: str) -> bool:
+        """Open a file/folder with the OS default app (fail-shot viewer)."""
+        try:
+            if path and os.path.exists(path):
+                os.startfile(path)  # noqa: S606 — local tool, user-initiated
+                return True
+        except Exception as exc:
+            log_warning(f"Không mở được: {exc}")
+        return False
 
     def workflow_running(self) -> bool:
         return bool(self._engine and self._engine.is_running())

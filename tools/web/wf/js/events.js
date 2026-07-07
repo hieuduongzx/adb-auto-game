@@ -53,7 +53,7 @@ window.__recv = function(raw){
   // is followed across call boundaries in and out.
   if(type==="node_active"){
     if(!wfRunning) return;
-    if(data.id) wfLiveNode=data.id;   // the true running node, even if in an off-screen graph
+    if(data.id){ wfLiveNode=data.id; wfNoteNodeStart(data.id); }   // the true running node, even if in an off-screen graph
     // Follow-focus first: if the running node lives in another graph (a function
     // we stepped into, or the activity we stepped back out to), switch to it and
     // centre. This rebuilds the canvas so the node is now present for the guard.
@@ -62,7 +62,15 @@ window.__recv = function(raw){
     wfSetRunningNode(data.id);
     return;
   }
-  if(type==="node_result"){ if(!wfRunning) return; if(data.id && !wfNode(data.id)) return; wfMarkNodeResult(data.id, data.status, data.port); if(typeof wfDebugAutoStep==="function") wfDebugAutoStep(); return; }
+  if(type==="node_result"){ if(!wfRunning) return; wfNoteNodeDone(data.id);
+    if(data.id && !wfNode(data.id)) return; wfMarkNodeResult(data.id, data.status, data.port); if(typeof wfDebugAutoStep==="function") wfDebugAutoStep(); return; }
+  // Failure screenshot saved for a node's final failed attempt — remember it and
+  // refresh the inspector if that node is the one being inspected right now.
+  if(type==="node_fail_shot"){
+    if(data.id){ wfFailShots[data.id]=data.path||"";
+      if(WF.selectedNode===data.id) wfRenderInspector(); }
+    return;
+  }
   // Activity-level run status: blinking-green while the engine executes it,
   // then solid-green when it completed (reached End) or solid-red on failure.
   // The marks persist after the run and only clear on the next run start

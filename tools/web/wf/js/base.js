@@ -28,6 +28,35 @@ let wfRunStopped=false; // true once a finished run's trail is on display (greys
 let wfSkipIds=null;     // ids greyed out as "not reached", captured once when the run stops
 const wfRan={};       // nodeId -> "ok" | "fail"
 const wfRanPort={};   // nodeId -> output port actually taken
+// Per-node timing, measured UI-side between node_active and node_result:
+// nodeId -> {last: ms of the latest run, n: how many times it ran}. Shown as a
+// small mono chip under the block's bottom-right corner; cleared per run.
+const wfNodeT0={};
+const wfNodeDur={};
+// nodeId -> absolute path of the failure screenshot the engine saved for this
+// node's final failed attempt (designer test runs capture these automatically).
+const wfFailShots={};
+function wfFmtDur(ms){
+  if(ms<995)   return (ms/1000).toFixed(2)+"s";
+  if(ms<60000) return (ms/1000).toFixed(1)+"s";
+  return Math.floor(ms/60000)+"m"+String(Math.round(ms%60000/1000)).padStart(2,"0");
+}
+function wfApplyNodeTime(id){
+  const d=wfNodeDur[id]; const el=wfNodeElById(id);
+  if(!d||!el||el.classList.contains("wf-stk-jbot")) return;   // flush stack member: no room below
+  let chip=el.querySelector(".wf-node-time");
+  if(!chip){ chip=document.createElement("span"); chip.className="wf-node-time"; el.appendChild(chip); }
+  chip.textContent=wfFmtDur(d.last)+(d.n>1?" ×"+d.n:"");
+  chip.title="Thời gian chạy lần cuối"+(d.n>1?` (chạy ${d.n} lần)`:"");
+}
+function wfNoteNodeStart(id){ if(id) wfNodeT0[id]=performance.now(); }
+function wfNoteNodeDone(id){
+  if(!id || wfNodeT0[id]===undefined) return;
+  const dt=performance.now()-wfNodeT0[id]; delete wfNodeT0[id];
+  const prev=wfNodeDur[id];
+  wfNodeDur[id]={last:dt, n:(prev?prev.n:0)+1};
+  wfApplyNodeTime(id);
+}
 // Activity run-status tracker: activityId -> "running" | "done" | "errored".
 // Drives the row indicator in the bottom-right panel: blinking green while the
 // engine executes it, solid green once completed, solid red on failure. Cleared
@@ -117,6 +146,7 @@ function wfMarkUnreached(){
 // Re-paint the whole trail after a canvas redraw (nodes/wires are rebuilt fresh).
 function wfReapplyRunViz(){
   Object.keys(wfRan).forEach(id=>wfMarkNodeResult(id, wfRan[id], wfRanPort[id]));
+  Object.keys(wfNodeDur).forEach(wfApplyNodeTime);
   const el=wfNodeElById(wfRunNode); if(el) el.classList.add("running");
   if(wfRunStopped) wfMarkUnreached();
 }
@@ -124,6 +154,10 @@ function wfResetRunViz(){
   wfRunNode=null; wfLiveNode=null; wfRunStopped=false; wfSkipIds=null;
   for(const k in wfRan) delete wfRan[k];
   for(const k in wfRanPort) delete wfRanPort[k];
+  for(const k in wfNodeT0) delete wfNodeT0[k];
+  for(const k in wfNodeDur) delete wfNodeDur[k];
+  for(const k in wfFailShots) delete wfFailShots[k];
+  document.querySelectorAll(".wf-node-time").forEach(el=>el.remove());
   wfResetActStatus();
   document.querySelectorAll(".wf-node.running,.wf-node.ran-ok,.wf-node.ran-fail,.wf-node.ran-skip")
     .forEach(el=>el.classList.remove("running","ran-ok","ran-fail","ran-skip"));

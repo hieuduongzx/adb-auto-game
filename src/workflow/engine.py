@@ -130,6 +130,24 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # ``cases`` list) so ``outs`` here is only the static fallback hint.
     "switch":      {"label": "Rẽ nhánh",       "kind": "switch",    "ins": 1, "outs": ["default"]},
     "scroll_find": {"label": "Kéo đến ảnh",    "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    # Lặp thân ("body" quay về cổng "loop") đến khi template xuất hiện → "found".
+    # maxLoops > 0 giới hạn số vòng; hết lượt mà chưa thấy → "fail". Gói gọn
+    # pattern phổ biến nhất trong workflow thực tế: loop ∞ + if_image + break.
+    "loop_until_image": {"label": "Lặp đến khi thấy ảnh", "kind": "loop_until", "ins": 2, "outs": ["body", "found", "fail"]},
+    # Chạm MỌI vị trí khớp template trên màn hình hiện tại (match_all + NMS).
+    # true khi chạm được ≥1 vị trí — quét thu thập vật phẩm/phần thưởng.
+    "tap_all_images": {"label": "Chạm tất cả ảnh", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    # Quản lý app: dừng hẳn (am force-stop, tuỳ chọn pm clear) — cặp với
+    # launch_app để làm flow "game treo → restart".
+    "app_stop": {"label": "Dừng ứng dụng", "kind": "action", "ins": 1, "outs": ["out"]},
+    # Điều kiện: app/tiêu đề cửa sổ hiện tại có chứa chuỗi? (ADB: package
+    # foreground; Win32: tiêu đề cửa sổ) — phát hiện game crash.
+    "if_app": {"label": "Nếu app đang mở", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    # Gỡ cài đặt app (pm uninstall, tuỳ chọn -k giữ dữ liệu). ADB-only.
+    "app_uninstall": {"label": "Gỡ ứng dụng", "kind": "action", "ins": 1, "outs": ["out"]},
+    # Thoát app ĐANG mở (không cần package): ADB force-stop app foreground;
+    # Win32 đóng cửa sổ mục tiêu.
+    "app_exit": {"label": "Thoát app hiện tại", "kind": "action", "ins": 1, "outs": ["out"]},
     "random_branch":{"label":"Chọn ngẫu nhiên","kind": "random",    "ins": 1, "outs": []},
     "format_var":  {"label": "Định dạng chuỗi","kind": "action",    "ins": 1, "outs": ["out"]},
     "notify":      {"label": "Thông báo",       "kind": "action",    "ins": 1, "outs": ["out"]},
@@ -254,6 +272,11 @@ class WorkflowEngine:
         self._debug_gate = threading.Event()
         self._debug_gate.set()
         self.failure_screenshot_dir: Optional[str] = None
+        # When True (the designer's test runs), a failure screenshot is captured
+        # for EVERY final action failure — not just nodes that opted in via
+        # screenshotOnFail — so the designer can show "what the screen looked
+        # like when this block failed" without per-node setup.
+        self.capture_failures_always = False
 
         self.running = False
         self._stop = threading.Event()
@@ -277,6 +300,9 @@ class WorkflowEngine:
             # fired whenever a variable changes: (name, value). Lets the designer
             # show a live "current variables" panel during a test run.
             "on_var": [],
+            # fired after a failure screenshot is written: (node_id, path). The
+            # designer shows it in the inspector when the failed node is selected.
+            "on_fail_shot": [],
         }
 
         # Dispatch table for action nodes: type -> handler(node, params) -> bool.
@@ -312,6 +338,9 @@ class WorkflowEngine:
             "win_launch":   self._a_win_launch,
             "win_activate": self._a_win_activate,
             "win_close":    self._a_win_close,
+            "app_stop":     self._a_app_stop,
+            "app_uninstall": self._a_app_uninstall,
+            "app_exit":     self._a_app_exit,
         }
 
     # ── Per-thread execution context ─────────────────────────────────────────
@@ -764,6 +793,47 @@ class WorkflowEngine:
                         loop_port = "done"
                 self._emit("on_node_done", nid, "ok", loop_port)
                 cur = self._next(adj, cur, loop_port)
+            elif kind == "loop_until":
+                # Lặp đến khi thấy ảnh: mỗi lần (re-)enter node, chụp + tìm
+                # template. Thấy → "found"; break trong thân → "found" (thoát);
+                # hết maxLoops → "fail"; còn lượt → "body" (thân quay về cổng
+                # "loop"). delayBefore của node đóng vai trò poll interval.
+                tpl = self._resolve_template(params.get("template", ""))
+                threshold = float(params.get("threshold", 0.85))
+                lu_port = None
+                if self._break_loop:
+                    self._break_loop = False
+                    log_info(f"[workflow] ↺ thoát 'lặp đến khi thấy ảnh' sau {counters.get(cur, 0)} vòng (break)")
+                    counters[cur] = 0
+                    lu_port = "found"
+                else:
+                    res = self.auto.find_template(tpl, threshold=threshold,
+                                                  region=self._search_region(params))
+                    if res:
+                        self._last_pos = (res[0], res[1])
+                        log_info(f"[workflow] ↺ thấy ảnh {os.path.basename(tpl)} sau "
+                                 f"{counters.get(cur, 0)} vòng ({res[0]}, {res[1]})")
+                        counters[cur] = 0
+                        lu_port = "found"
+                    else:
+                        done = counters.get(cur, 0)
+                        max_loops = self._resolve_count(params.get("maxLoops", 0), default=0)
+                        if max_loops > 0 and done >= max_loops:
+                            log_warning(f"[workflow] ↺ chưa thấy ảnh {os.path.basename(tpl)} sau {done} vòng — nhánh fail")
+                            counters[cur] = 0
+                            lu_port = "fail"
+                        else:
+                            counters[cur] = done + 1
+                            steps = 0  # vòng lặp chủ ý — đừng để step cap cắt ngang
+                            lu_port = "body"
+                self._emit("on_node_done", nid, "ok" if lu_port != "fail" else "fail", lu_port)
+                nxt = self._next(adj, cur, lu_port)
+                if lu_port == "fail" and nxt is None:
+                    # fail không đi dây → nhánh này coi như thất bại (đỏ), giống
+                    # một condition false cụt trong try_chain.
+                    self._branch_failed = True
+                    break
+                cur = nxt
             elif kind == "parallel":
                 self._run_parallel(nodes, adj, cur, depth)
                 # Execution after all branches is handled inside _run_parallel
@@ -1289,9 +1359,54 @@ class WorkflowEngine:
             log_info(f"[workflow] 🎨 {name} = {value or '(không đọc được)'}")
         return True
 
+    @staticmethod
+    def _ocr_whitelist(params: Dict) -> Optional[str]:
+        """The node's optional OCR character whitelist ('' → None)."""
+        wl = str(params.get("whitelist", "") or "").strip()
+        return wl or None
+
     def _eval_condition(self, ntype: str, params: Dict) -> bool:
         if ntype in ("if_color", "wait_color", "tap_color"):
             return self._eval_color_condition(ntype, params)
+        if ntype == "tap_all_images":
+            tpl = self._resolve_template(params.get("template", ""))
+            threshold = float(params.get("threshold", 0.85))
+            self.auto.capture_screen()  # find_all_templates reads the latest frame
+            hits = self.auto.find_all_templates(tpl, threshold=threshold) or []
+            region = self._search_region(params)
+            if region:
+                rx, ry, rw, rh = region
+                hits = [h for h in hits if rx <= h[0] <= rx + rw and ry <= h[1] <= ry + rh]
+            max_taps = self._resolve_count(params.get("maxTaps", 0), default=0)
+            if max_taps > 0:
+                hits = hits[:max_taps]
+            delay = max(0.0, float(params.get("delayBetween", 0.15) or 0))
+            tapped = 0
+            for hx, hy, _score in hits:
+                if self._stop.is_set():
+                    break
+                self._pause.wait()
+                if self._tap_at(int(hx), int(hy), params, label="ảnh"):
+                    tapped += 1
+                if delay:
+                    self._sleep(delay)
+            if tapped:
+                self._last_pos = (int(hits[0][0]), int(hits[0][1]))
+                log_info(f"[workflow] 👆 chạm {tapped} vị trí khớp {os.path.basename(tpl)}")
+            return tapped > 0
+        if ntype == "if_app":
+            negate = bool(params.get("negate", False))
+            needle = str(self._resolve_value(params.get("package", "")) or "").strip().lower()
+            try:
+                if hasattr(self.auto.adb, "clear_info_cache"):
+                    self.auto.adb.clear_info_cache()
+                cur_app = (self.auto.adb.get_current_app() or "").lower()
+            except Exception:
+                cur_app = ""
+            ok = bool(needle) and needle in cur_app
+            log_info(f"[workflow] 📱 app hiện tại: {cur_app or '(?)'} → "
+                     f"{'khớp' if ok else 'không khớp'} '{needle}'")
+            return ok != negate
         if ntype == "if_image":
             tpl = self._resolve_template(params.get("template", ""))
             threshold = float(params.get("threshold", 0.85))
@@ -1356,12 +1471,14 @@ class WorkflowEngine:
             return bool(self.auto.wait_for_text_in_region(
                 str(params.get("text", "")), region=self._region(params),
                 timeout=float(params.get("timeout", 10.0)),
+                whitelist=self._ocr_whitelist(params),
             ))
         if ntype == "if_text":
             negate = bool(params.get("negate", False))
             needle = str(params.get("text", ""))
             region = self._region(params)
-            found, read = self.auto.region_find_text(needle, region=region)
+            found, read = self.auto.region_find_text(
+                needle, region=region, whitelist=self._ocr_whitelist(params))
             log_info(
                 f"[workflow] 🔤 if_text vùng {region}: đọc được {read!r} → "
                 f"{'thấy' if found else 'không thấy'} '{needle}'"
@@ -1766,7 +1883,8 @@ class WorkflowEngine:
         return False
 
     def _save_failure_screenshot(self, node: Dict) -> None:
-        if not node.get("screenshotOnFail"):
+        # Per-node opt-in, or the designer's "always capture" test-run mode.
+        if not (node.get("screenshotOnFail") or self.capture_failures_always):
             return
         try:
             img = self.auto.capture_screen()
@@ -1777,8 +1895,12 @@ class WorkflowEngine:
             os.makedirs(out_dir, exist_ok=True)
             safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(node.get("id") or node.get("type") or "node"))
             path = os.path.join(out_dir, f"fail_{safe}_{time.strftime('%Y%m%d_%H%M%S')}.png")
-            if cv2.imwrite(path, img):
+            # Unicode-safe write (cv2.imwrite chokes on non-ASCII Windows paths).
+            ok, buf = cv2.imencode(".png", img)
+            if ok:
+                buf.tofile(path)
                 log_warning(f"[workflow] saved failure screenshot: {path}")
+                self._emit("on_fail_shot", str(node.get("id") or ""), path)
         except Exception as e:
             log_warning(f"[workflow] save failure screenshot failed: {e}")
 
@@ -1930,7 +2052,7 @@ class WorkflowEngine:
     def _a_read_var(self, node, p) -> bool:
         name = str(p.get("name", "")).strip()
         region = self._region(p)
-        text = self.auto.read_text(region=region) or ""
+        text = self.auto.read_text(region=region, whitelist=self._ocr_whitelist(p)) or ""
         if name:
             self._set_var(name, self._coerce(text.strip()))
             log_info(
@@ -1957,7 +2079,7 @@ class WorkflowEngine:
         else:
             region = self._region(p)
             try:
-                text = self.auto.read_text(region=region) or ""
+                text = self.auto.read_text(region=region, whitelist=self._ocr_whitelist(p)) or ""
                 log_info(f"[workflow] 🔤 parse_var OCR vùng {region}: {text!r}")
             except Exception as exc:
                 log_warning(f"[workflow] parse_var OCR lỗi: {exc}")
@@ -2031,6 +2153,85 @@ class WorkflowEngine:
 
     def _a_home(self, node, p) -> bool:
         return self.auto.go_home()
+
+    def _a_app_stop(self, node, p) -> bool:
+        """Force-stop một app (tuỳ chọn xóa dữ liệu) — cặp với launch_app cho
+        flow 'game treo → dừng hẳn → mở lại'. Chỉ áp dụng cho dự án ADB."""
+        if getattr(self, "_controller", "adb") == "win32":
+            log_warning("[workflow] ⛔ Dừng ứng dụng chỉ áp dụng cho dự án ADB — dùng 'Đóng cửa sổ' cho Win32")
+            return True
+        pkg = str(self._resolve_value(p.get("package", "")) or "").strip()
+        if not pkg:
+            log_warning("[workflow] ⛔ app_stop: chưa nhập package")
+            return False
+        dev = getattr(self.auto.adb, "device", None)
+        if not dev:
+            return False
+        try:
+            dev.shell(f"am force-stop {pkg}")
+            if self._truthy(p.get("clearData", False)):
+                dev.shell(f"pm clear {pkg}")
+                log_info(f"[workflow] ⛔ đã dừng + xóa dữ liệu '{pkg}'")
+            else:
+                log_info(f"[workflow] ⛔ đã dừng '{pkg}'")
+            return True
+        except Exception as exc:
+            log_warning(f"[workflow] app_stop lỗi: {exc}")
+            return False
+
+    def _a_app_uninstall(self, node, p) -> bool:
+        """pm uninstall một app (tuỳ chọn -k giữ dữ liệu/cache). ADB-only."""
+        if getattr(self, "_controller", "adb") == "win32":
+            log_warning("[workflow] 🗑 Gỡ ứng dụng chỉ áp dụng cho dự án ADB — bỏ qua")
+            return True
+        pkg = str(self._resolve_value(p.get("package", "")) or "").strip()
+        if not pkg:
+            log_warning("[workflow] 🗑 app_uninstall: chưa nhập package")
+            return False
+        dev = getattr(self.auto.adb, "device", None)
+        if not dev:
+            return False
+        try:
+            keep = "-k " if self._truthy(p.get("keepData", False)) else ""
+            out = (dev.shell(f"pm uninstall {keep}{pkg}") or "").strip()
+            ok = "success" in out.lower()
+            if ok:
+                log_info(f"[workflow] 🗑 đã gỡ '{pkg}'{' (giữ dữ liệu)' if keep else ''}")
+            else:
+                log_warning(f"[workflow] 🗑 gỡ '{pkg}' thất bại: {out or '(không có phản hồi)'}")
+            return ok
+        except Exception as exc:
+            log_warning(f"[workflow] app_uninstall lỗi: {exc}")
+            return False
+
+    def _a_app_exit(self, node, p) -> bool:
+        """Thoát app ĐANG mở: ADB force-stop app foreground (không cần biết
+        package); Win32 đóng cửa sổ mục tiêu."""
+        if getattr(self, "_controller", "adb") == "win32":
+            ctrl = getattr(self.auto, "adb", None)
+            if ctrl is None or not hasattr(ctrl, "close_window"):
+                return False
+            log_info("[workflow] 🚪 đóng cửa sổ mục tiêu")
+            return bool(ctrl.close_window())
+        try:
+            if hasattr(self.auto.adb, "clear_info_cache"):
+                self.auto.adb.clear_info_cache()
+            cur = (self.auto.adb.get_current_app() or "").strip()
+        except Exception:
+            cur = ""
+        if not cur:
+            log_warning("[workflow] 🚪 không xác định được app đang mở")
+            return False
+        dev = getattr(self.auto.adb, "device", None)
+        if not dev:
+            return False
+        try:
+            dev.shell(f"am force-stop {cur}")
+            log_info(f"[workflow] 🚪 đã thoát '{cur}'")
+            return True
+        except Exception as exc:
+            log_warning(f"[workflow] app_exit lỗi: {exc}")
+            return False
 
     def _a_launch_app(self, node, p) -> bool:
         pkg = str(p.get("package", "")).strip()

@@ -135,6 +135,19 @@ const WF_NODES = {
   // End node, "false" when it dead-ended (e.g. a node inside timed out).
   call:          {label:"Function",       ico:"function", kind:"call",      cat:null,     outs:["true","false"], fields:[]},
   scroll_find:   {label:"Scroll to image",   ico:"scroll",   kind:"condition", cat:"image",  outs:["true","false"],fields:[{k:"template",t:"tpl"},{k:"direction",lbl:"Swipe direction",t:"select",opts:[{v:"up",t:"↑ Up"},{v:"down",t:"↓ Down"},{v:"left",t:"← Left"},{v:"right",t:"→ Right"}],d:"up"},{k:"max_swipes",lbl:"Max swipes",t:"num",d:10},{k:"swipe_distance",lbl:"Distance (px)",t:"num",d:400},{k:"threshold",t:"num",d:.85,step:.05},{k:"swipe_duration",lbl:"Swipe duration (ms)",t:"num",d:300},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${({"up":"↑","down":"↓","left":"←","right":"→"})[p.direction]||"↑"} ≤${p.max_swipes||10}× → ${wfBase(p.template)}`},
+  // Lặp thân đến khi template xuất hiện: body quay về cổng "loop"; thấy ảnh →
+  // "found"; hết maxLoops (0 = ∞) → "fail". Thay cho cụm loop ∞ + if_image + break.
+  loop_until_image: {label:"Loop until image", ico:"loop", kind:"loop_until", cat:"image", ins:["in","loop"], outs:["body","found","fail"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxLoops",lbl:"Max loops (0 = ∞)",t:"num",varRef:true,d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`↺ đến khi thấy ${wfBase(p.template)}`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
+  // Chạm MỌI vị trí khớp template trên frame hiện tại (quét thu thập vật phẩm).
+  tap_all_images: {label:"Tap all matches", ico:"layers", kind:"condition", cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxTaps",lbl:"Max taps (0 = all)",t:"num",d:0},{k:"delayBetween",lbl:"Delay between taps (s)",t:"num",d:.15,step:.05},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`chạm hết ${wfBase(p.template)}`+((parseInt(p.maxTaps)||0)>0?` ≤${p.maxTaps}`:"")},
+  // Force-stop app (tuỳ chọn xóa dữ liệu) — cặp với Launch app cho flow restart game.
+  app_stop: {label:"Stop app", ico:"octagon", kind:"action", cat:"misc", outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"clearData",lbl:"Clear app data (pm clear)",t:"bool",d:false}], sum:p=>`⛔ ${p.package||"(package)"}`+(p.clearData?" +clear":"")},
+  // App/tiêu đề cửa sổ hiện tại có chứa chuỗi? (ADB: package · Win32: window title)
+  if_app: {label:"If app running", ico:"smartphone", kind:"condition", cat:"misc", outs:["true","false"], fields:[{k:"package",lbl:"Package / title contains",t:"text",varRef:true},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}app ~ "${p.package||"?"}"`},
+  // Gỡ cài đặt app (pm uninstall; -k = giữ dữ liệu). ADB-only.
+  app_uninstall: {label:"Uninstall app", ico:"trash", kind:"action", cat:"misc", outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"keepData",lbl:"Keep data & cache (-k)",t:"bool",d:false}], sum:p=>`🗑 ${p.package||"(package)"}`+(p.keepData?" ·keep":"")},
+  // Thoát app đang mở — không cần package (ADB: force-stop foreground · Win32: đóng cửa sổ).
+  app_exit: {label:"Exit current app", ico:"x", kind:"action", cat:"misc", outs:["out"], fields:[], sum:()=>"thoát app đang mở"},
   random_branch: {label:"Random branch",ico:"dice",   kind:"random",    cat:"flow",   outs:[],              fields:[{k:"count",lbl:"Branch count",t:"num",d:2,refresh:true}], sum:p=>`🎲 ${p.count||2} even branches`},
   format_var:    {label:"Format string",ico:"type",   kind:"action",    cat:"logic",  outs:["out"],         fields:[{k:"name",lbl:"Target variable",t:"text",d:"text",var:true},{k:"template",lbl:"Template string",t:"text",insertVar:true,d:"Round {round}/{total}"}], sum:p=>`${p.name||"?"} = "${p.template||""}"`},
   notify:        {label:"Notify",      ico:"bell",   kind:"action",    cat:"misc",   outs:["out"],         fields:[{k:"title",lbl:"Title",t:"text",insertVar:true,d:"Workflow"},{k:"message",lbl:"Message",t:"text",insertVar:true,d:"Completed!"},{k:"sound",lbl:"Play sound",t:"bool",d:true}], sum:p=>`🔔 [${p.title||"Workflow"}] ${p.message||""}`},
@@ -173,7 +186,7 @@ const WF_NODES = {
 // nodes are ADB-only, the Win32 window nodes are PC-only. Untagged categories
 // (basic/image/color/ocr/flow/logic/…) work on both and always show.
 const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"input",label:"Keys & Input"}, {key:"image",label:"Image"}, {key:"color",label:"Color"}, {key:"ocr",label:"Text (OCR)"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"device",label:"Device & Time",ctrl:"adb"}, {key:"win32",label:"Win32 (PC)",ctrl:"win32"}, {key:"misc",label:"Other"} ];
-const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"loop", done:"done", fail:"fail", "1":"1", "2":"2", "3":"3" };
+const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"loop", done:"done", found:"found", fail:"fail", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
 const WF_IN_LBL = { in:"in", loop:"loop" };
 

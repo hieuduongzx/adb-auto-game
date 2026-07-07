@@ -543,6 +543,7 @@ function wfNodeEl(n){
   else if(n.type==="try_chain") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3)+1;
   else if(n.type==="parallel") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3);
   else if(n.type==="random_branch") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||2);
+  else if(n.type==="loop_until_image") dynOutCount=3;   // body/found/fail — grow the card
   if(dynOutCount>2) el.style.minHeight=Math.max(60, 26 + (dynOutCount-1)*16 + 14)+"px";
   // Merged-block membership: hide the join port at the joined edge and flatten
   // that corner so the stack reads as one block.
