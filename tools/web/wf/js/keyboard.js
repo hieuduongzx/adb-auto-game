@@ -1,6 +1,8 @@
 // ── Keyboard (workflow shortcuts) ─────────────────────────────────────────────
 window.addEventListener("keydown", e => {
   const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  // F1 (hoặc ? ngoài ô nhập) — bảng phím tắt.
+  if(e.key==="F1" || (e.key==="?" && !typing)){ e.preventDefault(); if(typeof uiShowShortcuts==="function") uiShowShortcuts(); return; }
   if((e.key==="s"||e.key==="S") && (e.ctrlKey||e.metaKey)){
     e.preventDefault();
     // In Preview mode with a selected region, Ctrl+S = "Capture region" (quick crop)
@@ -32,7 +34,9 @@ window.addEventListener("keydown", e => {
   if(e.key==="Delete"||e.key==="Backspace"){ if(WF.sel.length){ e.preventDefault(); wfDeleteSelected(); return; } }
   if((e.key==="a"||e.key==="A") && (e.ctrlKey||e.metaKey)){ const g=wfGraph(); if(g){ e.preventDefault(); WF.sel=g.nodes.map(n=>n.id); WF.selectedNode=null; wfMarkSel(); wfRenderInspector(); return; } }
   if((e.key==="f"||e.key==="F") && !e.ctrlKey && !e.metaKey){ e.preventDefault(); wfFit(); return; }
-  if(e.key==="Escape"){ if(typeof wfRunning!=="undefined"&&wfRunning){ e.preventDefault(); wfToggleRun(); return; } if(wfGroupMode) wfSetGroupMode(false); wfClearSel(); wfMarkSel(); wfRenderInspector(); }
+  if(e.key==="Escape"){ if(typeof wfRunning!=="undefined"&&wfRunning){ e.preventDefault(); wfToggleRun(); return; }
+    const vald=document.getElementById("wf-vald"); if(vald){ vald.remove(); return; }
+    if(wfGroupMode) wfSetGroupMode(false); wfClearSel(); wfMarkSel(); wfRenderInspector(); }
   if(e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown"){
     if(WF.sel.length){ e.preventDefault();
       const dx=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0;

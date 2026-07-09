@@ -210,7 +210,11 @@ function wfCommitReorder(listEl, arr){
 let wfPalCollapsed={};
 try{ wfPalCollapsed=JSON.parse(localStorage.getItem("wfPalCollapsed")||"{}")||{}; }catch{}
 function wfPalToggleCat(key){
-  wfPalCollapsed[key]=!wfPalCollapsed[key];
+  // Toggle theo trạng thái HIỆU DỤNG (pref đã lưu, không thì default closed của
+  // category) — không thì click đầu tiên vào nhóm gập-mặc-định sẽ không mở ra.
+  const cat=(typeof WF_CATS!=="undefined") ? WF_CATS.find(c=>c.key===key) : null;
+  const cur=(wfPalCollapsed[key]!==undefined) ? !!wfPalCollapsed[key] : !!(cat&&cat.closed);
+  wfPalCollapsed[key]=!cur;
   try{ localStorage.setItem("wfPalCollapsed", JSON.stringify(wfPalCollapsed)); }catch{}
   wfRenderPalette();
 }
@@ -226,11 +230,14 @@ function wfRenderPalette(){
     // Controller-specific categories only appear in their matching project mode
     // (Device/emulator = ADB, Win32 window nodes = PC).
     if(cat.ctrl && cat.ctrl!==ctrl) return;
-    let types=Object.keys(WF_NODES).filter(t=>WF_NODES[t].cat===cat.key);
+    // .hidden = type gộp/khai tử: vẫn hydrate + chạy (file cũ), không cho kéo mới.
+    let types=Object.keys(WF_NODES).filter(t=>WF_NODES[t].cat===cat.key && !WF_NODES[t].hidden);
     if(q) types=types.filter(t=>(WF_NODES[t].label+" "+t).toLowerCase().includes(q));
     if(!types.length) return;
     shown+=types.length;
-    const closed = !q && !!wfPalCollapsed[cat.key];
+    // Chưa có lựa chọn lưu nào → dùng default của category (closed:true = gập).
+    const stored = wfPalCollapsed[cat.key];
+    const closed = !q && (stored!==undefined ? !!stored : !!cat.closed);
     const hdr=document.createElement("div"); hdr.className="wf-pal-cat cat-"+cat.key+(closed?" closed":"");
     hdr.title=closed?"Expand category":"Collapse category";
     hdr.innerHTML=`<span>${escHtml(cat.label)}</span><span class="wf-pal-cat-n">${types.length}</span>${WF_PAL_CHEV}`;
@@ -560,7 +567,6 @@ function wfNodeEl(n){
   const isTpls = tplField && tplField.t==="tpls";
   const hasTpl = !!tplField;
   const showThumb = hasTpl && (wfPreviewAll || n.showPreview);
-  const eyeBtn = ""; // eye moved to hover action bar
   // Action bar above the node (hover-only): delete, toggle preview, copy.
   const delSvg = '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
   const copySvg = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
@@ -598,7 +604,7 @@ function wfNodeEl(n){
   } else {
     el.innerHTML=
       actBar+
-      `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span>${eyeBtn}<span class="wf-node-title">${escHtml(title)}</span></div>`+
+      `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span><span class="wf-node-title">${escHtml(title)}</span></div>`+
       topRow+delayHtml+retryHtml+noteHtml+logHtml;
   }
   // Output ports are placed first; input ports mirror the output row of the
@@ -698,14 +704,13 @@ function wfNodeEl(n){
       wfUpdNodeSum(n); wfUpdNodePreview(n); wfRenderCanvas(); wfRenderInspector();
     });
   }
-  const eye=el.querySelector(".wf-node-eye");
   // Action bar buttons (hover toolbar above node)
   const actDel=el.querySelector(".wf-act-del");
   if(actDel){ actDel.addEventListener("mousedown",e=>e.stopPropagation()); actDel.addEventListener("click",e=>{ e.stopPropagation(); wfDeleteNode(n.id); }); }
   const actEye=el.querySelector(".wf-act-eye");
   if(actEye){ actEye.addEventListener("mousedown",e=>e.stopPropagation()); actEye.addEventListener("click",e=>{ e.stopPropagation(); wfPushUndoDebounced(); n.showPreview=!n.showPreview; wfRenderCanvas(); }); }
   const actCopy=el.querySelector(".wf-act-copy");
-  if(actCopy){ actCopy.addEventListener("mousedown",e=>e.stopPropagation()); actCopy.addEventListener("click",e=>{ e.stopPropagation(); wfSelectOne(n.id); wfMarkSel(); wfCopy(); wfPaste({clientX:event.clientX+20,clientY:event.clientY+20}); }); }
+  if(actCopy){ actCopy.addEventListener("mousedown",e=>e.stopPropagation()); actCopy.addEventListener("click",e=>{ e.stopPropagation(); wfSelectOne(n.id); wfMarkSel(); wfCopy(); wfPaste({clientX:e.clientX+20,clientY:e.clientY+20}); }); }
   el.querySelectorAll(".wf-port.out").forEach(p=>p.addEventListener("mousedown",e=>wfStartConnect(e,n.id,p.dataset.port)));
   // Connection completion is handled globally (drop anywhere on a node = connect).
   return el;

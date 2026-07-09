@@ -4,8 +4,8 @@
   "templatesDir": "templates",
   "controller": "win32",
   "win32": {
-    "window": "BrownDust II",
-    "matchBy": "title",
+    "window": "26504",
+    "matchBy": "pid",
     "inputMode": "background_cursor"
   },
   "speedhack": {
@@ -227,10 +227,68 @@
   ],
   "activities": [
     {
+      "id": "sequence_wjj5",
+      "name": "Activity 3",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nr1cv6zw",
+            "type": "start",
+            "x": 40,
+            "y": -45,
+            "params": {}
+          },
+          {
+            "id": "njj46q4x",
+            "type": "end",
+            "x": 460,
+            "y": 15,
+            "params": {}
+          },
+          {
+            "id": "n9f6vcy7",
+            "type": "win_resize",
+            "x": 260,
+            "y": 40,
+            "params": {
+              "width": 1920,
+              "height": 1080
+            }
+          },
+          {
+            "id": "nb62boqi",
+            "type": "win_style",
+            "x": 260,
+            "y": -80,
+            "params": {
+              "style": "windowed"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "n9f6vcy7",
+            "fromPort": "out",
+            "to": "njj46q4x"
+          },
+          {
+            "from": "nb62boqi",
+            "fromPort": "out",
+            "to": "n9f6vcy7"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
       "id": "sequence_kt27",
       "name": "Activity 1",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -271,7 +329,7 @@
             "x": 500,
             "y": 40,
             "params": {
-              "template": "templates/crop_20260702_132507_344_935_180_24.png",
+              "template": "templates/crop_20260707_141853_284_962_139_17.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
@@ -286,7 +344,7 @@
             "x": 680,
             "y": 40,
             "params": {
-              "template": "templates/crop_20260702_132613_1007_656_114_26.png",
+              "template": "templates/crop_20260707_141924_1002_636_88_22.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
@@ -344,7 +402,7 @@
             "x": 500,
             "y": 140,
             "params": {
-              "template": "templates/crop_20260702_132507_344_935_180_24.png",
+              "template": "templates/crop_20260707_141853_284_962_139_17.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
@@ -358,7 +416,7 @@
             "x": 680,
             "y": 140,
             "params": {
-              "template": "templates/crop_20260702_132613_1007_656_114_26.png",
+              "template": "templates/crop_20260707_141924_1002_636_88_22.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,

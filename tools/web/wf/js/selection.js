@@ -19,7 +19,6 @@ function wfDeleteNodes(ids){
   const g=wfGraph(); if(!g) return;
   const del=ids.filter(id=>{ const n=g.nodes.find(x=>x.id===id); return n && n.type!=="start"; });
   if(!del.length) return;
-  if(!confirm(`Delete ${del.length} node(s)?`)) return;
   wfPushUndo();
   g.nodes=g.nodes.filter(n=>!del.includes(n.id));
   g.edges=g.edges.filter(e=>!del.includes(e.from)&&!del.includes(e.to));
@@ -29,6 +28,9 @@ function wfDeleteNodes(ids){
   WF.sel=WF.sel.filter(id=>!del.includes(id));
   if(del.includes(WF.selectedNode)) WF.selectedNode=null;
   wfRenderCanvas(); wfRenderInspector();
+  // Không hỏi xác nhận — Ctrl+Z hoàn tác được; nhắc khi xóa nhiều block một lúc.
+  if(del.length>2) uiToast(`Đã xóa ${del.length} block — Ctrl+Z để hoàn tác`,"info");
+  else setStatus(`Đã xóa ${del.length} block — Ctrl+Z để hoàn tác`);
 }
 
 // ── Copy / paste ──────────────────────────────────────────────────────────────
@@ -58,7 +60,7 @@ function wfCopy(){
 function wfCut(){ if(wfCopy()) wfDeleteSelected(); }
 function wfDuplicate(){ if(wfCopy()) wfPaste(); }   // copy + cascade-offset paste
 function wfPaste(opts){
-  const g=wfGraph(); if(!g){ alert("Select or add an activity first."); return; }
+  const g=wfGraph(); if(!g){ uiToast("Chọn hoặc tạo một activity trước.","warning"); return; }
   if(!wfClipboard||!wfClipboard.nodes.length) return;
   wfPushUndo();
   const clip=wfClipboard;

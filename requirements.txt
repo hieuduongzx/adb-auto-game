@@ -35,6 +35,10 @@ pywin32>=306 ; sys_platform == "win32"
 # windows (Unity/DirectX) that PrintWindow can only see as black, even while
 # they're covered by other windows. Optional — capture falls back without it.
 windows-capture>=2.0.0 ; sys_platform == "win32"
+# Frida desktop hooking (optional). Enables background_frida_* input modes
+# on Win32 that fake cursor coordinates inside the game process without
+# moving the real mouse pointer.
+frida>=16.0.0 ; sys_platform == "win32"
 
 # Mobile automation
 pure-python-adb>=0.3.0.dev0

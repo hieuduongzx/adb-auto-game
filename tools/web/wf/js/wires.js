@@ -94,9 +94,16 @@ function wfWirePath(a,b,lane){
          ` L${xIn},${b.y-s2*r2} Q${xIn},${b.y} ${xIn+r2},${b.y} L${b.x},${b.y}`;
 }
 
+// Dây bị "vẽ mù" khi #wf-world đang display:none (tab Preview): mọi
+// getBoundingClientRect() trả 0 → path thành M0,0 vô hình. Guard ở dưới bỏ qua
+// lượt vẽ đó và đặt cờ stale; wfSwitchView("canvas") sẽ vẽ lại khi canvas hiện.
+let wfWiresStale=false;
 function wfDrawWires(){
   if(typeof wfMinimapQueue==="function") wfMinimapQueue();   // node moves redraw wires → keep the map live
   const svg=$("wf-wires"), g=wfGraph();
+  const world=$("wf-world");
+  if(world && world.offsetParent===null){ wfWiresStale=true; return; }   // canvas ẩn — đo sẽ ra 0
+  wfWiresStale=false;
   const temp=svg.querySelector(".temp");
   svg.innerHTML=WF_WIRE_DEFS; if(temp) svg.appendChild(temp);
   if(!g) return;
@@ -125,10 +132,10 @@ function wfDrawWires(){
 
 function wfDeleteWire(ed){
   const g=wfGraph(); if(!g||!ed) return;
-  if(!confirm("Remove this wire?")) return;
   wfPushUndo();
   const i=g.edges.indexOf(ed); if(i>=0) g.edges.splice(i,1);
   wfRenderCanvas();
+  setStatus("Đã xóa dây — Ctrl+Z để hoàn tác");
 }
 
 function wfDrawTempWire(mx,my){
@@ -142,3 +149,13 @@ function wfDrawTempWire(mx,my){
 }
 
 function wfClearTemp(){ const t=$("wf-wires").querySelector(".temp"); if(t)t.remove(); }
+
+// Bảo hiểm cuối: WebView2/Chromium thỉnh thoảng cull sai SVG lớn nằm trong
+// container transform (dây còn trong DOM nhưng không được paint — resize cửa sổ
+// mới hiện lại). Vẽ lại dây sau khi resize xong để người dùng không phải tự
+// "lay" cửa sổ; debounce 150ms cho các chuỗi sự kiện resize liên tiếp.
+let _wfWireResizeT=null;
+window.addEventListener("resize", ()=>{
+  clearTimeout(_wfWireResizeT);
+  _wfWireResizeT=setTimeout(()=>{ if(typeof wfPvActive==="undefined"||!wfPvActive) wfDrawWires(); },150);
+});

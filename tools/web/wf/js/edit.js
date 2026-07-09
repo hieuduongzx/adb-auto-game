@@ -110,6 +110,8 @@ function wfStackChain(sid){
 // Called after each canvas render (nodes must be in the DOM to measure heights).
 function wfReflowStacks(){
   const g=wfGraph(); if(!g) return;
+  // Canvas ẩn (tab Preview) → offsetHeight = 0, reflow sẽ ghi đè n.y sai lệch.
+  const world=$("wf-world"); if(world && world.offsetParent===null) return;
   const sids=[...new Set(g.nodes.filter(n=>n.stack).map(n=>n.stack))];
   for(const sid of sids){
     const chain=wfStackChain(sid);
@@ -211,11 +213,14 @@ function wfAddActivity(type){
 function wfDeleteActivity(id,ev){
   ev&&ev.stopPropagation();
   const i=WF.activities.findIndex(a=>a.id===id); if(i<0)return;
-  if(!confirm(`Delete activity "${WF.activities[i].name}"?`))return;
-  wfPushUndo();
-  WF.activities.splice(i,1);
-  if(WF.edit.kind==="activity"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
-  wfRenderAll();
+  uiConfirm({title:"Xóa activity?", message:`Xóa activity "${WF.activities[i].name}" cùng toàn bộ block bên trong?`, ok:"Xóa", danger:true}).then(ok=>{
+    if(!ok) return;
+    const j=WF.activities.findIndex(a=>a.id===id); if(j<0) return;
+    wfPushUndo();
+    WF.activities.splice(j,1);
+    if(WF.edit.kind==="activity"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
+    wfRenderAll();
+  });
 }
 // Re-clicking the already-open activity is a no-op (keeps the camera, and lets
 // the second click of a rename double-click land on a live row).
@@ -225,19 +230,21 @@ function wfToggleActivity(id,ev){ ev&&ev.stopPropagation(); const a=wfActById(id
 
 // ── Functions (reusable subroutines, used via a "call" node) ──────────────────
 function wfAddFunction(){
-  const name=(prompt("Function name (e.g. Go Home):","")||"").trim();
-  if(!name) return;
-  wfPushUndo();
-  const id="fn_"+wfUid().slice(1,6);
-  WF.functions.push({id,name,graph:wfNewGraph()});
-  WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
-  // Make sure the sidebar Functions section is open so the new row is visible.
-  const fsec=$("wf-side-fns-sec");
-  if(fsec && fsec.classList.contains("collapsed")){
-    fsec.classList.remove("collapsed");
-    try{ localStorage.setItem("wfFnsCollapsed","0"); }catch{}
-  }
-  wfRenderAll();
+  uiPrompt({title:"Function mới", label:"Tên function", placeholder:"VD: Về Home"}).then(v=>{
+    const name=(v||"").trim();
+    if(!name) return;
+    wfPushUndo();
+    const id="fn_"+wfUid().slice(1,6);
+    WF.functions.push({id,name,graph:wfNewGraph()});
+    WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+    // Make sure the sidebar Functions section is open so the new row is visible.
+    const fsec=$("wf-side-fns-sec");
+    if(fsec && fsec.classList.contains("collapsed")){
+      fsec.classList.remove("collapsed");
+      try{ localStorage.setItem("wfFnsCollapsed","0"); }catch{}
+    }
+    wfRenderAll();
+  });
 }
 function wfEditFunction(id,ev){ ev&&ev.stopPropagation();
   if(WF.edit.kind==="function"&&WF.edit.id===id) return;   // already open — keep camera
@@ -245,9 +252,12 @@ function wfEditFunction(id,ev){ ev&&ev.stopPropagation();
 function wfDeleteFunction(id,ev){
   ev&&ev.stopPropagation();
   const i=WF.functions.findIndex(f=>f.id===id); if(i<0)return;
-  if(!confirm(`Delete function "${WF.functions[i].name}"? Nodes calling it will be disabled.`))return;
-  wfPushUndo();
-  WF.functions.splice(i,1);
-  if(WF.edit.kind==="function"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
-  wfRenderAll();
+  uiConfirm({title:"Xóa function?", message:`Xóa function "${WF.functions[i].name}"? Các block đang gọi nó sẽ mất tác dụng.`, ok:"Xóa", danger:true}).then(ok=>{
+    if(!ok) return;
+    const j=WF.functions.findIndex(f=>f.id===id); if(j<0) return;
+    wfPushUndo();
+    WF.functions.splice(j,1);
+    if(WF.edit.kind==="function"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
+    wfRenderAll();
+  });
 }

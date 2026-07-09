@@ -45,6 +45,13 @@
   -webkit-appearance:none; appearance:none; background-image:none; }
 .tb-tray-source select:focus { outline:none; box-shadow:none; }
 
+/* Dirty marker — an amber dot on the Save button while there are unsaved
+   changes; clears on save/autosave. */
+#wf-save-btn { position:relative; }
+#wf-save-btn.dirty::after { content:""; position:absolute; top:-3px; right:-3px;
+  width:9px; height:9px; border-radius:50%; background:#f59e0b;
+  border:2px solid var(--panel); }
+
 /* The Run button is the toolbar's one focal point — standalone (no tray box),
    green, and a touch wider than a tray slot so it reads as primary while still
    sharing the 38px control height everything else uses. */
@@ -234,8 +241,24 @@
 .wf-cur-act { font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-bg);
   border:1px solid var(--accent-bd); border-radius:999px; padding:3px 10px; max-width:170px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-shrink:0; }
-.wf-hint { font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden;
-  text-overflow:ellipsis; min-width:0; flex-shrink:1; text-align:right; }
+/* OCR engine picker — a compact project-level setting; never crushed. */
+#wf-ocr-group { flex-shrink:0; }
+#wf-ocr-group select { font-size:11px; padding:3px 22px 3px 6px; min-width:88px; }
+/* Narrow window: the right-edge view tabs must never clip. Drop the speed-hack
+   package field (still editable in a wider window; the value persists) and
+   tighten the name + OCR fields before anything else gets crushed. */
+@media (max-width: 1400px){
+  #wf-speed-pkg { display:none; }
+  .wf-speed-title { display:none; }
+  #wf-bar > input { width:130px; min-width:80px; }
+  #wf-ocr-group select { min-width:64px; }
+  .wf-cur-act { display:none; }   /* trùng với hàng đang chọn trong panel Activities */
+}
+/* Cực hẹp: giữ đường chạy chính (tên, controller, tray, zoom, tabs) — hai cụm
+   cấu hình phụ (OCR / speed hack) tạm ẩn, mở rộng cửa sổ để chỉnh. */
+@media (max-width: 1300px){
+  #wf-ocr-group, #wf-speed-group { display:none !important; }
+}
 .wf-zoom { display:inline-flex; align-items:center; gap:2px; }
 .wf-zoom .btn { border-color:transparent; background:transparent; }
 .wf-zoom .btn:hover { background:var(--panel); border-color:var(--border2); }
@@ -255,8 +278,14 @@
 #wf-canvas::before { content:""; position:absolute; inset:0; pointer-events:none; z-index:0;
   box-shadow:inset 0 0 90px rgba(20,30,45,.055), inset 0 1px 0 rgba(255,255,255,.5); }
 #wf-canvas.panning { cursor:grabbing; }
-#wf-world { position:absolute; left:0; top:0; width:4000px; height:3000px; transform:translate(0px,0px); transform-origin:0 0; }
-#wf-wires { position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+/* will-change keeps the world on a stable compositor layer: the camera rewrites
+   this transform every pan/zoom frame, and without its own layer Chromium/WebView2
+   sometimes mis-culls the big wire SVG inside (wires vanish until a window
+   resize forces a repaint). translateZ(0) on the SVG pins it the same way. */
+#wf-world { position:absolute; left:0; top:0; width:4000px; height:3000px; transform:translate(0px,0px); transform-origin:0 0;
+  will-change:transform; }
+#wf-wires { position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none;
+  transform:translateZ(0); }
 /* Wires carry a directional arrowhead (markers defined per-colour in <defs>, see
    WF_WIRE_DEFS) so the flow direction reads at a glance. Rounded joins keep
    the orthogonal bends clean. A wider transparent stroke under each path
@@ -565,11 +594,20 @@
   background:var(--accent); pointer-events:none; z-index:4; }
 .wf-node.wf-entry::after { display:none; }
 /* Run trail: a node that finished this run (green = ran ok, red = action failed).
+   State recolours the WHOLE card (bg + header + title), not just the border —
+   a thin ring alone was too close to a plain block to read at a glance. The
+   category header tint gives way while the trail is showing (state > category).
    Defined before .running so the live amber glow still wins on the active node. */
-.wf-node.ran-ok   { border-color:var(--run-ok); }
-.wf-node.ran-ok::after { box-shadow:0 0 0 1.5px rgba(31,157,87,.55), 0 2px 7px rgba(31,157,87,.16); }
-.wf-node.ran-fail { border-color:var(--run-fail); }
-.wf-node.ran-fail::after { box-shadow:0 0 0 1.5px rgba(214,72,63,.55), 0 2px 7px rgba(214,72,63,.18); }
+.wf-node.ran-ok   { border-color:var(--run-ok); background:#f2fbf5; }
+.wf-node.ran-ok::after { box-shadow:0 0 0 1.5px rgba(31,157,87,.55), 0 2px 8px rgba(31,157,87,.22); }
+.wf-node.ran-ok .wf-node-hd { background:#dcf3e4; border-bottom-color:#a7dcbb; }
+.wf-node.ran-ok .wf-node-title { color:#166534; }
+.wf-node.ran-ok .ico { color:#1f9d57; }
+.wf-node.ran-fail { border-color:var(--run-fail); background:#fdf4f3; }
+.wf-node.ran-fail::after { box-shadow:0 0 0 1.5px rgba(214,72,63,.55), 0 2px 7px rgba(214,72,63,.2); }
+.wf-node.ran-fail .wf-node-hd { background:#fbe0dd; border-bottom-color:#f0b3ad; }
+.wf-node.ran-fail .wf-node-title { color:#991b1b; }
+.wf-node.ran-fail .ico { color:#d6483f; }
 /* Reached-but-not blocks: a finished run never entered these (a branch not
    taken). Their top accent bar reds out and the whole block dims, so the path
    that DID run stays the bright green trail and the skipped paths recede. */
@@ -633,13 +671,16 @@
 .wf-ctx-ico { display:flex; align-items:center; color:var(--muted); }
 .wf-ctx-ico svg { width:14px; height:14px; display:block; }
 .wf-ctx-item:hover .wf-ctx-ico { color:var(--accent); }
-/* The block the engine is on right now: a bright orange fill so it pops
-    against the green/red run trail and is instantly readable. */
-.wf-node.running { border-color:#f97316 !important; background:#fff7ed;
-  animation:wfRun 1s ease-in-out infinite; }
-.wf-node.running::after { box-shadow:0 0 0 3px rgba(249,115,22,.35), 0 0 12px rgba(249,115,22,.5); }
-.wf-node.running .wf-node-hd { background:#ffedd5; border-bottom-color:#fdba74; }
-.wf-node.running .wf-node-title { color:#9a3412; }
+/* The block the engine is on right now — readable from across the desk:
+   saturated amber card + a double pulsing halo (ring + wide glow), and the
+   node rises above its neighbours so the glow is never buried under another
+   card. Shadow-only emphasis (no transform: ports/wires must not shift). */
+.wf-node.running { border-color:#ea580c !important; background:#fff3e4;
+  z-index:var(--z-node-hover); }
+.wf-node.running::after { box-shadow:0 0 0 3px rgba(249,115,22,.5), 0 0 16px 3px rgba(249,115,22,.45); }
+.wf-node.running .wf-node-hd { background:#ffe1bf; border-bottom-color:#fb923c; }
+.wf-node.running .wf-node-title { color:#7c2d12; }
+.wf-node.running .ico { color:#ea580c; }
 /* ── Terminals (start/end) — an icon-sized round chip carrying a white glyph,
    matching the rounded, icon-first language of every other block instead of a
    bare geometric triangle. The card is a 30px circle so the sel/running/ran-*
@@ -730,9 +771,14 @@
 .wf-var-row .cb { width:17px; height:17px; border-radius:5px; border:1.5px solid #cfd5dd; background:var(--panel); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
 .wf-var-row .cb.checked { background:var(--accent); border-color:var(--accent); }
 .wf-var-row .cb svg { opacity:0; } .wf-var-row .cb.checked svg { opacity:1; }
-@keyframes wfRun { 0%,100%{ } 50%{ } }
-@keyframes wfRunGlow { 0%,100%{ box-shadow:0 0 0 3px rgba(249,115,22,.35), 0 0 12px rgba(249,115,22,.5);} 50%{ box-shadow:0 0 0 3px rgba(249,115,22,.65), 0 0 24px rgba(249,115,22,.9);} }
-.wf-node.running::after { animation:wfRunGlow 1s ease-in-out infinite; }
+/* Halo pulse: the ring widens 3→6px while the outer glow swells — one clear
+   heartbeat per ~0.9s. Reduced motion (global rule) freezes it at the strong
+   base frame, so the running block still reads without animation. */
+@keyframes wfRunGlow {
+  0%,100% { box-shadow:0 0 0 3px rgba(249,115,22,.5),  0 0 14px 2px  rgba(249,115,22,.4); }
+  50%     { box-shadow:0 0 0 6px rgba(249,115,22,.78), 0 0 30px 10px rgba(249,115,22,.6); }
+}
+.wf-node.running::after { animation:wfRunGlow .9s ease-in-out infinite; }
 .wf-node.note { width:var(--node-w); border:1px solid #e7d5a4; background:#fdf6e9; }
 .wf-node.note .wf-node-hd { background:transparent; border-bottom:1px dashed #e7d5a4; }
 .wf-node.note .wf-node-sum { white-space:normal; color:#7a5b12; font-family:var(--sans); font-size:11px; }
@@ -840,6 +886,21 @@
   background:var(--alt); border-radius:999px; padding:1px 7px; }
 .wf-find-item .w.here { color:var(--accent); background:var(--accent-bg); }
 .wf-find-empty { font-size:11px; color:var(--muted); padding:8px 10px; }
+
+/* ── Validation panel — reuses the finder card, docked top-centre ──────────── */
+.wf-vald { width:min(480px, calc(100% - 24px)); }
+.wf-vald-bar { display:flex; align-items:center; gap:8px; padding:8px 10px;
+  border-bottom:1px solid var(--line); }
+.wf-vald-bar > svg { width:15px; height:15px; color:var(--warn); flex-shrink:0; }
+.wf-vald-sum { font-size:12px; color:var(--dim); }
+.wf-vald-sum .e  { color:var(--err); font-weight:700; }
+.wf-vald-sum .w  { color:var(--warn); font-weight:700; }
+.wf-vald-sum .ok { color:var(--ok); font-weight:700; }
+.wf-vald-bar .wf-pal-search-clr { position:static; }
+.wf-vald-sev { flex-shrink:0; font-size:8.5px; font-weight:800; letter-spacing:.03em;
+  border-radius:4px; padding:2px 5px; min-width:34px; text-align:center; }
+.wf-vald-sev.err  { color:var(--err);  background:var(--err-bg);  border:1px solid var(--err-bd); }
+.wf-vald-sev.warn { color:var(--warn); background:var(--warn-bg); border:1px solid #e7d5a4; }
 
 /* Failure screenshot in the inspector (last test run). */
 .wf-fail-shot { display:block; width:100%; max-height:210px; object-fit:contain;

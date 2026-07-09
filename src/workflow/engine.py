@@ -172,6 +172,14 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "win_launch":   {"label": "Mở chương trình", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_activate": {"label": "Đưa cửa sổ lên trước", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_close":    {"label": "Đóng cửa sổ", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_resize":   {"label": "Thay đổi kích thước", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_move":     {"label": "Di chuyển cửa sổ", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_minimize": {"label": "Thu nhỏ", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_maximize": {"label": "Phóng to", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_restore":  {"label": "Khôi phục", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_always_on_top": {"label": "Luôn trên cùng", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_set_title": {"label": "Đổi tiêu đề", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_style":    {"label": "Đổi kiểu cửa sổ", "kind": "action", "ins": 1, "outs": ["out"]},
 }
 
 # ── Emulator launch specs ─────────────────────────────────────────────────────
@@ -338,6 +346,14 @@ class WorkflowEngine:
             "win_launch":   self._a_win_launch,
             "win_activate": self._a_win_activate,
             "win_close":    self._a_win_close,
+            "win_resize":   self._a_win_resize,
+            "win_move":     self._a_win_move,
+            "win_minimize": self._a_win_minimize,
+            "win_maximize": self._a_win_maximize,
+            "win_restore":  self._a_win_restore,
+            "win_always_on_top": self._a_win_always_on_top,
+            "win_set_title": self._a_win_set_title,
+            "win_style":    self._a_win_style,
             "app_stop":     self._a_app_stop,
             "app_uninstall": self._a_app_uninstall,
             "app_exit":     self._a_app_exit,
@@ -448,6 +464,9 @@ class WorkflowEngine:
         self._controller = str(self.flow.get("controller") or "adb").strip().lower()
         self._win32_cfg = dict(self.flow.get("win32") or {})
         self.speedhack_cfg = dict(self.flow.get("speedhack") or {})
+        # OCR engine của flow ("tesseract" / "easyocr" / "paddleocr"…; rỗng = auto):
+        # chọn trong Project settings của designer, áp dụng ở _ensure_ready().
+        self._ocr_backend = str(self.flow.get("ocr") or "").strip().lower()
         self._functions = {f.get("id"): f for f in (self.flow.get("functions") or []) if f.get("id")}
         # Global vars: declared at flow top level (``globals``), seeded into every
         # thread below. Reset the shared runtime dict on (re)load.
@@ -501,6 +520,30 @@ class WorkflowEngine:
 
     # ── Lifecycle ────────────────────────────────────────────────────────────
 
+    def _apply_ocr_backend(self) -> None:
+        """Đổi OCR engine của automation theo cấu hình flow (rỗng = giữ mặc định).
+
+        Gọi sau khi backend (ADB/Win32) sẵn sàng — cả hai đều có ``self.auto.ocr``
+        (OCRReader). Backend không khả dụng chỉ cảnh báo, không chặn run.
+        """
+        name = getattr(self, "_ocr_backend", "")
+        if not name:
+            return
+        try:
+            ocr = getattr(self.auto, "ocr", None)
+            if ocr is None or getattr(ocr, "backend_name", None) == name:
+                return
+            if hasattr(self.auto, "set_ocr_backend"):
+                ok = bool(self.auto.set_ocr_backend(name))
+            else:
+                ok = bool(ocr.set_backend(name))
+            if ok:
+                log_info(f"[workflow] OCR engine: {name}")
+            else:
+                log_warning(f"[workflow] OCR '{name}' không khả dụng — dùng engine mặc định")
+        except Exception as e:
+            log_warning(f"[workflow] Không đổi được OCR engine '{name}': {e}")
+
     def _ensure_ready(self) -> bool:
         """Connect the selected backend + start continuous capture if needed."""
         if getattr(self, "_controller", "adb") == "win32":
@@ -514,6 +557,7 @@ class WorkflowEngine:
             self.auto._update_screen_size()
             if not getattr(self.auto, "capture_running", False):
                 self.auto.start_continuous_capture()
+            self._apply_ocr_backend()
             return True
         except Exception as e:
             log_error(f"[workflow] Not ready: {e}")
@@ -546,6 +590,7 @@ class WorkflowEngine:
             self.auto._update_screen_size()
             if not getattr(self.auto, "capture_running", False):
                 self.auto.start_continuous_capture()
+            self._apply_ocr_backend()
             return True
         except Exception as e:
             log_error(f"[workflow] Win32 not ready: {e}")
@@ -980,7 +1025,12 @@ class WorkflowEngine:
             else:  # action (or unknown -> just follow out)
                 ok_act = True
                 handler = self._actions.get(ntype)
-                if handler is not None:
+                if ntype == "note":
+                    # Ghi chú không phải block thực thi — nếu lỡ bị đấu dây vào
+                    # đường chạy thì bỏ qua êm (đi tiếp cổng out, thường không có)
+                    # thay vì rơi xuống "Unknown node" và fail cả nhánh.
+                    pass
+                elif handler is not None:
                     ok_act = self._run_action_with_retry(node, params, handler)
                 else:
                     log_warning(f"[workflow] Unknown node: {ntype}")
@@ -1319,17 +1369,29 @@ class WorkflowEngine:
         tol = max(0, int(params.get("tolerance", 10) or 0))
         if ntype == "if_color":
             negate = bool(params.get("negate", False))
-            px = self._pixel_at(int(params.get("x", 0)), int(params.get("y", 0)))
+            x, y = int(params.get("x", 0)), int(params.get("y", 0))
+            px = self._pixel_at(x, y)
             ok = px is not None and self._color_close(px, target, tol)
+            if ok:
+                # Lưu vị trí "found" như các node ảnh — để "Tap → last found
+                # image" sau một node màu chạm đúng điểm vừa kiểm tra.
+                self._last_pos = (x, y)
             return ok != negate
         if ntype == "wait_color":
             x, y = int(params.get("x", 0)), int(params.get("y", 0))
+            negate = bool(params.get("negate", False))
             end = time.time() + max(0.0, float(params.get("timeout", 10.0)))
             while not self._stop.is_set():
                 self._pause.wait()
                 px = self._pixel_at(x, y)
-                if px is not None and self._color_close(px, target, tol):
+                ok = px is not None and self._color_close(px, target, tol)
+                if ok and not negate:
+                    self._last_pos = (x, y)
                     log_info(f"[workflow] 🎨 thấy màu {self._bgr_to_hex(target)} tại ({x}, {y})")
+                    return True
+                if negate and not ok:
+                    # Đảo: chờ đến khi màu BIẾN MẤT (nút sáng → tối, loading xong…).
+                    log_info(f"[workflow] 🎨 màu {self._bgr_to_hex(target)} đã biến mất tại ({x}, {y})")
                     return True
                 if time.time() >= end:
                     return False
@@ -1458,24 +1520,54 @@ class WorkflowEngine:
             return self._tap_at(res[0], res[1], params, label=os.path.basename(tpl))
         if ntype == "wait_image":
             tpl = self._resolve_template(params.get("template", ""))
+            threshold = float(params.get("threshold", 0.85))
+            timeout = float(params.get("timeout", 10.0))
+            region = self._search_region(params)
+            if bool(params.get("negate", False)):
+                # Đảo: chờ đến khi ảnh BIẾN MẤT (màn hình loading, hộp thoại…)
+                # — true ngay khi không còn thấy template; hết timeout → false.
+                end = time.time() + max(0.0, timeout)
+                while not self._stop.is_set():
+                    self._pause.wait()
+                    if self.auto.find_template(tpl, threshold=threshold, region=region) is None:
+                        log_info(f"[workflow] 🔍 ảnh {os.path.basename(tpl)} đã biến mất")
+                        return True
+                    if time.time() >= end:
+                        return False
+                    time.sleep(0.25)
+                return False
             res = self.auto.wait_for_template(
-                tpl, timeout=float(params.get("timeout", 10.0)),
-                threshold=float(params.get("threshold", 0.85)),
-                region=self._search_region(params),
+                tpl, timeout=timeout, threshold=threshold, region=region,
             )
             if res:
                 self._last_pos = (res[0], res[1])
                 log_info(f"[workflow] 🔍 thấy ảnh {os.path.basename(tpl)} ({res[0]}, {res[1]})")
             return res is not None
         if ntype == "wait_text":
+            needle = str(self._resolve_value(params.get("text", "")) or "")
+            region = self._region(params)
+            wl = self._ocr_whitelist(params)
+            timeout = float(params.get("timeout", 10.0))
+            if bool(params.get("negate", False)):
+                # Đảo: chờ đến khi chữ BIẾN MẤT khỏi vùng OCR.
+                end = time.time() + max(0.0, timeout)
+                while not self._stop.is_set():
+                    self._pause.wait()
+                    found, _read = self.auto.region_find_text(needle, region=region, whitelist=wl)
+                    if not found:
+                        log_info(f"[workflow] 🔤 chữ '{needle}' đã biến mất")
+                        return True
+                    if time.time() >= end:
+                        return False
+                    time.sleep(0.5)   # OCR nặng hơn match ảnh — poll thưa hơn
+                return False
             return bool(self.auto.wait_for_text_in_region(
-                str(params.get("text", "")), region=self._region(params),
-                timeout=float(params.get("timeout", 10.0)),
-                whitelist=self._ocr_whitelist(params),
+                needle, region=region, timeout=timeout, whitelist=wl,
             ))
         if ntype == "if_text":
             negate = bool(params.get("negate", False))
-            needle = str(params.get("text", ""))
+            # needle nhận biến — đồng bộ với if_app.package.
+            needle = str(self._resolve_value(params.get("text", "")) or "")
             region = self._region(params)
             found, read = self.auto.region_find_text(
                 needle, region=region, whitelist=self._ocr_whitelist(params))
@@ -1669,7 +1761,8 @@ class WorkflowEngine:
             elif kind in ("start", "end", "note", "stop"):
                 # Terminals/notes have no side-effects; just report ok.
                 port = None
-            elif kind in ("loop", "parallel", "join", "random", "switch", "call"):
+            elif kind in ("loop", "loop_until", "parallel", "and", "join",
+                          "random", "switch", "try_chain", "call"):
                 # Structural nodes don't make sense standalone; report no-op.
                 log_info(f"[workflow] Block '{ntype}' là cấu trúc — chạy trong luồng")
                 port = None
@@ -1928,9 +2021,11 @@ class WorkflowEngine:
 
     def _a_tap(self, node, p) -> bool:
         x, y = self._pos(p)
-        ok = self.auto.tap(x, y)
+        # taps=2 → chạm đúp: gộp công dụng của node double_tap (đã ẩn khỏi palette).
+        taps = 2 if str(p.get("taps", "1")) == "2" else 1
+        ok = self.auto.tap(x, y, tap_count=taps)
         if ok:
-            log_info(f"[workflow] 👆 chạm ({x}, {y})")
+            log_info(f"[workflow] 👆 chạm ({x}, {y})" + (" ×2" if taps == 2 else ""))
         return ok
 
     def _a_double_tap(self, node, p) -> bool:
@@ -1962,7 +2057,8 @@ class WorkflowEngine:
 
     def _a_tap_random(self, node, p) -> bool:
         x, y = int(p.get("x", 0)), int(p.get("y", 0))
-        w, h = int(p.get("w", 0)), int(p.get("h", 0))
+        # Mặc định khớp designer (100×100) — w/h=0 sẽ thoái hóa thành tap thường.
+        w, h = int(p.get("w", 100)), int(p.get("h", 100))
         rx = x + (random.randint(0, w) if w > 0 else 0)
         ry = y + (random.randint(0, h) if h > 0 else 0)
         ok = self.auto.tap(rx, ry)
@@ -2135,7 +2231,8 @@ class WorkflowEngine:
         return True
 
     def _a_send_text(self, node, p) -> bool:
-        return self.auto.send_text(str(p.get("text", "")))
+        # Điền {var} vào text (giống Log) — gõ giá trị biến ra ô nhập của game.
+        return self.auto.send_text(self._format_msg(str(p.get("text", ""))))
 
     def _a_key(self, node, p) -> bool:
         code = p.get("keycode", "")
@@ -2234,7 +2331,8 @@ class WorkflowEngine:
             return False
 
     def _a_launch_app(self, node, p) -> bool:
-        pkg = str(p.get("package", "")).strip()
+        # package nhận biến ({var} hoặc tên biến trần) — đồng bộ với app_stop/if_app.
+        pkg = str(self._resolve_value(p.get("package", "")) or "").strip()
         if not pkg or not self.auto.adb.launch_app(pkg):
             return False
         # Optional: block until the app is actually in the foreground (0 = don't
@@ -2276,7 +2374,8 @@ class WorkflowEngine:
         return True
 
     def _a_notify(self, node, p) -> bool:
-        title   = str(p.get("title", "Workflow")).strip() or "Workflow"
+        # Title cũng điền {var} như message (designer đánh dấu insertVar cả hai).
+        title   = self._format_msg(str(p.get("title", "Workflow"))).strip() or "Workflow"
         message = self._format_msg(str(p.get("message", "Đã hoàn thành!")))
         sound   = bool(p.get("sound", True))
         log_info(f"[workflow] 🔔 [{title}] {message}")
@@ -2613,3 +2712,70 @@ class WorkflowEngine:
         if ctrl is None:
             return False
         return bool(ctrl.close_window())
+
+    def _a_win_resize(self, node, p) -> bool:
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        w = int(p.get("width", 1280))
+        h = int(p.get("height", 720))
+        ok = bool(ctrl.resize_window(w, h))
+        log_info(f"[workflow] 🪟 resize → {w}×{h}")
+        return ok
+
+    def _a_win_move(self, node, p) -> bool:
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        x = int(p.get("x", 0))
+        y = int(p.get("y", 0))
+        ok = bool(ctrl.move_window(x, y))
+        log_info(f"[workflow] 🪟 move → ({x}, {y})")
+        return ok
+
+    def _a_win_minimize(self, node, p) -> bool:
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        return bool(ctrl.minimize_window())
+
+    def _a_win_maximize(self, node, p) -> bool:
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        return bool(ctrl.maximize_window())
+
+    def _a_win_restore(self, node, p) -> bool:
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        return bool(ctrl.restore_window())
+
+    def _a_win_always_on_top(self, node, p) -> bool:
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        on = bool(p.get("enabled", True))
+        ok = bool(ctrl.set_always_on_top(on))
+        log_info(f"[workflow] 🪟 always on top → {on}")
+        return ok
+
+    def _a_win_set_title(self, node, p) -> bool:
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        title = str(p.get("title", "")).strip()
+        if not title:
+            return True
+        ok = bool(ctrl.set_window_title(title))
+        log_info(f"[workflow] 🪟 title → '{title}'")
+        return ok
+
+    def _a_win_style(self, node, p) -> bool:
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        style = str(p.get("style", "windowed")).strip()
+        ok = bool(ctrl.set_window_style(style))
+        log_info(f"[workflow] 🪟 style → {style}")
+        return ok

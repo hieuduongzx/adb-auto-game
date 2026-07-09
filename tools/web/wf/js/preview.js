@@ -71,6 +71,10 @@ function wfSwitchView(view){
     if(scopePanel) scopePanel.style.display="none";
     if(inspTitle) inspTitle.textContent="Properties";
     wfZoomApplyMode("canvas");  // hand the zoom cluster back to the graph
+    // Nếu có lượt vẽ dây rơi vào lúc canvas còn ẩn (render trong tab Preview:
+    // focus-follow, undo, event engine…), vẽ lại ngay khi world hiện trở lại —
+    // không thì dây biến mất đến lần render kế tiếp.
+    if(typeof wfWiresStale!=="undefined" && wfWiresStale) wfDrawWires();
   }
 }
 
@@ -79,10 +83,9 @@ function wfSwitchView(view){
 // Preview mode wires it to the mirror (wfPvZoomBy/wfPvResetZoom/wfPvFit) and
 // refreshes the label from the current preview zoom.
 function wfZoomApplyMode(mode){
-  const zspan=document.querySelector(".wf-zoom");
-  if(!zspan) return;
-  const btns=zspan.querySelectorAll("button");
-  const out=btns[0], fit=btns[btns.length-1], inb=btns.length>=3?btns[1]:null;
+  const out=document.getElementById("wf-zoom-out"),
+        inb=document.getElementById("wf-zoom-in"),
+        fit=document.getElementById("wf-zoom-fit");
   const lbl=document.getElementById("wf-zoom-lbl");
   if(mode==="preview"){
     if(out) out.onclick=()=>wfPvZoomBy(1/1.1);

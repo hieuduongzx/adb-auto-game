@@ -3,9 +3,9 @@
   "previewAll": true,
   "logOpen": true,
   "sideW": 332,
-  "inspW": 280,
+  "inspW": 311,
   "minimap": false,
   "alignGuides": true,
   "previewHz": 60,
-  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\BrownDust2\\bd2.json"
+  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\GirlWars\\GirlWars.json"
 }

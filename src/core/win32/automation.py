@@ -76,6 +76,13 @@ class Win32Controller:
         pretend-activate via WM_ACTIVATE, briefly move the hardware cursor to
         the target, send the messages synchronously, restore the cursor. Works
         for cursor-polling games while the window stays behind others.
+      - ``"background_frida_api"``   — Frida-injected hook of ``GetCursorPos`` /
+        ``GetMessagePos`` inside the game process. The real cursor never moves
+        and the window is never activated, but cursor-polling games read the
+        faked coordinates. Requires ``pip install frida``.
+      - ``"background_frida_engine"`` — Frida hook at the engine level
+        (Unity Mono / IL2CPP) when available, otherwise falls back to the API
+        hook. Same "no real cursor move" guarantee.
       - ``"foreground"``        — bring the window forward and use real mouse input.
     """
 
@@ -89,6 +96,8 @@ class Win32Controller:
         self._cap_method: Optional[str] = None
         # Windows Graphics Capture session state (lazily started by _cap_wgc).
         self._wgc: Optional[dict] = None
+        # Frida-based input session (background_frida_* modes).
+        self._frida: Optional["FridaWin32Input"] = None
         # ADBController-compat attributes the engine reads.
         self.device_id = None
 
@@ -100,6 +109,11 @@ class Win32Controller:
         self.hwnd = None
         self._cap_method = None
         self._wgc_stop()
+        # Drop any Frida session when leaving a frida-based input mode.
+        new_mode = str(self.cfg.get("inputMode", "background")).strip().lower()
+        if not new_mode.startswith("background_frida") and self._frida is not None:
+            self._frida.detach()
+            self._frida = None
 
     @property
     def _match(self) -> Tuple[str, str, str]:
@@ -446,6 +460,177 @@ class Win32Controller:
         except Exception:
             return False
 
+    def _get_window_rect(self) -> Optional[Tuple[int, int, int, int]]:
+        """Return (left, top, right, bottom) in screen coordinates, or None."""
+        if not self.hwnd:
+            return None
+        try:
+            return self._w[1].GetWindowRect(self.hwnd)
+        except Exception:
+            return None
+
+    def _is_borderless(self) -> bool:
+        """Detect borderless / popup window (no caption bar = engine-managed)."""
+        if not self.hwnd:
+            return False
+        try:
+            win32con, win32api = self._w[3], self._w[4]
+            style = win32api.GetWindowLong(self.hwnd, win32con.GWL_STYLE)
+            # Borderless games usually use WS_POPUP without WS_CAPTION / WS_THICKFRAME.
+            has_caption = bool(style & win32con.WS_CAPTION)
+            has_thickframe = bool(style & win32con.WS_THICKFRAME)
+            return not has_caption and not has_thickframe
+        except Exception:
+            return False
+
+    def resize_window(self, width: int, height: int) -> bool:
+        if not self.hwnd:
+            return False
+        win32gui, win32con = self._w[1], self._w[3]
+        try:
+            rect = self._get_window_rect()
+            if rect is None:
+                return False
+            l, t, r, b = rect
+
+            # If maximized, restore first so resize can take effect.
+            placement = win32gui.GetWindowPlacement(self.hwnd)
+            if placement[1] == win32con.SW_SHOWMAXIMIZED:
+                log_info("[win32] window is maximized → restoring before resize")
+                win32gui.ShowWindow(self.hwnd, win32con.SW_RESTORE)
+                time.sleep(0.05)
+
+            borderless = self._is_borderless()
+            if borderless:
+                log_warning(
+                    "[win32] ⚠ Cửa sổ đang borderless (WS_POPUP, không viền). "
+                    "Game engine (Unity/DirectX) tự quản lý swapchain và thường ignore WM_SIZE. "
+                    "Resize qua Win32 API CÓ THỂ không có hiệu lực. "
+                    "→ Gợi ý: chuyển game sang Windowed mode (có viền) trong Settings game, "
+                    "hoặc dùng node 'Win style' để ép windowed (experimental)."
+                )
+
+            # Use MoveWindow (sends WM_SIZE). For borderless outer rect = client rect.
+            win32gui.MoveWindow(self.hwnd, l, t, int(width), int(height), True)
+            log_info(f"[win32] resize_window {l},{t} → {width}×{height}  (borderless={borderless})")
+            return True
+        except Exception as exc:
+            log_warning(f"[win32] resize_window lỗi: {exc}")
+            return False
+
+    def move_window(self, x: int, y: int) -> bool:
+        if not self.hwnd:
+            return False
+        win32gui = self._w[1]
+        try:
+            rect = self._get_window_rect()
+            if rect is None:
+                return False
+            _, _, r, b = rect
+            w, h = r - rect[0], b - rect[1]
+            win32gui.MoveWindow(self.hwnd, int(x), int(y), w, h, True)
+            log_info(f"[win32] move_window → ({x}, {y})  size {w}×{h}")
+            return True
+        except Exception as exc:
+            log_warning(f"[win32] move_window lỗi: {exc}")
+            return False
+
+    def minimize_window(self) -> bool:
+        if not self.hwnd:
+            return False
+        win32con = self._w[3]
+        try:
+            self._w[1].ShowWindow(self.hwnd, win32con.SW_MINIMIZE)
+            return True
+        except Exception as exc:
+            log_warning(f"[win32] minimize_window lỗi: {exc}")
+            return False
+
+    def maximize_window(self) -> bool:
+        if not self.hwnd:
+            return False
+        win32con = self._w[3]
+        try:
+            self._w[1].ShowWindow(self.hwnd, win32con.SW_MAXIMIZE)
+            return True
+        except Exception as exc:
+            log_warning(f"[win32] maximize_window lỗi: {exc}")
+            return False
+
+    def restore_window(self) -> bool:
+        if not self.hwnd:
+            return False
+        win32con = self._w[3]
+        try:
+            self._w[1].ShowWindow(self.hwnd, win32con.SW_RESTORE)
+            return True
+        except Exception as exc:
+            log_warning(f"[win32] restore_window lỗi: {exc}")
+            return False
+
+    def set_always_on_top(self, on_top: bool = True) -> bool:
+        if not self.hwnd:
+            return False
+        win32gui, win32con = self._w[1], self._w[3]
+        try:
+            z = win32con.HWND_TOPMOST if on_top else win32con.HWND_NOTOPMOST
+            win32gui.SetWindowPos(self.hwnd, z, 0, 0, 0, 0,
+                                  win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE | win32con.SWP_SHOWWINDOW)
+            return True
+        except Exception as exc:
+            log_warning(f"[win32] set_always_on_top lỗi: {exc}")
+            return False
+
+    def set_window_title(self, title: str) -> bool:
+        if not self.hwnd:
+            return False
+        try:
+            self._w[1].SetWindowText(self.hwnd, str(title))
+            return True
+        except Exception as exc:
+            log_warning(f"[win32] set_window_title lỗi: {exc}")
+            return False
+
+    def set_window_style(self, style_name: str = "windowed") -> bool:
+        """Experimental: change window style between windowed/borderless/popup.
+        
+        WARNING: Game engines may crash or fail to recreate swapchain when style
+        changes mid-flight. Use only when the game tolerates it."""
+        if not self.hwnd:
+            return False
+        win32gui, win32con, win32api = self._w[1], self._w[3], self._w[4]
+        try:
+            style = win32api.GetWindowLong(self.hwnd, win32con.GWL_STYLE)
+            exstyle = win32api.GetWindowLong(self.hwnd, win32con.GWL_EXSTYLE)
+            s = str(style_name).strip().lower()
+            if s == "windowed":
+                # Standard overlapped window with caption, border, thick frame
+                new_style = (win32con.WS_OVERLAPPEDWINDOW | win32con.WS_VISIBLE) & ~win32con.WS_POPUP
+                new_exstyle = exstyle & ~win32con.WS_EX_TOPMOST
+            elif s == "borderless":
+                # Borderless popup: no caption, no thick frame
+                new_style = (win32con.WS_POPUP | win32con.WS_VISIBLE | win32con.WS_CLIPCHILDREN) & ~win32con.WS_CAPTION & ~win32con.WS_THICKFRAME & ~win32con.WS_SYSMENU & ~win32con.WS_MINIMIZEBOX & ~win32con.WS_MAXIMIZEBOX
+                new_exstyle = exstyle & ~win32con.WS_EX_TOPMOST
+            elif s == "popup":
+                # Simple popup (may also be used by some engines)
+                new_style = win32con.WS_POPUP | win32con.WS_VISIBLE | win32con.WS_CLIPCHILDREN
+                new_exstyle = exstyle
+            else:
+                log_warning(f"[win32] unknown style '{style_name}' — use windowed/borderless/popup")
+                return False
+
+            win32api.SetWindowLong(self.hwnd, win32con.GWL_STYLE, new_style)
+            win32api.SetWindowLong(self.hwnd, win32con.GWL_EXSTYLE, new_exstyle)
+            win32gui.SetWindowPos(
+                self.hwnd, win32con.HWND_TOP, 0, 0, 0, 0,
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOZORDER | win32con.SWP_FRAMECHANGED | win32con.SWP_NOACTIVATE
+            )
+            log_info(f"[win32] set_window_style → {s} (experimental)")
+            return True
+        except Exception as exc:
+            log_warning(f"[win32] set_window_style lỗi: {exc}")
+            return False
+
     def launch_app(self, target: str) -> bool:
         """Start a program by exe path (with optional args), or focus a window
         whose title contains ``target`` if it's already open."""
@@ -475,6 +660,10 @@ class Win32Controller:
     def _cursor_mode(self) -> bool:
         return self._match[2] == "background_cursor"
 
+    def _frida_mode(self) -> bool:
+        m = self._match[2]
+        return m in ("background_frida_api", "background_frida_engine")
+
     def _send(self, msg: int, wparam: int, lparam: int) -> None:
         """SendMessage with an abort-if-hung timeout so a frozen game can't
         stall the whole engine thread."""
@@ -487,6 +676,8 @@ class Win32Controller:
             return self._tap_fg(x, y, duration, tap_count)
         if self._cursor_mode():
             return self._tap_bg_cursor(x, y, duration, tap_count)
+        if self._frida_mode():
+            return self._tap_bg_frida(x, y, duration, tap_count)
         return self._tap_bg(x, y, duration, tap_count)
 
     def _tap_bg(self, x, y, duration, tap_count) -> bool:
@@ -607,6 +798,8 @@ class Win32Controller:
             return False
         if self._cursor_mode():
             return self._swipe_bg_cursor(x1, y1, x2, y2, duration)
+        if self._frida_mode():
+            return self._swipe_bg_frida(x1, y1, x2, y2, duration)
         steps = max(2, int(max(1, duration) / 15))
         try:
             if self._foreground():
@@ -634,6 +827,66 @@ class Win32Controller:
             return True
         except Exception as exc:
             self._input_error("swipe", exc)
+            return False
+
+    def _ensure_frida(self) -> bool:
+        """Lazy-attach Frida to the current window's PID when needed."""
+        if self._frida is None:
+            from .frida_input import FridaWin32Input
+            self._frida = FridaWin32Input()
+        if not self.hwnd:
+            return False
+        win32process = self._w[5]
+        _, pid = win32process.GetWindowThreadProcessId(self.hwnd)
+        if not self._frida.ready or self._frida.pid != pid:
+            strategy = "engine" if self._match[2] == "background_frida_engine" else "api"
+            return self._frida.attach(self.hwnd, strategy=strategy)
+        return True
+
+    def _tap_bg_frida(self, x, y, duration, tap_count) -> bool:
+        """Frida-based tap: hooks GetCursorPos/GetMessagePos inside the game
+        so the game reads fake coordinates while the real cursor never moves."""
+        win32gui = self._w[1]
+        lp = _lparam(x, y)
+        try:
+            if not self._ensure_frida():
+                return False
+            sx, sy = win32gui.ClientToScreen(self.hwnd, (int(x), int(y)))
+            self._frida.set_target(sx, sy)
+            win32gui.PostMessage(self.hwnd, _WM_MOUSEMOVE, 0, lp)
+            for i in range(max(1, int(tap_count))):
+                down = _WM_LBUTTONDBLCLK if (tap_count >= 2 and i > 0) else _WM_LBUTTONDOWN
+                win32gui.PostMessage(self.hwnd, down, _MK_LBUTTON, lp)
+                time.sleep(max(0.02, float(duration)))
+                win32gui.PostMessage(self.hwnd, _WM_LBUTTONUP, 0, lp)
+                if tap_count >= 2:
+                    time.sleep(0.04)
+            self._frida.clear_target()
+            return True
+        except Exception as exc:
+            self._input_error("tap(frida)", exc)
+            return False
+
+    def _swipe_bg_frida(self, x1, y1, x2, y2, duration) -> bool:
+        """Frida-based swipe: updates the hooked cursor position each step."""
+        win32gui = self._w[1]
+        steps = max(2, int(max(1, duration) / 15))
+        try:
+            if not self._ensure_frida():
+                return False
+            win32gui.PostMessage(self.hwnd, _WM_LBUTTONDOWN, _MK_LBUTTON, _lparam(x1, y1))
+            for i in range(1, steps + 1):
+                cx = int(x1 + (x2 - x1) * i / steps)
+                cy = int(y1 + (y2 - y1) * i / steps)
+                sx, sy = win32gui.ClientToScreen(self.hwnd, (cx, cy))
+                self._frida.set_target(sx, sy)
+                win32gui.PostMessage(self.hwnd, _WM_MOUSEMOVE, _MK_LBUTTON, _lparam(cx, cy))
+                time.sleep(duration / 1000.0 / steps)
+            self._frida.clear_target()
+            win32gui.PostMessage(self.hwnd, _WM_LBUTTONUP, 0, _lparam(x2, y2))
+            return True
+        except Exception as exc:
+            self._input_error("swipe(frida)", exc)
             return False
 
     def drag(self, x1: int, y1: int, x2: int, y2: int, duration: int = 300) -> bool:

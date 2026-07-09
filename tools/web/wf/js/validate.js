@@ -71,22 +71,58 @@ function wfCenterOnNode(n){
   const ty=canvas.clientHeight/2-(n.y+30)*wfZoom;
   wfAnimateCamera(tx,ty,wfZoom,240);
 }
+// ── Validation panel — a docked list over the canvas (click a row → jump to
+// the node). Replaces the old truncated alert(); stays open while fixing so
+// each repaired issue is one click away from the next.
+function wfValidatePanelClose(){
+  const p=document.getElementById("wf-vald"); if(p) p.remove();
+}
+function wfValidatePanelShow(issues){
+  wfValidatePanelClose();
+  issues = issues || wfValidationIssues();
+  const canvas=$("wf-canvas"); if(!canvas) return;
+  const errs=issues.filter(i=>i.sev==="err").length;
+  const warns=issues.length-errs;
+  const p=document.createElement("div"); p.className="wf-find wf-vald"; p.id="wf-vald";
+  const sum = issues.length
+    ? `<b class="e">${errs} lỗi</b> · <b class="w">${warns} cảnh báo</b>`
+    : `<b class="ok">✓ Không có vấn đề nào</b>`;
+  p.innerHTML=`<div class="wf-vald-bar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      <span class="wf-vald-sum">${sum}</span>
+      <span class="spacer"></span>
+      <button class="btn sm" id="wf-vald-re">Kiểm tra lại</button>
+      <button class="wf-pal-search-clr" id="wf-vald-x" title="Đóng (Esc)" aria-label="Đóng">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="wf-find-list" id="wf-vald-list"></div>`;
+  canvas.appendChild(p);
+  const list=p.querySelector("#wf-vald-list");
+  if(!issues.length){
+    list.innerHTML=`<div class="wf-find-empty">Workflow sẵn sàng chạy — không thấy dây đứt, thiếu template hay nhánh hỏng.</div>`;
+  }
+  issues.forEach(i=>{
+    const row=document.createElement("button"); row.type="button"; row.className="wf-find-item";
+    row.innerHTML=`<span class="wf-vald-sev ${i.sev}">${i.sev==="err"?"LỖI":"CHÚ Ý"}</span>`+
+      `<span class="t">${escHtml(i.ctx.name)}</span><span class="s">${escHtml(i.msg)}</span>`;
+    row.onclick=()=>wfFocusIssue(i);
+    list.appendChild(row);
+  });
+  p.querySelector("#wf-vald-x").onclick=wfValidatePanelClose;
+  p.querySelector("#wf-vald-re").onclick=()=>wfValidatePanelShow();
+}
 function wfValidateShow(){
   const issues=wfValidationIssues();
   const errs=issues.filter(i=>i.sev==="err").length;
   const warns=issues.length-errs;
-  if(!issues.length){ setStatus("Workflow check passed"); alert("✓ Workflow check passed"); return true; }
-  let html=`Workflow check: ${errs} error(s), ${warns} warning(s)\n\n`;
-  html+=issues.slice(0,30).map((i,idx)=>`${idx+1}. [${i.sev.toUpperCase()}] ${i.ctx.name}: ${i.msg}`).join("\n");
-  if(issues.length>30) html+=`\n… +${issues.length-30} more`;
-  alert(html);
-  setStatus(`Workflow check: ${errs} errors, ${warns} warnings`);
-  wfFocusIssue(issues[0]);
+  setStatus(issues.length?`Kiểm tra: ${errs} lỗi, ${warns} cảnh báo`:"Kiểm tra workflow: OK");
+  wfValidatePanelShow(issues);
   return errs===0;
 }
 async function wfRunFromSelected(step){
   if(wfRunning){ setStatus("Workflow is already running"); return; }
-  if(!WF.activities.length){ alert("No activities."); return; }
+  if(!WF.activities.length){ uiToast("Chưa có activity nào.","warning"); return; }
   const g=wfGraph(), node=WF.selectedNode&&wfNode(WF.selectedNode);
   const startId=node ? node.id : null;
   if(!startId){ setStatus("Select a block first"); return; }

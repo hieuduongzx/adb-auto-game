@@ -98,7 +98,7 @@ function wfToggleVarsPanel(ev){
 }
 
 function wfToggleLog(ev){
-  if(ev && ev.target.closest(".btn-log-clear")) return;   // let "Clear" act without toggling
+  if(ev && ev.target.closest(".btn-log-clear, .log-filters")) return;   // let Clear/Copy/filter act without toggling
   const c=$("log-card"); if(!c) return;
   const isCollapsed = c.classList.contains("collapsed");
   if (isCollapsed) {
@@ -110,6 +110,24 @@ function wfToggleLog(ev){
     c.classList.add("collapsed");
   }
   wfSaveSettings();
+}
+
+// Lọc log theo mức (INF/OK/WRN/ERR) — set data-filter trên #log-card, CSS ẩn
+// các dòng khác mức; "Tất cả" gỡ filter.
+function wfLogFilter(f, ev){
+  if(ev) ev.stopPropagation();
+  const card=$("log-card"); if(!card) return;
+  if(f==="all") card.removeAttribute("data-filter"); else card.setAttribute("data-filter",f);
+  document.querySelectorAll("#log-filters .log-f").forEach(b=>b.classList.toggle("on", b.dataset.f===f));
+  if(card.classList.contains("collapsed")) wfToggleLog();   // lọc là để đọc — mở log ra
+}
+function wfCopyLog(ev){
+  if(ev) ev.stopPropagation();
+  const body=$("log-body"); if(!body) return;
+  const txt=[...body.querySelectorAll(".log-line")].map(l=>l.textContent.replace(/\s+/g," ").trim()).join("\n");
+  if(!txt){ setStatus("Log trống"); return; }
+  navigator.clipboard.writeText(txt).then(()=>uiToast("Đã copy "+body.children.length+" dòng log","success"))
+    .catch(()=>uiToast("Không copy được log","error"));
 }
 
 // ── Device handlers ─────────────────────────────────────────────────────────
@@ -128,14 +146,17 @@ async function openDevHelper(){ try{ await api().open_dev_helper(JSON.stringify(
 
 // New blank workflow.
 async function wfNew(){
-  if((WF.activities.length || WF.functions.length) &&
-     !confirm("Create a new workflow? Unsaved changes will be lost.")) return;
-  const name = prompt("Workflow name:", "My Workflow");
+  if(WF.activities.length || WF.functions.length){
+    const ok=await uiConfirm({title:"Tạo workflow mới?", message:"Thay đổi chưa lưu của workflow hiện tại sẽ mất.", ok:"Tạo mới", danger:true});
+    if(!ok) return;
+  }
+  const name = await uiPrompt({title:"Workflow mới", label:"Tên workflow", value:"My Workflow"});
   if(name===null) return; // cancelled
   WF.name = name.trim() || "My Workflow";
   WF.version=2; WF.templatesDir="templates";
   WF.speedhack={enabled:false, speed:2.0, package:""};
   WF.controller="adb"; WF.win32={window:"", matchBy:"title", inputMode:"background"};
+  WF.ocrBackend=""; if(typeof wfSyncOcrUI==="function") wfSyncOcrUI();
   WF.activities=[]; WF.functions=[]; WF.edit={kind:"activity",id:null};
   WF.sel=[]; WF.selectedNode=null; wfPan={x:0,y:0}; wfZoom=1; wfRunNode=null;
   const nm=$("wf-name"); if(nm) nm.value=WF.name;

@@ -73,7 +73,8 @@
   --sh-md: 0 2px 8px rgba(20,30,45,.08);
   --sh-lg: 0 10px 30px rgba(20,30,45,.16);
   /* Semantic z-index scale — no arbitrary 999s. */
-  --z-node: 2; --z-selbox: 1; --z-node-hover: 6; --z-menu: 50; --z-toast: 60;
+  --z-node: 2; --z-selbox: 1; --z-node-hover: 6; --z-menu: 50;
+  --z-modal: 70; --z-toast: 80;
   --ease: cubic-bezier(0.16,1,0.3,1);
   color-scheme: light;
 }
@@ -331,6 +332,17 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .btn-log-clear { font-size: 11px; font-weight: 600; color: var(--muted);
   padding: 3px 7px; border-radius: 5px; transition: color .1s, background .1s; }
 .btn-log-clear:hover { color: var(--dim); background: var(--panel); }
+/* Level filter chips in the log header; data-filter on #log-card hides the rest. */
+.log-filters { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px;
+  padding: 2px; border-radius: 7px; background: var(--alt); border: 1px solid var(--border); }
+.log-f { font-family: var(--mono); font-size: 9.5px; font-weight: 700; color: var(--muted);
+  padding: 2px 7px; border-radius: 5px; transition: color .1s, background .1s; }
+.log-f:hover { color: var(--ink); }
+.log-f.on { background: var(--panel); color: var(--accent); box-shadow: 0 1px 2px rgba(20,30,45,.1); }
+#log-card[data-filter="info"]    .log-line:not(.lv-info)    { display: none; }
+#log-card[data-filter="success"] .log-line:not(.lv-success) { display: none; }
+#log-card[data-filter="warning"] .log-line:not(.lv-warning) { display: none; }
+#log-card[data-filter="error"]   .log-line:not(.lv-error)   { display: none; }
 .log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px;
   background: var(--log-bg); border-radius: 0 0 var(--r-md) var(--r-md);
   user-select: text; cursor: text; }
@@ -354,3 +366,52 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 
 @keyframes fadeInUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
 .fade-in { animation: fadeInUp .2s var(--ease) both; }
+
+/* ── Toasts — non-blocking feedback, top-right under the toolbar ───────────── */
+#ui-toasts { position: fixed; top: 54px; right: 12px; z-index: var(--z-toast);
+  display: flex; flex-direction: column; gap: 7px; align-items: flex-end;
+  pointer-events: none; }
+.ui-toast { display: flex; align-items: center; gap: 8px; max-width: 360px;
+  padding: 8px 12px; border-radius: 9px; background: var(--panel);
+  border: 1px solid var(--border2); box-shadow: var(--sh-lg);
+  font-size: 12px; font-weight: 600; color: var(--ink2); cursor: pointer;
+  pointer-events: auto; animation: uiToastIn .18s var(--ease) both; }
+.ui-toast svg { width: 15px; height: 15px; flex-shrink: 0; }
+.ui-toast-msg { min-width: 0; line-height: 1.45; word-break: break-word; }
+.ui-toast.ui-success { border-color: var(--ok-bd);  background: var(--ok-bg);  color: #1c7a44; }
+.ui-toast.ui-error   { border-color: var(--err-bd); background: var(--err-bg); color: var(--err); }
+.ui-toast.ui-warning { border-color: #e7d5a4; background: var(--warn-bg); color: var(--warn); }
+.ui-toast.ui-info    { border-color: var(--accent-bd); background: var(--accent-bg); color: #2559c7; }
+.ui-toast.out { animation: uiToastOut .22s var(--ease) both; }
+@keyframes uiToastIn  { from { opacity: 0; transform: translateX(14px); } }
+@keyframes uiToastOut { to   { opacity: 0; transform: translateX(14px); } }
+
+/* ── Modal — confirm / prompt / custom dialogs ─────────────────────────────── */
+.ui-modal-wrap { position: fixed; inset: 0; z-index: var(--z-modal);
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(25, 34, 46, .32); animation: uiFade .14s ease-out both; }
+@keyframes uiFade { from { opacity: 0; } }
+.ui-modal { width: 380px; max-width: calc(100vw - 40px); max-height: calc(100vh - 60px);
+  display: flex; flex-direction: column; background: var(--panel);
+  border: 1px solid var(--border2); border-radius: 12px; box-shadow: var(--sh-lg);
+  animation: uiModalIn .16s var(--ease) both; }
+@keyframes uiModalIn { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+.ui-modal-hd { padding: 13px 16px 0; font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.ui-modal-bd { padding: 10px 16px 4px; overflow-y: auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 8px; }
+.ui-modal-msg { font-size: 12.5px; color: var(--ink2); line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; user-select: text; }
+.ui-modal-lbl { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+.ui-modal-inp { width: 100%; font-family: var(--sans); font-size: 13px; padding: 7px 10px; }
+.ui-modal-ft { display: flex; justify-content: flex-end; gap: 7px; padding: 12px 16px 14px; }
+.ui-modal-ft .btn { min-width: 74px; }
+
+/* Shortcuts cheat-sheet (F1) */
+.ui-keys { display: flex; flex-direction: column; gap: 3px; padding-bottom: 4px; }
+.ui-keys-grp { font-size: 10.5px; font-weight: 800; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--muted); margin: 9px 0 3px; }
+.ui-keys-grp:first-child { margin-top: 0; }
+.ui-keys-row { display: flex; align-items: baseline; gap: 10px; font-size: 12px; color: var(--ink2); }
+.ui-kbd { flex-shrink: 0; min-width: 138px; font-family: var(--mono); font-size: 10.5px;
+  font-weight: 600; color: var(--dim); background: var(--alt);
+  border: 1px solid var(--border2); border-radius: 5px; padding: 2px 7px; text-align: center; }

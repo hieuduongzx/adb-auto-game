@@ -169,7 +169,7 @@ function wfResetRunViz(){
 
 function appendLog(entry){
   const body=$("log-body"); if(!body) return;
-  const line=document.createElement("div"); line.className="log-line fade-in";
+  const line=document.createElement("div"); line.className=`log-line fade-in lv-${entry.level||"info"}`;
   line.innerHTML=`<span class="log-ts">${entry.ts}</span>`+
     `<span class="log-tag log-${entry.level}">${LOG_TAG[entry.level]||"INF"}</span>`+
     `<span class="log-msg">${escHtml(entry.msg)}</span>`;

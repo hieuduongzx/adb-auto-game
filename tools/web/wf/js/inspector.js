@@ -244,12 +244,14 @@ function wfShowVarMenu(anchor,onPick){
   const addRow=document.createElement("button"); addRow.type="button"; addRow.className="wf-varmenu-add";
   addRow.innerHTML=`${wfIco("pin")}<span>New global variable…</span>`;
   addRow.onclick=()=>{
-    const nm=(prompt("New global variable name:")||"").trim();
-    if(!nm) return;
-    wfPushUndoDebounced();
-    if(!Array.isArray(WF.globals)) WF.globals=[];
-    if(!WF.globals.some(v=>v.name===nm)) WF.globals.push({name:nm, label:nm, type:"text", value:"", children:[]});
-    wfRenderVarsPanel(); onPick(nm); wfCloseVarMenu();
+    uiPrompt({title:"Biến toàn cục mới", label:"Tên biến", placeholder:"VD: round"}).then(v=>{
+      const nm=(v||"").trim();
+      if(!nm) return;
+      wfPushUndoDebounced();
+      if(!Array.isArray(WF.globals)) WF.globals=[];
+      if(!WF.globals.some(x=>x.name===nm)) WF.globals.push({name:nm, label:nm, type:"text", value:"", children:[]});
+      wfRenderVarsPanel(); onPick(nm); wfCloseVarMenu();
+    });
   };
   menu.appendChild(addRow);
   document.body.appendChild(menu);

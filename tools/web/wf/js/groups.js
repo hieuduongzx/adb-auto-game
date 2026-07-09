@@ -42,8 +42,11 @@ function wfAddGroup(x,y,w,h){
   groups.push(gr); wfRenderCanvas(); setStatus(`Created "${gr.name}" — drag the title to move the whole group`);
   return gr;
 }
-function wfDeleteGroup(id){ if(!confirm("Delete this group? Nodes inside will not be removed.")) return; wfPushUndo(); const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); } }
-function wfRenameGroup(gr){ wfPushUndo(); const nm=prompt("Group name:", gr.name||""); if(nm!==null){ gr.name=(nm.trim()||gr.name); wfRenderCanvas(); } }
+function wfDeleteGroup(id){ wfPushUndo(); const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); setStatus("Đã xóa group (block bên trong giữ nguyên) — Ctrl+Z để hoàn tác"); } }
+function wfRenameGroup(gr){ uiPrompt({title:"Đổi tên group", label:"Tên group", value:gr.name||""}).then(nm=>{
+  if(nm===null) return; nm=nm.trim(); if(!nm||nm===gr.name) return;
+  wfPushUndo(); gr.name=nm; wfRenderCanvas();
+}); }
 // Create a group hugging the current multi-selection (toolbar button shortcut).
 function wfGroupSelection(){
   const ids=WF.sel.slice(); if(ids.length<1) return false;
@@ -537,7 +540,7 @@ function wfInitCanvas(){
     // Dropped straight onto a wire? Capture its edge so the new block splices in.
     const insEdge = wfInsWireGrp ? wfInsWireGrp.__edge : null;
     wfWireInsertClear();
-    const g=wfGraph(); if(!g){ alert("Select or add an activity/function first."); wfPaletteDrag=null; return; }
+    const g=wfGraph(); if(!g){ uiToast("Chọn hoặc tạo một activity/function trước.","warning"); wfPaletteDrag=null; return; }
     const wr=$("wf-world").getBoundingClientRect();
     const x=wfSnap((e.clientX-wr.left)/wfZoom-70), y=wfSnap((e.clientY-wr.top)/wfZoom-14);
     wfPushUndo();

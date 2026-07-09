@@ -35,6 +35,7 @@ function wfSerialize(){
   return {
     name:$("wf-name").value||"workflow", version:2, templatesDir:WF.templatesDir||"templates",
     controller:isWin32?"win32":"adb",
+    ocr:(WF.ocrBackend||"").trim(),
     win32:{ window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:w.inputMode||"background" },
     // Speed hack is ADB-only (Frida). Force it off in Win32 so a stale enabled
     // flag never makes the Runner try to start a non-existent cheat path.
@@ -79,6 +80,8 @@ function wfHydrate(flow){
   WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"templates";
   const sh=flow.speedhack||{}; WF.speedhack={enabled:!!sh.enabled, speed:(parseFloat(sh.speed)||2.0), package:(sh.package||"").trim()};
   WF.controller=(flow.controller==="win32")?"win32":"adb";
+  WF.ocrBackend=String(flow.ocr||"").trim().toLowerCase();
+  if(typeof wfSyncOcrUI==="function") wfSyncOcrUI();
   // Force speed hack off in Win32 mode (ADB/Frida only) so a file saved with
   // enabled=true under the old cheat.dll path can't revive it.
   if(WF.controller==="win32") WF.speedhack.enabled=false;
@@ -99,15 +102,51 @@ function wfHydrate(flow){
   wfRenderAll();
 }
 
-async function wfExport(){ await api().workflow_export(JSON.stringify(wfSerialize(),null,2), $("wf-name").value); }
+// ── Dirty state + autosave ────────────────────────────────────────────────────
+// Mọi mutation đi qua wfPushUndo/wfPushUndoDebounced đều gọi wfMarkDirty():
+// nút Save hiện chấm cam "chưa lưu", và (khi flow đã có file) một autosave
+// debounce 3s ghi đè im lặng — workflow_save không bao giờ mở dialog nên an toàn.
+let wfDirty=false;          // có thay đổi chưa ghi xuống đĩa
+let wfHasFile=false;        // flow đã gắn với một file cụ thể (mở/lưu ít nhất 1 lần)
+let wfAutosaveOn=true;
+let _wfAutosaveTimer=null;
+function wfSyncDirtyUI(){
+  const b=$("wf-save-btn");
+  if(b){ b.classList.toggle("dirty", wfDirty);
+    b.title = wfDirty ? "Lưu (Ctrl+S) — có thay đổi chưa lưu" : "Lưu vào file hiện tại (Ctrl+S)"; }
+}
+function wfMarkDirty(){
+  wfDirty=true; wfSyncDirtyUI();
+  if(wfAutosaveOn && wfHasFile){
+    clearTimeout(_wfAutosaveTimer);
+    _wfAutosaveTimer=setTimeout(wfAutosave, 3000);
+  }
+}
+function wfMarkClean(){ wfDirty=false; clearTimeout(_wfAutosaveTimer); wfSyncDirtyUI(); }
+async function wfAutosave(){
+  if(!wfDirty || !wfHasFile) return;
+  if(wfRunning){ _wfAutosaveTimer=setTimeout(wfAutosave, 5000); return; }   // đợi run xong
+  try{
+    const r=await api().workflow_save(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
+    if(r&&r.ok){ wfMarkClean(); setStatus("Đã tự lưu · "+new Date().toLocaleTimeString()); }
+  }catch{}
+}
+// Chặn đóng cửa sổ khi còn thay đổi chưa lưu (best-effort trong WebView2).
+window.addEventListener("beforeunload", e=>{ if(wfDirty){ e.preventDefault(); e.returnValue=""; } });
+
+async function wfExport(){
+  const ok=await api().workflow_export(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
+  if(ok){ wfHasFile=true; wfMarkClean(); setStatus("Workflow saved"); }
+}
 async function wfSave(){
   const r=await api().workflow_save(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
-  if(r&&r.ok) setStatus("Workflow saved");
+  if(r&&r.ok){ wfHasFile=true; wfMarkClean(); setStatus("Workflow saved"); }
+  else if(r&&r.ok===false) uiToast("Lưu thất bại — xem log để biết chi tiết.","error");
 }
 async function wfImport(){
   const txt=await api().workflow_import(); if(!txt)return;
-  try{ wfHydrate(JSON.parse(txt)); setStatus("Workflow imported"); }
-  catch(e){ alert("Invalid JSON: "+e); }
+  try{ wfHydrate(JSON.parse(txt)); wfHasFile=true; wfMarkClean(); setStatus("Workflow imported"); uiToast("Đã mở workflow \""+(WF.name||"")+"\"","success"); }
+  catch(e){ uiToast("File JSON không hợp lệ: "+e,"error"); }
 }
 // Play / stop glyphs for the run toggle (icon-only button).
 const WF_ICO_PLAY = '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
@@ -145,14 +184,33 @@ function wfSetRunning(on){
 }
 async function wfToggleRun(){
   if(wfRunning){ wfSetRunning(false); await api().workflow_stop(); return; }  // reset first, then stop
-  if(!WF.activities.length){ alert("No activities."); return; }
+  if(!WF.activities.length){ uiToast("Chưa có activity nào để chạy.","warning"); return; }
+  // Pre-flight: chặn khi có LỖI cứng (dây đứt, thiếu template…) — cảnh báo thì
+  // vẫn chạy bình thường. Người dùng có thể xem danh sách hoặc cố chạy tiếp.
+  if(typeof wfValidationIssues==="function"){
+    const issues=wfValidationIssues();
+    const errs=issues.filter(i=>i.sev==="err").length;
+    if(errs){
+      const pick=await uiModal({
+        title:"Workflow đang có lỗi",
+        body:`<div class="ui-modal-msg">Phát hiện <b>${errs} lỗi</b>${issues.length-errs?` và ${issues.length-errs} cảnh báo`:""} — flow có thể dừng giữa chừng hoặc chạy sai nhánh.</div>`,
+        buttons:[
+          {label:"Hủy", value:"cancel"},
+          {label:"Xem lỗi", value:"view"},
+          {label:"Vẫn chạy", value:"run", kind:"err"},
+        ],
+      });
+      if(pick==="view"){ wfValidatePanelShow(issues); return; }
+      if(pick!=="run") return;
+    }
+  }
   wfResetRunViz();        // clear last run's colours BEFORE the engine starts emitting
   wfSetRunning(true);     // mark running before any node event can arrive
   const ok=await api().workflow_run(JSON.stringify(wfSerialize()));
   if(!ok) wfSetRunning(false);
 }
 async function wfRunGui(){
-  if(!WF.activities.length){ alert("No activities."); return; }
+  if(!WF.activities.length){ uiToast("Chưa có activity nào.","warning"); return; }
   await api().open_runner(JSON.stringify(wfSerialize()));
   setStatus("Runner GUI opened");
 }
@@ -172,6 +230,7 @@ async function init(){
     (state.captureBackends||["scrcpy","adb"]).forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b==="adb"?"ADB screencap":"scrcpy (fast)"; capSel.appendChild(o); });
     capSel.value=S.captureBackend;
   }
+  if(typeof wfPopulateOcrBackends==="function") wfPopulateOcrBackends(state.ocrBackends);
   (state.log||[]).forEach(appendLog);
   try{ const st=await api().get_settings(); wfSnapOn=!!st.snap; wfPreviewAll=!!st.previewAll;
     wfMinimapOn=!!st.minimap;                 // opt-in — default off
@@ -199,7 +258,8 @@ async function init(){
   let reopened="", didRender=false;
   try{
     const lw=await api().get_last_workflow();
-    if(lw && lw.text){ wfHydrate(JSON.parse(lw.text)); reopened=lw.name||"previous workflow"; didRender=true; }
+    if(lw && lw.text){ wfHydrate(JSON.parse(lw.text)); reopened=lw.name||"previous workflow"; didRender=true;
+      wfHasFile=true; wfMarkClean(); }
   }catch(e){}
   // wfHydrate and wfAddActivity both call wfRenderAll() themselves; only fall back here.
   if(!WF.activities.length){ wfAddActivity("sequence"); didRender=true; }

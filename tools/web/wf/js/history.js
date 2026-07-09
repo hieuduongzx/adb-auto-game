@@ -48,6 +48,7 @@ function wfPushUndo() {
   _undoStack.push(snap);
   if (_undoStack.length > _UNDO_MAX) _undoStack.shift();
   _redoStack = [];
+  if (typeof wfMarkDirty === "function") wfMarkDirty();   // mutation sắp xảy ra → chưa lưu
 }
 
 // Debounced version for rapid-fire changes (inspector fields).
@@ -120,6 +121,7 @@ function wfUndo() {
   _redoStack.push(wfTakeSnapshot());
   const snap = _undoStack.pop();
   wfRestoreSnapshot(snap);
+  if (typeof wfMarkDirty === "function") wfMarkDirty();
   setStatus("Undone");
 }
 
@@ -129,5 +131,6 @@ function wfRedo() {
   _undoStack.push(wfTakeSnapshot());
   const snap = _redoStack.pop();
   wfRestoreSnapshot(snap);
+  if (typeof wfMarkDirty === "function") wfMarkDirty();
   setStatus("Redone");
 }
