@@ -17,8 +17,10 @@ function wfMmPalette(){
   wfMmColors={
     basic:v("--cat-basic")||"#6f9be8", image:v("--cat-image")||"#2fb0a3",
     color:v("--cat-color")||"#d6608f", ocr:v("--cat-ocr")||"#e0954b",
-    logic:v("--cat-logic")||"#9a78e6", flow:"#e0a64b", input:"#7a86e8",
-    device:"#8a97a8", win32:"#8a97a8", misc:"#9aa6b4",
+    logic:v("--cat-logic")||"#9a78e6", flow:v("--cat-flow")||"#e0a64b",
+    input:v("--cat-input")||"#7a86e8", app:v("--cat-app")||"#059669",
+    time:v("--cat-time")||"#0284c7", device:v("--cat-device")||"#64748b",
+    win32:v("--cat-win32")||"#6366f1", misc:v("--cat-misc")||"#9aa6b4",
     start:"#16a34a", end:"#dc2626", note:"#e2c56d", def:"#a5b1c2",
     run:v("--run-live")||"#f97316", accent:v("--accent")||"#2f6fed",
   };

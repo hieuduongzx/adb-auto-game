@@ -51,11 +51,18 @@
   /* Node-category accents — single source of truth for wf.css's .cat-* node
      styling AND the group-frame colour palette (js/groups.js), so retuning a
      category's colour here updates both instead of drifting apart. */
-  --cat-basic: #6f9be8;
-  --cat-image: #2fb0a3;
-  --cat-color: #d6608f;
-  --cat-ocr:   #e0954b;
-  --cat-logic: #9a78e6;
+  --cat-basic:  #6f9be8;
+  --cat-image:  #2fb0a3;
+  --cat-color:  #d6608f;
+  --cat-ocr:    #e0954b;
+  --cat-logic:  #9a78e6;
+  --cat-input:  #7a86e8;
+  --cat-flow:   #e0a64b;
+  --cat-app:    #059669;
+  --cat-time:   #0284c7;
+  --cat-device: #64748b;
+  --cat-win32:  #6366f1;
+  --cat-misc:   #9aa6b4;
   --group-red: #cf6b6b;  /* group-only accent — no matching node category */
   --log-bg:    #fbfcfd;
   --log-ink:   #41505f;

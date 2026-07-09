@@ -150,6 +150,8 @@ const UI_SHORTCUTS = [
     ["Giữ Alt khi kéo","Tắt hít nam châm tạm thời"],
   ]],
   ["Chạy thử", [
+    ["Ctrl+Enter","Test 1 block (match overlay trên Preview)"],
+    ["Debug overlay","Nút cạnh Focus trên panel Activities — bật để mọi match vẽ lên Preview khi run"],
     ["Esc","Dừng run · đóng panel/bỏ chọn"],
     ["Kéo thả chip lên dây","Chèn block vào giữa dây"],
   ]],

@@ -12,6 +12,12 @@ window.addEventListener("keydown", e => {
   }
   // Ctrl+F — node finder (global: works even while typing, like browser find).
   if((e.key==="f"||e.key==="F") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); if(typeof wfFindShow==="function") wfFindShow(); return; }
+  // Ctrl+Enter — test the selected block (match overlay on Preview).
+  if(e.key==="Enter" && (e.ctrlKey||e.metaKey)){
+    e.preventDefault();
+    if(typeof wfRunSingleNode==="function") wfRunSingleNode();
+    return;
+  }
   // Undo/Redo — works even while typing in inputs (global shortcuts).
   if((e.key==="z"||e.key==="Z") && (e.ctrlKey||e.metaKey) && !e.shiftKey){ e.preventDefault(); wfUndo(); return; }
   if(((e.key==="z"||e.key==="Z") && (e.ctrlKey||e.metaKey) && e.shiftKey) || ((e.key==="y"||e.key==="Y") && (e.ctrlKey||e.metaKey))){ e.preventDefault(); wfRedo(); return; }

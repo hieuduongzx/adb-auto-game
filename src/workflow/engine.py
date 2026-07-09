@@ -285,6 +285,11 @@ class WorkflowEngine:
         # screenshotOnFail — so the designer can show "what the screen looked
         # like when this block failed" without per-node setup.
         self.capture_failures_always = False
+        # When True (designer only), image/color/OCR matches emit ``on_match``
+        # with rects + confidence so the Preview tab can draw a live overlay.
+        # Off in the standalone runner — no UI to paint and no need for the
+        # best-score-below-threshold extra match work on every miss.
+        self.report_matches = False
 
         self.running = False
         self._stop = threading.Event()
@@ -311,6 +316,10 @@ class WorkflowEngine:
             # fired after a failure screenshot is written: (node_id, path). The
             # designer shows it in the inspector when the failed node is selected.
             "on_fail_shot": [],
+            # fired after a template/color/OCR probe: one dict with rects
+            # [{x,y,w,h,conf,ok,label}, …], threshold, template name, optional
+            # search region. Designer paints these on the Preview canvas.
+            "on_match": [],
         }
 
         # Dispatch table for action nodes: type -> handler(node, params) -> bool.
@@ -852,8 +861,11 @@ class WorkflowEngine:
                     counters[cur] = 0
                     lu_port = "found"
                 else:
-                    res = self.auto.find_template(tpl, threshold=threshold,
-                                                  region=self._search_region(params))
+                    res = self._find_template(
+                        tpl, threshold=threshold,
+                        region=self._search_region(params),
+                        report=True,  # live overlay each probe on designer
+                    )
                     if res:
                         self._last_pos = (res[0], res[1])
                         log_info(f"[workflow] ↺ thấy ảnh {os.path.basename(tpl)} sau "
@@ -1248,13 +1260,180 @@ class WorkflowEngine:
             items = [str(params.get("template"))]
         return [self._resolve_template(it) for it in items if it.strip()]
 
+    # ── Match overlay helpers (designer Preview) ─────────────────────────────
+    # When report_matches is on, every final template/color/OCR probe emits
+    # on_match so the UI can draw the hit box + confidence. Misses still emit
+    # the *best* below-threshold location (dashed red) so "why didn't it match?"
+    # is visible without re-running in DevScope.
+
+    def _tpl_wh(self, path: str) -> tuple:
+        try:
+            tpl = self.auto.matcher.load(path)
+            if tpl is not None:
+                return int(tpl.shape[1]), int(tpl.shape[0])
+        except Exception:
+            pass
+        return 0, 0
+
+    def _rect_from_center(
+        self,
+        cx: int,
+        cy: int,
+        conf: float,
+        tw: int,
+        th: int,
+        scale: float = 1.0,
+        ok: bool = True,
+        label: str = "",
+    ) -> Dict[str, Any]:
+        sw = max(1, int(tw * scale)) if tw else 24
+        sh = max(1, int(th * scale)) if th else 24
+        return {
+            "x": max(0, int(cx) - sw // 2),
+            "y": max(0, int(cy) - sh // 2),
+            "w": sw,
+            "h": sh,
+            "conf": float(conf),
+            "ok": bool(ok),
+            "label": label or "",
+        }
+
+    def _best_match_raw(self, tpl: str, region=None):
+        """Best match at any confidence (for fail overlay). Returns matcher tuple
+        ``(cx, cy, conf, scale)`` or ``None``."""
+        try:
+            screen = self.auto.get_latest_screen()
+            if screen is None:
+                screen = self.auto.capture_screen()
+            if screen is None:
+                return None
+            template = self.auto.matcher.load(tpl)
+            if template is None:
+                return None
+            # threshold just above 0 so a total miss (no valid scale) stays None
+            # without requiring a real match.
+            return self.auto.matcher.match(
+                screen, template, threshold=0.01, multi_scale=False,
+                scales=[1.0], region=region,
+            )
+        except Exception:
+            return None
+
+    def _report_template_match(
+        self,
+        tpl: str,
+        res,
+        threshold: float,
+        region=None,
+        label: str = "",
+    ) -> None:
+        """Emit on_match for one template probe. ``res`` is find_template's
+        ``(cx, cy, conf)`` or ``None``."""
+        if not self.report_matches:
+            return
+        name = os.path.basename(tpl or "") or "?"
+        tw, th = self._tpl_wh(tpl)
+        rects: List[Dict[str, Any]] = []
+        ok = False
+        conf = 0.0
+        if res:
+            cx, cy, conf = int(res[0]), int(res[1]), float(res[2])
+            ok = conf >= float(threshold)
+            rects.append(self._rect_from_center(
+                cx, cy, conf, tw, th, 1.0, ok, label or name))
+        else:
+            best = self._best_match_raw(tpl, region)
+            if best:
+                cx, cy, conf, scale = best
+                rects.append(self._rect_from_center(
+                    int(cx), int(cy), float(conf), tw, th, float(scale),
+                    False, label or name))
+        self._emit("on_match", {
+            "rects": rects,
+            "ok": ok,
+            "threshold": float(threshold),
+            "template": name,
+            "label": label or name,
+            "region": list(region) if region else None,
+            "conf": float(conf) if rects else 0.0,
+        })
+
+    def _report_match_rects(
+        self,
+        rects: List[Dict[str, Any]],
+        *,
+        ok: bool,
+        threshold: float = 0.0,
+        label: str = "",
+        region=None,
+        conf: float = 0.0,
+    ) -> None:
+        if not self.report_matches:
+            return
+        self._emit("on_match", {
+            "rects": rects,
+            "ok": ok,
+            "threshold": float(threshold),
+            "template": label,
+            "label": label,
+            "region": list(region) if region else None,
+            "conf": float(conf),
+        })
+
+    def _report_ocr_region(self, region, ok: bool, needle: str = "") -> None:
+        """Highlight the OCR search box after a text probe (no char boxes)."""
+        if not self.report_matches:
+            return
+        rects: List[Dict[str, Any]] = []
+        if region and len(region) >= 4:
+            x, y, w, h = (int(region[0]), int(region[1]),
+                          int(region[2]), int(region[3]))
+            if w > 0 and h > 0:
+                rects.append({
+                    "x": x, "y": y, "w": w, "h": h,
+                    "conf": 1.0 if ok else 0.0,
+                    "ok": bool(ok),
+                    "label": (needle or "OCR")[:24],
+                })
+        self._report_match_rects(
+            rects, ok=bool(ok), label=needle or "OCR",
+            region=region, conf=1.0 if ok else 0.0,
+        )
+
+    def _find_template(self, tpl: str, threshold: float = 0.85, region=None,
+                       report: bool = True):
+        """find_template + optional match overlay report."""
+        res = self.auto.find_template(tpl, threshold=threshold, region=region)
+        if report:
+            self._report_template_match(tpl, res, threshold, region)
+        return res
+
+    def _wait_for_template(
+        self,
+        tpl: str,
+        timeout: float = 10.0,
+        threshold: float = 0.85,
+        region=None,
+        report: bool = True,
+    ):
+        """wait_for_template + one overlay report when done (found or timeout)."""
+        res = self.auto.wait_for_template(
+            tpl, timeout=timeout, threshold=threshold, region=region)
+        if report:
+            self._report_template_match(tpl, res, threshold, region)
+        return res
+
     def _find_any(self, templates: List[str], threshold: float, region=None):
         """(x, y) of the first listed template currently on screen, or ``None``.
         Sequential: stops at the first match (list order is the priority order)."""
         for tpl in templates:
+            # report only the winner (or the first miss below)
             res = self.auto.find_template(tpl, threshold=threshold, region=region)
             if res:
+                self._report_template_match(tpl, res, threshold, region)
                 return (res[0], res[1])
+        if templates:
+            self._report_template_match(templates[0], None, threshold, region)
         return None
 
     def _find_any_parallel(self, templates: List[str], threshold: float, region=None):
@@ -1271,7 +1450,7 @@ class WorkflowEngine:
                 res = self.auto.find_template(tpl, threshold=threshold, region=region)
                 if res:
                     with lock:
-                        results.append((res[0], res[1]))
+                        results.append((tpl, res[0], res[1], res[2]))
             except Exception:
                 pass
 
@@ -1281,7 +1460,12 @@ class WorkflowEngine:
             t.start()
         for t in threads:
             t.join()
-        return results[0] if results else None
+        if results:
+            tpl, x, y, conf = results[0]
+            self._report_template_match(tpl, (x, y, conf), threshold, region)
+            return (x, y)
+        self._report_template_match(templates[0], None, threshold, region)
+        return None
 
     def _wait_any(self, templates: List[str], timeout: float, threshold: float,
                   parallel: bool = False, region=None):
@@ -1376,37 +1560,63 @@ class WorkflowEngine:
                 # Lưu vị trí "found" như các node ảnh — để "Tap → last found
                 # image" sau một node màu chạm đúng điểm vừa kiểm tra.
                 self._last_pos = (x, y)
+            hex_lbl = self._bgr_to_hex(target)
+            self._report_match_rects(
+                [self._rect_from_center(x, y, 1.0 if ok else 0.0, 18, 18, 1.0, ok, hex_lbl)],
+                ok=ok != negate, label=hex_lbl, conf=1.0 if ok else 0.0,
+            )
             return ok != negate
         if ntype == "wait_color":
             x, y = int(params.get("x", 0)), int(params.get("y", 0))
             negate = bool(params.get("negate", False))
             end = time.time() + max(0.0, float(params.get("timeout", 10.0)))
+            hex_lbl = self._bgr_to_hex(target)
             while not self._stop.is_set():
                 self._pause.wait()
                 px = self._pixel_at(x, y)
                 ok = px is not None and self._color_close(px, target, tol)
                 if ok and not negate:
                     self._last_pos = (x, y)
-                    log_info(f"[workflow] 🎨 thấy màu {self._bgr_to_hex(target)} tại ({x}, {y})")
+                    log_info(f"[workflow] 🎨 thấy màu {hex_lbl} tại ({x}, {y})")
+                    self._report_match_rects(
+                        [self._rect_from_center(x, y, 1.0, 18, 18, 1.0, True, hex_lbl)],
+                        ok=True, label=hex_lbl, conf=1.0,
+                    )
                     return True
                 if negate and not ok:
                     # Đảo: chờ đến khi màu BIẾN MẤT (nút sáng → tối, loading xong…).
-                    log_info(f"[workflow] 🎨 màu {self._bgr_to_hex(target)} đã biến mất tại ({x}, {y})")
+                    log_info(f"[workflow] 🎨 màu {hex_lbl} đã biến mất tại ({x}, {y})")
+                    self._report_match_rects(
+                        [self._rect_from_center(x, y, 0.0, 18, 18, 1.0, True, hex_lbl)],
+                        ok=True, label=hex_lbl, conf=0.0,
+                    )
                     return True
                 if time.time() >= end:
+                    self._report_match_rects(
+                        [self._rect_from_center(x, y, 0.0, 18, 18, 1.0, False, hex_lbl)],
+                        ok=False, label=hex_lbl, conf=0.0,
+                    )
                     return False
                 time.sleep(0.25)
             return False
         if ntype == "tap_color":
             region = self._search_region(params)
             end = time.time() + max(0.0, float(params.get("timeout", 10.0)))
+            hex_lbl = self._bgr_to_hex(target)
             while not self._stop.is_set():
                 self._pause.wait()
                 hit = self._find_color(target, tol, region=region)
                 if hit:
                     self._last_pos = hit
-                    return self._tap_at(hit[0], hit[1], params, label=f"màu {self._bgr_to_hex(target)}")
+                    self._report_match_rects(
+                        [self._rect_from_center(hit[0], hit[1], 1.0, 18, 18, 1.0, True, hex_lbl)],
+                        ok=True, label=hex_lbl, region=region, conf=1.0,
+                    )
+                    return self._tap_at(hit[0], hit[1], params, label=f"màu {hex_lbl}")
                 if time.time() >= end:
+                    self._report_match_rects(
+                        [], ok=False, label=hex_lbl, region=region, conf=0.0,
+                    )
                     return False  # colour never appeared — false branch fires
                 time.sleep(0.25)
             return False
@@ -1442,6 +1652,15 @@ class WorkflowEngine:
             max_taps = self._resolve_count(params.get("maxTaps", 0), default=0)
             if max_taps > 0:
                 hits = hits[:max_taps]
+            # Overlay every hit before tapping so Preview shows the full set.
+            name = os.path.basename(tpl) if tpl else "?"
+            tw, th = self._tpl_wh(tpl)
+            self._report_match_rects(
+                [self._rect_from_center(int(hx), int(hy), float(sc), tw, th, 1.0, True, name)
+                 for hx, hy, sc in hits],
+                ok=bool(hits), threshold=threshold, label=name, region=region,
+                conf=float(hits[0][2]) if hits else 0.0,
+            )
             delay = max(0.0, float(params.get("delayBetween", 0.15) or 0))
             tapped = 0
             for hx, hy, _score in hits:
@@ -1473,7 +1692,7 @@ class WorkflowEngine:
             tpl = self._resolve_template(params.get("template", ""))
             threshold = float(params.get("threshold", 0.85))
             negate = bool(params.get("negate", False))
-            res = self.auto.find_template(tpl, threshold=threshold, region=self._search_region(params))
+            res = self._find_template(tpl, threshold=threshold, region=self._search_region(params))
             if res:
                 self._last_pos = (res[0], res[1])
             return (res is not None) != negate
@@ -1509,7 +1728,7 @@ class WorkflowEngine:
         if ntype == "tap_image":
             # Find (with timeout), remember position, optionally wait, then tap.
             tpl = self._resolve_template(params.get("template", ""))
-            res = self.auto.wait_for_template(
+            res = self._wait_for_template(
                 tpl, timeout=float(params.get("timeout", 10.0)),
                 threshold=float(params.get("threshold", 0.85)),
                 region=self._search_region(params),
@@ -1529,14 +1748,18 @@ class WorkflowEngine:
                 end = time.time() + max(0.0, timeout)
                 while not self._stop.is_set():
                     self._pause.wait()
-                    if self.auto.find_template(tpl, threshold=threshold, region=region) is None:
+                    if self._find_template(tpl, threshold=threshold, region=region,
+                                           report=False) is None:
                         log_info(f"[workflow] 🔍 ảnh {os.path.basename(tpl)} đã biến mất")
+                        self._report_template_match(tpl, None, threshold, region)
                         return True
                     if time.time() >= end:
+                        # still visible — report the hit as fail for negate path
+                        res = self._find_template(tpl, threshold=threshold, region=region)
                         return False
                     time.sleep(0.25)
                 return False
-            res = self.auto.wait_for_template(
+            res = self._wait_for_template(
                 tpl, timeout=timeout, threshold=threshold, region=region,
             )
             if res:
@@ -1556,14 +1779,18 @@ class WorkflowEngine:
                     found, _read = self.auto.region_find_text(needle, region=region, whitelist=wl)
                     if not found:
                         log_info(f"[workflow] 🔤 chữ '{needle}' đã biến mất")
+                        self._report_ocr_region(region, True, needle)
                         return True
                     if time.time() >= end:
+                        self._report_ocr_region(region, False, needle)
                         return False
                     time.sleep(0.5)   # OCR nặng hơn match ảnh — poll thưa hơn
                 return False
-            return bool(self.auto.wait_for_text_in_region(
+            found = bool(self.auto.wait_for_text_in_region(
                 needle, region=region, timeout=timeout, whitelist=wl,
             ))
+            self._report_ocr_region(region, found, needle)
+            return found
         if ntype == "if_text":
             negate = bool(params.get("negate", False))
             # needle nhận biến — đồng bộ với if_app.package.
@@ -1575,7 +1802,9 @@ class WorkflowEngine:
                 f"[workflow] 🔤 if_text vùng {region}: đọc được {read!r} → "
                 f"{'thấy' if found else 'không thấy'} '{needle}'"
             )
-            return bool(found) != negate
+            ok = bool(found) != negate
+            self._report_ocr_region(region, ok, needle)
+            return ok
         if ntype == "if_var":
             cur = self._vars.get(str(params.get("name", "")))
             rhs = self._resolve_value(params.get("value", ""))
@@ -1594,16 +1823,19 @@ class WorkflowEngine:
             cx, cy = (w // 2, h // 2) if (w and h) else (540, 960)
             delta  = {"up": (0, -distance), "down": (0, distance),
                       "left": (-distance, 0), "right": (distance, 0)}.get(direction, (0, -distance))
+            region = self._search_region(params)
             for i in range(max_sw):
                 if self._stop.is_set():
                     return False
                 self._pause.wait()
-                res = self.auto.find_template(template, threshold=threshold,
-                                              region=self._search_region(params))
+                res = self.auto.find_template(template, threshold=threshold, region=region)
                 if res:
+                    self._report_template_match(template, res, threshold, region)
                     self._last_pos = (res[0], res[1])
                     log_info(f"[workflow] 🔍 thấy ảnh sau {i} lần vuốt ({res[0]}, {res[1]})")
                     return True
+                if i == max_sw - 1:
+                    self._report_template_match(template, None, threshold, region)
                 self.auto.swipe(cx, cy, cx + delta[0], cy + delta[1], duration)
                 self._sleep(0.4)
             return False
@@ -1731,13 +1963,25 @@ class WorkflowEngine:
         self._emit("on_stop")
         log_success("[workflow] Stopped")
 
+    # Node types whose ``timeout`` param waits for a screen change. Single-node
+    # test caps this so "Test block" returns in ~1s with an overlay instead of
+    # hanging for the full configured wait (often 10s).
+    _QUICK_TIMEOUT_TYPES = frozenset({
+        "tap_image", "wait_image", "tap_image_any", "wait_image_any",
+        "tap_color", "wait_color", "wait_text", "scroll_find",
+    })
+
     def run_single_node(self, node: Dict[str, Any]) -> Dict[str, Any]:
         """Execute one node in isolation (no graph walk), on the calling thread.
 
-        Used by the designer's "Chạy block này" context-menu action: it fires
-        the same on_node / on_node_done callbacks as a real run so the UI paints
-        the block amber then green/red, and the log panel streams the node's
-        output. Conditions report the taken branch; actions report ok/fail.
+        Used by the designer's "Test block" action: fires the same on_node /
+        on_node_done callbacks as a real run so the UI paints the block
+        amber→green/red, streams log output, and (when report_matches is on)
+        emits on_match rects for the Preview overlay. Conditions report the
+        taken branch; actions report ok/fail.
+
+        Image/color wait timeouts are capped at 1s so a miss returns quickly
+        with a best-score overlay instead of blocking for the full timeout.
 
         Returns ``{status, port}`` so the caller can relay the outcome.
         """
@@ -1748,7 +1992,15 @@ class WorkflowEngine:
             return {"status": "error", "port": None}
         nid = node.get("id")
         ntype = node.get("type")
-        params = node.get("params", {}) or {}
+        # Shallow-copy params so timeout cap doesn't mutate the designer's node.
+        params = dict(node.get("params", {}) or {})
+        if ntype in self._QUICK_TIMEOUT_TYPES:
+            try:
+                params["timeout"] = min(float(params.get("timeout", 10) or 10), 1.0)
+            except (TypeError, ValueError):
+                params["timeout"] = 1.0
+        work = dict(node)
+        work["params"] = params
         spec = NODE_TYPES.get(ntype)
         kind = spec.get("kind") if spec else None
         self._emit("on_node", nid)
@@ -1769,7 +2021,7 @@ class WorkflowEngine:
             else:
                 handler = self._actions.get(ntype)
                 if handler is not None:
-                    ok_act = self._run_action_with_retry(node, params, handler)
+                    ok_act = self._run_action_with_retry(work, params, handler)
                     status = "ok" if ok_act else "fail"
                     port = "out"
                 else:

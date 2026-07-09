@@ -20,7 +20,12 @@ let wfPvErr    = "";           // last capture error text (shown until next fram
 const WF_PV_COLOR = (function(){
   const cs=getComputedStyle(document.documentElement);
   const v=(name,fallback)=>(cs.getPropertyValue(name)||fallback).trim();
-  return { fail:v("--run-fail","#dc2626"), info:v("--run-info","#06b6d4"), warn:v("--run-warn","#eab308") };
+  return {
+    fail:v("--run-fail","#dc2626"),
+    info:v("--run-info","#06b6d4"),
+    warn:v("--run-warn","#eab308"),
+    ok:v("--run-ok","#16a34a") || "#16a34a",
+  };
 })();
 
 // ── View tab switching ──────────────────────────────────────────────────────
@@ -170,7 +175,10 @@ let wfPvZoom=1, wfPvPanX=0, wfPvPanY=0;
 // interactions and Python events; redrawn by wfPvDraw.
 let wfPvPoint=null;                 // [x,y] in image coords
 let wfPvRegion=null;                // [x,y,w,h] in image coords
-let wfPvOverlay=[];                 // [[x,y,w,h,conf], ...] match rects
+// Match overlay from engine / DevScope: [x,y,w,h,conf,ok(0|1),label?]
+let wfPvOverlay=[];
+let wfPvMatchRegion=null;           // [x,y,w,h] optional engine search crop
+let wfPvOverlayMeta=null;           // {ok,label,threshold,conf} last match summary
 let wfPvDragging=false, wfPvDragStart=null, wfPvDragEnd=null;
 let wfPvPanning=false, wfPvPanStart=null, wfPvPanBase=null;
 // Hover HUD: image-coords + pixel colour under the cursor, with crosshair
@@ -234,15 +242,48 @@ function wfPvDraw(){
   const [x0,y0]=wfPvImgToCanvas(0,0), [x1,y1]=wfPvImgToCanvas(wfPvImgW,wfPvImgH);
   ctx.drawImage(wfPvImg, x0, y0, x1-x0, y1-y0);
 
-  // Template-match overlay rects (red, with confidence label).
-  ctx.strokeStyle=WF_PV_COLOR.fail; ctx.lineWidth=2; ctx.fillStyle=WF_PV_COLOR.fail;
+  // Engine search region (dashed cyan) — where the template was looked for.
+  if(wfPvMatchRegion && wfPvMatchRegion.length>=4){
+    const [rx,ry,rw,rh]=wfPvMatchRegion;
+    if(rw>0&&rh>0){
+      const [cx,cy]=wfPvImgToCanvas(rx,ry), [cx2,cy2]=wfPvImgToCanvas(rx+rw,ry+rh);
+      ctx.save();
+      ctx.strokeStyle=WF_PV_COLOR.info; ctx.lineWidth=1.5;
+      ctx.setLineDash([5,4]);
+      ctx.strokeRect(cx,cy,cx2-cx,cy2-cy);
+      ctx.restore();
+    }
+  }
+  // Template-match overlay: green = above threshold, red = best below threshold.
   ctx.font="11px IBM Plex Mono,monospace"; ctx.textAlign="left";
   for(const r of wfPvOverlay){
+    const conf=Number(r[4])||0;
+    // r[5] may be missing (legacy DevScope match_template) → treat as ok/hit.
+    const ok = r[5]===undefined || r[5]===null ? true : !!r[5];
+    const label = r[6] ? String(r[6]) : "";
+    const col = ok ? WF_PV_COLOR.ok : WF_PV_COLOR.fail;
     const [cx,cy]=wfPvImgToCanvas(r[0],r[1]), [cx2,cy2]=wfPvImgToCanvas(r[0]+r[2],r[1]+r[3]);
-    ctx.strokeRect(cx,cy,cx2-cx,cy2-cy);
-    ctx.fillText((r[4]||0).toFixed(2), cx+2, cy-4);
+    const bw=cx2-cx, bh=cy2-cy;
+    ctx.strokeStyle=col; ctx.lineWidth=2;
+    if(!ok){ ctx.save(); ctx.setLineDash([4,3]); ctx.strokeRect(cx,cy,bw,bh); ctx.restore(); }
+    else ctx.strokeRect(cx,cy,bw,bh);
+    // Semi-transparent fill so the hit is obvious on busy screens.
+    ctx.fillStyle=ok ? "rgba(22,163,74,.12)" : "rgba(220,38,38,.10)";
+    ctx.fillRect(cx,cy,bw,bh);
+    // Confidence chip above the box.
+    const txt=(ok?"✓ ":"✗ ")+conf.toFixed(2)+(label?"  "+label:"");
+    ctx.font="11px IBM Plex Mono,monospace";
+    const tw=ctx.measureText(txt).width;
+    const chipH=16, chipW=tw+10;
+    let bx=cx, by=cy-chipH-2;
+    if(by<2) by=cy+2;
+    ctx.fillStyle="rgba(15,18,22,.88)";
+    ctx.beginPath(); ctx.roundRect(bx,by,chipW,chipH,3); ctx.fill();
+    ctx.fillStyle=col; ctx.textBaseline="middle";
+    ctx.fillText(txt, bx+5, by+chipH/2+0.5);
+    ctx.textBaseline="alphabetic";
   }
-  // Selected region (cyan).
+  // Selected region (cyan) — user crop in Preview inspect tools.
   if(wfPvRegion){
     const [x,y,w,h]=wfPvRegion;
     const [cx,cy]=wfPvImgToCanvas(x,y), [cx2,cy2]=wfPvImgToCanvas(x+w,y+h);

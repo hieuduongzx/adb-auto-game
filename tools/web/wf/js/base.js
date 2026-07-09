@@ -8,13 +8,169 @@ function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
 function setConnected(on){ const a=$("device-dot"),b=$("footer-dot"); if(a)a.classList.toggle("connected",on); if(b)b.classList.toggle("connected",on); }
 
 // Load a template thumbnail (data-URL from Python) into an <img>, hide if none.
+// Stores the template path on the element so the hover zoom can fetch a larger
+// preview without walking back through the node params.
 async function wfLoadThumb(img, path){
   if(!img) return;
+  img.dataset.path = path || "";
   img.removeAttribute("src");
   if(!path){ img.style.display="none"; return; }
   img.style.display="";  // let CSS show checkerboard while loading
   try{ const d=await api().image_thumbnail(path); if(d){ img.src=d; img.style.display="block"; } }catch{}
 }
+
+// ── Thumbnail hover zoom ────────────────────────────────────────────────────
+// Hold the pointer over a node image preview for ~1.2s → a larger floating
+// frame appears next to it so you can read detail without opening the file.
+// Instant show of the already-loaded small src, then upgrade to a bigger
+// thumbnail async. Leave the thumb (or the pop) to dismiss.
+const WF_THUMB_HOVER_MS = 1200;
+const WF_THUMB_POP_W = 420;          // max edge for the hi-res fetch
+let _wfThumbSrc = null;              // the <img> currently armed / shown
+let _wfThumbShowTimer = null;
+let _wfThumbHideTimer = null;
+let _wfThumbPopSeq = 0;              // invalidate in-flight hi-res loads
+
+function wfThumbEl(el){
+  return el && el.closest ? el.closest(".wf-node-thumb, .wf-node-thumb-sm") : null;
+}
+function wfThumbPopEl(){
+  let pop = document.getElementById("wf-thumb-pop");
+  if(pop) return pop;
+  pop = document.createElement("div");
+  pop.id = "wf-thumb-pop";
+  pop.setAttribute("role", "tooltip");
+  pop.innerHTML = '<div class="wf-thumb-pop-frame"><img alt=""></div><div class="wf-thumb-pop-name"></div>';
+  document.body.appendChild(pop);
+  // Moving into the pop keeps it open; leaving dismisses.
+  pop.addEventListener("mouseenter", ()=>{ clearTimeout(_wfThumbHideTimer); _wfThumbHideTimer=null; });
+  pop.addEventListener("mouseleave", ()=> wfThumbPopHide());
+  return pop;
+}
+function wfThumbPopPosition(pop, anchor){
+  const r = anchor.getBoundingClientRect();
+  const pad = 10;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  // Measure after show so we know the real box size (capped by CSS).
+  const pr = pop.getBoundingClientRect();
+  const pw = pr.width || 280, ph = pr.height || 200;
+  // Prefer right of the thumb; flip left / above / below when near edges.
+  let left = r.right + pad;
+  let top  = r.top + (r.height/2) - ph/2;
+  if(left + pw > vw - 8) left = r.left - pad - pw;
+  if(left < 8) left = Math.max(8, Math.min(vw - pw - 8, r.left));
+  if(top < 8) top = 8;
+  if(top + ph > vh - 8) top = Math.max(8, vh - ph - 8);
+  // If still overlapping the thumb (tiny viewport), park below it.
+  const overlaps = !(left+pw < r.left || left > r.right || top+ph < r.top || top > r.bottom);
+  if(overlaps){
+    top = r.bottom + pad;
+    if(top + ph > vh - 8) top = Math.max(8, r.top - pad - ph);
+    left = Math.max(8, Math.min(vw - pw - 8, r.left + r.width/2 - pw/2));
+  }
+  pop.style.left = Math.round(left)+"px";
+  pop.style.top  = Math.round(top)+"px";
+}
+function wfThumbPopShow(img){
+  if(!img || !img.isConnected) return;
+  // Only while the node is actually showing previews (global or per-node eye).
+  const node = img.closest(".wf-node");
+  if(!node || !node.classList.contains("showing-thumb")) return;
+  if(!img.src && !img.dataset.path) return;
+
+  const pop = wfThumbPopEl();
+  const big = pop.querySelector("img");
+  const nameEl = pop.querySelector(".wf-thumb-pop-name");
+  const path = img.dataset.path || "";
+  const base = path ? path.split(/[\\/]/).pop() : "";
+  // Paint immediately with whatever we already have (small thumb), then upgrade.
+  if(img.src) big.src = img.src;
+  else big.removeAttribute("src");
+  if(nameEl){ nameEl.textContent = base; nameEl.title = path; nameEl.style.display = base ? "" : "none"; }
+  pop.classList.add("show");
+  // First layout pass with current image, then re-pin once the hi-res arrives.
+  wfThumbPopPosition(pop, img);
+
+  const seq = ++_wfThumbPopSeq;
+  if(path){
+    try{
+      api().image_thumbnail(path, WF_THUMB_POP_W).then(d=>{
+        if(!d || seq !== _wfThumbPopSeq || _wfThumbSrc !== img) return;
+        big.src = d;
+        // Re-measure after the larger image loads (size may change).
+        if(big.complete) wfThumbPopPosition(pop, img);
+        else big.onload = ()=>{ if(seq === _wfThumbPopSeq) wfThumbPopPosition(pop, img); };
+      });
+    }catch{}
+  }
+}
+function wfThumbPopHide(){
+  clearTimeout(_wfThumbShowTimer); _wfThumbShowTimer=null;
+  clearTimeout(_wfThumbHideTimer); _wfThumbHideTimer=null;
+  _wfThumbSrc = null;
+  _wfThumbPopSeq++;
+  const pop = document.getElementById("wf-thumb-pop");
+  if(pop) pop.classList.remove("show");
+}
+function wfThumbPopScheduleHide(){
+  clearTimeout(_wfThumbHideTimer);
+  // Short grace so the cursor can travel from the thumb into the pop.
+  _wfThumbHideTimer = setTimeout(()=>{
+    const pop = document.getElementById("wf-thumb-pop");
+    if(pop && pop.matches(":hover")) return;
+    wfThumbPopHide();
+  }, 120);
+}
+function wfInitThumbHover(){
+  if(document.documentElement.__wfThumbHover) return;
+  document.documentElement.__wfThumbHover = true;
+
+  // Capture-phase so we see enter/leave on the imgs even if something stops bubble.
+  document.addEventListener("pointerover", e=>{
+    const img = wfThumbEl(e.target);
+    if(!img) return;
+    const node = img.closest(".wf-node");
+    if(!node || !node.classList.contains("showing-thumb")) return;
+    clearTimeout(_wfThumbHideTimer); _wfThumbHideTimer=null;
+    // Same thumb again (left briefly, or move into the pop and back): keep the
+    // open pop, or re-arm the delay if it was cancelled mid-wait.
+    if(_wfThumbSrc === img){
+      const pop = document.getElementById("wf-thumb-pop");
+      if(pop && pop.classList.contains("show")) return;
+      if(_wfThumbShowTimer) return;   // still counting down
+    }
+    // Arm a new hover; cancel any previous pending show.
+    clearTimeout(_wfThumbShowTimer);
+    _wfThumbSrc = img;
+    _wfThumbShowTimer = setTimeout(()=>{
+      _wfThumbShowTimer = null;
+      if(_wfThumbSrc === img) wfThumbPopShow(img);
+    }, WF_THUMB_HOVER_MS);
+  }, true);
+
+  document.addEventListener("pointerout", e=>{
+    const img = wfThumbEl(e.target);
+    if(!img) return;
+    // Still inside the same thumb (moving between its children — none usually).
+    const to = e.relatedTarget;
+    if(to && img.contains(to)) return;
+    // Moving into the pop itself — keep showing.
+    if(to && to.closest && to.closest("#wf-thumb-pop")) return;
+    if(_wfThumbSrc === img){
+      clearTimeout(_wfThumbShowTimer); _wfThumbShowTimer=null;
+      wfThumbPopScheduleHide();
+    }
+  }, true);
+
+  // Dragging / panning / scrolling the canvas should dismiss immediately.
+  const dismiss = ()=> wfThumbPopHide();
+  document.addEventListener("pointerdown", dismiss, true);
+  document.addEventListener("wheel", dismiss, {capture:true, passive:true});
+  window.addEventListener("blur", dismiss);
+  window.addEventListener("resize", dismiss);
+}
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", wfInitThumbHover);
+else wfInitThumbHover();
 
 // Run visualisation. The engine reports (a) the node about to run — painted amber
 // while live — and (b) each node's result once it finishes. Results accumulate
@@ -25,6 +181,9 @@ async function wfLoadThumb(img, path){
 let wfRunNode=null;
 let wfLiveNode=null;    // the engine's true current node id (even if in an off-screen graph); drives focus-on-toggle
 let wfRunStopped=false; // true once a finished run's trail is on display (greys-out skipped blocks)
+// True while "Test block" (single node) is in flight — events.js accepts
+// node_active / node_result without requiring a full graph run (wfRunning).
+let wfNodeTesting=false;
 let wfSkipIds=null;     // ids greyed out as "not reached", captured once when the run stops
 const wfRan={};       // nodeId -> "ok" | "fail"
 const wfRanPort={};   // nodeId -> output port actually taken

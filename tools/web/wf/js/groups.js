@@ -363,21 +363,75 @@ function wfMarkDefaultEntry(){
 }
 
 // ── Right-click context menu (group / copy / delete) ──────────────────────────
-// Run one block in isolation — the engine executes it on the calling thread
-// (no graph walk), firing the same on_node/on_node_done callbacks a real run
-// does, so the canvas paints it amber→green/red and the log streams its output.
-function wfRunSingleNode(node){
-  if(!node) return;
-  if(wfRunning){ setStatus("Workflow is running — stop before running one block"); return; }
-  // Serialize just this node (id/type/params + note/log) and the current flow
-  // so the engine can resolve templates against the right templates dir.
+// Can this node type be tested in isolation? Structural nodes (loop / call /
+// parallel / switch…) need a graph walk — only action + condition make sense.
+function wfCanTestNode(node){
+  if(!node) return false;
+  const def=WF_NODES[node.type]||{};
+  return def.kind==="action" || def.kind==="condition";
+}
+
+// Test one block: switch to Preview, run the node on the device, paint match
+// overlay (image/color/OCR) + green/red trail. Timeout for wait_* is capped to
+// 1s server-side so a miss returns quickly with the best-score box.
+async function wfRunSingleNode(node){
+  if(!node){
+    // Toolbar / shortcut with no arg → use the primary selection.
+    node = WF.selectedNode ? wfNode(WF.selectedNode) : null;
+  }
+  if(!node){ uiToast("Chọn một block để test.","warning"); return; }
+  if(wfRunning){ uiToast("Đang chạy workflow — dừng trước khi test 1 block.","warning"); return; }
+  if(wfNodeTesting){ setStatus("Đang test block…"); return; }
+  if(!wfCanTestNode(node)){
+    uiToast("Block cấu trúc (loop/call/…) không test riêng — dùng Run from selected.","warning");
+    return;
+  }
+  const def=WF_NODES[node.type]||{};
+  // Show the live screen + match boxes (Test always paints overlay even if
+  // Debug overlay toggle is off — see wfWantMatchOverlay).
+  if(typeof wfSwitchView==="function") wfSwitchView("preview");
+  // Clear prior trail colours on this node so amber→result is obvious.
+  const el=typeof wfNodeElById==="function"?wfNodeElById(node.id):null;
+  if(el) el.classList.remove("ran-ok","ran-fail","ran-skip");
+  if(typeof wfPvOverlay!=="undefined"){ wfPvOverlay=[]; wfPvMatchRegion=null; wfPvOverlayMeta=null; }
+  if(typeof wfPvDraw==="function") wfPvDraw();
+
   const clean={ id:node.id, type:node.type, params:Object.assign({}, node.params||{}) };
   if(node.note) clean.note=node.note;
   if(node.log)  clean.log=node.log;
-  setStatus("Running block…");
-  api().workflow_run_node(JSON.stringify(clean), JSON.stringify(wfSerialize())).then(ok=>{
-    if(!ok) setStatus("Block run failed");
-  });
+  // Per-node timing/retry used by the engine for real runs — include so test
+  // matches production behaviour (except wait timeout which is capped).
+  if(node.delayBefore) clean.delayBefore=node.delayBefore;
+  if(node.delayAfter)  clean.delayAfter=node.delayAfter;
+  if(node.retryCount)  clean.retryCount=node.retryCount;
+  if(node.retryDelay)  clean.retryDelay=node.retryDelay;
+  if(node.screenshotOnFail) clean.screenshotOnFail=node.screenshotOnFail;
+
+  wfNodeTesting=true;
+  if(typeof wfNoteNodeStart==="function") wfNoteNodeStart(node.id);
+  if(typeof wfSetRunningNode==="function") wfSetRunningNode(node.id);
+  setStatus("Test «"+(def.label||node.type)+"»…");
+  try{
+    const r=await api().workflow_run_node(JSON.stringify(clean), JSON.stringify(wfSerialize()));
+    const status=(r && r.status) ? r.status : (r ? "ok" : "fail");
+    const port=r && r.port;
+    if(typeof wfNoteNodeDone==="function") wfNoteNodeDone(node.id);
+    if(typeof wfMarkNodeResult==="function") wfMarkNodeResult(node.id, status, port);
+    if(typeof wfSetRunningNode==="function") wfSetRunningNode(null);
+    const failish = status==="fail" || port==="false";
+    const branch = port!=null ? " → "+port : "";
+    setStatus("Test «"+(def.label||node.type)+"»: "+status+branch);
+    if(typeof uiToast==="function"){
+      uiToast((def.label||node.type)+": "+(failish?"không khớp / fail":"ok")+branch,
+              failish?"warning":"success");
+    }
+  }catch(e){
+    if(typeof wfSetRunningNode==="function") wfSetRunningNode(null);
+    setStatus("Test block failed");
+    if(typeof uiToast==="function") uiToast("Test block lỗi","error");
+  }finally{
+    wfNodeTesting=false;
+  }
 }
 function wfHideMenu(){ const m=$("wf-ctxmenu"); if(m) m.style.display="none"; }
 function wfShowMenu(clientX, clientY){
@@ -388,15 +442,9 @@ function wfShowMenu(clientX, clientY){
   if(WF.sel.length===1){
     const _n=wfNode(WF.sel[0]);
     if(_n&&_n.type!=="start") items.push({ico:"play",label:"Set as default", fn:()=>wfSetAsDefault(WF.sel[0])});
-    // Run a single block in isolation (no graph walk). Structural nodes (loop,
-    // parallel, switch, call) and terminals don't make sense standalone, so the
-    // entry only shows on executable action/condition kinds.
-    if(_n){
-      const _def=WF_NODES[_n.type]||{};
-      const _kind=_def.kind;
-      if(_kind==="action"||_kind==="condition"){
-        items.push({ico:"play",label:"Run this block", fn:()=>wfRunSingleNode(_n)});
-      }
+    // Test one block: runs on device, paints match overlay on Preview.
+    if(_n && wfCanTestNode(_n)){
+      items.push({ico:"target",label:"Test block (Ctrl+Enter)", fn:()=>wfRunSingleNode(_n)});
     }
   }
   if(stackSids.length) items.push({ico:"link_off",label:"Unmerge", fn:()=>stackSids.forEach(wfUnmerge)});
@@ -494,9 +542,11 @@ function wfInitCanvas(){
   if(aadd) aadd.onclick=(e)=>{ e.stopPropagation(); wfActAddCurrent(); };
   const afocus=$("wf-act-focus");
   if(afocus) afocus.onclick=(e)=>{ e.stopPropagation(); wfToggleFocus(); };
+  const adbg=$("wf-act-dbg");
+  if(adbg) adbg.onclick=(e)=>{ e.stopPropagation(); if(typeof wfToggleDebugOverlay==="function") wfToggleDebugOverlay(); };
   // Only the title row (not the tab bar / header buttons) is the collapse trigger.
   const ahdr=document.querySelector("#wf-act-hdr-row");
-  if(ahdr) ahdr.onclick=(e)=>{ if(e.target.closest(".wf-act-hdr-add,.wf-act-hdr-focus")) return; wfActCollapsed=!wfActCollapsed; wfPersistPanelState(); wfToggleActPanel(); };
+  if(ahdr) ahdr.onclick=(e)=>{ if(e.target.closest(".wf-act-hdr-add,.wf-act-hdr-tog,.wf-act-hdr-focus")) return; wfActCollapsed=!wfActCollapsed; wfPersistPanelState(); wfToggleActPanel(); };
   // Functions section (bottom of the left sidebar): "+" creates, header collapses.
   const fadd=$("wf-fn-add");
   if(fadd) fadd.onclick=(e)=>{ e.stopPropagation(); wfAddFunction(); };

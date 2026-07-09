@@ -121,9 +121,15 @@ async function pvRunMatch(all){
   const el=$("pv-tpl-result");
   if(r.error){ el.textContent=r.error; el.className="tpl-result empty"; return; }
   el.textContent=r.summary; el.className="tpl-result";
-  wfPvOverlay=r.rects||[]; wfPvDraw();
+  // DevScope match_template returns [x,y,w,h,conf] — treat as ok hits.
+  wfPvOverlay=(r.rects||[]).map(rect=>{
+    if(Array.isArray(rect) && rect.length===5) return rect.concat([1,""]);
+    return rect;
+  });
+  wfPvMatchRegion=null; wfPvOverlayMeta=r;
+  wfPvDraw();
 }
-async function pvClearOverlay(){ await api().clear_overlay(); wfPvOverlay=[]; wfPvDraw(); }
+async function pvClearOverlay(){ await api().clear_overlay(); wfPvOverlay=[]; wfPvMatchRegion=null; wfPvOverlayMeta=null; wfPvDraw(); }
 
 // ── Asset library ───────────────────────────────────────────────────────────
 async function pvRefreshAssets(){

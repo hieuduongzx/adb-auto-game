@@ -171,6 +171,7 @@ class DevHelperAPI:
         self._auto_refresh_enabled = True
         self._refresh_hz = 20.0
         self._last_auto_capture = 0.0
+        self._device_lost_announced = False
 
         # Background workers.
         self._device_lock = threading.Lock()
@@ -291,6 +292,8 @@ class DevHelperAPI:
             self.controller.quick_refresh()
             s = self.controller.get_status_summary()
             self._connected_serial = s.get("device_id") if s.get("connected") else None
+            if s.get("connected"):
+                self._device_lost_announced = False
             self._push("device_status", {
                 "connected": bool(s.get("connected")),
                 "serial": s.get("device_id"),
@@ -315,14 +318,37 @@ class DevHelperAPI:
                             or self.controller.device_id != self._selected_serial):
                         self.controller.select_device(self._selected_serial)
                 self._push("devices_update", {"devices": items})
-                if items:
+                serials = {d.get("serial") for d in items if d.get("serial")}
+                wanted = self._selected_serial or self._connected_serial
+                if wanted and wanted not in serials:
+                    self.controller.mark_disconnected("không còn trong adb devices")
+                    self._connected_serial = None
+                    if self._auto_refresh_enabled:
+                        self._on_device_lost(f"{wanted} not found")
+                    else:
+                        self._push("device_status", {
+                            "connected": False, "serial": None, "name": "",
+                        })
+                elif items:
                     s = self.controller.get_status_summary()
                     self._connected_serial = s.get("device_id") if s.get("connected") else None
+                    if s.get("connected"):
+                        self._device_lost_announced = False
                     self._push("device_status", {
                         "connected": bool(s.get("connected")),
                         "serial": s.get("device_id"),
                         "name": s.get("device_name") or "",
                     })
+                else:
+                    if self.controller.device is not None or self._connected_serial:
+                        self.controller.mark_disconnected("không còn device nào")
+                        self._connected_serial = None
+                        if self._auto_refresh_enabled:
+                            self._on_device_lost("no devices")
+                        else:
+                            self._push("device_status", {
+                                "connected": False, "serial": None, "name": "",
+                            })
             except Exception:
                 self._push("devices_update", {"devices": []})
 
@@ -496,7 +522,8 @@ class DevHelperAPI:
     def capture(self) -> bool:
         """Capture a screenshot and push a JPEG frame to JS."""
         if self.controller.device is None:
-            self._push("capture_failed", {"error": "No device selected"})
+            if self._auto_refresh_enabled:
+                self._on_device_lost("No device selected")
             return False
         with self._capture_lock:
             if self._capture_in_flight:
@@ -505,12 +532,40 @@ class DevHelperAPI:
         threading.Thread(target=self._capture_worker, daemon=True).start()
         return True
 
+    def _on_device_lost(self, reason: str = "") -> None:
+        """Stop live capture and notify UI once when the ADB device vanishes."""
+        if getattr(self, "_device_lost_announced", False) and not self._auto_refresh_enabled:
+            return
+        self._device_lost_announced = True
+        was_refreshing = self._auto_refresh_enabled
+        self._auto_refresh_enabled = False
+        try:
+            self.controller.mark_disconnected(reason)
+        except Exception:
+            self.controller.device = None
+        self._connected_serial = None
+        try:
+            stop_scrcpy_sources()
+        except Exception:
+            pass
+        msg = reason or "Device not found"
+        log_warning(f"Đã dừng auto-refresh — device mất: {msg}")
+        self._push("device_status", {"connected": False, "serial": None, "name": ""})
+        if was_refreshing:
+            self._push("capture_failed", {
+                "error": f"Device mất kết nối — đã dừng capture ({msg})",
+            })
+
     def _capture_worker(self) -> None:
         try:
             img = capture_screen_frame(self.controller)
+            if img is None and self.controller.device is None:
+                self._on_device_lost("device not found")
+                return
             if img is None:
                 self._push("capture_failed", {"error": "Failed to capture screen"})
                 return
+            self._device_lost_announced = False
             h, w = img.shape[:2]
             self._screen = img
             self._screen_w = w
@@ -519,6 +574,13 @@ class DevHelperAPI:
             self._push_frame(img)
             self._push("captured", {"w": w, "h": h})
         except Exception as exc:
+            if self.controller.device is None or ADBController.is_device_gone_error(exc):
+                try:
+                    self.controller.mark_disconnected(str(exc))
+                except Exception:
+                    self.controller.device = None
+                self._on_device_lost(str(exc))
+                return
             self._push("capture_failed", {"error": str(exc)})
         finally:
             with self._capture_lock:
@@ -529,6 +591,9 @@ class DevHelperAPI:
             time.sleep(0.1)
             if not self._auto_refresh_enabled or self._closing:
                 continue
+            if self.controller.device is None:
+                self._on_device_lost("No device selected")
+                continue
             now = time.monotonic()
             period = 1.0 / max(0.1, self._refresh_hz)
             if now - self._last_auto_capture >= period:
@@ -538,6 +603,8 @@ class DevHelperAPI:
     def set_auto_refresh(self, enabled: bool) -> bool:
         self._auto_refresh_enabled = bool(enabled)
         self._last_auto_capture = time.monotonic()
+        if enabled:
+            self._device_lost_announced = False
         return True
 
     def set_refresh_hz(self, hz: float) -> bool:

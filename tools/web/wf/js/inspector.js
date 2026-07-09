@@ -116,7 +116,17 @@ function wfRenderInspector(){
   const node=wfNode(WF.selectedNode), act=wfCurAct(), fn=wfCurFn();
   if(node){
     const def=WF_NODES[node.type]||{label:node.type,fields:[]};
-    body.appendChild(wfInspId(def.ico||"box", def.label||node.type, node.type));
+    const idEl=wfInspId(def.ico||"box", def.label||node.type, node.type);
+    // Test this block alone — a small icon action tucked into the header's right
+    // edge; jumps to Preview and draws match boxes (Ctrl+Enter equivalent).
+    if(typeof wfCanTestNode==="function" && wfCanTestNode(node)){
+      const tbtn=document.createElement("button"); tbtn.type="button"; tbtn.className="btn sm ico wf-insp-test-btn";
+      tbtn.innerHTML=wfIco("target");
+      tbtn.title="Test block — chạy block này, vẽ match overlay (xanh=đạt threshold, đỏ=best dưới ngưỡng · Ctrl+Enter)";
+      tbtn.onclick=()=>{ if(typeof wfRunSingleNode==="function") wfRunSingleNode(node); };
+      idEl.appendChild(tbtn);
+    }
+    body.appendChild(idEl);
 
     const pblock=wfInspBlock("Parameters");
     if(node.type==="call"){ pblock.appendChild(wfCallPicker(node)); }
@@ -690,6 +700,19 @@ function wfPairRow(node,fA,fB){
   return wrap;
 }
 
+// Normalize a free-text / legacy clock value to HTML time input form (HH:MM).
+// Accepts "8:00", "08:00", "8:00:00"; returns "" for blank or unparseable.
+function wfNormTime(raw){
+  if(raw===undefined||raw===null) return "";
+  const s=String(raw).trim();
+  if(!s) return "";
+  const m=s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if(!m) return "";
+  const hh=Math.min(23, Math.max(0, parseInt(m[1],10)));
+  const mm=Math.min(59, Math.max(0, parseInt(m[2],10)));
+  return String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0");
+}
+
 function wfFieldEl(node,f){
   // Region is a special block (already styled as a panel).
   if(f.t==="region") return wfRegionField(node,f);
@@ -731,6 +754,21 @@ function wfFieldEl(node,f){
     inp.oninput=()=>{ let v=inp.value.trim(); if(v && v[0]!=="#") v="#"+v;
       if(valid(v)) pick.value=v; commit(v); };
     row.appendChild(pick); row.appendChild(inp);
+    return row;
+  }
+
+  // Clock time (HH:MM) — native picker. Empty allowed (e.g. optional schedule).
+  // Normalizes legacy free-text values like "8:00" → "08:00" for the input.
+  if(f.t==="time"){
+    const inp=document.createElement("input"); inp.type="time"; inp.className="wf-time-pick";
+    const raw=node.params[f.k]!==undefined?node.params[f.k]:(f.d!==undefined?f.d:"");
+    const norm=wfNormTime(raw);
+    if(norm) inp.value=norm;
+    // Keep stored param in HH:MM so the engine and node summary stay consistent.
+    if(norm && String(raw).trim()!==norm) node.params[f.k]=norm;
+    inp.onchange=()=>{ wfPushUndoDebounced(); node.params[f.k]=inp.value||""; wfUpdNodeSum(node); };
+    inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]=inp.value||""; wfUpdNodeSum(node); };
+    row.appendChild(inp);
     return row;
   }
 

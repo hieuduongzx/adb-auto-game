@@ -113,10 +113,19 @@ class ADBGameAutomation:
         log_info("Starting continuous screen capture thread")
         while self.capture_running:
             try:
+                # Device already dropped (emulator closed) — wait quietly; a
+                # reconnect will repopulate adb.device. Don't thrash capture.
+                if getattr(self.adb, "device", None) is None:
+                    time.sleep(max(0.5, self.capture_interval * 5))
+                    continue
                 screen = capture_screen_frame(self.adb, timeout=self.capture_interval)
                 if screen is not None:
                     with self.screen_lock:
                         self.latest_screen = screen
+                elif getattr(self.adb, "device", None) is None:
+                    # capture_screen_raw marked the device gone — back off.
+                    time.sleep(max(0.5, self.capture_interval * 5))
+                    continue
                 time.sleep(self.capture_interval)
             except Exception as e:
                 log_error(f"Error in capture thread: {e}")

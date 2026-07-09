@@ -22,11 +22,41 @@ window.__recv = function(raw){
   // ── Scope tool events (Preview tab inspector) ───────────────────────────────
   if(type==="captured"){ const rl=$("wf-pv-res"); if(rl) rl.textContent=`${data.w} × ${data.h}`; return; }
   if(type==="overlay"){
-    if(typeof wfPvOverlay!=="undefined"){ wfPvOverlay=data.rects||[]; if(typeof wfPvDraw==="function") wfPvDraw(); }
+    // Gate: only paint when Debug overlay is ON (or a single-block Test is running).
+    // Engine still emits matches always; this keeps normal runs clean.
+    const want = typeof wfWantMatchOverlay==="function" ? wfWantMatchOverlay() : !!wfDebugOverlayOn;
+    if(!want){
+      // Drop stale boxes if the user turned the toggle off mid-run.
+      if(typeof wfPvOverlay!=="undefined" && wfPvOverlay.length){
+        wfPvOverlay=[]; wfPvMatchRegion=null; wfPvOverlayMeta=null;
+        if(typeof wfPvDraw==="function") wfPvDraw();
+      }
+      return;
+    }
+    if(typeof wfPvOverlay!=="undefined"){
+      // Chỉ cập nhật state overlay — không ép chuyển tab Preview.
+      // User tự mở Preview (Tab) khi muốn xem box.
+      wfPvOverlay=data.rects||[];
+      if(typeof wfPvMatchRegion!=="undefined") wfPvMatchRegion=data.region||null;
+      if(typeof wfPvOverlayMeta!=="undefined") wfPvOverlayMeta=data;
+      if(typeof wfPvDraw==="function") wfPvDraw();
+      // Status line: e.g. "Match btn_ok.png: 0.912 ✓ (thr 0.85)"
+      if(data && (data.label!=null || data.conf!=null)){
+        const conf=Number(data.conf);
+        const thr=data.threshold!=null?Number(data.threshold):null;
+        const mark=data.ok?"✓":"✗";
+        const bits=[];
+        if(data.label) bits.push(String(data.label));
+        if(!isNaN(conf)) bits.push(conf.toFixed(3));
+        bits.push(mark);
+        if(thr!=null && !isNaN(thr)) bits.push("(thr "+thr.toFixed(2)+")");
+        setStatus("Match "+bits.join(" "));
+      }
+    }
     return;
   }
   if(type==="selection_cleared"){
-    if(typeof wfPvRegion!=="undefined"){ wfPvRegion=null; wfPvPoint=null; wfPvOverlay=[]; pvSetRegionBadge(false); if(typeof wfPvDraw==="function") wfPvDraw(); }
+    if(typeof wfPvRegion!=="undefined"){ wfPvRegion=null; wfPvPoint=null; wfPvOverlay=[]; wfPvMatchRegion=null; wfPvOverlayMeta=null; pvSetRegionBadge(false); if(typeof wfPvDraw==="function") wfPvDraw(); }
     return;
   }
   if(type==="out_dir"){ if(typeof pvUpdateOutDir==="function") pvUpdateOutDir(data.path); return; }
@@ -52,18 +82,25 @@ window.__recv = function(raw){
   // the node's own graph (activity or function) and centre on it, so execution
   // is followed across call boundaries in and out.
   if(type==="node_active"){
-    if(!wfRunning) return;
+    // Full test run OR single-block test both light the amber node.
+    if(!wfRunning && !wfNodeTesting) return;
     if(data.id){ wfLiveNode=data.id; wfNoteNodeStart(data.id); }   // the true running node, even if in an off-screen graph
     // Follow-focus first: if the running node lives in another graph (a function
     // we stepped into, or the activity we stepped back out to), switch to it and
     // centre. This rebuilds the canvas so the node is now present for the guard.
-    if(data.id && wfFocusOn) wfFocusFollow(data.id);
+    if(data.id && wfFocusOn && !wfNodeTesting) wfFocusFollow(data.id);
     if(data.id && !wfNode(data.id)) return;   // off-graph & focus off → leave call block lit
     wfSetRunningNode(data.id);
     return;
   }
-  if(type==="node_result"){ if(!wfRunning) return; wfNoteNodeDone(data.id);
-    if(data.id && !wfNode(data.id)) return; wfMarkNodeResult(data.id, data.status, data.port); if(typeof wfDebugAutoStep==="function") wfDebugAutoStep(); return; }
+  if(type==="node_result"){
+    if(!wfRunning && !wfNodeTesting) return;
+    wfNoteNodeDone(data.id);
+    if(data.id && !wfNode(data.id)) return;
+    wfMarkNodeResult(data.id, data.status, data.port);
+    if(typeof wfDebugAutoStep==="function") wfDebugAutoStep();
+    return;
+  }
   // Failure screenshot saved for a node's final failed attempt — remember it and
   // refresh the inspector if that node is the one being inspected right now.
   if(type==="node_fail_shot"){

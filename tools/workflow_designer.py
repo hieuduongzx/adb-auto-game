@@ -166,6 +166,9 @@ class WorkflowDesignerAPI:
         self._auto_refresh_enabled = False
         self._refresh_hz = 30.0
         self._last_auto_capture = 0.0
+        # After a device-gone failure we stop live capture and announce once;
+        # cleared on reconnect / when Preview auto-refresh is turned back on.
+        self._device_lost_announced = False
 
         # DevScope-style tool state shared with the Preview tab's tool panel:
         # the last picked point / drag region / template-match overlay, plus the
@@ -282,7 +285,10 @@ class WorkflowDesignerAPI:
                 self._push("capture_failed", {"error": "Chưa đặt cửa sổ Win32"})
                 return False
         elif self.controller.device is None:
-            self._push("capture_failed", {"error": "No device selected"})
+            # Device already gone — stop the live preview loop quietly. Do not
+            # push capture_failed every tick (that was flooding the UI/log).
+            if self._auto_refresh_enabled:
+                self._on_device_lost("No device selected")
             return False
         with self._capture_lock:
             if self._capture_in_flight:
@@ -290,6 +296,30 @@ class WorkflowDesignerAPI:
             self._capture_in_flight = True
         threading.Thread(target=self._capture_worker, daemon=True).start()
         return True
+
+    def _on_device_lost(self, reason: str = "") -> None:
+        """Stop live capture and tell the UI the device is gone — once."""
+        if getattr(self, "_device_lost_announced", False) and not self._auto_refresh_enabled:
+            # Already stopped + announced; stay quiet until a reconnect.
+            return
+        self._device_lost_announced = True
+        was_refreshing = self._auto_refresh_enabled
+        self._auto_refresh_enabled = False
+        # Drop the stale ADB handle if capture hasn't already.
+        try:
+            self.controller.mark_disconnected(reason)
+        except Exception:
+            self.controller.device = None
+        self._connected_serial = None
+        try:
+            stop_scrcpy_sources()
+        except Exception:
+            pass
+        msg = reason or "Device not found"
+        log_warning(f"Đã dừng Preview — device mất: {msg}")
+        self._push("device_status", {"connected": False, "serial": None, "name": ""})
+        if was_refreshing:
+            self._push("capture_failed", {"error": f"Device mất kết nối — đã dừng capture ({msg})"})
 
     def _capture_worker(self) -> None:
         try:
@@ -302,15 +332,32 @@ class WorkflowDesignerAPI:
                 img = self._win32.capture_frame()
             else:
                 img = capture_screen_frame(self.controller)
+                # Capture path cleared the handle on "device not found" — stop
+                # the preview loop so we don't keep spawning workers.
+                if img is None and self.controller.device is None:
+                    self._on_device_lost("device not found")
+                    return
             if img is None:
                 self._push("capture_failed", {"error": "Failed to capture screen"})
                 return
+            # Successful frame — allow a future disconnect to re-announce.
+            self._device_lost_announced = False
             h, w = img.shape[:2]
             self._screen = img
             self._screen_w = w
             self._screen_h = h
             self._push_frame(img)
         except Exception as exc:
+            if self._capture_kind != "win32" and (
+                self.controller.device is None
+                or ADBController.is_device_gone_error(exc)
+            ):
+                try:
+                    self.controller.mark_disconnected(str(exc))
+                except Exception:
+                    self.controller.device = None
+                self._on_device_lost(str(exc))
+                return
             self._push("capture_failed", {"error": str(exc)})
         finally:
             with self._capture_lock:
@@ -321,6 +368,11 @@ class WorkflowDesignerAPI:
             time.sleep(0.1)
             if not self._auto_refresh_enabled or self._closing:
                 continue
+            # Bail early when ADB already dropped the device (e.g. another
+            # thread marked it disconnected mid-run).
+            if self._capture_kind != "win32" and self.controller.device is None:
+                self._on_device_lost("No device selected")
+                continue
             now = time.monotonic()
             period = 1.0 / max(0.1, self._refresh_hz)
             if now - self._last_auto_capture >= period:
@@ -330,6 +382,9 @@ class WorkflowDesignerAPI:
     def set_auto_refresh(self, enabled: bool) -> bool:
         self._auto_refresh_enabled = bool(enabled)
         self._last_auto_capture = time.monotonic()
+        if enabled:
+            # Fresh Preview session — allow disconnect messaging again.
+            self._device_lost_announced = False
         return True
 
     def set_refresh_hz(self, hz: float) -> bool:
@@ -984,6 +1039,8 @@ class WorkflowDesignerAPI:
             self.controller.quick_refresh()
             s = self.controller.get_status_summary()
             self._connected_serial = s.get("device_id") if s.get("connected") else None
+            if s.get("connected"):
+                self._device_lost_announced = False
             self._push("device_status", {
                 "connected": bool(s.get("connected")),
                 "serial": s.get("device_id"),
@@ -1021,9 +1078,23 @@ class WorkflowDesignerAPI:
                             or self.controller.device_id != self._selected_serial):
                         self.controller.select_device(self._selected_serial)
                 self._push("devices_update", {"devices": items})
-                if items:
+                serials = {d.get("serial") for d in items if d.get("serial")}
+                # Selected emulator closed → clear handle + stop live capture.
+                wanted = self._selected_serial or self._connected_serial
+                if wanted and wanted not in serials:
+                    self.controller.mark_disconnected("không còn trong adb devices")
+                    self._connected_serial = None
+                    if self._auto_refresh_enabled and self._capture_kind != "win32":
+                        self._on_device_lost(f"{wanted} not found")
+                    else:
+                        self._push("device_status", {
+                            "connected": False, "serial": None, "name": "",
+                        })
+                elif items:
                     s = self.controller.get_status_summary()
                     self._connected_serial = s.get("device_id") if s.get("connected") else None
+                    if s.get("connected"):
+                        self._device_lost_announced = False
                     self._push("device_status", {
                         "connected": bool(s.get("connected")),
                         "serial": s.get("device_id"),
@@ -1031,6 +1102,17 @@ class WorkflowDesignerAPI:
                     })
                     if self._connected_serial:
                         self._warm_capture_async()
+                else:
+                    # Empty device list — mirror disconnected state to the UI.
+                    if self.controller.device is not None or self._connected_serial:
+                        self.controller.mark_disconnected("không còn device nào")
+                        self._connected_serial = None
+                        if self._auto_refresh_enabled and self._capture_kind != "win32":
+                            self._on_device_lost("no devices")
+                        else:
+                            self._push("device_status", {
+                                "connected": False, "serial": None, "name": "",
+                            })
             except Exception:
                 self._push("devices_update", {"devices": []})
 
@@ -1382,6 +1464,8 @@ class WorkflowDesignerAPI:
         # (no per-node opt-in) so the inspector can show what the screen looked
         # like when the block failed.
         self._engine.capture_failures_always = True
+        # Live match boxes on Preview during test run / Test-one-block.
+        self._engine.report_matches = True
         self._engine.callbacks["on_stop"] = [lambda: self._push("workflow_state", {"running": False})]
         self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
         self._engine.callbacks["on_node_done"] = [
@@ -1395,6 +1479,55 @@ class WorkflowDesignerAPI:
                                        {"id": act.get("id"), "status": "ok" if ok else "fail"})]
         self._engine.callbacks["on_fail_shot"] = [
             lambda nid, path: self._push("node_fail_shot", {"id": nid, "path": path})]
+        self._engine.callbacks["on_match"] = [self._on_engine_match]
+
+    def _on_engine_match(self, data) -> None:
+        """Push match rects to Preview and freeze the frame the engine just used.
+
+        ``data`` is the dict from WorkflowEngine.on_match (rects with conf/ok,
+        optional search region, template label). Converts dict rects to the
+        compact ``[x,y,w,h,conf,ok,label]`` arrays the canvas overlay expects.
+        """
+        data = data or {}
+        out: List[list] = []
+        for r in (data.get("rects") or []):
+            if isinstance(r, dict):
+                out.append([
+                    float(r.get("x", 0)), float(r.get("y", 0)),
+                    float(r.get("w", 0)), float(r.get("h", 0)),
+                    float(r.get("conf", 0) or 0),
+                    1 if r.get("ok") else 0,
+                    str(r.get("label") or ""),
+                ])
+            elif isinstance(r, (list, tuple)) and len(r) >= 4:
+                out.append(list(r))
+        region = data.get("region")
+        if region is not None and not isinstance(region, list):
+            try:
+                region = list(region)
+            except Exception:
+                region = None
+        self._overlay = [(r[0], r[1], r[2], r[3], r[4]) for r in out]
+        self._push("overlay", {
+            "rects": out,
+            "ok": bool(data.get("ok")),
+            "label": data.get("label") or data.get("template") or "",
+            "threshold": data.get("threshold"),
+            "conf": data.get("conf"),
+            "region": region,
+        })
+        # Push the engine's latest screen so Preview shows the frame the match
+        # was computed on (even if the tab wasn't auto-refreshing).
+        try:
+            if self._engine is not None:
+                screen = self._engine.auto.get_latest_screen()
+                if screen is not None:
+                    self._screen = screen
+                    h, w = screen.shape[:2]
+                    self._screen_w, self._screen_h = int(w), int(h)
+                    self._push_frame(screen)
+        except Exception:
+            pass
 
     def open_path(self, path: str) -> bool:
         """Open a file/folder with the OS default app (fail-shot viewer)."""
@@ -1462,29 +1595,31 @@ class WorkflowDesignerAPI:
             return True
         return False
 
-    def workflow_run_node(self, node_json: str, flow_json: str = "") -> bool:
-        """Run a single node in isolation (no graph walk) — context-menu action.
+    def workflow_run_node(self, node_json: str, flow_json: str = "") -> dict:
+        """Run a single node in isolation (no graph walk) — Test block.
 
         ``flow_json`` is the current serialized workflow so template paths resolve
-        against the same templates dir. The engine fires the node on the calling
-        thread and emits the same on_node / on_node_done callbacks a real run does,
-        so the canvas paints the block amber→green/red.
+        against the same templates dir. Emits on_node / on_node_done / on_match
+        so the canvas paints the block and Preview draws match boxes.
+
+        Returns ``{ok, status, port}`` (dict — not bare bool — so the UI can
+        show the taken branch without waiting for a late event).
         """
         try:
             node = json.loads(node_json)
             flow = json.loads(flow_json) if flow_json else None
         except Exception as exc:
             log_error(f"JSON không hợp lệ: {exc}")
-            return False
+            return {"ok": False, "status": "error", "port": None}
         is_win32 = self._flow_is_win32(flow)
         if not is_win32 and self.controller.device is None:
             log_error("Chưa chọn thiết bị để chạy block")
-            return False
+            return {"ok": False, "status": "error", "port": None}
         if self._engine is None:
             self._engine = WorkflowEngine()
         if self._engine.is_running():
             log_warning("Workflow đang chạy")
-            return False
+            return {"ok": False, "status": "busy", "port": None}
         serial = self._connected_serial or self._selected_serial
         try:
             if serial and not is_win32:
@@ -1506,11 +1641,16 @@ class WorkflowDesignerAPI:
         self._engine.failure_screenshot_dir = os.path.join(_PROJECT_ROOT, "out", "workflow_failures")
         self._bind_workflow_callbacks()
         try:
-            self._engine.run_single_node(node)
+            result = self._engine.run_single_node(node) or {}
         except Exception as exc:
             log_error(f"Chạy block lỗi: {exc}")
-            return False
-        return True
+            return {"ok": False, "status": "error", "port": None}
+        status = result.get("status") or "ok"
+        return {
+            "ok": status not in ("error", "busy"),
+            "status": status,
+            "port": result.get("port"),
+        }
 
     # ── Standalone speed hack (manual ▶, independent of the test run) ──────────
 

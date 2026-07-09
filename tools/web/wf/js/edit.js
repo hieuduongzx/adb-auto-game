@@ -13,6 +13,12 @@ function wfNode(id){ const g=wfGraph(); return g?g.nodes.find(n=>n.id===id):null
 // editor switches to that graph too — so focus follows execution across the
 // call boundary. The toggle lives on the activity panel header.
 let wfFocusOn = false;
+// Debug overlay — when ON, every image/color/OCR match the engine reports is
+// drawn on the Preview tab (box + confidence + search region). Off by default
+// so a normal test run stays clean; turn on to diagnose template misses.
+// Persisted in localStorage so the preference survives restarts.
+let wfDebugOverlayOn = false;
+try{ wfDebugOverlayOn = localStorage.getItem("wfDebugOverlay")==="1"; }catch{}
 // Locate which activity or function graph contains a node id → {kind,id,node}.
 function wfFindNodeOwner(nodeId){
   if(!nodeId) return null;
@@ -53,6 +59,12 @@ function wfSyncFocusBtn(){
     ? "Focus: ON — auto-centre on the running block (follows into/out of functions). Click to turn off."
     : "Focus: OFF — canvas stays put during a run. Click to turn on."; }
 }
+function wfSyncDebugOverlayBtn(){
+  const b=$("wf-act-dbg");
+  if(b){ b.classList.toggle("on", wfDebugOverlayOn); b.title = wfDebugOverlayOn
+    ? "Debug overlay: ON — match ảnh/màu/OCR vẽ box + conf trên Preview (không đổi tab). Click để tắt."
+    : "Debug overlay: OFF — không vẽ match khi run. Click để bật."; }
+}
 // Toggle follow-focus. When turned on mid-run, immediately snap to the block
 // that's running right now — using the engine's true current node (wfLiveNode),
 // which may live in an off-screen function graph, not just the last node lit in
@@ -62,6 +74,28 @@ function wfToggleFocus(){
   wfSyncFocusBtn();
   setStatus("Focus "+(wfFocusOn?"on":"off"));
   if(wfFocusOn){ const id=wfLiveNode||wfRunNode; if(id) wfFocusFollow(id); }
+}
+// Toggle match overlay on Preview. When turned off mid-run, clear the current
+// boxes so the screen is clean again; when on, next engine match paints immediately.
+function wfToggleDebugOverlay(){
+  wfDebugOverlayOn=!wfDebugOverlayOn;
+  try{ localStorage.setItem("wfDebugOverlay", wfDebugOverlayOn?"1":"0"); }catch{}
+  wfSyncDebugOverlayBtn();
+  if(!wfDebugOverlayOn){
+    if(typeof wfPvOverlay!=="undefined"){
+      wfPvOverlay=[]; wfPvMatchRegion=null; wfPvOverlayMeta=null;
+      if(typeof wfPvDraw==="function") wfPvDraw();
+    }
+    setStatus("Debug overlay off");
+  } else {
+    // Không ép đổi tab — chỉ bật cờ vẽ; user tự mở Preview khi muốn xem.
+    setStatus("Debug overlay on — match boxes vẽ khi mở Preview");
+  }
+}
+// Should the current match event be painted? Debug-overlay toggle, or a
+// single-block Test (always shows overlay — that's the point of Test).
+function wfWantMatchOverlay(){
+  return !!wfDebugOverlayOn || !!(typeof wfNodeTesting!=="undefined" && wfNodeTesting);
 }
 function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",delayBefore:0,delayAfter:0,retryCount:0,retryDelay:0,screenshotOnFail:false,showPreview:false,stack:null}; }
 // Every fresh graph seeds both terminals: Start, and an End further right —

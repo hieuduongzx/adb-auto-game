@@ -207,6 +207,8 @@ async function wfToggleRun(){
     }
   }
   wfResetRunViz();        // clear last run's colours BEFORE the engine starts emitting
+  // Clear previous match overlay so the new run's boxes replace it cleanly.
+  if(typeof wfPvOverlay!=="undefined"){ wfPvOverlay=[]; wfPvMatchRegion=null; wfPvOverlayMeta=null; if(typeof wfPvDraw==="function") wfPvDraw(); }
   wfSetRunning(true);     // mark running before any node event can arrive
   const ok=await api().workflow_run(JSON.stringify(wfSerialize()));
   if(!ok) wfSetRunning(false);

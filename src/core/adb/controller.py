@@ -401,12 +401,73 @@ class ADBController:
         """Press home button"""
         return self.press_key(KEYCODE_HOME)
     
+    @staticmethod
+    def is_device_gone_error(exc: BaseException) -> bool:
+        """True when ADB reports the serial is gone/offline (not a transient glitch).
+
+        Matches pure-python-adb / adb protocol failures like::
+
+            ERROR: 'FAIL' 0022device '127.0.0.1:16384' not found
+        """
+        msg = str(exc or "").lower()
+        if not msg:
+            return False
+        # ADB protocol: "ERROR: 'FAIL' 0022device 'host:port' not found"
+        if "device" in msg and "not found" in msg:
+            return True
+        needles = (
+            "device offline",
+            "device unauthorized",
+            "no devices/emulators found",
+            "connection reset",
+            "broken pipe",
+            "cannot connect to",
+            "unable to connect",
+            "device not found",
+        )
+        return any(n in msg for n in needles)
+
+    def mark_disconnected(self, reason: str = "") -> bool:
+        """Drop the live device handle so callers stop hammering a dead serial.
+
+        Returns ``True`` only the first time we transition from connected → gone
+        (so UI/log can announce once). Keeps ``device_id`` so a later reconnect
+        can target the same serial.
+        """
+        if self.device is None:
+            return False
+        serial = self.device_id or getattr(self.device, "serial", None) or "?"
+        self.device = None
+        try:
+            self.clear_info_cache()
+        except Exception:
+            pass
+        tail = f" — {reason}" if reason else ""
+        log_warning(f"Device mất kết nối: {serial}{tail} — đã dừng capture")
+        return True
+
     def capture_screen_raw(self) -> Optional[bytes]:
-        """Capture raw screen data"""
+        """Capture raw screen data.
+
+        If the device has vanished (emulator closed, ADB dropped the serial),
+        clear the handle and return ``None`` — do **not** keep logging every
+        frame; the designer/preview loop would otherwise spam tens of errors/s.
+        """
+        if self.device is None:
+            return None
         try:
             return self.device.screencap()
         except Exception as e:
-            log_error(f"Error capturing screen: {e}")
+            if self.is_device_gone_error(e):
+                # First call clears + logs once; subsequent frames are quiet.
+                self.mark_disconnected(str(e))
+                return None
+            # Transient capture errors: rate-limit so a sticky glitch can't flood.
+            now = time.monotonic()
+            last = getattr(self, "_last_capture_err_log", 0.0)
+            if now - last >= 2.0:
+                self._last_capture_err_log = now
+                log_error(f"Error capturing screen: {e}")
             return None
     
     def get_current_app(self) -> Optional[str]:

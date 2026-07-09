@@ -130,10 +130,21 @@ const WF_NODES = {
   // own output port "c{i}", else the "default" port. Ports are dynamic (one per
   // case + default) — see wfNodeEl. Cases edited by wfSwitchCasesEditor.
   "switch":   {label:"Switch",  ico:"git_branch",kind:"switch",cat:"logic",outs:["default"], fields:[], sum:p=>`${(p.cases||[]).length} branches`},
-  launch_app: {label:"Launch app",    ico:"rocket",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"wait",lbl:"Launch wait (s)",t:"num",d:0}], sum:p=>(p.package||"(package)")+(p.wait?` ·wait ${p.wait}s`:"")},
-  screenshot: {label:"Screenshot",      ico:"camera",kind:"action",cat:"misc",  outs:["out"], fields:[], sum:()=>"take screenshot"},
+  // ── App lifecycle (ADB package · Win32 window title where noted) ───────────
+  launch_app: {label:"Launch app",    ico:"rocket",kind:"action",cat:"app",  outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"wait",lbl:"Launch wait (s)",t:"num",d:0}], sum:p=>(p.package||"(package)")+(p.wait?` ·wait ${p.wait}s`:"")},
+  // Force-stop app (tuỳ chọn xóa dữ liệu) — cặp với Launch app cho flow restart game. ADB-only at runtime.
+  app_stop: {label:"Stop app", ico:"octagon", kind:"action", cat:"app", outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"clearData",lbl:"Clear app data (pm clear)",t:"bool",d:false}], sum:p=>`⛔ ${p.package||"(package)"}`+(p.clearData?" +clear":"")},
+  // Thoát app đang mở — không cần package (ADB: force-stop foreground · Win32: đóng cửa sổ).
+  app_exit: {label:"Exit current app", ico:"x", kind:"action", cat:"app", outs:["out"], fields:[], sum:()=>"thoát app đang mở"},
+  // Gỡ cài đặt app (pm uninstall; -k = giữ dữ liệu). ADB-only at runtime.
+  app_uninstall: {label:"Uninstall app", ico:"trash", kind:"action", cat:"app", outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"keepData",lbl:"Keep data & cache (-k)",t:"bool",d:false}], sum:p=>`🗑 ${p.package||"(package)"}`+(p.keepData?" ·keep":"")},
+  // App/tiêu đề cửa sổ hiện tại có chứa chuỗi? (ADB: package · Win32: window title)
+  if_app: {label:"If app running", ico:"smartphone", kind:"condition", cat:"app", outs:["true","false"], fields:[{k:"package",lbl:"Package / title contains",t:"text",varRef:true},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}app ~ "${p.package||"?"}"`},
+  // ── Utilities ──────────────────────────────────────────────────────────────
+  screenshot: {label:"Screenshot",      ico:"camera",kind:"action",cat:"basic", outs:["out"], fields:[], sum:()=>"take screenshot"},
   log:        {label:"Log",   ico:"log",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"message",t:"text",insertVar:true}], sum:p=>`"${p.message||""}"`},
   note:          {label:"Note",        ico:"message",  kind:"note",      cat:"misc",   outs:[],             fields:[{k:"text",t:"text",d:"note"}], sum:p=>p.text||""},
+  notify:        {label:"Notify",      ico:"bell",   kind:"action",    cat:"misc",   outs:["out"],         fields:[{k:"title",lbl:"Title",t:"text",insertVar:true,d:"Workflow"},{k:"message",lbl:"Message",t:"text",insertVar:true,d:"Completed!"},{k:"sound",lbl:"Play sound",t:"bool",d:true}], sum:p=>`🔔 [${p.title||"Workflow"}] ${p.message||""}`},
   // Function call returns a boolean: "true" when the function's walk reached an
   // End node, "false" when it dead-ended (e.g. a node inside timed out).
   call:          {label:"Function",       ico:"function", kind:"call",      cat:null,     outs:["true","false"], fields:[]},
@@ -143,21 +154,13 @@ const WF_NODES = {
   loop_until_image: {label:"Loop until image", ico:"loop", kind:"loop_until", cat:"image", ins:["in","loop"], outs:["body","found","fail"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxLoops",lbl:"Max loops (0 = ∞)",t:"num",varRef:true,d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`↺ đến khi thấy ${wfBase(p.template)}`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
   // Chạm MỌI vị trí khớp template trên frame hiện tại (quét thu thập vật phẩm).
   tap_all_images: {label:"Tap all matches", ico:"layers", kind:"condition", cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxTaps",lbl:"Max taps (0 = all)",t:"num",varRef:true,d:0},{k:"delayBetween",lbl:"Delay between taps (s)",t:"num",d:.15,step:.05},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`chạm hết ${wfBase(p.template)}`+((parseInt(p.maxTaps)||0)>0?` ≤${p.maxTaps}`:"")+(p.taps=="2"?" ×2":"")},
-  // Force-stop app (tuỳ chọn xóa dữ liệu) — cặp với Launch app cho flow restart game.
-  app_stop: {label:"Stop app", ico:"octagon", kind:"action", cat:"misc", outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"clearData",lbl:"Clear app data (pm clear)",t:"bool",d:false}], sum:p=>`⛔ ${p.package||"(package)"}`+(p.clearData?" +clear":"")},
-  // App/tiêu đề cửa sổ hiện tại có chứa chuỗi? (ADB: package · Win32: window title)
-  if_app: {label:"If app running", ico:"smartphone", kind:"condition", cat:"misc", outs:["true","false"], fields:[{k:"package",lbl:"Package / title contains",t:"text",varRef:true},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}app ~ "${p.package||"?"}"`},
-  // Gỡ cài đặt app (pm uninstall; -k = giữ dữ liệu). ADB-only.
-  app_uninstall: {label:"Uninstall app", ico:"trash", kind:"action", cat:"misc", outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"keepData",lbl:"Keep data & cache (-k)",t:"bool",d:false}], sum:p=>`🗑 ${p.package||"(package)"}`+(p.keepData?" ·keep":"")},
-  // Thoát app đang mở — không cần package (ADB: force-stop foreground · Win32: đóng cửa sổ).
-  app_exit: {label:"Exit current app", ico:"x", kind:"action", cat:"misc", outs:["out"], fields:[], sum:()=>"thoát app đang mở"},
   random_branch: {label:"Random branch",ico:"dice",   kind:"random",    cat:"flow",   outs:[],              fields:[{k:"count",lbl:"Branch count",t:"num",d:2,refresh:true}], sum:p=>`🎲 ${p.count||2} even branches`},
   format_var:    {label:"Format string",ico:"type",   kind:"action",    cat:"logic",  outs:["out"],         fields:[{k:"name",lbl:"Target variable",t:"text",d:"text",var:true},{k:"template",lbl:"Template string",t:"text",insertVar:true,d:"Round {round}/{total}"}], sum:p=>`${p.name||"?"} = "${p.template||""}"`},
-  notify:        {label:"Notify",      ico:"bell",   kind:"action",    cat:"misc",   outs:["out"],         fields:[{k:"title",lbl:"Title",t:"text",insertVar:true,d:"Workflow"},{k:"message",lbl:"Message",t:"text",insertVar:true,d:"Completed!"},{k:"sound",lbl:"Play sound",t:"bool",d:true}], sum:p=>`🔔 [${p.title||"Workflow"}] ${p.message||""}`},
-  // ── Device / time ──────────────────────────────────────────────────────────
+  // ── Time ───────────────────────────────────────────────────────────────────
   get_time:      {label:"Get time → variable", ico:"clock", kind:"action", cat:"time", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"now",var:true},{k:"part",lbl:"Value",t:"select",opts:[{v:"hm",t:"HH:MM"},{v:"hms",t:"HH:MM:SS"},{v:"hour",t:"Hour (0-23)"},{v:"minute",t:"Minute"},{v:"second",t:"Second"},{v:"date",t:"Date YYYY-MM-DD"},{v:"datetime",t:"Date & time"},{v:"weekday",t:"Weekday (1=Mon…7=Sun)"},{v:"timestamp",t:"Unix timestamp"},{v:"custom",t:"Custom (strftime)"}],d:"hm"},{k:"format",lbl:"strftime format",t:"text",d:"%H:%M",showWhen:{part:"custom"}}], sum:p=>`${p.name||"?"} = ${({hm:"HH:MM",hms:"HH:MM:SS",hour:"hour",minute:"minute",second:"second",date:"date",datetime:"datetime",weekday:"weekday",timestamp:"timestamp",custom:p.format||"?"})[p.part||"hm"]}`},
-  wait_until:    {label:"Wait until time", ico:"alarm", kind:"action", cat:"time", outs:["out"], fields:[{k:"time",lbl:"Time (HH:MM)",t:"text",d:"08:00"},{k:"nextDay",lbl:"If passed → wait next day",t:"bool",d:true}], sum:p=>`⏰ ${p.time||"08:00"}`},
-  if_time:       {label:"If within time", ico:"clock", kind:"condition", cat:"time", outs:["true","false"], fields:[{k:"from",lbl:"From (HH:MM)",t:"text",d:"08:00"},{k:"to",lbl:"To (HH:MM)",t:"text",d:"22:00"},{k:"negate",lbl:"Negate (outside window)",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}${p.from||"00:00"}–${p.to||"23:59"}`},
+  wait_until:    {label:"Wait until time", ico:"alarm", kind:"action", cat:"time", outs:["out"], fields:[{k:"time",lbl:"Time",t:"time",d:"08:00"},{k:"nextDay",lbl:"If passed → wait next day",t:"bool",d:true}], sum:p=>`⏰ ${p.time||"08:00"}`},
+  if_time:       {label:"If within time", ico:"clock", kind:"condition", cat:"time", outs:["true","false"], fields:[{k:"from",lbl:"From",t:"time",d:"08:00"},{k:"to",lbl:"To",t:"time",d:"22:00"},{k:"negate",lbl:"Negate (outside window)",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}${p.from||"00:00"}–${p.to||"23:59"}`},
+  // ── Device (ADB / emulator) ────────────────────────────────────────────────
   device_info:   {label:"Device info → variable", ico:"smartphone", kind:"action", cat:"device", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"info",var:true},{k:"prop",lbl:"Property",t:"select",opts:[{v:"battery",t:"Battery level (%)"},{v:"current_app",t:"Current app package"},{v:"width",t:"Screen width"},{v:"height",t:"Screen height"},{v:"model",t:"Model"},{v:"brand",t:"Brand"},{v:"android",t:"Android version"},{v:"sdk",t:"SDK level"},{v:"serial",t:"Serial"},{v:"ip",t:"IP address"}],d:"battery"}], sum:p=>`${p.name||"?"} = ${p.prop||"battery"}`},
   screen_power:  {label:"Screen power", ico:"power", kind:"action", cat:"device", outs:["out"], fields:[{k:"action",lbl:"Action",t:"select",opts:[{v:"on",t:"Wake / On"},{v:"off",t:"Sleep / Off"},{v:"toggle",t:"Toggle (power key)"}],d:"on"}], sum:p=>`🖥 ${({on:"wake",off:"sleep",toggle:"toggle"})[p.action||"on"]}`},
   // Launch the emulator PROCESS on the PC (not an app inside it). Optional "at"
@@ -168,7 +171,7 @@ const WF_NODES = {
     {k:"instance",lbl:"Instance name (BlueStacks)",t:"text",d:"",showWhen:{emulator:"bluestacks"}},
     {k:"path",lbl:"Install folder / console .exe (blank = auto)",t:"text",d:"",pickFolder:true},
     {k:"command",lbl:"Custom command ({index})",t:"text",d:"",showWhen:{emulator:"custom"}},
-    {k:"at",lbl:"Schedule at (HH:MM, blank = now)",t:"text",d:""},
+    {k:"at",lbl:"Schedule at (blank = now)",t:"time",d:""},
     {k:"nextDay",lbl:"If time passed → wait next day",t:"bool",d:true},
     {k:"wait",lbl:"Wait for ADB ready (s)",t:"num",d:60},
     {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
@@ -195,12 +198,25 @@ const WF_NODES = {
 };
 // `ctrl` restricts a category to one project controller: the Device/emulator
 // nodes are ADB-only, the Win32 window nodes are PC-only. Untagged categories
-// (basic/image/color/ocr/flow/logic/…) work on both and always show.
+// (basic/image/app/color/ocr/flow/logic/…) work on both and always show.
 // Thứ tự theo tần suất dùng thật (thống kê 12 workflow: image/basic/flow/logic
 // chiếm ~95% số node). Nhóm chưa từng dùng (`closed:true`) gập mặc định — lần
 // đầu mở app palette chỉ phô ~15 loại node hay dùng; người dùng mở nhóm nào thì
 // trạng thái đó được nhớ trong localStorage (wfPalCollapsed) như cũ.
-const WF_CATS = [ {key:"basic",label:"Basic"}, {key:"image",label:"Image"}, {key:"flow",label:"Flow"}, {key:"logic",label:"Variables / Conditions"}, {key:"ocr",label:"Text (OCR)"}, {key:"input",label:"Keys & Input"}, {key:"color",label:"Color",closed:true}, {key:"time",label:"Time",closed:true}, {key:"device",label:"Device & Time",ctrl:"adb",closed:true}, {key:"win32",label:"Win32 (PC)",ctrl:"win32"}, {key:"misc",label:"Other",closed:true} ];
+const WF_CATS = [
+  {key:"basic", label:"Basic"},
+  {key:"image", label:"Image"},
+  {key:"flow",  label:"Flow"},
+  {key:"logic", label:"Variables / Conditions"},
+  {key:"ocr",   label:"Text (OCR)"},
+  {key:"input", label:"Keys & Input"},
+  {key:"app",   label:"App",     closed:true},
+  {key:"color", label:"Color",   closed:true},
+  {key:"time",  label:"Time",    closed:true},
+  {key:"device",label:"Device",  ctrl:"adb",   closed:true},
+  {key:"win32", label:"Win32 (PC)", ctrl:"win32"},
+  {key:"misc",  label:"Other",   closed:true},
+];
 const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"loop", done:"done", found:"found", fail:"fail", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
 const WF_IN_LBL = { in:"in", loop:"loop" };
@@ -275,6 +291,7 @@ function wfSyncToggleBtns(){
   const a=$("wf-align-btn"); if(a){ a.title="Smart align: "+(wfAlignOn?"On":"Off")+" — kéo block tự hít cạnh/cổng block khác (giữ Alt để tắt tạm)"; a.classList.toggle("on",wfAlignOn); }
   const m=$("wf-minimap-btn"); if(m){ m.title="Minimap: "+(wfMinimapOn?"On":"Off")+" — toàn cảnh đồ thị, click để nhảy camera"; m.classList.toggle("on",wfMinimapOn); }
   if(typeof wfSyncFocusBtn==="function") wfSyncFocusBtn();
+  if(typeof wfSyncDebugOverlayBtn==="function") wfSyncDebugOverlayBtn();
   wfSyncSpeedUI();
 }
 function wfToggleAlign(){
