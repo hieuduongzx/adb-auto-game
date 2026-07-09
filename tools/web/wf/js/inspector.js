@@ -75,17 +75,15 @@ function wfRenderInspector(){
     body.appendChild(wfInspId("box", WF.sel.length+" blocks selected", null, WF.sel.length));
 
     const listBlock=wfInspBlock();
-    const list=document.createElement("div"); list.style.cssText="display:flex;flex-direction:column;gap:3px;";
+    const list=document.createElement("div"); list.className="wf-msel-list";
     selNodes.slice(0,8).forEach(n=>{
       const def=WF_NODES[n.type]||{};
-      const row=document.createElement("div");
-      row.style.cssText="font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
-      row.textContent=(def.label||n.type)+(n.label?` · ${n.label}`:"");
+      const row=document.createElement("div"); row.className="wf-msel-row";
+      row.innerHTML=`<span class="dot"></span><span class="lbl">${escHtml((def.label||n.type)+(n.label?` · ${n.label}`:""))}</span>`;
       list.appendChild(row);
     });
     if(selNodes.length>8){
-      const more=document.createElement("div");
-      more.style.cssText="font-size:10px;color:var(--muted);";
+      const more=document.createElement("div"); more.className="wf-msel-more";
       more.textContent=`+${selNodes.length-8} more…`; list.appendChild(more);
     }
     listBlock.appendChild(list); body.appendChild(listBlock);
@@ -178,11 +176,29 @@ function wfRenderInspector(){
     body.appendChild(wfInspJsonBlock(act.type==="background"?"Background":"Activity", ()=>wfSerializeActivity(act)));
 
     const tipBlock=wfInspBlock();
-    const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Click a node on the canvas to edit its parameters.";
-    tipBlock.appendChild(tip); body.appendChild(tipBlock);
+    tipBlock.innerHTML=
+      `<div class="wf-empty">
+        <div class="wf-empty-t">Chọn block để chỉnh</div>
+        <div class="wf-empty-s">Click một node trên canvas để xem tham số, note và log của block đó.</div>
+        <div class="wf-empty-keys">
+          <span><b>Ctrl+F</b> tìm block</span>
+          <span><b>Del</b> xóa</span>
+          <span><b>Ctrl+D</b> nhân đôi</span>
+        </div>
+      </div>`;
+    body.appendChild(tipBlock);
     return;
   }
-  body.innerHTML='<div class="wf-insp-empty">No activity selected.</div>';
+  body.innerHTML=
+    `<div class="wf-empty">
+      <div class="wf-empty-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h5.5A2 2 0 0 1 17.5 8.5V14"/></svg></div>
+      <div class="wf-empty-t">Chưa mở activity</div>
+      <div class="wf-empty-s">Chọn hoặc tạo activity ở panel góc phải, rồi kéo node từ palette bên trái vào canvas.</div>
+      <div class="wf-empty-keys">
+        <span><b>+</b> thêm activity</span>
+        <span><b>F1</b> phím tắt</span>
+      </div>
+    </div>`;
 }
 
 // ── Variable picker infrastructure ───────────────────────────────────────────
@@ -227,7 +243,7 @@ function wfShowVarMenu(anchor,onPick){
     list.innerHTML="";
     const f=(filter||"").trim().toLowerCase();
     const shown=names.filter(n=>!f||n.toLowerCase().includes(f));
-    if(!shown.length){ const e=document.createElement("div"); e.className="wf-varmenu-empty"; e.textContent=names.length?"No match.":"No variables yet."; list.appendChild(e); }
+    if(!shown.length){ const e=document.createElement("div"); e.className="wf-varmenu-empty"; e.textContent=names.length?"Không khớp.":"Chưa có biến."; list.appendChild(e); }
     let lastScope=null;
     shown.forEach(n=>{
       const info=map[n];

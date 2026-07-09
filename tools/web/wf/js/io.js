@@ -173,12 +173,14 @@ function wfSetRunning(on){
     b.title = on?"Stop":"Test run";
     b.classList.toggle("ok",!on); b.classList.toggle("err",on);
   }
-  // Running status pill: amber "Running" while executing, grey "Ready" at rest.
+  // Running status pill: amber while executing; green Ready / amber Stopped at rest.
   const pill=$("wf-run-status");
   if(pill){
     pill.classList.toggle("running", !!on);
+    pill.classList.toggle("ok", !on && !wfRunStopped);
+    pill.classList.remove("err");
     const txt=pill.querySelector(".wf-run-txt");
-    if(txt) txt.textContent = on ? "Running" : (wfRunStopped ? "Stopped" : "Ready");
+    if(txt) txt.textContent = on ? "Đang chạy" : (wfRunStopped ? "Đã dừng" : "Sẵn sàng");
   }
   wfRenderVarsPanel();
 }

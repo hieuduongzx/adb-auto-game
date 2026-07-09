@@ -89,7 +89,14 @@ window.__recv = function(raw){
 };
 
 // ── Log drawer ────────────────────────────────────────────────────────────────
-function updateLogCount(){ const c=$("log-count"), b=$("log-body"); if(c&&b) c.textContent = b.children.length? String(b.children.length):""; }
+function updateLogCount(){
+  const c=$("log-count"), b=$("log-body"); if(!c||!b) return;
+  const n=b.children.length;
+  c.textContent = n ? String(n) : "";
+  // Highlight the count when there are errors so the collapsed log still warns.
+  const hasErr = !!b.querySelector(".lv-error");
+  c.classList.toggle("has-err", hasErr);
+}
 function wfToggleVarsPanel(ev){
   if(ev && ev.target.closest(".wf-vars-actions")) return;
   wfVarsCollapsed = !wfVarsCollapsed;

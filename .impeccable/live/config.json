@@ -1,6 +1,0 @@
-{
-  "files": ["tools/web/wf/index.html"],
-  "insertBefore": "</body>",
-  "commentSyntax": "html",
-  "cspChecked": true
-}

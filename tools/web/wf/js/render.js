@@ -71,12 +71,14 @@ function wfRenderActivities(){
     wrap.appendChild(el);
   }
   if(seqWrap){
-    if(!seqActs.length){ seqWrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">No sequence activities.</div>'; }
-    else seqActs.forEach(a=>rowInto(seqWrap, a));
+    if(!seqActs.length){
+      seqWrap.innerHTML='<div class="wf-list-empty">Chưa có activity tuần tự.<span class="hint">Bấm + để tạo activity đầu tiên.</span></div>';
+    } else seqActs.forEach(a=>rowInto(seqWrap, a));
   }
   if(bgWrap){
-    if(!bgActs.length){ bgWrap.innerHTML='<div class="wf-insp-empty" style="padding:2px;">No background tasks.</div>'; }
-    else bgActs.forEach(a=>rowInto(bgWrap, a));
+    if(!bgActs.length){
+      bgWrap.innerHTML='<div class="wf-list-empty">Chưa có background task.<span class="hint">Chạy song song, theo interval — bấm + để thêm.</span></div>';
+    } else bgActs.forEach(a=>rowInto(bgWrap, a));
   }
   wfToggleActPanel();   // re-apply the persisted collapsed state on every render
 }
@@ -84,7 +86,10 @@ function wfRenderActivities(){
 function wfRenderFunctions(){
   const wrap=$("wf-functions"); if(!wrap) return; wrap.innerHTML="";
   const cnt=$("wf-fn-count"); if(cnt) cnt.textContent = WF.functions.length? String(WF.functions.length):"";
-  if(!WF.functions.length){ wrap.innerHTML='<div class="wf-insp-empty">No functions. Click “+” to create one.</div>'; return; }
+  if(!WF.functions.length){
+    wrap.innerHTML='<div class="wf-list-empty">Chưa có function.<span class="hint">Tạo function rồi kéo vào canvas để gọi lại.</span></div>';
+    return;
+  }
   WF.functions.forEach(fn=>{
     const sel = WF.edit.kind==="function" && fn.id===WF.edit.id;
     const el=document.createElement("div"); el.className="wf-act wf-fn"+(sel?" sel":""); el.dataset.id=fn.id;
@@ -250,7 +255,11 @@ function wfRenderPalette(){
   });
   if(!shown){
     const none=document.createElement("div"); none.className="wf-pal-none";
-    none.textContent=q?`No nodes match “${wfPaletteQuery.trim()}”`:"No nodes.";
+    if(q){
+      none.innerHTML=`Không có node khớp “${escHtml(wfPaletteQuery.trim())}”.<br><span style="opacity:.85">Thử từ khóa khác hoặc xóa ô tìm.</span>`;
+    } else {
+      none.textContent="Không có node.";
+    }
     pal.appendChild(none);
   }
   // Function calls live in the Function list at the top of the sidebar — drag a
@@ -353,7 +362,7 @@ function wfRenderVarsPanel(){
   body.innerHTML="";
   if(!allNames.length){
     const e=document.createElement("div"); e.className="wf-vars-empty";
-    e.textContent="No variables. Click + to add a global variable.";
+    e.textContent="Chưa có biến. Bấm + để thêm biến global.";
     body.appendChild(e); wfEqualizeCornerPanels(); return;
   }
   function mkSep(label){ const s=document.createElement("span"); s.className="wf-vars-sep"; s.textContent=label; return s; }
@@ -412,7 +421,7 @@ function wfShowGlobsEditor(){
     body.innerHTML="";
     if(!WF.globals.length){
       const e=document.createElement("div"); e.className="wf-vars-empty";
-      e.textContent="No global variables. Click \"+ Add\".";
+      e.textContent="Chưa có biến global. Bấm “+ Add”.";
       body.appendChild(e);
     }
     WF.globals.forEach((v,idx)=> { body.appendChild(wfGlobRow(v,idx,render)); wfBuildGlobChildren(v,body,render); });

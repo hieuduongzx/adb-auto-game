@@ -25,9 +25,9 @@
         <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
     </div>
     <span class="tb-divider"></span>
-    <div id="wf-run-status" class="wf-run-status" title="Run status">
+    <div id="wf-run-status" class="wf-run-status ok" title="Trạng thái chạy">
       <span class="wf-run-dot"></span>
-      <span class="wf-run-txt">Ready</span>
+      <span class="wf-run-txt">Sẵn sàng</span>
     </div>
   </div>
 
@@ -88,11 +88,11 @@
        one drag away — dragging a function row onto the canvas inserts a call). -->
   <div id="wf-side" class="card">
     <div class="wf-side-sec" style="flex:1;min-height:0;display:flex;flex-direction:column;">
-      <div class="wf-side-hdr"><span>Node</span></div>
+      <div class="wf-side-hdr"><span>Nodes</span></div>
       <div class="wf-pal-search">
-        <svg class="wf-pal-search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="wf-pal-search-inp" type="text" placeholder="Search nodes…" oninput="wfPaletteFilter(this.value)" spellcheck="false" autocomplete="off">
-        <button id="wf-pal-search-clr" class="wf-pal-search-clr" title="Clear" onclick="wfPaletteFilterClear()" style="display:none">
+        <svg class="wf-pal-search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="wf-pal-search-inp" type="search" placeholder="Tìm node…" oninput="wfPaletteFilter(this.value)" spellcheck="false" autocomplete="off" aria-label="Tìm node">
+        <button id="wf-pal-search-clr" class="wf-pal-search-clr" title="Xóa" onclick="wfPaletteFilterClear()" style="display:none" type="button" aria-label="Xóa tìm kiếm">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -115,7 +115,7 @@
   <!-- Center: graph canvas -->
   <div id="wf-main" class="card">
     <div id="wf-bar">
-      <input id="wf-name" type="text" placeholder="Workflow name" value="My Workflow">
+      <input id="wf-name" type="text" placeholder="Tên workflow" value="My Workflow" aria-label="Tên workflow">
       <!-- Project controller: ADB device/emulator vs a native Win32 window. -->
       <div id="wf-controller-group" class="wf-speed-group" title="Loại dự án: ADB (thiết bị/giả lập) hay Win32 (cửa sổ chương trình PC)">
         <select id="wf-controller" onchange="wfControllerChanged()" title="Controller">
@@ -197,12 +197,13 @@
       <div id="wf-canvas-empty" class="wf-empty-note">
         <div class="wf-empty-card">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h5.5A2 2 0 0 1 17.5 8.5V14"/></svg>
-          <div class="t">No activity open</div>
-          <div class="s">Create an activity, then drag blocks in from the left palette.</div>
-          <button class="btn accent sm" onclick="wfActAddCurrent()">+ Add activity</button>
+          <div class="t">Chưa mở activity</div>
+          <div class="s">Tạo activity rồi kéo block từ palette bên trái vào canvas để dựng luồng.</div>
+          <button class="btn accent sm" onclick="wfActAddCurrent()">+ Thêm activity</button>
           <div class="keys">
             <span><b>Wheel</b> zoom</span><span><b>Space</b> pan</span>
             <span><b>F</b> fit view</span><span><b>Tab</b> preview</span>
+            <span><b>F1</b> phím tắt</span>
           </div>
         </div>
       </div>
@@ -575,15 +576,15 @@
     <span class="log-label">Log</span>
     <span class="log-count" id="log-count"></span>
     <span class="spacer"></span>
-    <span class="log-filters" id="log-filters">
-      <button class="log-f on" data-f="all" onclick="wfLogFilter('all',event)">Tất cả</button>
-      <button class="log-f" data-f="info" onclick="wfLogFilter('info',event)">INF</button>
-      <button class="log-f" data-f="success" onclick="wfLogFilter('success',event)">OK</button>
-      <button class="log-f" data-f="warning" onclick="wfLogFilter('warning',event)">WRN</button>
-      <button class="log-f" data-f="error" onclick="wfLogFilter('error',event)">ERR</button>
+    <span class="log-filters" id="log-filters" role="group" aria-label="Lọc log">
+      <button class="log-f on" data-f="all" onclick="wfLogFilter('all',event)" title="Tất cả">All</button>
+      <button class="log-f" data-f="info" onclick="wfLogFilter('info',event)" title="Info">INF</button>
+      <button class="log-f" data-f="success" onclick="wfLogFilter('success',event)" title="Success">OK</button>
+      <button class="log-f" data-f="warning" onclick="wfLogFilter('warning',event)" title="Warning">WRN</button>
+      <button class="log-f" data-f="error" onclick="wfLogFilter('error',event)" title="Error">ERR</button>
     </span>
-    <button class="btn-log-clear" onclick="wfCopyLog(event)" title="Copy toàn bộ log">Copy</button>
-    <button class="btn-log-clear" onclick="onClearLog(event)" title="Xóa toàn bộ log">Xóa</button>
+    <button class="btn-log-clear" onclick="wfCopyLog(event)" title="Copy toàn bộ log" type="button">Copy</button>
+    <button class="btn-log-clear" onclick="onClearLog(event)" title="Xóa toàn bộ log" type="button">Xóa</button>
   </div>
   <div class="log-body" id="log-body"></div>
 </div>

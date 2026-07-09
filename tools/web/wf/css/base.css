@@ -72,9 +72,10 @@
   --sh-sm: 0 1px 2px rgba(20,30,45,.06);
   --sh-md: 0 2px 8px rgba(20,30,45,.08);
   --sh-lg: 0 10px 30px rgba(20,30,45,.16);
-  /* Semantic z-index scale — no arbitrary 999s. */
+  /* Semantic z-index scale — no arbitrary 999s.
+     dropdown (floating pickers) sits under modal/toast, above menus on canvas. */
   --z-node: 2; --z-selbox: 1; --z-node-hover: 6; --z-menu: 50;
-  --z-modal: 70; --z-toast: 80;
+  --z-dropdown: 55; --z-modal: 70; --z-toast: 80;
   --ease: cubic-bezier(0.16,1,0.3,1);
   color-scheme: light;
 }
@@ -114,6 +115,8 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 #app { flex: 1; display: flex; flex-direction: column; gap: 7px;
   padding: 8px 8px 4px; overflow: hidden; min-height: 0; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--sh-sm); }
+/* App chrome: slightly quieter frame so content (canvas / graph) is the focus. */
+#app > .card { box-shadow: 0 1px 2px rgba(20,30,45,.04); }
 
 /* ── Toolbar ────────────────────────────────────────────────────────────── */
 #toolbar { padding: 6px var(--s4); display: flex; align-items: center; gap: var(--s3); flex-shrink: 0; }
@@ -124,12 +127,13 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .device-wrap { display: flex; align-items: center; gap: 7px; min-width: 200px; height: 38px;
   padding: 0 10px; border: 1px solid var(--border2); border-radius: 8px; background: var(--panel); }
 #device-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
-  flex-shrink: 0; transition: background .2s; }
-#device-dot.connected { background: var(--ok); }
+  flex-shrink: 0; transition: background .2s, box-shadow .2s; }
+#device-dot.connected { background: var(--ok); box-shadow: 0 0 0 3px rgba(31,146,84,.18); }
 /* Device dot inside the new tray layout */
 .tb-device-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
-  flex-shrink: 0; transition: background .2s; }
-.tb-device-dot.connected { background: var(--ok) !important; }
+  flex-shrink: 0; transition: background .2s, box-shadow .2s; }
+.tb-device-dot.connected { background: var(--ok) !important; box-shadow: 0 0 0 3px rgba(31,146,84,.18); }
+.tb-device-dot:not(.connected) { background: #d3d9e0; }
 #device-select { flex: 1; min-width: 0; border: none; background: transparent; background-image: none;
   font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--dim);
   cursor: pointer; -webkit-appearance: none; appearance: none; padding: 0; }
@@ -142,11 +146,13 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
     height: 30px; border-radius: 8px; font-weight: 600; font-size: 11.5px;
-    transition: background .15s, opacity .15s, color .15s, border-color .15s;
+    transition: background .15s, opacity .15s, color .15s, border-color .15s, box-shadow .15s, transform .1s;
     border: 1px solid var(--border); background: var(--panel); color: var(--dim);
     padding: 0 11px; flex-shrink: 0; }
   .btn:hover  { background: var(--alt); color: var(--ink); border-color: var(--border2); }
-.btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn:active:not(:disabled) { transform: translateY(0.5px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
 .btn.accent:hover { background: #2559c7; }
 .btn.ok  { background: var(--ok);  color: #fff; border-color: var(--ok);
@@ -329,9 +335,11 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .log-count { font-family: var(--mono); font-size: 10px; color: var(--muted);
   background: var(--alt); border-radius: 999px; padding: 1px 7px; min-width: 18px; text-align: center; }
 .log-count:empty { display: none; }
+.log-count.has-err { color: var(--err); background: var(--err-bg); }
 .btn-log-clear { font-size: 11px; font-weight: 600; color: var(--muted);
   padding: 3px 7px; border-radius: 5px; transition: color .1s, background .1s; }
 .btn-log-clear:hover { color: var(--dim); background: var(--panel); }
+.btn-log-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Level filter chips in the log header; data-filter on #log-card hides the rest. */
 .log-filters { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px;
   padding: 2px; border-radius: 7px; background: var(--alt); border: 1px solid var(--border); }
@@ -355,10 +363,10 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .log-warning { color: #c08a1e; } .log-error   { color: var(--run-fail); }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
-#footer { display: flex; align-items: center; gap: 6px; padding: 2px 5px 3px; flex-shrink: 0; }
+#footer { display: flex; align-items: center; gap: 6px; padding: 3px 6px 4px; flex-shrink: 0; }
 #footer-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
-  flex-shrink: 0; transition: background .2s; }
-#footer-dot.connected { background: var(--ok); }
+  flex-shrink: 0; transition: background .2s, box-shadow .2s; }
+#footer-dot.connected { background: var(--ok); box-shadow: 0 0 0 3px rgba(31,146,84,.16); }
 #status-text { font-size: 11px; color: var(--dim); font-weight: 500;
   flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #hover-pos  { font-family: var(--mono); font-size: 10.5px; color: var(--muted); min-width: 88px; text-align: right; }
