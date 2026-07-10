@@ -1281,7 +1281,7 @@ function applySpeedhack(info){
   $("speed-toggle").setAttribute("aria-checked", String(!!S.speedhack.enabled));
   const rng = $("speed-range"); rng.value = S.speedhack.speed; rng.disabled = !S.speedhack.enabled;
   $("speed-val").textContent = (parseFloat(S.speedhack.speed)||1).toFixed(1)+"x";
-  $("speed-pkg").textContent = S.speedhack.package ? ("→ "+S.speedhack.package) : "(tự dò package từ node Mở app)";
+  $("speed-pkg").textContent = S.speedhack.package ? ("→ "+S.speedhack.package) : "(package workflow / node Mở app)";
 }
 async function onSpeedToggle(){
   const en = !S.speedhack.enabled;

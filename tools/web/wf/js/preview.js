@@ -39,7 +39,8 @@ function wfSwitchView(view){
   // Graph-only chrome: hide the pinned panels + empty hint while previewing.
   const graphOnly = [world, empty,
     document.getElementById("wf-corner-stack"),
-    document.getElementById("wf-layout-bar")];
+    document.getElementById("wf-layout-bar"),
+    document.getElementById("wf-cur-act")];
 
   if(view==="preview"){
     if(canvas) canvas.style.overflow = "hidden";
@@ -554,17 +555,25 @@ function wfPvCapture(){
 }
 
 // Push-based frame receiver — Python calls this when a new frame is ready.
+// Prefer the decoded image's natural size so the on-screen box always matches
+// the real capture (ADB screencap / scrcpy), not a stale cached wm size.
 window.__recvFrame = function(dataUrl, w, h){
   // Drop frames that arrive after the user left the tab (avoid needless work).
   if(!wfPvActive) return;
   const img = new Image();
   img.onload = ()=>{
     wfPvImg = img;
-    wfPvImgW = w || img.naturalWidth;
-    wfPvImgH = h || img.naturalHeight;
+    // natural* is the ground truth of the JPEG we just decoded; fall back to
+    // the backend's reported size only if the browser omits natural dims.
+    const nw = img.naturalWidth || 0, nh = img.naturalHeight || 0;
+    wfPvImgW = nw || (w|0) || 0;
+    wfPvImgH = nh || (h|0) || 0;
     wfPvErr = "";
     wfPvPixDirty = true;   // hover-HUD pixel cache rebuilds lazily on next hover
-    wfPvDraw();
+    // Keep the canvas buffer sized to the wrap so letterboxing uses the true
+    // device aspect (image box = device aspect ratio inside the dark panel).
+    if(typeof wfPvResize==="function") wfPvResize();
+    else wfPvDraw();
   };
   img.src = dataUrl;
 };

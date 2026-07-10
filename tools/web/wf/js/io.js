@@ -27,19 +27,81 @@ function wfSerializeNode(n){
   if(!n) return null;
   return wfCleanGraph({nodes:[n],edges:[]}).nodes[0];
 }
+
+// ── Per-entity JSON import (Debug JSON paste) ────────────────────────────────
+// Apply a pasted object onto the live entity. Keeps the current id so the
+// edit pointer / selection stay valid. Accepts the serialize shape, or (for
+// activity) a full workflow JSON with an activities[] array.
+function wfApplyActivityJson(act, raw){
+  if(!act) throw new Error("No activity selected");
+  if(!raw || typeof raw!=="object" || Array.isArray(raw)) throw new Error("JSON must be an object");
+  let o=raw;
+  // Unwrap a full workflow paste: prefer same id, else first activity.
+  if(o.graph===undefined && Array.isArray(raw.activities) && raw.activities.length){
+    o=raw.activities.find(a=>a && a.id===act.id) || raw.activities[0];
+  }
+  if(!o || typeof o!=="object" || Array.isArray(o)) throw new Error("Not a valid activity JSON");
+  if(o.graph===undefined && o.vars===undefined && o.name===undefined && o.type===undefined)
+    throw new Error("Not an activity JSON (need name, type, vars, or graph)");
+  if(o.name!=null && String(o.name).trim()) act.name=String(o.name).trim();
+  if(o.type==="background"||o.type==="sequence") act.type=o.type;
+  if(o.enabled!==undefined) act.enabled=!!o.enabled;
+  if(o.maxRetries!==undefined) act.maxRetries=parseInt(o.maxRetries,10)||1;
+  if(o.pollInterval!==undefined) act.pollInterval=parseFloat(o.pollInterval)||1.0;
+  if(o.vars!==undefined) act.vars=wfHydVars(o.vars);
+  if(o.graph!==undefined) act.graph=wfHydrateGraph(o.graph);
+  // act.id is intentionally left alone.
+}
+function wfApplyFunctionJson(fn, raw){
+  if(!fn) throw new Error("No function selected");
+  if(!raw || typeof raw!=="object" || Array.isArray(raw)) throw new Error("JSON must be an object");
+  let o=raw;
+  if(o.graph===undefined && Array.isArray(raw.functions) && raw.functions.length){
+    o=raw.functions.find(f=>f && f.id===fn.id) || raw.functions[0];
+  }
+  if(!o || typeof o!=="object" || Array.isArray(o)) throw new Error("Not a valid function JSON");
+  if(o.graph===undefined && o.name===undefined) throw new Error("Not a function JSON (need name or graph)");
+  if(o.name!=null && String(o.name).trim()) fn.name=String(o.name).trim();
+  if(o.graph!==undefined) fn.graph=wfHydrateGraph(o.graph);
+}
+function wfApplyNodeJson(node, raw){
+  if(!node) throw new Error("No node selected");
+  if(!raw || typeof raw!=="object" || Array.isArray(raw)) throw new Error("JSON must be an object");
+  if(node.type==="start") throw new Error("Cannot import over the Start node");
+  const o=raw.params!==undefined||raw.type!==undefined?raw:(raw.nodes&&raw.nodes[0])||raw;
+  if(!o || typeof o!=="object" || Array.isArray(o)) throw new Error("Not a valid node JSON");
+  if(o.type==="start") throw new Error("Cannot import a Start node onto another block");
+  if(o.type!=null && String(o.type).trim() && o.type!=="start") node.type=String(o.type).trim();
+  if(o.params!==undefined) node.params=o.params||{};
+  if(o.note!==undefined) node.note=o.note||"";
+  if(o.log!==undefined) node.log=o.log||"";
+  if(o.delayBefore!==undefined) node.delayBefore=parseFloat(o.delayBefore)||0;
+  if(o.delayAfter!==undefined) node.delayAfter=parseFloat(o.delayAfter)||0;
+  if(o.retryCount!==undefined) node.retryCount=parseInt(o.retryCount,10)||0;
+  if(o.retryDelay!==undefined) node.retryDelay=parseFloat(o.retryDelay)||0;
+  if(o.screenshotOnFail!==undefined) node.screenshotOnFail=!!o.screenshotOnFail;
+  if(o.showPreview!==undefined) node.showPreview=!!o.showPreview;
+  if(o.stack!==undefined) node.stack=o.stack||null;
+  // Keep node.id / x / y unless the paste explicitly provides coords.
+  if(o.x!==undefined) node.x=Math.round(o.x)||node.x;
+  if(o.y!==undefined) node.y=Math.round(o.y)||node.y;
+}
 function wfSerialize(){
   wfSpeedFromUI();
-  const sh=WF.speedhack||{enabled:false,speed:2.0,package:""};
+  if(typeof wfPackageFromUI==="function") wfPackageFromUI();
+  const sh=WF.speedhack||{enabled:false,speed:2.0};
   const w=WF.win32||{window:"",matchBy:"title",inputMode:"background"};
   const isWin32=(WF.controller==="win32");
   return {
     name:$("wf-name").value||"workflow", version:2, templatesDir:WF.templatesDir||"templates",
+    // Target Android package (workflow-level; used by speed hack + as a project hint).
+    package:(WF.package||"").trim(),
     controller:isWin32?"win32":"adb",
     ocr:(WF.ocrBackend||"").trim(),
     win32:{ window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:w.inputMode||"background" },
-    // Speed hack is ADB-only (Frida). Force it off in Win32 so a stale enabled
-    // flag never makes the Runner try to start a non-existent cheat path.
-    speedhack:{ enabled:isWin32?false:!!sh.enabled, speed:sh.speed||2.0, package:(sh.package||"").trim() },
+    // Speed hack is ADB-only (Frida). Package lives at the top level (key "package").
+    // Force speedhack off in Win32 so a stale enabled flag never starts Frida.
+    speedhack:{ enabled:isWin32?false:!!sh.enabled, speed:sh.speed||2.0 },
     globals: wfSerialVars(WF.globals||[]),
     functions: WF.functions.map(f=>({ id:f.id, name:f.name, graph:wfCleanGraph(f.graph) })),
     activities: WF.activities.map(a=>{
@@ -59,6 +121,13 @@ function wfHydrateGraph(g){
     let delayBefore=n.delayBefore;
     if(delayBefore===undefined && params && params.delay!==undefined) delayBefore=params.delay;
     if(params && params.delay!==undefined) delete params.delay;
+    // Package-bearing app nodes: add pkgSrc if missing.
+    // Had a free-text package → "custom"; empty → "project" (use Project settings).
+    if(params && (n.type==="launch_app"||n.type==="app_stop"||n.type==="app_uninstall"||n.type==="if_app")){
+      if(params.pkgSrc===undefined||params.pkgSrc===null||params.pkgSrc===""){
+        params.pkgSrc = (String(params.package||"").trim()) ? "custom" : "project";
+      }
+    }
     return {id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params,note:n.note||"",log:n.log||"",
       delayBefore:parseFloat(delayBefore)||0, delayAfter:parseFloat(n.delayAfter)||0,
       retryCount:parseInt(n.retryCount,10)||0, retryDelay:parseFloat(n.retryDelay)||0, screenshotOnFail:!!n.screenshotOnFail,
@@ -78,7 +147,11 @@ function wfHydrateGraph(g){
 }
 function wfHydrate(flow){
   WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"templates";
-  const sh=flow.speedhack||{}; WF.speedhack={enabled:!!sh.enabled, speed:(parseFloat(sh.speed)||2.0), package:(sh.package||"").trim()};
+  const sh=flow.speedhack||{};
+  // Speed hack is only {enabled, speed}. Package is top-level; migrate legacy
+  // speedhack.package when opening older workflow files.
+  WF.speedhack={enabled:!!sh.enabled, speed:(parseFloat(sh.speed)||2.0)};
+  WF.package=String(flow.package!=null?flow.package:(sh.package||"")).trim();
   WF.controller=(flow.controller==="win32")?"win32":"adb";
   WF.ocrBackend=String(flow.ocr||"").trim().toLowerCase();
   if(typeof wfSyncOcrUI==="function") wfSyncOcrUI();
@@ -199,8 +272,22 @@ function wfSetRunning(on){
 async function wfToggleRun(){
   if(wfRunning){ wfSetRunning(false); await api().workflow_stop(); return; }  // reset first, then stop
   if(!WF.activities.length){ uiToast("No activities to run yet.","warning"); return; }
-  // Pre-flight: block on HARD errors (broken wires, missing templates…) —
-  // warnings still run normally. The user can view the list or run anyway.
+  await wfStartRunFlow(null);
+}
+// Run exactly one activity (right-click → "Run this activity only"). Other
+// activities are sent as disabled so the engine skips them without mutating
+// the designer's enable checkboxes.
+async function wfRunOneActivity(actId){
+  if(wfRunning){ uiToast("A workflow is already running — stop it first.","warning"); return; }
+  const act=(WF.activities||[]).find(a=>a.id===actId);
+  if(!act){ uiToast("Activity not found.","error"); return; }
+  // Open the target activity so the live node trail paints on the right graph.
+  if(typeof wfSelectActivity==="function") wfSelectActivity(actId);
+  await wfStartRunFlow(actId);
+}
+// Shared pre-flight + engine start. ``onlyId`` null → all enabled activities;
+// otherwise only that activity is marked enabled in the payload.
+async function wfStartRunFlow(onlyId){
   if(typeof wfValidationIssues==="function"){
     const issues=wfValidationIssues();
     const errs=issues.filter(i=>i.sev==="err").length;
@@ -218,11 +305,16 @@ async function wfToggleRun(){
       if(pick!=="run") return;
     }
   }
-  wfResetRunViz();        // clear last run's colours BEFORE the engine starts emitting
-  // Clear previous match overlay so the new run's boxes replace it cleanly.
+  wfResetRunViz();
   if(typeof wfPvOverlay!=="undefined"){ wfPvOverlay=[]; wfPvMatchRegion=null; wfPvOverlayMeta=null; if(typeof wfPvDraw==="function") wfPvDraw(); }
-  wfSetRunning(true);     // mark running before any node event can arrive
-  const ok=await api().workflow_run(JSON.stringify(wfSerialize()));
+  const flow=wfSerialize();
+  if(onlyId){
+    (flow.activities||[]).forEach(a=>{ a.enabled = (a.id===onlyId); });
+    const target=(flow.activities||[]).find(a=>a.id===onlyId);
+    setStatus("Running only «"+(target&&target.name?target.name:onlyId)+"»…");
+  }
+  wfSetRunning(true);
+  const ok=await api().workflow_run(JSON.stringify(flow));
   if(!ok) wfSetRunning(false);
 }
 async function wfRunGui(){
@@ -253,10 +345,12 @@ async function init(){
     wfAlignOn = st.alignGuides!==false;       // opt-out — default on
     if(st.previewHz){ wfPvHz=Math.max(0.2, Math.min(60, parseFloat(st.previewHz)||30)); const hz=$("wf-pv-hz"); if(hz) hz.value=wfPvHz; }
     if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); }
+    if(st.logH){ const lc=$("log-card"); if(lc){ const h=Math.max(80, Math.min(480, parseInt(st.logH,10)||140)); lc.style.height=h+"px"; lc.dataset.openH=String(h); } }
     if(st.sideW){ const sd=$("wf-side"); if(sd) sd.style.width=Math.max(150,Math.min(480,st.sideW))+"px"; }
     if(st.inspW){ const insp=$("wf-inspector"); if(insp) insp.style.width=Math.max(180,Math.min(520,st.inspW))+"px"; } }catch{}
   wfInitSideResizer();
   wfInitInspResizer();
+  if(typeof wfInitLogResizer==="function") wfInitLogResizer();
   wfSetupSortable($("wf-activities"));
   if($("wf-activities-bg")) wfSetupSortable($("wf-activities-bg"));
   if($("wf-functions")) wfSetupSortable($("wf-functions"));

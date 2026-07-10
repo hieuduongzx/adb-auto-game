@@ -81,6 +81,21 @@ const WF_ICONS = {
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
   }
 
+// Display label for package-bearing nodes (Launch / Stop / Uninstall / If app).
+// pkgSrc "project" → workflow package from Project settings; else custom text.
+function wfPkgLabel(p){
+  const src=String((p&&p.pkgSrc)||"").trim().toLowerCase();
+  // Legacy nodes (no pkgSrc): show custom package if set, else project package.
+  if(!src || src==="project"){
+    const proj=(typeof WF!=="undefined" && WF.package)?String(WF.package).trim():"";
+    if(proj) return proj;
+    // Old file with only a free-text package and no pkgSrc — still show it.
+    if(!src){ const c=String((p&&p.package)||"").trim(); if(c) return c; }
+    return "⚙ project package";
+  }
+  return String((p&&p.package)||"").trim() || "(package)";
+}
+
 // Node catalog: UI source of truth (icon, kind, output ports, param fields).
 // Mirrors src/workflow/engine.py NODE_TYPES. kind: start|end|action|condition|loop.
 const WF_NODES = {
@@ -131,15 +146,32 @@ const WF_NODES = {
   // case + default) — see wfNodeEl. Cases edited by wfSwitchCasesEditor.
   "switch":   {label:"Switch",  ico:"git_branch",kind:"switch",cat:"logic",outs:["default"], fields:[], sum:p=>`${(p.cases||[]).length} branches`},
   // ── App lifecycle (ADB package · Win32 window title where noted) ───────────
-  launch_app: {label:"Launch app",    ico:"rocket",kind:"action",cat:"app",  outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"wait",lbl:"Launch wait (s)",t:"num",d:0}], sum:p=>(p.package||"(package)")+(p.wait?` ·wait ${p.wait}s`:"")},
+  // pkgSrc: "project" = workflow package from Project settings; "custom" = free text / var.
+  launch_app: {label:"Launch app",    ico:"rocket",kind:"action",cat:"app",  outs:["out"], fields:[
+    {k:"pkgSrc",lbl:"Package source",t:"select",opts:[{v:"project",t:"Project package"},{v:"custom",t:"Custom…"}],d:"project"},
+    {k:"package",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
+    {k:"wait",lbl:"Launch wait (s)",t:"num",d:0}
+  ], sum:p=>wfPkgLabel(p)+(p.wait?` ·wait ${p.wait}s`:"")},
   // Force-stop an app (optionally clear its data) — pairs with Launch app for restart-game flows. ADB-only at runtime.
-  app_stop: {label:"Stop app", ico:"octagon", kind:"action", cat:"app", outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"clearData",lbl:"Clear app data (pm clear)",t:"bool",d:false}], sum:p=>`⛔ ${p.package||"(package)"}`+(p.clearData?" +clear":"")},
+  app_stop: {label:"Stop app", ico:"octagon", kind:"action", cat:"app", outs:["out"], fields:[
+    {k:"pkgSrc",lbl:"Package source",t:"select",opts:[{v:"project",t:"Project package"},{v:"custom",t:"Custom…"}],d:"project"},
+    {k:"package",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
+    {k:"clearData",lbl:"Clear app data (pm clear)",t:"bool",d:false}
+  ], sum:p=>`⛔ ${wfPkgLabel(p)}`+(p.clearData?" +clear":"")},
   // Exit the current app — no package needed (ADB: force-stop foreground · Win32: close the window).
   app_exit: {label:"Exit current app", ico:"x", kind:"action", cat:"app", outs:["out"], fields:[], sum:()=>"exit current app"},
   // Uninstall an app (pm uninstall; -k = keep data). ADB-only at runtime.
-  app_uninstall: {label:"Uninstall app", ico:"trash", kind:"action", cat:"app", outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"keepData",lbl:"Keep data & cache (-k)",t:"bool",d:false}], sum:p=>`🗑 ${p.package||"(package)"}`+(p.keepData?" ·keep":"")},
+  app_uninstall: {label:"Uninstall app", ico:"trash", kind:"action", cat:"app", outs:["out"], fields:[
+    {k:"pkgSrc",lbl:"Package source",t:"select",opts:[{v:"project",t:"Project package"},{v:"custom",t:"Custom…"}],d:"project"},
+    {k:"package",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
+    {k:"keepData",lbl:"Keep data & cache (-k)",t:"bool",d:false}
+  ], sum:p=>`🗑 ${wfPkgLabel(p)}`+(p.keepData?" ·keep":"")},
   // Does the current app package / window title contain a string? (ADB: package · Win32: window title)
-  if_app: {label:"If app running", ico:"smartphone", kind:"condition", cat:"app", outs:["true","false"], fields:[{k:"package",lbl:"Package / title contains",t:"text",varRef:true},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}app ~ "${p.package||"?"}"`},
+  if_app: {label:"If app running", ico:"smartphone", kind:"condition", cat:"app", outs:["true","false"], fields:[
+    {k:"pkgSrc",lbl:"Package source",t:"select",opts:[{v:"project",t:"Project package"},{v:"custom",t:"Custom…"}],d:"project"},
+    {k:"package",lbl:"Package / title contains",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
+    {k:"negate",t:"bool",d:false}
+  ], sum:p=>`${p.negate?"not ":""}app ~ "${wfPkgLabel(p)}"`},
   // ── Utilities ──────────────────────────────────────────────────────────────
   screenshot: {label:"Screenshot",      ico:"camera",kind:"action",cat:"basic", outs:["out"], fields:[], sum:()=>"take screenshot"},
   log:        {label:"Log",   ico:"log",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"message",t:"text",insertVar:true}], sum:p=>`"${p.message||""}"`},
@@ -186,6 +218,16 @@ const WF_NODES = {
     {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
     {k:"attach",lbl:"Attach as active device when ready",t:"bool",d:true},
   ], sum:p=>`🖥 ${(!p.emulator||p.emulator==="last")?"last used":(p.emulator+((parseInt(p.index)||0)?(" #"+p.index):""))} ready?`},
+  // Poll until the emulator finishes Android boot (adb connect + sys.boot_completed
+  // == 1), or until timeout. Use after Launch emulator (with wait=0) or when the
+  // instance is already starting outside this flow.
+  wait_emulator:{label:"Wait emulator ready", ico:"timer", kind:"condition", cat:"device", outs:["true","false"], fields:[
+    {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"}],d:"last"},
+    {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
+    {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
+    {k:"timeout",lbl:"Timeout (s)",t:"num",d:120},
+    {k:"attach",lbl:"Attach as active device when ready",t:"bool",d:true},
+  ], sum:p=>`⏳ ${(!p.emulator||p.emulator==="last")?"last used":(p.emulator+((parseInt(p.index)||0)?(" #"+p.index):""))} ≤${p.timeout??120}s`},
   // ── Win32 (PC program window control) ────────────────────────────────────────
   // Only used when the project's Controller = Win32. The tap/swipe/image/color/
   // OCR nodes still work on Win32 through the shared screen-capture pipeline.
@@ -265,7 +307,10 @@ function wfIns(type){ const def=WF_NODES[type]; return (def&&def.ins)||["in"]; }
 // sel = ids of all selected nodes (multi-select); selectedNode = primary (inspector).
 const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities:[], functions:[],
   globals:[],
-  speedhack:{enabled:false, speed:2.0, package:""},
+  // Target Android package for this workflow (ADB). Top-level, not part of speedhack.
+  package:"",
+  // Speed hack toggle + multiplier only; package lives on WF.package.
+  speedhack:{enabled:false, speed:2.0},
   // Which backend drives the flow: "adb" (device/emulator) or "win32" (PC window).
   controller:"adb",
   win32:{window:"", matchBy:"title", inputMode:"background"},
@@ -293,7 +338,9 @@ function wfPersistPanelState(){
        localStorage.setItem("wfActCollapsed",  wfActCollapsed ?"1":"0"); }catch{}
 }
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
-function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector"); api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), sideW: sd?sd.offsetWidth:undefined, inspW: insp?insp.offsetWidth:undefined}); }catch{} }
+function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector");
+  const logH = lc && !lc.classList.contains("collapsed") ? lc.offsetHeight : (lc && lc.dataset.openH ? parseInt(lc.dataset.openH,10) : undefined);
+  api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), logH: logH||undefined, sideW: sd?sd.offsetWidth:undefined, inspW: insp?insp.offsetWidth:undefined}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
   const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off"); s.classList.toggle("on",wfSnapOn); }
@@ -312,14 +359,36 @@ function wfToggleMinimap(){
   wfMinimapOn=!wfMinimapOn; wfSyncToggleBtns(); wfSaveSettings();
   if(typeof wfMinimapQueue==="function") wfMinimapQueue();   // shows or hides on next frame
 }
+// ── Workflow package (ADB) — project-level; edited in Project settings popup ─
+function wfPackageFromUI(){
+  const el=$("wf-package"); if(!el) return;
+  WF.package=(el.value||"").trim();
+}
+function wfPackageChanged(){
+  if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
+  wfPackageFromUI();
+  setStatus(WF.package ? ("Package: "+WF.package) : "Package cleared");
+}
+function wfSyncPackageUI(){
+  const el=$("wf-package"); if(!el) return;
+  if(document.activeElement!==el) el.value=WF.package||"";
+}
+// Best-effort package: workflow field, else the first "Launch app" node's package.
+function wfAutoPackage(){
+  const top=(WF.package||"").trim(); if(top) return top;
+  const graphs=[...WF.activities.map(a=>a.graph), ...WF.functions.map(f=>f.graph)];
+  for(const g of graphs){ for(const n of (g&&g.nodes||[])){
+    if(n.type==="launch_app"){ const p=((n.params||{}).package||"").trim(); if(p) return p; } } }
+  return "";
+}
+
 // ── Speed hack — a standalone manual tool, decoupled from "Test run" ────────
 // The ⚡ toggle enables the feature (still saved into the flow for the Runner GUI)
 // and reveals a separate ▶ button; pressing ▶ is what actually injects Frida here.
-// ADB-only — Win32 projects have no speed hack (the old cheat.dll inject path was
-// removed), so the whole cluster is hidden in Win32 mode.
+// Uses WF.package (workflow-level). ADB-only — hidden in Win32 mode.
 let wfSpeedRunning=false;   // is the standalone injection currently on?
 function wfSyncSpeedUI(){
-  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0});
   const win32=(WF.controller==="win32");
   // Hide the entire speed-hack cluster in Win32 mode — no Frida, no cheat DLL.
   const grp=$("wf-speed-group");
@@ -327,81 +396,81 @@ function wfSyncSpeedUI(){
   if(win32) return;
   const b=$("wf-speed-btn");
   if(b){
-    b.title = "Speed hack: "+(sh.enabled?"On":"Off")+" (accelerate the game with Frida — root required)";
+    b.title = "Speed hack: "+(sh.enabled?"On":"Off")+" (accelerate the game with Frida — root required · set package in Project settings)";
     b.classList.toggle("on",sh.enabled);
   }
   const v=$("wf-speed-val"); if(v && document.activeElement!==v) v.value=sh.speed;
-  const pk=$("wf-speed-pkg");
-  if(pk){ if(document.activeElement!==pk) pk.value=sh.package||""; }
   if(grp) grp.classList.toggle("on", sh.enabled);
   const rb=$("wf-speed-run-btn");
   if(rb){
     rb.style.display = sh.enabled ? "inline-flex" : "none";
     rb.innerHTML = wfSpeedRunning ? WF_ICO_STOP : WF_ICO_PLAY;
-    rb.title = wfSpeedRunning ? "Disable speed hack" : "Enable speed hack now (independent of Test run)";
+    rb.title = wfSpeedRunning ? "Disable speed hack" : "Enable speed hack now (uses workflow package · independent of Test run)";
     rb.classList.toggle("ok", !wfSpeedRunning); rb.classList.toggle("err", wfSpeedRunning);
   }
 }
 function wfSpeedFromUI(){
-  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
-  const v=parseFloat($("wf-speed-val").value); sh.speed=(isNaN(v)||v<=0)?1:v;
-  sh.package=($("wf-speed-pkg").value||"").trim();
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0});
+  const el=$("wf-speed-val");
+  const v=el?parseFloat(el.value):sh.speed; sh.speed=(isNaN(v)||v<=0)?1:v;
+  wfPackageFromUI();
 }
 // Speed value edited: persist, and if the hack is live, push the new scale.
-function wfSpeedChanged(){ wfSpeedFromUI(); if(wfSpeedRunning){ const sh=WF.speedhack; api().speedhack_start(sh.speed, sh.package); } }
+function wfSpeedChanged(){ wfSpeedFromUI(); if(wfSpeedRunning){ const sh=WF.speedhack; api().speedhack_start(sh.speed, wfAutoPackage()); } }
 function wfToggleSpeed(){
-  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0});
   wfSpeedFromUI(); sh.enabled=!sh.enabled;
   if(!sh.enabled && wfSpeedRunning){ api().speedhack_stop(); wfSpeedRunning=false; }  // disabling stops it
   wfSyncSpeedUI();
 }
-// Best-effort package: the field, else the first "Launch app" node's package.
-function wfAutoPackage(){
-  const graphs=[...WF.activities.map(a=>a.graph), ...WF.functions.map(f=>f.graph)];
-  for(const g of graphs){ for(const n of (g&&g.nodes||[])){
-    if(n.type==="launch_app"){ const p=((n.params||{}).package||"").trim(); if(p) return p; } } }
-  return "";
-}
 // The ▶/⏹ button: actually inject (or stop) the speed hack, on its own.
 // ADB-only (Frida). Win32 mode hides the whole cluster, so this never fires there.
 async function wfSpeedRun(){
-  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,package:""});
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0});
   wfSpeedFromUI();
   if(wfSpeedRunning){ await api().speedhack_stop(); return; }
-  const pkg=sh.package||wfAutoPackage();
-  if(!pkg){ uiToast("Enter the game package (or add a Launch app block) to enable the speed hack.","warning"); return; }
+  const pkg=wfAutoPackage();
+  if(!pkg){ uiToast("Set the app package in Project settings (gear next to the title), or add a Launch app block.","warning"); return; }
   const ok=await api().speedhack_start(sh.speed, pkg);
   if(!ok){ wfSpeedRunning=false; wfSyncSpeedUI(); }
 }
-// ── The flow's OCR engine (same as the Engine dropdown on the Preview tab, but
-// workflow-level: saved into the JSON so test runs / the Runner both apply it) ─
+
+// ── Project settings popup (package · controller · OCR · Win32 target) ───────
+// Bar only shows the gear + title; everything project-wide lives here.
+let wfOcrBackendsCache=["tesseract","easyocr","paddleocr"];
 function wfSyncOcrUI(){
   const sel=$("wf-ocr-select"); if(sel) sel.value=WF.ocrBackend||"";
 }
 function wfOcrChanged(){
-  WF.ocrBackend=($("wf-ocr-select").value||"").trim();
-  wfPushUndoDebounced();
+  const sel=$("wf-ocr-select");
+  WF.ocrBackend=sel?((sel.value||"").trim()):(WF.ocrBackend||"");
+  if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
   setStatus("OCR engine: "+(WF.ocrBackend||"auto"));
 }
-// Fill the backend list from the host (get_state().ocrBackends) into the select.
-function wfPopulateOcrBackends(backs){
-  const sel=$("wf-ocr-select"); if(!sel) return;
+function wfFillOcrSelect(sel){
+  if(!sel) return;
+  const backs=wfOcrBackendsCache&&wfOcrBackendsCache.length?wfOcrBackendsCache:["tesseract","easyocr","paddleocr"];
   sel.innerHTML='<option value="">Auto</option>';
-  (backs&&backs.length?backs:["tesseract","easyocr","paddleocr"]).forEach(b=>{
-    const o=document.createElement("option"); o.value=b; o.textContent=b; sel.appendChild(o);
-  });
-  wfSyncOcrUI();
+  backs.forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b; sel.appendChild(o); });
+  sel.value=WF.ocrBackend||"";
 }
-
+// Cache backends from the host; fill the select if the settings form is open.
+function wfPopulateOcrBackends(backs){
+  if(backs&&backs.length) wfOcrBackendsCache=backs.slice();
+  const sel=$("wf-ocr-select"); if(sel){ wfFillOcrSelect(sel); }
+}
 // ── Project controller (ADB vs Win32) ────────────────────────────────────────
 function wfSyncControllerUI(){
   const sel=$("wf-controller"); if(sel) sel.value=WF.controller||"adb";
   const w=WF.win32||(WF.win32={window:"",matchBy:"title",inputMode:"background"});
-  const grp=$("wf-win32-group"); if(grp) grp.style.display=(WF.controller==="win32")?"inline-flex":"none";
+  const win32=(WF.controller==="win32");
+  const adbSec=$("wf-proj-adb-sec"); if(adbSec) adbSec.style.display=win32?"none":"";
+  const winSec=$("wf-proj-win32-sec"); if(winSec) winSec.style.display=win32?"":"none";
   const win=$("wf-win32-window"); if(win && document.activeElement!==win) win.value=w.window||"";
   const mb=$("wf-win32-matchby"); if(mb) mb.value=w.matchBy||"title";
   const md=$("wf-win32-mode"); if(md) md.value=w.inputMode||"background";
-  wfSyncSpeedUI();   // speed-hack method/labels depend on the controller
+  wfSyncPackageUI();
+  wfSyncSpeedUI();   // speed-hack visibility depends on the controller
   wfPushCaptureSource();
 }
 // Tell the Python side which source the Preview tab should capture from, so the
@@ -409,7 +478,13 @@ function wfSyncControllerUI(){
 function wfPushCaptureSource(){
   try{ api().set_capture_source(WF.controller||"adb", WF.win32||{}); }catch{}
 }
-function wfControllerChanged(){ WF.controller=($("wf-controller").value==="win32")?"win32":"adb"; wfSyncControllerUI(); wfRenderPalette(); wfPushUndoDebounced(); }
+function wfControllerChanged(){
+  const sel=$("wf-controller");
+  WF.controller=(sel&&sel.value==="win32")?"win32":"adb";
+  wfSyncControllerUI();
+  if(typeof wfRenderPalette==="function") wfRenderPalette();
+  if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
+}
 // Window picker: a dropdown of currently-open windows so the user chooses the
 // game window instead of typing its title. Reuses the .wf-varmenu styling.
 let wfWinMenuEl=null;
@@ -419,8 +494,11 @@ async function wfPickWindow(ev){
   if(ev) ev.stopPropagation();
   let wins=[]; try{ wins=await api().list_windows()||[]; }catch{}
   wfCloseWinMenu();
-  const anchor=$("wf-win32-window");
-  const menu=document.createElement("div"); menu.className="wf-varmenu"; wfWinMenuEl=menu;
+  const anchor=$("wf-win32-window"); if(!anchor) return;
+  const menu=document.createElement("div"); menu.className="wf-varmenu";
+  // Sit above the project-settings modal (--z-modal is 70).
+  menu.style.zIndex="80";
+  wfWinMenuEl=menu;
   const search=document.createElement("input"); search.type="text"; search.className="wf-varmenu-search";
   search.placeholder="Find window…"; search.spellcheck=false; search.autocomplete="off"; menu.appendChild(search);
   const list=document.createElement("div"); list.className="wf-varmenu-list"; menu.appendChild(list);
@@ -435,7 +513,7 @@ async function wfPickWindow(ev){
       row.innerHTML=`<span class="vn">${escHtml(w.title)}</span><span class="vt">${escHtml(meta)}</span>`;
       row.title=`Title: ${w.title}\nClass: ${w.cls||""}\nPID: ${w.pid||"?"}`;
       row.onclick=()=>{
-        const by=($("wf-win32-matchby").value)||"title";
+        const by=($("wf-win32-matchby")&&$("wf-win32-matchby").value)||"title";
         anchor.value = (by==="pid") ? String(w.pid||"") : (by==="class") ? (w.cls||w.title) : w.title;
         wfWin32FromUI(); wfCloseWinMenu();
       };
@@ -445,7 +523,7 @@ async function wfPickWindow(ev){
   render("");
   document.body.appendChild(menu);
   const r=($("wf-win32-pick")||anchor).getBoundingClientRect();
-  const mw=Math.max(300, anchor.getBoundingClientRect().width);
+  const mw=Math.max(300, anchor.getBoundingClientRect().width||280);
   menu.style.width=mw+"px";
   let left=Math.min(r.left, window.innerWidth-mw-8);
   let top=r.bottom+4; if(top+300>window.innerHeight) top=Math.max(8, r.top-304);
@@ -455,11 +533,138 @@ async function wfPickWindow(ev){
 }
 function wfWin32FromUI(){
   const w=WF.win32||(WF.win32={});
-  w.window=($("wf-win32-window").value||"").trim();
-  w.matchBy=$("wf-win32-matchby").value||"title";
-  w.inputMode=$("wf-win32-mode").value||"background";
+  const win=$("wf-win32-window"), mb=$("wf-win32-matchby"), md=$("wf-win32-mode");
+  if(win) w.window=(win.value||"").trim();
+  if(mb) w.matchBy=mb.value||"title";
+  if(md) w.inputMode=md.value||"background";
   wfPushCaptureSource();
-  wfPushUndoDebounced();
+  if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
+}
+
+// Open the project settings dialog (gear left of the title).
+function wfOpenProjectSettings(){
+  if(typeof uiModal!=="function") return;
+  return uiModal({
+    title:"Project settings",
+    width:"440px",
+    body:(bd)=>{
+      const form=document.createElement("div"); form.className="wf-proj-form";
+
+      // ── Controller ────────────────────────────────────────────────────────
+      const secCtrl=document.createElement("div"); secCtrl.className="wf-proj-sec";
+      secCtrl.innerHTML=`<div class="wf-proj-sec-lbl">Controller</div>`;
+      const rowCtrl=document.createElement("div"); rowCtrl.className="wf-proj-row";
+      rowCtrl.innerHTML=
+        `<label for="wf-controller">Project type</label>`+
+        `<select id="wf-controller" title="ADB device/emulator or Win32 PC window">`+
+          `<option value="adb">ADB — Android device / emulator</option>`+
+          `<option value="win32">Win32 — PC program window</option>`+
+        `</select>`+
+        `<div class="hint">Chooses capture + input backend for the whole workflow.</div>`;
+      secCtrl.appendChild(rowCtrl);
+      form.appendChild(secCtrl);
+
+      // ── ADB package ───────────────────────────────────────────────────────
+      const secAdb=document.createElement("div"); secAdb.className="wf-proj-sec"; secAdb.id="wf-proj-adb-sec";
+      secAdb.innerHTML=`<div class="wf-proj-sec-lbl">Android package</div>`;
+      const rowPkg=document.createElement("div"); rowPkg.className="wf-proj-row";
+      rowPkg.innerHTML=
+        `<label for="wf-package">Package name</label>`+
+        `<input id="wf-package" class="mono" type="text" placeholder="com.game.package" spellcheck="false" autocomplete="off" title="Target Android package">`+
+        `<div class="hint">Used by speed hack and as a default for Launch / Stop app blocks.</div>`;
+      secAdb.appendChild(rowPkg);
+      form.appendChild(secAdb);
+
+      // ── Win32 target ──────────────────────────────────────────────────────
+      const secWin=document.createElement("div"); secWin.className="wf-proj-sec"; secWin.id="wf-proj-win32-sec";
+      secWin.style.display="none";
+      secWin.innerHTML=`<div class="wf-proj-sec-lbl">Win32 window</div>`;
+      const rowWin=document.createElement("div"); rowWin.className="wf-proj-row";
+      rowWin.innerHTML=
+        `<label for="wf-win32-window">Target window</label>`+
+        `<div class="wf-proj-inline">`+
+          `<input id="wf-win32-window" type="text" placeholder="Title, class, or PID (e.g. Genshin*)" spellcheck="false" autocomplete="off">`+
+          `<button type="button" class="btn sm ico" id="wf-win32-pick" title="Pick an open window">`+
+            `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>`+
+          `</button>`+
+        `</div>`;
+      secWin.appendChild(rowWin);
+      const rowWinOpts=document.createElement("div"); rowWinOpts.className="wf-proj-grid2";
+      rowWinOpts.innerHTML=
+        `<div class="wf-proj-row">`+
+          `<label for="wf-win32-matchby">Match by</label>`+
+          `<select id="wf-win32-matchby"><option value="title">Title</option><option value="class">Class</option><option value="pid">PID</option></select>`+
+        `</div>`+
+        `<div class="wf-proj-row">`+
+          `<label for="wf-win32-mode">Input mode</label>`+
+          `<select id="wf-win32-mode" title="How input is delivered to the window">`+
+            `<option value="background">Background</option>`+
+            `<option value="background_cursor">Background + cursor (Unity)</option>`+
+            `<option value="background_frida_api">Background + Frida (API hook)</option>`+
+            `<option value="background_frida_engine">Background + Frida Unity (engine)</option>`+
+            `<option value="foreground">Foreground</option>`+
+          `</select>`+
+        `</div>`;
+      secWin.appendChild(rowWinOpts);
+      form.appendChild(secWin);
+
+      // ── OCR ───────────────────────────────────────────────────────────────
+      const secOcr=document.createElement("div"); secOcr.className="wf-proj-sec";
+      secOcr.innerHTML=`<div class="wf-proj-sec-lbl">OCR</div>`;
+      const rowOcr=document.createElement("div"); rowOcr.className="wf-proj-row";
+      rowOcr.innerHTML=
+        `<label for="wf-ocr-select">Text engine</label>`+
+        `<select id="wf-ocr-select" title="OCR engine for Wait text / If text / Read → variable / Parse"></select>`+
+        `<div class="hint">Auto = first available backend. Saved into the workflow JSON.</div>`;
+      secOcr.appendChild(rowOcr);
+      form.appendChild(secOcr);
+
+      bd.appendChild(form);
+      // Query inside `form` — the modal is not in document yet during body().
+      const q=(id)=>form.querySelector("#"+id);
+
+      // Wire events + seed values. Prefer live `input` so closing without blur
+      // still keeps the latest package / window text (modal DOM is destroyed on close).
+      const ctrl=q("wf-controller"); if(ctrl) ctrl.onchange=()=>wfControllerChanged();
+      const pkg=q("wf-package");
+      if(pkg){
+        pkg.addEventListener("input",()=>{
+          WF.package=(pkg.value||"").trim();
+          // Node summaries that use Project package refresh live.
+          if(typeof wfRenderCanvas==="function") wfRenderCanvas();
+        });
+        pkg.addEventListener("change",()=>{ if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced(); setStatus(WF.package?("Package: "+WF.package):"Package cleared"); });
+      }
+      const ocr=q("wf-ocr-select"); if(ocr){ wfFillOcrSelect(ocr); ocr.onchange=()=>wfOcrChanged(); }
+      const winEl=q("wf-win32-window");
+      if(winEl){
+        winEl.addEventListener("input",()=>{ const w=WF.win32||(WF.win32={}); w.window=(winEl.value||"").trim(); });
+        winEl.addEventListener("change",()=>wfWin32FromUI());
+      }
+      const mb=q("wf-win32-matchby"); if(mb) mb.onchange=()=>wfWin32FromUI();
+      const md=q("wf-win32-mode"); if(md) md.onchange=()=>wfWin32FromUI();
+      const pick=q("wf-win32-pick"); if(pick) pick.onclick=(e)=>wfPickWindow(e);
+
+      // Seed values immediately (form not in document yet — don't rely on $()).
+      if(ctrl) ctrl.value=WF.controller||"adb";
+      if(pkg) pkg.value=WF.package||"";
+      const w=WF.win32||{};
+      if(winEl) winEl.value=w.window||"";
+      if(mb) mb.value=w.matchBy||"title";
+      if(md) md.value=w.inputMode||"background";
+      const win32=(WF.controller==="win32");
+      const adbSec=q("wf-proj-adb-sec"); if(adbSec) adbSec.style.display=win32?"none":"";
+      const winSec=q("wf-proj-win32-sec"); if(winSec) winSec.style.display=win32?"":"none";
+
+      // After mount, refresh helpers that also touch speed-hack / capture source.
+      setTimeout(()=>{ wfSyncControllerUI(); },0);
+    },
+    buttons:[{label:"Done", value:true, kind:"accent"}],
+  }).then(()=>{
+    wfCloseWinMenu();
+    if(typeof wfPushCaptureSource==="function") wfPushCaptureSource();
+    wfSyncSpeedUI();
+  });
 }
 function wfToggleSnap(){ wfSnapOn=!wfSnapOn; wfSyncToggleBtns(); wfSaveSettings(); }
 function wfTogglePreview(){ wfPreviewAll=!wfPreviewAll; wfSyncToggleBtns(); wfRenderCanvas(); wfSaveSettings(); }
@@ -551,6 +756,36 @@ function wfInitInspResizer(){
   rez.addEventListener("mousedown",e=>{ e.preventDefault(); drag={x:e.clientX, w:insp.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
   window.addEventListener("mousemove",e=>{ if(!drag) return; insp.style.width=Math.max(180, Math.min(520, drag.w-(e.clientX-drag.x)))+"px"; });
   window.addEventListener("mouseup",()=>{ if(!drag) return; drag=null; rez.classList.remove("drag"); document.body.style.cursor=""; wfSaveSettings(); });
+}
+// Drag-to-resize the bottom log drawer; height persists in settings.
+function wfInitLogResizer(){
+  const card=$("log-card"), rez=$("log-resizer"); if(!card||!rez||rez.__wired) return;
+  rez.__wired=true; let drag=null;
+  const clampH=h=>Math.max(80, Math.min(Math.floor(window.innerHeight*0.55), Math.min(480, h)));
+  rez.addEventListener("mousedown",e=>{
+    e.preventDefault(); e.stopPropagation();
+    if(card.classList.contains("collapsed")) return;
+    drag={y:e.clientY, h:card.offsetHeight};
+    card.classList.add("resizing");
+    rez.classList.add("drag");
+    document.body.style.cursor="row-resize";
+  });
+  window.addEventListener("mousemove",e=>{
+    if(!drag) return;
+    // Dragging the top edge up increases height.
+    const h=clampH(drag.h-(e.clientY-drag.y));
+    card.style.height=h+"px";
+    card.dataset.openH=String(h);
+  });
+  window.addEventListener("mouseup",()=>{
+    if(!drag) return;
+    drag=null;
+    card.classList.remove("resizing");
+    rez.classList.remove("drag");
+    document.body.style.cursor="";
+    if(!card.classList.contains("collapsed")) card.dataset.openH=String(card.offsetHeight);
+    wfSaveSettings();
+  });
 }
 // Fit & center all blocks of the current graph into the canvas. Uses the live DOM
 // node bounds (world coords), so it's exact regardless of node heights.

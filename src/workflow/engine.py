@@ -170,6 +170,10 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # re-checks the instance saved by the last successful launch_emulator, so a
     # flow can skip the boot when "the one I set" is already up.
     "if_emulator": {"label": "If emulator ready", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    # Poll until the emulator finishes Android boot (adb connect +
+    # sys.boot_completed == 1) or until timeout — true when ready, false on
+    # timeout/unresolvable target.
+    "wait_emulator": {"label": "Wait emulator ready", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     # ── Win32 (điều khiển cửa sổ chương trình PC) ─────────────────────────────
     # Only meaningful when the flow's controller is "win32". Tap/swipe/image/
     # color/OCR nodes already work on Win32 via the shared capture pipeline;
@@ -276,10 +280,14 @@ class WorkflowEngine:
         # by every block in the workflow. Runtime writes to a global name keep
         # the shared dict in sync so other threads read the latest value.
         self._globals: Dict[str, Any] = {}
+        # Target Android package for this flow (top-level ``package`` key).
+        # Independent of speedhack; used as the default inject target and a
+        # project-level app id. Legacy files may still nest it under speedhack.
+        self.package: str = ""
         # Speedhack: a Frida clock_gettime time-scale, configured per-flow under
-        # the top-level ``speedhack`` key ({enabled, speed, package}). The engine
-        # owns the manager so both the designer's "Run test" and the runner GUI
-        # get it for free. See src/game_core/frida_speedhack.py.
+        # the top-level ``speedhack`` key ({enabled, speed}). The engine owns the
+        # manager so both the designer's "Run test" and the runner GUI get it for
+        # free. Package comes from ``self.package``. See frida_speedhack.py.
         self.speedhack_cfg: Dict[str, Any] = {}
         self._speedhack: Optional[FridaSpeedhackManager] = None
         self._speedhack_stop: Optional[threading.Event] = None
@@ -492,6 +500,11 @@ class WorkflowEngine:
         self._controller = str(self.flow.get("controller") or "adb").strip().lower()
         self._win32_cfg = dict(self.flow.get("win32") or {})
         self.speedhack_cfg = dict(self.flow.get("speedhack") or {})
+        # Workflow package: prefer top-level key; migrate legacy speedhack.package.
+        pkg = str(self.flow.get("package") or "").strip()
+        if not pkg:
+            pkg = str((self.speedhack_cfg or {}).get("package") or "").strip()
+        self.package = pkg
         # OCR engine của flow ("tesseract" / "easyocr" / "paddleocr"…; rỗng = auto):
         # chọn trong Project settings của designer, áp dụng ở _ensure_ready().
         self._ocr_backend = str(self.flow.get("ocr") or "").strip().lower()
@@ -590,10 +603,11 @@ class WorkflowEngine:
             if not self.auto.adb.device:
                 self.auto.adb.check_adb_connection()
             if not self.auto.adb.device:
-                # A flow with a launch_emulator / if_emulator node may
-                # legitimately start with no device — those nodes boot/find the
-                # emulator and attach to its ADB (_attach_adb_after_boot).
-                if self._flow_has_node_type("launch_emulator", "if_emulator"):
+                # A flow with a launch_emulator / if_emulator / wait_emulator
+                # node may legitimately start with no device — those nodes
+                # boot/find the emulator and attach to its ADB
+                # (_attach_adb_after_boot).
+                if self._flow_has_node_type("launch_emulator", "if_emulator", "wait_emulator"):
                     log_info("[workflow] No device yet — an emulator node will boot/attach one")
                     self._apply_ocr_backend()
                     return True
@@ -1713,9 +1727,11 @@ class WorkflowEngine:
             return tapped > 0
         if ntype == "if_emulator":
             return self._c_if_emulator(params)
+        if ntype == "wait_emulator":
+            return self._c_wait_emulator(params)
         if ntype == "if_app":
             negate = bool(params.get("negate", False))
-            needle = str(self._resolve_value(params.get("package", "")) or "").strip().lower()
+            needle = self._node_package(params).lower()
             try:
                 if hasattr(self.auto.adb, "clear_info_cache"):
                     self.auto.adb.clear_info_cache()
@@ -2077,20 +2093,52 @@ class WorkflowEngine:
     # ── Speedhack ────────────────────────────────────────────────────────────
 
     def _auto_package(self) -> str:
-        """Best-effort target package: the first ``launch_app`` node's package.
+        """Best-effort target package: workflow field, else first ``launch_app`` node.
 
-        Lets a flow that opens the game itself drive the speedhack without the
-        user retyping the package in the speedhack config.
+        Lets a flow that opens the game itself drive speedhack / app helpers
+        without retyping the package everywhere.
         """
+        pkg = str(getattr(self, "package", "") or "").strip()
+        if pkg:
+            return pkg
+        # Legacy nested package (older workflow JSON).
+        pkg = str((self.speedhack_cfg or {}).get("package") or "").strip()
+        if pkg:
+            return pkg
         graphs = [a.get("graph", {}) or {} for a in self.activities()]
         graphs += [f.get("graph", {}) or {} for f in self._functions.values()]
         for g in graphs:
             for n in g.get("nodes", []) or []:
                 if n.get("type") == "launch_app":
-                    pkg = str((n.get("params", {}) or {}).get("package", "")).strip()
-                    if pkg:
-                        return pkg
+                    found = str((n.get("params", {}) or {}).get("package", "")).strip()
+                    if found:
+                        return found
         return ""
+
+    def _resolve_package(self) -> str:
+        """Canonical package for speedhack / app tools."""
+        return self._auto_package()
+
+    def _node_package(self, params: Dict[str, Any]) -> str:
+        """Resolve package for launch_app / app_stop / app_uninstall / if_app.
+
+        ``pkgSrc``:
+          - ``project`` — use the workflow-level package (Project settings)
+          - ``custom``  — free text / variable from the node's ``package`` field
+          - missing     — legacy: explicit package wins; else fall back to project
+        """
+        p = params or {}
+        src = str(p.get("pkgSrc") or "").strip().lower()
+        if src == "project":
+            return self._resolve_package()
+        if src == "custom":
+            return str(self._resolve_value(p.get("package", "")) or "").strip()
+        # Legacy nodes (no pkgSrc): keep previous behaviour, but if package is
+        # empty borrow the project package so old "blank" blocks still work.
+        pkg = str(self._resolve_value(p.get("package", "")) or "").strip()
+        if pkg:
+            return pkg
+        return self._resolve_package()
 
     def speedhack_info(self) -> Dict[str, Any]:
         """Current speedhack config + runtime state (for the GUI)."""
@@ -2102,12 +2150,15 @@ class WorkflowEngine:
         return {
             "enabled": self._truthy(cfg.get("enabled", False)),
             "speed": speed,
-            "package": str(cfg.get("package") or "").strip() or self._auto_package(),
+            "package": self._resolve_package(),
             "active": bool(self._speedhack and self._speedhack.active),
         }
 
     def configure_speedhack(self, enabled=None, speed=None, package=None) -> None:
-        """Update the speedhack config; applies live if a run is in progress."""
+        """Update the speedhack config; applies live if a run is in progress.
+
+        ``package`` updates the workflow-level package (not nested under speedhack).
+        """
         cfg = dict(self.speedhack_cfg or {})
         if enabled is not None:
             cfg["enabled"] = bool(enabled)
@@ -2117,7 +2168,11 @@ class WorkflowEngine:
             except (TypeError, ValueError):
                 pass
         if package is not None:
-            cfg["package"] = str(package).strip()
+            self.package = str(package).strip()
+            if isinstance(self.flow, dict):
+                self.flow["package"] = self.package
+        # Keep speedhack_cfg free of package (top-level owns it).
+        cfg.pop("package", None)
         self.speedhack_cfg = cfg
         if not self.running:
             return
@@ -2156,10 +2211,10 @@ class WorkflowEngine:
             return
         if self._speedhack is not None:
             return
-        package = str(cfg.get("package") or "").strip() or self._auto_package()
+        package = self._resolve_package()
         if not package:
             log_warning("[speedhack] bật nhưng chưa có package game (đặt 'package' "
-                        "trong cấu hình speedhack hoặc thêm node Mở app)")
+                        "cạnh tên workflow hoặc thêm node Mở app)")
             return
         try:
             scale = float(cfg.get("speed", 2.0) or 2.0)
@@ -2547,9 +2602,9 @@ class WorkflowEngine:
         if getattr(self, "_controller", "adb") == "win32":
             log_warning("[workflow] ⛔ Dừng ứng dụng chỉ áp dụng cho dự án ADB — dùng 'Đóng cửa sổ' cho Win32")
             return True
-        pkg = str(self._resolve_value(p.get("package", "")) or "").strip()
+        pkg = self._node_package(p)
         if not pkg:
-            log_warning("[workflow] ⛔ app_stop: chưa nhập package")
+            log_warning("[workflow] ⛔ app_stop: chưa có package (Project settings hoặc Custom)")
             return False
         dev = getattr(self.auto.adb, "device", None)
         if not dev:
@@ -2571,9 +2626,9 @@ class WorkflowEngine:
         if getattr(self, "_controller", "adb") == "win32":
             log_warning("[workflow] 🗑 Gỡ ứng dụng chỉ áp dụng cho dự án ADB — bỏ qua")
             return True
-        pkg = str(self._resolve_value(p.get("package", "")) or "").strip()
+        pkg = self._node_package(p)
         if not pkg:
-            log_warning("[workflow] 🗑 app_uninstall: chưa nhập package")
+            log_warning("[workflow] 🗑 app_uninstall: chưa có package (Project settings hoặc Custom)")
             return False
         dev = getattr(self.auto.adb, "device", None)
         if not dev:
@@ -2621,9 +2676,12 @@ class WorkflowEngine:
             return False
 
     def _a_launch_app(self, node, p) -> bool:
-        # package nhận biến ({var} hoặc tên biến trần) — đồng bộ với app_stop/if_app.
-        pkg = str(self._resolve_value(p.get("package", "")) or "").strip()
-        if not pkg or not self.auto.adb.launch_app(pkg):
+        # package: Project settings (pkgSrc=project) hoặc custom/var (pkgSrc=custom).
+        pkg = self._node_package(p)
+        if not pkg:
+            log_warning("[workflow] 🚀 launch_app: chưa có package (Project settings hoặc Custom)")
+            return False
+        if not self.auto.adb.launch_app(pkg):
             return False
         # Optional: block until the app is actually in the foreground (0 = don't
         # wait). Lets "open game → tap image" work without a manual fixed delay.
@@ -2899,14 +2957,12 @@ class WorkflowEngine:
         except Exception:
             return None
 
-    def _c_if_emulator(self, p: Dict) -> bool:
-        """True when the target emulator instance is booted and its ADB answers
-        (``adb connect`` + ``sys.boot_completed`` == 1).
+    def _resolve_emulator_target(self, p: Dict) -> Optional[tuple]:
+        """Resolve ``(kind, index, host)`` for if_emulator / wait_emulator.
 
-        ``emulator`` = "last" (default) re-checks the instance the last
-        successful launch_emulator saved — "is the one I set still running?".
-        With ``attach`` on (default), a flow that started with no device binds
-        to the ready instance so the following nodes can drive it.
+        ``emulator`` = "last" re-checks the instance the last successful
+        launch_emulator saved. Returns None when the target can't be resolved
+        (no saved state, unknown family, missing port).
         """
         kind = str(p.get("emulator", "last")).strip().lower() or "last"
         try:
@@ -2926,7 +2982,7 @@ class WorkflowEngine:
             saved = self._load_emulator_state()
             if not saved:
                 log_warning("[workflow] 🖥 No saved emulator yet — run a Launch emulator node once first")
-                return False
+                return None
             kind = str(saved.get("emulator") or "?").lower()
             try:
                 index = int(saved.get("index") or 0)
@@ -2944,15 +3000,77 @@ class WorkflowEngine:
                 port = spec["port0"] + index * spec["step"]
         if port is None:
             log_warning(f"[workflow] 🖥 Can't derive the ADB port for '{kind}' — set 'ADB port override'")
-            return False
-        host = f"127.0.0.1:{port}"
-        ready = self._emulator_adb_ready(host)
-        log_info(f"[workflow] 🖥 Emulator {kind} #{index} ({host}) → {'ready' if ready else 'not ready'}")
-        if (ready and bool(p.get("attach", True))
+            return None
+        return kind, index, f"127.0.0.1:{port}"
+
+    def _maybe_attach_emulator(self, p: Dict, host: str) -> None:
+        """Attach ADB to ``host`` when ``attach`` is on and no device is bound yet."""
+        if (bool(p.get("attach", True))
                 and getattr(self, "_controller", "adb") != "win32"
                 and not self.auto.adb.device):
             self._attach_adb_after_boot(host)
+
+    def _c_if_emulator(self, p: Dict) -> bool:
+        """True when the target emulator instance is booted and its ADB answers
+        (``adb connect`` + ``sys.boot_completed`` == 1).
+
+        ``emulator`` = "last" (default) re-checks the instance the last
+        successful launch_emulator saved — "is the one I set still running?".
+        With ``attach`` on (default), a flow that started with no device binds
+        to the ready instance so the following nodes can drive it.
+        """
+        target = self._resolve_emulator_target(p)
+        if not target:
+            return False
+        kind, index, host = target
+        ready = self._emulator_adb_ready(host)
+        log_info(f"[workflow] 🖥 Emulator {kind} #{index} ({host}) → {'ready' if ready else 'not ready'}")
+        if ready:
+            self._maybe_attach_emulator(p, host)
         return ready
+
+    def _c_wait_emulator(self, p: Dict) -> bool:
+        """Poll until the target emulator finishes booting (ADB +
+        ``sys.boot_completed``) or ``timeout`` seconds elapse.
+
+        true  → ready (and optionally attached as the active device)
+        false → timeout / unresolvable target / stopped mid-wait
+        """
+        target = self._resolve_emulator_target(p)
+        if not target:
+            return False
+        kind, index, host = target
+        try:
+            timeout = float(p.get("timeout", 120) or 120)
+        except (TypeError, ValueError):
+            timeout = 120.0
+        timeout = max(0.0, timeout)
+        log_info(
+            f"[workflow] ⏳ Waiting for emulator {kind} #{index} ({host}) "
+            f"up to {timeout:.0f}s…"
+        )
+        end = time.time() + timeout
+        # Immediate probe first so an already-booted instance returns instantly.
+        while not self._stop.is_set():
+            self._pause.wait()
+            if self._emulator_adb_ready(host):
+                log_success(
+                    f"[workflow] ⏳ Emulator {kind} #{index} ({host}) ready"
+                )
+                self._maybe_attach_emulator(p, host)
+                return True
+            if time.time() >= end:
+                break
+            # Short sleep so stop/pause stay responsive; boot often takes tens of s.
+            time.sleep(1.0)
+        if self._stop.is_set():
+            log_warning(f"[workflow] ⏳ Wait emulator cancelled ({host})")
+        else:
+            log_warning(
+                f"[workflow] ⏳ Emulator {kind} #{index} ({host}) not ready "
+                f"after {timeout:.0f}s"
+            )
+        return False
 
     @staticmethod
     def _emulator_adb_ready(host: str) -> bool:
@@ -3071,31 +3189,23 @@ class WorkflowEngine:
         return spec["port0"] + index * spec["step"]
 
     def _wait_emulator_adb(self, port: Optional[int], wait: float) -> Optional[str]:
-        """Poll ``adb connect 127.0.0.1:<port>`` until it succeeds or ``wait`` s
-        elapse. Returns the connected ``host:port`` serial, or None. With no
-        known port, just sleep ``wait`` s to let the emulator boot."""
+        """Poll until ``127.0.0.1:<port>`` is ADB-connectable *and* Android
+        reports ``sys.boot_completed`` == 1, or ``wait`` s elapse.
+
+        Returns the connected ``host:port`` serial, or None. With no known
+        port, just sleep ``wait`` s to let the emulator boot.
+        """
         if not port:
             log_info(f"[workflow] ▶ Chờ giả lập khởi động {wait:.0f}s (không rõ cổng ADB)")
             self._sleep(wait)
             return None
-        from src.core.adb.constants import get_adb_path
-        adb = get_adb_path()
         host = f"127.0.0.1:{port}"
-        import subprocess
         end = time.time() + wait
         while time.time() < end and not self._stop.is_set():
             self._pause.wait()
-            try:
-                r = subprocess.run(
-                    [adb, "connect", host],
-                    capture_output=True, text=True, timeout=5,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
-                )
-                if "connected" in (r.stdout or "").lower():  # "connected to" / "already connected"
-                    log_success(f"[workflow] ▶ Giả lập sẵn sàng — ADB {host}")
-                    return host
-            except Exception:
-                pass
+            if self._emulator_adb_ready(host):
+                log_success(f"[workflow] ▶ Giả lập sẵn sàng — ADB {host}")
+                return host
             time.sleep(1.0)
         log_warning(f"[workflow] ▶ Chưa thấy ADB {host} sau {wait:.0f}s")
         return None

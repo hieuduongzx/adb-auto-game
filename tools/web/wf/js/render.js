@@ -2,7 +2,15 @@
 function wfRenderAll(){
   wfRenderActivities(); wfRenderFunctions(); wfRenderPalette(); wfRenderCanvas(); wfRenderInspector();
   const t=wfEditTarget();
-  $("wf-cur-act").textContent = !t ? "—" : (WF.edit.kind==="function" ? "ƒ "+t.name : t.name);
+  const cur=$("wf-cur-act");
+  if(cur){
+    const isFn = WF.edit.kind==="function";
+    const label = !t ? "" : (isFn ? "ƒ "+t.name : t.name);
+    cur.textContent = label;
+    cur.dataset.empty = label ? "0" : "1";
+    cur.classList.toggle("is-fn", !!isFn && !!label);
+    cur.title = label ? ((isFn?"Function":"Activity")+" · "+(t.name||"")) : "No activity open";
+  }
 }
 
 // ── Inline rename (double-click a row name) ──────────────────────────────────
@@ -67,6 +75,12 @@ function wfRenderActivities(){
     el.querySelector(".wf-act-cb").addEventListener("click",e=>wfToggleActivity(act.id,e));
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteActivity(act.id,e));
     el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-cb,.wf-act-del,.wf-act-grip,.wf-act-rename"))return; wfSelectActivity(act.id); });
+    // Right-click a row → run this activity only / toggle / delete (does not bubble
+    // to the panel-level select-all menu).
+    el.addEventListener("contextmenu",e=>{
+      e.preventDefault(); e.stopPropagation();
+      if(typeof wfShowActRowMenu==="function") wfShowActRowMenu(e.clientX, e.clientY, act);
+    });
     wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.activities);
     wrap.appendChild(el);
   }
@@ -362,20 +376,25 @@ function wfRenderVarsPanel(){
   body.innerHTML="";
   if(!allNames.length){
     const e=document.createElement("div"); e.className="wf-vars-empty";
-    e.textContent="No variables yet. Click + to add a global variable.";
+    e.textContent="No variables yet. Click + to add a global or local variable.";
     body.appendChild(e); wfEqualizeCornerPanels(); return;
   }
   function mkSep(label){ const s=document.createElement("span"); s.className="wf-vars-sep"; s.textContent=label; return s; }
-  function mkRow(n, isGlobal){
+  function mkRow(n, scope){
     const row=document.createElement("div"); row.className="wf-var-row-live";
-    // Global rows are a shortcut into the globals editor — one click to edit.
-    if(isGlobal){ row.classList.add("clickable");
+    // Declared rows open the matching editor (global vs activity-local).
+    if(scope==="global"){ row.classList.add("clickable");
       row.addEventListener("click",()=>{ wfGlobsOpen=true; wfShowGlobsEditor(); }); }
+    else if(scope==="activity"){ row.classList.add("clickable");
+      row.addEventListener("click",()=>{ wfShowLocalsEditor(); }); }
     const nm=document.createElement("span"); nm.className="vn";
-    nm.title=n+(isGlobal?" · global · click to edit":"");
-    if(isGlobal){
+    nm.title=n+(scope==="global"?" · global · click to edit":scope==="activity"?" · local (this activity) · click to edit":"");
+    if(scope==="global"){
       nm.style.color="var(--accent)";
       nm.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>'+n;
+    } else if(scope==="activity"){
+      nm.style.color="var(--cat-logic-ink,#6d28d9)";
+      nm.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg>'+n;
     } else { nm.textContent=n; }
     const live=wfLiveVars[n];
     const hasDeclared=declared.hasOwnProperty(n);
@@ -386,22 +405,165 @@ function wfRenderVarsPanel(){
     row.appendChild(nm); row.appendChild(vv);
     return row;
   }
-  if(globalNames.length){ body.appendChild(mkSep("Global")); globalNames.forEach(n=>body.appendChild(mkRow(n,true))); }
-  if(actNames.length){ body.appendChild(mkSep("Activities")); actNames.forEach(n=>body.appendChild(mkRow(n,false))); }
-  if(nodeNames.length){ body.appendChild(mkSep("Node")); nodeNames.forEach(n=>body.appendChild(mkRow(n,false))); }
-  if(liveExtra.length){ body.appendChild(mkSep("Live")); liveExtra.forEach(n=>body.appendChild(mkRow(n,false))); }
+  if(globalNames.length){ body.appendChild(mkSep("Global")); globalNames.forEach(n=>body.appendChild(mkRow(n,"global"))); }
+  if(actNames.length){ body.appendChild(mkSep("Local · "+((act&&act.name)||"activity"))); actNames.forEach(n=>body.appendChild(mkRow(n,"activity"))); }
+  if(nodeNames.length){ body.appendChild(mkSep("Node")); nodeNames.forEach(n=>body.appendChild(mkRow(n,"node"))); }
+  if(liveExtra.length){ body.appendChild(mkSep("Live")); liveExtra.forEach(n=>body.appendChild(mkRow(n,"live"))); }
   wfEqualizeCornerPanels();
 }
 
-// ── Global variables editor (popover from the vars panel "+") ─────────────────
+// ── Add variable: pick Global vs Local (activity) ─────────────────────────────
 let wfGlobsOpen=false;
+function wfHideAddVarMenu(){ const m=document.getElementById("wf-var-scope-menu"); if(m) m.remove(); }
+function wfShowAddVarMenu(){
+  wfHideAddVarMenu();
+  const btn=$("wf-vars-add"); if(!btn) return;
+  const menu=document.createElement("div"); menu.id="wf-var-scope-menu"; menu.className="wf-var-scope-menu";
+  const act=typeof wfCurAct==="function"?wfCurAct():null;
+  const mk=(title,sub,fn,disabled)=>{
+    const b=document.createElement("button"); b.type="button"; b.className="wf-var-scope-item";
+    b.disabled=!!disabled;
+    b.innerHTML=`<span class="ttl">${title}</span><span class="sub">${sub}</span>`;
+    b.onclick=()=>{ if(disabled) return; wfHideAddVarMenu(); fn(); };
+    menu.appendChild(b);
+  };
+  mk("Global variable","Shared by every activity in this workflow", ()=>wfAddQuickGlobal());
+  mk("Local variable", act?(`Only «${act.name||"activity"}» · reset each run`):"Select an activity first",
+     ()=>wfAddQuickLocal(), !act);
+  document.body.appendChild(menu);
+  const r=btn.getBoundingClientRect();
+  const mw=menu.offsetWidth||188;
+  let left=Math.min(r.right-mw, window.innerWidth-mw-8);
+  let top=r.bottom+6;
+  if(top+120>window.innerHeight) top=Math.max(8, r.top-126);
+  menu.style.left=Math.max(8,left)+"px";
+  menu.style.top=top+"px";
+  const outside=e=>{ if(!e.target.closest("#wf-var-scope-menu") && !e.target.closest("#wf-vars-add")){ wfHideAddVarMenu(); document.removeEventListener("mousedown",outside,true); } };
+  setTimeout(()=>document.addEventListener("mousedown",outside,true),0);
+}
 function wfAddQuickGlobal(){
   if(!Array.isArray(WF.globals)) WF.globals=[];
   wfPushUndoDebounced();
   const n=WF.globals.length+1;
-  WF.globals.push({name:"g"+n, label:"Global "+n, type:"bool", value:false});
+  WF.globals.push({name:"g"+n, label:"Global "+n, type:"bool", value:false, children:[]});
   wfRenderVarsPanel();
   wfShowGlobsEditor();
+}
+function wfAddQuickLocal(){
+  const act=typeof wfCurAct==="function"?wfCurAct():null;
+  if(!act){ if(typeof uiToast==="function") uiToast("Select an activity first.","warning"); return; }
+  if(!Array.isArray(act.vars)) act.vars=[];
+  wfPushUndoDebounced();
+  const n=act.vars.length+1;
+  act.vars.push({name:"v"+n, label:"Local "+n, type:"bool", value:false, children:[]});
+  wfRenderVarsPanel();
+  wfShowLocalsEditor();
+  // Keep the Properties inspector in sync when it's showing activity vars.
+  if(typeof wfRenderInspector==="function" && !WF.selectedNode) wfRenderInspector();
+}
+// Activity-local variables editor (mirrors the global editor, scoped to the
+// current activity). Click a Local row or add via "+" → Local.
+function wfShowLocalsEditor(){
+  wfHideGlobsEditor();
+  const act=typeof wfCurAct==="function"?wfCurAct():null;
+  if(!act){ if(typeof uiToast==="function") uiToast("Select an activity first.","warning"); return; }
+  if(!Array.isArray(act.vars)) act.vars=[];
+  // Reuse the same popover shell as globals so layout stays consistent.
+  const existing=document.getElementById("wf-globs-pop"); if(existing) existing.remove();
+  const pop=document.createElement("div"); pop.id="wf-globs-pop"; pop.className="wf-globs-pop";
+  const hdr=document.createElement("div"); hdr.className="wf-vars-hdr";
+  const actName=act.name||"activity";
+  hdr.innerHTML='<span>Local · '+escHtml(actName)+'</span><span class="wf-vars-close" style="cursor:pointer" title="Close">'+wfIco("x")+'</span>';
+  hdr.querySelector(".wf-vars-close").onclick=wfHideGlobsEditor;
+  pop.appendChild(hdr);
+  const body=document.createElement("div"); body.className="wf-globs-pop-body";
+  function render(){
+    body.innerHTML="";
+    if(!act.vars.length){
+      const e=document.createElement("div"); e.className="wf-vars-empty";
+      e.textContent="No local variables for this activity. Click “+ Add”.";
+      body.appendChild(e);
+    }
+    act.vars.forEach((v,idx)=>{ body.appendChild(wfLocalRow(act,v,idx,render)); wfBuildLocalChildren(act,v,body,render); });
+    const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Add";
+    add.style.marginTop="2px";
+    add.onclick=()=>{ wfPushUndoDebounced(); const n=act.vars.length+1; act.vars.push({name:"v"+n, label:"Local "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
+    body.appendChild(add);
+  }
+  render();
+  pop.appendChild(body);
+  document.body.appendChild(pop);
+  const btn=$("wf-vars-add");
+  if(btn){
+    const r=btn.getBoundingClientRect();
+    let left=r.right-250, top=r.bottom+6;
+    pop.style.top=Math.max(8, top)+"px";
+    pop.style.left=Math.max(8, Math.min(window.innerWidth-250, left))+"px";
+  }
+}
+function wfLocalRow(act,v,idx,render){
+  // Same fields as global rows, but edits write into act.vars.
+  const card=document.createElement("div"); card.className="wf-glob-card";
+  const r1=document.createElement("div"); r1.className="wf-var-row";
+  r1.style.alignItems="center";
+  const tag=document.createElement("span"); tag.className="wf-glob-tag";
+  tag.style.color="var(--cat-logic-ink,#6d28d9)";
+  tag.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg>LOCAL';
+  const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Child"; addChild.title="Add child variable";
+  addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
+  const del=document.createElement("button"); del.className="wf-glob-del"; del.textContent="−"; del.title="Delete local variable";
+  del.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); act.vars.splice(idx,1); render(); wfRenderVarsPanel(); };
+  const sp=document.createElement("span"); sp.style.flex="1";
+  r1.appendChild(tag); r1.appendChild(sp); r1.appendChild(addChild); r1.appendChild(del);
+  card.appendChild(r1);
+  const r1b=document.createElement("div"); r1b.className="wf-var-row";
+  const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Title"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
+  lbl.oninput=()=>{ wfPushUndoDebounced(); v.label=lbl.value; };
+  r1b.appendChild(lbl);
+  card.appendChild(r1b);
+  const r2=document.createElement("div"); r2.className="wf-var-row";
+  const nm=document.createElement("input"); nm.type="text"; nm.value=v.name||""; nm.placeholder="variable"; nm.style.flex="1"; nm.style.minWidth="0"; nm.style.fontSize="10.5px"; nm.style.fontFamily="var(--mono)";
+  nm.oninput=()=>{ wfPushUndoDebounced(); v.name=nm.value; wfRenderVarsPanel(); };
+  r2.appendChild(nm);
+  const ty=document.createElement("select");
+  [["bool","bool"],["number","number"],["text","text"],["select","select"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
+  ty.onchange=()=>{
+    wfPushUndoDebounced();
+    v.type=ty.value;
+    if(ty.value==="select"){ if(!v.options||!v.options.length) v.options=["A","B"]; v.value=v.options[0]; }
+    else v.value = ty.value==="bool"?false : ty.value==="number"?0 : "";
+    render(); wfRenderVarsPanel();
+  };
+  r2.appendChild(ty);
+  card.appendChild(r2);
+  card.appendChild(wfVarValue(v));
+  if(v.type==="select"){
+    const r3=document.createElement("div"); r3.className="wf-var-row";
+    const l=document.createElement("label"); l.textContent="options"; l.style.fontSize="10px"; r3.appendChild(l);
+    const opt=document.createElement("input"); opt.type="text"; opt.value=(v.options||[]).join(", "); opt.placeholder="A, B, C"; opt.style.flex="1"; opt.style.minWidth="0"; opt.style.fontSize="10px";
+    opt.onchange=()=>{ wfPushUndoDebounced(); v.options=opt.value.split(",").map(s=>s.trim()).filter(Boolean); if(!v.options.includes(v.value)) v.value=v.options[0]||""; render(); wfRenderVarsPanel(); };
+    r3.appendChild(opt); card.appendChild(r3);
+  }
+  return card;
+}
+function wfBuildLocalChildren(act,v,container,render,depth){
+  depth=depth||0;
+  v.children=v.children||[];
+  v.children.forEach((cv,ci)=>{
+    const childCard=wfLocalRow(act,cv,ci,()=>{
+      // Deleting a child splices by index into v.children, not act.vars.
+      // Re-render via the parent render() so the whole tree refreshes.
+      render();
+    });
+    // Override delete for nested rows: remove from parent.children.
+    const delBtn=childCard.querySelector(".wf-glob-del");
+    if(delBtn){
+      delBtn.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children.splice(ci,1); render(); wfRenderVarsPanel(); };
+    }
+    childCard.style.marginLeft=((depth+1)*WF_VAR_INDENT)+"px";
+    container.appendChild(childCard);
+    if(cv.children&&cv.children.length) wfBuildLocalChildren(act,cv,container,render,depth+1);
+  });
 }
 function wfToggleGlobsEditor(){
   wfGlobsOpen=!wfGlobsOpen;

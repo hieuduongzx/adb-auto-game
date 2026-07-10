@@ -2,6 +2,7 @@
   "name": "Cherry Tale",
   "version": 2,
   "templatesDir": "templates",
+  "package": "com.neversoft.rpg.erolabs",
   "controller": "adb",
   "ocr": "",
   "win32": {
@@ -11,8 +12,7 @@
   },
   "speedhack": {
     "enabled": false,
-    "speed": 2,
-    "package": ""
+    "speed": 2
   },
   "globals": [],
   "functions": [
@@ -161,42 +161,168 @@
   "activities": [
     {
       "id": "sequence_xguu",
-      "name": "Activity 13",
+      "name": "Run Game",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
           {
-            "id": "n3qq8pc1",
+            "id": "n6pi9wel",
             "type": "start",
-            "x": 60,
-            "y": 70,
-            "params": {}
-          },
-          {
-            "id": "nescziq0",
-            "type": "end",
-            "x": 420,
-            "y": 70,
-            "params": {}
-          },
-          {
-            "id": "ndx1ob8z",
-            "type": "launch_app",
-            "x": 120,
+            "x": 40,
             "y": 55,
+            "params": {}
+          },
+          {
+            "id": "ndi8pf0t",
+            "type": "end",
+            "x": 1280,
+            "y": 115,
+            "params": {}
+          },
+          {
+            "id": "nj3zqhb2",
+            "type": "launch_emulator",
+            "x": 300,
+            "y": 116,
+            "params": {
+              "emulator": "mumu",
+              "index": 0,
+              "instance": "",
+              "path": "D:\\Programs\\MuMuPlayerGlobal\\nx_main",
+              "command": "",
+              "at": "",
+              "nextDay": true,
+              "wait": 60,
+              "port": 0
+            }
+          },
+          {
+            "id": "nj5xjfpu",
+            "type": "launch_app",
+            "x": 480,
+            "y": 40,
+            "params": {
+              "package": "",
+              "wait": 0,
+              "pkgSrc": "project"
+            }
+          },
+          {
+            "id": "nbra4ijc",
+            "type": "if_emulator",
+            "x": 100,
+            "y": 40,
+            "params": {
+              "emulator": "last",
+              "index": 0,
+              "port": 0,
+              "attach": true
+            }
+          },
+          {
+            "id": "ni8wav38",
+            "type": "if_app",
+            "x": 300,
+            "y": 40,
             "params": {
               "package": "com.neversoft.rpg.erolabs",
-              "wait": 0
+              "negate": true,
+              "pkgSrc": "project"
+            }
+          },
+          {
+            "id": "n3gpedjr",
+            "type": "wait_image",
+            "x": 660,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260710_233810_872_990_175_33.png",
+              "threshold": 0.85,
+              "timeout": 120,
+              "negate": false
+            }
+          },
+          {
+            "id": "nsz0mjsw",
+            "type": "tap_image",
+            "x": 840,
+            "y": 40,
+            "params": {
+              "template": "templates/crop_20260710_233827_872_990_175_33.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 120,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nfti3h6c",
+            "type": "call",
+            "x": 1080,
+            "y": 100,
+            "params": {
+              "fn": "fn_ppung"
             }
           }
         ],
         "edges": [
           {
-            "from": "n3qq8pc1",
+            "from": "n6pi9wel",
             "fromPort": "out",
-            "to": "ndx1ob8z"
+            "to": "nbra4ijc"
+          },
+          {
+            "from": "nbra4ijc",
+            "fromPort": "false",
+            "to": "nj3zqhb2"
+          },
+          {
+            "from": "nj3zqhb2",
+            "fromPort": "out",
+            "to": "ni8wav38"
+          },
+          {
+            "from": "nbra4ijc",
+            "fromPort": "true",
+            "to": "ni8wav38"
+          },
+          {
+            "from": "ni8wav38",
+            "fromPort": "true",
+            "to": "nj5xjfpu"
+          },
+          {
+            "from": "nj5xjfpu",
+            "fromPort": "out",
+            "to": "n3gpedjr"
+          },
+          {
+            "from": "n3gpedjr",
+            "fromPort": "true",
+            "to": "nsz0mjsw"
+          },
+          {
+            "from": "ni8wav38",
+            "fromPort": "false",
+            "to": "nfti3h6c"
+          },
+          {
+            "from": "nsz0mjsw",
+            "fromPort": "false",
+            "to": "nfti3h6c"
+          },
+          {
+            "from": "nfti3h6c",
+            "fromPort": "true",
+            "to": "ndi8pf0t"
+          },
+          {
+            "from": "nsz0mjsw",
+            "fromPort": "true",
+            "to": "nfti3h6c"
           }
         ],
         "groups": []
@@ -207,7 +333,7 @@
       "id": "sequence_9x85",
       "name": "Bữa Tiệc",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -371,7 +497,7 @@
       "id": "sequence_hlng",
       "name": "Bạn Bè",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -839,8 +965,8 @@
           {
             "id": "nr7m1c13",
             "type": "end",
-            "x": 1620,
-            "y": 100,
+            "x": 1460,
+            "y": 105,
             "params": {}
           }
         ],
@@ -1167,7 +1293,7 @@
             "x": 1460,
             "y": 314,
             "params": {
-              "template": "templates/crop_20260704_085455_824_868_248_148.png",
+              "template": "templates/crop_20260708_125554_866_769_281_154.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
@@ -2983,7 +3109,7 @@
       "id": "sequence_vf95",
       "name": "Bang Hội",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [

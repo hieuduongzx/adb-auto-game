@@ -470,8 +470,24 @@ function wfShowWireMenu(clientX, clientY, ed){
   d.onclick=()=>{ wfHideMenu(); wfDeleteWire(ed); }; m.appendChild(d);
   m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
 }
-// Right-click menu on the Activities panel: tick / untick the enable checkbox
-// of every activity in the visible tab (sequence or background) at once.
+// Right-click menu on a single activity row.
+function wfShowActRowMenu(clientX, clientY, act){
+  const m=$("wf-ctxmenu"); if(!m||!act) return;
+  m.innerHTML="";
+  const items=[
+    {ico:"play",  label:"Run this activity only", fn:()=>{ if(typeof wfRunOneActivity==="function") wfRunOneActivity(act.id); }},
+    {ico:"check", label: act.enabled?"Disable":"Enable", fn:()=>wfToggleActivity(act.id)},
+    {ico:"trash", label:"Delete activity", fn:()=>wfDeleteActivity(act.id)},
+  ];
+  items.forEach(it=>{
+    const d=document.createElement("div"); d.className="wf-ctx-item";
+    d.innerHTML=`<span class="wf-ctx-ico">${wfIco(it.ico)}</span>${escHtml(it.label)}`;
+    d.onclick=()=>{ wfHideMenu(); it.fn(); }; m.appendChild(d);
+  });
+  m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
+}
+// Right-click empty area of the Activities panel: tick / untick every activity
+// in the visible tab (sequence or background) at once.
 function wfShowActAllMenu(clientX, clientY){
   const m=$("wf-ctxmenu"); if(!m) return;
   const isBg = (typeof wfActTabCur!=="undefined" && wfActTabCur==="bg");
@@ -526,12 +542,12 @@ function wfInitCanvas(){
     if(ne && !WF.sel.includes(ne.dataset.node)){ wfSelectOne(ne.dataset.node); wfMarkSel(); wfRenderInspector(); }
     wfShowMenu(e.clientX, e.clientY);
   });
-  document.addEventListener("mousedown",e=>{ if(!e.target.closest("#wf-ctxmenu")) wfHideMenu(); if(!e.target.closest("#wf-globs-pop") && !e.target.closest("#wf-vars-mgr") && !e.target.closest("#wf-vars-add")) wfHideGlobsEditor(); if(!e.target.closest("#wf-layout-bar")) wfCloseLayoutMenu(); }, true);
+  document.addEventListener("mousedown",e=>{ if(!e.target.closest("#wf-ctxmenu")) wfHideMenu(); if(!e.target.closest("#wf-globs-pop") && !e.target.closest("#wf-vars-mgr") && !e.target.closest("#wf-vars-add") && !e.target.closest("#wf-var-scope-menu")) wfHideGlobsEditor(); if(!e.target.closest("#wf-layout-bar")) wfCloseLayoutMenu(); }, true);
   // Vars panel header toggles collapse (click-through to drag is fine on body).
   const vhdr=document.querySelector("#wf-vars-panel .wf-vars-hdr");
   if(vhdr) vhdr.onclick=(e)=>{ if(e.target.closest(".wf-vars-actions")) return; wfVarsCollapsed=!wfVarsCollapsed; wfPersistPanelState(); wfRenderVarsPanel(); };
   const vadd=$("wf-vars-add");
-  if(vadd) vadd.onclick=(e)=>{ e.stopPropagation(); wfAddQuickGlobal(); };
+  if(vadd) vadd.onclick=(e)=>{ e.stopPropagation(); if(typeof wfShowAddVarMenu==="function") wfShowAddVarMenu(); };
   const vmgr=$("wf-vars-mgr");
   if(vmgr) vmgr.onclick=(e)=>{ e.stopPropagation(); wfToggleGlobsEditor(); };
   // Activities panel: tab switching + "+" add button + collapse.
@@ -564,8 +580,10 @@ function wfInitCanvas(){
   // ── Activity panel: stop wheel from zooming the canvas ──────────────────
   const actBody=document.querySelector(".wf-act-panel-body");
   if(actBody) actBody.addEventListener("wheel", e=>e.stopPropagation(), {passive:true});
-  // Right-click anywhere in the activity list → select/deselect-all menu.
+  // Right-click empty area of the activity list → select/deselect-all menu.
+  // (Row-level contextmenu is handled on each .wf-act and stops propagation.)
   if(actBody) actBody.addEventListener("contextmenu", e=>{
+    if(e.target.closest(".wf-act")) return;  // row menu owns this click
     e.preventDefault(); e.stopPropagation();
     wfShowActAllMenu(e.clientX, e.clientY);
   });

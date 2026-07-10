@@ -26,10 +26,11 @@ function wfInspBlock(label,count){
   return b;
 }
 
-// Debug block: a collapsible JSON preview of the current selection plus a
-// Copy button. `getObj` is called lazily so the JSON is always current when the
-// user copies / expands. `label` names the entity (Activity / Function / Node).
-function wfInspJsonBlock(label, getObj){
+// Debug block: collapsible JSON preview + Copy, and optional Import (paste JSON
+// into the textarea then apply). `getObj` is lazy so the JSON is current when
+// the user copies / expands. `applyObj(parsed)` receives the parsed object and
+// mutates the live entity; omit it to hide Import.
+function wfInspJsonBlock(label, getObj, applyObj){
   const b=wfInspBlock("Debug JSON");
   const wrap=document.createElement("div"); wrap.className="wf-json-tool";
 
@@ -37,29 +38,110 @@ function wfInspJsonBlock(label, getObj){
   const toggle=document.createElement("button"); toggle.className="wf-json-toggle"; toggle.type="button";
   toggle.innerHTML=`<svg class="wf-json-chev" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg><span>Preview ${escHtml(label)} JSON</span>`;
   const copyBtn=document.createElement("button"); copyBtn.className="btn sm"; copyBtn.type="button";
-  copyBtn.innerHTML=`${wfIco("clipboard")}<span>Copy JSON</span>`;
+  copyBtn.innerHTML=`${wfIco("clipboard")}<span>Copy</span>`;
   copyBtn.title="Copy this "+label+"'s JSON to the clipboard";
   bar.appendChild(toggle); bar.appendChild(copyBtn);
 
-  const pre=document.createElement("textarea"); pre.className="wf-json-pre"; pre.readOnly=true; pre.spellcheck=false;
+  let importBtn=null;
+  if(typeof applyObj==="function"){
+    importBtn=document.createElement("button"); importBtn.className="btn sm"; importBtn.type="button";
+    importBtn.innerHTML=`${wfIco("edit")}<span>Import</span>`;
+    importBtn.title="Paste JSON into the box below, then click Import to apply it to this "+label;
+    bar.appendChild(importBtn);
+  }
+
+  // Editable so the user can paste / tweak JSON before Import.
+  const pre=document.createElement("textarea"); pre.className="wf-json-pre"; pre.spellcheck=false;
+  pre.placeholder="Paste "+label+" JSON here, then click Import…";
   pre.style.display="none";
 
   const json=()=>{ try{ return JSON.stringify(getObj(),null,2); }catch{ return "// (unavailable)"; } };
+  const openPre=(seed)=>{
+    if(pre.style.display==="none"){
+      if(seed!==false) pre.value=json();
+      pre.style.display="block"; wrap.classList.add("open");
+    }
+  };
+  const flashBtn=(btn, ok, msg)=>{
+    if(!btn) return;
+    btn.classList.remove("flash","flash-err");
+    btn.classList.add(ok?"flash":"flash-err");
+    const lbl=btn.querySelector("span"); const old=lbl?lbl.textContent:"";
+    if(lbl&&msg) lbl.textContent=msg;
+    setTimeout(()=>{ btn.classList.remove("flash","flash-err"); if(lbl&&msg) lbl.textContent=old; }, ok?900:1600);
+  };
   toggle.onclick=()=>{
     const open=pre.style.display==="none";
-    if(open){ pre.value=json(); pre.style.display="block"; wrap.classList.add("open"); }
+    if(open) openPre(true);
     else { pre.style.display="none"; wrap.classList.remove("open"); }
   };
   copyBtn.onclick=async()=>{
     const txt=json();
     try{ await navigator.clipboard.writeText(txt); }
-    catch{ pre.style.display="block"; pre.value=txt; pre.select(); document.execCommand&&document.execCommand("copy"); }
-    copyBtn.classList.add("flash");
-    const lbl=copyBtn.querySelector("span"); const old=lbl.textContent; lbl.textContent="Copied!";
-    setTimeout(()=>{ copyBtn.classList.remove("flash"); lbl.textContent=old; },900);
+    catch{ openPre(false); pre.value=txt; pre.select(); document.execCommand&&document.execCommand("copy"); }
+    flashBtn(copyBtn, true, "Copied!");
   };
+  if(importBtn){
+    importBtn.onclick=()=>{
+      // First click with panel closed: open for paste (keep empty if blank, else seed).
+      if(pre.style.display==="none"){
+        openPre(true);
+        pre.focus(); pre.select();
+        flashBtn(importBtn, true, "Paste…");
+        return;
+      }
+      const txt=(pre.value||"").trim();
+      if(!txt){
+        pre.focus();
+        flashBtn(importBtn, false, "Empty");
+        if(typeof uiToast==="function") uiToast("Paste "+label+" JSON into the box, then Import.","warning");
+        return;
+      }
+      let parsed;
+      try{ parsed=JSON.parse(txt); }
+      catch(e){
+        flashBtn(importBtn, false, "Invalid");
+        if(typeof uiToast==="function") uiToast("Invalid JSON: "+e.message,"error");
+        return;
+      }
+      try{
+        if(typeof wfPushUndo==="function") wfPushUndo();
+        applyObj(parsed);
+        // Drop selection entries whose nodes vanished after a graph replace;
+        // keep a still-valid node selection (node-level import).
+        const g=typeof wfGraph==="function"?wfGraph():null;
+        if(g){
+          const ids=new Set((g.nodes||[]).map(n=>n.id));
+          if(Array.isArray(WF.sel)) WF.sel=WF.sel.filter(id=>ids.has(id));
+          if(WF.selectedNode && !ids.has(WF.selectedNode)) WF.selectedNode=null;
+        }
+        if(typeof wfRenderAll==="function") wfRenderAll();
+        else {
+          if(typeof wfRenderActivities==="function") wfRenderActivities();
+          if(typeof wfRenderFunctions==="function") wfRenderFunctions();
+          if(typeof wfRenderCanvas==="function") wfRenderCanvas();
+          if(typeof wfRenderInspector==="function") wfRenderInspector();
+        }
+        if(typeof setStatus==="function") setStatus(label+" imported from JSON");
+        if(typeof uiToast==="function") uiToast("Imported "+label+" JSON","success");
+      }catch(e){
+        flashBtn(importBtn, false, "Failed");
+        if(typeof uiToast==="function") uiToast(String(e.message||e),"error");
+      }
+    };
+  }
 
-  wrap.appendChild(bar); wrap.appendChild(pre); b.appendChild(wrap);
+  wrap.appendChild(bar); wrap.appendChild(pre);
+  if(importBtn){
+    const hint=document.createElement("div"); hint.className="wf-json-hint";
+    hint.textContent="Paste JSON above → Import applies it to this "+label+" (undoable).";
+    hint.style.display="none";
+    const syncHint=()=>{ hint.style.display=wrap.classList.contains("open")?"":"none"; };
+    toggle.addEventListener("click", ()=>setTimeout(syncHint,0));
+    importBtn.addEventListener("click", ()=>setTimeout(syncHint,0));
+    wrap.appendChild(hint);
+  }
+  b.appendChild(wrap);
   return b;
 }
 
@@ -156,18 +238,18 @@ function wfRenderInspector(){
     const failBlk=wfFailShotBlock(node); if(failBlk) body.appendChild(failBlk);
     if(node.type!=="note") body.appendChild(wfNoteField(node));
     if(node.type!=="note" && node.type!=="start") body.appendChild(wfLogField(node));
-    body.appendChild(wfInspJsonBlock("Node", ()=>wfSerializeNode(node)));
+    body.appendChild(wfInspJsonBlock("Node", ()=>wfSerializeNode(node), o=>wfApplyNodeJson(node,o)));
     return;
   }
 
   if(fn){
     body.appendChild(wfInspId("function","Function","ƒ "+(fn.name||"")));
     const b=wfInspBlock("Function name");
-    b.appendChild(wfActField("Name","text",fn.name,v=>{ fn.name=v; wfRenderFunctions(); wfRenderPalette(); $("wf-cur-act").textContent="ƒ "+v; }));
+    b.appendChild(wfActField("Name","text",fn.name,v=>{ fn.name=v; wfRenderFunctions(); wfRenderPalette(); const c=$("wf-cur-act"); if(c){ c.textContent="ƒ "+v; c.dataset.empty="0"; c.classList.add("is-fn"); c.title="Function · "+v; } }));
     const tip=document.createElement("div"); tip.className="wf-insp-tip"; tip.textContent="Arrange nodes for this function. It can be used as a node in any activity (drag from Functions).";
     b.appendChild(tip);
     body.appendChild(b);
-    body.appendChild(wfInspJsonBlock("Function", ()=>wfSerializeFunction(fn)));
+    body.appendChild(wfInspJsonBlock("Function", ()=>wfSerializeFunction(fn), o=>wfApplyFunctionJson(fn,o)));
     return;
   }
 
@@ -176,14 +258,14 @@ function wfRenderInspector(){
     body.appendChild(wfInspId(act.type==="background"?"layers":"play", typeLabel, act.name||""));
 
     const b=wfInspBlock("Configuration");
-    b.appendChild(wfActField("Name","text",act.name,v=>{ act.name=v; wfRenderActivities(); $("wf-cur-act").textContent=v; }));
+    b.appendChild(wfActField("Name","text",act.name,v=>{ act.name=v; wfRenderActivities(); const c=$("wf-cur-act"); if(c){ c.textContent=v; c.dataset.empty="0"; c.classList.remove("is-fn"); c.title="Activity · "+v; } }));
     if(act.type==="background") b.appendChild(wfActField("Interval (s)","num",act.pollInterval,v=>act.pollInterval=parseFloat(v)||1));
     else b.appendChild(wfActField("Retry count","num",act.maxRetries,v=>act.maxRetries=parseInt(v)||1));
     body.appendChild(b);
 
     body.appendChild(wfVarsSection(act));
 
-    body.appendChild(wfInspJsonBlock(act.type==="background"?"Background":"Activity", ()=>wfSerializeActivity(act)));
+    body.appendChild(wfInspJsonBlock(act.type==="background"?"Background":"Activity", ()=>wfSerializeActivity(act), o=>wfApplyActivityJson(act,o)));
 
     const tipBlock=wfInspBlock();
     tipBlock.innerHTML=
@@ -267,9 +349,9 @@ function wfShowVarMenu(anchor,onPick){
     });
   }
   render("");
-  const addRow=document.createElement("button"); addRow.type="button"; addRow.className="wf-varmenu-add";
-  addRow.innerHTML=`${wfIco("pin")}<span>New global variable…</span>`;
-  addRow.onclick=()=>{
+  const addGlobal=document.createElement("button"); addGlobal.type="button"; addGlobal.className="wf-varmenu-add";
+  addGlobal.innerHTML=`${wfIco("pin")}<span>New global variable…</span>`;
+  addGlobal.onclick=()=>{
     uiPrompt({title:"New global variable", label:"Variable name", placeholder:"e.g. round"}).then(v=>{
       const nm=(v||"").trim();
       if(!nm) return;
@@ -279,7 +361,23 @@ function wfShowVarMenu(anchor,onPick){
       wfRenderVarsPanel(); onPick(nm); wfCloseVarMenu();
     });
   };
-  menu.appendChild(addRow);
+  menu.appendChild(addGlobal);
+  const act=typeof wfCurAct==="function"?wfCurAct():null;
+  if(act){
+    const addLocal=document.createElement("button"); addLocal.type="button"; addLocal.className="wf-varmenu-add";
+    addLocal.innerHTML=`${wfIco("pin")}<span>New local variable…</span>`;
+    addLocal.onclick=()=>{
+      uiPrompt({title:"New local variable", label:`Name (activity «${act.name||"activity"}»)`, placeholder:"e.g. step"}).then(v=>{
+        const nm=(v||"").trim();
+        if(!nm) return;
+        wfPushUndoDebounced();
+        if(!Array.isArray(act.vars)) act.vars=[];
+        if(!act.vars.some(x=>x.name===nm)) act.vars.push({name:nm, label:nm, type:"text", value:"", children:[]});
+        wfRenderVarsPanel(); onPick(nm); wfCloseVarMenu();
+      });
+    };
+    menu.appendChild(addLocal);
+  }
   document.body.appendChild(menu);
   const r=anchor.getBoundingClientRect();
   const mw=Math.max(220, r.width);

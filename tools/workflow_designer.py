@@ -149,6 +149,10 @@ class WorkflowDesignerAPI:
         self._device_lock = threading.Lock()
         self._selected_serial: Optional[str] = None
         self._connected_serial: Optional[str] = None
+        # When no device is listed, periodically deep-scan emulator ports so a
+        # freshly-booted instance is picked up without a manual "Scan ports".
+        self._last_deep_scan = 0.0
+        self._deep_scan_interval = 30.0
 
         # Capture source for the Preview tab: "adb" (self.controller) or "win32"
         # (a native window via Win32Controller). Kept in sync from the designer UI
@@ -246,17 +250,23 @@ class WorkflowDesignerAPI:
     # while the user is actually looking at the mirror.
 
     def _push_frame(self, bgr: np.ndarray) -> None:
-        """Send a JPEG screenshot frame to JS as a data URL."""
+        """Send a JPEG screenshot frame to JS as a data URL.
+
+        Always report the frame's own width/height so the Preview box uses the
+        real capture size (ADB screencap native resolution), not a stale value.
+        """
         if self._window is None or self._closing:
             return
         try:
             ok, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, 92])
             if not ok:
                 return
+            h, w = bgr.shape[:2]
+            self._screen_w = int(w)
+            self._screen_h = int(h)
             b64 = base64.b64encode(buf.tobytes()).decode("ascii")
             self._window.evaluate_js(
-                f'window.__recvFrame("data:image/jpeg;base64,{b64}",'
-                f'{self._screen_w},{self._screen_h})')
+                f'window.__recvFrame("data:image/jpeg;base64,{b64}",{w},{h})')
         except Exception:
             pass
 
@@ -1095,12 +1105,24 @@ class WorkflowDesignerAPI:
             return
         threading.Thread(target=warm_scrcpy_source, args=(serial,), daemon=True).start()
 
-    def _device_worker(self) -> None:
+    def _device_worker(self, deep: bool = False) -> None:
+        """Refresh the device list. ``deep`` also probes known emulator ports
+        (slower) — used on a 30s cadence when nothing is connected so a new
+        emulator instance is found without a manual Scan ports click."""
         with self._device_lock:
             try:
                 self.scanner.ensure_adb_server_running()
                 devices = self.controller.client.devices()
                 items = self.scanner.unique_devices(devices)
+                if not items and deep:
+                    try:
+                        found = self.scanner.scan_all(stop_on_first=False) or []
+                        if found:
+                            log_info(f"Auto-scan found {len(found)} device(s)")
+                    except Exception as exc:
+                        log_warning(f"Auto port scan failed: {exc}")
+                    devices = self.controller.client.devices()
+                    items = self.scanner.unique_devices(devices)
                 if items and not self._selected_serial:
                     first = items[0].get("serial")
                     if first:
@@ -1150,10 +1172,21 @@ class WorkflowDesignerAPI:
                 self._push("devices_update", {"devices": []})
 
     def _device_poll(self) -> None:
+        """Light refresh every 5s; when no device is connected, also deep-scan
+        emulator ports about every 30s so a newly started instance is found."""
         while not self._closing:
             time.sleep(5)
-            if not self._closing:
-                self._device_worker()
+            if self._closing:
+                break
+            deep = False
+            # Deep-scan when nothing is connected — a light adb-devices poll is
+            # enough while a device is live; offline, re-probe emulator ports.
+            if not self._connected_serial:
+                now = time.monotonic()
+                if now - self._last_deep_scan >= self._deep_scan_interval:
+                    deep = True
+                    self._last_deep_scan = now
+            self._device_worker(deep=deep)
 
     def _scan_ports_worker(self) -> None:
         log_info("Port scanning all known emulator ranges...")
@@ -1448,13 +1481,13 @@ class WorkflowDesignerAPI:
 
     @staticmethod
     def _flow_has_launch_emulator(flow: Optional[dict]) -> bool:
-        """A flow with a launch_emulator / if_emulator node may start with no
-        device — those nodes boot/find the emulator and the engine attaches to
-        its ADB afterwards."""
+        """A flow with a launch_emulator / if_emulator / wait_emulator node may
+        start with no device — those nodes boot/find the emulator and the engine
+        attaches to its ADB afterwards."""
         for coll in ("activities", "functions"):
             for item in (flow or {}).get(coll) or []:
                 for n in ((item.get("graph") or {}).get("nodes") or []):
-                    if n.get("type") in ("launch_emulator", "if_emulator"):
+                    if n.get("type") in ("launch_emulator", "if_emulator", "wait_emulator"):
                         return True
         return False
 
@@ -1664,7 +1697,7 @@ class WorkflowDesignerAPI:
             return {"ok": False, "status": "error", "port": None}
         is_win32 = self._flow_is_win32(flow)
         if (not is_win32 and self.controller.device is None
-                and node.get("type") not in ("launch_emulator", "if_emulator")):
+                and node.get("type") not in ("launch_emulator", "if_emulator", "wait_emulator")):
             log_error("No device selected to run the block")
             return {"ok": False, "status": "error", "port": None}
         if self._engine is None:

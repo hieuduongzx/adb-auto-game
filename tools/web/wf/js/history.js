@@ -12,8 +12,8 @@ let _undoStack = [];
 let _redoStack = [];
 
 // Deep-clone the entire workflow state (all activities, functions, globals,
-// speedhack) plus the current selection. This makes undo work across edit-target
-// switches — e.g. undo after deleting an activity restores it fully.
+// package, speedhack) plus the current selection. This makes undo work across
+// edit-target switches — e.g. undo after deleting an activity restores it fully.
 function wfTakeSnapshot() {
   return {
     editKind: WF.edit.kind,
@@ -35,7 +35,8 @@ function wfTakeSnapshot() {
       graph: typeof wfCleanGraph === "function" ? wfCleanGraph(f.graph) : { nodes: [], edges: [], groups: [] },
     })),
     globals: JSON.parse(JSON.stringify(WF.globals || [])),
-    speedhack: JSON.parse(JSON.stringify(WF.speedhack || { enabled: false, speed: 2.0, package: "" })),
+    package: WF.package || "",
+    speedhack: JSON.parse(JSON.stringify(WF.speedhack || { enabled: false, speed: 2.0 })),
     sel: (WF.sel || []).slice(),
     selectedNode: WF.selectedNode,
   };
@@ -75,7 +76,13 @@ function wfRestoreSnapshot(snap) {
 
   // Restore top-level fields.
   if (snap.globals !== undefined) WF.globals = snap.globals;
-  if (snap.speedhack !== undefined) WF.speedhack = snap.speedhack;
+  if (snap.package !== undefined) WF.package = snap.package || "";
+  if (snap.speedhack !== undefined) {
+    const sh = snap.speedhack || {};
+    // Drop legacy nested package if an old snapshot still carries it.
+    WF.speedhack = { enabled: !!sh.enabled, speed: (parseFloat(sh.speed) || 2.0) };
+    if (snap.package === undefined && sh.package) WF.package = String(sh.package).trim();
+  }
 
   // Restore activities.
   WF.activities = (snap.activities || []).map(a => ({

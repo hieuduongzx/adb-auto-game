@@ -3,7 +3,7 @@
   "index": 0,
   "instance": "",
   "path": "D:\\Programs\\MuMuPlayerGlobal\\nx_main",
-  "port": 0,
-  "serial": null,
-  "launched_at": "2026-07-10 08:35:06"
+  "port": 16384,
+  "serial": "127.0.0.1:16384",
+  "launched_at": "2026-07-10 23:36:33"
 }

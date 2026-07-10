@@ -149,15 +149,17 @@ function wfToggleVarsPanel(ev){
 }
 
 function wfToggleLog(ev){
-  if(ev && ev.target.closest(".btn-log-clear, .log-filters")) return;   // let Clear/Copy/filter act without toggling
+  if(ev && ev.target.closest(".btn-log-clear, .log-filters, #log-resizer")) return;   // let Clear/Copy/filter/resize act without toggling
   const c=$("log-card"); if(!c) return;
   const isCollapsed = c.classList.contains("collapsed");
   if (isCollapsed) {
-    c.style.display = "flex"; // Ensure it's not display:none if handled by CSS previously
-    // Force reflow
-    void c.offsetWidth;
     c.classList.remove("collapsed");
+    // Restore the last open height if the user had resized the drawer.
+    const openH=parseInt(c.dataset.openH||"",10);
+    if(openH>=80) c.style.height=openH+"px";
   } else {
+    // Remember current height so reopening restores the user's resize.
+    if(c.offsetHeight>=80) c.dataset.openH=String(c.offsetHeight);
     c.classList.add("collapsed");
   }
   wfSaveSettings();
@@ -202,8 +204,6 @@ async function onCaptureBackendChange(backend){
   const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
   setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (nhanh/headless)"));
 }
-async function openDevHelper(){ try{ await api().open_dev_helper(JSON.stringify(wfSerialize())); setStatus("Opening DevScope…"); }catch{} }
-
 // New blank workflow.
 async function wfNew(){
   if(WF.activities.length || WF.functions.length){
@@ -214,12 +214,14 @@ async function wfNew(){
   if(name===null) return; // cancelled
   WF.name = name.trim() || "My Workflow";
   WF.version=2; WF.templatesDir="templates";
-  WF.speedhack={enabled:false, speed:2.0, package:""};
+  WF.package="";
+  WF.speedhack={enabled:false, speed:2.0};
   WF.controller="adb"; WF.win32={window:"", matchBy:"title", inputMode:"background"};
   WF.ocrBackend=""; if(typeof wfSyncOcrUI==="function") wfSyncOcrUI();
   WF.activities=[]; WF.functions=[]; WF.edit={kind:"activity",id:null};
   WF.sel=[]; WF.selectedNode=null; wfPan={x:0,y:0}; wfZoom=1; wfRunNode=null;
   const nm=$("wf-name"); if(nm) nm.value=WF.name;
+  if(typeof wfSyncPackageUI==="function") wfSyncPackageUI();
   wfSyncSpeedUI();
   if(typeof wfSyncControllerUI==="function") wfSyncControllerUI();
   try{ await api().workflow_new(WF.name); }catch{}

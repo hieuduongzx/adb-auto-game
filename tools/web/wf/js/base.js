@@ -341,7 +341,11 @@ function appendLog(entry){
 }
 function rebuildDeviceSelect(devices, connected){
   const sel=$("device-select"), prev=sel.value; sel.innerHTML="";
-  if(!devices||!devices.length){ const o=document.createElement("option"); o.value=""; o.textContent="No devices"; sel.appendChild(o); sel.disabled=true; return; }
+  if(!devices||!devices.length){
+    const o=document.createElement("option"); o.value="";
+    o.textContent="No devices — auto-scanning…";
+    sel.appendChild(o); sel.disabled=true; return;
+  }
   sel.disabled=false;
   devices.forEach(d=>{ const o=document.createElement("option"); o.value=d.serial||""; o.textContent=(d.name||d.serial)+(d.serial?` (${d.serial})`:""); sel.appendChild(o); });
   sel.value=connected||S.connectedSerial||prev||(devices[0]&&devices[0].serial)||"";

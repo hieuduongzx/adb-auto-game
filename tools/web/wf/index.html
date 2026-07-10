@@ -55,7 +55,7 @@
     </div>
   </div>
 
-  <!-- ── Right: device + capture source + DevScope ─────────────────────────── -->
+  <!-- ── Right: device + capture source ─────────────────────────────────────── -->
   <div class="tb-zone tb-right">
     <div class="tb-tray tb-tray-device">
       <span class="tb-tray-label">Device</span>
@@ -79,9 +79,6 @@
         <option value="adb">ADB</option>
       </select>
     </div>
-    <span class="tb-divider"></span>
-    <button class="btn" onclick="openDevHelper()" title="DevScope — capture/measure regions, save images directly to the current workflow templates">
-      <svg width="15" height="15" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.3L3 18l3 3 6.4-6.3a4 4 0 0 0 5.3-5.4l-2.6 2.6-2.5-.4-.4-2.5z"/></svg>DevScope</button>
   </div>
 </div>
 
@@ -117,41 +114,14 @@
   <!-- Center: graph canvas -->
   <div id="wf-main" class="card">
     <div id="wf-bar">
-      <input id="wf-name" type="text" placeholder="Workflow name" value="My Workflow" aria-label="Workflow name">
-      <!-- Project controller: ADB device/emulator vs a native Win32 window. -->
-      <div id="wf-controller-group" class="wf-speed-group" title="Project type: ADB (device/emulator) or Win32 (PC program window)">
-        <select id="wf-controller" onchange="wfControllerChanged()" title="Controller">
-          <option value="adb">ADB</option>
-          <option value="win32">Win32</option>
-        </select>
-        <span id="wf-win32-group" style="display:none;align-items:center;gap:4px">
-          <input id="wf-win32-window" type="text" placeholder="Window title/class or PID (e.g. Genshin*)" title="Target window" style="width:170px" onchange="wfWin32FromUI()">
-          <button class="btn sm ico wf-var-pick" id="wf-win32-pick" title="Pick an open window" onclick="wfPickWindow(event)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg></button>
-          <select id="wf-win32-matchby" title="Match by" onchange="wfWin32FromUI()">
-            <option value="title">Title</option>
-            <option value="class">Class</option>
-            <option value="pid">PID</option>
-          </select>
-          <select id="wf-win32-mode" title="Input mode: Background (PostMessage) · Background + cursor (Unity/NIKKE — flicks the real cursor) · Background + Frida API (hooks GetCursorPos, doesn't take the mouse) · Background + Frida Engine (hooks Unity/Mono, doesn't take the mouse) · Foreground (SendInput, takes the mouse)" onchange="wfWin32FromUI()">
-            <option value="background">Background</option>
-            <option value="background_cursor">Background + cursor (Unity)</option>
-            <option value="background_frida_api">Background + Frida (API hook)</option>
-            <option value="background_frida_engine">Background + Frida Unity (engine hook)</option>
-            <option value="foreground">Foreground</option>
-          </select>
-        </span>
+      <!-- Project identity: gear + name as one tray so the title doesn't float. -->
+      <div class="wf-title-tray" title="Project — click the gear for package / ADB / OCR settings">
+        <button type="button" class="btn sm ico" id="wf-proj-settings" onclick="wfOpenProjectSettings()" title="Project settings — package, ADB/Win32, OCR…" aria-label="Project settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
+        <span class="tb-tray-sep"></span>
+        <input id="wf-name" type="text" placeholder="Workflow name" value="My Workflow" aria-label="Workflow name">
       </div>
-      <!-- The flow's OCR engine — same as the Engine dropdown on the Preview tab
-           but saved into the JSON (key "ocr") so test runs + the Runner use the
-           chosen engine. -->
-      <div class="wf-speed-group" id="wf-ocr-group" title="OCR engine for text-reading blocks (Wait text / If text / Read → variable / Parse). Auto = the engine picks the first available backend.">
-        <span class="wf-speed-title">OCR</span>
-        <select id="wf-ocr-select" onchange="wfOcrChanged()" title="OCR engine">
-          <option value="">Auto</option>
-        </select>
-      </div>
-      <span class="wf-cur-act" id="wf-cur-act">—</span>
       <!-- Canvas edit toggles, grouped in a segmented tray. -->
       <span class="wf-tool-tray">
         <button class="btn sm ico" id="wf-snap-btn" onclick="wfToggleSnap()" title="Snap to grid: Off">
@@ -166,13 +136,12 @@
           <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="6" y="13" width="7" height="4" rx="1"/></svg></button>
       </span>
       <span class="tb-divider"></span>
-      <div id="wf-speed-group" class="wf-speed-group" title="Speed hack — separate from Test run">
+      <div id="wf-speed-group" class="wf-speed-group" title="Speed hack — separate from Test run (uses workflow package)">
         <span class="wf-speed-title">Speed hack</span>
         <button class="btn sm ico" id="wf-speed-btn" onclick="wfToggleSpeed()" title="Speed hack: Off (accelerate the game with Frida — root required)">
           <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></button>
         <input id="wf-speed-val" type="number" min="0.1" step="0.1" value="2" title="Speed (x)" style="width:48px;text-align:right" onchange="wfSpeedChanged()">
         <span class="hz-unit">x</span>
-        <input id="wf-speed-pkg" type="text" placeholder="game package" title="Game package to inject speedhack" style="width:150px" onchange="wfSpeedFromUI()">
         <button class="btn sm ico ok" id="wf-speed-run-btn" onclick="wfSpeedRun()" title="Enable speed hack" style="display:none"></button>
       </div>
       <span class="spacer"></span>
@@ -194,6 +163,8 @@
       </div>
     </div>
     <div id="wf-canvas">
+      <!-- Soft watermark: name of the open activity/function (top-left of the graph). -->
+      <div class="wf-cur-act" id="wf-cur-act" data-empty="1" title="Currently open activity / function" aria-live="polite"></div>
       <div id="wf-world">
         <svg id="wf-wires"></svg>
       </div>
@@ -268,7 +239,7 @@
           <span class="wf-vars-count" id="wf-vars-count"></span>
           <span class="wf-vars-live" id="wf-vars-live" title="● Live — engine is running">●</span>
           <span class="wf-vars-actions">
-            <button id="wf-vars-add" class="wf-vars-add" title="Add global variable">
+            <button id="wf-vars-add" class="wf-vars-add" title="Add variable (global or local)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
             <button id="wf-vars-mgr" class="wf-vars-add" title="Manage global variables"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -577,6 +548,7 @@
 
 
 <div id="log-card" class="card">
+  <div id="log-resizer" title="Drag to resize log"></div>
   <div class="log-hdr" onclick="wfToggleLog(event)" title="Click to collapse/open log">
     <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
     <span class="log-label">Log</span>
