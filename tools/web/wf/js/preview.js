@@ -25,6 +25,7 @@ const WF_PV_COLOR = (function(){
     info:v("--run-info","#06b6d4"),
     warn:v("--run-warn","#eab308"),
     ok:v("--run-ok","#16a34a") || "#16a34a",
+    shade:v("--shade","#121316"),
   };
 })();
 
@@ -76,9 +77,9 @@ function wfSwitchView(view){
     if(scopePanel) scopePanel.style.display="none";
     if(inspTitle) inspTitle.textContent="Properties";
     wfZoomApplyMode("canvas");  // hand the zoom cluster back to the graph
-    // Nếu có lượt vẽ dây rơi vào lúc canvas còn ẩn (render trong tab Preview:
-    // focus-follow, undo, event engine…), vẽ lại ngay khi world hiện trở lại —
-    // không thì dây biến mất đến lần render kế tiếp.
+    // If a wire draw landed while the canvas was hidden (renders during the
+    // Preview tab: focus-follow, undo, engine events…), redraw the moment the
+    // world is visible again — otherwise the wires vanish until the next render.
     if(typeof wfWiresStale!=="undefined" && wfWiresStale) wfDrawWires();
   }
 }
@@ -237,7 +238,7 @@ function wfPvDraw(){
   const ctx=wfPvCtx, cw=cvs.width, ch=cvs.height;
   wfPvRecompute();
   ctx.clearRect(0,0,cw,ch);
-  ctx.fillStyle="#121316"; ctx.fillRect(0,0,cw,ch);
+  ctx.fillStyle=WF_PV_COLOR.shade; ctx.fillRect(0,0,cw,ch);
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
   const [x0,y0]=wfPvImgToCanvas(0,0), [x1,y1]=wfPvImgToCanvas(wfPvImgW,wfPvImgH);
   ctx.drawImage(wfPvImg, x0, y0, x1-x0, y1-y0);
@@ -334,7 +335,7 @@ function wfPvDraw(){
     ctx.closePath(); ctx.fill();
     ctx.beginPath(); ctx.arc(sx,sy,3,0,Math.PI*2); ctx.fill();
     if(ef){ const a=wfPvImgFromCanvas(wfPvRDrag.s), b=wfPvImgFromCanvas(wfPvRDrag.c);
-      if(a&&b) chip(`vuốt (${a[0]},${a[1]}) → (${b[0]},${b[1]})`, tx+10, ty+10); }
+      if(a&&b) chip(`swipe (${a[0]},${a[1]}) → (${b[0]},${b[1]})`, tx+10, ty+10); }
   }
   // Tap ripples — a ring expanding from the tapped point (~380ms), so a
   // right-click tap gives visible feedback exactly where it landed.
@@ -477,7 +478,7 @@ function wfPvAttachCanvas(){
         const dur=Math.max(120, Math.min(800, Math.round(len*0.35)));
         await api().swipe(a[0],a[1],b[0],b[1],dur);
         wfPvRipples.push({x:b[0],y:b[1],t0:performance.now()}); wfPvAnimLoop();
-        setStatus(`Vuốt (${a[0]},${a[1]}) → (${b[0]},${b[1]}) · ${dur}ms`);
+        setStatus(`Swipe (${a[0]},${a[1]}) → (${b[0]},${b[1]}) · ${dur}ms`);
       }
       wfPvDraw(); return;
     }

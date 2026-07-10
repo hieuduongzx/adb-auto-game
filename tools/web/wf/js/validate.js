@@ -85,14 +85,14 @@ function wfValidatePanelShow(issues){
   const warns=issues.length-errs;
   const p=document.createElement("div"); p.className="wf-find wf-vald"; p.id="wf-vald";
   const sum = issues.length
-    ? `<b class="e">${errs} lỗi</b> · <b class="w">${warns} cảnh báo</b>`
-    : `<b class="ok">✓ Không có vấn đề nào</b>`;
+    ? `<b class="e">${errs} error${errs===1?"":"s"}</b> · <b class="w">${warns} warning${warns===1?"":"s"}</b>`
+    : `<b class="ok">✓ No issues found</b>`;
   p.innerHTML=`<div class="wf-vald-bar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
       <span class="wf-vald-sum">${sum}</span>
       <span class="spacer"></span>
-      <button class="btn sm" id="wf-vald-re">Kiểm tra lại</button>
-      <button class="wf-pal-search-clr" id="wf-vald-x" title="Đóng (Esc)" aria-label="Đóng">
+      <button class="btn sm" id="wf-vald-re">Re-check</button>
+      <button class="wf-pal-search-clr" id="wf-vald-x" title="Close (Esc)" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -100,11 +100,11 @@ function wfValidatePanelShow(issues){
   canvas.appendChild(p);
   const list=p.querySelector("#wf-vald-list");
   if(!issues.length){
-    list.innerHTML=`<div class="wf-find-empty">Workflow sẵn sàng chạy — không thấy dây đứt, thiếu template hay nhánh hỏng.</div>`;
+    list.innerHTML=`<div class="wf-find-empty">The workflow is ready to run — no broken wires, missing templates or bad branches found.</div>`;
   }
   issues.forEach(i=>{
     const row=document.createElement("button"); row.type="button"; row.className="wf-find-item";
-    row.innerHTML=`<span class="wf-vald-sev ${i.sev}">${i.sev==="err"?"LỖI":"CHÚ Ý"}</span>`+
+    row.innerHTML=`<span class="wf-vald-sev ${i.sev}">${i.sev==="err"?"ERROR":"WARN"}</span>`+
       `<span class="t">${escHtml(i.ctx.name)}</span><span class="s">${escHtml(i.msg)}</span>`;
     row.onclick=()=>wfFocusIssue(i);
     list.appendChild(row);
@@ -116,13 +116,13 @@ function wfValidateShow(){
   const issues=wfValidationIssues();
   const errs=issues.filter(i=>i.sev==="err").length;
   const warns=issues.length-errs;
-  setStatus(issues.length?`Kiểm tra: ${errs} lỗi, ${warns} cảnh báo`:"Kiểm tra workflow: OK");
+  setStatus(issues.length?`Check: ${errs} errors, ${warns} warnings`:"Workflow check: OK");
   wfValidatePanelShow(issues);
   return errs===0;
 }
 async function wfRunFromSelected(step){
   if(wfRunning){ setStatus("Workflow is already running"); return; }
-  if(!WF.activities.length){ uiToast("Chưa có activity nào.","warning"); return; }
+  if(!WF.activities.length){ uiToast("No activities yet.","warning"); return; }
   const g=wfGraph(), node=WF.selectedNode&&wfNode(WF.selectedNode);
   const startId=node ? node.id : null;
   if(!startId){ setStatus("Select a block first"); return; }
@@ -132,7 +132,21 @@ async function wfRunFromSelected(step){
 }
 let wfDebugMode=false;
 async function wfStartStepRun(){ wfDebugMode=true; await wfRunFromSelected(true); }
-function wfDebugAutoStep(){ if(wfDebugMode) setStatus("Paused — click Next step"); }
+// Visual pause marker: the block the engine is holding on gets a steady blue
+// ring + ⏸ chip (CSS .wf-node.paused), and the Next-step toolbar button pulses
+// so the one control that resumes execution is obvious. Cleared on each step
+// and whenever the run ends (wfSetRunning(false) → wfClearDebugPause).
+function wfClearDebugPause(){
+  document.querySelectorAll(".wf-node.paused").forEach(el=>el.classList.remove("paused"));
+  const nb=$("wf-step-next-btn"); if(nb) nb.classList.remove("paused");
+}
+function wfDebugAutoStep(){
+  if(!wfDebugMode) return;
+  setStatus("Paused — click Next step");
+  const el=wfNodeElById(wfRunNode); if(el) el.classList.add("paused");
+  const nb=$("wf-step-next-btn"); if(nb) nb.classList.add("paused");
+}
 async function wfDebugStep(){
+  wfClearDebugPause();
   try{ await api().workflow_debug_step(); setStatus("Step"); }catch{ setStatus("No paused debug run"); }
 }

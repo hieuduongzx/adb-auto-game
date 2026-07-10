@@ -159,7 +159,7 @@ async function pvRefreshAssets(){
 let pvSelAsset=()=>null;
 async function pvDeleteAsset(){
   const path=pvSelAsset(); if(!path) return;
-  const ok=await uiConfirm({title:"Xóa ảnh?", message:`Xóa file "${path.split("/").pop()}" khỏi ổ đĩa? Không thể hoàn tác.`, ok:"Xóa", danger:true});
+  const ok=await uiConfirm({title:"Delete image?", message:`Delete "${path.split("/").pop()}" from disk? This can't be undone.`, ok:"Delete", danger:true});
   if(!ok) return;
   try{ await api().delete_asset(path); }catch{}
   pvRefreshAssets();

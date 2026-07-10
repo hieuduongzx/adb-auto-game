@@ -87,7 +87,7 @@ const WF_NODES = {
   start:      {label:"Start",   ico:"play", kind:"start", cat:null,    outs:["out"], fields:[]},
   end:        {label:"End",  ico:"square", kind:"end",   cat:"flow",  outs:[],      fields:[]},
   tap:        {label:"Tap",      ico:"pointer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`)+(p.taps=="2"?" ×2":"")},
-  // Ẩn khỏi palette — trùng với tap(taps=2); file cũ vẫn mở/chạy bình thường.
+  // Hidden from the palette — superseded by tap(taps=2); old files still open/run fine.
   double_tap: {label:"Double tap",  ico:"hand",kind:"action",cat:"basic", hidden:true, outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`)+" ×2"},
   tap_random: {label:"Random tap",ico:"dice",kind:"action",cat:"basic", outs:["out"], fields:[{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:100},{k:"h",t:"num",d:100}], sum:p=>`region (${p.x},${p.y}) ${p.w}×${p.h}`},
   long_press: {label:"Long press",       ico:"timer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}},{k:"duration",lbl:"Duration (ms)",t:"num",d:800}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x},${p.y})`)+` ${p.duration}ms`},
@@ -100,20 +100,20 @@ const WF_NODES = {
   back:       {label:"Back",      ico:"back",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"Back key"},
   home:       {label:"Home",      ico:"home",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"Home key"},
   tap_image:  {label:"Tap image",  ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")},
-  wait_image: {label:"Wait image",   ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Đảo — chờ đến khi KHÔNG thấy",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>(p.negate?"đến khi mất ":"")+wfBase(p.template)},
+  wait_image: {label:"Wait image",   ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate — wait until it DISAPPEARS",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>(p.negate?"until gone ":"")+wfBase(p.template)},
   if_image:   {label:"If image",   ico:"help",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.negate?"not ":""}found ${wfBase(p.template)}`},
   // "…_any" = OR over several images: true when ANY listed template matches.
   tap_image_any: {label:"Tap any image", ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBaseAny(p.templates)+(p.taps=="2"?" ×2":"")+(p.mode==="parallel"?" //":"")},
   wait_image_any:{label:"Wait any image",  ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBaseAny(p.templates)+(p.mode==="parallel"?" //":"")},
   if_image_any:  {label:"If any image",  ico:"layers",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.negate?"not ":""}found ${wfBaseAny(p.templates)}${p.mode==="parallel"?" //":""}`},
-  wait_text:  {label:"Wait text",   ico:"scan_text",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Đảo — chờ đến khi KHÔNG thấy",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (ký tự cho phép)",t:"text",d:""}], sum:p=>(p.negate?"đến khi mất ":"")+`"${p.text||""}"`},
-  if_text:    {label:"If text",   ico:"type",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (ký tự cho phép)",t:"text",d:""}], sum:p=>`${p.negate?"not ":""}contains "${p.text||""}"`},
-  read_var:   {label:"Read → variable",ico:"search",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"whitelist",lbl:"OCR whitelist (ký tự cho phép)",t:"text",d:""}], sum:p=>`→ ${p.name||"?"}`},
-  parse_var:  {label:"Parse → variable",ico:"scissors",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"OCR region"},{v:"var",t:"From variable"}],d:"region"},{k:"fromVar",lbl:"Source variable",t:"text",d:"",var:true,showWhen:{source:"var"}},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num",showWhen:{source:"region"}},{k:"y",t:"num",showWhen:{source:"region"}},{k:"w",t:"num",d:200,showWhen:{source:"region"}},{k:"h",t:"num",d:80,showWhen:{source:"region"}},{k:"whitelist",lbl:"OCR whitelist (ký tự cho phép)",t:"text",d:"",showWhen:{source:"region"}}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
+  wait_text:  {label:"Wait text",   ico:"scan_text",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate — wait until it DISAPPEARS",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>(p.negate?"until gone ":"")+`"${p.text||""}"`},
+  if_text:    {label:"If text",   ico:"type",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`${p.negate?"not ":""}contains "${p.text||""}"`},
+  read_var:   {label:"Read → variable",ico:"search",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`→ ${p.name||"?"}`},
+  parse_var:  {label:"Parse → variable",ico:"scissors",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"OCR region"},{v:"var",t:"From variable"}],d:"region"},{k:"fromVar",lbl:"Source variable",t:"text",d:"",var:true,showWhen:{source:"var"}},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num",showWhen:{source:"region"}},{k:"y",t:"num",showWhen:{source:"region"}},{k:"w",t:"num",d:200,showWhen:{source:"region"}},{k:"h",t:"num",d:80,showWhen:{source:"region"}},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:"",showWhen:{source:"region"}}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
   // ── Color (pixel) nodes — compare screen pixels against a #RRGGBB colour.
   // Tolerance = max per-channel difference (same rule as DevScope's Inspect color).
   tap_color:  {label:"Tap color", ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"timeout",t:"num",d:10},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.color||"?"} ±${p.tolerance??10}`+(p.taps=="2"?" ×2":"")},
-  wait_color: {label:"Wait color",ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"x",t:"num"},{k:"y",t:"num"},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Đảo — chờ đến khi KHÔNG còn màu",t:"bool",d:false}], sum:p=>(p.negate?"đến khi mất ":"")+`(${p.x||0},${p.y||0}) = ${p.color||"?"}`},
+  wait_color: {label:"Wait color",ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"x",t:"num"},{k:"y",t:"num"},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate — wait until the color is GONE",t:"bool",d:false}], sum:p=>(p.negate?"until gone ":"")+`(${p.x||0},${p.y||0}) = ${p.color||"?"}`},
   if_color:   {label:"If color",  ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"x",t:"num"},{k:"y",t:"num"},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}(${p.x||0},${p.y||0}) ≈ ${p.color||"?"}`},
   read_color: {label:"Read color → variable",ico:"pipette",kind:"action",cat:"color", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"color",var:true},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>`${p.name||"?"} = px(${p.x||0},${p.y||0})`},
   loop:       {label:"Repeat",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"infinite",t:"bool",d:true},{k:"count",lbl:"Repeat count",t:"num",varRef:true,d:3,showWhen:{infinite:false}}], sum:p=>p.infinite?"∞ infinite":`${p.count}×`},
@@ -132,13 +132,13 @@ const WF_NODES = {
   "switch":   {label:"Switch",  ico:"git_branch",kind:"switch",cat:"logic",outs:["default"], fields:[], sum:p=>`${(p.cases||[]).length} branches`},
   // ── App lifecycle (ADB package · Win32 window title where noted) ───────────
   launch_app: {label:"Launch app",    ico:"rocket",kind:"action",cat:"app",  outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"wait",lbl:"Launch wait (s)",t:"num",d:0}], sum:p=>(p.package||"(package)")+(p.wait?` ·wait ${p.wait}s`:"")},
-  // Force-stop app (tuỳ chọn xóa dữ liệu) — cặp với Launch app cho flow restart game. ADB-only at runtime.
+  // Force-stop an app (optionally clear its data) — pairs with Launch app for restart-game flows. ADB-only at runtime.
   app_stop: {label:"Stop app", ico:"octagon", kind:"action", cat:"app", outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"clearData",lbl:"Clear app data (pm clear)",t:"bool",d:false}], sum:p=>`⛔ ${p.package||"(package)"}`+(p.clearData?" +clear":"")},
-  // Thoát app đang mở — không cần package (ADB: force-stop foreground · Win32: đóng cửa sổ).
-  app_exit: {label:"Exit current app", ico:"x", kind:"action", cat:"app", outs:["out"], fields:[], sum:()=>"thoát app đang mở"},
-  // Gỡ cài đặt app (pm uninstall; -k = giữ dữ liệu). ADB-only at runtime.
+  // Exit the current app — no package needed (ADB: force-stop foreground · Win32: close the window).
+  app_exit: {label:"Exit current app", ico:"x", kind:"action", cat:"app", outs:["out"], fields:[], sum:()=>"exit current app"},
+  // Uninstall an app (pm uninstall; -k = keep data). ADB-only at runtime.
   app_uninstall: {label:"Uninstall app", ico:"trash", kind:"action", cat:"app", outs:["out"], fields:[{k:"package",t:"text",varRef:true},{k:"keepData",lbl:"Keep data & cache (-k)",t:"bool",d:false}], sum:p=>`🗑 ${p.package||"(package)"}`+(p.keepData?" ·keep":"")},
-  // App/tiêu đề cửa sổ hiện tại có chứa chuỗi? (ADB: package · Win32: window title)
+  // Does the current app package / window title contain a string? (ADB: package · Win32: window title)
   if_app: {label:"If app running", ico:"smartphone", kind:"condition", cat:"app", outs:["true","false"], fields:[{k:"package",lbl:"Package / title contains",t:"text",varRef:true},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}app ~ "${p.package||"?"}"`},
   // ── Utilities ──────────────────────────────────────────────────────────────
   screenshot: {label:"Screenshot",      ico:"camera",kind:"action",cat:"basic", outs:["out"], fields:[], sum:()=>"take screenshot"},
@@ -149,11 +149,12 @@ const WF_NODES = {
   // End node, "false" when it dead-ended (e.g. a node inside timed out).
   call:          {label:"Function",       ico:"function", kind:"call",      cat:null,     outs:["true","false"], fields:[]},
   scroll_find:   {label:"Scroll to image",   ico:"scroll",   kind:"condition", cat:"image",  outs:["true","false"],fields:[{k:"template",t:"tpl"},{k:"direction",lbl:"Swipe direction",t:"select",opts:[{v:"up",t:"↑ Up"},{v:"down",t:"↓ Down"},{v:"left",t:"← Left"},{v:"right",t:"→ Right"}],d:"up"},{k:"max_swipes",lbl:"Max swipes",t:"num",d:10},{k:"swipe_distance",lbl:"Distance (px)",t:"num",d:400},{k:"threshold",t:"num",d:.85,step:.05},{k:"swipe_duration",lbl:"Swipe duration (ms)",t:"num",d:300},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${({"up":"↑","down":"↓","left":"←","right":"→"})[p.direction]||"↑"} ≤${p.max_swipes||10}× → ${wfBase(p.template)}`},
-  // Lặp thân đến khi template xuất hiện: body quay về cổng "loop"; thấy ảnh →
-  // "found"; hết maxLoops (0 = ∞) → "fail". Thay cho cụm loop ∞ + if_image + break.
-  loop_until_image: {label:"Loop until image", ico:"loop", kind:"loop_until", cat:"image", ins:["in","loop"], outs:["body","found","fail"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxLoops",lbl:"Max loops (0 = ∞)",t:"num",varRef:true,d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`↺ đến khi thấy ${wfBase(p.template)}`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
-  // Chạm MỌI vị trí khớp template trên frame hiện tại (quét thu thập vật phẩm).
-  tap_all_images: {label:"Tap all matches", ico:"layers", kind:"condition", cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxTaps",lbl:"Max taps (0 = all)",t:"num",varRef:true,d:0},{k:"delayBetween",lbl:"Delay between taps (s)",t:"num",d:.15,step:.05},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`chạm hết ${wfBase(p.template)}`+((parseInt(p.maxTaps)||0)>0?` ≤${p.maxTaps}`:"")+(p.taps=="2"?" ×2":"")},
+  // Loop the body until the template appears: body loops back via the "loop"
+  // port; image found → "found"; maxLoops exhausted (0 = ∞) → "fail". Replaces
+  // the loop-∞ + if_image + break cluster.
+  loop_until_image: {label:"Loop until image", ico:"loop", kind:"loop_until", cat:"image", ins:["in","loop"], outs:["body","found","fail"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxLoops",lbl:"Max loops (0 = ∞)",t:"num",varRef:true,d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`↺ until found ${wfBase(p.template)}`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
+  // Tap EVERY position matching the template on the current frame (loot-collection sweeps).
+  tap_all_images: {label:"Tap all matches", ico:"layers", kind:"condition", cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxTaps",lbl:"Max taps (0 = all)",t:"num",varRef:true,d:0},{k:"delayBetween",lbl:"Delay between taps (s)",t:"num",d:.15,step:.05},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`tap all ${wfBase(p.template)}`+((parseInt(p.maxTaps)||0)>0?` ≤${p.maxTaps}`:"")+(p.taps=="2"?" ×2":"")},
   random_branch: {label:"Random branch",ico:"dice",   kind:"random",    cat:"flow",   outs:[],              fields:[{k:"count",lbl:"Branch count",t:"num",d:2,refresh:true}], sum:p=>`🎲 ${p.count||2} even branches`},
   format_var:    {label:"Format string",ico:"type",   kind:"action",    cat:"logic",  outs:["out"],         fields:[{k:"name",lbl:"Target variable",t:"text",d:"text",var:true},{k:"template",lbl:"Template string",t:"text",insertVar:true,d:"Round {round}/{total}"}], sum:p=>`${p.name||"?"} = "${p.template||""}"`},
   // ── Time ───────────────────────────────────────────────────────────────────
@@ -176,33 +177,42 @@ const WF_NODES = {
     {k:"wait",lbl:"Wait for ADB ready (s)",t:"num",d:60},
     {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
   ], sum:p=>`▶ ${p.emulator||"ldplayer"}${(p.index?(" #"+p.index):"")}${p.at?(" ⏰"+p.at):""}`},
-  // ── Win32 (điều khiển cửa sổ chương trình PC) ────────────────────────────────
-  // Chỉ dùng khi Controller của dự án = Win32. Các node tap/swipe/ảnh/màu/OCR
-  // vẫn chạy được trên Win32 nhờ dùng chung pipeline chụp màn hình.
+  // Is an emulator instance booted & its ADB responding (sys.boot_completed)?
+  // "Last used" re-checks the instance saved by the last successful Launch
+  // emulator (data/emulator_state.json) — skip the boot when it's already up.
+  if_emulator:{label:"If emulator ready", ico:"monitor", kind:"condition", cat:"device", outs:["true","false"], fields:[
+    {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"}],d:"last"},
+    {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
+    {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
+    {k:"attach",lbl:"Attach as active device when ready",t:"bool",d:true},
+  ], sum:p=>`🖥 ${(!p.emulator||p.emulator==="last")?"last used":(p.emulator+((parseInt(p.index)||0)?(" #"+p.index):""))} ready?`},
+  // ── Win32 (PC program window control) ────────────────────────────────────────
+  // Only used when the project's Controller = Win32. The tap/swipe/image/color/
+  // OCR nodes still work on Win32 through the shared screen-capture pipeline.
   win_launch:   {label:"Launch program", ico:"rocket", kind:"action", cat:"win32", outs:["out"], fields:[
     {k:"path",lbl:"Program (.exe) path",t:"text",d:"",pickFolder:false},
     {k:"args",lbl:"Arguments (optional)",t:"text",d:""},
     {k:"window",lbl:"Wait for window title (optional)",t:"text",d:""},
     {k:"wait",lbl:"Wait for window (s)",t:"num",d:30},
   ], sum:p=>`▶ ${(p.path||"(program)").split(/[\\/]/).pop()}`},
-  win_activate: {label:"Activate window", ico:"monitor", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"đưa cửa sổ lên trước"},
-  win_close:    {label:"Close window", ico:"x", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"đóng cửa sổ mục tiêu"},
+  win_activate: {label:"Activate window", ico:"monitor", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"bring window to front"},
+  win_close:    {label:"Close window", ico:"x", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"close target window"},
   win_resize:   {label:"Resize window", ico:"maximize", kind:"action", cat:"win32", outs:["out"], fields:[{k:"width",lbl:"Width",t:"num",d:1280},{k:"height",lbl:"Height",t:"num",d:720}], sum:p=>`${p.width||1280}×${p.height||720}`},
   win_move:     {label:"Move window", ico:"move", kind:"action", cat:"win32", outs:["out"], fields:[{k:"x",lbl:"Screen X",t:"num",d:0},{k:"y",lbl:"Screen Y",t:"num",d:0}], sum:p=>`(${p.x||0}, ${p.y||0})`},
-  win_minimize: {label:"Minimize window", ico:"minimize", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"thu nhỏ"},
-  win_maximize: {label:"Maximize window", ico:"maximize", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"phóng to"},
-  win_restore:  {label:"Restore window", ico:"monitor", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"khôi phục"},
+  win_minimize: {label:"Minimize window", ico:"minimize", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"minimize"},
+  win_maximize: {label:"Maximize window", ico:"maximize", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"maximize"},
+  win_restore:  {label:"Restore window", ico:"monitor", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"restore"},
   win_always_on_top: {label:"Always on top", ico:"pin", kind:"action", cat:"win32", outs:["out"], fields:[{k:"enabled",lbl:"Enabled",t:"bool",d:true}], sum:p=>p.enabled?"📌 on top":"📌 normal"},
   win_set_title: {label:"Set window title", ico:"type", kind:"action", cat:"win32", outs:["out"], fields:[{k:"title",lbl:"New title",t:"text",d:"Game"}], sum:p=>`"${p.title||"?"}"`},
-  win_style:    {label:"Set window style", ico:"settings", kind:"action", cat:"win32", outs:["out"], fields:[{k:"style",lbl:"Style",t:"select",opts:[{v:"windowed",t:"Windowed (có viền)"},{v:"borderless",t:"Borderless (không viền)"},{v:"popup",t:"Popup"}],d:"windowed"}], sum:p=>`${p.style||"windowed"}`},
+  win_style:    {label:"Set window style", ico:"settings", kind:"action", cat:"win32", outs:["out"], fields:[{k:"style",lbl:"Style",t:"select",opts:[{v:"windowed",t:"Windowed (with frame)"},{v:"borderless",t:"Borderless"},{v:"popup",t:"Popup"}],d:"windowed"}], sum:p=>`${p.style||"windowed"}`},
 };
 // `ctrl` restricts a category to one project controller: the Device/emulator
 // nodes are ADB-only, the Win32 window nodes are PC-only. Untagged categories
 // (basic/image/app/color/ocr/flow/logic/…) work on both and always show.
-// Thứ tự theo tần suất dùng thật (thống kê 12 workflow: image/basic/flow/logic
-// chiếm ~95% số node). Nhóm chưa từng dùng (`closed:true`) gập mặc định — lần
-// đầu mở app palette chỉ phô ~15 loại node hay dùng; người dùng mở nhóm nào thì
-// trạng thái đó được nhớ trong localStorage (wfPalCollapsed) như cũ.
+// Order follows real usage frequency (across 12 workflows: image/basic/flow/
+// logic make up ~95% of nodes). Never-used groups (`closed:true`) collapse by
+// default — a fresh palette shows only the ~15 common node types; whichever
+// group the user opens is remembered in localStorage (wfPalCollapsed) as before.
 const WF_CATS = [
   {key:"basic", label:"Basic"},
   {key:"image", label:"Image"},
@@ -259,9 +269,9 @@ const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities
   // Which backend drives the flow: "adb" (device/emulator) or "win32" (PC window).
   controller:"adb",
   win32:{window:"", matchBy:"title", inputMode:"background"},
-  // OCR engine cho các block đọc chữ (wait_text/if_text/read_var/parse_var…).
-  // "" = auto (engine tự chọn backend khả dụng đầu tiên). Lưu vào flow JSON
-  // (khóa "ocr") nên Runner + test run dùng đúng engine đã chọn.
+  // OCR engine for text-reading blocks (wait_text/if_text/read_var/parse_var…).
+  // "" = auto (the engine picks the first available backend). Saved into the
+  // flow JSON (key "ocr") so the Runner + test runs use the chosen engine.
   ocrBackend:"",
   edit:{kind:"activity", id:null}, sel:[], selectedNode:null };
 let wfSpace=false;  // space held → pan instead of box-select
@@ -288,8 +298,8 @@ function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
   const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off"); s.classList.toggle("on",wfSnapOn); }
   const p=$("wf-preview-btn"); if(p){ p.title="Image preview: "+(wfPreviewAll?"On":"Off"); p.classList.toggle("on",wfPreviewAll); }
-  const a=$("wf-align-btn"); if(a){ a.title="Smart align: "+(wfAlignOn?"On":"Off")+" — kéo block tự hít cạnh/cổng block khác (giữ Alt để tắt tạm)"; a.classList.toggle("on",wfAlignOn); }
-  const m=$("wf-minimap-btn"); if(m){ m.title="Minimap: "+(wfMinimapOn?"On":"Off")+" — toàn cảnh đồ thị, click để nhảy camera"; m.classList.toggle("on",wfMinimapOn); }
+  const a=$("wf-align-btn"); if(a){ a.title="Smart align: "+(wfAlignOn?"On":"Off")+" — dragged blocks snap to other blocks' edges/ports (hold Alt to pause)"; a.classList.toggle("on",wfAlignOn); }
+  const m=$("wf-minimap-btn"); if(m){ m.title="Minimap: "+(wfMinimapOn?"On":"Off")+" — bird's-eye view of the graph, click to jump the camera"; m.classList.toggle("on",wfMinimapOn); }
   if(typeof wfSyncFocusBtn==="function") wfSyncFocusBtn();
   if(typeof wfSyncDebugOverlayBtn==="function") wfSyncDebugOverlayBtn();
   wfSyncSpeedUI();
@@ -359,12 +369,12 @@ async function wfSpeedRun(){
   wfSpeedFromUI();
   if(wfSpeedRunning){ await api().speedhack_stop(); return; }
   const pkg=sh.package||wfAutoPackage();
-  if(!pkg){ uiToast("Nhập package game (hoặc thêm block Mở ứng dụng) để bật speed hack.","warning"); return; }
+  if(!pkg){ uiToast("Enter the game package (or add a Launch app block) to enable the speed hack.","warning"); return; }
   const ok=await api().speedhack_start(sh.speed, pkg);
   if(!ok){ wfSpeedRunning=false; wfSyncSpeedUI(); }
 }
-// ── OCR engine của flow (giống dropdown Engine bên tab Preview, nhưng cấp
-// workflow: lưu vào JSON nên chạy test / Runner đều áp dụng) ─────────────────
+// ── The flow's OCR engine (same as the Engine dropdown on the Preview tab, but
+// workflow-level: saved into the JSON so test runs / the Runner both apply it) ─
 function wfSyncOcrUI(){
   const sel=$("wf-ocr-select"); if(sel) sel.value=WF.ocrBackend||"";
 }
@@ -373,7 +383,7 @@ function wfOcrChanged(){
   wfPushUndoDebounced();
   setStatus("OCR engine: "+(WF.ocrBackend||"auto"));
 }
-// Đổ danh sách backend từ host (get_state().ocrBackends) vào select.
+// Fill the backend list from the host (get_state().ocrBackends) into the select.
 function wfPopulateOcrBackends(backs){
   const sel=$("wf-ocr-select"); if(!sel) return;
   sel.innerHTML='<option value="">Auto</option>';
@@ -412,13 +422,13 @@ async function wfPickWindow(ev){
   const anchor=$("wf-win32-window");
   const menu=document.createElement("div"); menu.className="wf-varmenu"; wfWinMenuEl=menu;
   const search=document.createElement("input"); search.type="text"; search.className="wf-varmenu-search";
-  search.placeholder="Tìm cửa sổ…"; search.spellcheck=false; search.autocomplete="off"; menu.appendChild(search);
+  search.placeholder="Find window…"; search.spellcheck=false; search.autocomplete="off"; menu.appendChild(search);
   const list=document.createElement("div"); list.className="wf-varmenu-list"; menu.appendChild(list);
   function render(filter){
     list.innerHTML="";
     const f=(filter||"").trim().toLowerCase();
     const shown=wins.filter(w=>!f||w.title.toLowerCase().includes(f)||(w.cls||"").toLowerCase().includes(f)||String(w.pid||"").includes(f));
-    if(!shown.length){ const e=document.createElement("div"); e.className="wf-varmenu-empty"; e.textContent=wins.length?"Không khớp.":"Không thấy cửa sổ nào."; list.appendChild(e); return; }
+    if(!shown.length){ const e=document.createElement("div"); e.className="wf-varmenu-empty"; e.textContent=wins.length?"No match.":"No windows found."; list.appendChild(e); return; }
     shown.forEach(w=>{
       const row=document.createElement("button"); row.type="button"; row.className="wf-varmenu-item";
       const meta=[w.pid?("pid "+w.pid):"", w.cls||""].filter(Boolean).join(" · ");

@@ -122,7 +122,7 @@ function wfRenderInspector(){
     if(typeof wfCanTestNode==="function" && wfCanTestNode(node)){
       const tbtn=document.createElement("button"); tbtn.type="button"; tbtn.className="btn sm ico wf-insp-test-btn";
       tbtn.innerHTML=wfIco("target");
-      tbtn.title="Test block — chạy block này, vẽ match overlay (xanh=đạt threshold, đỏ=best dưới ngưỡng · Ctrl+Enter)";
+      tbtn.title="Test block — run this block and draw its match overlay (green = above threshold, red = best below threshold · Ctrl+Enter)";
       tbtn.onclick=()=>{ if(typeof wfRunSingleNode==="function") wfRunSingleNode(node); };
       idEl.appendChild(tbtn);
     }
@@ -188,12 +188,12 @@ function wfRenderInspector(){
     const tipBlock=wfInspBlock();
     tipBlock.innerHTML=
       `<div class="wf-empty">
-        <div class="wf-empty-t">Chọn block để chỉnh</div>
-        <div class="wf-empty-s">Click một node trên canvas để xem tham số, note và log của block đó.</div>
+        <div class="wf-empty-t">Select a block to edit</div>
+        <div class="wf-empty-s">Click a node on the canvas to see that block's parameters, note and log.</div>
         <div class="wf-empty-keys">
-          <span><b>Ctrl+F</b> tìm block</span>
-          <span><b>Del</b> xóa</span>
-          <span><b>Ctrl+D</b> nhân đôi</span>
+          <span><b>Ctrl+F</b> find block</span>
+          <span><b>Del</b> delete</span>
+          <span><b>Ctrl+D</b> duplicate</span>
         </div>
       </div>`;
     body.appendChild(tipBlock);
@@ -202,11 +202,11 @@ function wfRenderInspector(){
   body.innerHTML=
     `<div class="wf-empty">
       <div class="wf-empty-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h5.5A2 2 0 0 1 17.5 8.5V14"/></svg></div>
-      <div class="wf-empty-t">Chưa mở activity</div>
-      <div class="wf-empty-s">Chọn hoặc tạo activity ở panel góc phải, rồi kéo node từ palette bên trái vào canvas.</div>
+      <div class="wf-empty-t">No activity open</div>
+      <div class="wf-empty-s">Select or create an activity in the corner panel, then drag nodes from the left palette onto the canvas.</div>
       <div class="wf-empty-keys">
-        <span><b>+</b> thêm activity</span>
-        <span><b>F1</b> phím tắt</span>
+        <span><b>+</b> add activity</span>
+        <span><b>F1</b> shortcuts</span>
       </div>
     </div>`;
 }
@@ -253,7 +253,7 @@ function wfShowVarMenu(anchor,onPick){
     list.innerHTML="";
     const f=(filter||"").trim().toLowerCase();
     const shown=names.filter(n=>!f||n.toLowerCase().includes(f));
-    if(!shown.length){ const e=document.createElement("div"); e.className="wf-varmenu-empty"; e.textContent=names.length?"Không khớp.":"Chưa có biến."; list.appendChild(e); }
+    if(!shown.length){ const e=document.createElement("div"); e.className="wf-varmenu-empty"; e.textContent=names.length?"No match.":"No variables yet."; list.appendChild(e); }
     let lastScope=null;
     shown.forEach(n=>{
       const info=map[n];
@@ -270,7 +270,7 @@ function wfShowVarMenu(anchor,onPick){
   const addRow=document.createElement("button"); addRow.type="button"; addRow.className="wf-varmenu-add";
   addRow.innerHTML=`${wfIco("pin")}<span>New global variable…</span>`;
   addRow.onclick=()=>{
-    uiPrompt({title:"Biến toàn cục mới", label:"Tên biến", placeholder:"VD: round"}).then(v=>{
+    uiPrompt({title:"New global variable", label:"Variable name", placeholder:"e.g. round"}).then(v=>{
       const nm=(v||"").trim();
       if(!nm) return;
       wfPushUndoDebounced();
@@ -455,20 +455,20 @@ function wfUpdNodeRetry(node){
 
 // Failure screenshot from the last test run (engine saves one on every action's
 // final failed attempt; see node_fail_shot in events.js). Thumbnail + click or
-// "Mở ảnh" to open full-size in the OS viewer. Cleared when the next run starts.
+// "Open image" to open full-size in the OS viewer. Cleared when the next run starts.
 function wfFailShotBlock(node){
   const path=(typeof wfFailShots!=="undefined") ? wfFailShots[node.id] : null;
   if(!path) return null;
-  const b=wfInspBlock("Ảnh lúc fail");
+  const b=wfInspBlock("Failure screenshot");
   const img=document.createElement("img");
-  img.className="wf-fail-shot"; img.title="Màn hình lúc block này fail — bấm để mở ảnh gốc";
+  img.className="wf-fail-shot"; img.title="The screen when this block failed — click to open the original image";
   img.addEventListener("click",()=>{ try{ api().open_path(path); }catch{} });
   try{ api().image_thumbnail(path, 460).then(d=>{ if(d) img.src=d; else img.remove(); }); }catch{}
   b.appendChild(img);
   const row=document.createElement("div"); row.className="wf-field";
   const p=document.createElement("span"); p.className="wf-fail-shot-path";
   p.textContent=path.split(/[\\/]/).pop(); p.title=path;
-  const open=document.createElement("button"); open.className="btn sm"; open.textContent="Mở ảnh";
+  const open=document.createElement("button"); open.className="btn sm"; open.textContent="Open image";
   open.onclick=()=>{ try{ api().open_path(path); }catch{} };
   row.appendChild(p); row.appendChild(open); b.appendChild(row);
   return b;
@@ -791,7 +791,7 @@ function wfFieldEl(node,f){
   // the text input (e.g. the emulator install dir on launch_emulator).
   if(f.pickFolder){
     inp.style.fontSize="10px";
-    const btn=document.createElement("button"); btn.className="btn sm ico"; btn.title="Chọn thư mục…";
+    const btn=document.createElement("button"); btn.className="btn sm ico"; btn.title="Choose folder…";
     btn.innerHTML=wfIco("folder");
     btn.onclick=async()=>{ const p=await api().pick_folder(inp.value||""); if(p){ inp.value=p; wfPushUndoDebounced(); node.params[f.k]=p; wfUpdNodeSum(node); } };
     row.appendChild(btn);

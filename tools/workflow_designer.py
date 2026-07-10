@@ -76,7 +76,7 @@ _WEB_DIR = (os.path.join(bundle_dir(), "web") if is_frozen()
 # ``workflows/<name>/<name>.json`` (with its ``templates/`` bundle alongside),
 # next to the .exe in a frozen build or in the repo root from source.
 _WORKFLOWS_DIR = os.path.join(_PROJECT_ROOT, "workflows")
-# Transient flow written for the "Chạy GUI" handoff to the runner.
+# Transient flow written for the "Run GUI" handoff to the runner.
 _RUN_TMP_DIR = os.path.join(_WORKFLOWS_DIR, "_run")
 _SETTINGS_PATH = os.path.join(_PROJECT_ROOT, "data", "designer_settings.json")
 # Convention: a saved workflow.json is paired with a sibling assets folder of
@@ -275,14 +275,14 @@ class WorkflowDesignerAPI:
                 else:
                     self._win32.configure(cfg or {})
             except Exception as exc:
-                log_warning(f"Win32 capture source lỗi: {exc}")
+                log_warning(f"Win32 capture source error: {exc}")
                 return False
         return True
 
     def capture(self) -> bool:
         if self._capture_kind == "win32":
             if self._win32 is None:
-                self._push("capture_failed", {"error": "Chưa đặt cửa sổ Win32"})
+                self._push("capture_failed", {"error": "No Win32 window set"})
                 return False
         elif self.controller.device is None:
             # Device already gone — stop the live preview loop quietly. Do not
@@ -316,10 +316,10 @@ class WorkflowDesignerAPI:
         except Exception:
             pass
         msg = reason or "Device not found"
-        log_warning(f"Đã dừng Preview — device mất: {msg}")
+        log_warning(f"Preview stopped — device lost: {msg}")
         self._push("device_status", {"connected": False, "serial": None, "name": ""})
         if was_refreshing:
-            self._push("capture_failed", {"error": f"Device mất kết nối — đã dừng capture ({msg})"})
+            self._push("capture_failed", {"error": f"Device disconnected — capture stopped ({msg})"})
 
     def _capture_worker(self) -> None:
         try:
@@ -327,7 +327,7 @@ class WorkflowDesignerAPI:
                 if not self._win32.device:
                     self._win32.attach()
                 if not self._win32.device:
-                    self._push("capture_failed", {"error": "Không tìm thấy cửa sổ Win32 mục tiêu"})
+                    self._push("capture_failed", {"error": "Target Win32 window not found"})
                     return
                 img = self._win32.capture_frame()
             else:
@@ -609,7 +609,7 @@ class WorkflowDesignerAPI:
             fname = f"crop_{_ts()}_{x}_{y}_{w}_{h}.png"
         path = os.path.join(out_dir, fname)
         if cv2.imwrite(path, crop):
-            log_success(f"Chụp vùng: {path}")
+            log_success(f"Region captured: {path}")
             return path
         return ""
 
@@ -947,8 +947,41 @@ class WorkflowDesignerAPI:
     def clear_log(self) -> bool:
         self._log_buffer.clear()
         self._push("log_cleared", {})
-        log_info("Đã xoá nhật ký")
+        log_info("Log cleared")
         return True
+
+    def save_log(self) -> str:
+        """Save the full backend log buffer to a .txt file (native save dialog).
+
+        Returns the written path, or "" when the buffer is empty / the dialog
+        was cancelled / the write failed.
+        """
+        if not self._log_buffer:
+            return ""
+        lines = [f"{e.get('ts', '')} [{e.get('level', 'info').upper():7s}] {e.get('msg', '')}"
+                 for e in self._log_buffer]
+        default = f"workflow_log_{_ts()}.txt"
+        path = None
+        win = self._win()
+        try:
+            if win:
+                paths = win.create_file_dialog(
+                    webview.SAVE_DIALOG, directory=self._scope_out(), save_filename=default,
+                    file_types=("Text (*.txt)", "All files (*.*)"))
+                if paths:
+                    path = paths[0] if isinstance(paths, (list, tuple)) else paths
+        except Exception:
+            path = None
+        if not path:
+            return ""
+        if not path.lower().endswith(".txt"):
+            path += ".txt"
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+        except Exception:
+            return ""
+        return path
 
     # ── Persisted UI settings (snap, global preview, …) ───────────────────────
 
@@ -970,7 +1003,7 @@ class WorkflowDesignerAPI:
                 json.dump(merged, f, ensure_ascii=False, indent=2)
             return True
         except Exception as exc:
-            log_warning(f"Lưu cài đặt thất bại: {exc}")
+            log_warning(f"Saving settings failed: {exc}")
             return False
 
     def _remember_last_workflow(self, path: Optional[str]) -> None:
@@ -1082,7 +1115,7 @@ class WorkflowDesignerAPI:
                 # Selected emulator closed → clear handle + stop live capture.
                 wanted = self._selected_serial or self._connected_serial
                 if wanted and wanted not in serials:
-                    self.controller.mark_disconnected("không còn trong adb devices")
+                    self.controller.mark_disconnected("no longer in adb devices")
                     self._connected_serial = None
                     if self._auto_refresh_enabled and self._capture_kind != "win32":
                         self._on_device_lost(f"{wanted} not found")
@@ -1105,7 +1138,7 @@ class WorkflowDesignerAPI:
                 else:
                     # Empty device list — mirror disconnected state to the UI.
                     if self.controller.device is not None or self._connected_serial:
-                        self.controller.mark_disconnected("không còn device nào")
+                        self.controller.mark_disconnected("no devices left")
                         self._connected_serial = None
                         if self._auto_refresh_enabled and self._capture_kind != "win32":
                             self._on_device_lost("no devices")
@@ -1296,9 +1329,9 @@ class WorkflowDesignerAPI:
             n = self._materialize_templates(flow, os.path.dirname(os.path.abspath(path)))
             text = json.dumps(flow, ensure_ascii=False, indent=2)
             if n:
-                log_info(f"Đã đóng gói {n} ảnh template vào ./{_TEMPLATES_DIRNAME}/")
+                log_info(f"Bundled {n} template images into ./{_TEMPLATES_DIRNAME}/")
         except Exception as exc:
-            log_warning(f"Không thể đóng gói ảnh template: {exc} — lưu JSON gốc")
+            log_warning(f"Couldn't bundle template images: {exc} — saving the original JSON")
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(text)
 
@@ -1347,7 +1380,7 @@ class WorkflowDesignerAPI:
         if not path:
             # No location chosen → default per-workflow folder next to the app.
             path = self._default_flow_path(name)
-            log_info(f"Lưu mặc định vào workflows/{_sanitize_name(name) or 'workflow'}/")
+            log_info(f"Saving by default into workflows/{_sanitize_name(name) or 'workflow'}/")
         if not path.lower().endswith(".json"):
             path += ".json"
         try:
@@ -1356,10 +1389,10 @@ class WorkflowDesignerAPI:
             self._remember_dir(path)
             self._remember_last_workflow(path)
             self._scope_refresh_out()
-            log_success(f"Đã lưu workflow: {path}")
+            log_success(f"Workflow saved: {path}")
             return True
         except Exception as exc:
-            log_error(f"Lưu workflow thất bại: {exc}")
+            log_error(f"Saving workflow failed: {exc}")
             return False
 
     def workflow_save(self, flow_json: str, name: str = "") -> dict:
@@ -1372,10 +1405,10 @@ class WorkflowDesignerAPI:
             self._remember_dir(path)
             self._remember_last_workflow(path)
             self._scope_refresh_out()
-            log_success(f"Đã lưu: {path}")
+            log_success(f"Saved: {path}")
             return {"ok": True, "path": path}
         except Exception as exc:
-            log_error(f"Lưu thất bại: {exc}")
+            log_error(f"Save failed: {exc}")
             return {"ok": False, "path": self._wf_path}
 
     def workflow_import(self) -> str:
@@ -1401,10 +1434,10 @@ class WorkflowDesignerAPI:
             self._remember_dir(path)
             self._remember_last_workflow(str(path))
             self._scope_refresh_out()
-            log_info(f"Đã mở workflow: {path}")
+            log_info(f"Workflow opened: {path}")
             return text
         except Exception as exc:
-            log_error(f"Mở workflow thất bại: {exc}")
+            log_error(f"Opening workflow failed: {exc}")
             return ""
 
     # ── Test run ────────────────────────────────────────────────────────────────
@@ -1413,20 +1446,35 @@ class WorkflowDesignerAPI:
     def _flow_is_win32(flow: Optional[dict]) -> bool:
         return str((flow or {}).get("controller") or "adb").strip().lower() == "win32"
 
+    @staticmethod
+    def _flow_has_launch_emulator(flow: Optional[dict]) -> bool:
+        """A flow with a launch_emulator / if_emulator node may start with no
+        device — those nodes boot/find the emulator and the engine attaches to
+        its ADB afterwards."""
+        for coll in ("activities", "functions"):
+            for item in (flow or {}).get(coll) or []:
+                for n in ((item.get("graph") or {}).get("nodes") or []):
+                    if n.get("type") in ("launch_emulator", "if_emulator"):
+                        return True
+        return False
+
     def workflow_run(self, flow_json: str) -> bool:
         try:
             flow = json.loads(flow_json)
         except Exception as exc:
-            log_error(f"JSON workflow không hợp lệ: {exc}")
+            log_error(f"Invalid workflow JSON: {exc}")
             return False
         # Win32 flows target a native window — no ADB device needed; the engine
         # attaches to the window itself in _ensure_ready_win32().
         is_win32 = self._flow_is_win32(flow)
         if not is_win32 and self.controller.device is None:
-            log_error("Chưa chọn thiết bị để chạy workflow")
-            return False
+            if self._flow_has_launch_emulator(flow):
+                log_info("No device yet — the Launch emulator node will boot one and connect")
+            else:
+                log_error("No device selected to run the workflow")
+                return False
         if self._engine and self._engine.is_running():
-            log_warning("Workflow đang chạy")
+            log_warning("Workflow is already running")
             return False
         if self._engine is None:
             self._engine = WorkflowEngine()
@@ -1436,7 +1484,7 @@ class WorkflowDesignerAPI:
                 self._engine.auto.adb.device_id = serial
                 self._engine.auto.adb.select_device(serial)
         except Exception as exc:
-            log_warning(f"Không thể chọn thiết bị cho engine: {exc}")
+            log_warning(f"Couldn't select a device for the engine: {exc}")
         anchor = self._wf_path or os.path.join(_PROJECT_ROOT, "flow.json")
         self._engine.load(flow, flow_path=anchor)
         self._engine.failure_screenshot_dir = os.path.join(_PROJECT_ROOT, "out", "workflow_failures")
@@ -1448,7 +1496,7 @@ class WorkflowDesignerAPI:
             # Seed the panel with global vars immediately (activity vars arrive
             # via on_var when each activity starts).
             self._push("vars_snapshot", {"vars": dict(self._engine._globals)})
-            log_success("Workflow bắt đầu chạy")
+            log_success("Workflow started")
         return ok
 
     def workflow_stop(self) -> bool:
@@ -1536,7 +1584,7 @@ class WorkflowDesignerAPI:
                 os.startfile(path)  # noqa: S606 — local tool, user-initiated
                 return True
         except Exception as exc:
-            log_warning(f"Không mở được: {exc}")
+            log_warning(f"Couldn't open: {exc}")
         return False
 
     def workflow_running(self) -> bool:
@@ -1546,16 +1594,19 @@ class WorkflowDesignerAPI:
         try:
             flow = json.loads(flow_json)
         except Exception as exc:
-            log_error(f"JSON workflow không hợp lệ: {exc}")
+            log_error(f"Invalid workflow JSON: {exc}")
             return False
         is_win32 = self._flow_is_win32(flow)
         if not is_win32 and self.controller.device is None:
-            log_error("Chưa chọn thiết bị để chạy workflow")
-            return False
+            if self._flow_has_launch_emulator(flow):
+                log_info("No device yet — the Launch emulator node will boot one and connect")
+            else:
+                log_error("No device selected to run the workflow")
+                return False
         if self._engine is None:
             self._engine = WorkflowEngine()
         if self._engine.is_running():
-            log_warning("Workflow đang chạy")
+            log_warning("Workflow is already running")
             return False
         serial = self._connected_serial or self._selected_serial
         try:
@@ -1563,7 +1614,7 @@ class WorkflowDesignerAPI:
                 self._engine.auto.adb.device_id = serial
                 self._engine.auto.adb.select_device(serial)
         except Exception as exc:
-            log_warning(f"Không thể chọn thiết bị cho engine: {exc}")
+            log_warning(f"Couldn't select a device for the engine: {exc}")
         anchor = self._wf_path or os.path.join(_PROJECT_ROOT, "flow.json")
         self._engine.load(flow, flow_path=anchor)
         self._engine.failure_screenshot_dir = os.path.join(_PROJECT_ROOT, "out", "workflow_failures")
@@ -1580,13 +1631,13 @@ class WorkflowDesignerAPI:
             if act:
                 self._push("activity_active", {"id": act.get("id")})
         if not graph:
-            log_error("Không tìm thấy graph để chạy")
+            log_error("No graph found to run")
             return False
         ok = self._engine.start_graph(graph, node_id, seed_act=seed_act, step=bool(step))
         self._push("workflow_state", {"running": ok})
         if ok:
             self._push("vars_snapshot", {"vars": dict(self._engine._globals)})
-            log_success("Workflow debug bắt đầu chạy")
+            log_success("Workflow debug run started")
         return ok
 
     def workflow_debug_step(self) -> bool:
@@ -1609,16 +1660,17 @@ class WorkflowDesignerAPI:
             node = json.loads(node_json)
             flow = json.loads(flow_json) if flow_json else None
         except Exception as exc:
-            log_error(f"JSON không hợp lệ: {exc}")
+            log_error(f"Invalid JSON: {exc}")
             return {"ok": False, "status": "error", "port": None}
         is_win32 = self._flow_is_win32(flow)
-        if not is_win32 and self.controller.device is None:
-            log_error("Chưa chọn thiết bị để chạy block")
+        if (not is_win32 and self.controller.device is None
+                and node.get("type") not in ("launch_emulator", "if_emulator")):
+            log_error("No device selected to run the block")
             return {"ok": False, "status": "error", "port": None}
         if self._engine is None:
             self._engine = WorkflowEngine()
         if self._engine.is_running():
-            log_warning("Workflow đang chạy")
+            log_warning("Workflow is already running")
             return {"ok": False, "status": "busy", "port": None}
         serial = self._connected_serial or self._selected_serial
         try:
@@ -1626,7 +1678,7 @@ class WorkflowDesignerAPI:
                 self._engine.auto.adb.device_id = serial
                 self._engine.auto.adb.select_device(serial)
         except Exception as exc:
-            log_warning(f"Không thể chọn thiết bị cho engine: {exc}")
+            log_warning(f"Couldn't select a device for the engine: {exc}")
         # Load the current flow (templates base + functions) so the node runs
         # against the same assets as a full run. Anchor to the open file if any.
         anchor = self._wf_path or os.path.join(_PROJECT_ROOT, "flow.json")
@@ -1634,16 +1686,16 @@ class WorkflowDesignerAPI:
             if flow:
                 self._engine.load(flow, flow_path=anchor)
             else:
-                log_warning("Không có flow để nạp cho block")
+                log_warning("No flow to load for the block")
         except Exception as exc:
-            log_warning(f"Không nạp được flow cho block: {exc}")
+            log_warning(f"Couldn't load the flow for the block: {exc}")
         # Re-bind the same GUI callbacks a full test run uses.
         self._engine.failure_screenshot_dir = os.path.join(_PROJECT_ROOT, "out", "workflow_failures")
         self._bind_workflow_callbacks()
         try:
             result = self._engine.run_single_node(node) or {}
         except Exception as exc:
-            log_error(f"Chạy block lỗi: {exc}")
+            log_error(f"Block run error: {exc}")
             return {"ok": False, "status": "error", "port": None}
         status = result.get("status") or "ok"
         return {
@@ -1664,17 +1716,17 @@ class WorkflowDesignerAPI:
         cheat.dll injection was removed) — refuse there with a clear message.
         """
         if self._capture_kind == "win32":
-            log_error("[speedhack] không hỗ trợ ở mode Win32 (chỉ ADB/Frida).")
+            log_error("[speedhack] not supported in Win32 mode (ADB/Frida only).")
             return False
         try:
             scale = float(speed)
         except (TypeError, ValueError):
             scale = 2.0
         if self.controller.device is None:
-            log_error("[speedhack] chưa chọn thiết bị")
+            log_error("[speedhack] no device selected")
             return False
         if scale <= 0 or scale == 1.0:
-            log_warning("[speedhack] tốc độ phải khác 1.0 để tăng tốc")
+            log_warning("[speedhack] speed must differ from 1.0 to accelerate")
             return False
         # Already running → just push the new scale live (no re-inject, no package).
         if self._sh_mgr is not None:
@@ -1683,12 +1735,12 @@ class WorkflowDesignerAPI:
             return ok
         pkg = (package or "").strip()
         if not pkg:
-            log_error("[speedhack] cần nhập package game để bật speed hack")
+            log_error("[speedhack] a game package is required to enable the speed hack")
             return False
         mgr = FridaSpeedhackManager(package=pkg)
         mgr.adb_controller = self.controller
         if not mgr.available:
-            log_warning("[speedhack] không tìm thấy frida-inject trong vendor/frida/")
+            log_warning("[speedhack] frida-inject not found in vendor/frida/")
             return False
         self._sh_mgr = mgr
         self._sh_stop = threading.Event()
@@ -1702,17 +1754,17 @@ class WorkflowDesignerAPI:
         mgr = self._sh_mgr
         if mgr is None:
             return
-        log_info(f"[speedhack] sẽ tăng tốc '{mgr.package}' x{scale} khi game chạy…")
+        log_info(f"[speedhack] will accelerate '{mgr.package}' x{scale} once the game runs…")
         while mgr is not None and stop_ev is not None and not stop_ev.is_set():
             if mgr.active:
                 return
             try:
                 if mgr.set_scale(scale):
-                    log_success(f"[speedhack] đã bật x{scale}")
+                    log_success(f"[speedhack] enabled x{scale}")
                     self._sh_push(True, True)
                     return
             except Exception as e:
-                log_warning(f"[speedhack] thử lại: {e}")
+                log_warning(f"[speedhack] retrying: {e}")
             for _ in range(50):  # ~5s, stay responsive to stop
                 if stop_ev.is_set():
                     return
@@ -1729,7 +1781,7 @@ class WorkflowDesignerAPI:
             try:
                 mgr.detach()
             except Exception as e:
-                log_warning(f"[speedhack] lỗi khi tắt: {e}")
+                log_warning(f"[speedhack] error while disabling: {e}")
         self._sh_push(False, False)
         return True
 
@@ -1762,7 +1814,7 @@ class WorkflowDesignerAPI:
             os.makedirs(dest, exist_ok=True)
             return dest
         except Exception as exc:
-            log_warning(f"Không xác định được thư mục templates: {exc}")
+            log_warning(f"Couldn't resolve the templates folder: {exc}")
             return None
 
     def open_dev_helper(self, flow_json: str = "") -> bool:
@@ -1772,12 +1824,12 @@ class WorkflowDesignerAPI:
             out_dir = self._workflow_templates_dir(flow_json)
             launch_tool("devhelper", [out_dir] if out_dir else None)
             if out_dir:
-                log_success(f"Đã mở DevScope · ảnh lưu vào: {out_dir}")
+                log_success(f"DevScope opened · images save to: {out_dir}")
             else:
-                log_success("Đã mở DevScope")
+                log_success("DevScope opened")
             return True
         except Exception as exc:
-            log_error(f"Mở DevScope thất bại: {exc}")
+            log_error(f"Opening DevScope failed: {exc}")
             return False
 
     def open_runner(self, flow_json: str) -> bool:
@@ -1796,10 +1848,10 @@ class WorkflowDesignerAPI:
             tmp = os.path.join(_RUN_TMP_DIR, "_designer_run.json")
             self._write_flow(flow_json, tmp)
             launch_tool("runner", [tmp])
-            log_success("Đã mở Runner GUI với workflow hiện tại")
+            log_success("Runner GUI opened with the current workflow")
             return True
         except Exception as exc:
-            log_error(f"Mở Runner thất bại: {exc}")
+            log_error(f"Opening Runner failed: {exc}")
             return False
 
     # ── Teardown ─────────────────────────────────────────────────────────────

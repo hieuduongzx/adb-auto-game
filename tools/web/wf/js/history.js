@@ -48,7 +48,7 @@ function wfPushUndo() {
   _undoStack.push(snap);
   if (_undoStack.length > _UNDO_MAX) _undoStack.shift();
   _redoStack = [];
-  if (typeof wfMarkDirty === "function") wfMarkDirty();   // mutation sắp xảy ra → chưa lưu
+  if (typeof wfMarkDirty === "function") wfMarkDirty();   // a mutation is imminent → unsaved
 }
 
 // Debounced version for rapid-fire changes (inspector fields).

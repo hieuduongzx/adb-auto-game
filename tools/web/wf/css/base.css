@@ -20,6 +20,7 @@
   --ok-bd:     #cfead9;
   --warn:      #9c6c12;
   --warn-bg:   #fdf6e9;
+  --warn-bd:   #e7d5a4;
   --err:       #bb3a33;
   --err-bg:    #fcefee;
   --err-bd:    #eecdca;
@@ -30,6 +31,25 @@
   --run-live:  #f97316;
   --run-info:  #06b6d4;
   --run-warn:  #eab308;
+  /* Run-trail card tints — the full-card recolour a block keeps after it ran
+     (ok/fail) and while it is live (amber). bg = card body, hd = header fill,
+     hd-bd = header underline, ink = title/icon. Single source for wf.css. */
+  --run-ok-bg:      #f2fbf5;
+  --run-ok-hd:      #dcf3e4;
+  --run-ok-hd-bd:   #a7dcbb;
+  --run-ok-ink:     #166534;
+  --run-fail-bg:    #fdf4f3;
+  --run-fail-hd:    #fbe0dd;
+  --run-fail-hd-bd: #f0b3ad;
+  --run-fail-ink:   #991b1b;
+  --run-live-bd:    #ea580c;
+  --run-live-bg:    #fff3e4;
+  --run-live-hd:    #ffe1bf;
+  --run-live-hd-bd: #fb923c;
+  --run-live-ink:   #7c2d12;
+  /* Terminal (start/end/stop) accents — also read by minimap.js chips. */
+  --term-start: #16a34a;
+  --term-end:   #dc2626;
   /* Branch-port semantics (condition true/false, loop back-edge) — one hex per
      role, shared between the port dots, wires and their SVG arrowheads. */
   --branch-t:    #1f9d57;
@@ -63,7 +83,36 @@
   --cat-device: #64748b;
   --cat-win32:  #6366f1;
   --cat-misc:   #9aa6b4;
+  /* Per-category ink/bg/bd triads — one source for the palette category pills,
+     chip icon tints AND node header tints (previously three separate hardcoded
+     sets in wf.css that could drift apart). ink = readable dark text on bg. */
+  --cat-basic-ink:#2d64cc;  --cat-basic-bg:#eef5ff;  --cat-basic-bd:#c5d8f5;
+  --cat-input-ink:#4338ca;  --cat-input-bg:#eef0ff;  --cat-input-bd:#c4c6f5;
+  --cat-image-ink:#0f766e;  --cat-image-bg:#ecfdf9;  --cat-image-bd:#99e6d4;
+  --cat-color-ink:#be185d;  --cat-color-bg:#fdf2f8;  --cat-color-bd:#f5c1da;
+  --cat-ocr-ink:#c2610f;    --cat-ocr-bg:#fff7ed;    --cat-ocr-bd:#fbc99a;
+  --cat-flow-ink:#b45309;   --cat-flow-bg:#fffbeb;   --cat-flow-bd:#f7d97e;
+  --cat-logic-ink:#6d28d9;  --cat-logic-bg:#f5f3ff;  --cat-logic-bd:#d8c8f7;
+  --cat-app-ink:#047857;    --cat-app-bg:#ecfdf5;    --cat-app-bd:#a7f3d0;
+  --cat-time-ink:#0369a1;   --cat-time-bg:#e0f2fe;   --cat-time-bd:#7dd3fc;
+  --cat-device-ink:#475569; --cat-device-bg:#f1f5f9; --cat-device-bd:#cbd5e1;
+  --cat-win32-ink:#4f46e5;  --cat-win32-bg:#eef2ff;  --cat-win32-bd:#c7d2fe;
+  --cat-misc-ink:#374151;   --cat-misc-bg:#f3f4f6;   --cat-misc-bd:#d1d5db;
   --group-red: #cf6b6b;  /* group-only accent — no matching node category */
+  /* Note (sticky) block — shares the warm warn family. */
+  --note-ink:  #7a5b12;
+  /* Attention amber: unsaved-changes dot + active speed-hack tint. */
+  --amber:     #f59e0b;
+  --speed-on:  #f1c84b;
+  /* Neutral "off" dot/toggle track + checkbox border. */
+  --dot-off:   #d3d9e0;
+  --cb-bd:     #cfd5dd;
+  /* Dark image surfaces (device mirror, template thumbnails on dark). */
+  --shade:     #121316;
+  --shade2:    #1a1d21;
+  /* Scrollbar thumb (shared by every custom scrollbar). */
+  --scroll-thumb:       #cbd5e1;
+  --scroll-thumb-hover: #94a3b8;
   --log-bg:    #fbfcfd;
   --log-ink:   #41505f;
   --log-muted: #b3bbc4;
@@ -115,8 +164,8 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
-  ::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+  ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-thumb-hover); }
 
 /* ── Layout ─────────────────────────────────────────────────────────────── */
 #app { flex: 1; display: flex; flex-direction: column; gap: 7px;
@@ -133,14 +182,14 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 
 .device-wrap { display: flex; align-items: center; gap: 7px; min-width: 200px; height: 38px;
   padding: 0 10px; border: 1px solid var(--border2); border-radius: 8px; background: var(--panel); }
-#device-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
+#device-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot-off);
   flex-shrink: 0; transition: background .2s, box-shadow .2s; }
 #device-dot.connected { background: var(--ok); box-shadow: 0 0 0 3px rgba(31,146,84,.18); }
 /* Device dot inside the new tray layout */
-.tb-device-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
+.tb-device-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot-off);
   flex-shrink: 0; transition: background .2s, box-shadow .2s; }
 .tb-device-dot.connected { background: var(--ok) !important; box-shadow: 0 0 0 3px rgba(31,146,84,.18); }
-.tb-device-dot:not(.connected) { background: #d3d9e0; }
+.tb-device-dot:not(.connected) { background: var(--dot-off); }
 #device-select { flex: 1; min-width: 0; border: none; background: transparent; background-image: none;
   font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--dim);
   cursor: pointer; -webkit-appearance: none; appearance: none; padding: 0; }
@@ -193,7 +242,7 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .hz-unit  { font-size: 11px; color: var(--muted); flex-shrink: 0; }
 
 .pill-wrap { display: flex; align-items: center; gap: 7px; cursor: pointer; }
-#auto-cb { width: 36px; height: 21px; border-radius: 999px; background: #d3d9e0;
+#auto-cb { width: 36px; height: 21px; border-radius: 999px; background: var(--dot-off);
   position: relative; transition: background .2s; flex-shrink: 0; display: block; }
 #auto-cb.on { background: var(--accent); }
 #auto-thumb { position: absolute; top: 2px; left: 2px; width: 17px; height: 17px;
@@ -283,11 +332,11 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 
 #ocr-engine { font-size: 10px; font-weight: 600; color: #1c7a44;
   background: var(--ok-bg); border: 1px solid var(--ok-bd); border-radius: 999px; padding: 2px 7px; }
-#ocr-engine.unavailable { color: var(--warn); background: var(--warn-bg); border-color: #e7d5a4; }
+#ocr-engine.unavailable { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-bd); }
 
 /* Checkboxes */
 .cb-line { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
-.cb { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid #cfd5dd;
+.cb { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--cb-bd);
   background: var(--panel); flex-shrink: 0; display: flex; align-items: center;
   justify-content: center; transition: background .12s, border-color .12s; }
 .cb.checked { background: var(--accent); border-color: var(--accent); }
@@ -322,7 +371,7 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
   transition: border-color .12s, box-shadow .12s; }
 .asset-card:hover  { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,111,237,.12); }
 .asset-card.active { border-color: var(--accent); }
-.asset-thumb { width: 100%; height: 66px; object-fit: contain; background: #1a1d21; display: block; }
+.asset-thumb { width: 100%; height: 66px; object-fit: contain; background: var(--shade2); display: block; }
 .asset-name  { font-size: 9.5px; color: var(--dim); padding: 3px 5px 4px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -371,7 +420,7 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
 #footer { display: flex; align-items: center; gap: 6px; padding: 3px 6px 4px; flex-shrink: 0; }
-#footer-dot { width: 7px; height: 7px; border-radius: 50%; background: #d3d9e0;
+#footer-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot-off);
   flex-shrink: 0; transition: background .2s, box-shadow .2s; }
 #footer-dot.connected { background: var(--ok); box-shadow: 0 0 0 3px rgba(31,146,84,.16); }
 #status-text { font-size: 11px; color: var(--dim); font-weight: 500;
@@ -395,7 +444,7 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .ui-toast-msg { min-width: 0; line-height: 1.45; word-break: break-word; }
 .ui-toast.ui-success { border-color: var(--ok-bd);  background: var(--ok-bg);  color: #1c7a44; }
 .ui-toast.ui-error   { border-color: var(--err-bd); background: var(--err-bg); color: var(--err); }
-.ui-toast.ui-warning { border-color: #e7d5a4; background: var(--warn-bg); color: var(--warn); }
+.ui-toast.ui-warning { border-color: var(--warn-bd); background: var(--warn-bg); color: var(--warn); }
 .ui-toast.ui-info    { border-color: var(--accent-bd); background: var(--accent-bg); color: #2559c7; }
 .ui-toast.out { animation: uiToastOut .22s var(--ease) both; }
 @keyframes uiToastIn  { from { opacity: 0; transform: translateX(14px); } }

@@ -1,7 +1,7 @@
 // ── Keyboard (workflow shortcuts) ─────────────────────────────────────────────
 window.addEventListener("keydown", e => {
   const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
-  // F1 (hoặc ? ngoài ô nhập) — bảng phím tắt.
+  // F1 (or ? outside an input) — shortcuts sheet.
   if(e.key==="F1" || (e.key==="?" && !typing)){ e.preventDefault(); if(typeof uiShowShortcuts==="function") uiShowShortcuts(); return; }
   if((e.key==="s"||e.key==="S") && (e.ctrlKey||e.metaKey)){
     e.preventDefault();

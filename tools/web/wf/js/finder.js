@@ -46,7 +46,7 @@ function wfFindRender(listEl, q){
   listEl.innerHTML="";
   if(!wfFindHits.length){
     const e=document.createElement("div"); e.className="wf-find-empty";
-    e.textContent=terms.length?"Không khớp block nào.":"Chưa có block.";
+    e.textContent=terms.length?"No blocks match.":"No blocks yet.";
     listEl.appendChild(e); return;
   }
   const cur=wfEditTarget();
@@ -64,7 +64,7 @@ function wfFindRender(listEl, q){
   });
   if(wfFindHits.length>30){
     const more=document.createElement("div"); more.className="wf-find-empty";
-    more.textContent=`+${wfFindHits.length-30} kết quả nữa — gõ thêm để lọc`;
+    more.textContent=`+${wfFindHits.length-30} more results — type to narrow down`;
     listEl.appendChild(more);
   }
 }
@@ -75,7 +75,7 @@ function wfFindShow(){
   box.innerHTML=
     `<div class="wf-find-bar">
        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
-       <input type="text" placeholder="Tìm block… (tên, ảnh, ghi chú)" spellcheck="false" autocomplete="off">
+       <input type="text" placeholder="Find block… (name, image, note)" spellcheck="false" autocomplete="off">
        <span class="k">Esc</span>
      </div>
      <div class="wf-find-list"></div>`;

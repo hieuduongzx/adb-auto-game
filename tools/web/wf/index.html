@@ -25,9 +25,9 @@
         <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
     </div>
     <span class="tb-divider"></span>
-    <div id="wf-run-status" class="wf-run-status ok" title="Trạng thái chạy">
+    <div id="wf-run-status" class="wf-run-status ok" title="Run status">
       <span class="wf-run-dot"></span>
-      <span class="wf-run-txt">Sẵn sàng</span>
+      <span class="wf-run-txt">Ready</span>
     </div>
   </div>
 
@@ -41,7 +41,7 @@
       <button class="btn ico" onclick="wfValidateShow()" title="Check workflow — find broken wires, missing templates, and bad branch counts">
         <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></button>
       <span class="tb-tray-sep"></span>
-      <button class="btn ico" onclick="wfRunSingleNode()" title="Test block — chạy 1 block đang chọn, vẽ match overlay trên Preview (Ctrl+Enter)">
+      <button class="btn ico" onclick="wfRunSingleNode()" title="Test block — run the selected block and draw its match overlay on Preview (Ctrl+Enter)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4"/></svg></button>
       <button class="btn ico" onclick="wfRunFromSelected(false)" title="Run from selected block">
         <svg viewBox="0 0 24 24"><polygon points="7 4 19 12 7 20 7 4"/><path d="M3 5v14"/></svg></button>
@@ -93,8 +93,8 @@
       <div class="wf-side-hdr"><span>Nodes</span></div>
       <div class="wf-pal-search">
         <svg class="wf-pal-search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="wf-pal-search-inp" type="search" placeholder="Tìm node…" oninput="wfPaletteFilter(this.value)" spellcheck="false" autocomplete="off" aria-label="Tìm node">
-        <button id="wf-pal-search-clr" class="wf-pal-search-clr" title="Xóa" onclick="wfPaletteFilterClear()" style="display:none" type="button" aria-label="Xóa tìm kiếm">
+        <input id="wf-pal-search-inp" type="search" placeholder="Find node…" oninput="wfPaletteFilter(this.value)" spellcheck="false" autocomplete="off" aria-label="Find node">
+        <button id="wf-pal-search-clr" class="wf-pal-search-clr" title="Clear" onclick="wfPaletteFilterClear()" style="display:none" type="button" aria-label="Clear search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -117,34 +117,35 @@
   <!-- Center: graph canvas -->
   <div id="wf-main" class="card">
     <div id="wf-bar">
-      <input id="wf-name" type="text" placeholder="Tên workflow" value="My Workflow" aria-label="Tên workflow">
+      <input id="wf-name" type="text" placeholder="Workflow name" value="My Workflow" aria-label="Workflow name">
       <!-- Project controller: ADB device/emulator vs a native Win32 window. -->
-      <div id="wf-controller-group" class="wf-speed-group" title="Loại dự án: ADB (thiết bị/giả lập) hay Win32 (cửa sổ chương trình PC)">
+      <div id="wf-controller-group" class="wf-speed-group" title="Project type: ADB (device/emulator) or Win32 (PC program window)">
         <select id="wf-controller" onchange="wfControllerChanged()" title="Controller">
           <option value="adb">ADB</option>
           <option value="win32">Win32</option>
         </select>
         <span id="wf-win32-group" style="display:none;align-items:center;gap:4px">
-          <input id="wf-win32-window" type="text" placeholder="Tên/lớp cửa sổ hoặc PID (VD Genshin*)" title="Cửa sổ mục tiêu" style="width:170px" onchange="wfWin32FromUI()">
-          <button class="btn sm ico wf-var-pick" id="wf-win32-pick" title="Chọn cửa sổ đang mở" onclick="wfPickWindow(event)">
+          <input id="wf-win32-window" type="text" placeholder="Window title/class or PID (e.g. Genshin*)" title="Target window" style="width:170px" onchange="wfWin32FromUI()">
+          <button class="btn sm ico wf-var-pick" id="wf-win32-pick" title="Pick an open window" onclick="wfPickWindow(event)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg></button>
-          <select id="wf-win32-matchby" title="Khớp theo" onchange="wfWin32FromUI()">
+          <select id="wf-win32-matchby" title="Match by" onchange="wfWin32FromUI()">
             <option value="title">Title</option>
             <option value="class">Class</option>
             <option value="pid">PID</option>
           </select>
-          <select id="wf-win32-mode" title="Chế độ điều khiển: Nền (PostMessage) · Nền+chuột (Unity/NIKKE — nháy con trỏ thật) · Nền+Frida API (hook GetCursorPos, không chiếm chuột) · Nền+Frida Engine (hook Unity/Mono, không chiếm chuột) · Trước (SendInput chiếm chuột)" onchange="wfWin32FromUI()">
-            <option value="background">Nền</option>
-            <option value="background_cursor">Nền + chuột (Unity)</option>
-            <option value="background_frida_api">Nền + Frida (hook API)</option>
-            <option value="background_frida_engine">Nền + Frida Unity (hook engine)</option>
-            <option value="foreground">Trước</option>
+          <select id="wf-win32-mode" title="Input mode: Background (PostMessage) · Background + cursor (Unity/NIKKE — flicks the real cursor) · Background + Frida API (hooks GetCursorPos, doesn't take the mouse) · Background + Frida Engine (hooks Unity/Mono, doesn't take the mouse) · Foreground (SendInput, takes the mouse)" onchange="wfWin32FromUI()">
+            <option value="background">Background</option>
+            <option value="background_cursor">Background + cursor (Unity)</option>
+            <option value="background_frida_api">Background + Frida (API hook)</option>
+            <option value="background_frida_engine">Background + Frida Unity (engine hook)</option>
+            <option value="foreground">Foreground</option>
           </select>
         </span>
       </div>
-      <!-- OCR engine của flow — giống dropdown Engine bên Preview nhưng lưu vào
-           JSON (khóa "ocr") nên test run + Runner dùng đúng engine đã chọn. -->
-      <div class="wf-speed-group" id="wf-ocr-group" title="OCR engine cho các block đọc chữ (Chờ chữ / Nếu thấy chữ / Đọc → biến / Tách chữ). Auto = engine tự chọn backend khả dụng.">
+      <!-- The flow's OCR engine — same as the Engine dropdown on the Preview tab
+           but saved into the JSON (key "ocr") so test runs + the Runner use the
+           chosen engine. -->
+      <div class="wf-speed-group" id="wf-ocr-group" title="OCR engine for text-reading blocks (Wait text / If text / Read → variable / Parse). Auto = the engine picks the first available backend.">
         <span class="wf-speed-title">OCR</span>
         <select id="wf-ocr-select" onchange="wfOcrChanged()" title="OCR engine">
           <option value="">Auto</option>
@@ -171,11 +172,11 @@
           <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></button>
         <input id="wf-speed-val" type="number" min="0.1" step="0.1" value="2" title="Speed (x)" style="width:48px;text-align:right" onchange="wfSpeedChanged()">
         <span class="hz-unit">x</span>
-        <input id="wf-speed-pkg" type="text" placeholder="package game" title="Game package to inject speedhack" style="width:150px" onchange="wfSpeedFromUI()">
+        <input id="wf-speed-pkg" type="text" placeholder="game package" title="Game package to inject speedhack" style="width:150px" onchange="wfSpeedFromUI()">
         <button class="btn sm ico ok" id="wf-speed-run-btn" onclick="wfSpeedRun()" title="Enable speed hack" style="display:none"></button>
       </div>
       <span class="spacer"></span>
-      <button class="btn sm ico" onclick="uiShowShortcuts()" title="Phím tắt & thao tác chuột (F1)" aria-label="Phím tắt">
+      <button class="btn sm ico" onclick="uiShowShortcuts()" title="Keyboard & mouse shortcuts (F1)" aria-label="Shortcuts">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.9.4-1.5 1-1.5 2"/><path d="M12 17h.01"/></svg></button>
       <!-- View controls grouped at the right: zoom tray + Canvas/Preview tabs. -->
       <span class="wf-zoom wf-tool-tray">
@@ -199,13 +200,13 @@
       <div id="wf-canvas-empty" class="wf-empty-note">
         <div class="wf-empty-card">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h5.5A2 2 0 0 1 17.5 8.5V14"/></svg>
-          <div class="t">Chưa mở activity</div>
-          <div class="s">Tạo activity rồi kéo block từ palette bên trái vào canvas để dựng luồng.</div>
-          <button class="btn accent sm" onclick="wfActAddCurrent()">+ Thêm activity</button>
+          <div class="t">No activity open</div>
+          <div class="s">Create an activity, then drag blocks from the left palette onto the canvas to build the flow.</div>
+          <button class="btn accent sm" onclick="wfActAddCurrent()">+ Add activity</button>
           <div class="keys">
             <span><b>Wheel</b> zoom</span><span><b>Space</b> pan</span>
             <span><b>F</b> fit view</span><span><b>Tab</b> preview</span>
-            <span><b>F1</b> phím tắt</span>
+            <span><b>F1</b> shortcuts</span>
           </div>
         </div>
       </div>
@@ -223,7 +224,7 @@
           </div>
           <span class="spacer"></span>
           <span id="wf-pv-res" class="wf-pv-res"></span>
-          <span id="wf-pv-hint" class="wf-pv-hint" title="Chuột trái = chọn điểm (đọc màu) · Kéo trái = chọn vùng (crop) · Chuột phải = tap thiết bị · Kéo phải = vuốt thiết bị · Chuột giữa = kéo khung nhìn · Lăn = zoom">trái = chọn điểm · kéo = vùng · phải = tap · kéo phải = vuốt</span>
+          <span id="wf-pv-hint" class="wf-pv-hint" title="Left click = pick point (read color) · Left drag = select region (crop) · Right click = tap device · Right drag = swipe device · Middle drag = pan · Wheel = zoom">left = point · drag = region · right = tap · right-drag = swipe</span>
         </div>
         <div id="wf-pv-wrap"><canvas id="wf-pv-canvas"></canvas></div>
       </div>
@@ -243,7 +244,7 @@
             <button class="wf-act-hdr-tog" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>
             </button>
-            <button class="wf-act-hdr-tog" id="wf-act-dbg" title="Debug overlay: Off — khi bật, mọi match ảnh/màu/OCR vẽ box + confidence lên Preview">
+            <button class="wf-act-hdr-tog" id="wf-act-dbg" title="Debug overlay: Off — when on, every image/color/OCR match draws its box + confidence on Preview">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M12 5v2M12 17v2M5 12H3M21 12h-2"/></svg>
             </button>
             <button class="wf-act-hdr-add" id="wf-act-add" title="Add activity">+</button>
@@ -581,15 +582,16 @@
     <span class="log-label">Log</span>
     <span class="log-count" id="log-count"></span>
     <span class="spacer"></span>
-    <span class="log-filters" id="log-filters" role="group" aria-label="Lọc log">
-      <button class="log-f on" data-f="all" onclick="wfLogFilter('all',event)" title="Tất cả">All</button>
+    <span class="log-filters" id="log-filters" role="group" aria-label="Filter log">
+      <button class="log-f on" data-f="all" onclick="wfLogFilter('all',event)" title="All levels">All</button>
       <button class="log-f" data-f="info" onclick="wfLogFilter('info',event)" title="Info">INF</button>
       <button class="log-f" data-f="success" onclick="wfLogFilter('success',event)" title="Success">OK</button>
       <button class="log-f" data-f="warning" onclick="wfLogFilter('warning',event)" title="Warning">WRN</button>
       <button class="log-f" data-f="error" onclick="wfLogFilter('error',event)" title="Error">ERR</button>
     </span>
-    <button class="btn-log-clear" onclick="wfCopyLog(event)" title="Copy toàn bộ log" type="button">Copy</button>
-    <button class="btn-log-clear" onclick="onClearLog(event)" title="Xóa toàn bộ log" type="button">Xóa</button>
+    <button class="btn-log-clear" onclick="wfCopyLog(event)" title="Copy the whole log" type="button">Copy</button>
+    <button class="btn-log-clear" onclick="wfSaveLog(event)" title="Save the whole log to a .txt file" type="button">Save</button>
+    <button class="btn-log-clear" onclick="onClearLog(event)" title="Clear the whole log" type="button">Clear</button>
   </div>
   <div class="log-body" id="log-body"></div>
 </div>

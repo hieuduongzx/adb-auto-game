@@ -206,7 +206,7 @@ function wfApplyNodeTime(id){
   let chip=el.querySelector(".wf-node-time");
   if(!chip){ chip=document.createElement("span"); chip.className="wf-node-time"; el.appendChild(chip); }
   chip.textContent=wfFmtDur(d.last)+(d.n>1?" ×"+d.n:"");
-  chip.title="Thời gian chạy lần cuối"+(d.n>1?` (chạy ${d.n} lần)`:"");
+  chip.title="Last run duration"+(d.n>1?` (ran ${d.n} times)`:"");
 }
 function wfNoteNodeStart(id){ if(id) wfNodeT0[id]=performance.now(); }
 function wfNoteNodeDone(id){
@@ -318,8 +318,8 @@ function wfResetRunViz(){
   for(const k in wfFailShots) delete wfFailShots[k];
   document.querySelectorAll(".wf-node-time").forEach(el=>el.remove());
   wfResetActStatus();
-  document.querySelectorAll(".wf-node.running,.wf-node.ran-ok,.wf-node.ran-fail,.wf-node.ran-skip")
-    .forEach(el=>el.classList.remove("running","ran-ok","ran-fail","ran-skip"));
+  document.querySelectorAll(".wf-node.running,.wf-node.paused,.wf-node.ran-ok,.wf-node.ran-fail,.wf-node.ran-skip")
+    .forEach(el=>el.classList.remove("running","paused","ran-ok","ran-fail","ran-skip"));
   document.querySelectorAll("#wf-wires path.took-wire,#wf-wires path.nottook-wire")
     .forEach(p=>p.classList.remove("took-wire","nottook-wire"));
   document.querySelectorAll(".wf-port.out.took,.wf-port.out.nottook")
@@ -333,7 +333,9 @@ function appendLog(entry){
     `<span class="log-tag log-${entry.level}">${LOG_TAG[entry.level]||"INF"}</span>`+
     `<span class="log-msg">${escHtml(entry.msg)}</span>`;
   body.appendChild(line);
-  while(body.children.length>500) body.removeChild(body.firstChild);
+  // Cap matches the backend buffer (2000) — long unattended runs keep more
+  // history in view; the Save button exports the full buffer to a file anyway.
+  while(body.children.length>2000) body.removeChild(body.firstChild);
   body.scrollTop=body.scrollHeight;
   updateLogCount();
 }

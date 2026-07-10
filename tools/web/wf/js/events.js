@@ -9,13 +9,20 @@ window.__recv = function(raw){
   if(type==="capture_backend"){
     S.captureBackend=data.backend||"scrcpy";
     const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
-    setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (nhanh/headless)"));
+    setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (fast/headless)"));
     return;
   }
   if(type==="workflow_state"){ wfSetRunning(!!data.running); return; }
   if(type==="capture_failed"){
-    // From the Preview tab's live mirror — surface the error and refresh the empty state.
+    // From the Preview tab's live mirror — surface the error and refresh the
+    // empty state. Auto-refresh can fail at 30Hz, so the toast is throttled:
+    // one per 15s is enough to notice without a toast storm.
     setStatus(`Capture failed: ${data.error||""}`);
+    const now=Date.now();
+    if(now-(window.__wfCapFailToastAt||0)>15000){
+      window.__wfCapFailToastAt=now;
+      if(typeof uiToast==="function") uiToast("Capture failed: "+(data.error||"unknown error"),"error");
+    }
     if(typeof wfPvErr!=="undefined"){ wfPvErr=String(data.error||""); if(!wfPvImg && wfPvActive) wfPvDrawEmpty(); }
     return;
   }
@@ -34,8 +41,8 @@ window.__recv = function(raw){
       return;
     }
     if(typeof wfPvOverlay!=="undefined"){
-      // Chỉ cập nhật state overlay — không ép chuyển tab Preview.
-      // User tự mở Preview (Tab) khi muốn xem box.
+      // Only update the overlay state — never force-switch to the Preview tab.
+      // The user opens Preview (Tab) themselves when they want to see the boxes.
       wfPvOverlay=data.rects||[];
       if(typeof wfPvMatchRegion!=="undefined") wfPvMatchRegion=data.region||null;
       if(typeof wfPvOverlayMeta!=="undefined") wfPvOverlayMeta=data;
@@ -156,22 +163,31 @@ function wfToggleLog(ev){
   wfSaveSettings();
 }
 
-// Lọc log theo mức (INF/OK/WRN/ERR) — set data-filter trên #log-card, CSS ẩn
-// các dòng khác mức; "Tất cả" gỡ filter.
+// Filter the log by level (INF/OK/WRN/ERR) — sets data-filter on #log-card, CSS
+// hides the other levels; "All" removes the filter.
 function wfLogFilter(f, ev){
   if(ev) ev.stopPropagation();
   const card=$("log-card"); if(!card) return;
   if(f==="all") card.removeAttribute("data-filter"); else card.setAttribute("data-filter",f);
   document.querySelectorAll("#log-filters .log-f").forEach(b=>b.classList.toggle("on", b.dataset.f===f));
-  if(card.classList.contains("collapsed")) wfToggleLog();   // lọc là để đọc — mở log ra
+  if(card.classList.contains("collapsed")) wfToggleLog();   // filtering means reading — open the log
 }
 function wfCopyLog(ev){
   if(ev) ev.stopPropagation();
   const body=$("log-body"); if(!body) return;
   const txt=[...body.querySelectorAll(".log-line")].map(l=>l.textContent.replace(/\s+/g," ").trim()).join("\n");
-  if(!txt){ setStatus("Log trống"); return; }
-  navigator.clipboard.writeText(txt).then(()=>uiToast("Đã copy "+body.children.length+" dòng log","success"))
-    .catch(()=>uiToast("Không copy được log","error"));
+  if(!txt){ setStatus("Log is empty"); return; }
+  navigator.clipboard.writeText(txt).then(()=>uiToast("Copied "+body.children.length+" log lines","success"))
+    .catch(()=>uiToast("Couldn't copy the log","error"));
+}
+// Save the full log (the backend buffer, not just the visible tail) to a .txt
+// file via a native save dialog on the Python side.
+async function wfSaveLog(ev){
+  if(ev) ev.stopPropagation();
+  try{
+    const path=await api().save_log();
+    if(path) uiToast("Log saved → "+path,"success");
+  }catch{ uiToast("Couldn't save the log","error"); }
 }
 
 // ── Device handlers ─────────────────────────────────────────────────────────
@@ -191,10 +207,10 @@ async function openDevHelper(){ try{ await api().open_dev_helper(JSON.stringify(
 // New blank workflow.
 async function wfNew(){
   if(WF.activities.length || WF.functions.length){
-    const ok=await uiConfirm({title:"Tạo workflow mới?", message:"Thay đổi chưa lưu của workflow hiện tại sẽ mất.", ok:"Tạo mới", danger:true});
+    const ok=await uiConfirm({title:"Create a new workflow?", message:"Unsaved changes in the current workflow will be lost.", ok:"Create new", danger:true});
     if(!ok) return;
   }
-  const name = await uiPrompt({title:"Workflow mới", label:"Tên workflow", value:"My Workflow"});
+  const name = await uiPrompt({title:"New workflow", label:"Workflow name", value:"My Workflow"});
   if(name===null) return; // cancelled
   WF.name = name.trim() || "My Workflow";
   WF.version=2; WF.templatesDir="templates";

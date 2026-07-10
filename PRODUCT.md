@@ -38,7 +38,8 @@ always readable at a glance from across the desk.
    chrome must earn its place.
 3. **State first** — run status, per-activity status, and device connection
    are visible without interaction.
-4. **Vietnamese-first labels**, mono for data (serials, timers, counts).
+4. **English labels throughout** (unified July 2026 — previously mixed
+   Vietnamese/English), mono for data (serials, timers, counts).
 
 ## Accessibility & Inclusion
 

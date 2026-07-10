@@ -48,6 +48,7 @@ JSON shape::
 """
 from __future__ import annotations
 
+import json
 import os
 import random
 import re
@@ -165,6 +166,10 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # can, on its own, sit idle until 07:00 then boot the emulator (no Task
     # Scheduler / PC-wake needed — the PC is already on running this tool).
     "launch_emulator": {"label": "Mở giả lập", "kind": "action", "ins": 1, "outs": ["out"]},
+    # Is an emulator instance booted & its ADB responding? "last" (default)
+    # re-checks the instance saved by the last successful launch_emulator, so a
+    # flow can skip the boot when "the one I set" is already up.
+    "if_emulator": {"label": "If emulator ready", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     # ── Win32 (điều khiển cửa sổ chương trình PC) ─────────────────────────────
     # Only meaningful when the flow's controller is "win32". Tap/swipe/image/
     # color/OCR nodes already work on Win32 via the shared capture pipeline;
@@ -202,8 +207,14 @@ EMULATOR_CONSOLES: Dict[str, Dict[str, Any]] = {
     "mumu": {
         "exes": ["MuMuManager.exe"],
         "args": ["control", "-v", "{index}", "launch"],
-        "dirs": [r"C:\Program Files\Netease\MuMuPlayer-12.0\shell",
-                 r"C:\Program Files\Netease\MuMuPlayerGlobal-12.0\shell"],
+        # MuMu 12 keeps the console in <install>\shell; the newer 5.x/6.x
+        # (incl. Global) builds moved it to <install>\nx_main — "subdirs" lets
+        # a bare install dir resolve either layout.
+        "subdirs": ["shell", "nx_main"],
+        "dirs": [r"C:\Program Files\Netease\MuMuPlayer-12.0",
+                 r"C:\Program Files\Netease\MuMuPlayerGlobal-12.0",
+                 r"C:\Program Files\Netease\MuMuPlayer",
+                 r"C:\Program Files\Netease\MuMuPlayerGlobal"],
         "port0": 16384, "step": 32,
     },
     "nox": {
@@ -225,6 +236,14 @@ EMULATOR_CONSOLES: Dict[str, Dict[str, Any]] = {
         "port0": 5555, "step": 10,
     },
 }
+
+# The instance the last successful launch_emulator booted ({emulator, index,
+# port, serial, …}). if_emulator's "last" option reads this back, so a flow can
+# check "is the emulator I used before still the one running?" across runs.
+_EMULATOR_STATE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "data", "emulator_state.json",
+)
 
 # Condition node types a switch case may use — only the *instant* ones (no
 # wait_* timeout blocking, no tap_* side-effect), so evaluating one case never
@@ -553,6 +572,16 @@ class WorkflowEngine:
         except Exception as e:
             log_warning(f"[workflow] Không đổi được OCR engine '{name}': {e}")
 
+    def _flow_has_node_type(self, *ntypes: str) -> bool:
+        """True if any activity/function graph in the loaded flow contains a
+        node of one of the given types."""
+        graphs = [(a.get("graph") or {}) for a in (self.flow.get("activities") or [])]
+        graphs += [(f.get("graph") or {}) for f in (self.flow.get("functions") or [])]
+        return any(
+            str(n.get("type")) in ntypes
+            for g in graphs for n in (g.get("nodes") or [])
+        )
+
     def _ensure_ready(self) -> bool:
         """Connect the selected backend + start continuous capture if needed."""
         if getattr(self, "_controller", "adb") == "win32":
@@ -561,6 +590,13 @@ class WorkflowEngine:
             if not self.auto.adb.device:
                 self.auto.adb.check_adb_connection()
             if not self.auto.adb.device:
+                # A flow with a launch_emulator / if_emulator node may
+                # legitimately start with no device — those nodes boot/find the
+                # emulator and attach to its ADB (_attach_adb_after_boot).
+                if self._flow_has_node_type("launch_emulator", "if_emulator"):
+                    log_info("[workflow] No device yet — an emulator node will boot/attach one")
+                    self._apply_ocr_backend()
+                    return True
                 log_error("[workflow] No ADB device connected")
                 return False
             self.auto._update_screen_size()
@@ -1675,6 +1711,8 @@ class WorkflowEngine:
                 self._last_pos = (int(hits[0][0]), int(hits[0][1]))
                 log_info(f"[workflow] 👆 chạm {tapped} vị trí khớp {os.path.basename(tpl)}")
             return tapped > 0
+        if ntype == "if_emulator":
+            return self._c_if_emulator(params)
         if ntype == "if_app":
             negate = bool(params.get("negate", False))
             needle = str(self._resolve_value(params.get("package", "")) or "").strip().lower()
@@ -2823,10 +2861,142 @@ class WorkflowEngine:
             return False
 
         wait = float(p.get("wait", 0) or 0)
+        port = self._emulator_adb_port(p, kind, index)
+        host: Optional[str] = None
         if wait > 0:
-            port = self._emulator_adb_port(p, kind, index)
-            self._wait_emulator_adb(port, wait)
+            host = self._wait_emulator_adb(port, wait)
+        # Remember which instance this flow booted so if_emulator's "last used"
+        # option can re-check the same one on future runs.
+        self._save_emulator_state({
+            "emulator": kind,
+            "index": index,
+            "instance": str(p.get("instance", "") or ""),
+            "path": str(p.get("path", "") or ""),
+            "port": port,
+            "serial": host or (f"127.0.0.1:{port}" if port else None),
+            "launched_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+        # Flows started with no device (deferred readiness in _ensure_ready)
+        # attach to the freshly booted emulator here so the next node can run.
+        if getattr(self, "_controller", "adb") != "win32" and not self.auto.adb.device:
+            self._attach_adb_after_boot(host)
         return True
+
+    @staticmethod
+    def _save_emulator_state(state: Dict[str, Any]) -> None:
+        try:
+            os.makedirs(os.path.dirname(_EMULATOR_STATE_PATH), exist_ok=True)
+            with open(_EMULATOR_STATE_PATH, "w", encoding="utf-8") as fh:
+                json.dump(state, fh, ensure_ascii=False, indent=2)
+        except Exception as exc:
+            log_warning(f"[workflow] Couldn't save the emulator state: {exc}")
+
+    @staticmethod
+    def _load_emulator_state() -> Optional[Dict[str, Any]]:
+        try:
+            with open(_EMULATOR_STATE_PATH, "r", encoding="utf-8") as fh:
+                return json.load(fh) or None
+        except Exception:
+            return None
+
+    def _c_if_emulator(self, p: Dict) -> bool:
+        """True when the target emulator instance is booted and its ADB answers
+        (``adb connect`` + ``sys.boot_completed`` == 1).
+
+        ``emulator`` = "last" (default) re-checks the instance the last
+        successful launch_emulator saved — "is the one I set still running?".
+        With ``attach`` on (default), a flow that started with no device binds
+        to the ready instance so the following nodes can drive it.
+        """
+        kind = str(p.get("emulator", "last")).strip().lower() or "last"
+        try:
+            index = int(float(p.get("index", 0) or 0))
+        except (TypeError, ValueError):
+            index = 0
+        # Blank/0 port = "auto" (the designer serializes an empty num field as 0).
+        port: Optional[int] = None
+        override = str(p.get("port", "") or "").strip()
+        if override:
+            try:
+                val = int(float(override))
+                port = val if val > 0 else None
+            except (TypeError, ValueError):
+                port = None
+        if kind == "last":
+            saved = self._load_emulator_state()
+            if not saved:
+                log_warning("[workflow] 🖥 No saved emulator yet — run a Launch emulator node once first")
+                return False
+            kind = str(saved.get("emulator") or "?").lower()
+            try:
+                index = int(saved.get("index") or 0)
+            except (TypeError, ValueError):
+                index = 0
+            if port is None:
+                try:
+                    val = int(saved.get("port") or 0)
+                    port = val if val > 0 else None
+                except (TypeError, ValueError):
+                    port = None
+        if port is None:
+            spec = EMULATOR_CONSOLES.get(kind)
+            if spec and "port0" in spec:
+                port = spec["port0"] + index * spec["step"]
+        if port is None:
+            log_warning(f"[workflow] 🖥 Can't derive the ADB port for '{kind}' — set 'ADB port override'")
+            return False
+        host = f"127.0.0.1:{port}"
+        ready = self._emulator_adb_ready(host)
+        log_info(f"[workflow] 🖥 Emulator {kind} #{index} ({host}) → {'ready' if ready else 'not ready'}")
+        if (ready and bool(p.get("attach", True))
+                and getattr(self, "_controller", "adb") != "win32"
+                and not self.auto.adb.device):
+            self._attach_adb_after_boot(host)
+        return ready
+
+    @staticmethod
+    def _emulator_adb_ready(host: str) -> bool:
+        """One-shot readiness probe: ``adb connect`` succeeds AND the instance
+        reports ``sys.boot_completed`` == 1 (Android finished booting)."""
+        from src.core.adb.constants import get_adb_path
+        import subprocess
+        adb = get_adb_path()
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        try:
+            r = subprocess.run(
+                [adb, "connect", host],
+                capture_output=True, text=True, timeout=5, creationflags=flags,
+            )
+            if "connected" not in (r.stdout or "").lower():
+                return False
+            r = subprocess.run(
+                [adb, "-s", host, "shell", "getprop", "sys.boot_completed"],
+                capture_output=True, text=True, timeout=5, creationflags=flags,
+            )
+            return (r.stdout or "").strip() == "1"
+        except Exception:
+            return False
+
+    def _attach_adb_after_boot(self, serial: Optional[str]) -> None:
+        """Bind the engine to the emulator that launch_emulator just booted:
+        select its ADB serial (if known), then start capture — the steps
+        _ensure_ready() skipped when the flow started with no device."""
+        try:
+            adb = self.auto.adb
+            if serial:
+                adb.device_id = serial
+            adb.check_adb_connection()
+            if not adb.device:
+                log_warning(
+                    "[workflow] No ADB device after the emulator launch — "
+                    "set 'Wait' on the Launch emulator node so it can finish booting"
+                )
+                return
+            self.auto._update_screen_size()
+            if not getattr(self.auto, "capture_running", False):
+                self.auto.start_continuous_capture()
+        except Exception as exc:
+            log_warning(f"[workflow] Couldn't attach to the booted emulator: {exc}")
 
     def _emulator_launch_argv(self, p: Dict, kind: str, index: int) -> Optional[List[str]]:
         """Build the console argv for booting one instance, or None if it can't be
@@ -2847,7 +3017,7 @@ class WorkflowEngine:
         spec = EMULATOR_CONSOLES.get(kind)
         if not spec:
             return None
-        exe = self._resolve_console_exe(path, spec["exes"], spec["dirs"])
+        exe = self._resolve_console_exe(path, spec["exes"], spec["dirs"], spec.get("subdirs"))
         if not exe:
             return None
         instance = str(p.get("instance", "") or index)
@@ -2856,31 +3026,43 @@ class WorkflowEngine:
         return [exe] + args
 
     @staticmethod
-    def _resolve_console_exe(path: str, exes: List[str], dirs: List[str]) -> Optional[str]:
+    def _resolve_console_exe(path: str, exes: List[str], dirs: List[str],
+                             subdirs: Optional[List[str]] = None) -> Optional[str]:
         """Find the console .exe: an explicit file, else inside an explicit dir,
-        else inside each known default install dir."""
+        else inside each known default install dir. ``subdirs`` are well-known
+        per-family subfolders also searched under each dir (e.g. MuMu's
+        ``shell``/``nx_main``)."""
+        def find_in(d: str) -> Optional[str]:
+            for sub in [""] + list(subdirs or []):
+                for name in exes:
+                    cand = os.path.join(d, sub, name)
+                    if os.path.exists(cand):
+                        return cand
+            return None
+
         if path:
             if os.path.isfile(path):
                 return path
             if os.path.isdir(path):
-                for name in exes:
-                    cand = os.path.join(path, name)
-                    if os.path.exists(cand):
-                        return cand
+                hit = find_in(path)
+                if hit:
+                    return hit
         for d in dirs:
-            for name in exes:
-                cand = os.path.join(d, name)
-                if os.path.exists(cand):
-                    return cand
+            hit = find_in(d)
+            if hit:
+                return hit
         return None
 
     def _emulator_adb_port(self, p: Dict, kind: str, index: int) -> Optional[int]:
         """The instance's ADB port: an explicit ``port`` override, else derived
         from the family's first-instance port + index*step (mirrors constants.py)."""
+        # The designer serializes a blank num field as 0 — treat <= 0 as "auto".
         override = str(p.get("port", "")).strip()
         if override:
             try:
-                return int(override)
+                val = int(float(override))
+                if val > 0:
+                    return val
             except ValueError:
                 pass
         spec = EMULATOR_CONSOLES.get(kind)
@@ -2888,13 +3070,14 @@ class WorkflowEngine:
             return None
         return spec["port0"] + index * spec["step"]
 
-    def _wait_emulator_adb(self, port: Optional[int], wait: float) -> None:
+    def _wait_emulator_adb(self, port: Optional[int], wait: float) -> Optional[str]:
         """Poll ``adb connect 127.0.0.1:<port>`` until it succeeds or ``wait`` s
-        elapse. With no known port, just sleep ``wait`` s to let the emulator boot."""
+        elapse. Returns the connected ``host:port`` serial, or None. With no
+        known port, just sleep ``wait`` s to let the emulator boot."""
         if not port:
             log_info(f"[workflow] ▶ Chờ giả lập khởi động {wait:.0f}s (không rõ cổng ADB)")
             self._sleep(wait)
-            return
+            return None
         from src.core.adb.constants import get_adb_path
         adb = get_adb_path()
         host = f"127.0.0.1:{port}"
@@ -2910,11 +3093,12 @@ class WorkflowEngine:
                 )
                 if "connected" in (r.stdout or "").lower():  # "connected to" / "already connected"
                     log_success(f"[workflow] ▶ Giả lập sẵn sàng — ADB {host}")
-                    return
+                    return host
             except Exception:
                 pass
             time.sleep(1.0)
         log_warning(f"[workflow] ▶ Chưa thấy ADB {host} sau {wait:.0f}s")
+        return None
 
     # ── Win32 handlers ─────────────────────────────────────────────────────────
 

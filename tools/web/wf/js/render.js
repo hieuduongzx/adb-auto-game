@@ -72,12 +72,12 @@ function wfRenderActivities(){
   }
   if(seqWrap){
     if(!seqActs.length){
-      seqWrap.innerHTML='<div class="wf-list-empty">Chưa có activity tuần tự.<span class="hint">Bấm + để tạo activity đầu tiên.</span></div>';
+      seqWrap.innerHTML='<div class="wf-list-empty">No sequence activities yet.<span class="hint">Click + to create the first one.</span></div>';
     } else seqActs.forEach(a=>rowInto(seqWrap, a));
   }
   if(bgWrap){
     if(!bgActs.length){
-      bgWrap.innerHTML='<div class="wf-list-empty">Chưa có background task.<span class="hint">Chạy song song, theo interval — bấm + để thêm.</span></div>';
+      bgWrap.innerHTML='<div class="wf-list-empty">No background tasks yet.<span class="hint">They run in parallel on an interval — click + to add one.</span></div>';
     } else bgActs.forEach(a=>rowInto(bgWrap, a));
   }
   wfToggleActPanel();   // re-apply the persisted collapsed state on every render
@@ -87,7 +87,7 @@ function wfRenderFunctions(){
   const wrap=$("wf-functions"); if(!wrap) return; wrap.innerHTML="";
   const cnt=$("wf-fn-count"); if(cnt) cnt.textContent = WF.functions.length? String(WF.functions.length):"";
   if(!WF.functions.length){
-    wrap.innerHTML='<div class="wf-list-empty">Chưa có function.<span class="hint">Tạo function rồi kéo vào canvas để gọi lại.</span></div>';
+    wrap.innerHTML='<div class="wf-list-empty">No functions yet.<span class="hint">Create one, then drag it onto the canvas to call it.</span></div>';
     return;
   }
   WF.functions.forEach(fn=>{
@@ -215,8 +215,8 @@ function wfCommitReorder(listEl, arr){
 let wfPalCollapsed={};
 try{ wfPalCollapsed=JSON.parse(localStorage.getItem("wfPalCollapsed")||"{}")||{}; }catch{}
 function wfPalToggleCat(key){
-  // Toggle theo trạng thái HIỆU DỤNG (pref đã lưu, không thì default closed của
-  // category) — không thì click đầu tiên vào nhóm gập-mặc-định sẽ không mở ra.
+  // Toggle based on the EFFECTIVE state (saved pref, else the category's default
+  // closed flag) — otherwise the first click on a closed-by-default group wouldn't open it.
   const cat=(typeof WF_CATS!=="undefined") ? WF_CATS.find(c=>c.key===key) : null;
   const cur=(wfPalCollapsed[key]!==undefined) ? !!wfPalCollapsed[key] : !!(cat&&cat.closed);
   wfPalCollapsed[key]=!cur;
@@ -235,12 +235,12 @@ function wfRenderPalette(){
     // Controller-specific categories only appear in their matching project mode
     // (Device/emulator = ADB, Win32 window nodes = PC).
     if(cat.ctrl && cat.ctrl!==ctrl) return;
-    // .hidden = type gộp/khai tử: vẫn hydrate + chạy (file cũ), không cho kéo mới.
+    // .hidden = merged/retired type: still hydrates + runs (old files), just not draggable as new.
     let types=Object.keys(WF_NODES).filter(t=>WF_NODES[t].cat===cat.key && !WF_NODES[t].hidden);
     if(q) types=types.filter(t=>(WF_NODES[t].label+" "+t).toLowerCase().includes(q));
     if(!types.length) return;
     shown+=types.length;
-    // Chưa có lựa chọn lưu nào → dùng default của category (closed:true = gập).
+    // No saved preference yet → use the category default (closed:true = collapsed).
     const stored = wfPalCollapsed[cat.key];
     const closed = !q && (stored!==undefined ? !!stored : !!cat.closed);
     const hdr=document.createElement("div"); hdr.className="wf-pal-cat cat-"+cat.key+(closed?" closed":"");
@@ -256,9 +256,9 @@ function wfRenderPalette(){
   if(!shown){
     const none=document.createElement("div"); none.className="wf-pal-none";
     if(q){
-      none.innerHTML=`Không có node khớp “${escHtml(wfPaletteQuery.trim())}”.<br><span style="opacity:.85">Thử từ khóa khác hoặc xóa ô tìm.</span>`;
+      none.innerHTML=`No nodes match “${escHtml(wfPaletteQuery.trim())}”.<br><span style="opacity:.85">Try another keyword or clear the search.</span>`;
     } else {
-      none.textContent="Không có node.";
+      none.textContent="No nodes.";
     }
     pal.appendChild(none);
   }
@@ -362,7 +362,7 @@ function wfRenderVarsPanel(){
   body.innerHTML="";
   if(!allNames.length){
     const e=document.createElement("div"); e.className="wf-vars-empty";
-    e.textContent="Chưa có biến. Bấm + để thêm biến global.";
+    e.textContent="No variables yet. Click + to add a global variable.";
     body.appendChild(e); wfEqualizeCornerPanels(); return;
   }
   function mkSep(label){ const s=document.createElement("span"); s.className="wf-vars-sep"; s.textContent=label; return s; }
@@ -421,7 +421,7 @@ function wfShowGlobsEditor(){
     body.innerHTML="";
     if(!WF.globals.length){
       const e=document.createElement("div"); e.className="wf-vars-empty";
-      e.textContent="Chưa có biến global. Bấm “+ Add”.";
+      e.textContent="No global variables. Click “+ Add”.";
       body.appendChild(e);
     }
     WF.globals.forEach((v,idx)=> { body.appendChild(wfGlobRow(v,idx,render)); wfBuildGlobChildren(v,body,render); });

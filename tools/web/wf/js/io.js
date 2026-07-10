@@ -103,17 +103,19 @@ function wfHydrate(flow){
 }
 
 // ── Dirty state + autosave ────────────────────────────────────────────────────
-// Mọi mutation đi qua wfPushUndo/wfPushUndoDebounced đều gọi wfMarkDirty():
-// nút Save hiện chấm cam "chưa lưu", và (khi flow đã có file) một autosave
-// debounce 3s ghi đè im lặng — workflow_save không bao giờ mở dialog nên an toàn.
-let wfDirty=false;          // có thay đổi chưa ghi xuống đĩa
-let wfHasFile=false;        // flow đã gắn với một file cụ thể (mở/lưu ít nhất 1 lần)
+// Every mutation that goes through wfPushUndo/wfPushUndoDebounced calls
+// wfMarkDirty(): the Save button shows an amber "unsaved" dot, and (once the
+// flow has a file) a 3s-debounced autosave silently overwrites it —
+// workflow_save never opens a dialog, so this is safe.
+let wfDirty=false;          // there are changes not yet written to disk
+let wfHasFile=false;        // the flow is bound to a concrete file (opened/saved at least once)
 let wfAutosaveOn=true;
 let _wfAutosaveTimer=null;
+let _wfAutosaveFailAt=0;    // throttle the failure toast (autosave retries often)
 function wfSyncDirtyUI(){
   const b=$("wf-save-btn");
   if(b){ b.classList.toggle("dirty", wfDirty);
-    b.title = wfDirty ? "Lưu (Ctrl+S) — có thay đổi chưa lưu" : "Lưu vào file hiện tại (Ctrl+S)"; }
+    b.title = wfDirty ? "Save (Ctrl+S) — unsaved changes" : "Save to the current file (Ctrl+S)"; }
 }
 function wfMarkDirty(){
   wfDirty=true; wfSyncDirtyUI();
@@ -125,13 +127,22 @@ function wfMarkDirty(){
 function wfMarkClean(){ wfDirty=false; clearTimeout(_wfAutosaveTimer); wfSyncDirtyUI(); }
 async function wfAutosave(){
   if(!wfDirty || !wfHasFile) return;
-  if(wfRunning){ _wfAutosaveTimer=setTimeout(wfAutosave, 5000); return; }   // đợi run xong
+  if(wfRunning){ _wfAutosaveTimer=setTimeout(wfAutosave, 5000); return; }   // wait for the run to finish
+  let failed=false;
   try{
     const r=await api().workflow_save(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
-    if(r&&r.ok){ wfMarkClean(); setStatus("Đã tự lưu · "+new Date().toLocaleTimeString()); }
-  }catch{}
+    if(r&&r.ok){ setStatus("Autosaved · "+new Date().toLocaleTimeString()); wfMarkClean(); return; }
+    failed = !!(r && r.ok===false);
+  }catch{ failed=true; }
+  // Autosave failed: the dirty dot stays on, and (throttled to once a minute)
+  // a toast says so — a silent catch here used to hide disk-full/locked-file
+  // errors until the user lost work.
+  if(failed && Date.now()-_wfAutosaveFailAt>60000){
+    _wfAutosaveFailAt=Date.now();
+    if(typeof uiToast==="function") uiToast("Autosave failed — use Ctrl+S and check the log.","error");
+  }
 }
-// Chặn đóng cửa sổ khi còn thay đổi chưa lưu (best-effort trong WebView2).
+// Block closing the window while there are unsaved changes (best-effort in WebView2).
 window.addEventListener("beforeunload", e=>{ if(wfDirty){ e.preventDefault(); e.returnValue=""; } });
 
 async function wfExport(){
@@ -141,12 +152,12 @@ async function wfExport(){
 async function wfSave(){
   const r=await api().workflow_save(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
   if(r&&r.ok){ wfHasFile=true; wfMarkClean(); setStatus("Workflow saved"); }
-  else if(r&&r.ok===false) uiToast("Lưu thất bại — xem log để biết chi tiết.","error");
+  else if(r&&r.ok===false) uiToast("Save failed — check the log for details.","error");
 }
 async function wfImport(){
   const txt=await api().workflow_import(); if(!txt)return;
-  try{ wfHydrate(JSON.parse(txt)); wfHasFile=true; wfMarkClean(); setStatus("Workflow imported"); uiToast("Đã mở workflow \""+(WF.name||"")+"\"","success"); }
-  catch(e){ uiToast("File JSON không hợp lệ: "+e,"error"); }
+  try{ wfHydrate(JSON.parse(txt)); wfHasFile=true; wfMarkClean(); setStatus("Workflow imported"); uiToast("Opened workflow \""+(WF.name||"")+"\"","success"); }
+  catch(e){ uiToast("Invalid JSON file: "+e,"error"); }
 }
 // Play / stop glyphs for the run toggle (icon-only button).
 const WF_ICO_PLAY = '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
@@ -157,6 +168,7 @@ function wfSetRunning(on){
   const cvs=$("wf-canvas"); if(cvs) cvs.classList.toggle("wf-running", !!on);
   if(!on){
     if(typeof wfDebugMode!=="undefined") wfDebugMode=false;
+    if(typeof wfClearDebugPause==="function") wfClearDebugPause();
     // Keep the green/red trail so the user can see where execution stopped.
     // Only remove the amber "currently running" pulse and dim unreached blocks.
     if(wfRunNode){ const _re=wfNodeElById(wfRunNode); if(_re) _re.classList.remove("running"); }
@@ -180,26 +192,26 @@ function wfSetRunning(on){
     pill.classList.toggle("ok", !on && !wfRunStopped);
     pill.classList.remove("err");
     const txt=pill.querySelector(".wf-run-txt");
-    if(txt) txt.textContent = on ? "Đang chạy" : (wfRunStopped ? "Đã dừng" : "Sẵn sàng");
+    if(txt) txt.textContent = on ? "Running" : (wfRunStopped ? "Stopped" : "Ready");
   }
   wfRenderVarsPanel();
 }
 async function wfToggleRun(){
   if(wfRunning){ wfSetRunning(false); await api().workflow_stop(); return; }  // reset first, then stop
-  if(!WF.activities.length){ uiToast("Chưa có activity nào để chạy.","warning"); return; }
-  // Pre-flight: chặn khi có LỖI cứng (dây đứt, thiếu template…) — cảnh báo thì
-  // vẫn chạy bình thường. Người dùng có thể xem danh sách hoặc cố chạy tiếp.
+  if(!WF.activities.length){ uiToast("No activities to run yet.","warning"); return; }
+  // Pre-flight: block on HARD errors (broken wires, missing templates…) —
+  // warnings still run normally. The user can view the list or run anyway.
   if(typeof wfValidationIssues==="function"){
     const issues=wfValidationIssues();
     const errs=issues.filter(i=>i.sev==="err").length;
     if(errs){
       const pick=await uiModal({
-        title:"Workflow đang có lỗi",
-        body:`<div class="ui-modal-msg">Phát hiện <b>${errs} lỗi</b>${issues.length-errs?` và ${issues.length-errs} cảnh báo`:""} — flow có thể dừng giữa chừng hoặc chạy sai nhánh.</div>`,
+        title:"The workflow has errors",
+        body:`<div class="ui-modal-msg">Found <b>${errs} error${errs===1?"":"s"}</b>${issues.length-errs?` and ${issues.length-errs} warning${issues.length-errs===1?"":"s"}`:""} — the flow may stop midway or take the wrong branch.</div>`,
         buttons:[
-          {label:"Hủy", value:"cancel"},
-          {label:"Xem lỗi", value:"view"},
-          {label:"Vẫn chạy", value:"run", kind:"err"},
+          {label:"Cancel", value:"cancel"},
+          {label:"View errors", value:"view"},
+          {label:"Run anyway", value:"run", kind:"err"},
         ],
       });
       if(pick==="view"){ wfValidatePanelShow(issues); return; }
@@ -214,7 +226,7 @@ async function wfToggleRun(){
   if(!ok) wfSetRunning(false);
 }
 async function wfRunGui(){
-  if(!WF.activities.length){ uiToast("Chưa có activity nào.","warning"); return; }
+  if(!WF.activities.length){ uiToast("No activities yet.","warning"); return; }
   await api().open_runner(JSON.stringify(wfSerialize()));
   setStatus("Runner GUI opened");
 }

@@ -42,8 +42,8 @@ function wfAddGroup(x,y,w,h){
   groups.push(gr); wfRenderCanvas(); setStatus(`Created "${gr.name}" — drag the title to move the whole group`);
   return gr;
 }
-function wfDeleteGroup(id){ wfPushUndo(); const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); setStatus("Đã xóa group (block bên trong giữ nguyên) — Ctrl+Z để hoàn tác"); } }
-function wfRenameGroup(gr){ uiPrompt({title:"Đổi tên group", label:"Tên group", value:gr.name||""}).then(nm=>{
+function wfDeleteGroup(id){ wfPushUndo(); const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); setStatus("Group deleted (blocks kept) — Ctrl+Z to undo"); } }
+function wfRenameGroup(gr){ uiPrompt({title:"Rename group", label:"Group name", value:gr.name||""}).then(nm=>{
   if(nm===null) return; nm=nm.trim(); if(!nm||nm===gr.name) return;
   wfPushUndo(); gr.name=nm; wfRenderCanvas();
 }); }
@@ -292,7 +292,7 @@ function wfWireInsertSplice(g, edge, node){
   const toId=edge.to, toPort=edge.toPort||"in";
   edge.to=node.id; edge.toPort="in";
   if(outPort) g.edges.push({from:node.id, fromPort:outPort, to:toId, toPort:toPort});
-  setStatus("Đã chèn block vào giữa dây");
+  setStatus("Block spliced into the wire");
   return true;
 }
 
@@ -379,11 +379,11 @@ async function wfRunSingleNode(node){
     // Toolbar / shortcut with no arg → use the primary selection.
     node = WF.selectedNode ? wfNode(WF.selectedNode) : null;
   }
-  if(!node){ uiToast("Chọn một block để test.","warning"); return; }
-  if(wfRunning){ uiToast("Đang chạy workflow — dừng trước khi test 1 block.","warning"); return; }
-  if(wfNodeTesting){ setStatus("Đang test block…"); return; }
+  if(!node){ uiToast("Select a block to test.","warning"); return; }
+  if(wfRunning){ uiToast("A workflow is running — stop it before testing a single block.","warning"); return; }
+  if(wfNodeTesting){ setStatus("Testing block…"); return; }
   if(!wfCanTestNode(node)){
-    uiToast("Block cấu trúc (loop/call/…) không test riêng — dùng Run from selected.","warning");
+    uiToast("Structural blocks (loop/call/…) can't be tested alone — use Run from selected.","warning");
     return;
   }
   const def=WF_NODES[node.type]||{};
@@ -422,13 +422,13 @@ async function wfRunSingleNode(node){
     const branch = port!=null ? " → "+port : "";
     setStatus("Test «"+(def.label||node.type)+"»: "+status+branch);
     if(typeof uiToast==="function"){
-      uiToast((def.label||node.type)+": "+(failish?"không khớp / fail":"ok")+branch,
+      uiToast((def.label||node.type)+": "+(failish?"no match / fail":"ok")+branch,
               failish?"warning":"success");
     }
   }catch(e){
     if(typeof wfSetRunningNode==="function") wfSetRunningNode(null);
     setStatus("Test block failed");
-    if(typeof uiToast==="function") uiToast("Test block lỗi","error");
+    if(typeof uiToast==="function") uiToast("Test block error","error");
   }finally{
     wfNodeTesting=false;
   }
@@ -590,7 +590,7 @@ function wfInitCanvas(){
     // Dropped straight onto a wire? Capture its edge so the new block splices in.
     const insEdge = wfInsWireGrp ? wfInsWireGrp.__edge : null;
     wfWireInsertClear();
-    const g=wfGraph(); if(!g){ uiToast("Chọn hoặc tạo một activity/function trước.","warning"); wfPaletteDrag=null; return; }
+    const g=wfGraph(); if(!g){ uiToast("Select or create an activity/function first.","warning"); wfPaletteDrag=null; return; }
     const wr=$("wf-world").getBoundingClientRect();
     const x=wfSnap((e.clientX-wr.left)/wfZoom-70), y=wfSnap((e.clientY-wr.top)/wfZoom-14);
     wfPushUndo();

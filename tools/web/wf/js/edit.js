@@ -62,8 +62,8 @@ function wfSyncFocusBtn(){
 function wfSyncDebugOverlayBtn(){
   const b=$("wf-act-dbg");
   if(b){ b.classList.toggle("on", wfDebugOverlayOn); b.title = wfDebugOverlayOn
-    ? "Debug overlay: ON — match ảnh/màu/OCR vẽ box + conf trên Preview (không đổi tab). Click để tắt."
-    : "Debug overlay: OFF — không vẽ match khi run. Click để bật."; }
+    ? "Debug overlay: ON — image/color/OCR matches draw box + conf on Preview (doesn't switch tabs). Click to turn off."
+    : "Debug overlay: OFF — matches aren't drawn during a run. Click to turn on."; }
 }
 // Toggle follow-focus. When turned on mid-run, immediately snap to the block
 // that's running right now — using the engine's true current node (wfLiveNode),
@@ -88,8 +88,8 @@ function wfToggleDebugOverlay(){
     }
     setStatus("Debug overlay off");
   } else {
-    // Không ép đổi tab — chỉ bật cờ vẽ; user tự mở Preview khi muốn xem.
-    setStatus("Debug overlay on — match boxes vẽ khi mở Preview");
+    // Never force a tab switch — just arm the draw flag; the user opens Preview when they want to look.
+    setStatus("Debug overlay on — match boxes draw on the Preview tab");
   }
 }
 // Should the current match event be painted? Debug-overlay toggle, or a
@@ -144,7 +144,7 @@ function wfStackChain(sid){
 // Called after each canvas render (nodes must be in the DOM to measure heights).
 function wfReflowStacks(){
   const g=wfGraph(); if(!g) return;
-  // Canvas ẩn (tab Preview) → offsetHeight = 0, reflow sẽ ghi đè n.y sai lệch.
+  // Canvas hidden (Preview tab) → offsetHeight = 0, so the reflow would overwrite n.y with garbage.
   const world=$("wf-world"); if(world && world.offsetParent===null) return;
   const sids=[...new Set(g.nodes.filter(n=>n.stack).map(n=>n.stack))];
   for(const sid of sids){
@@ -247,7 +247,7 @@ function wfAddActivity(type){
 function wfDeleteActivity(id,ev){
   ev&&ev.stopPropagation();
   const i=WF.activities.findIndex(a=>a.id===id); if(i<0)return;
-  uiConfirm({title:"Xóa activity?", message:`Xóa activity "${WF.activities[i].name}" cùng toàn bộ block bên trong?`, ok:"Xóa", danger:true}).then(ok=>{
+  uiConfirm({title:"Delete activity?", message:`Delete activity "${WF.activities[i].name}" and every block inside it?`, ok:"Delete", danger:true}).then(ok=>{
     if(!ok) return;
     const j=WF.activities.findIndex(a=>a.id===id); if(j<0) return;
     wfPushUndo();
@@ -264,7 +264,7 @@ function wfToggleActivity(id,ev){ ev&&ev.stopPropagation(); const a=wfActById(id
 
 // ── Functions (reusable subroutines, used via a "call" node) ──────────────────
 function wfAddFunction(){
-  uiPrompt({title:"Function mới", label:"Tên function", placeholder:"VD: Về Home"}).then(v=>{
+  uiPrompt({title:"New function", label:"Function name", placeholder:"e.g. Go home"}).then(v=>{
     const name=(v||"").trim();
     if(!name) return;
     wfPushUndo();
@@ -286,7 +286,7 @@ function wfEditFunction(id,ev){ ev&&ev.stopPropagation();
 function wfDeleteFunction(id,ev){
   ev&&ev.stopPropagation();
   const i=WF.functions.findIndex(f=>f.id===id); if(i<0)return;
-  uiConfirm({title:"Xóa function?", message:`Xóa function "${WF.functions[i].name}"? Các block đang gọi nó sẽ mất tác dụng.`, ok:"Xóa", danger:true}).then(ok=>{
+  uiConfirm({title:"Delete function?", message:`Delete function "${WF.functions[i].name}"? Blocks calling it will stop working.`, ok:"Delete", danger:true}).then(ok=>{
     if(!ok) return;
     const j=WF.functions.findIndex(f=>f.id===id); if(j<0) return;
     wfPushUndo();
