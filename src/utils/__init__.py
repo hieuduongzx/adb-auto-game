@@ -172,7 +172,7 @@ def log_normal(message: str) -> None:
 # ---------------------------------------------------------------------------
 # Frozen / packaged-build helpers
 #
-# These let the same code run from source (``python tools/...``) and from a
+# These let the same code run from source (``python apps/...``) and from a
 # PyInstaller one-dir build. In a frozen build:
 #   * ``app_dir()``    -> the folder that contains the .exe (where ``vendor/``,
 #                         ``data/`` and ``out/`` live and stay writable);
@@ -217,27 +217,40 @@ def bundle_dir() -> str:
     return _SOURCE_ROOT
 
 
-# Maps a logical tool name to (frozen exe basename, source-tree script path
+# Maps a logical app name to (frozen exe basename, source-tree script path
 # relative to the project root). The designer executable also hosts the
 # runner GUI via the ``--runner`` switch.
-_TOOL_MAP = {
-    "designer": ("Workflow2k.exe", os.path.join("tools", "workflow_designer.py")),
-    "devhelper": ("DevScope.exe", os.path.join("tools", "dev_helper.py")),
-    "runner": ("Workflow2k.exe", os.path.join("tools", "workflow_runner.py")),
+#
+# Packaging ships only Workflow2k.exe (designer + runner). DevScope is
+# source-only unless you add it back to packaging/apps_build.spec.
+_APP_MAP = {
+    "designer": ("Workflow2k.exe", os.path.join("apps", "workflow_designer.py")),
+    "devscope": ("DevScope.exe", os.path.join("apps", "devscope.py")),
+    "runner": ("Workflow2k.exe", os.path.join("apps", "workflow_runner.py")),
 }
 
 
 def launch_tool(tool: str, extra_args: Optional[Sequence[str]] = None) -> None:
-    """Launch a sibling tool process, working both frozen and from source.
+    """Launch a sibling app process, working both frozen and from source.
 
     Frozen: runs the matching ``*.exe`` next to the current executable (the
-    runner is launched as ``designer.exe --runner <args>``). Source: runs
-    ``python tools/<script>.py <args>``.
+    runner is launched as ``Workflow2k.exe --runner <args>``). Source: runs
+    ``python apps/<script>.py <args>``.
+
+    Raises ``FileNotFoundError`` if the frozen target exe is missing
+    (e.g. DevScope is not in the default packaging output).
     """
     args = [str(a) for a in (extra_args or [])]
-    exe_name, script_rel = _TOOL_MAP[tool]
+    if tool not in _APP_MAP:
+        raise KeyError(f"Unknown app '{tool}'. Known: {', '.join(sorted(_APP_MAP))}")
+    exe_name, script_rel = _APP_MAP[tool]
     if is_frozen():
         target = os.path.join(os.path.dirname(os.path.abspath(sys.executable)), exe_name)
+        if not os.path.isfile(target):
+            raise FileNotFoundError(
+                f"{exe_name} not found next to this build. "
+                f"From source: python {script_rel}"
+            )
         prefix = ["--runner"] if tool == "runner" else []
         cmd = [target, *prefix, *args]
     else:

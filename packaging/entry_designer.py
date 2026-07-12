@@ -1,13 +1,13 @@
-"""Frozen entry point for ``designer.exe``.
+"""Frozen entry point for ``Workflow2k.exe``.
 
 Default behaviour opens the **Workflow Designer**. When invoked with
 ``--runner [flow.json]`` it opens the **Workflow Runner** GUI instead — the
-designer's *Chạy GUI* button relaunches this same executable in that mode
+designer's *Run GUI* button relaunches this same executable in that mode
 (see :func:`src.utils.launch_tool`).
 
 This module is the PyInstaller analysis entry point; the static
 ``import workflow_designer`` / ``import workflow_runner`` below are what pull
-those tools (and their whole dependency tree) into the build.
+those apps (and their whole dependency tree) into the build.
 """
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ import os
 import sys
 
 # When run from source (e.g. ``python packaging/entry_designer.py`` for a smoke
-# test) make the repo + tools/ importable. In a frozen build everything is
+# test) make the repo + apps/ importable. In a frozen build everything is
 # already on the bundled path, so this is a no-op.
 if not getattr(sys, "frozen", False):
     _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    for _p in (_ROOT, os.path.join(_ROOT, "tools")):
+    for _p in (_ROOT, os.path.join(_ROOT, "apps")):
         if _p not in sys.path:
             sys.path.insert(0, _p)
 

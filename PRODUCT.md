@@ -32,8 +32,8 @@ always readable at a glance from across the desk.
 
 ## Design Principles
 
-1. **One vocabulary across tools** — the runner, designer, and DevScope share
-   tokens, controls, and component shapes (see `tools/web/wf/css/base.css`).
+1. **One vocabulary across apps** — the runner, designer, and DevScope share
+   tokens, controls, and component shapes (see `apps/web/wf/css/base.css`).
 2. **Density without clutter** — small window, many rows; every pixel of
    chrome must earn its place.
 3. **State first** — run status, per-activity status, and device connection

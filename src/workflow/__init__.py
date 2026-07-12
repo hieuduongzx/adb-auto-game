@@ -1,16 +1,15 @@
 """JSON-driven workflow engine for ADB auto-game.
 
 A *workflow* is a plain JSON document describing automation as a list of
-**activities**, each holding a stack of **blocks** (tap, swipe, wait,
-tap_image, …). Activities run in one of two modes, mirroring
-``src/game_core/base_game.py``:
+**activities**, each holding a **node graph** (tap, swipe, wait, if_image, …).
+Activities run in one of two modes:
 
-* ``sequence``   — run once, in order, as part of the main run.
-* ``background`` — loop in their own thread, polling every ``pollInterval``
-  seconds; can be toggled on/off while sequence activities run.
+* ``sequence``   — run the graph once, in order, as part of the main run.
+* ``background`` — loop the graph in its own thread every ``pollInterval`` s;
+  can be toggled on/off while sequence activities run.
 
-The same JSON is produced by the Workflow tab in ``tools/dev_helper.py`` and
-consumed by the standalone runner GUI (``tools/workflow_runner.py``).
+Produced by Workflow2k Designer (``apps/workflow_designer.py``) and consumed
+by the Runner (``apps/workflow_runner.py``).
 """
 from .engine import WorkflowEngine, NODE_TYPES
 

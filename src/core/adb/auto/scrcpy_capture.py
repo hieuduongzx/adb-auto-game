@@ -29,14 +29,22 @@ try:
 except ImportError:  # pragma: no cover
     CodecContext = None
 
-from src.utils import CREATE_NO_WINDOW, log_debug, log_info, log_warning
+from src.utils import CREATE_NO_WINDOW, app_dir, log_debug, log_info, log_warning
 from ..constants import get_adb_path
 
 
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
-_SCRCPY_DIR = os.path.join(_PROJECT_ROOT, "vendor", "scrcpy")
-_SCRCPY_EXE = os.path.join(_SCRCPY_DIR, "scrcpy.exe" if os.name == "nt" else "scrcpy")
-_SCRCPY_SERVER = os.path.join(_SCRCPY_DIR, "scrcpy-server")
+def _scrcpy_dir() -> str:
+    """``vendor/scrcpy`` next to the project root (source) or the .exe (frozen)."""
+    return os.path.join(app_dir(), "vendor", "scrcpy")
+
+
+def _scrcpy_exe() -> str:
+    return os.path.join(_scrcpy_dir(), "scrcpy.exe" if os.name == "nt" else "scrcpy")
+
+
+def _scrcpy_server() -> str:
+    return os.path.join(_scrcpy_dir(), "scrcpy-server")
+
 
 _SOURCES: Dict[str, "ScrcpyFrameSource"] = {}
 _SOURCES_LOCK = threading.Lock()
@@ -82,7 +90,7 @@ def _serial_of(controller) -> str:
 
 def _scrcpy_available() -> bool:
     return (CodecContext is not None
-            and os.path.isfile(_SCRCPY_SERVER))
+            and os.path.isfile(_scrcpy_server()))
 
 
 def _adb_run(serial: str, *args: str, timeout: float = 15.0) -> subprocess.CompletedProcess:
@@ -105,7 +113,7 @@ def _scrcpy_server_version() -> str:
         return _SERVER_VERSION
     try:
         out = subprocess.run(
-            [_SCRCPY_EXE, "--version"], capture_output=True, text=True,
+            [_scrcpy_exe(), "--version"], capture_output=True, text=True,
             timeout=10, creationflags=CREATE_NO_WINDOW,
         ).stdout
         m = re.search(r"scrcpy\s+(\d[\w.]*)", out or "")
@@ -325,7 +333,7 @@ class ScrcpyFrameSource:
 
     def _launch_and_connect(self) -> bytes:
         """Push server, forward a port, start it, return the first bytes."""
-        r = _adb_run(self.serial, "push", _SCRCPY_SERVER, self.JAR_REMOTE)
+        r = _adb_run(self.serial, "push", _scrcpy_server(), self.JAR_REMOTE)
         if r.returncode != 0:
             raise RuntimeError(f"adb push thất bại: {(r.stderr or r.stdout).strip()}")
 

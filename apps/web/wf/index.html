@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workflow2k</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/wf.css">
+</head>
+<body>
+<div id="app">
+
+<div id="toolbar" class="card">
+  <!-- ── Left: Project file operations + run status ────────────────────────── -->
+  <div class="tb-zone tb-left">
+    <div class="tb-tray tb-tray-doc">
+      <button class="btn ico" onclick="wfNew()" title="New — create an empty workflow">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
+      <button class="btn ico" onclick="wfImport()" title="Open… — workflow from JSON file">
+        <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+      <span class="tb-tray-sep"></span>
+      <button class="btn accent ico" id="wf-save-btn" onclick="wfSave()" title="Save to the current file (Ctrl+S)">
+        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
+      <button class="btn ico" onclick="wfExport()" title="Save as… — new JSON file">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+    </div>
+    <span class="tb-divider"></span>
+    <div id="wf-run-status" class="wf-run-status ok" title="Run status">
+      <span class="wf-run-dot"></span>
+      <span class="wf-run-txt">Ready</span>
+    </div>
+  </div>
+
+  <!-- ── Center: primary run control (hero) + secondary run tools tray ─────── -->
+  <div class="tb-zone tb-center">
+    <!-- The one focal action — larger, green, standalone. -->
+    <button class="btn ok ico tb-run-btn" id="wf-run-btn" onclick="wfToggleRun()" title="Test run"></button>
+    <!-- All secondary run tooling in one segmented tray: pre-flight check ·
+         step-debug controls · launch external Runner. -->
+    <div class="tb-tray tb-run-aux">
+      <button class="btn ico" onclick="wfValidateShow()" title="Check workflow — find broken wires, missing templates, and bad branch counts">
+        <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></button>
+      <span class="tb-tray-sep"></span>
+      <button class="btn ico" onclick="wfRunSingleNode()" title="Test block — run the selected block and draw its match overlay on Preview (Ctrl+Enter)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4"/></svg></button>
+      <button class="btn ico" onclick="wfRunFromSelected(false)" title="Run from selected block">
+        <svg viewBox="0 0 24 24"><polygon points="7 4 19 12 7 20 7 4"/><path d="M3 5v14"/></svg></button>
+      <button class="btn ico" onclick="wfStartStepRun()" title="Step debug from selected/default block">
+        <svg viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><path d="M18 5v14"/></svg></button>
+      <button class="btn ico" id="wf-step-next-btn" onclick="wfDebugStep()" title="Next step">
+        <svg viewBox="0 0 24 24"><path d="M5 12h12"/><path d="m13 6 6 6-6 6"/></svg></button>
+      <span class="tb-tray-sep"></span>
+      <button class="btn ico" onclick="wfRunGui()" title="Run GUI — open Runner with the current workflow">
+        <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
+    </div>
+  </div>
+
+  <!-- ── Right: device + capture source ─────────────────────────────────────── -->
+  <div class="tb-zone tb-right">
+    <div class="tb-tray tb-tray-device">
+      <span class="tb-tray-label">Device</span>
+      <span class="tb-tray-sep"></span>
+      <span id="device-dot" class="tb-device-dot"></span>
+      <select id="device-select" onchange="onDeviceChange(this.value)">
+        <option value="">Scanning…</option>
+      </select>
+      <button class="btn ico sm" onclick="onRefreshDevices()" title="Refresh — rescan connected devices">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg></button>
+      <button class="btn ico sm" onclick="onScanPorts()" title="Scan ports — probe known emulator ports">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+      <button class="btn ico sm" onclick="onRestartAdb()" title="Restart ADB server">
+        <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
+    </div>
+    <div class="tb-tray tb-tray-source">
+      <span class="tb-tray-label">Source</span>
+      <span class="tb-tray-sep"></span>
+      <select id="capture-backend" onchange="onCaptureBackendChange(this.value)">
+        <option value="scrcpy">scrcpy</option>
+        <option value="adb">ADB</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div id="workflow-view" style="display:flex;">
+  <!-- Left: node palette + functions (pinned at the bottom so they're always
+       one drag away — dragging a function row onto the canvas inserts a call). -->
+  <div id="wf-side" class="card">
+    <div class="wf-side-sec" style="flex:1;min-height:0;display:flex;flex-direction:column;">
+      <div class="wf-side-hdr"><span>Nodes</span></div>
+      <div class="wf-pal-search">
+        <svg class="wf-pal-search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="wf-pal-search-inp" type="search" placeholder="Find node…" oninput="wfPaletteFilter(this.value)" spellcheck="false" autocomplete="off" aria-label="Find node">
+        <button id="wf-pal-search-clr" class="wf-pal-search-clr" title="Clear" onclick="wfPaletteFilterClear()" style="display:none" type="button" aria-label="Clear search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="wf-palette" class="wf-palette"></div>
+    </div>
+    <div class="wf-side-sec" id="wf-side-fns-sec">
+      <div class="wf-side-hdr wf-side-hdr-toggle" id="wf-fns-hdr" title="Collapse/expand functions">
+        <span class="wf-side-chev">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+        </span>
+        <span>Functions</span>
+        <span class="side-count" id="wf-fn-count"></span>
+        <span class="spacer"></span>
+        <button class="wf-act-hdr-add" id="wf-fn-add" title="Create new function">+</button>
+      </div>
+      <div id="wf-functions" class="wf-side-fns wf-act-list"></div>
+    </div>
+  </div>
+  <div id="wf-side-resizer" title="Drag to resize the left column"></div>
+  <!-- Center: graph canvas -->
+  <div id="wf-main" class="card">
+    <div id="wf-bar">
+      <!-- Project identity: gear + name as one tray so the title doesn't float. -->
+      <div class="wf-title-tray" title="Project — click the gear for package / ADB / OCR settings">
+        <button type="button" class="btn sm ico" id="wf-proj-settings" onclick="wfOpenProjectSettings()" title="Project settings — package, ADB/Win32, OCR…" aria-label="Project settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
+        <span class="tb-tray-sep"></span>
+        <input id="wf-name" type="text" placeholder="Workflow name" value="My Workflow" aria-label="Workflow name">
+      </div>
+      <!-- Canvas edit toggles, grouped in a segmented tray. -->
+      <span class="wf-tool-tray">
+        <button class="btn sm ico" id="wf-snap-btn" onclick="wfToggleSnap()" title="Snap to grid: Off">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></button>
+        <button class="btn sm ico" id="wf-preview-btn" onclick="wfTogglePreview()" title="Image preview: Off">
+          <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        <button class="btn sm ico" id="wf-group-btn" onclick="wfToggleGroupMode()" title="Create group: Off — click then drag to draw a frame (or select nodes first, then click)">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="4 3"/></svg></button>
+        <button class="btn sm ico" id="wf-align-btn" onclick="wfToggleAlign()" title="Smart align: On">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="3 2.5"/><rect x="4" y="6" width="16" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/></svg></button>
+        <button class="btn sm ico" id="wf-minimap-btn" onclick="wfToggleMinimap()" title="Minimap: Off">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="6" y="13" width="7" height="4" rx="1"/></svg></button>
+      </span>
+      <span class="tb-divider"></span>
+      <div id="wf-speed-group" class="wf-speed-group" title="Speed hack — separate from Test run (uses workflow package)">
+        <span class="wf-speed-title">Speed hack</span>
+        <button class="btn sm ico" id="wf-speed-btn" onclick="wfToggleSpeed()" title="Speed hack: Off (accelerate the game with Frida — root required)">
+          <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></button>
+        <input id="wf-speed-val" type="number" min="0.1" step="0.1" value="2" title="Speed (x)" style="width:48px;text-align:right" onchange="wfSpeedChanged()">
+        <span class="hz-unit">x</span>
+        <button class="btn sm ico ok" id="wf-speed-run-btn" onclick="wfSpeedRun()" title="Enable speed hack" style="display:none"></button>
+      </div>
+      <span class="spacer"></span>
+      <button class="btn sm ico" onclick="uiShowShortcuts()" title="Keyboard & mouse shortcuts (F1)" aria-label="Shortcuts">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.9.4-1.5 1-1.5 2"/><path d="M12 17h.01"/></svg></button>
+      <!-- View controls grouped at the right: zoom tray + Canvas/Preview tabs. -->
+      <span class="wf-zoom wf-tool-tray">
+        <button class="btn sm ico" id="wf-zoom-out" onclick="wfZoomBy(1/1.1)" title="Zoom out">
+          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <span id="wf-zoom-lbl" onclick="wfZoomReset()" title="Reset 100%" style="min-width:38px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--dim);cursor:pointer;">100%</span>
+        <button class="btn sm ico" id="wf-zoom-in" onclick="wfZoomBy(1.1)" title="Zoom in">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <button class="btn sm ico" id="wf-zoom-fit" onclick="wfFit()" title="Fit view — show all blocks (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/></svg></button>
+      </span>
+      <span class="tb-divider"></span>
+      <div id="wf-view-tabs" class="wf-view-tabs">
+        <button class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Edit mode — design the workflow graph (Tab)">Edit</button>
+        <button class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview mode — live device mirror + scope tools (Tab)">Preview</button>
+      </div>
+    </div>
+    <div id="wf-canvas">
+      <!-- Soft watermark: name of the open activity/function (top-left of the graph). -->
+      <div class="wf-cur-act" id="wf-cur-act" data-empty="1" title="Currently open activity / function" aria-live="polite"></div>
+      <div id="wf-world">
+        <svg id="wf-wires"></svg>
+      </div>
+      <div id="wf-canvas-empty" class="wf-empty-note">
+        <div class="wf-empty-card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h5.5A2 2 0 0 1 17.5 8.5V14"/></svg>
+          <div class="t">No activity open</div>
+          <div class="s">Create an activity, then drag blocks from the left palette onto the canvas to build the flow.</div>
+          <button class="btn accent sm" onclick="wfActAddCurrent()">+ Add activity</button>
+          <div class="keys">
+            <span><b>Wheel</b> zoom</span><span><b>Space</b> pan</span>
+            <span><b>F</b> fit view</span><span><b>Tab</b> preview</span>
+            <span><b>F1</b> shortcuts</span>
+          </div>
+        </div>
+      </div>
+      <!-- Live device mirror — only captures while this tab is active (scope-like). -->
+      <div id="wf-preview-pane" class="wf-preview-pane" style="display:none">
+        <div class="wf-pv-bar">
+          <button class="btn sm" id="wf-pv-capture" title="Capture one frame">Capture</button>
+          <button class="pill-wrap" id="wf-pv-auto" title="Auto refresh">
+            <span class="wf-pv-cb on"><span class="wf-pv-thumb"></span></span>
+            <span class="pill-label">Auto</span>
+          </button>
+          <div class="hz-wrap">
+            <input id="wf-pv-hz" type="number" min="0.2" max="60" step="0.5" value="30" title="Refresh rate (Hz)">
+            <span class="hz-unit">Hz</span>
+          </div>
+          <span class="spacer"></span>
+          <span id="wf-pv-res" class="wf-pv-res"></span>
+          <span id="wf-pv-hint" class="wf-pv-hint" title="Left click = pick point (read color) · Left drag = select region (crop) · Right click = tap device · Right drag = swipe device · Middle drag = pan · Wheel = zoom">left = point · drag = region · right = tap · right-drag = swipe</span>
+        </div>
+        <div id="wf-pv-wrap"><canvas id="wf-pv-canvas"></canvas></div>
+      </div>
+      <!-- Bottom-right corner stack: Activities on top, Variables below. The two
+           panels anchor to each other — collapsing Activities lets Variables
+           rise with it, since they share this flex column pinned to the corner. -->
+      <div id="wf-corner-stack" class="wf-corner-stack">
+      <!-- Activities panel (Sequent / Background tabs — functions live in the
+           left sidebar). Title row (chevron + label + add btn) + tab bar. -->
+      <div id="wf-act-panel" class="wf-act-panel">
+        <div class="wf-act-panel-hdr">
+          <div class="wf-act-hdr-row" id="wf-act-hdr-row">
+            <span class="wf-act-hdr-chevron">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+            </span>
+            <span class="wf-act-hdr-title" id="wf-act-hdr-title">Activities</span>
+            <button class="wf-act-hdr-tog" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <button class="wf-act-hdr-tog" id="wf-act-dbg" title="Debug overlay: Off — when on, every image/color/OCR match draws its box + confidence on Preview">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M12 5v2M12 17v2M5 12H3M21 12h-2"/></svg>
+            </button>
+            <button class="wf-act-hdr-add" id="wf-act-add" title="Add activity">+</button>
+          </div>
+          <div class="wf-act-tab-row">
+            <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequent <span class="side-count" id="wf-act-count"></span></button>
+            <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
+          </div>
+        </div>
+        <div class="wf-act-panel-body">
+          <div id="wf-activities" class="wf-act-list"></div>
+          <div id="wf-activities-bg" class="wf-act-list" style="display:none"></div>
+        </div>
+      </div>
+      <div id="wf-vars-panel" class="wf-vars-panel">
+        <div class="wf-vars-hdr" onclick="wfToggleVarsPanel(event)">
+          <span class="wf-act-hdr-chevron">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+          </span>
+          <span class="wf-vars-title">Variables</span>
+          <span class="wf-vars-count" id="wf-vars-count"></span>
+          <span class="wf-vars-live" id="wf-vars-live" title="● Live — engine is running">●</span>
+          <span class="wf-vars-actions">
+            <button id="wf-vars-add" class="wf-vars-add" title="Add variable (global or local)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button id="wf-vars-mgr" class="wf-vars-add" title="Manage global variables"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+          </span>
+        </div>
+        <div id="wf-vars-body" class="wf-vars-body"></div>
+      </div>
+      </div><!-- /wf-corner-stack -->
+      <!-- Auto-layout — one button that opens a menu of layout strategies.
+           Click again (or outside) to collapse. Each tidies the graph + fits. -->
+      <div id="wf-layout-bar" class="wf-layout-bar">
+        <button class="wf-layout-toggle" id="wf-layout-toggle" onclick="wfToggleLayoutMenu(event)" title="Arrange blocks">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        </button>
+        <div class="wf-layout-menu" id="wf-layout-menu">
+          <button class="wf-layout-item" data-layout="vertical"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span><span class="lbl"><b>Vertical</b><i>top-down flow</i></span></button>
+          <button class="wf-layout-item" data-layout="horizontal"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span><span class="lbl"><b>Horizontal</b><i>left-to-right flow</i></span></button>
+          <button class="wf-layout-item" data-layout="tree"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v18"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span><span class="lbl"><b>Tree</b><i>expanded branches</i></span></button>
+          <button class="wf-layout-item" data-layout="zigzag"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 12 7 12 17 20 17"/></svg></span><span class="lbl"><b>Zigzag</b><i>snake flow</i></span></button>
+          <button class="wf-layout-item" data-layout="radial"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg></span><span class="lbl"><b>Radial</b><i>radial from outputs</i></span></button>
+          <button class="wf-layout-item" data-layout="compact"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="12" x2="21" y2="12"/></svg></span><span class="lbl"><b>Compact</b><i>near-square grid</i></span></button>
+        </div>
+      </div>
+      <!-- Minimap — bird's-eye view; click/drag to jump. Auto-shows only when the
+           graph outgrows the viewport (or has enough blocks to need it). -->
+      <div id="wf-minimap" class="wf-minimap" title="Minimap — click or drag to move the view">
+        <canvas id="wf-minimap-cv"></canvas>
+      </div>
+    </div>
+  </div>
+  <div id="wf-insp-resizer" title="Drag to resize the right column"></div>
+  <!-- Right: inspector (node properties in Canvas mode) -->
+  <div id="wf-inspector" class="card" style="width:280px;">
+    <div class="wf-side-hdr" id="wf-insp-hdr"><span id="wf-insp-title">Properties</span></div>
+    <div id="wf-insp-body"></div>
+    <!-- Scope tool panel — shown only in Preview mode. Mirrors DevScope so the
+         Preview tab doubles as a region picker / action tester. -->
+    <div id="wf-scope-panel" style="display:none;flex:1;min-height:0;flex-direction:column;">
+      <div id="pv-tabs-bar">
+        <button class="tab-btn active" data-tab="inspect"  onclick="pvSwitchTab('inspect')">Inspect</button>
+        <button class="tab-btn"        data-tab="template" onclick="pvSwitchTab('template')">Template match</button>
+        <button class="tab-btn"        data-tab="device"   onclick="pvSwitchTab('device')">Device</button>
+        <button class="tab-btn"        data-tab="library"  onclick="pvSwitchTab('library')">Library</button>
+      </div>
+
+      <!-- Inspect -->
+      <div class="tab-pane active" id="pv-tab-inspect">
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Screenshot</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="btns">
+              <button class="btn sm" onclick="pvSaveFull()">Save full image</button>
+              <button class="btn sm" onclick="pvCapture()">Capture again</button>
+            </div>
+            <div class="row"><span class="lbl">Name</span>
+              <input id="pv-full-name" type="text" placeholder="file name (optional)"></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Point &amp; Color</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="row">
+              <span class="lbl">Point</span>
+              <input id="pv-pt-x" type="text" readonly style="text-align:center;">
+              <input id="pv-pt-y" type="text" readonly style="text-align:center;">
+              <button class="icon-btn" onclick="pvCopyText($('pv-pt-x').value+', '+$('pv-pt-y').value, this)" title="Copy x,y">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+            <div class="row">
+              <span class="lbl">Color</span>
+              <input id="pv-pt-hex" type="text" readonly>
+              <button class="icon-btn" onclick="pvCopyEl('pv-pt-hex', this)" title="Copy HEX">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+              <div id="pv-color-swatch"></div>
+            </div>
+            <div class="row">
+              <span class="lbl">RGB</span>
+              <input id="pv-pt-rgb" type="text" readonly>
+              <button class="icon-btn" onclick="pvCopyEl('pv-pt-rgb', this)" title="Copy RGB">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+            <div class="row" style="justify-content:flex-end;">
+              <button class="btn sm accent" onclick="pvTapPoint()">Tap point</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group closed">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Inspect color</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="row">
+              <span class="lbl">Point</span>
+              <input id="pv-cc-x" type="number" min="0" value="0" style="text-align:center;">
+              <input id="pv-cc-y" type="number" min="0" value="0" style="text-align:center;">
+            </div>
+            <div class="row">
+              <span class="lbl">Sample color</span>
+              <input id="pv-cc-hex" type="text" placeholder="#RRGGBB" oninput="$('pv-cc-swatch').style.background=this.value">
+              <div id="pv-cc-swatch"></div>
+            </div>
+            <div class="row">
+              <span class="lbl">Tolerance</span>
+              <input id="pv-cc-tol" type="number" min="0" max="255" value="10" style="width:56px;flex:none;text-align:right;">
+              <span class="hz-unit">≤ max(ΔR,ΔG,ΔB)</span>
+              <button class="btn sm accent" style="margin-left:auto;" onclick="pvCheckColor()">Inspect</button>
+            </div>
+            <div id="pv-cc-result" class="cc-result"></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Selection region</span>
+            <span class="badge cyan" id="pv-region-badge" style="display:none;"><span class="bd"></span>selected</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="row">
+              <span class="lbl">Position</span>
+              <input id="pv-rg-x" type="number" min="0" value="0" style="text-align:center;">
+              <input id="pv-rg-y" type="number" min="0" value="0" style="text-align:center;">
+              <button class="icon-btn" onclick="pvCopyText($('pv-rg-x').value+', '+$('pv-rg-y').value+', '+$('pv-rg-w').value+', '+$('pv-rg-h').value, this)" title="Copy x,y,w,h">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+            <div class="row">
+              <span class="lbl">Size</span>
+              <input id="pv-rg-w" type="number" min="0" value="0" style="text-align:center;">
+              <input id="pv-rg-h" type="number" min="0" value="0" style="text-align:center;">
+            </div>
+            <div class="row"><span class="lbl">Name</span>
+              <input id="pv-crop-name" type="text" placeholder="region name (optional)"></div>
+            <div class="row" style="gap:4px;">
+              <span class="lbl">Folder</span>
+              <span id="pv-out-dir-label" style="flex:1;min-width:0;font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);" title=""></span>
+            </div>
+            <div class="btns">
+              <button class="btn sm ok" onclick="pvQuickCrop()" title="Save region to templates/ (Ctrl+S)">Capture region</button>
+              <button class="btn sm err" onclick="pvClearRegion()">Delete</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Read text (OCR)</span>
+            <span id="pv-ocr-engine" style="margin-left:4px;">not loaded</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="row"><span class="lbl">Engine</span>
+              <select id="pv-ocr-backend" onchange="pvOcrBackendChange(this.value)" style="flex:1;min-width:0;"></select></div>
+            <div class="row">
+              <input id="pv-ocr-result" type="text" readonly placeholder="(not read)" style="flex:1;background:var(--surface);font-size:13px;">
+              <button class="icon-btn" onclick="pvCopyEl('pv-ocr-result', this)" title="Copy result">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <input id="pv-ocr-wl" type="text" placeholder="Whitelist e.g. 0-9/" style="flex:1;min-width:0;font-size:11px;">
+              <button class="btn h30 accent" onclick="pvReadText()">Read</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Actions</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">Tap</span>
+              <input id="pv-tap-x" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+              <input id="pv-tap-y" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+              <button class="btn sm" onclick="pvSendTap()">Send</button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">Long press</span>
+              <input id="pv-lp-x"   type="number" min="0"   value="0"   style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+              <input id="pv-lp-y"   type="number" min="0"   value="0"   style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+              <input id="pv-lp-dur" type="number" min="100" value="800" step="100" style="width:56px;flex:none;text-align:right;padding:5px 3px;font-size:11px;">
+              <span class="hz-unit">ms</span>
+              <button class="btn sm" onclick="pvSendLongPress()">Send</button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">Swipe</span>
+              <input id="pv-sw-x1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+              <input id="pv-sw-y1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+              <span style="font-size:13px;color:var(--muted);">→</span>
+              <input id="pv-sw-x2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+              <input id="pv-sw-y2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+              <button class="btn sm" onclick="pvSendSwipe()">Send</button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">Duration</span>
+              <input id="pv-sw-dur" type="number" min="50" max="100000" step="50" value="300" style="width:72px;flex:none;text-align:right;">
+              <span class="hz-unit">ms</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="group closed">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Keys &amp; Text</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="key-strip">
+              <button class="btn" onclick="api().send_key('BACK')">Back</button>
+              <button class="btn" onclick="api().send_key('HOME')">Home</button>
+              <button class="btn" onclick="api().send_key('ENTER')">Enter</button>
+              <button class="btn" onclick="api().send_key('APP_SWITCH')">Recents</button>
+              <button class="btn" onclick="api().send_key('VOLUME_UP')">Vol +</button>
+              <button class="btn" onclick="api().send_key('VOLUME_DOWN')">Vol −</button>
+              <button class="btn" onclick="api().send_key('POWER')">Power</button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">Custom</span>
+              <input id="pv-key-custom" type="text" placeholder="KEYCODE or number" style="flex:1;min-width:0;">
+              <button class="btn sm" onclick="api().send_key($('pv-key-custom').value.trim())">Send</button>
+            </div>
+            <div class="row" style="gap:5px;">
+              <span class="lbl n" style="font-weight:600;">Text</span>
+              <input id="pv-inp-text" type="text" placeholder="Enter text…" style="flex:1;min-width:0;">
+              <button class="btn sm" onclick="pvSendText()">Send</button>
+            </div>
+          </div>
+        </div>
+      </div><!-- /pv-tab-inspect -->
+
+      <!-- Template match -->
+      <div class="tab-pane" id="pv-tab-template">
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Template match</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <p style="font-size:11.5px;color:var(--dim);line-height:1.5;">Choose a PNG template image, then match it against the current screenshot.</p>
+            <div class="row" style="gap:6px;">
+              <input id="pv-tpl-path" type="text" placeholder="Template PNG path" style="flex:1;min-width:0;font-size:11px;">
+              <button class="btn h30" onclick="pvBrowseTpl()">Choose…</button>
+            </div>
+            <div class="row"><span class="lbl" style="min-width:64px;">Threshold</span>
+              <input id="pv-tpl-thr" type="number" min="0.1" max="0.999" step="0.05" value="0.85" style="width:80px;flex:none;text-align:right;"></div>
+            <label class="cb-line" onclick="$('pv-cb-gray').classList.toggle('checked')">
+              <span class="cb" id="pv-cb-gray"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg></span>
+              Grayscale</label>
+            <label class="cb-line" onclick="$('pv-cb-multiscale').classList.toggle('checked')">
+              <span class="cb" id="pv-cb-multiscale"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg></span>
+              Multiscale (0.8 .. 1.2)</label>
+            <div class="btns">
+              <button class="btn h30 accent" onclick="pvRunMatch(false)">Find best match</button>
+              <button class="btn h30" onclick="pvRunMatch(true)">Find all</button>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button class="btn sm" onclick="pvClearOverlay()">Clear overlay</button>
+            </div>
+            <div class="tpl-result empty" id="pv-tpl-result">No results.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Device -->
+      <div class="tab-pane" id="pv-tab-device">
+        <div class="group">
+          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Device info</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <div class="grp-body">
+            <div class="info-grid">
+              <span class="k">Status</span><span class="v" id="pv-i-status">-</span>
+              <span class="k">Serial</span>      <span class="v" id="pv-i-serial">-</span>
+              <span class="k">Model</span>       <span class="v" id="pv-i-model">-</span>
+              <span class="k">Brand</span>        <span class="v" id="pv-i-brand">-</span>
+              <span class="k">Android</span>    <span class="v" id="pv-i-android">-</span>
+              <span class="k">ABI</span>         <span class="v" id="pv-i-abi">-</span>
+              <span class="k">Resolution</span><span class="v" id="pv-i-screen">-</span>
+              <span class="k">Density</span>     <span class="v" id="pv-i-density">-</span>
+              <span class="k">Battery</span>         <span class="v" id="pv-i-battery">-</span>
+              <span class="k">IP</span>          <span class="v" id="pv-i-ip">-</span>
+              <span class="k">Uptime</span>      <span class="v" id="pv-i-uptime">-</span>
+              <span class="k">App</span>   <span class="v" id="pv-i-app">-</span>
+            </div>
+            <div class="btns">
+              <button class="btn sm" onclick="api().refresh_info()">Refresh</button>
+              <button class="btn sm" onclick="api().copy_info()">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Library -->
+      <div class="tab-pane" id="pv-tab-library">
+        <div style="display:flex;align-items:center;gap:7px;padding:0 1px 2px;">
+          <span id="pv-lib-out-label" style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;" title="">./out/</span>
+          <span class="spacer"></span>
+          <button class="btn sm" onclick="pvRefreshAssets()">Refresh</button>
+          <button class="btn sm err" id="pv-btn-del-asset" style="display:none;" onclick="pvDeleteAsset()">Delete</button>
+        </div>
+        <div class="asset-grid" id="pv-asset-grid">
+          <div style="font-size:11.5px;color:var(--muted);padding:4px 0;">No images.</div>
+        </div>
+      </div>
+    </div><!-- /wf-scope-panel -->
+  </div>
+</div>
+<div id="wf-ctxmenu"></div>
+
+
+<div id="log-card" class="card">
+  <div id="log-resizer" title="Drag to resize log"></div>
+  <div class="log-hdr" onclick="wfToggleLog(event)" title="Click to collapse/open log">
+    <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
+    <span class="log-label">Log</span>
+    <span class="log-count" id="log-count"></span>
+    <span class="spacer"></span>
+    <span class="log-filters" id="log-filters" role="group" aria-label="Filter log">
+      <button class="log-f on" data-f="all" onclick="wfLogFilter('all',event)" title="All levels">All</button>
+      <button class="log-f" data-f="info" onclick="wfLogFilter('info',event)" title="Info">INF</button>
+      <button class="log-f" data-f="success" onclick="wfLogFilter('success',event)" title="Success">OK</button>
+      <button class="log-f" data-f="warning" onclick="wfLogFilter('warning',event)" title="Warning">WRN</button>
+      <button class="log-f" data-f="error" onclick="wfLogFilter('error',event)" title="Error">ERR</button>
+    </span>
+    <button class="btn-log-clear" onclick="wfCopyLog(event)" title="Copy the whole log" type="button">Copy</button>
+    <button class="btn-log-clear" onclick="wfSaveLog(event)" title="Save the whole log to a .txt file" type="button">Save</button>
+    <button class="btn-log-clear" onclick="onClearLog(event)" title="Clear the whole log" type="button">Clear</button>
+  </div>
+  <div class="log-body" id="log-body"></div>
+</div>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────── -->
+
+<div id="footer">
+  <span id="footer-dot"></span>
+  <span id="status-text">Ready</span>
+  <span class="spacer"></span>
+  <span id="hover-pos" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:88px;text-align:right;">—</span>
+  <span style="color:var(--border);margin:0 3px;">·</span>
+  <span id="footer-out" style="font-size:11px;color:var(--log-muted);font-family:var(--mono);">workflow → workflows/</span>
+</div>
+
+</div><!-- /app -->
+
+<script src="js/base.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/events.js"></script>
+<script src="js/keyboard.js"></script>
+<script src="js/workflow.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/edit.js"></script>
+<script src="js/render.js"></script>
+<script src="js/selection.js"></script>
+<script src="js/wires.js"></script>
+<script src="js/groups.js"></script>
+<script src="js/minimap.js"></script>
+<script src="js/finder.js"></script>
+<script src="js/inspector.js"></script>
+<script src="js/preview.js"></script>
+<script src="js/scope-tools.js"></script>
+<script src="js/validate.js"></script>
+<script src="js/io.js"></script>
+<script src="js/history.js"></script>
+</body>
+</html>

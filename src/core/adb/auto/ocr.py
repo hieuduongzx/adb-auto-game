@@ -87,8 +87,6 @@ _PROJECT_TESSERACT_CANDIDATES = (
     "vendor/Tesseract-OCR/tesseract.exe",
     "ocr/Tesseract-OCR/tesseract.exe",
     "ocr/tesseract/tesseract.exe",
-    "tools/tesseract/tesseract.exe",
-    "tools/Tesseract-OCR/tesseract.exe",
     "tesseract/tesseract.exe",
     "Tesseract-OCR/tesseract.exe",
 )

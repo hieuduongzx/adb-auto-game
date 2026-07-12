@@ -1,63 +1,37 @@
-# Core dependencies
+# ADB auto-game — core dependencies for Workflow2k apps.
+# Install:  pip install -r requirements.txt
+
+# ── Capture / vision ────────────────────────────────────────────────────────
 opencv-python>=4.8.0
 numpy>=1.24.0
 pillow>=10.0.0
-pyyaml>=6.0.1
+# scrcpy H.264 decode (optional — capture falls back to ADB screencap)
+av>=10.0.0
 
-# OCR (text recognition for region-based checks)
-# Tesseract is the only supported backend (see src.core.adb.auto.ocr).
-# Fast for short Latin labels like "0/5", "VIP 3", "Lv 35".
-#
-# Requires the Tesseract C++ binary to also be installed on the system:
-#   - Windows: https://github.com/UB-Mannheim/tesseract/wiki
-#   - Linux:   apt-get install tesseract-ocr
-#   - macOS:   brew install tesseract
-# If installed off PATH on Windows, set TESSERACT_CMD to the binary path.
+# ── OCR (Tesseract is the default / packaged backend) ───────────────────────
+# Requires the Tesseract binary: vendor/tesseract/ or system install.
+#   Windows: https://github.com/UB-Mannheim/tesseract/wiki
+# Optional neural backends (not packaged; pip install if needed):
+#   pip install easyocr
+#   pip install paddlepaddle paddleocr
 pytesseract>=0.3.10
-# EasyOCR - neural OCR backend (better with stylised fonts, but heavier:
-# pulls torch + downloads ~100MB language models on first use). Optional
-# - OCRReader auto-falls back to tesseract if absent.
-easyocr>=1.7.0
-# PaddleOCR - neural OCR backend (strong multilingual accuracy, pulls
-# its own paddlepaddle runtime). Optional. On Windows with paddle 3.3.x
-# mkldnn must be disabled (OCRReader does this automatically).
-paddleocr>=3.0.0
-paddlepaddle>=3.0.0
 
-# GUI Framework
-PySide6>=6.6.0         # Native Qt UI
-qtawesome>=1.4.2       # FontAwesome icons for Qt UI
+# ── GUI (PyWebView + EdgeChromium / WebView2 on Windows) ────────────────────
+pywebview>=5.0
+pythonnet>=3.0.0 ; sys_platform == "win32"
+clr_loader>=0.2.0 ; sys_platform == "win32"
 
-# Win32 desktop control (native program-window backend, alternative to ADB).
-# Windows-only; provides PrintWindow capture + PostMessage/SendInput input.
+# ── Win32 desktop control (native window backend, alternative to ADB) ───────
 pywin32>=306 ; sys_platform == "win32"
-# Windows Graphics Capture backend (Win10 1903+): captures GPU-rendered game
-# windows (Unity/DirectX) that PrintWindow can only see as black, even while
-# they're covered by other windows. Optional — capture falls back without it.
+# GPU window capture when PrintWindow is black (Unity/DirectX). Optional.
 windows-capture>=2.0.0 ; sys_platform == "win32"
-# Frida desktop hooking (optional). Enables background_frida_* input modes
-# on Win32 that fake cursor coordinates inside the game process without
-# moving the real mouse pointer.
+# Frida desktop input hooks (optional Win32 background_* modes).
 frida>=16.0.0 ; sys_platform == "win32"
 
-# Mobile automation
+# ── Mobile automation ───────────────────────────────────────────────────────
 pure-python-adb>=0.3.0.dev0
-# scrcpy-backed screenshot/frame capture: we talk to vendor/scrcpy/scrcpy-server
-# (4.x) directly over ADB and decode its H.264 stream with PyAV. Optional —
-# capture falls back to ADB screencap if PyAV is missing.
-av>=10.0.0
-# Utilities
-keyboard>=0.13.5      # Keyboard hotkeys (q to quit)
-colorama>=0.4.6       # Coloured console output
 
-# Misc
+# ── Utilities ───────────────────────────────────────────────────────────────
+keyboard>=0.13.5      # hotkeys (e.g. q-to-quit on ADBGameAutomation)
+colorama>=0.4.6       # coloured console logs
 typing-extensions>=4.7.1
-python-dotenv>=1.0.0
-
-# Development tools (optional, install with: pip install -r requirements-dev.txt)
-# pytest>=7.4.0
-# black>=23.7.0
-# flake8>=6.1.0
-# mypy>=1.5.1
-# pylint>=2.17.5
-# pre-commit>=3.3.3

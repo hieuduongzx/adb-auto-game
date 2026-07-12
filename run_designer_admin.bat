@@ -6,8 +6,8 @@ cd /d "%~dp0"
 net session >nul 2>&1
 if %errorlevel%==0 (
     rem Đã có quyền admin (mở từ terminal admin) — chạy thẳng.
-    python tools\workflow_designer.py
+    python apps\workflow_designer.py
 ) else (
     rem Chưa có quyền — bật UAC rồi chạy lại chính lệnh này với quyền admin.
-    powershell -NoProfile -Command "Start-Process -FilePath 'python' -ArgumentList 'tools\workflow_designer.py' -WorkingDirectory '%~dp0' -Verb RunAs"
+    powershell -NoProfile -Command "Start-Process -FilePath 'python' -ArgumentList 'apps\workflow_designer.py' -WorkingDirectory '%~dp0' -Verb RunAs"
 )

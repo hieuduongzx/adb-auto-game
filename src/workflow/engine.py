@@ -3,8 +3,8 @@
 The engine wraps an :class:`~src.core.adb.auto.ADBGameAutomation` instance and
 runs the **node graph** of each activity. It is shared by two front-ends:
 
-* the **Run test** button in ``tools/dev_helper.py`` (design-time preview), and
-* the standalone **runner GUI** (``tools/workflow_runner.py``).
+* the **Run test** button in Workflow2k Designer (design-time preview), and
+* the standalone **runner GUI** (``apps/workflow_runner.py``).
 
 Both feed it the exact same JSON, so a flow that runs in the designer runs
 unchanged in the runner.
@@ -18,7 +18,7 @@ starts at the ``start`` node and follows output ports edge-by-edge:
   loop node to iterate), then ``done``;
 * reaching an ``end`` node — or a port with no edge — ends the activity.
 
-There are two activity modes, mirroring ``src/game_core/base_game.py``:
+There are two activity modes:
 
 * ``sequence``   — run the graph once (with ``maxRetries``), in order;
 * ``background`` — run the graph in its own thread every ``pollInterval`` s.
@@ -57,7 +57,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 
 from src.core import ADBGameAutomation
-from src.game_core.frida_speedhack import FridaSpeedhackManager
+from src.core.frida_speedhack import FridaSpeedhackManager
 from src.utils import log_error, log_info, log_success, log_warning
 
 
@@ -122,6 +122,10 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # false), stop that branch and try branch 2, then 3... If every wired branch
     # fails, continue from the "fail" port.
     "try_chain":  {"label": "Thử lần lượt",  "kind": "try_chain", "ins": 1, "outs": []},
+    # Explicit "give up this try_chain branch, try the next one" — like break for
+    # loops. Wire it inside a try_chain arm when you want to abandon the branch
+    # without an actual action failure (e.g. after an if_image true path).
+    "try_next":   {"label": "Thử nhánh kế",  "kind": "try_next",  "ins": 1, "outs": []},
     # Output ports are dynamic (count param) so outs is left empty here; the
     # engine reads params["count"] at runtime and the designer renders them live.
     "join":       {"label": "Gộp",           "kind": "join",      "ins": 1, "outs": ["out"]},
@@ -241,13 +245,13 @@ EMULATOR_CONSOLES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# The instance the last successful launch_emulator booted ({emulator, index,
-# port, serial, …}). if_emulator's "last" option reads this back, so a flow can
-# check "is the emulator I used before still the one running?" across runs.
-_EMULATOR_STATE_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "data", "emulator_state.json",
-)
+# Last successful launch_emulator payload ({emulator, index, port, serial, …}).
+# if_emulator's "last" option reads this back so a flow can check "is the
+# emulator I used before still the one running?" across runs. Resolved via
+# app_dir() so frozen builds write next to the .exe, not inside _MEIPASS.
+def _emulator_state_path() -> str:
+    from src.utils import app_dir
+    return os.path.join(app_dir(), "data", "emulator_state.json")
 
 # Condition node types a switch case may use — only the *instant* ones (no
 # wait_* timeout blocking, no tap_* side-effect), so evaluating one case never
@@ -508,6 +512,18 @@ class WorkflowEngine:
         # OCR engine của flow ("tesseract" / "easyocr" / "paddleocr"…; rỗng = auto):
         # chọn trong Project settings của designer, áp dụng ở _ensure_ready().
         self._ocr_backend = str(self.flow.get("ocr") or "").strip().lower()
+        # ADB frame source for this flow: "scrcpy" | "adb". Key "capture" (also
+        # accept legacy captureBackend / capture_backend). Applied on load so
+        # designer preview + runner + test runs share the same source.
+        cap_raw = (
+            self.flow.get("capture")
+            if self.flow.get("capture") not in (None, "")
+            else self.flow.get("captureBackend")
+            if self.flow.get("captureBackend") not in (None, "")
+            else self.flow.get("capture_backend")
+        )
+        self._capture_backend = str(cap_raw or "").strip().lower()
+        self._apply_capture_backend()
         self._functions = {f.get("id"): f for f in (self.flow.get("functions") or []) if f.get("id")}
         # Global vars: declared at flow top level (``globals``), seeded into every
         # thread below. Reset the shared runtime dict on (re)load.
@@ -584,6 +600,27 @@ class WorkflowEngine:
                 log_warning(f"[workflow] OCR '{name}' không khả dụng — dùng engine mặc định")
         except Exception as e:
             log_warning(f"[workflow] Không đổi được OCR engine '{name}': {e}")
+
+    def _apply_capture_backend(self) -> None:
+        """Apply the flow's ADB capture source (scrcpy / adb screencap).
+
+        Empty / missing key leaves the process-wide default alone (scrcpy).
+        Only meaningful for ADB flows; Win32 captures windows, not this path.
+        """
+        name = getattr(self, "_capture_backend", "") or ""
+        if name not in ("scrcpy", "adb"):
+            return
+        try:
+            from src.core.adb.auto.scrcpy_capture import (
+                get_capture_backend,
+                set_capture_backend,
+            )
+            if get_capture_backend() == name:
+                return
+            set_capture_backend(name)
+            log_info(f"[workflow] Capture backend: {name}")
+        except Exception as e:
+            log_warning(f"[workflow] Không đổi được capture backend '{name}': {e}")
 
     def _flow_has_node_type(self, *ntypes: str) -> bool:
         """True if any activity/function graph in the loaded flow contains a
@@ -864,6 +901,16 @@ class WorkflowEngine:
                 log_info("[workflow] Dừng theo node Stop")
                 self._emit("on_node_done", nid, "ok", None)
                 self.stop()
+                break
+            elif kind == "try_next":
+                # Abandon the current try_chain arm and let the outer try_chain
+                # advance to the next numbered port (or "fail" if none left).
+                if self._try_chain_mode:
+                    log_info("[workflow] ↩ thử nhánh kế — bỏ nhánh hiện tại")
+                    self._branch_failed = True
+                else:
+                    log_warning("[workflow] 'Thử nhánh kế' ngoài Try in order — không có hiệu lực")
+                self._emit("on_node_done", nid, "ok", None)
                 break
             elif kind == "condition":
                 res = self._eval_condition(ntype, params)
@@ -2064,8 +2111,8 @@ class WorkflowEngine:
             if kind == "condition":
                 res = self._eval_condition(ntype, params)
                 port = "true" if res else "false"
-            elif kind in ("start", "end", "note", "stop"):
-                # Terminals/notes have no side-effects; just report ok.
+            elif kind in ("start", "end", "note", "stop", "try_next"):
+                # Terminals/notes/control exits have no side-effects standalone.
                 port = None
             elif kind in ("loop", "loop_until", "parallel", "and", "join",
                           "random", "switch", "try_chain", "call"):
@@ -2942,9 +2989,10 @@ class WorkflowEngine:
 
     @staticmethod
     def _save_emulator_state(state: Dict[str, Any]) -> None:
+        path = _emulator_state_path()
         try:
-            os.makedirs(os.path.dirname(_EMULATOR_STATE_PATH), exist_ok=True)
-            with open(_EMULATOR_STATE_PATH, "w", encoding="utf-8") as fh:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
                 json.dump(state, fh, ensure_ascii=False, indent=2)
         except Exception as exc:
             log_warning(f"[workflow] Couldn't save the emulator state: {exc}")
@@ -2952,7 +3000,7 @@ class WorkflowEngine:
     @staticmethod
     def _load_emulator_state() -> Optional[Dict[str, Any]]:
         try:
-            with open(_EMULATOR_STATE_PATH, "r", encoding="utf-8") as fh:
+            with open(_emulator_state_path(), "r", encoding="utf-8") as fh:
                 return json.load(fh) or None
         except Exception:
             return None

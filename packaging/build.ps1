@@ -1,17 +1,14 @@
 <#
 .SYNOPSIS
-    Build the two ADB auto-game tools into ONE shared folder with a single
-    shared vendor/.
+    Build Workflow2k (Designer + Runner) into dist/Workflow2k/ with vendor/.
 
     dist/Workflow2k/
         Workflow2k.exe      Workflow Designer (+ Runner via --runner)
-        DevScope.exe        Dev / device inspector tool
-        _workflow2k/        Workflow2k's private runtime files
-        _devscope/          DevScope's private runtime files
-        vendor/             shared adb / frida / tesseract (one copy)
+        _workflow2k/        private runtime files
+        vendor/             adb / frida / tesseract
 
-    Both .exe resolve their writable root (vendor/, data/, out/) to the folder
-    they sit in, so a single vendor/ next to them serves both.
+    The .exe resolves its writable root (vendor/, data/, out/) to the folder
+    it sits in.
 
 .PARAMETER SkipVendor
     Skip copying vendor/ (quick code-only rebuild; keeps the existing vendor/).
@@ -26,10 +23,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Root    = Split-Path -Parent $PSScriptRoot          # project root
-$Spec    = Join-Path $PSScriptRoot "tools_build.spec"
+$Spec    = Join-Path $PSScriptRoot "apps_build.spec"
 $Stage   = Join-Path $Root "build\_staging"          # PyInstaller COLLECT output
 $Work    = Join-Path $Root "build"
-$OutDir  = Join-Path $Root "dist\Workflow2k"         # final shared folder
+$OutDir  = Join-Path $Root "dist\Workflow2k"         # final output folder
 
 Write-Host "==> Project root: $Root" -ForegroundColor Cyan
 
@@ -42,15 +39,13 @@ if (-not $havePI) {
     if ($LASTEXITCODE -ne 0) { throw "pip install pyinstaller failed" }
 }
 
-# 2. Build both tools into the staging dir.
+# 2. Build Workflow2k into the staging dir.
 Write-Host "==> Running PyInstaller..." -ForegroundColor Cyan
 python -m PyInstaller --noconfirm --clean --distpath $Stage --workpath $Work $Spec
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 
-# 3. Merge both tool folders into one shared output folder.
-#    Each tool has a distinct contents_directory (_workflow2k / _devscope) and a
-#    distinct .exe name, so merging never collides.
-Write-Host "==> Assembling shared folder: $OutDir" -ForegroundColor Cyan
+# 3. Promote staging/Workflow2k -> dist/Workflow2k.
+Write-Host "==> Assembling output folder: $OutDir" -ForegroundColor Cyan
 $keepVendor = (Test-Path (Join-Path $OutDir "vendor")) -and $SkipVendor
 if (Test-Path $OutDir) {
     # Preserve an existing vendor/ on -SkipVendor; wipe everything else.
@@ -60,17 +55,16 @@ if (Test-Path $OutDir) {
 } else {
     New-Item -ItemType Directory -Path $OutDir | Out-Null
 }
-foreach ($tool in @("Workflow2k", "DevScope")) {
-    $src = Join-Path $Stage $tool
-    robocopy $src $OutDir /E /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
-    if ($LASTEXITCODE -ge 8) { throw "robocopy $tool -> shared folder failed (code $LASTEXITCODE)" }
-}
+$src = Join-Path $Stage "Workflow2k"
+if (-not (Test-Path $src)) { throw "PyInstaller did not produce $src" }
+robocopy $src $OutDir /E /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
+if ($LASTEXITCODE -ge 8) { throw "robocopy Workflow2k -> dist failed (code $LASTEXITCODE)" }
 
-# 4. Copy the single shared vendor/.
+# 4. Copy vendor/.
 if (-not $SkipVendor) {
     $vendorSrc = Join-Path $Root "vendor"
     $vendorDst = Join-Path $OutDir "vendor"
-    Write-Host "==> Copying shared vendor/ -> $vendorDst" -ForegroundColor Cyan
+    Write-Host "==> Copying vendor/ -> $vendorDst" -ForegroundColor Cyan
     robocopy $vendorSrc $vendorDst /MIR /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy vendor failed (code $LASTEXITCODE)" }
 }
@@ -82,5 +76,4 @@ Remove-Item -Recurse -Force $Stage -ErrorAction SilentlyContinue
 Write-Host ""
 Write-Host "==> Done." -ForegroundColor Green
 Write-Host "    $OutDir\Workflow2k.exe"
-Write-Host "    $OutDir\DevScope.exe"
-Write-Host "    (shared $OutDir\vendor)"
+Write-Host "    (vendor: $OutDir\vendor)"
