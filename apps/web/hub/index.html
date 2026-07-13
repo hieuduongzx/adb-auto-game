@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workflow2k</title>
+<link rel="stylesheet" href="css/hub.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <header id="header" class="card">
+    <div class="hdr-brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+          <path d="M17.5 14v7M14 17.5h7"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1 class="app-title">Workflow2k</h1>
+        <p class="app-sub">Workflow dashboard</p>
+      </div>
+    </div>
+    <div class="hdr-actions">
+      <button class="btn ico" id="btn-refresh" title="Refresh list" aria-label="Refresh list">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+      <button class="btn accent" id="btn-new" title="Create a new workflow">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New workflow
+      </button>
+    </div>
+  </header>
+
+  <!-- Toolbar: search + count -->
+  <div id="toolbar" class="card">
+    <div class="search-wrap">
+      <svg class="search-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="search" placeholder="Search workflows…" autocomplete="off" spellcheck="false">
+    </div>
+    <span id="count" class="count-label">—</span>
+  </div>
+
+  <!-- Table -->
+  <main id="main" class="card">
+    <div class="table-scroll">
+      <table id="wf-table" aria-label="Workflows">
+        <thead>
+          <tr>
+            <th class="col-name">Name</th>
+            <th class="col-acts">Activities</th>
+            <th class="col-ctrl">Controller</th>
+            <th class="col-mod">Modified</th>
+            <th class="col-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="wf-body">
+          <!-- rows injected by hub.js -->
+        </tbody>
+      </table>
+      <div id="empty" class="empty" hidden>
+        <div class="empty-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <p class="empty-title">No workflows yet</p>
+        <p class="empty-msg">Create one to start building automation flows.</p>
+        <button class="btn accent" id="btn-empty-new">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New workflow
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer id="footer">
+    <span id="footer-path" class="foot-path" title=""></span>
+    <span class="foot-hint">Run · Edit · Delete</span>
+  </footer>
+
+</div>
+
+<!-- Modal host (created by JS when needed) -->
+<script src="js/hub.js"></script>
+</body>
+</html>

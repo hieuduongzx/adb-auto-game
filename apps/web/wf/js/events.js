@@ -217,22 +217,28 @@ async function wfApplyCaptureBackend(backend){
   if(typeof WF!=="undefined") WF.captureBackend=S.captureBackend;
   const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
 }
-// New blank workflow.
+// New blank workflow — name + controller (ADB/Win32) + capture (scrcpy/ADB).
 async function wfNew(){
   if(WF.activities.length || WF.functions.length){
     const ok=await uiConfirm({title:"Create a new workflow?", message:"Unsaved changes in the current workflow will be lost.", ok:"Create new", danger:true});
     if(!ok) return;
   }
-  const name = await uiPrompt({title:"New workflow", label:"Workflow name", value:"My Workflow"});
-  if(name===null) return; // cancelled
-  WF.name = name.trim() || "My Workflow";
+  const opts = await wfPromptNewWorkflow();
+  if(!opts) return; // cancelled
+
+  const name = (opts.name||"").trim() || "My Workflow";
+  const controller = opts.controller==="win32" ? "win32" : "adb";
+  const capture = (controller==="adb" && opts.capture==="adb") ? "adb" : "scrcpy";
+
+  WF.name = name;
   WF.version=2; WF.templatesDir="templates";
   WF.package="";
   WF.speedhack={enabled:false, speed:2.0};
-  WF.controller="adb"; WF.win32={window:"", matchBy:"title", inputMode:"background"};
+  WF.controller=controller;
+  WF.win32={window:"", matchBy:"title", inputMode:"background"};
   WF.ocrBackend=""; if(typeof wfSyncOcrUI==="function") wfSyncOcrUI();
-  WF.captureBackend="scrcpy";
-  if(typeof wfApplyCaptureBackend==="function") wfApplyCaptureBackend("scrcpy");
+  WF.captureBackend=capture;
+  if(typeof wfApplyCaptureBackend==="function") wfApplyCaptureBackend(capture);
   WF.activities=[]; WF.functions=[]; WF.edit={kind:"activity",id:null};
   WF.sel=[]; WF.selectedNode=null; wfPan={x:0,y:0}; wfZoom=1; wfRunNode=null;
   const nm=$("wf-name"); if(nm) nm.value=WF.name;
@@ -242,5 +248,94 @@ async function wfNew(){
   try{ await api().workflow_new(WF.name); }catch{}
   wfAddActivity("sequence");   // seed one activity so the canvas isn't empty
   await wfSave();              // auto-create workflow.json inside the named folder
-  setStatus("New workflow: " + WF.name);
+  const tag = controller==="win32" ? "Win32" : ("ADB · "+capture);
+  setStatus("New workflow: " + WF.name + " ("+tag+")");
+}
+
+/** Dialog: name + controller + capture → ``{name, controller, capture}`` | null. */
+function wfPromptNewWorkflow(){
+  if(typeof uiModal!=="function"){
+    // Fallback if UI kit is unavailable.
+    return Promise.resolve({name:"My Workflow", controller:"adb", capture:"scrcpy"});
+  }
+  let nameInp=null, ctrlSeg=null, capSeg=null, capHint=null;
+  const syncCap=()=>{
+    if(!ctrlSeg||!capSeg) return;
+    const on=ctrlSeg.querySelector(".choice.on");
+    const win32=on && on.dataset.value==="win32";
+    capSeg.classList.toggle("disabled", !!win32);
+    capSeg.querySelectorAll(".choice").forEach(c=>{ c.disabled=!!win32; });
+    if(capHint){
+      capHint.textContent = win32
+        ? "Win32 captures the target PC window directly — ADB capture source is unused."
+        : "How the device screen is grabbed during preview and runs.";
+    }
+  };
+  return uiModal({
+    title:"New workflow",
+    width:"460px",
+    body:(bd)=>{
+      bd.innerHTML=
+        `<div class="wf-new-form">`+
+          `<div class="wf-new-field">`+
+            `<label class="ui-modal-lbl" for="wf-new-name">Workflow name</label>`+
+            `<input id="wf-new-name" class="ui-modal-inp" type="text" value="My Workflow" spellcheck="false" autocomplete="off">`+
+          `</div>`+
+          `<div class="wf-new-field">`+
+            `<div class="ui-modal-lbl">Controller</div>`+
+            `<div class="choice-seg" data-field="controller" role="group" aria-label="Controller">`+
+              `<button type="button" class="choice on" data-value="adb">`+
+                `<span class="choice-title">ADB</span>`+
+                `<span class="choice-sub">Device / emulator</span>`+
+              `</button>`+
+              `<button type="button" class="choice" data-value="win32">`+
+                `<span class="choice-title">Win32</span>`+
+                `<span class="choice-sub">PC window</span>`+
+              `</button>`+
+            `</div>`+
+          `</div>`+
+          `<div class="wf-new-field">`+
+            `<div class="ui-modal-lbl">Capture source</div>`+
+            `<div class="choice-seg" data-field="capture" role="group" aria-label="Capture source">`+
+              `<button type="button" class="choice on" data-value="scrcpy">`+
+                `<span class="choice-title">scrcpy</span>`+
+                `<span class="choice-sub">Fast stream</span>`+
+              `</button>`+
+              `<button type="button" class="choice" data-value="adb">`+
+                `<span class="choice-title">ADB</span>`+
+                `<span class="choice-sub">screencap</span>`+
+              `</button>`+
+            `</div>`+
+            `<div class="hint" id="wf-new-cap-hint">How the device screen is grabbed during preview and runs.</div>`+
+          `</div>`+
+        `</div>`;
+      nameInp=bd.querySelector("#wf-new-name");
+      ctrlSeg=bd.querySelector('.choice-seg[data-field="controller"]');
+      capSeg=bd.querySelector('.choice-seg[data-field="capture"]');
+      capHint=bd.querySelector("#wf-new-cap-hint");
+      bd.querySelectorAll(".choice-seg").forEach(seg=>{
+        seg.addEventListener("click",e=>{
+          const btn=e.target.closest(".choice");
+          if(!btn||btn.disabled||seg.classList.contains("disabled")) return;
+          seg.querySelectorAll(".choice").forEach(c=>c.classList.remove("on"));
+          btn.classList.add("on");
+          if(seg.dataset.field==="controller") syncCap();
+        });
+      });
+      syncCap();
+      setTimeout(()=>{ try{ nameInp.focus(); nameInp.select(); }catch{} },0);
+    },
+    buttons:[
+      {label:"Cancel", value:null},
+      {label:"Create", value:"ok", kind:"accent"},
+    ],
+  }).then(v=>{
+    if(v!=="ok") return null;
+    const name=(nameInp&&nameInp.value||"").trim()||"My Workflow";
+    const cOn=ctrlSeg&&ctrlSeg.querySelector(".choice.on");
+    const pOn=capSeg&&capSeg.querySelector(".choice.on");
+    const controller=(cOn&&cOn.dataset.value==="win32")?"win32":"adb";
+    const capture=(controller==="adb"&&pOn&&pOn.dataset.value==="adb")?"adb":"scrcpy";
+    return {name, controller, capture};
+  });
 }

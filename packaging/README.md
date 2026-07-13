@@ -1,11 +1,11 @@
 # Đóng gói app ra .exe
 
-Build **Workflow2k** (Designer + Runner qua `--runner`) vào một thư mục kèm
-**`vendor/`** (adb / frida / tesseract):
+Build **Workflow2k** (Hub mặc định + Designer qua `--designer` + Runner qua
+`--runner`) vào một thư mục kèm **`vendor/`** (adb / frida / tesseract):
 
 ```
 dist/Workflow2k/
-    Workflow2k.exe      Workflow Designer (kiêm Runner qua --runner)
+    Workflow2k.exe      Hub (mặc định); --designer / --runner
     _workflow2k/        file runtime riêng
     vendor/             adb / frida / tesseract
 ```
@@ -36,10 +36,13 @@ pwsh packaging/build.ps1 -SkipVendor
 
 - **Tài nguyên ghi được** (`vendor/`, `data/`, `out/`) nằm **cạnh `.exe`** —
   `src.utils.app_dir()` trả về thư mục chứa exe khi frozen, hoặc project root khi chạy source.
-- **Asset chỉ-đọc** (HTML `web/wf`, `web/runner`) được nhúng trong bundle —
-  `src.utils.bundle_dir()` → `_MEIPASS`.
-- **Runner** dùng cùng exe: `Workflow2k.exe --runner [flow.json]`
-  (khi source: `python apps/workflow_runner.py`).
+- **Asset chỉ-đọc** (HTML `web/hub`, `web/wf`, `web/runner`) được nhúng trong
+  bundle — `src.utils.bundle_dir()` → `_MEIPASS`.
+- **Cùng một exe, ba mode:**
+  - `Workflow2k.exe` → Hub (dashboard)
+  - `Workflow2k.exe --designer [flow.json]` → Designer
+  - `Workflow2k.exe --runner [flow.json]` → Runner
+  (source: `python apps/workflow_hub.py` / `workflow_designer.py` / `workflow_runner.py`).
 
 ## Lưu ý
 

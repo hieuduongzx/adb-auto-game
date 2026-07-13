@@ -171,22 +171,22 @@
           {
             "id": "n6pi9wel",
             "type": "start",
-            "x": 24,
-            "y": 52,
+            "x": 40,
+            "y": 40,
             "params": {}
           },
           {
             "id": "ndi8pf0t",
             "type": "end",
-            "x": 1280,
-            "y": 115,
+            "x": 720,
+            "y": 40,
             "params": {}
           },
           {
             "id": "nj3zqhb2",
             "type": "launch_emulator",
             "x": 300,
-            "y": 115,
+            "y": 120,
             "params": {
               "emulator": "mumu",
               "index": 0,
@@ -202,8 +202,8 @@
           {
             "id": "nj5xjfpu",
             "type": "launch_app",
-            "x": 480,
-            "y": 40,
+            "x": 500,
+            "y": -56,
             "params": {
               "package": "",
               "wait": 0,
@@ -226,7 +226,7 @@
             "id": "ni8wav38",
             "type": "if_app",
             "x": 300,
-            "y": 40,
+            "y": -24,
             "params": {
               "package": "com.neversoft.rpg.erolabs",
               "negate": true,
@@ -236,8 +236,8 @@
           {
             "id": "n3gpedjr",
             "type": "wait_image",
-            "x": 660,
-            "y": 40,
+            "x": 700,
+            "y": -56,
             "params": {
               "template": "templates/crop_20260710_233810_872_990_175_33.png",
               "threshold": 0.85,
@@ -248,8 +248,8 @@
           {
             "id": "nsz0mjsw",
             "type": "tap_image",
-            "x": 840,
-            "y": 40,
+            "x": 900,
+            "y": -56,
             "params": {
               "template": "templates/crop_20260710_233827_872_990_175_33.png",
               "taps": "1",
@@ -262,8 +262,8 @@
           {
             "id": "nfti3h6c",
             "type": "call",
-            "x": 1040,
-            "y": 56,
+            "x": 500,
+            "y": 24,
             "params": {
               "fn": "fn_ppung"
             }
@@ -857,7 +857,7 @@
             "id": "nl6of53k",
             "type": "tap_image",
             "x": 780,
-            "y": -40,
+            "y": -120,
             "params": {
               "template": "templates/isHome_20260629_021510_131x82.png",
               "taps": "1",
@@ -871,7 +871,7 @@
             "id": "n9mu7clk",
             "type": "tap_image",
             "x": 780,
-            "y": 60,
+            "y": -20,
             "params": {
               "template": "templates/isHome_20260629_021513_127x83.png",
               "taps": "1",
@@ -886,7 +886,7 @@
             "id": "no6ihwv3",
             "type": "tap_image",
             "x": 1180,
-            "y": -40,
+            "y": -120,
             "params": {
               "template": "templates/isHome_20260629_021538_113x35.png",
               "taps": "1",
@@ -900,7 +900,7 @@
             "id": "n1ztghpi",
             "type": "tap",
             "x": 1380,
-            "y": -40,
+            "y": -120,
             "params": {
               "target": "pos",
               "x": 1730,
@@ -913,7 +913,7 @@
             "id": "nkzryy9a",
             "type": "tap_image",
             "x": 1580,
-            "y": -40,
+            "y": -120,
             "params": {
               "template": "templates/isHome_20260629_021742_88x25.png",
               "taps": "1",
@@ -929,7 +929,7 @@
             "id": "n278kx1x",
             "type": "tap_image",
             "x": 1780,
-            "y": -40,
+            "y": -120,
             "params": {
               "template": "templates/isHome_20260629_021816_131x29.png",
               "taps": "1",
@@ -944,7 +944,7 @@
             "id": "nso8seo3",
             "type": "if_image",
             "x": 980,
-            "y": -40,
+            "y": -120,
             "params": {
               "template": "templates/isHome_20260629_022006_115x29.png",
               "threshold": 0.85,
@@ -956,7 +956,7 @@
             "id": "nyf4txvl",
             "type": "if_image",
             "x": 980,
-            "y": 60,
+            "y": -20,
             "params": {
               "template": "templates/isHome_20260629_022006_115x29.png",
               "threshold": 0.85,
@@ -968,7 +968,7 @@
             "id": "nr7m1c13",
             "type": "end",
             "x": 1460,
-            "y": 105,
+            "y": 25,
             "params": {}
           }
         ],
@@ -3036,7 +3036,7 @@
           {
             "id": "nsm1d1hw",
             "type": "tap_image",
-            "x": 1320,
+            "x": 1340,
             "y": 40,
             "params": {
               "template": "templates/crop_20260707_083641_882_820_161_23.png",
@@ -3051,9 +3051,18 @@
           {
             "id": "n3vmxuk9",
             "type": "end",
-            "x": 1540,
-            "y": 85,
+            "x": 1620,
+            "y": 55,
             "params": {}
+          },
+          {
+            "id": "nchgvr8o",
+            "type": "call",
+            "x": 1340,
+            "y": 120,
+            "params": {
+              "fn": "fn_ppung"
+            }
           }
         ],
         "edges": [
@@ -3106,6 +3115,16 @@
           {
             "from": "nsm1d1hw",
             "fromPort": "false",
+            "to": "n3vmxuk9"
+          },
+          {
+            "from": "ns68bq12",
+            "fromPort": "done",
+            "to": "nchgvr8o"
+          },
+          {
+            "from": "nchgvr8o",
+            "fromPort": "true",
             "to": "n3vmxuk9"
           }
         ],

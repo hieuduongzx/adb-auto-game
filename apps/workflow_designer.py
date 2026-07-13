@@ -140,6 +140,8 @@ class WorkflowDesignerAPI:
         self._engine: Optional[WorkflowEngine] = None
         self._wf_path: Optional[str] = None
         self._last_dir: Optional[str] = None
+        # When launched from the Hub with a path, prefer this over lastWorkflow.
+        self._pending_load: Optional[str] = None
 
         self._window: Optional[webview.Window] = None
         self._closing = False
@@ -1030,24 +1032,36 @@ class WorkflowDesignerAPI:
             pass
 
     def get_last_workflow(self) -> dict:
-        """Return the previously-open workflow so the designer can reopen it.
+        """Return the workflow to open on startup.
 
-        ``{ok, path, name, text}`` when a remembered file still exists, else ``{}``.
+        Prefers a path passed from the Hub / CLI (``_pending_load``), else the
+        remembered ``lastWorkflow`` from settings.
+
+        ``{ok, path, name, text}`` when a file is available, else ``{}``.
         """
-        path = (self.get_settings() or {}).get("lastWorkflow")
-        if not path or not os.path.isfile(str(path)):
+        path: Optional[str] = None
+        if self._pending_load and os.path.isfile(self._pending_load):
+            path = self._pending_load
+            self._pending_load = None
+        else:
+            self._pending_load = None
+            raw = (self.get_settings() or {}).get("lastWorkflow")
+            if raw and os.path.isfile(str(raw)):
+                path = str(raw)
+        if not path:
             return {}
         try:
-            with open(str(path), "r", encoding="utf-8") as fh:
+            with open(path, "r", encoding="utf-8") as fh:
                 text = fh.read()
             name = ""
             try:
                 name = (json.loads(text) or {}).get("name", "")
             except Exception:
                 pass
-            self._wf_path = str(path)
+            self._wf_path = path
             self._remember_dir(path)
-            return {"ok": True, "path": str(path), "name": name, "text": text}
+            self._remember_last_workflow(path)
+            return {"ok": True, "path": path, "name": name, "text": text}
         except Exception:
             return {}
 
@@ -1910,8 +1924,13 @@ class WorkflowDesignerAPI:
 
 # ── Entry points ────────────────────────────────────────────────────────────
 
-def create_workflow_designer_window(title: str = "Workflow2k") -> webview.Window:
+def create_workflow_designer_window(
+    title: str = "Workflow2k",
+    auto_load: Optional[str] = None,
+) -> webview.Window:
     api = WorkflowDesignerAPI()
+    if auto_load and os.path.isfile(auto_load):
+        api._pending_load = os.path.abspath(auto_load)
     html_path = os.path.join(_WEB_DIR, "wf", "index.html")
     url = f"file:///{html_path.replace(os.sep, '/')}"
     window = webview.create_window(
@@ -1952,11 +1971,14 @@ def _enable_windows_dpi_awareness() -> None:
         pass
 
 
-def run() -> None:
+def run(auto_load: Optional[str] = None) -> None:
+    """Open the Designer. Optional *auto_load* is a workflow JSON path to open."""
     _enable_windows_dpi_awareness()
-    create_workflow_designer_window()
+    create_workflow_designer_window(auto_load=auto_load)
     webview.start(debug=False, private_mode=False)
 
 
 if __name__ == "__main__":
-    run()
+    # Optional path from the Hub: ``python apps/workflow_designer.py path.json``
+    auto = sys.argv[1] if len(sys.argv) > 1 else None
+    run(auto)

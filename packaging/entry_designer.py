@@ -1,13 +1,15 @@
 """Frozen entry point for ``Workflow2k.exe``.
 
-Default behaviour opens the **Workflow Designer**. When invoked with
-``--runner [flow.json]`` it opens the **Workflow Runner** GUI instead — the
-designer's *Run GUI* button relaunches this same executable in that mode
-(see :func:`src.utils.launch_tool`).
+Default behaviour opens the **Hub** (workflow dashboard). Switches:
 
-This module is the PyInstaller analysis entry point; the static
-``import workflow_designer`` / ``import workflow_runner`` below are what pull
-those apps (and their whole dependency tree) into the build.
+- ``--designer [flow.json]`` — Workflow Designer (optionally with a file open)
+- ``--runner [flow.json]``   — Workflow Runner GUI (optionally auto-load a flow)
+
+The Hub's *Edit* / *Run* buttons relaunch this same executable with those
+flags (see :func:`src.utils.launch_tool`).
+
+This module is the PyInstaller analysis entry point; the static imports below
+pull the hub, designer, and runner (and their dependency trees) into the build.
 """
 from __future__ import annotations
 
@@ -30,9 +32,13 @@ def main() -> None:
         flow = argv[1] if len(argv) > 1 else None
         from workflow_runner import run as run_runner
         run_runner(flow)
+    elif argv and argv[0] == "--designer":
+        flow = argv[1] if len(argv) > 1 else None
+        from workflow_designer import run as run_designer
+        run_designer(flow)
     else:
-        import workflow_designer
-        workflow_designer.run()
+        import workflow_hub
+        workflow_hub.run()
 
 
 if __name__ == "__main__":

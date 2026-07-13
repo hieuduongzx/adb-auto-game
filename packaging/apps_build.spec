@@ -4,12 +4,12 @@
 Output (after ``build.ps1`` merges staging + vendor)::
 
     dist/Workflow2k/
-        Workflow2k.exe      -> Workflow Designer (+ Runner via --runner)
+        Workflow2k.exe      -> Hub (default) + Designer (--designer) + Runner (--runner)
         _workflow2k/        -> private runtime files
         vendor/             -> adb / frida / tesseract (external, not bundled)
 
 ``vendor/`` is NOT bundled here (kept external/updatable). Web HTML assets ARE
-bundled (``wf/`` + ``runner/`` only — DevScope is not packaged). Neural OCR
+bundled (``hub/`` + ``wf/`` + ``runner/`` — DevScope is not packaged). Neural OCR
 backends (easyocr / paddle / torch) are excluded; only Tesseract.
 
 Prefer ``build.ps1`` (handles staging + vendor). Raw build::
@@ -46,10 +46,11 @@ hiddenimports += [
     "pytesseract",    # OCR (calls the vendored tesseract.exe)
 ]
 
-# --- bundled web assets (designer + runner only; no DevScope) ----------------
-# Under apps/web: only wf/ and runner/ are needed for Workflow2k.
+# --- bundled web assets (hub + designer + runner; no DevScope) ---------------
+# Under apps/web: hub/, wf/, and runner/ are needed for Workflow2k.
 _web_src = os.path.join(ROOT, "apps", "web")
 web_datas = [
+    (os.path.join(_web_src, "hub"), os.path.join("web", "hub")),
     (os.path.join(_web_src, "wf"), os.path.join("web", "wf")),
     (os.path.join(_web_src, "runner"), os.path.join("web", "runner")),
 ]
@@ -73,7 +74,7 @@ _common = dict(
     noarchive=False,
 )
 
-# ── Workflow2k.exe (Workflow Designer + Runner) ──────────────────────────────
+# ── Workflow2k.exe (Hub + Designer + Runner) ────────────────────────────────
 a_designer = Analysis(
     [os.path.join(ROOT, "packaging", "entry_designer.py")],
     datas=datas + web_datas,

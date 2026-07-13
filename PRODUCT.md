@@ -13,10 +13,12 @@ wide) and portrait.
 
 ## Product Purpose
 
-An internal tool suite — **Workflow2k Designer** (node-graph editor),
-**Workflow2k Runner** (load a JSON flow and run it), and **DevScope** (device
-inspector). The runner's job: load a flow, toggle activities, press Start, and
-monitor progress/log at a glance while it runs unattended.
+An internal tool suite — **Workflow2k Hub** (workflow dashboard: list / run /
+edit / create), **Workflow2k Designer** (node-graph editor), **Workflow2k
+Runner** (load a JSON flow and run it), and **DevScope** (device inspector).
+The hub is the default entry; the runner's job is load a flow, toggle
+activities, press Start, and monitor progress/log at a glance while it runs
+unattended.
 
 ## Brand Personality
 
@@ -32,7 +34,7 @@ always readable at a glance from across the desk.
 
 ## Design Principles
 
-1. **One vocabulary across apps** — the runner, designer, and DevScope share
+1. **One vocabulary across apps** — the hub, runner, designer, and DevScope share
    tokens, controls, and component shapes (see `apps/web/wf/css/base.css`).
 2. **Density without clutter** — small window, many rows; every pixel of
    chrome must earn its place.

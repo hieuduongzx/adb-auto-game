@@ -218,23 +218,32 @@ def bundle_dir() -> str:
 
 
 # Maps a logical app name to (frozen exe basename, source-tree script path
-# relative to the project root). The designer executable also hosts the
-# runner GUI via the ``--runner`` switch.
+# relative to the project root). Workflow2k.exe hosts Hub + Designer + Runner
+# via CLI switches (default = hub, ``--designer``, ``--runner``).
 #
-# Packaging ships only Workflow2k.exe (designer + runner). DevScope is
-# source-only unless you add it back to packaging/apps_build.spec.
+# Packaging ships only Workflow2k.exe. DevScope is source-only unless you add
+# it back to packaging/apps_build.spec.
 _APP_MAP = {
+    "hub": ("Workflow2k.exe", os.path.join("apps", "workflow_hub.py")),
     "designer": ("Workflow2k.exe", os.path.join("apps", "workflow_designer.py")),
     "devscope": ("DevScope.exe", os.path.join("apps", "devscope.py")),
     "runner": ("Workflow2k.exe", os.path.join("apps", "workflow_runner.py")),
+}
+
+# Frozen CLI flags so one exe can host hub / designer / runner.
+_FROZEN_PREFIX = {
+    "hub": [],
+    "designer": ["--designer"],
+    "runner": ["--runner"],
 }
 
 
 def launch_tool(tool: str, extra_args: Optional[Sequence[str]] = None) -> None:
     """Launch a sibling app process, working both frozen and from source.
 
-    Frozen: runs the matching ``*.exe`` next to the current executable (the
-    runner is launched as ``Workflow2k.exe --runner <args>``). Source: runs
+    Frozen: runs the matching ``*.exe`` next to the current executable
+    (``Workflow2k.exe``, ``Workflow2k.exe --designer <args>``,
+    ``Workflow2k.exe --runner <args>``). Source: runs
     ``python apps/<script>.py <args>``.
 
     Raises ``FileNotFoundError`` if the frozen target exe is missing
@@ -251,7 +260,7 @@ def launch_tool(tool: str, extra_args: Optional[Sequence[str]] = None) -> None:
                 f"{exe_name} not found next to this build. "
                 f"From source: python {script_rel}"
             )
-        prefix = ["--runner"] if tool == "runner" else []
+        prefix = list(_FROZEN_PREFIX.get(tool, []))
         cmd = [target, *prefix, *args]
     else:
         cmd = [sys.executable, os.path.join(_SOURCE_ROOT, script_rel), *args]

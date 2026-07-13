@@ -4,16 +4,19 @@ Internal tool suite for Android (emulator/device) automation on Windows.
 
 | App | Role | Run (source) |
 |-----|------|----------------|
-| **Workflow2k Designer** | Node-graph workflow editor | `python apps/workflow_designer.py` |
-| **Workflow2k Runner** | Load JSON flow & run | `python apps/workflow_runner.py` |
+| **Workflow2k Hub** | Dashboard: list / run / edit / create workflows | `python apps/workflow_hub.py` |
+| **Workflow2k Designer** | Node-graph workflow editor | `python apps/workflow_designer.py [flow.json]` |
+| **Workflow2k Runner** | Load JSON flow & run | `python apps/workflow_runner.py [flow.json]` |
 | **DevScope** | Device inspector / crop templates | `python apps/devscope.py` |
 
-Also: `run_designer.bat` / `run_designer_admin.bat` (Admin needed when the game window is elevated).
+Also: `run_hub.bat`, `run_designer.bat` / `run_designer_admin.bat` (Admin needed when the game window is elevated).
+
+Frozen exe modes: `Workflow2k.exe` (hub), `--designer [flow]`, `--runner [flow]`.
 
 ## Layout
 
 ```
-apps/           Product apps + web UI (wf / runner / scope)
+apps/           Product apps + web UI (hub / wf / runner / scope)
 src/            Library: ADB core, OCR, Win32, workflow engine, utils
 workflows/      User flows: <Name>/*.json + templates/
 data/           Runtime settings (gitignored machine-local files)
