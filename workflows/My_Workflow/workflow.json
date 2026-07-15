@@ -1,0 +1,58 @@
+{
+  "name": "My Workflow",
+  "version": 2,
+  "templatesDir": "templates",
+  "package": "",
+  "controller": "win32",
+  "ocr": "",
+  "capture": "scrcpy",
+  "win32": {
+    "window": "",
+    "matchBy": "title",
+    "inputMode": "background"
+  },
+  "speedhack": {
+    "enabled": false,
+    "speed": 2
+  },
+  "globals": [
+    {
+      "name": "g1",
+      "label": "Global 1",
+      "type": "bool",
+      "value": false,
+      "options": []
+    }
+  ],
+  "functions": [],
+  "activities": [
+    {
+      "id": "sequence_v10r",
+      "name": "Activity 1",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nj4r696m",
+            "type": "start",
+            "x": 48,
+            "y": 72,
+            "params": {}
+          },
+          {
+            "id": "nc48zyyo",
+            "type": "end",
+            "x": 440,
+            "y": 72,
+            "params": {}
+          }
+        ],
+        "edges": [],
+        "groups": []
+      },
+      "maxRetries": 1
+    }
+  ]
+}

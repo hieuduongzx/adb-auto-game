@@ -241,10 +241,22 @@ async function wfExport(){
   const ok=await api().workflow_export(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
   if(ok){ wfHasFile=true; wfMarkClean(); setStatus("Workflow saved"); }
 }
+let wfSaving=false;
 async function wfSave(){
-  const r=await api().workflow_save(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
-  if(r&&r.ok){ wfHasFile=true; wfMarkClean(); setStatus("Workflow saved"); }
-  else if(r&&r.ok===false) uiToast("Save failed — check the log for details.","error");
+  if(wfSaving) return;
+  wfSaving=true;
+  const btn=$("wf-save-btn"), oldTitle=btn&&btn.title;
+  if(btn){ btn.disabled=true; btn.classList.add("saving"); btn.setAttribute("aria-busy","true"); btn.title="Saving workflow…"; }
+  try{
+    const r=await api().workflow_save(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
+    if(r&&r.ok){ wfHasFile=true; wfMarkClean(); setStatus("Workflow saved"); uiToast("Workflow saved","success",{dur:1600}); }
+    else uiToast("Save failed — check the log for details.","error");
+  }catch(e){
+    uiToast("Save failed — "+String(e&&e.message||e||"unknown error"),"error");
+  }finally{
+    wfSaving=false;
+    if(btn){ btn.disabled=false; btn.classList.remove("saving"); btn.removeAttribute("aria-busy"); btn.title=oldTitle||"Save workflow"; }
+  }
 }
 async function wfImport(){
   const txt=await api().workflow_import(); if(!txt)return;

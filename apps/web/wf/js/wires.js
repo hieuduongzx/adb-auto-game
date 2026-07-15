@@ -25,6 +25,8 @@ const WF_WIRE_DEFS = (function(){
     mk("wf-ah-f",v("--branch-f","#e0792e"))+
     mk("wf-ah-switch",v("--wire-switch","#9a78e6"))+
     mk("wf-ah-loop",v("--branch-loop-line","#d09030"))+
+    mk("wf-ah-run-ok",v("--run-ok","#1f9d57"))+
+    mk("wf-ah-run-fail",v("--run-fail","#d6483f"))+
     mk("wf-ah-hover",v("--accent","#2f6fed"))+
     mk("wf-ah-temp",v("--accent","#2f6fed"))+
   "</defs>";
@@ -57,10 +59,18 @@ function wfWireBoxesRebuild(){
 function wfWireBlocked(a,b,c1x,c2x){
   const pad=4;
   const near=(p,bx)=>p.x>=bx.left-8&&p.x<=bx.right+8&&p.y>=bx.top-8&&p.y<=bx.bottom+8;
-  const boxes=wfWireBoxes.filter(bx=>!near(a,bx)&&!near(b,bx));
+  const minX=Math.min(a.x,b.x,c1x,c2x)-pad, maxX=Math.max(a.x,b.x,c1x,c2x)+pad;
+  const minY=Math.min(a.y,b.y)-pad, maxY=Math.max(a.y,b.y)+pad;
+  // Broad phase: only sample against boxes overlapping the curve's bounds.
+  const boxes=wfWireBoxes.filter(bx=>!near(a,bx)&&!near(b,bx) &&
+    bx.right>=minX&&bx.left<=maxX&&bx.bottom>=minY&&bx.top<=maxY);
   if(!boxes.length) return false;
-  for(let i=1;i<24;i++){
-    const t=i/24, u=1-t;
+  // Adaptive sampling: long/high-curvature splines need more probes than a
+  // short local hop. Roughly one sample per 10 world px, capped for large maps.
+  const approx=Math.hypot(c1x-a.x,0)+Math.hypot(c2x-c1x,b.y-a.y)+Math.hypot(b.x-c2x,0);
+  const steps=Math.max(24,Math.min(128,Math.ceil(approx/10)));
+  for(let i=1;i<steps;i++){
+    const t=i/steps, u=1-t;
     const x=u*u*u*a.x + 3*u*u*t*c1x + 3*u*t*t*c2x + t*t*t*b.x;
     const y=(u*u*u+3*u*u*t)*a.y + (3*u*t*t+t*t*t)*b.y;
     for(const bx of boxes)
@@ -134,9 +144,20 @@ function wfShelfClearance(x0,x1,y){
 
 // Detours placed earlier in the current draw pass — a new detour nudges its
 // shelf/risers a few px away from any it would overdraw. Overlap is resolved
-// pairwise on real geometry, so unrelated wires never fan apart (the old lane
-// counters pushed every back-run onto its own ever-farther orbit).
+// pairwise on real geometry, so unrelated wires never fan apart.
 let wfPlacedDetours=[];
+function wfShelfLaneY(x0,x1,preferred,mid){
+  const occupied=wfPlacedDetours.filter(o=>Math.min(x1,o.x1)>Math.max(x0,o.x0)).map(o=>o.routeY);
+  const ok=y=>wfShelfClearance(x0,x1,y)>=10 && occupied.every(oy=>Math.abs(y-oy)>=10);
+  if(ok(preferred)) return preferred;
+  // Search symmetric 10px lanes and choose the valid one nearest the endpoint
+  // midpoint. Unlike a one-step nudge, this cannot settle inside a node band.
+  for(let step=1;step<=20;step++){
+    const candidates=[preferred-step*10,preferred+step*10].filter(ok);
+    if(candidates.length) return candidates.sort((p,q)=>Math.abs(p-mid)-Math.abs(q-mid))[0];
+  }
+  return preferred;
+}
 function wfDetourGeom(a,b){
   let routeY=(a.y+b.y)/2, xOut=a.x+16, xIn=b.x-16;
   for(let i=0;i<2;i++){                       // risers ↔ shelf settle in 2 passes
@@ -144,24 +165,28 @@ function wfDetourGeom(a,b){
     xIn =wfRiserX(b.x-16, routeY, b.y, -1, b.x-6, b.y);
     routeY=wfShelfY(Math.min(xOut,xIn), Math.max(xOut,xIn), a, b);
   }
-  const yr=(y0,y1,o0,o1)=>Math.min(Math.max(y0,y1),Math.max(o0,o1))>Math.max(Math.min(y0,y1),Math.min(o0,o1));
-  for(let it=0; it<4; it++){
-    let moved=false;
-    const x0=Math.min(xOut,xIn), x1=Math.max(xOut,xIn);
-    for(const o of wfPlacedDetours){
-      if(Math.abs(routeY-o.routeY)<10 && Math.min(x1,o.x1)>Math.max(x0,o.x0)){
-        // Step to whichever side of the occupied shelf has more room to the nodes.
-        const up=o.routeY-10, dn=o.routeY+10;
-        const cu=wfShelfClearance(x0,x1,up), cd=wfShelfClearance(x0,x1,dn);
-        routeY = cu===cd ? (routeY>=o.routeY?dn:up) : (cu>cd?up:dn);
-        moved=true;
-      }
-      if(Math.abs(xOut-o.xOut)<8 && yr(a.y,routeY,o.ya,o.routeY)){ xOut+=8; moved=true; }
-      if(Math.abs(xIn-o.xIn)<8 && yr(routeY,b.y,o.routeY,o.yb)){ xIn-=8; moved=true; }
-    }
-    if(!moved) break;
+  let x0=Math.min(xOut,xIn), x1=Math.max(xOut,xIn);
+  routeY=wfShelfLaneY(x0,x1,routeY,(a.y+b.y)/2);
+  // The shelf may have moved to avoid another wire. Recompute both risers for
+  // that FINAL shelf, otherwise a previously-clear riser can cross a node.
+  for(let i=0;i<2;i++){
+    xOut=wfRiserX(a.x+16,a.y,routeY,+1,a.x+6,a.y);
+    xIn =wfRiserX(b.x-16,routeY,b.y,-1,b.x-6,b.y);
   }
-  return {xOut,xIn,routeY, x0:Math.min(xOut,xIn), x1:Math.max(xOut,xIn), ya:a.y, yb:b.y};
+  // Separate coincident risers only when the nudged lane is also node-clear.
+  const yr=(y0,y1,o0,o1)=>Math.min(Math.max(y0,y1),Math.max(o0,o1))>Math.max(Math.min(y0,y1),Math.min(o0,o1));
+  for(const o of wfPlacedDetours){
+    if(Math.abs(xOut-o.xOut)<8 && yr(a.y,routeY,o.ya,o.routeY)){
+      const cand=xOut+8, clear=wfRiserX(cand,a.y,routeY,+1,a.x+6,a.y);
+      if(Math.abs(clear-cand)<.1) xOut=cand;
+    }
+    if(Math.abs(xIn-o.xIn)<8 && yr(routeY,b.y,o.routeY,o.yb)){
+      const cand=xIn-8, clear=wfRiserX(cand,routeY,b.y,-1,b.x-6,b.y);
+      if(Math.abs(clear-cand)<.1) xIn=cand;
+    }
+  }
+  x0=Math.min(xOut,xIn); x1=Math.max(xOut,xIn);
+  return {xOut,xIn,routeY,x0,x1,ya:a.y,yb:b.y};
 }
 
 // `register` — wfDrawWires passes true so the wire's detour geometry joins
@@ -221,7 +246,14 @@ function wfDrawWires(){
   wfWireBoxesRebuild();
   wfPlacedDetours=[];
 
-  (g.edges||[]).forEach(ed=>{
+  // Route in a deterministic order. Geometry no longer changes merely because
+  // JSON import/delete/undo happened to reorder the edge array.
+  const edges=[...(g.edges||[])].sort((a,b)=>{
+    const ka=`${a.from}\u0000${a.fromPort||"out"}\u0000${a.to}\u0000${a.toPort||"in"}`;
+    const kb=`${b.from}\u0000${b.fromPort||"out"}\u0000${b.to}\u0000${b.toPort||"in"}`;
+    return ka<kb?-1:ka>kb?1:0;
+  });
+  edges.forEach(ed=>{
     if(wfSameStack(ed.from,ed.to)) return;
     const toPort=ed.toPort||"in";
     const a=wfPortPt(ed.from,ed.fromPort), b=wfPortPt(ed.to,toPort);
@@ -230,7 +262,15 @@ function wfDrawWires(){
     const cls="wire"+(toPort==="loop"?" loopback":"");
     const grp=document.createElementNS(NS,"g"); grp.setAttribute("class","wire-grp"); grp.__edge=ed;
     const hit=document.createElementNS(NS,"path"); hit.setAttribute("class","wire-hit"); hit.setAttribute("d",d);
-    const tt=document.createElementNS(NS,"title"); tt.textContent="Right-click to delete wire"; hit.appendChild(tt);
+    hit.setAttribute("tabindex","0"); hit.setAttribute("role","button");
+    const fromLabel=WF_PORT_LBL[ed.fromPort]||ed.fromPort||"out";
+    hit.setAttribute("aria-label",`Wire ${fromLabel||"out"}; press Delete to remove`);
+    const tt=document.createElementNS(NS,"title"); tt.textContent="Right-click or press Delete to remove wire"; hit.appendChild(tt);
+    hit.addEventListener("keydown",e=>{
+      if(e.key==="Delete"||e.key==="Backspace"){
+        e.preventDefault(); e.stopPropagation(); wfDeleteWire(ed);
+      }
+    });
     const p=document.createElementNS(NS,"path");
     p.setAttribute("class",cls);
     p.dataset.from=ed.from; p.dataset.fromport=ed.fromPort; p.dataset.to=ed.to;

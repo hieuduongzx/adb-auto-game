@@ -25,6 +25,10 @@ function wfValidationIssues(){
     nodes.forEach(n=>{
       const def=WF_NODES[n.type];
       if(!def){ add("err",`Unknown node type: ${n.type}`,ctx,n.id); return; }
+      const cat=(typeof WF_CATS!=="undefined")?WF_CATS.find(c=>c.key===def.cat):null;
+      if(cat&&cat.ctrl&&cat.ctrl!==WF.controller){
+        add("err",`${def.label} is ${cat.ctrl==="adb"?"ADB-only":"Win32-only"} but this project uses ${WF.controller.toUpperCase()}`,ctx,n.id);
+      }
       if(def.kind!=="start" && def.kind!=="note" && !edges.some(e=>e.to===n.id)) add("warn","No incoming wire",ctx,n.id);
       (def.fields||[]).forEach(f=>{
         const v=(n.params||{})[f.k];
@@ -32,6 +36,7 @@ function wfValidationIssues(){
         if(f.t==="tpls" && (!Array.isArray(v)||!v.some(x=>String(x||"").trim()))) add("err",`${def.label}: empty template list`,ctx,n.id);
         if(f.var && String(v||"").trim() && !varNames.has(String(v).trim())) add("warn",`Variable not declared yet: ${v}`,ctx,n.id);
       });
+      if(n.type==="win_launch" && !String((n.params||{}).path||"").trim()) add("err","Launch program: choose an executable or path variable",ctx,n.id);
       if(n.type==="parallel"){
         const count=Math.max(1,parseInt((n.params||{}).count)||3);
         for(let i=1;i<=count;i++) if(!edges.some(e=>e.from===n.id && e.fromPort===String(i))) add("warn",`Parallel branch #${i} is not wired`,ctx,n.id);

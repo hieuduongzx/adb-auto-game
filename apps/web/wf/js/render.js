@@ -303,8 +303,10 @@ function wfRenderPalette(){
     const closed = !q && (stored!==undefined ? !!stored : !!cat.closed);
     const hdr=document.createElement("div"); hdr.className="wf-pal-cat cat-"+cat.key+(closed?" closed":"");
     hdr.title=closed?"Expand category":"Collapse category";
+    hdr.tabIndex=q?-1:0; hdr.setAttribute("role","button"); hdr.setAttribute("aria-expanded",String(!closed));
     hdr.innerHTML=`<span>${escHtml(cat.label)}</span><span class="wf-pal-cat-n">${types.length}</span>${WF_PAL_CHEV}`;
     hdr.addEventListener("click",()=>{ if(!q) wfPalToggleCat(cat.key); });
+    hdr.addEventListener("keydown",e=>{ if(!q&&(e.key==="Enter"||e.key===" ")){ e.preventDefault(); wfPalToggleCat(cat.key); } });
     pal.appendChild(hdr);
     if(closed) return;
     const grid=document.createElement("div"); grid.className="wf-pal-grid";
@@ -348,12 +350,27 @@ function wfPaletteFilterClear(){
   const clr=$("wf-pal-search-clr"); if(clr) clr.style.display="none";
   wfRenderPalette();
 }
+function wfInsertNodeAtViewportCenter(type){
+  const g=wfGraph(), canvas=$("wf-canvas"), world=$("wf-world");
+  if(!g||!canvas||!world){ uiToast("Open an activity or function before adding a block.","warning"); return; }
+  const cr=canvas.getBoundingClientRect(), wr=world.getBoundingClientRect();
+  const x=wfSnap((cr.left+cr.width/2-wr.left)/wfZoom-84);
+  const y=wfSnap((cr.top+cr.height/2-wr.top)/wfZoom-32);
+  wfPushUndo();
+  const node=wfNewNode(type,x,y); g.nodes.push(node);
+  wfSelectOne(node.id); wfRenderCanvas(); wfRenderInspector(); wfPopNodes([node.id]);
+}
 function wfChip(ico,label,dragType,catKey){
   const chip=document.createElement("div");
   chip.className="wf-chip"+(catKey?" cat-"+catKey:""); chip.draggable=true;
-  chip.innerHTML=`<span class="ico">${wfIco(ico)}</span>${escHtml(label)}`;
+  chip.tabIndex=0; chip.setAttribute("role","button");
+  chip.setAttribute("aria-label","Add "+label+" block to the center of the canvas");
+  chip.title="Drag to place · double-click or press Enter to add at canvas center";
+  chip.innerHTML=`<span class="ico">${wfIco(ico)}</span><span>${escHtml(label)}</span>`;
   chip.addEventListener("dragstart",e=>{ wfPaletteDrag=dragType; e.dataTransfer.effectAllowed="copy"; try{e.dataTransfer.setData("text/plain",dragType);}catch{} });
   chip.addEventListener("dragend",()=>{ wfPaletteDrag=null; });
+  chip.addEventListener("dblclick",()=>wfInsertNodeAtViewportCenter(dragType));
+  chip.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); wfInsertNodeAtViewportCenter(dragType); } });
   return chip;
 }
 
@@ -768,7 +785,8 @@ function wfNodeEl(n){
   // Nodes with true/false outputs show "T"/"F" labels in the top-right corner;
   // flag them so the header reserves room and the title can't slide under the labels.
   const tfCls = ((def.outs||[]).includes("true") || n.type==="switch") ? " has-tf" : "";
-  el.className="wf-node "+def.kind+catCls+tfCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"");
+  const typeCls=" type-"+String(n.type||"unknown").replace(/[^a-zA-Z0-9_-]/g,"-");
+  el.className="wf-node "+def.kind+typeCls+catCls+tfCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"");
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
   // Dynamic output ports — grow the card so they all sit inside it. Multi-port
   // blocks stack ports from the primary row (≈ card centre), 16px apart.
@@ -821,13 +839,14 @@ function wfNodeEl(n){
     : `<img class="wf-node-thumb">`) : "";
   // start/end = solid round chip (icon + label under).
   const isTerminal = def.kind==="start"||def.kind==="end";
+  const isNextBranch = n.type==="try_next";
   // Color nodes get a live swatch dot in front of the summary text.
   const sumHtml = sum?`<div class="wf-node-sum">${wfColorDotHtml(n,def)}${escHtml(sum)}</div>`:"";
   const topRow = hasTpl ? `<div class="wf-node-prevrow">${thumbHtml}${sumHtml}</div>` : sumHtml;
   el.classList.toggle("showing-thumb", hasRealThumb);
   el.classList.toggle("has-thumb", hasTpl);
   if(isTerminal){
-    // Filled circle + white glyph; text label sits below (not a border).
+    // Start is a play circle; End is an octagonal stop marker.
     const termIco = def.kind==="end"
       ? '<rect x="7" y="7" width="10" height="10" rx="2"/>'
       : '<polygon points="9 6 18 12 9 18 9 6"/>';
@@ -836,6 +855,12 @@ function wfNodeEl(n){
         `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none">${termIco}</svg>`+
       `</span>`+
       `<span class="wf-node-tri-lbl">${escHtml(def.label)}</span>`;
+  } else if(isNextBranch){
+    // A branch-control token, not an action card: compact capsule + arrow.
+    el.innerHTML=actBar+
+      `<div class="wf-next-body"><span class="ico">${wfIco(def.ico)}</span>`+
+        `<span class="wf-next-copy"><b>${escHtml(title)}</b><small>${escHtml(sum||"skip to next branch")}</small></span>`+
+      `</div>`+noteHtml;
   } else {
     el.innerHTML=
       actBar+
@@ -855,7 +880,7 @@ function wfNodeEl(n){
   // Primary port row — single in + first out share this y so chains stay level.
   // Cards 64px / terminal discs 40px; port is 8px → top = h/2 − 4.
   // Extra ports (true/false, loop-back…) stack 16px below; card grows as needed.
-  const rowTop = isTerminal ? Math.round(40/2 - 4) : Math.round(64/2 - 4);
+  const rowTop = isTerminal ? Math.round(40/2 - 4) : isNextBranch ? 18 : Math.round(64/2 - 4);
   const outTop = i => rowTop + (outs.length>1 ? i*16 : 0);
   // Single input → the shared primary row (level with the first output). The
   // loop's in/loop pair stacks from that row downward.

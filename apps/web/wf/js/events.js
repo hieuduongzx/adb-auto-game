@@ -203,7 +203,7 @@ async function onCaptureBackendChange(backend){
   if(typeof WF!=="undefined") WF.captureBackend=(backend==="adb")?"adb":"scrcpy";
   if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
   await wfApplyCaptureBackend(backend);
-  setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (nhanh/headless)")+" — saved with workflow");
+  setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (fast/headless)")+" — saved with workflow");
 }
 // Apply backend process-wide + sync the Source dropdown (no dirty mark).
 async function wfApplyCaptureBackend(backend){

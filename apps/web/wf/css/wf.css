@@ -9,6 +9,7 @@
 .tb-left .wf-run-status { margin-left:auto; }
 .tb-center{ justify-self:center; }
 .tb-right { justify-self:end; }
+.tb-backend-tools { display:flex; align-items:center; gap:var(--s2); min-width:0; }
 
 /* ── Unified tray: segmented control with label + internal separators ────────
    Each tray has an optional .tb-tray-label (uppercase muted text) that brands
@@ -34,6 +35,13 @@
 .tb-tray-source { height:38px; box-sizing:border-box; padding:0 8px; gap:6px; align-items:center; }
 .tb-tray-device { min-width:260px; max-width:340px; }
 .tb-tray-source { min-width:168px; width:168px; }
+.tb-tray-win32 { height:38px; min-width:280px; max-width:420px; padding:0 8px; gap:7px; }
+.tb-tray-win32 .btn { width:28px; height:28px; flex-shrink:0; }
+.tb-target-label { min-width:0; max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:12px; font-weight:600; color:var(--ink2); }
+.tb-backend-chip { flex-shrink:0; padding:2px 7px; border-radius:5px; background:var(--cat-win32-bg);
+  color:var(--cat-win32-ink); border:1px solid var(--cat-win32-bd); font-size:9.5px; font-weight:700; }
+#win32-target-dot.configured { background:var(--cat-win32); box-shadow:0 0 0 3px rgba(99,102,241,.15); }
 .tb-tray-device .tb-device-dot { margin-left:0; flex-shrink:0; }
 .tb-tray-device select,
 .tb-tray-source select { font-family:var(--sans); font-size:12px; font-weight:600; color:var(--dim);
@@ -52,6 +60,8 @@
 #wf-save-btn.dirty::after { content:""; position:absolute; top:-3px; right:-3px;
   width:9px; height:9px; border-radius:50%; background:var(--amber);
   border:2px solid var(--panel); box-shadow:0 0 0 1px rgba(245,158,11,.25); }
+#wf-save-btn.saving svg { animation:wfSavePulse .7s ease-in-out infinite alternate; }
+@keyframes wfSavePulse { to { opacity:.35; transform:scale(.9); } }
 
 /* The Run button is the toolbar's one focal point — standalone (no tray box),
    green, and a touch wider than a tray slot so it reads as primary while still
@@ -71,10 +81,14 @@
   .tb-tray-label { display:none; }
   .tb-tray-device { min-width:180px; max-width:240px; }
   .tb-tray-source { min-width:132px; width:132px; }
+  .tb-tray-win32 { min-width:220px; max-width:300px; }
+  .tb-target-label { max-width:120px; }
 }
 @media (max-width: 1100px){
   .tb-tray-device { min-width:140px; max-width:200px; }
   .tb-tray-source { min-width:110px; width:110px; }
+  .tb-tray-win32 { min-width:170px; max-width:220px; }
+  .tb-backend-chip { display:none; }
   .wf-run-status .wf-run-txt { display:none; }   /* the pill's dot still shows state */
   .wf-run-status { padding:0 8px; }
 }
@@ -195,6 +209,7 @@
     border-radius:5px; color:var(--ink); cursor:pointer; user-select:none;
     transition:background .1s; }
   .wf-pal-cat:hover { background:var(--alt); }
+  .wf-pal-cat:focus-visible { outline:2px solid var(--accent); outline-offset:1px; background:var(--accent-bg); }
   /* Leader rule between the label and the count — "LABEL ——— n" gives each
      group a confident anchor line without reintroducing per-category color. */
   .wf-pal-cat > span:first-of-type { flex:1; min-width:0; display:flex;
@@ -369,9 +384,11 @@
 /* Hover: the whole group brightens to accent (wire + arrowhead) and lifts on a
    soft shadow — matching professional graph editors. Overrides the semantic
    hue only while hovered, so the wire you're about to grab is unmistakable. */
-#wf-wires .wire-grp:hover path.wire { stroke:var(--accent) !important; stroke-width:2.2; stroke-opacity:1;
+#wf-wires .wire-grp:hover path.wire,
+#wf-wires .wire-grp:focus-within path.wire { stroke:var(--accent) !important; stroke-width:2.2; stroke-opacity:1;
   marker-end:url(#wf-ah-hover) !important; }
-#wf-wires .wire-grp:hover { filter:drop-shadow(0 1px 3px rgba(47,111,237,.28)); }
+#wf-wires .wire-grp:hover, #wf-wires .wire-grp:focus-within { filter:drop-shadow(0 1px 3px rgba(47,111,237,.28)); }
+#wf-wires .wire-hit:focus { outline:none; }
 /* While wiring up a connection, wires ignore the pointer so the drop lands on the
    node underneath rather than being swallowed by a wire's hit-path. */
 #wf-canvas.wf-connecting .wire-hit { pointer-events:none; }
@@ -381,8 +398,8 @@
   stroke-opacity:1; marker-end:url(#wf-ah-hover) !important; }
 #wf-wires .wire-grp.wire-insert { filter:drop-shadow(0 1px 4px rgba(47,111,237,.4)); }
 /* Run trail on wires: the path taken (bright green) vs the skipped branch (faint red). */
-#wf-wires path.wire.took-wire    { stroke:var(--run-ok) !important; stroke-width:2.0; stroke-opacity:1 !important; marker-end:none !important; }
-#wf-wires path.wire.nottook-wire { stroke:var(--run-fail) !important; stroke-opacity:.34 !important; stroke-width:1.1; marker-end:none !important; }
+#wf-wires path.wire.took-wire    { stroke:var(--run-ok) !important; stroke-width:2.0; stroke-opacity:1 !important; marker-end:url(#wf-ah-run-ok) !important; }
+#wf-wires path.wire.nottook-wire { stroke:var(--run-fail) !important; stroke-opacity:.34 !important; stroke-width:1.1; marker-end:url(#wf-ah-run-fail) !important; }
 #wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:1.55; stroke-dasharray:7 5;
   stroke-linecap:round; pointer-events:none; marker-end:url(#wf-ah-temp); }
 /* Motion on the connective tissue — state, not decoration. The in-progress
@@ -713,12 +730,23 @@
 /* Terminals read as bold, unmistakable entry/exit points: start = green,
    end/stop = red — accent, title and header tint all aligned to one hue so the
    block's role is obvious without reading the label. */
-.wf-node.start { --node-accent:var(--term-start); --ntitle:#15803d; }
-.wf-node.end { --node-accent:var(--term-end); --ntitle:#b42318; }
+.wf-node.start { --node-accent:var(--term-start); --ntitle:#047857; }
+.wf-node.end { --node-accent:var(--term-end); --ntitle:#be123c; }
 .wf-node.stop { --node-accent:var(--term-end); --ntitle:#b42318; --nhd-bg:#fee2e2; --nhd-bd:#f4b8b2; }
 .wf-node.condition { --node-accent:#9a78e6; }
 .wf-node.loop { --node-accent:#e0a64b; }
 .wf-node.call { --node-accent:#7c3aed; }
+/* Shape is semantic, not decorative: decisions have opposing clipped-feeling
+   corners, loops/calls are softer reusable-flow containers, actions stay the
+   baseline rounded rectangle. Ports remain outside the shape and never clip. */
+.wf-node.condition:not(.wf-stacked) { border-radius:3px 15px 3px 15px; }
+.wf-node.condition:not(.wf-stacked)::after { border-radius:3px 15px 3px 15px; }
+.wf-node.condition:not(.wf-stacked) .wf-node-hd { border-radius:2px 14px 0 0; }
+.wf-node.loop:not(.wf-stacked), .wf-node.loop_until:not(.wf-stacked), .wf-node.call:not(.wf-stacked) { border-radius:15px; }
+.wf-node.loop:not(.wf-stacked)::after, .wf-node.loop_until:not(.wf-stacked)::after,
+.wf-node.call:not(.wf-stacked)::after { border-radius:15px; }
+.wf-node.loop:not(.wf-stacked) .wf-node-hd, .wf-node.loop_until:not(.wf-stacked) .wf-node-hd,
+.wf-node.call:not(.wf-stacked) .wf-node-hd { border-radius:14px 14px 0 0; }
 /* Per-category accent colour, placed AFTER the kind rules so it also colours the
    image/ocr/logic condition blocks (action + condition nodes carry a cat class). */
 .wf-node.cat-basic  { --node-accent:var(--cat-basic); }
@@ -804,20 +832,41 @@
   #wf-step-next-btn.paused { animation:wfStepPulse 1.2s ease-in-out infinite; }
 }
 @keyframes wfStepPulse { 0%,100%{box-shadow:0 0 0 0 rgba(47,111,237,.55)} 50%{box-shadow:0 0 0 5px rgba(47,111,237,0)} }
-/* ── Terminals (start/end) — solid round chips ────────────────────────────────
-   Filled accent disc + white icon. No coloured card border / left rail.
-   Selection and run states use circular halos via ::after. */
+/* Next branch is a control-flow token, not a normal action card. Its capsule
+   shape reads as a hand-off/continue instruction and stays compact in try arms. */
+.wf-node.try_next { width:146px; min-height:44px !important; border:none;
+  border-radius:999px; background:transparent !important; }
+.wf-node.try_next::after { border-radius:999px; }
+.wf-next-body { height:44px; display:flex; align-items:center; gap:8px; padding:0 13px 0 11px;
+  border:1px solid var(--cat-flow-bd); border-radius:999px; background:var(--cat-flow-bg);
+  box-shadow:var(--sh-sm); color:var(--cat-flow-ink); overflow:hidden; }
+.wf-next-body .ico { width:16px; height:16px; color:var(--cat-flow-ink); }
+.wf-next-body .ico svg { width:16px; height:16px; }
+.wf-next-copy { display:flex; flex-direction:column; min-width:0; line-height:1.15; }
+.wf-next-copy b { font-size:10.5px; white-space:nowrap; }
+.wf-next-copy small { margin-top:2px; font-family:var(--mono); font-size:8.5px; font-weight:500;
+  color:var(--warn); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-node.try_next.ran-ok .wf-next-body { border-color:var(--run-ok); background:var(--run-ok-hd); color:var(--run-ok-ink); }
+.wf-node.try_next.ran-fail .wf-next-body { border-color:var(--run-fail); background:var(--run-fail-hd); color:var(--run-fail-ink); }
+.wf-node.try_next.running .wf-next-body { border-color:var(--run-live-bd); background:var(--run-live-hd); color:var(--run-live-ink); }
+.wf-node.try_next.paused .wf-next-body { border-color:var(--accent); background:var(--accent-bg); color:var(--accent); }
+
+/* ── Terminals ────────────────────────────────────────────────────────────────
+   Start is a play circle; End is an octagonal stop marker. Distinct silhouettes
+   make entry and completion recognizable without reading their labels. */
 .wf-node.start, .wf-node.end {
   width:var(--term-size); height:var(--term-size); min-height:var(--term-size);
-  border-radius:50%; border:none; background:transparent; overflow:visible;
+  border:none; background:transparent; overflow:visible;
 }
+.wf-node.start { border-radius:50%; }
+.wf-node.end { border-radius:10px; }
 .wf-node.start:not(.sel):not(.running):not(.ran-ok):not(.ran-fail):not(.paused),
 .wf-node.end:not(.sel):not(.running):not(.ran-ok):not(.ran-fail):not(.paused) {
   border:none; box-shadow:none;
 }
-.wf-node.start::after, .wf-node.end::after {
-  border-radius:50%; box-shadow:none;
-}
+.wf-node.start::after, .wf-node.end::after { box-shadow:none; }
+.wf-node.start::after { border-radius:50%; }
+.wf-node.end::after { border-radius:10px; }
 /* Don't let shared card trail / select paints square under the disc. */
 .wf-node.start.running, .wf-node.end.running,
 .wf-node.start.ran-ok, .wf-node.end.ran-ok,
@@ -839,12 +888,14 @@
 .wf-node.start.running::after, .wf-node.end.running::after {
   box-shadow:0 0 0 3px rgba(249,115,22,.45), 0 0 12px 2px rgba(249,115,22,.35);
 }
-/* Filled disc body. */
+/* Terminal body; each terminal supplies its own silhouette. */
 .wf-node-tri {
-  position:absolute; inset:0; border-radius:50%; background:var(--node-accent);
+  position:absolute; inset:0; background:var(--node-accent);
   display:flex; align-items:center; justify-content:center; color:#fff;
   box-shadow:0 2px 5px rgba(20,30,45,.2), inset 0 1px 0 rgba(255,255,255,.22);
 }
+.wf-node.start .wf-node-tri { border-radius:50%; }
+.wf-node.end .wf-node-tri { border-radius:9px; clip-path:polygon(28% 0,72% 0,100% 28%,100% 72%,72% 100%,28% 100%,0 72%,0 28%); }
 .wf-node-tri svg { width:16px; height:16px; display:block; }
 .wf-node.start .wf-node-tri svg { margin-left:1px; } /* optical centre for play */
 /* Label under the disc (muted, not a coloured border). */
@@ -1197,13 +1248,14 @@
 
 /* Field row — single canonical definition (was duplicated). */
 .wf-field { display:flex; align-items:center; gap:6px; }
-.wf-field > label { font-size:10.5px; color:var(--ink2); font-weight:600; min-width:58px; flex-shrink:0; }
+.wf-field > label { font-size:10.5px; line-height:1.25; color:var(--ink2); font-weight:600;
+  width:88px; max-width:40%; flex-shrink:0; overflow-wrap:anywhere; }
 /* Two short numeric fields on one line (x/y, w/h, x1/y1…). Each cell drops its
    fixed label width so the label hugs its input; the pair splits the row 50/50
    so the panel reads compact instead of one tall column of half-empty rows. */
 .wf-field-pair { display:flex; align-items:center; gap:10px; }
 .wf-field-pair > .wf-field { flex:1; min-width:0; gap:5px; }
-.wf-field-pair > .wf-field > label { min-width:0; flex-shrink:0;
+.wf-field-pair > .wf-field > label { width:auto; max-width:none; min-width:0; flex-shrink:0;
   text-transform:uppercase; letter-spacing:.02em; color:var(--muted); font-size:10px; }
 .wf-field-pair > .wf-field > input { flex:1; min-width:0; text-align:center; }
 .wf-field > input[type=text], .wf-field > input[type=number], .wf-field > input[type=time], .wf-field > select {
@@ -1217,6 +1269,7 @@
 .wf-field .cb { width:17px; height:17px; border-radius:5px; border:1.5px solid var(--cb-bd); background:var(--panel);
   display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
 .wf-field .cb.checked { background:var(--accent); border-color:var(--accent); }
+.wf-field .cb:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .wf-field .cb svg { opacity:0; } .wf-field .cb.checked svg { opacity:1; }
 .wf-field .btn.sm { height:24px; padding:0 8px; font-size:10.5px; }
 /* Color-field swatch picker: a compact square that opens the native picker. */
@@ -1239,7 +1292,8 @@
 .btn.sm.ico.wf-var-pick { width:24px; height:24px; padding:0; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; }
 .btn.sm.ico.wf-var-pick svg { width:13px; height:13px; }
 .btn.sm.ico.wf-var-pick:hover { color:var(--accent); border-color:var(--accent); }
-.wf-path-field > label { min-width:58px; }
+.wf-path-field { flex-wrap:wrap; }
+.wf-path-field > label { width:100%; max-width:none; }
 .btn.sm.ico.wf-path-browse { width:24px; height:24px; padding:0; flex-shrink:0; }
 .btn.sm.ico.wf-path-browse svg { width:13px; height:13px; }
 .wf-path-field .wf-var-badge { max-width:44px; }

@@ -57,6 +57,7 @@
 
   <!-- ── Right: device + capture source ─────────────────────────────────────── -->
   <div class="tb-zone tb-right">
+    <div id="tb-adb-tools" class="tb-backend-tools">
     <div class="tb-tray tb-tray-device">
       <span class="tb-tray-label">Device</span>
       <span class="tb-tray-sep"></span>
@@ -78,6 +79,19 @@
         <option value="scrcpy">scrcpy</option>
         <option value="adb">ADB</option>
       </select>
+    </div>
+    </div>
+    <div id="tb-win32-tools" class="tb-backend-tools" style="display:none">
+      <div class="tb-tray tb-tray-win32" title="Current Win32 target and input mode">
+        <span class="tb-tray-label">PC target</span>
+        <span class="tb-tray-sep"></span>
+        <span class="tb-device-dot" id="win32-target-dot"></span>
+        <span id="win32-target-label" class="tb-target-label">Not configured</span>
+        <span id="win32-input-label" class="tb-backend-chip">Background</span>
+        <button class="btn ico sm" onclick="wfOpenProjectSettings()" title="Configure Win32 target and input mode">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1-.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -203,7 +217,7 @@
            panels anchor to each other — collapsing Activities lets Variables
            rise with it, since they share this flex column pinned to the corner. -->
       <div id="wf-corner-stack" class="wf-corner-stack">
-      <!-- Activities panel (Sequent / Background tabs — functions live in the
+      <!-- Activities panel (Sequence / Background tabs — functions live in the
            left sidebar). Title row (chevron + label + add btn) + tab bar. -->
       <div id="wf-act-panel" class="wf-act-panel">
         <div class="wf-act-panel-hdr">
@@ -221,7 +235,7 @@
             <button class="wf-act-hdr-add" id="wf-act-add" title="Add activity">+</button>
           </div>
           <div class="wf-act-tab-row">
-            <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequent <span class="side-count" id="wf-act-count"></span></button>
+            <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequence <span class="side-count" id="wf-act-count"></span></button>
             <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
           </div>
         </div>

@@ -48,8 +48,8 @@
   --run-live-hd-bd: #fb923c;
   --run-live-ink:   #7c2d12;
   /* Terminal (start/end/stop) accents — also read by minimap.js chips. */
-  --term-start: #16a34a;
-  --term-end:   #dc2626;
+  --term-start: #059669; /* modern emerald — start / go */
+  --term-end:   #e11d48; /* modern rose-red — end / stop */
   /* Branch-port semantics (condition true/false, loop back-edge) — one hex per
      role, shared between the port dots, wires and their SVG arrowheads. */
   --branch-t:    #1f9d57;

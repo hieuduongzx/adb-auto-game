@@ -171,22 +171,22 @@
           {
             "id": "n6pi9wel",
             "type": "start",
-            "x": 40,
-            "y": 40,
+            "x": 20,
+            "y": -64,
             "params": {}
           },
           {
             "id": "ndi8pf0t",
             "type": "end",
-            "x": 744,
-            "y": 20,
+            "x": 1140,
+            "y": 144,
             "params": {}
           },
           {
             "id": "nj3zqhb2",
             "type": "launch_emulator",
             "x": 300,
-            "y": 120,
+            "y": 4,
             "params": {
               "emulator": "mumu",
               "index": 0,
@@ -203,7 +203,7 @@
             "id": "nj5xjfpu",
             "type": "launch_app",
             "x": 500,
-            "y": -56,
+            "y": -120,
             "params": {
               "package": "",
               "wait": 0,
@@ -213,8 +213,8 @@
           {
             "id": "nbra4ijc",
             "type": "if_emulator",
-            "x": 108,
-            "y": 40,
+            "x": 80,
+            "y": -76,
             "params": {
               "emulator": "last",
               "index": 0,
@@ -226,7 +226,7 @@
             "id": "ni8wav38",
             "type": "if_app",
             "x": 300,
-            "y": -24,
+            "y": -76,
             "params": {
               "package": "com.neversoft.rpg.erolabs",
               "negate": true,
@@ -237,7 +237,7 @@
             "id": "n3gpedjr",
             "type": "wait_image",
             "x": 700,
-            "y": -56,
+            "y": -76,
             "params": {
               "template": "templates/crop_20260710_233810_872_990_175_33.png",
               "threshold": 0.85,
@@ -249,7 +249,7 @@
             "id": "nsz0mjsw",
             "type": "tap_image",
             "x": 900,
-            "y": -56,
+            "y": -76,
             "params": {
               "template": "templates/crop_20260710_233827_872_990_175_33.png",
               "taps": "1",
@@ -262,8 +262,8 @@
           {
             "id": "nfti3h6c",
             "type": "call",
-            "x": 500,
-            "y": 24,
+            "x": 700,
+            "y": 4,
             "params": {
               "fn": "fn_ppung"
             }
@@ -1062,7 +1062,7 @@
       "id": "sequence_h2uf",
       "name": "Vòng Tròn Giả Kim",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -1930,7 +1930,7 @@
           {
             "id": "n0705z64",
             "type": "tap_image",
-            "x": 460,
+            "x": 480,
             "y": 240,
             "params": {
               "template": "templates/crop_20260629_092858_214x61.png",
@@ -1973,7 +1973,7 @@
           {
             "id": "nappv4fb",
             "type": "tap_image",
-            "x": 640,
+            "x": 680,
             "y": 240,
             "params": {
               "template": "templates/crop_20260629_093001_87x25.png",
@@ -1988,8 +1988,8 @@
           {
             "id": "nb8z5psv",
             "type": "tap_image",
-            "x": 1200,
-            "y": 180,
+            "x": 1320,
+            "y": 176,
             "params": {
               "template": "templates/crop_20260629_093032_132x28.png",
               "taps": "1",
@@ -2003,8 +2003,8 @@
           {
             "id": "nqv92179",
             "type": "tap_image",
-            "x": 1200,
-            "y": 260,
+            "x": 1320,
+            "y": 256,
             "params": {
               "template": "templates/crop_20260629_093054_99x32.png",
               "taps": "1",
@@ -2019,8 +2019,8 @@
           {
             "id": "n73dep9x",
             "type": "wait_image",
-            "x": 1420,
-            "y": 480,
+            "x": 1520,
+            "y": 484,
             "params": {
               "template": "templates/crop_20260629_091313_31x35.png",
               "threshold": 0.85,
@@ -2030,8 +2030,8 @@
           {
             "id": "nk6983ml",
             "type": "tap_image",
-            "x": 1600,
-            "y": 480,
+            "x": 1720,
+            "y": 484,
             "params": {
               "template": "templates/crop_20260629_091348_27x35.png",
               "taps": "1",
@@ -2044,8 +2044,8 @@
           {
             "id": "nfeb529c",
             "type": "calc_var",
-            "x": 1780,
-            "y": 480,
+            "x": 1920,
+            "y": 484,
             "params": {
               "name": "count",
               "op": "-",
@@ -2055,8 +2055,8 @@
           {
             "id": "nju17nre",
             "type": "wait",
-            "x": 1960,
-            "y": 480,
+            "x": 2120,
+            "y": 484,
             "params": {
               "seconds": 3
             }
@@ -2064,7 +2064,7 @@
           {
             "id": "n34ruhda",
             "type": "loop",
-            "x": 840,
+            "x": 880,
             "y": 240,
             "params": {
               "count": 3,
@@ -2074,8 +2074,8 @@
           {
             "id": "nxrfynes",
             "type": "if_var",
-            "x": 1020,
-            "y": 180,
+            "x": 1080,
+            "y": 240,
             "params": {
               "name": "count",
               "op": ">",
@@ -2085,8 +2085,8 @@
           {
             "id": "nc9n5lt4",
             "type": "tap_image",
-            "x": 1480,
-            "y": 320,
+            "x": 1520,
+            "y": 381,
             "params": {
               "template": "templates/crop_20260629_020144_213x200_1.png",
               "taps": "1",
@@ -2099,8 +2099,8 @@
           {
             "id": "ndri9sb4",
             "type": "tap_image",
-            "x": 1200,
-            "y": 345,
+            "x": 1320,
+            "y": 341,
             "params": {
               "template": "templates/crop_20260629_095034_50x25.png",
               "taps": "1",
@@ -2114,8 +2114,8 @@
           {
             "id": "n0tpiv1j",
             "type": "parallel",
-            "x": 1200,
-            "y": 464,
+            "x": 1320,
+            "y": 420,
             "params": {
               "count": 3
             }
@@ -2123,8 +2123,8 @@
           {
             "id": "n4ign27p",
             "type": "end",
-            "x": 500,
-            "y": 376,
+            "x": 524,
+            "y": 373,
             "params": {}
           }
         ],
@@ -2948,7 +2948,7 @@
           {
             "id": "nvi0au73",
             "type": "start",
-            "x": -40,
+            "x": -20,
             "y": 55,
             "params": {}
           },

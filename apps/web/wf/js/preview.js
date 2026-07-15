@@ -58,7 +58,9 @@ function wfSwitchView(view){
     wfPvInit();                 // lazy init on first switch
     wfPvResize();
     pvInitOcrBackends();        // populate OCR dropdown (no-op after first)
-    api().refresh_info();       // seed the device tab
+    // Device metadata is Android-only; querying it in Win32 mode caused noisy
+    // ADB scans even though the workflow targets a PC window.
+    if(WF.controller!=="win32") api().refresh_info();
     api().scope_out_dir().then(p=>{ if(p) pvUpdateOutDir(p); });  // resolve + label the crop folder
     if(wfPvAuto) wfPvStartAuto();
     wfPvCapture();              // grab one frame immediately

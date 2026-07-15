@@ -94,8 +94,18 @@ function wfMinimapDraw(){
     const sel = WF.sel.includes(n.id);
     ctx.fillStyle = running ? P.run : wfMmColorFor(n);
     ctx.globalAlpha = running||sel ? 1 : .82;
+    const px=X(n.x), py=Y(n.y), pw=Math.max(2.5,w*scale), ph=Math.max(2,h*scale);
+    const def=WF_NODES[n.type]||{};
     ctx.beginPath();
-    ctx.roundRect(X(n.x),Y(n.y),Math.max(2.5,w*scale),Math.max(2,h*scale),1.5);
+    if(def.kind==="start"){
+      ctx.ellipse(px+pw/2,py+ph/2,pw/2,ph/2,0,0,Math.PI*2);
+    }else if(def.kind==="end"){
+      const c=Math.min(pw,ph)*.26;
+      ctx.moveTo(px+c,py); ctx.lineTo(px+pw-c,py); ctx.lineTo(px+pw,py+c); ctx.lineTo(px+pw,py+ph-c);
+      ctx.lineTo(px+pw-c,py+ph); ctx.lineTo(px+c,py+ph); ctx.lineTo(px,py+ph-c); ctx.lineTo(px,py+c); ctx.closePath();
+    }else{
+      ctx.roundRect(px,py,pw,ph,n.type==="try_next"?ph/2:1.5);
+    }
     ctx.fill();
     if(sel){ ctx.globalAlpha=1; ctx.strokeStyle=P.accent; ctx.lineWidth=1;
       ctx.stroke(); }

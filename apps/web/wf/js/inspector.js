@@ -302,6 +302,17 @@ function wfRenderInspector(){
     </div>`;
 }
 
+// Human-readable fallback for schema keys without an explicit label. Keeps
+// implementation names such as `offsetX` or `max_swipes` out of the UI.
+function wfFieldLabel(f){
+  if(f&&f.lbl) return f.lbl;
+  const key=String((f&&f.k)||"");
+  const short={x:"X",y:"Y",w:"Width",h:"Height",x1:"X 1",y1:"Y 1",x2:"X 2",y2:"Y 2"};
+  if(short[key]) return short[key];
+  const text=key.replace(/_/g," ").replace(/([a-z0-9])([A-Z])/g,"$1 $2").trim();
+  return text?text.charAt(0).toUpperCase()+text.slice(1):"Value";
+}
+
 // ── Variable picker infrastructure ───────────────────────────────────────────
 // A single source of truth describing every variable the user can reference,
 // with its declared type, scope (global/activity/node) and best-known value.
@@ -427,7 +438,7 @@ function wfVarBadge(){
 // Combobox: free-text input + variable menu button + a live type/value badge.
 function wfVarNameField(node,f){
   const row=document.createElement("div"); row.className="wf-field wf-var-field";
-  const lab=document.createElement("label"); lab.textContent=f.lbl||f.k; lab.title=f.k; row.appendChild(lab);
+  const lab=document.createElement("label"); lab.textContent=wfFieldLabel(f); lab.title=f.k; row.appendChild(lab);
   const inp=document.createElement("input"); inp.type="text"; inp.className="wf-var-input";
   inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
   inp.placeholder=f.ph||"variable name";
@@ -446,7 +457,7 @@ function wfVarNameField(node,f){
 // that variable's live value at run time.
 function wfVarRefField(node,f){
   const row=document.createElement("div"); row.className="wf-field wf-var-field";
-  const lab=document.createElement("label"); lab.textContent=f.lbl||f.k; lab.title=f.k; row.appendChild(lab);
+  const lab=document.createElement("label"); lab.textContent=wfFieldLabel(f); lab.title=f.k; row.appendChild(lab);
   const inp=document.createElement("input"); inp.type=f.t==="num"?"text":"text";  // text so a var name is typeable even on numeric fields
   inp.className="wf-var-input"; inp.inputMode=f.t==="num"?"numeric":"text";
   inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
@@ -469,7 +480,7 @@ function wfVarRefField(node,f){
 // Keeping both actions beside one input avoids forcing users to copy paths by hand.
 function wfPathField(node,f){
   const row=document.createElement("div"); row.className="wf-field wf-var-field wf-path-field";
-  const lab=document.createElement("label"); lab.textContent=f.lbl||f.k; lab.title=f.k; row.appendChild(lab);
+  const lab=document.createElement("label"); lab.textContent=wfFieldLabel(f); lab.title=f.k; row.appendChild(lab);
   const inp=document.createElement("input"); inp.type="text"; inp.className="wf-var-input";
   inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
   inp.placeholder=f.ph||(f.pickFolder?"folder or path variable":"file or path variable");
@@ -768,8 +779,10 @@ function findParentVarIdx(arr, idx, depth){
 function wfVarValue(v){
   if((v.type||"bool")==="bool"){
     const cb=document.createElement("span"); cb.className="cb"+(v.value?" checked":""); cb.title="Default value";
+    cb.setAttribute("role","checkbox"); cb.tabIndex=0; cb.setAttribute("aria-checked",String(!!v.value));
     cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
-    cb.onclick=()=>{ wfPushUndoDebounced(); v.value=!v.value; cb.classList.toggle("checked",v.value); };
+    cb.onclick=()=>{ wfPushUndoDebounced(); v.value=!v.value; cb.classList.toggle("checked",v.value); cb.setAttribute("aria-checked",String(!!v.value)); };
+    cb.onkeydown=e=>{ if(e.key===" "||e.key==="Enter"){ e.preventDefault(); cb.click(); } };
     return cb;
   }
   if(v.type==="select"){
@@ -857,15 +870,17 @@ function wfFieldEl(node,f){
   if(f.t==="region") return wfRegionField(node,f);
 
   const row=document.createElement("div"); row.className="wf-field";
-  const lab=document.createElement("label"); lab.textContent=f.lbl||f.k; lab.title=f.k; row.appendChild(lab);
+  const lab=document.createElement("label"); lab.textContent=wfFieldLabel(f); lab.title=f.k; row.appendChild(lab);
 
   if(f.t==="bool"){
     const cb=document.createElement("span"); cb.className="cb"+(node.params[f.k]?" checked":"");
+    cb.setAttribute("role","checkbox"); cb.tabIndex=0; cb.setAttribute("aria-checked",String(!!node.params[f.k]));
     cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
     // A bool that another field gates on (showWhen) must re-render the inspector
     // so the dependent field appears/disappears (e.g. loop infinite ↔ count).
     const gates=(WF_NODES[node.type]&&WF_NODES[node.type].fields||[]).some(ff=>ff.showWhen&&ff.showWhen[f.k]!==undefined);
-    cb.onclick=()=>{ wfPushUndoDebounced(); node.params[f.k]=!node.params[f.k]; cb.classList.toggle("checked",node.params[f.k]); wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); if(gates) wfRenderInspector(); };
+    cb.onclick=()=>{ wfPushUndoDebounced(); node.params[f.k]=!node.params[f.k]; cb.classList.toggle("checked",node.params[f.k]); cb.setAttribute("aria-checked",String(!!node.params[f.k])); wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); if(gates) wfRenderInspector(); };
+    cb.onkeydown=e=>{ if(e.key===" "||e.key==="Enter"){ e.preventDefault(); cb.click(); } };
     row.appendChild(cb); return row;
   }
   if(f.t==="select"){
@@ -946,7 +961,7 @@ function wfTplsField(node,f,row){
   // it in a .wf-field.full block (label on top) instead of the default
   // label+control row which squeezes the list to the right of the label.
   const wrap=document.createElement("div"); wrap.className="wf-field full";
-  const lab=document.createElement("label"); lab.textContent=f.lbl||f.k; lab.title=f.k; wrap.appendChild(lab);
+  const lab=document.createElement("label"); lab.textContent=wfFieldLabel(f); lab.title=f.k; wrap.appendChild(lab);
   const arr=()=> Array.isArray(node.params[f.k])?node.params[f.k]:(node.params[f.k]=[]);
   const list=document.createElement("div"); list.className="wf-tpls-list";
   function renderList(){

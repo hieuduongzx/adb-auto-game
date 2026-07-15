@@ -502,6 +502,25 @@ function wfNormWinInputMode(value){
   const mode=String(value||"").trim().toLowerCase();
   return WF_WIN_INPUT_MODES.has(mode)?mode:"background";
 }
+function wfSyncBackendChrome(){
+  const isWin32=WF.controller==="win32";
+  const adbTools=$("tb-adb-tools"), winTools=$("tb-win32-tools");
+  if(adbTools) adbTools.style.display=isWin32?"none":"flex";
+  if(winTools) winTools.style.display=isWin32?"flex":"none";
+  const cfg=WF.win32||{};
+  const target=String(cfg.window||"").trim();
+  const targetEl=$("win32-target-label");
+  if(targetEl){ targetEl.textContent=target||"Launch-first workflow"; targetEl.title=target||"No fixed target — a Launch program node can attach one"; }
+  const dot=$("win32-target-dot"); if(dot) dot.classList.toggle("configured",!!target);
+  const mode=wfNormWinInputMode(cfg.inputMode);
+  const modeEl=$("win32-input-label");
+  if(modeEl) modeEl.textContent=({background:"Background",background_cursor:"Cursor",foreground:"Foreground"})[mode];
+  const footerDeviceDot=$("footer-dot"); if(footerDeviceDot) footerDeviceDot.style.display=isWin32?"none":"";
+  // Device details and Android key tools do not apply to a Win32 capture.
+  const deviceTab=document.querySelector('#pv-tabs-bar .tab-btn[data-tab="device"]');
+  if(deviceTab) deviceTab.style.display=isWin32?"none":"";
+  if(isWin32 && deviceTab&&deviceTab.classList.contains("active") && typeof pvSwitchTab==="function") pvSwitchTab("inspect");
+}
 function wfSyncControllerUI(){
   const sel=$("wf-controller"); if(sel) sel.value=WF.controller||"adb";
   const w=WF.win32||(WF.win32={window:"",matchBy:"title",inputMode:"background"});
@@ -513,6 +532,7 @@ function wfSyncControllerUI(){
   const md=$("wf-win32-mode"); if(md) md.value=wfNormWinInputMode(w.inputMode);
   wfSyncPackageUI();
   wfSyncSpeedUI();   // speed-hack visibility depends on the controller
+  wfSyncBackendChrome();
   wfPushCaptureSource();
 }
 // Tell the Python side which source the Preview tab should capture from, so the
@@ -579,6 +599,7 @@ function wfWin32FromUI(){
   if(win) w.window=(win.value||"").trim();
   if(mb) w.matchBy=mb.value||"title";
   if(md) w.inputMode=wfNormWinInputMode(md.value);
+  wfSyncBackendChrome();
   wfPushCaptureSource();
   if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
 }
