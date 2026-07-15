@@ -182,6 +182,9 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # Only meaningful when the flow's controller is "win32". Tap/swipe/image/
     # color/OCR nodes already work on Win32 via the shared capture pipeline;
     # these cover the window-lifecycle actions ADB nodes can't express.
+    "win_send_text":{"label": "Nhập văn bản PC", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_key":      {"label": "Phím PC (VK)", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_escape":   {"label": "Phím Escape", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_launch":   {"label": "Mở chương trình", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_activate": {"label": "Đưa cửa sổ lên trước", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_close":    {"label": "Đóng cửa sổ", "kind": "action", "ins": 1, "outs": ["out"]},
@@ -383,6 +386,9 @@ class WorkflowEngine:
             "screen_power": self._a_screen_power,
             "read_color":   self._a_read_color,
             "launch_emulator": self._a_launch_emulator,
+            "win_send_text":self._a_send_text,
+            "win_key":      self._a_key,
+            "win_escape":   self._a_back,
             "win_launch":   self._a_win_launch,
             "win_activate": self._a_win_activate,
             "win_close":    self._a_win_close,
@@ -675,12 +681,21 @@ class WorkflowEngine:
                 self.auto = Win32GameAutomation(cfg=self._win32_cfg)
             else:
                 self.auto.configure(self._win32_cfg)
+            target = str(self._win32_cfg.get("window", "") or "").strip()
+            has_launcher = self._flow_has_node_type("win_launch")
+            if not self.auto.adb.device and target:
+                self.auto.adb.check_adb_connection()  # attach an already-open window
             if not self.auto.adb.device:
-                self.auto.adb.check_adb_connection()  # attach window
-            if not self.auto.adb.device:
+                # A workflow may intentionally start the Windows program itself.
+                # Do not require a Project-settings target before its Launch
+                # program node has had a chance to create and attach the window.
+                if has_launcher:
+                    log_info("[workflow] No Win32 target yet — Launch program will start/attach it")
+                    self._apply_ocr_backend()
+                    return True
                 log_error(
                     f"[workflow] Win32: không tìm thấy cửa sổ "
-                    f"'{self._win32_cfg.get('window','')}' — kiểm tra Project settings"
+                    f"'{target}' — kiểm tra Project settings"
                 )
                 return False
             self.auto._update_screen_size()
@@ -2448,11 +2463,19 @@ class WorkflowEngine:
         return self.auto.swipe(cx, cy, cx + dx, cy + dy, dur)
 
     def _a_tap_random(self, node, p) -> bool:
-        x, y = int(p.get("x", 0)), int(p.get("y", 0))
-        # Mặc định khớp designer (100×100) — w/h=0 sẽ thoái hóa thành tap thường.
-        w, h = int(p.get("w", 100)), int(p.get("h", 100))
-        rx = x + (random.randint(0, w) if w > 0 else 0)
-        ry = y + (random.randint(0, h) if h > 0 else 0)
+        # New shape uses two explicit corners, which is easier to reason about
+        # than x/y + width/height. Keep legacy params runnable for old JSON files.
+        if any(k in p for k in ("x1", "y1", "x2", "y2")):
+            x1, y1 = int(p.get("x1", 0)), int(p.get("y1", 0))
+            x2, y2 = int(p.get("x2", 100)), int(p.get("y2", 100))
+        else:
+            x1, y1 = int(p.get("x", 0)), int(p.get("y", 0))
+            x2 = x1 + max(0, int(p.get("w", 100)))
+            y2 = y1 + max(0, int(p.get("h", 100)))
+        lo_x, hi_x = sorted((x1, x2))
+        lo_y, hi_y = sorted((y1, y2))
+        rx = random.randint(lo_x, hi_x)
+        ry = random.randint(lo_y, hi_y)
         ok = self.auto.tap(rx, ry)
         if ok:
             log_info(f"[workflow] 👆 chạm ngẫu nhiên ({rx}, {ry})")
@@ -3168,7 +3191,7 @@ class WorkflowEngine:
         """Build the console argv for booting one instance, or None if it can't be
         resolved. A custom command always wins; otherwise the per-family console
         exe is discovered under the given path or the default install dirs."""
-        path = str(p.get("path", "")).strip()
+        path = str(self._resolve_value(p.get("path", ""))).strip()
         custom = str(p.get("command", "")).strip()
         if kind == "custom" or custom:
             if not custom:
@@ -3273,24 +3296,36 @@ class WorkflowEngine:
         ctrl = self._win32_ctrl()
         if ctrl is None:
             return False
-        path = str(p.get("path", "")).strip()
-        args = str(p.get("args", "")).strip()
+        path = str(self._resolve_value(p.get("path", ""))).strip()
+        args = str(self._resolve_value(p.get("args", ""))).strip()
         cmd = f'"{path}" {args}'.strip() if args else path
         if not ctrl.launch_app(cmd):
             return False
-        window = str(p.get("window", "")).strip()
+        window = str(self._resolve_value(p.get("window", ""))).strip()
         wait = float(p.get("wait", 0) or 0)
-        if window and wait > 0:
+        # Prefer the explicit title; when it is blank, attach the top-level
+        # window created by the process we just launched. This makes an initial
+        # Launch program node work without a pre-existing Project target.
+        if wait > 0 and (window or getattr(ctrl, "last_launch_pid", None)):
             end = time.time() + wait
             while time.time() < end and not self._stop.is_set():
                 self._pause.wait()
-                hwnd = ctrl._find_hwnd(window, "title")
+                hwnd = (ctrl._find_hwnd(window, "title") if window
+                        else ctrl.find_window_by_pid(ctrl.last_launch_pid))
                 if hwnd:
                     ctrl.hwnd = hwnd
-                    log_success(f"[workflow] 🪟 Cửa sổ '{window}' đã mở")
+                    title = ctrl._w[1].GetWindowText(hwnd) or window
+                    log_success(f"[workflow] 🪟 Cửa sổ '{title}' đã mở và được gắn")
+                    try:
+                        self.auto._update_screen_size()
+                        if not getattr(self.auto, "capture_running", False):
+                            self.auto.start_continuous_capture()
+                    except Exception as exc:
+                        log_warning(f"[workflow] Win32 capture chưa sẵn sàng: {exc}")
                     return True
                 time.sleep(0.5)
-            log_warning(f"[workflow] 🪟 Chưa thấy cửa sổ '{window}' sau {wait:.0f}s")
+            label = window or f"PID {ctrl.last_launch_pid}"
+            log_warning(f"[workflow] 🪟 Chưa thấy cửa sổ '{label}' sau {wait:.0f}s")
         return True
 
     def _a_win_activate(self, node, p) -> bool:

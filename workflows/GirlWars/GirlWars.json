@@ -519,7 +519,7 @@
       "id": "sequence_eu1z",
       "name": "Run Game",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -527,7 +527,7 @@
             "id": "n6pi9wel",
             "type": "start",
             "x": 20,
-            "y": 7,
+            "y": 23,
             "params": {}
           },
           {
@@ -569,7 +569,7 @@
             "id": "nbra4ijc",
             "type": "if_emulator",
             "x": 100,
-            "y": 24,
+            "y": -5,
             "params": {
               "emulator": "last",
               "index": 0,
@@ -2410,8 +2410,8 @@
           {
             "id": "nrtqbat0",
             "type": "start",
-            "x": -120,
-            "y": -185,
+            "x": -140,
+            "y": -180,
             "params": {}
           },
           {

@@ -98,6 +98,23 @@ function wfPkgLabel(p){
   return String((p&&p.package)||"").trim() || "(package)";
 }
 
+// Named Windows virtual keys for the Win32 keyboard node. Values remain VK
+// numbers in JSON/runtime, but users choose readable key names instead of
+// memorising codes.
+const WF_WIN_KEYS = [
+  {v:"13",t:"Enter"},{v:"27",t:"Escape"},{v:"32",t:"Space"},{v:"9",t:"Tab"},{v:"8",t:"Backspace"},
+  {v:"37",t:"← Left"},{v:"38",t:"↑ Up"},{v:"39",t:"→ Right"},{v:"40",t:"↓ Down"},
+  {v:"46",t:"Delete"},{v:"45",t:"Insert"},{v:"36",t:"Home"},{v:"35",t:"End"},{v:"33",t:"Page Up"},{v:"34",t:"Page Down"},
+  {v:"16",t:"Shift"},{v:"17",t:"Ctrl"},{v:"18",t:"Alt"},
+  ...Array.from({length:12},(_,i)=>({v:String(112+i),t:"F"+(i+1)})),
+  ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(ch=>({v:String(ch.charCodeAt(0)),t:ch})),
+  ..."0123456789".split("").map(ch=>({v:String(ch.charCodeAt(0)),t:ch})),
+];
+function wfWinKeyLabel(value){
+  const hit=WF_WIN_KEYS.find(k=>String(k.v)===String(value));
+  return hit?hit.t:("VK "+value);
+}
+
 // Node catalog: UI source of truth (icon, kind, output ports, param fields).
 // Mirrors src/workflow/engine.py NODE_TYPES. kind: start|end|action|condition|loop.
 const WF_NODES = {
@@ -106,7 +123,10 @@ const WF_NODES = {
   tap:        {label:"Tap",      ico:"pointer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`)+(p.taps=="2"?" ×2":"")},
   // Hidden from the palette — superseded by tap(taps=2); old files still open/run fine.
   double_tap: {label:"Double tap",  ico:"hand",kind:"action",cat:"basic", hidden:true, outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`)+" ×2"},
-  tap_random: {label:"Random tap",ico:"dice",kind:"action",cat:"basic", outs:["out"], fields:[{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:100},{k:"h",t:"num",d:100}], sum:p=>`region (${p.x},${p.y}) ${p.w}×${p.h}`},
+  tap_random: {label:"Random tap",ico:"dice",kind:"action",cat:"basic", outs:["out"], fields:[
+    {k:"x1",lbl:"From X",t:"num",d:0},{k:"y1",lbl:"From Y",t:"num",d:0},
+    {k:"x2",lbl:"To X",t:"num",d:100},{k:"y2",lbl:"To Y",t:"num",d:100}
+  ], sum:p=>`X ${Math.min(Number(p.x1)||0,Number(p.x2)||0)}–${Math.max(Number(p.x1)||0,Number(p.x2)||0)} · Y ${Math.min(Number(p.y1)||0,Number(p.y2)||0)}–${Math.max(Number(p.y1)||0,Number(p.y2)||0)}`},
   long_press: {label:"Long press",       ico:"timer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}},{k:"duration",lbl:"Duration (ms)",t:"num",d:800}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x},${p.y})`)+` ${p.duration}ms`},
   swipe:      {label:"Swipe",      ico:"arrow_down",kind:"action",cat:"basic", outs:["out"], fields:[{k:"x1",t:"num"},{k:"y1",t:"num"},{k:"x2",t:"num"},{k:"y2",t:"num"},{k:"duration",t:"num",d:300}], sum:p=>`(${p.x1},${p.y1})→(${p.x2},${p.y2})`},
   swipe_dir:  {label:"Swipe direction",ico:"arrow_down",kind:"action",cat:"basic", outs:["out"], fields:[{k:"direction",t:"select",opts:[{v:"up",t:"↑ Up"},{v:"down",t:"↓ Down"},{v:"left",t:"← Left"},{v:"right",t:"→ Right"}],d:"up"},{k:"distance",lbl:"Distance (px)",t:"num",d:400},{k:"duration",lbl:"Duration (ms)",t:"num",d:300}], sum:p=>`${({up:"↑",down:"↓",left:"←",right:"→"})[p.direction]||"↑"} ${p.distance}px`},
@@ -207,7 +227,7 @@ const WF_NODES = {
     {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"},{v:"custom",t:"Custom command"}],d:"ldplayer"},
     {k:"index",lbl:"Instance index",t:"num",d:0},
     {k:"instance",lbl:"Instance name (BlueStacks)",t:"text",d:"",showWhen:{emulator:"bluestacks"}},
-    {k:"path",lbl:"Install folder / console .exe (blank = auto)",t:"text",d:"",pickFolder:true},
+    {k:"path",lbl:"Install folder / console .exe (blank = auto)",t:"path",d:"",pickFolder:true},
     {k:"command",lbl:"Custom command ({index})",t:"text",d:"",showWhen:{emulator:"custom"}},
     {k:"at",lbl:"Schedule at (blank = now)",t:"time",d:""},
     {k:"nextDay",lbl:"If time passed → wait next day",t:"bool",d:true},
@@ -236,8 +256,11 @@ const WF_NODES = {
   // ── Win32 (PC program window control) ────────────────────────────────────────
   // Only used when the project's Controller = Win32. The tap/swipe/image/color/
   // OCR nodes still work on Win32 through the shared screen-capture pipeline.
+  win_send_text:{label:"Input text", ico:"keyboard", kind:"action", cat:"win32", outs:["out"], fields:[{k:"text",t:"text",insertVar:true}], sum:p=>`"${p.text||""}"`},
+  win_key:      {label:"Press key", ico:"disc", kind:"action", cat:"win32", outs:["out"], fields:[{k:"keycode",lbl:"Key",t:"select",opts:WF_WIN_KEYS,d:"13"}], sum:p=>wfWinKeyLabel(p.keycode??"13")},
+  win_escape:   {label:"Escape key", ico:"back", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"Esc"},
   win_launch:   {label:"Launch program", ico:"rocket", kind:"action", cat:"win32", outs:["out"], fields:[
-    {k:"path",lbl:"Program (.exe) path",t:"text",d:"",pickFolder:false},
+    {k:"path",lbl:"Program (.exe) path",t:"path",d:"",pickFile:true},
     {k:"args",lbl:"Arguments (optional)",t:"text",d:""},
     {k:"window",lbl:"Wait for window title (optional)",t:"text",d:""},
     {k:"wait",lbl:"Wait for window (s)",t:"num",d:30},
@@ -254,22 +277,21 @@ const WF_NODES = {
   win_style:    {label:"Set window style", ico:"settings", kind:"action", cat:"win32", outs:["out"], fields:[{k:"style",lbl:"Style",t:"select",opts:[{v:"windowed",t:"Windowed (with frame)"},{v:"borderless",t:"Borderless"},{v:"popup",t:"Popup"}],d:"windowed"}], sum:p=>`${p.style||"windowed"}`},
 };
 // `ctrl` restricts a category to one project controller: the Device/emulator
-// nodes are ADB-only, the Win32 window nodes are PC-only. Untagged categories
-// (basic/image/app/color/ocr/flow/logic/…) work on both and always show.
-// Order follows real usage frequency (across 12 workflows: image/basic/flow/
-// logic make up ~95% of nodes). Never-used groups (`closed:true`) collapse by
-// default — a fresh palette shows only the ~15 common node types; whichever
-// group the user opens is remembered in localStorage (wfPalCollapsed) as before.
+// Device, Android App, and Android Keys/Input nodes are ADB-only; Win32
+// window/keyboard nodes are PC-only. Visual/basic/flow groups work on both.
+// Order follows task adjacency: direct input first; visual recognition groups
+// stay together (Image → Text → Color); decision/flow groups stay together;
+// platform lifecycle tools sit near each other at the end.
 const WF_CATS = [
   {key:"basic", label:"Basic"},
+  {key:"input", label:"Keys & Input (ADB)", ctrl:"adb"},
   {key:"image", label:"Image"},
-  {key:"flow",  label:"Flow"},
-  {key:"logic", label:"Variables / Conditions"},
   {key:"ocr",   label:"Text (OCR)"},
-  {key:"input", label:"Keys & Input"},
-  {key:"app",   label:"App",     closed:true},
   {key:"color", label:"Color",   closed:true},
+  {key:"logic", label:"Variables / Conditions"},
+  {key:"flow",  label:"Flow"},
   {key:"time",  label:"Time",    closed:true},
+  {key:"app",   label:"App (ADB)", ctrl:"adb", closed:true},
   {key:"device",label:"Device",  ctrl:"adb",   closed:true},
   {key:"win32", label:"Win32 (PC)", ctrl:"win32"},
   {key:"misc",  label:"Other",   closed:true},
@@ -475,6 +497,11 @@ function wfPopulateOcrBackends(backs){
   const sel=$("wf-ocr-select"); if(sel){ wfFillOcrSelect(sel); }
 }
 // ── Project controller (ADB vs Win32) ────────────────────────────────────────
+const WF_WIN_INPUT_MODES=new Set(["background","background_cursor","foreground"]);
+function wfNormWinInputMode(value){
+  const mode=String(value||"").trim().toLowerCase();
+  return WF_WIN_INPUT_MODES.has(mode)?mode:"background";
+}
 function wfSyncControllerUI(){
   const sel=$("wf-controller"); if(sel) sel.value=WF.controller||"adb";
   const w=WF.win32||(WF.win32={window:"",matchBy:"title",inputMode:"background"});
@@ -483,7 +510,7 @@ function wfSyncControllerUI(){
   const winSec=$("wf-proj-win32-sec"); if(winSec) winSec.style.display=win32?"":"none";
   const win=$("wf-win32-window"); if(win && document.activeElement!==win) win.value=w.window||"";
   const mb=$("wf-win32-matchby"); if(mb) mb.value=w.matchBy||"title";
-  const md=$("wf-win32-mode"); if(md) md.value=w.inputMode||"background";
+  const md=$("wf-win32-mode"); if(md) md.value=wfNormWinInputMode(w.inputMode);
   wfSyncPackageUI();
   wfSyncSpeedUI();   // speed-hack visibility depends on the controller
   wfPushCaptureSource();
@@ -551,7 +578,7 @@ function wfWin32FromUI(){
   const win=$("wf-win32-window"), mb=$("wf-win32-matchby"), md=$("wf-win32-mode");
   if(win) w.window=(win.value||"").trim();
   if(mb) w.matchBy=mb.value||"title";
-  if(md) w.inputMode=md.value||"background";
+  if(md) w.inputMode=wfNormWinInputMode(md.value);
   wfPushCaptureSource();
   if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
 }
@@ -613,11 +640,9 @@ function wfOpenProjectSettings(){
         `<div class="wf-proj-row">`+
           `<label for="wf-win32-mode">Input mode</label>`+
           `<select id="wf-win32-mode" title="How input is delivered to the window">`+
-            `<option value="background">Background</option>`+
-            `<option value="background_cursor">Background + cursor (Unity)</option>`+
-            `<option value="background_frida_api">Background + Frida (API hook)</option>`+
-            `<option value="background_frida_engine">Background + Frida Unity (engine)</option>`+
-            `<option value="foreground">Foreground</option>`+
+            `<option value="background">Background — PostMessage</option>`+
+            `<option value="background_cursor">Background + cursor — Unity / Unreal</option>`+
+            `<option value="foreground">Foreground — real mouse</option>`+
           `</select>`+
         `</div>`;
       secWin.appendChild(rowWinOpts);
@@ -666,7 +691,7 @@ function wfOpenProjectSettings(){
       const w=WF.win32||{};
       if(winEl) winEl.value=w.window||"";
       if(mb) mb.value=w.matchBy||"title";
-      if(md) md.value=w.inputMode||"background";
+      if(md) md.value=wfNormWinInputMode(w.inputMode);
       const win32=(WF.controller==="win32");
       const adbSec=q("wf-proj-adb-sec"); if(adbSec) adbSec.style.display=win32?"none":"";
       const winSec=q("wf-proj-win32-sec"); if(winSec) winSec.style.display=win32?"":"none";

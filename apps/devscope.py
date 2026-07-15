@@ -58,6 +58,7 @@ from src.utils import (
     add_log_subscriber,
     app_dir,
     bundle_dir,
+    file_url,
     is_frozen,
     launch_tool,
     log_error,
@@ -65,6 +66,7 @@ from src.utils import (
     log_success,
     log_warning,
     remove_log_subscriber,
+    webview_storage_path,
 )
 
 # In a frozen build, writable resources (out/, data/) live next to the .exe.
@@ -1135,7 +1137,7 @@ def create_devscope_window(title: str = "DevScope",
                            out_dir: Optional[str] = None) -> webview.Window:
     api = DevScopeAPI(out_dir=out_dir)
     html_path = os.path.join(_WEB_DIR, "scope", "index.html")
-    url = f"file:///{html_path.replace(os.sep, '/')}"
+    url = file_url(html_path)
 
     window = webview.create_window(
         title=title,
@@ -1159,7 +1161,11 @@ def run(out_dir: Optional[str] = None) -> None:
     output folder — the Workflow Designer passes its workflow's templates/ dir.
     """
     create_devscope_window(out_dir=out_dir)
-    webview.start(debug=False, private_mode=False)
+    webview.start(
+        debug=False,
+        private_mode=False,
+        storage_path=webview_storage_path("devscope"),
+    )
 
 
 if __name__ == "__main__":

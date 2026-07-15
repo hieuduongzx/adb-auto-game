@@ -583,7 +583,7 @@ function wfLocalRow(act,v,idx,render){
   nm.oninput=()=>{ wfPushUndoDebounced(); v.name=nm.value; wfRenderVarsPanel(); };
   r2.appendChild(nm);
   const ty=document.createElement("select");
-  [["bool","bool"],["number","number"],["text","text"],["select","select"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
+  [["bool","bool"],["number","number"],["text","text"],["path","path"],["select","select"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
   ty.onchange=()=>{
     wfPushUndoDebounced();
     v.type=ty.value;
@@ -683,7 +683,7 @@ function wfGlobRow(v,idx,render){
   nm.oninput=()=>{ wfPushUndoDebounced(); v.name=nm.value; wfRenderVarsPanel(); };
   r2.appendChild(nm);
   const ty=document.createElement("select");
-  [["bool","bool"],["number","number"],["text","text"],["select","select"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
+  [["bool","bool"],["number","number"],["text","text"],["path","path"],["select","select"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
   ty.onchange=()=>{
     wfPushUndoDebounced();
     v.type=ty.value;

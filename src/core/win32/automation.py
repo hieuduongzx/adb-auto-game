@@ -76,13 +76,6 @@ class Win32Controller:
         pretend-activate via WM_ACTIVATE, briefly move the hardware cursor to
         the target, send the messages synchronously, restore the cursor. Works
         for cursor-polling games while the window stays behind others.
-      - ``"background_frida_api"``   — Frida-injected hook of ``GetCursorPos`` /
-        ``GetMessagePos`` inside the game process. The real cursor never moves
-        and the window is never activated, but cursor-polling games read the
-        faked coordinates. Requires ``pip install frida``.
-      - ``"background_frida_engine"`` — Frida hook at the engine level
-        (Unity Mono / IL2CPP) when available, otherwise falls back to the API
-        hook. Same "no real cursor move" guarantee.
       - ``"foreground"``        — bring the window forward and use real mouse input.
     """
 
@@ -96,10 +89,11 @@ class Win32Controller:
         self._cap_method: Optional[str] = None
         # Windows Graphics Capture session state (lazily started by _cap_wgc).
         self._wgc: Optional[dict] = None
-        # Frida-based input session (background_frida_* modes).
-        self._frida: Optional["FridaWin32Input"] = None
         # ADBController-compat attributes the engine reads.
         self.device_id = None
+        # PID of the most recently started program. Used by an initial
+        # win_launch node to attach its window without preconfigured title.
+        self.last_launch_pid: Optional[int] = None
 
     # ── config ────────────────────────────────────────────────────────────────
     def configure(self, cfg: dict) -> None:
@@ -109,18 +103,16 @@ class Win32Controller:
         self.hwnd = None
         self._cap_method = None
         self._wgc_stop()
-        # Drop any Frida session when leaving a frida-based input mode.
-        new_mode = str(self.cfg.get("inputMode", "background")).strip().lower()
-        if not new_mode.startswith("background_frida") and self._frida is not None:
-            self._frida.detach()
-            self._frida = None
 
     @property
     def _match(self) -> Tuple[str, str, str]:
+        mode = str(self.cfg.get("inputMode", "background")).strip().lower()
+        if mode not in ("background", "background_cursor", "foreground"):
+            mode = "background"
         return (
             str(self.cfg.get("window", "")).strip(),
             str(self.cfg.get("matchBy", "title")).strip().lower() or "title",
-            str(self.cfg.get("inputMode", "background")).strip().lower() or "background",
+            mode,
         )
 
     # ── engine/ADBController-compat surface ────────────────────────────────────
@@ -440,13 +432,68 @@ class Win32Controller:
 
     # ── window management ──────────────────────────────────────────────────────
     def activate(self) -> bool:
+        """Reliably make the target the real foreground window before input.
+
+        Windows normally rejects ``SetForegroundWindow`` from a background
+        automation thread. Temporarily joining its input queue to the current
+        foreground/target threads, plus the standard Alt-key unlock, makes the
+        focus transfer explicit instead of moving the cursor over an inactive
+        game window.
+        """
         if not self.hwnd:
             return False
-        win32gui, win32con = self._w[1], self._w[3]
+        ctypes, win32gui, _, win32con, win32api, win32process = self._w
+        target = self.hwnd
         try:
-            win32gui.ShowWindow(self.hwnd, win32con.SW_RESTORE)
-            win32gui.SetForegroundWindow(self.hwnd)
-            return True
+            try:
+                target = win32gui.GetAncestor(self.hwnd, 2) or self.hwnd  # GA_ROOT
+            except Exception:
+                pass
+            self.hwnd = target
+            win32gui.ShowWindow(target, win32con.SW_RESTORE)
+            user32 = ctypes.windll.user32
+            current_tid = int(win32api.GetCurrentThreadId())
+            target_tid = int(win32process.GetWindowThreadProcessId(target)[0])
+            foreground = win32gui.GetForegroundWindow()
+            foreground_tid = (int(win32process.GetWindowThreadProcessId(foreground)[0])
+                              if foreground else 0)
+            attached = []
+            for tid in (foreground_tid, target_tid):
+                if tid and tid != current_tid and tid not in attached:
+                    if user32.AttachThreadInput(current_tid, tid, True):
+                        attached.append(tid)
+            try:
+                # Press/release Alt to legally unlock foreground activation for
+                # this input sequence under Windows' foreground-lock policy.
+                win32api.keybd_event(win32con.VK_MENU, 0, 0, 0)
+                try:
+                    win32gui.BringWindowToTop(target)
+                    win32gui.SetForegroundWindow(target)
+                    try:
+                        win32gui.SetActiveWindow(target)
+                        win32gui.SetFocus(target)
+                    except Exception:
+                        pass
+                finally:
+                    win32api.keybd_event(win32con.VK_MENU, 0, _KE_KEYUP, 0)
+            finally:
+                for tid in reversed(attached):
+                    try:
+                        user32.AttachThreadInput(current_tid, tid, False)
+                    except Exception:
+                        pass
+            # Do not report success until Windows confirms the target is active.
+            for _ in range(8):
+                fg = win32gui.GetForegroundWindow()
+                try:
+                    fg = win32gui.GetAncestor(fg, 2) or fg
+                except Exception:
+                    pass
+                if fg == target:
+                    return True
+                time.sleep(0.025)
+            log_warning("[win32] Không thể đưa cửa sổ mục tiêu lên foreground")
+            return False
         except Exception as exc:
             log_warning(f"[win32] activate lỗi: {exc}")
             return False
@@ -631,17 +678,47 @@ class Win32Controller:
             log_warning(f"[win32] set_window_style lỗi: {exc}")
             return False
 
+    def find_window_by_pid(self, pid: Optional[int]) -> Optional[int]:
+        """Return a visible top-level window owned by *pid*, if one exists."""
+        if not pid:
+            return None
+        win32gui, win32process = self._w[1], self._w[5]
+        found: list = []
+
+        def _cb(hwnd, _):
+            try:
+                if (win32gui.IsWindowVisible(hwnd)
+                        and win32process.GetWindowThreadProcessId(hwnd)[1] == int(pid)):
+                    found.append(hwnd)
+            except Exception:
+                pass
+
+        try:
+            win32gui.EnumWindows(_cb, None)
+        except Exception:
+            return None
+        return found[0] if found else None
+
     def launch_app(self, target: str) -> bool:
         """Start a program by exe path (with optional args), or focus a window
         whose title contains ``target`` if it's already open."""
         target = (target or "").strip()
         if not target:
             return False
-        # If it's a runnable path, start it; else treat as a window title to focus.
-        exe = target.split('"')[1] if target.startswith('"') else target.split(" ")[0]
+        # A bare path may contain spaces. Check the complete string before
+        # parsing a quoted command with arguments.
+        if os.path.exists(target):
+            exe = target
+        elif target.startswith('"') and '"' in target[1:]:
+            exe = target.split('"', 2)[1]
+        else:
+            exe = target.split(" ", 1)[0]
         if os.path.exists(exe):
             try:
-                subprocess.Popen(target, shell=True)
+                use_shell = os.path.splitext(exe)[1].lower() in (".bat", ".cmd")
+                command = target if use_shell or target != exe else [exe]
+                proc = subprocess.Popen(command, shell=use_shell)
+                self.last_launch_pid = int(proc.pid)
                 return True
             except Exception as exc:
                 log_error(f"[win32] Không mở được '{target}': {exc}")
@@ -649,6 +726,7 @@ class Win32Controller:
         hwnd = self._find_hwnd(target, "title")
         if hwnd:
             self.hwnd = hwnd
+            self.last_launch_pid = None
             return self.activate()
         log_warning(f"[win32] launch: '{target}' không phải file tồn tại và không có cửa sổ khớp")
         return False
@@ -659,10 +737,6 @@ class Win32Controller:
 
     def _cursor_mode(self) -> bool:
         return self._match[2] == "background_cursor"
-
-    def _frida_mode(self) -> bool:
-        m = self._match[2]
-        return m in ("background_frida_api", "background_frida_engine")
 
     def _send(self, msg: int, wparam: int, lparam: int) -> None:
         """SendMessage with an abort-if-hung timeout so a frozen game can't
@@ -676,8 +750,6 @@ class Win32Controller:
             return self._tap_fg(x, y, duration, tap_count)
         if self._cursor_mode():
             return self._tap_bg_cursor(x, y, duration, tap_count)
-        if self._frida_mode():
-            return self._tap_bg_frida(x, y, duration, tap_count)
         return self._tap_bg(x, y, duration, tap_count)
 
     def _tap_bg(self, x, y, duration, tap_count) -> bool:
@@ -780,7 +852,9 @@ class Win32Controller:
     def _tap_fg(self, x, y, duration, tap_count) -> bool:
         win32gui, win32api = self._w[1], self._w[4]
         try:
-            self.activate()
+            if not self.activate():
+                return False
+            time.sleep(0.03)
             sx, sy = win32gui.ClientToScreen(self.hwnd, (int(x), int(y)))
             win32api.SetCursorPos((sx, sy))
             for _ in range(max(1, int(tap_count))):
@@ -798,13 +872,13 @@ class Win32Controller:
             return False
         if self._cursor_mode():
             return self._swipe_bg_cursor(x1, y1, x2, y2, duration)
-        if self._frida_mode():
-            return self._swipe_bg_frida(x1, y1, x2, y2, duration)
         steps = max(2, int(max(1, duration) / 15))
         try:
             if self._foreground():
                 win32gui, win32api = self._w[1], self._w[4]
-                self.activate()
+                if not self.activate():
+                    return False
+                time.sleep(0.03)
                 sx, sy = win32gui.ClientToScreen(self.hwnd, (int(x1), int(y1)))
                 win32api.SetCursorPos((sx, sy))
                 win32api.mouse_event(_ME_LDOWN, 0, 0, 0, 0)
@@ -829,66 +903,6 @@ class Win32Controller:
             self._input_error("swipe", exc)
             return False
 
-    def _ensure_frida(self) -> bool:
-        """Lazy-attach Frida to the current window's PID when needed."""
-        if self._frida is None:
-            from .frida_input import FridaWin32Input
-            self._frida = FridaWin32Input()
-        if not self.hwnd:
-            return False
-        win32process = self._w[5]
-        _, pid = win32process.GetWindowThreadProcessId(self.hwnd)
-        if not self._frida.ready or self._frida.pid != pid:
-            strategy = "engine" if self._match[2] == "background_frida_engine" else "api"
-            return self._frida.attach(self.hwnd, strategy=strategy)
-        return True
-
-    def _tap_bg_frida(self, x, y, duration, tap_count) -> bool:
-        """Frida-based tap: hooks GetCursorPos/GetMessagePos inside the game
-        so the game reads fake coordinates while the real cursor never moves."""
-        win32gui = self._w[1]
-        lp = _lparam(x, y)
-        try:
-            if not self._ensure_frida():
-                return False
-            sx, sy = win32gui.ClientToScreen(self.hwnd, (int(x), int(y)))
-            self._frida.set_target(sx, sy)
-            win32gui.PostMessage(self.hwnd, _WM_MOUSEMOVE, 0, lp)
-            for i in range(max(1, int(tap_count))):
-                down = _WM_LBUTTONDBLCLK if (tap_count >= 2 and i > 0) else _WM_LBUTTONDOWN
-                win32gui.PostMessage(self.hwnd, down, _MK_LBUTTON, lp)
-                time.sleep(max(0.02, float(duration)))
-                win32gui.PostMessage(self.hwnd, _WM_LBUTTONUP, 0, lp)
-                if tap_count >= 2:
-                    time.sleep(0.04)
-            self._frida.clear_target()
-            return True
-        except Exception as exc:
-            self._input_error("tap(frida)", exc)
-            return False
-
-    def _swipe_bg_frida(self, x1, y1, x2, y2, duration) -> bool:
-        """Frida-based swipe: updates the hooked cursor position each step."""
-        win32gui = self._w[1]
-        steps = max(2, int(max(1, duration) / 15))
-        try:
-            if not self._ensure_frida():
-                return False
-            win32gui.PostMessage(self.hwnd, _WM_LBUTTONDOWN, _MK_LBUTTON, _lparam(x1, y1))
-            for i in range(1, steps + 1):
-                cx = int(x1 + (x2 - x1) * i / steps)
-                cy = int(y1 + (y2 - y1) * i / steps)
-                sx, sy = win32gui.ClientToScreen(self.hwnd, (cx, cy))
-                self._frida.set_target(sx, sy)
-                win32gui.PostMessage(self.hwnd, _WM_MOUSEMOVE, _MK_LBUTTON, _lparam(cx, cy))
-                time.sleep(duration / 1000.0 / steps)
-            self._frida.clear_target()
-            win32gui.PostMessage(self.hwnd, _WM_LBUTTONUP, 0, _lparam(x2, y2))
-            return True
-        except Exception as exc:
-            self._input_error("swipe(frida)", exc)
-            return False
-
     def drag(self, x1: int, y1: int, x2: int, y2: int, duration: int = 300) -> bool:
         return self.swipe(x1, y1, x2, y2, duration)
 
@@ -901,8 +915,8 @@ class Win32Controller:
             return False
         win32gui = self._w[1]
         try:
-            if self._foreground():
-                self.activate()
+            if self._foreground() and not self.activate():
+                return False
             for ch in str(text):
                 win32gui.PostMessage(self.hwnd, _WM_CHAR, ord(ch), 0)
                 time.sleep(0.005)
@@ -923,7 +937,8 @@ class Win32Controller:
         try:
             if self._foreground():
                 win32api = self._w[4]
-                self.activate()
+                if not self.activate():
+                    return False
                 win32api.keybd_event(vk, 0, 0, 0)
                 time.sleep(0.03)
                 win32api.keybd_event(vk, 0, _KE_KEYUP, 0)

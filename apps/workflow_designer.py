@@ -55,6 +55,7 @@ from src.utils import (
     add_log_subscriber,
     app_dir,
     bundle_dir,
+    file_url,
     is_frozen,
     launch_tool,
     log_error,
@@ -62,6 +63,7 @@ from src.utils import (
     log_success,
     log_warning,
     remove_log_subscriber,
+    webview_storage_path,
 )
 
 # In a frozen build, writable resources (data/) live next to the .exe.
@@ -651,6 +653,29 @@ class WorkflowDesignerAPI:
         start_dir = start if start and os.path.isdir(start) else ""
         try:
             paths = win.create_file_dialog(webview.FOLDER_DIALOG, directory=start_dir)
+        except Exception as exc:
+            log_warning(f"Dialog error: {exc}")
+            return ""
+        if not paths:
+            return ""
+        path = paths[0] if isinstance(paths, (list, tuple)) else paths
+        return str(path)
+
+    def pick_file(self, start: str = "") -> str:
+        """Open a general file picker for executable/path fields and variables."""
+        win = self._win()
+        if win is None:
+            return ""
+        start_dir = ""
+        if start:
+            start_dir = start if os.path.isdir(start) else os.path.dirname(start)
+        if not start_dir or not os.path.isdir(start_dir):
+            start_dir = _PROJECT_ROOT
+        try:
+            paths = win.create_file_dialog(
+                webview.OPEN_DIALOG, directory=start_dir, allow_multiple=False,
+                file_types=("Programs (*.exe;*.bat;*.cmd;*.com)", "All files (*.*)"),
+            )
         except Exception as exc:
             log_warning(f"Dialog error: {exc}")
             return ""
@@ -1932,7 +1957,7 @@ def create_workflow_designer_window(
     if auto_load and os.path.isfile(auto_load):
         api._pending_load = os.path.abspath(auto_load)
     html_path = os.path.join(_WEB_DIR, "wf", "index.html")
-    url = f"file:///{html_path.replace(os.sep, '/')}"
+    url = file_url(html_path)
     window = webview.create_window(
         title=title,
         url=url,
@@ -1975,7 +2000,12 @@ def run(auto_load: Optional[str] = None) -> None:
     """Open the Designer. Optional *auto_load* is a workflow JSON path to open."""
     _enable_windows_dpi_awareness()
     create_workflow_designer_window(auto_load=auto_load)
-    webview.start(debug=False, private_mode=False)
+    # Own WebView2 profile so Hub/Runner can stay open at the same time.
+    webview.start(
+        debug=False,
+        private_mode=False,
+        storage_path=webview_storage_path("designer"),
+    )
 
 
 if __name__ == "__main__":

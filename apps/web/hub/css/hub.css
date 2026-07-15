@@ -301,6 +301,7 @@ input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px 
 .col-actions { width: 118px; text-align: right !important; }
 
 @media (max-width: 560px) {
+  .choice-seg-3 { grid-template-columns:1fr; }
   .col-acts, .col-mod,
   #wf-table th.col-acts, #wf-table th.col-mod,
   #wf-table td:nth-child(2),
@@ -566,6 +567,7 @@ input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px 
   gap: 6px;
 }
 .choice-seg.disabled { opacity: .48; }
+.choice-seg-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
 .choice {
   display: flex;
   flex-direction: column;

@@ -100,7 +100,7 @@ function wfSerialize(){
     ocr:(WF.ocrBackend||"").trim(),
     // ADB frame source for this game/workflow ("scrcpy" | "adb").
     capture:(WF.captureBackend==="adb")?"adb":"scrcpy",
-    win32:{ window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:w.inputMode||"background" },
+    win32:{ window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:wfNormWinInputMode(w.inputMode) },
     // Speed hack is ADB-only (Frida). Package lives at the top level (key "package").
     // Force speedhack off in Win32 so a stale enabled flag never starts Frida.
     speedhack:{ enabled:isWin32?false:!!sh.enabled, speed:sh.speed||2.0 },
@@ -129,6 +129,15 @@ function wfHydrateGraph(g){
       if(params.pkgSrc===undefined||params.pkgSrc===null||params.pkgSrc===""){
         params.pkgSrc = (String(params.package||"").trim()) ? "custom" : "project";
       }
+    }
+    // Random tap used to store top-left + width/height. Convert it to two
+    // explicit corners so the inspector shows the same region the engine uses.
+    if(params && n.type==="tap_random" && !["x1","y1","x2","y2"].some(k=>params[k]!==undefined)){
+      const x=Number(params.x)||0, y=Number(params.y)||0;
+      params.x1=x; params.y1=y;
+      params.x2=x+(params.w===undefined?100:Math.max(0,Number(params.w)||0));
+      params.y2=y+(params.h===undefined?100:Math.max(0,Number(params.h)||0));
+      delete params.x; delete params.y; delete params.w; delete params.h;
     }
     return {id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params,note:n.note||"",log:n.log||"",
       delayBefore:parseFloat(delayBefore)||0, delayAfter:parseFloat(n.delayAfter)||0,
@@ -168,7 +177,7 @@ function wfHydrate(flow){
   // Force speed hack off in Win32 mode (ADB/Frida only) so a file saved with
   // enabled=true under the old cheat.dll path can't revive it.
   if(WF.controller==="win32") WF.speedhack.enabled=false;
-  const w=flow.win32||{}; WF.win32={window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:w.inputMode||"background"};
+  const w=flow.win32||{}; WF.win32={window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:wfNormWinInputMode(w.inputMode)};
   WF.functions=(flow.functions||[]).map(f=>({ id:f.id||("fn_"+wfUid().slice(1,6)), name:f.name||"function", graph:wfHydrateGraph(f.graph) }));
   WF.globals = wfHydVars(flow.globals||[]);
   WF.activities=(flow.activities||[]).map(a=>({

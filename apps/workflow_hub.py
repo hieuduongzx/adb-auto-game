@@ -27,7 +27,14 @@ if _PROJECT_ROOT not in sys.path:
 
 import webview
 
-from src.utils import app_dir, bundle_dir, is_frozen, launch_tool
+from src.utils import (
+    app_dir,
+    bundle_dir,
+    file_url,
+    is_frozen,
+    launch_tool,
+    webview_storage_path,
+)
 
 # In a frozen build, writable resources (workflows/, data/) live next to the .exe.
 if is_frozen():
@@ -54,19 +61,27 @@ def _norm_capture(raw: str) -> str:
     return "adb" if str(raw or "").strip().lower() == "adb" else "scrcpy"
 
 
+def _norm_input_mode(raw: str) -> str:
+    mode = str(raw or "").strip().lower()
+    return mode if mode in {"background", "background_cursor", "foreground"} else "background"
+
+
 def _blank_flow(
     name: str,
     controller: str = "adb",
     capture: str = "scrcpy",
+    input_mode: str = "background",
 ) -> dict:
     """Minimal valid workflow matching the designer's *New* seed shape.
 
     *controller*: ``adb`` | ``win32``
     *capture*: ``scrcpy`` | ``adb`` (ADB frame source; kept for win32 too so a
     later switch back to ADB remembers the choice).
+    *input_mode*: Win32 ``background`` | ``background_cursor`` | ``foreground``.
     """
     ctrl = _norm_controller(controller)
     cap = _norm_capture(capture)
+    mode = _norm_input_mode(input_mode)
     return {
         "name": name,
         "version": 2,
@@ -77,7 +92,7 @@ def _blank_flow(
         "win32": {
             "window": "",
             "matchBy": "title",
-            "inputMode": "background",
+            "inputMode": mode,
         },
         "speedhack": {
             "enabled": False,
@@ -281,11 +296,13 @@ class WorkflowHubAPI:
         name: str = "",
         controller: str = "adb",
         capture: str = "scrcpy",
+        input_mode: str = "background",
     ) -> dict:
         """Scaffold ``workflows/<Name>/workflow.json`` (+ empty templates/).
 
         *controller*: ``adb`` | ``win32``
         *capture*: ``scrcpy`` | ``adb`` (ADB screen-capture backend)
+        *input_mode*: Win32 input delivery mode (ignored by ADB workflows)
 
         Returns ``{ok, path, name, controller, capture}`` or ``{ok: false, error}``.
         """
@@ -305,9 +322,10 @@ class WorkflowHubAPI:
         display = (name or "").strip() or clean
         ctrl = _norm_controller(controller)
         cap = _norm_capture(capture)
+        mode = _norm_input_mode(input_mode)
         try:
             os.makedirs(os.path.join(folder, _TEMPLATES_DIRNAME), exist_ok=True)
-            flow = _blank_flow(display, controller=ctrl, capture=cap)
+            flow = _blank_flow(display, controller=ctrl, capture=cap, input_mode=mode)
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(flow, fh, ensure_ascii=False, indent=2)
                 fh.write("\n")
@@ -318,6 +336,7 @@ class WorkflowHubAPI:
                 "folder": clean,
                 "controller": ctrl,
                 "capture": cap,
+                "inputMode": mode,
             }
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
@@ -347,7 +366,7 @@ _HUB_MIN = (420, 560)
 def create_hub_window(title: str = "Workflow2k") -> webview.Window:
     api = WorkflowHubAPI()
     html_path = os.path.join(_WEB_DIR, "hub", "index.html")
-    url = f"file:///{html_path.replace(os.sep, '/')}"
+    url = file_url(html_path)
     window = webview.create_window(
         title=title,
         url=url,
@@ -368,7 +387,12 @@ def run() -> None:
     # No DPI shim here — designer needs it for the canvas; on the hub it can
     # interact badly with WebView2 sizing. pywebview/WinForms already handle DPI.
     create_hub_window()
-    webview.start(debug=False, private_mode=False)
+    # Per-app WebView2 profile — Designer/Runner launch as sibling processes.
+    webview.start(
+        debug=False,
+        private_mode=False,
+        storage_path=webview_storage_path("hub"),
+    )
 
 
 if __name__ == "__main__":

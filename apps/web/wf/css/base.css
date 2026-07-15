@@ -495,6 +495,7 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
   gap: 6px;
 }
 .choice-seg.disabled { opacity: .48; }
+.choice-seg-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .choice {
   display: flex;
   flex-direction: column;
@@ -523,6 +524,9 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
   font-size: 10.5px; font-weight: 500; color: var(--muted); line-height: 1.25;
 }
 .choice.on .choice-sub { color: #4a78c9; }
+@media (max-width: 520px) {
+  .choice-seg-3 { grid-template-columns: 1fr; }
+}
 
 /* Shortcuts cheat-sheet (F1) */
 .ui-keys { display: flex; flex-direction: column; gap: 3px; padding-bottom: 4px; }

@@ -40,12 +40,14 @@ from src.utils import (
     add_log_subscriber,
     app_dir,
     bundle_dir,
+    file_url,
     is_frozen,
     log_error,
     log_info,
     log_success,
     log_warning,
     remove_log_subscriber,
+    webview_storage_path,
 )
 
 # In a frozen build, writable resources (data/) live next to the .exe.
@@ -424,7 +426,7 @@ def create_workflow_runner_window(title: str = "Workflow2k Runner",
     api = WorkflowRunnerAPI()
     api._pending_load = auto_load
     html_path = os.path.join(_WEB_DIR, "runner", "index.html")
-    url = f"file:///{html_path.replace(os.sep, '/')}"
+    url = file_url(html_path)
     window = webview.create_window(
         title=title,
         url=url,
@@ -442,7 +444,11 @@ def create_workflow_runner_window(title: str = "Workflow2k Runner",
 
 def run(auto_load: Optional[str] = None) -> None:
     create_workflow_runner_window(auto_load=auto_load)
-    webview.start(debug=False, private_mode=False)
+    webview.start(
+        debug=False,
+        private_mode=False,
+        storage_path=webview_storage_path("runner"),
+    )
 
 
 if __name__ == "__main__":

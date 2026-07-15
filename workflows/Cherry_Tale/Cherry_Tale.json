@@ -164,7 +164,7 @@
       "id": "sequence_xguu",
       "name": "Run Game",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -178,8 +178,8 @@
           {
             "id": "ndi8pf0t",
             "type": "end",
-            "x": 720,
-            "y": 40,
+            "x": 744,
+            "y": 20,
             "params": {}
           },
           {
@@ -334,7 +334,7 @@
       "id": "sequence_9x85",
       "name": "Bữa Tiệc",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -348,7 +348,7 @@
           {
             "id": "nqmf20e6",
             "type": "tap_image",
-            "x": 160,
+            "x": 120,
             "y": -36,
             "params": {
               "template": "templates/crop_20260629_015843_57x46.png",
@@ -362,7 +362,7 @@
           {
             "id": "nxbi2js8",
             "type": "tap_image",
-            "x": 340,
+            "x": 320,
             "y": -36,
             "params": {
               "template": "templates/crop_20260629_015855_103x30.png",
@@ -392,7 +392,7 @@
           {
             "id": "nm0ibj2v",
             "type": "tap_image",
-            "x": 700,
+            "x": 720,
             "y": -36,
             "params": {
               "template": "templates/crop_20260629_015910_107x34.png",
@@ -406,7 +406,7 @@
           {
             "id": "n52kitq9",
             "type": "tap_image",
-            "x": 880,
+            "x": 920,
             "y": -36,
             "params": {
               "template": "templates/crop_20260708_125554_866_769_281_154.png",
@@ -420,7 +420,7 @@
           {
             "id": "noste6ns",
             "type": "call",
-            "x": -20,
+            "x": -80,
             "y": -36,
             "params": {
               "fn": "fn_ppung"
@@ -429,7 +429,7 @@
           {
             "id": "nlb7c6ql",
             "type": "log",
-            "x": 700,
+            "x": 720,
             "y": 40,
             "params": {
               "message": "Không có để mà nhận"
@@ -438,8 +438,8 @@
           {
             "id": "nmsssxb7",
             "type": "end",
-            "x": 1160,
-            "y": -21,
+            "x": 1140,
+            "y": 64,
             "params": {}
           }
         ],
@@ -498,7 +498,7 @@
       "id": "sequence_hlng",
       "name": "Bạn Bè",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -648,7 +648,7 @@
       "id": "sequence_kc43",
       "name": "Nhận Thư",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -662,8 +662,8 @@
           {
             "id": "npb983wx",
             "type": "tap_image",
-            "x": 320,
-            "y": 40,
+            "x": 116,
+            "y": 120,
             "params": {
               "template": "templates/isHome_20260629_020645_36x24.png",
               "taps": "1",
@@ -676,8 +676,8 @@
           {
             "id": "npmt5tuu",
             "type": "tap_image",
-            "x": 524,
-            "y": 40,
+            "x": 300,
+            "y": 120,
             "params": {
               "template": "templates/isHome_20260629_020704_175x20.png",
               "taps": "1",
@@ -690,10 +690,10 @@
           {
             "id": "nuw5egc1",
             "type": "tap_image",
-            "x": 728,
-            "y": 40,
+            "x": 300,
+            "y": 200,
             "params": {
-              "template": "templates/crop_20260629_020144_213x200.png",
+              "template": "templates/crop_20260715_074423_923_904_99_107.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -714,8 +714,8 @@
           {
             "id": "n7kdjw4k",
             "type": "tap_image",
-            "x": 1136,
-            "y": 40,
+            "x": 480,
+            "y": 280,
             "params": {
               "template": "templates/crop_20260629_031440_29x29.png",
               "taps": "1",
@@ -729,8 +729,8 @@
           {
             "id": "npmenb9e",
             "type": "wait_image",
-            "x": 932,
-            "y": 40,
+            "x": 480,
+            "y": 200,
             "params": {
               "template": "templates/isHome_20260629_020704_175x20.png",
               "threshold": 0.85,
@@ -740,8 +740,8 @@
           {
             "id": "nls0zwk9",
             "type": "end",
-            "x": 1340,
-            "y": 52,
+            "x": 680,
+            "y": 304,
             "params": {}
           }
         ],
@@ -790,7 +790,7 @@
       "id": "sequence_3q1b",
       "name": "Drawn Free",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -798,7 +798,7 @@
             "id": "n5dkiz64",
             "type": "start",
             "x": 120,
-            "y": -96,
+            "y": -104,
             "params": {}
           },
           {
@@ -1047,6 +1047,11 @@
             "from": "n3170j1v",
             "fromPort": "out",
             "to": "nl6of53k"
+          },
+          {
+            "from": "nkzryy9a",
+            "fromPort": "false",
+            "to": "n278kx1x"
           }
         ],
         "groups": []
@@ -2464,10 +2469,10 @@
             "x": 2340,
             "y": 100,
             "params": {
-              "x": 0,
-              "y": 0,
-              "w": 100,
-              "h": 100
+              "x1": 0,
+              "y1": 0,
+              "x2": 100,
+              "y2": 100
             },
             "delayBefore": 2
           },

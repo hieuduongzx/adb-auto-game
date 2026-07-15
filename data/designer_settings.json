@@ -1,11 +1,12 @@
 {
   "snap": true,
   "previewAll": true,
-  "logOpen": true,
+  "logOpen": false,
   "sideW": 332,
   "inspW": 311,
   "minimap": false,
   "alignGuides": true,
   "previewHz": 60,
-  "logH": 137
+  "logH": 248,
+  "lastWorkflow": "A:\\Dev\\Dev Tool\\adb-auto-game\\workflows\\Cherry_Tale\\Cherry_Tale.json"
 }

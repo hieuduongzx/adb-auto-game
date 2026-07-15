@@ -110,16 +110,20 @@ function modal(spec) {
   });
 }
 
-/** Collect create-dialog fields. Returns ``{name, controller, capture}`` or null. */
+/** Collect create-dialog fields. Returns project backend settings or null. */
 function readNewWorkflowForm(box) {
   const name = (box.querySelector("#hub-name-input").value || "").trim() || "My Workflow";
   const ctrlBtn = box.querySelector('.choice-seg[data-field="controller"] .choice.on');
   const capBtn = box.querySelector('.choice-seg[data-field="capture"] .choice.on');
+  const inputBtn = box.querySelector('.choice-seg[data-field="inputMode"] .choice.on');
   const controller = (ctrlBtn && ctrlBtn.dataset.value === "win32") ? "win32" : "adb";
-  // Capture only applies to ADB projects; still persist a default for win32.
+  // Capture only applies to ADB; input mode only applies to Win32.
   const capture = (controller === "adb" && capBtn && capBtn.dataset.value === "adb")
     ? "adb" : "scrcpy";
-  return { name, controller, capture };
+  const allowedModes = new Set(["background", "background_cursor", "foreground"]);
+  const inputMode = inputBtn && allowedModes.has(inputBtn.dataset.value)
+    ? inputBtn.dataset.value : "background";
+  return { name, controller, capture, inputMode };
 }
 
 function wireChoiceSeg(box) {
@@ -129,28 +133,24 @@ function wireChoiceSeg(box) {
       if (!btn || btn.disabled || seg.classList.contains("disabled")) return;
       seg.querySelectorAll(".choice").forEach((c) => c.classList.remove("on"));
       btn.classList.add("on");
-      if (seg.dataset.field === "controller") syncCaptureForController(box);
+      if (seg.dataset.field === "controller") syncBackendFields(box);
     });
   });
-  syncCaptureForController(box);
+  syncBackendFields(box);
 }
 
-function syncCaptureForController(box) {
+function syncBackendFields(box) {
   const ctrlBtn = box.querySelector('.choice-seg[data-field="controller"] .choice.on');
   const win32 = ctrlBtn && ctrlBtn.dataset.value === "win32";
-  const capSeg = box.querySelector('.choice-seg[data-field="capture"]');
-  const capHint = box.querySelector("#hub-capture-hint");
-  if (!capSeg) return;
-  capSeg.classList.toggle("disabled", !!win32);
-  capSeg.querySelectorAll(".choice").forEach((c) => { c.disabled = !!win32; });
-  if (capHint) {
-    capHint.textContent = win32
-      ? "Win32 captures the target PC window directly — ADB capture source is unused."
-      : "How the device screen is grabbed during preview and runs.";
-  }
+  const capField = box.querySelector("#hub-capture-field");
+  const inputField = box.querySelector("#hub-input-field");
+  // Use explicit display instead of the HTML hidden attribute. WebView2 can
+  // retain the attribute's UA `display:none` after dynamic modal updates.
+  if (capField) capField.style.display = win32 ? "none" : "";
+  if (inputField) inputField.style.display = win32 ? "" : "none";
 }
 
-/** New-workflow dialog → ``{name, controller, capture}`` or null if cancelled. */
+/** New-workflow dialog → backend settings or null if cancelled. */
 function promptNewWorkflow() {
   return new Promise((resolve) => {
     if (_modal) modalClose(undefined);
@@ -180,7 +180,7 @@ function promptNewWorkflow() {
             `</button>` +
           `</div>` +
         `</div>` +
-        `<div class="form-field">` +
+        `<div class="form-field" id="hub-capture-field">` +
           `<span class="form-lbl">Capture source</span>` +
           `<div class="choice-seg" data-field="capture" role="group" aria-label="Capture source">` +
             `<button type="button" class="choice on" data-value="scrcpy">` +
@@ -192,7 +192,25 @@ function promptNewWorkflow() {
               `<span class="choice-sub">screencap</span>` +
             `</button>` +
           `</div>` +
-          `<p class="ui-modal-hint" id="hub-capture-hint">How the device screen is grabbed during preview and runs.</p>` +
+          `<p class="ui-modal-hint">How the device screen is grabbed during preview and runs.</p>` +
+        `</div>` +
+        `<div class="form-field" id="hub-input-field" style="display:none">` +
+          `<span class="form-lbl">Win32 input mode</span>` +
+          `<div class="choice-seg choice-seg-3" data-field="inputMode" role="group" aria-label="Win32 input mode">` +
+            `<button type="button" class="choice on" data-value="background">` +
+              `<span class="choice-title">Background</span>` +
+              `<span class="choice-sub">PostMessage</span>` +
+            `</button>` +
+            `<button type="button" class="choice" data-value="background_cursor">` +
+              `<span class="choice-title">Cursor</span>` +
+              `<span class="choice-sub">Unity / Unreal</span>` +
+            `</button>` +
+            `<button type="button" class="choice" data-value="foreground">` +
+              `<span class="choice-title">Foreground</span>` +
+              `<span class="choice-sub">Real mouse</span>` +
+            `</button>` +
+          `</div>` +
+          `<p class="ui-modal-hint">How clicks and swipes are delivered to the PC window.</p>` +
         `</div>` +
         `<p class="ui-modal-hint">Creates workflows/&lt;Name&gt;/workflow.json and opens the Designer.</p>` +
       `</div>` +
@@ -416,7 +434,7 @@ async function createWorkflow() {
   const a = api();
   if (!a) return;
   try {
-    const res = await a.create_workflow(opts.name, opts.controller, opts.capture);
+    const res = await a.create_workflow(opts.name, opts.controller, opts.capture, opts.inputMode);
     if (!res || !res.ok) {
       toast((res && res.error) || "Create failed", "error");
       return;

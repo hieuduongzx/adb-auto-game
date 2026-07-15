@@ -331,15 +331,17 @@ const WF_VAR_SCOPE_LBL={global:"Global", activity:"Activity", node:"Node", live:
 let wfVarMenuEl=null;
 function wfCloseVarMenu(){ if(wfVarMenuEl){ wfVarMenuEl.remove(); wfVarMenuEl=null; document.removeEventListener("mousedown",wfVarMenuOutside,true); } }
 function wfVarMenuOutside(e){ if(wfVarMenuEl && !e.target.closest(".wf-varmenu") && !e.target.closest(".wf-var-pick")) wfCloseVarMenu(); }
-function wfShowVarMenu(anchor,onPick){
+function wfShowVarMenu(anchor,onPick,opts){
   wfCloseVarMenu();
+  opts=opts||{};
   const menu=document.createElement("div"); menu.className="wf-varmenu"; wfVarMenuEl=menu;
   const search=document.createElement("input"); search.type="text"; search.className="wf-varmenu-search";
   search.placeholder="Search variables…"; search.spellcheck=false; search.autocomplete="off";
   menu.appendChild(search);
   const list=document.createElement("div"); list.className="wf-varmenu-list"; menu.appendChild(list);
   const map=wfVarInfoMap();
-  const names=Object.keys(map).sort();
+  const allowed=Array.isArray(opts.types)&&opts.types.length?new Set(opts.types):null;
+  const names=Object.keys(map).filter(n=>!allowed||allowed.has(map[n].type)).sort();
   function render(filter){
     list.innerHTML="";
     const f=(filter||"").trim().toLowerCase();
@@ -366,7 +368,7 @@ function wfShowVarMenu(anchor,onPick){
       if(!nm) return;
       wfPushUndoDebounced();
       if(!Array.isArray(WF.globals)) WF.globals=[];
-      if(!WF.globals.some(x=>x.name===nm)) WF.globals.push({name:nm, label:nm, type:"text", value:"", children:[]});
+      if(!WF.globals.some(x=>x.name===nm)) WF.globals.push({name:nm, label:nm, type:opts.newType||"text", value:"", children:[]});
       wfRenderVarsPanel(); onPick(nm); wfCloseVarMenu();
     });
   };
@@ -381,7 +383,7 @@ function wfShowVarMenu(anchor,onPick){
         if(!nm) return;
         wfPushUndoDebounced();
         if(!Array.isArray(act.vars)) act.vars=[];
-        if(!act.vars.some(x=>x.name===nm)) act.vars.push({name:nm, label:nm, type:"text", value:"", children:[]});
+        if(!act.vars.some(x=>x.name===nm)) act.vars.push({name:nm, label:nm, type:opts.newType||"text", value:"", children:[]});
         wfRenderVarsPanel(); onPick(nm); wfCloseVarMenu();
       });
     };
@@ -399,11 +401,11 @@ function wfShowVarMenu(anchor,onPick){
   setTimeout(()=>{ search.focus(); document.addEventListener("mousedown",wfVarMenuOutside,true); },0);
 }
 // Small "𝑥" button that opens the variable menu beside a field.
-function wfVarPickBtn(onPick,title){
+function wfVarPickBtn(onPick,title,opts){
   const b=document.createElement("button"); b.type="button"; b.className="btn sm ico wf-var-pick";
   b.title=title||"Pick a variable";
   b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16M20 4L4 20"/></svg>';
-  b.onclick=(e)=>{ e.stopPropagation(); wfShowVarMenu(b,onPick); };
+  b.onclick=(e)=>{ e.stopPropagation(); wfShowVarMenu(b,onPick,opts); };
   return b;
 }
 // Live value / type badge shown beside a variable-bound field. Returns the
@@ -460,6 +462,30 @@ function wfVarRefField(node,f){
   const pick=wfVarPickBtn(name=>{ inp.value=name; commit(!!f.refresh); }, "Use a variable as this value");
   row.appendChild(inp); row.appendChild(pick); row.appendChild(badge);
   sync();
+  return row;
+}
+
+// A Windows path may be a literal selected from disk or a path/text variable.
+// Keeping both actions beside one input avoids forcing users to copy paths by hand.
+function wfPathField(node,f){
+  const row=document.createElement("div"); row.className="wf-field wf-var-field wf-path-field";
+  const lab=document.createElement("label"); lab.textContent=f.lbl||f.k; lab.title=f.k; row.appendChild(lab);
+  const inp=document.createElement("input"); inp.type="text"; inp.className="wf-var-input";
+  inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
+  inp.placeholder=f.ph||(f.pickFolder?"folder or path variable":"file or path variable");
+  const badge=wfVarBadge();
+  const commit=()=>{ wfPushUndoDebounced(); node.params[f.k]=inp.value; wfUpdNodeSum(node); badge.refresh(wfVarBadgeInfo(inp.value)?inp.value:""); };
+  inp.oninput=commit;
+  const variable=wfVarPickBtn(name=>{ inp.value=name; commit(); },"Use a path variable",{types:["path","text"],newType:"path"});
+  const browse=document.createElement("button"); browse.type="button"; browse.className="btn sm ico wf-path-browse";
+  browse.innerHTML=wfIco("folder"); browse.title=f.pickFolder?"Choose folder…":"Choose file…";
+  browse.onclick=async()=>{
+    const current=wfVarBadgeInfo(inp.value)?"":inp.value;
+    const p=f.pickFolder?await api().pick_folder(current||""):await api().pick_file(current||"");
+    if(p){ inp.value=p; commit(); }
+  };
+  row.appendChild(inp); row.appendChild(variable); row.appendChild(browse); row.appendChild(badge);
+  badge.refresh(wfVarBadgeInfo(inp.value)?inp.value:"");
   return row;
 }
 
@@ -699,7 +725,7 @@ function wfVarRow(act,v,idx,depth){
   nm.oninput=()=>{ wfPushUndoDebounced(); v.name=nm.value; };
   r2.appendChild(nm);
   const ty=document.createElement("select");
-  [["bool","bool"],["number","number"],["text","text"],["select","select"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
+  [["bool","bool"],["number","number"],["text","text"],["path","path"],["select","select"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
   ty.onchange=()=>{
     wfPushUndoDebounced();
     v.type=ty.value;
@@ -753,9 +779,15 @@ function wfVarValue(v){
     return sel;
   }
   const inp=document.createElement("input"); inp.type=v.type==="number"?"number":"text";
-  inp.value=v.value!==undefined&&v.value!==null?v.value:""; inp.style.width="58px";
+  inp.value=v.value!==undefined&&v.value!==null?v.value:"";
+  inp.style.width=v.type==="path"?"100%":"58px";
   inp.oninput=()=>{ wfPushUndoDebounced(); v.value = v.type==="number"?(parseFloat(inp.value)||0):inp.value; };
-  return inp;
+  if(v.type!=="path") return inp;
+  const wrap=document.createElement("div"); wrap.className="wf-var-path-value";
+  const browse=document.createElement("button"); browse.type="button"; browse.className="btn sm ico"; browse.title="Choose file…"; browse.innerHTML=wfIco("folder");
+  browse.onclick=async()=>{ const p=await api().pick_file(inp.value||""); if(p){ inp.value=p; v.value=p; wfPushUndoDebounced(); } };
+  wrap.appendChild(inp); wrap.appendChild(browse);
+  return wrap;
 }
 
 // ── Smart paste on coordinate fields ─────────────────────────────────────────
@@ -839,7 +871,7 @@ function wfFieldEl(node,f){
   if(f.t==="select"){
     const sel=document.createElement("select");
     (f.opts||[]).forEach(o=>{ const v=(o&&o.v!==undefined)?o.v:o, t=(o&&o.t!==undefined)?o.t:o;
-      const op=document.createElement("option"); op.value=v; op.textContent=t; if(node.params[f.k]===v)op.selected=true; sel.appendChild(op); });
+      const op=document.createElement("option"); op.value=v; op.textContent=t; if(String(node.params[f.k])===String(v))op.selected=true; sel.appendChild(op); });
     // If any sibling field gates on this one (showWhen), re-render the inspector
     // so gated fields appear/disappear as the selection changes.
     const gates=(WF_NODES[node.type]&&WF_NODES[node.type].fields||[]).some(ff=>ff.showWhen&&ff.showWhen[f.k]!==undefined);
@@ -879,6 +911,8 @@ function wfFieldEl(node,f){
     return row;
   }
 
+  // Path = literal file/folder OR a path variable, with native browse action.
+  if(f.t==="path"){ return wfPathField(node,f); }
   // Variable NAME field (declares/targets a variable) → combobox picker.
   if(f.var){ return wfVarNameField(node,f); }
   // Variable-or-literal VALUE field (loop count, set/if value…) → ref picker.
@@ -893,16 +927,6 @@ function wfFieldEl(node,f){
 
   // Free-text fields that expand {name} placeholders get an insert-variable btn.
   if(f.t==="text" && f.insertVar){ row.appendChild(wfInsertVarBtn(inp)); }
-
-  // Path fields marked pickFolder get a "browse for a folder" button next to
-  // the text input (e.g. the emulator install dir on launch_emulator).
-  if(f.pickFolder){
-    inp.style.fontSize="10px";
-    const btn=document.createElement("button"); btn.className="btn sm ico"; btn.title="Choose folder…";
-    btn.innerHTML=wfIco("folder");
-    btn.onclick=async()=>{ const p=await api().pick_folder(inp.value||""); if(p){ inp.value=p; wfPushUndoDebounced(); node.params[f.k]=p; wfUpdNodeSum(node); } };
-    row.appendChild(btn);
-  }
 
   if(f.t==="tpl"){
     inp.style.fontSize="10px";

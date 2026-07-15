@@ -217,6 +217,32 @@ def bundle_dir() -> str:
     return _SOURCE_ROOT
 
 
+def file_url(path: str) -> str:
+    """Absolute ``file://`` URL for a local path (spaces / unicode encoded).
+
+    WebView2 rejects or truncates bare ``file:///C:/path with spaces/...``
+    URLs, which yields an empty window. ``Path.as_uri()`` percent-encodes
+    correctly (e.g. ``Dev Tool`` → ``Dev%20Tool``).
+    """
+    from pathlib import Path
+
+    return Path(os.path.abspath(path)).as_uri()
+
+
+def webview_storage_path(app_key: str) -> str:
+    """Per-app WebView2 user-data folder under the project ``data/`` tree.
+
+    Hub / Designer / Runner / DevScope often run as *separate processes* at
+    the same time. With ``private_mode=False`` they would otherwise share
+    ``%AppData%/pywebview`` and WebView2 fails to init the second window
+    (HRESULT ``0x8007139F``) — empty chrome, no HTML.
+    """
+    key = (app_key or "app").strip().lower() or "app"
+    path = os.path.join(app_dir(), "data", "webview", key)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
 # Maps a logical app name to (frozen exe basename, source-tree script path
 # relative to the project root). Workflow2k.exe hosts Hub + Designer + Runner
 # via CLI switches (default = hub, ``--designer``, ``--runner``).
@@ -274,6 +300,8 @@ __all__ = [
     "is_frozen",
     "app_dir",
     "bundle_dir",
+    "file_url",
+    "webview_storage_path",
     "launch_tool",
     "setup_logger",
     "set_current_state",
