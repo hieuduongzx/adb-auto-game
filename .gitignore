@@ -75,10 +75,7 @@ vendor/frida/
 vendor/scrcpy/
 
 # Runtime / machine-local state (may embed absolute paths)
-data/designer_settings.json
-data/emulator_state.json
-data/autoclick_settings.json
-data/webview/
+data/
 
 # Designer → runner temp handoff (not user content)
 workflows/_run/

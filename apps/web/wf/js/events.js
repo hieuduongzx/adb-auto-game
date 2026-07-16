@@ -91,6 +91,8 @@ window.__recv = function(raw){
   if(type==="node_active"){
     // Full test run OR single-block test both light the amber node.
     if(!wfRunning && !wfNodeTesting) return;
+    // New node → any previous delayAfter countdown is done.
+    if(typeof wfClearNodeDelay==="function") wfClearNodeDelay();
     if(data.id){ wfLiveNode=data.id; wfNoteNodeStart(data.id); }   // the true running node, even if in an off-screen graph
     // Follow-focus first: if the running node lives in another graph (a function
     // we stepped into, or the activity we stepped back out to), switch to it and
@@ -102,10 +104,27 @@ window.__recv = function(raw){
   }
   if(type==="node_result"){
     if(!wfRunning && !wfNodeTesting) return;
+    // delayBefore is over once the action reports a result; delayAfter may start
+    // next via node_delay — only clear a before-wait here so we don't wipe after.
+    if(typeof wfDelayState!=="undefined" && wfDelayState && wfDelayState.phase==="before")
+      wfClearNodeDelay();
     wfNoteNodeDone(data.id);
     if(data.id && !wfNode(data.id)) return;
     wfMarkNodeResult(data.id, data.status, data.port);
     if(typeof wfDebugAutoStep==="function") wfDebugAutoStep();
+    return;
+  }
+  // Per-node delayBefore / delayAfter: engine is sleeping; show a live countdown
+  // on the delay chip next to the block (phase null = wait finished).
+  if(type==="node_delay"){
+    if(!wfRunning && !wfNodeTesting) return;
+    if(data.id && wfFocusOn && !wfNodeTesting) wfFocusFollow(data.id);
+    if(data.phase==="before" || data.phase==="after"){
+      if(data.id && !wfNode(data.id)) return;
+      wfStartNodeDelay(data.id, data.phase, data.seconds);
+    } else {
+      wfEndNodeDelay(data.id);
+    }
     return;
   }
   // Failure screenshot saved for a node's final failed attempt — remember it and
@@ -130,6 +149,7 @@ window.__recv = function(raw){
   }
   if(type==="var_update"){ wfLiveVars[data.name]=data.value; wfRenderVarsPanel(); return; }
   if(type==="vars_snapshot"){ wfLiveVars=data.vars||{}; wfRenderVarsPanel(); return; }
+  if(type==="build_done"){ if(typeof wfOnBuildDone==="function") wfOnBuildDone(data); return; }
 };
 
 // ── Log drawer ────────────────────────────────────────────────────────────────
@@ -234,6 +254,7 @@ async function wfNew(){
 
   WF.name = name;
   WF.version=2; WF.templatesDir="templates";
+  WF.buildVersion="1.0.0";
   WF.package="";
   WF.speedhack={enabled:false, speed:2.0};
   WF.controller=controller;
@@ -307,10 +328,14 @@ function wfPromptNewWorkflow(){
           `</div>`+
           `<div class="wf-new-field" id="wf-new-input-field" style="display:none">`+
             `<div class="ui-modal-lbl">Win32 input mode</div>`+
-            `<div class="choice-seg choice-seg-3" data-field="inputMode" role="group" aria-label="Win32 input mode">`+
+            `<div class="choice-seg choice-seg-4" data-field="inputMode" role="group" aria-label="Win32 input mode">`+
               `<button type="button" class="choice on" data-value="background">`+
                 `<span class="choice-title">Background</span>`+
                 `<span class="choice-sub">PostMessage</span>`+
+              `</button>`+
+              `<button type="button" class="choice" data-value="background_sync">`+
+                `<span class="choice-title">BG sync</span>`+
+                `<span class="choice-sub">SendMessage</span>`+
               `</button>`+
               `<button type="button" class="choice" data-value="background_cursor">`+
                 `<span class="choice-title">Cursor</span>`+

@@ -144,10 +144,10 @@
             <div><legend>Click sequence</legend><span id="ac-point-summary">1 point</span></div>
             <button class="btn" type="button" id="ac-add-point" title="Add the current cursor position (F8)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add point <kbd>F8</kbd></button>
           </div>
-          <div class="point-list-head" aria-hidden="true"><span>Point</span><span>Position</span><span>Click</span><span></span></div>
           <div id="ac-points" class="point-list"></div>
-          <div id="ac-points-empty" class="points-empty" hidden><b>No click points</b><span>Add a point to build your sequence.</span></div>
-          <p class="setting-hint">Points run top to bottom. <kbd>F7</kbd> updates the selected point; <kbd>F8</kbd> captures and adds a new point.</p>
+          <div id="ac-points-empty" class="points-empty" hidden><b>No click points</b><span>Add a point, or press <kbd>F8</kbd> to capture the cursor.</span></div>
+          <div id="ac-point-editor" class="point-editor" hidden></div>
+          <p class="setting-hint">Points run top to bottom. Select one to edit it below — <kbd>F7</kbd> sets its position from the cursor, <kbd>F8</kbd> adds a new point.</p>
         </fieldset>
 
         <fieldset class="setting-group">

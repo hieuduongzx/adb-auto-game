@@ -120,7 +120,7 @@ function readNewWorkflowForm(box) {
   // Capture only applies to ADB; input mode only applies to Win32.
   const capture = (controller === "adb" && capBtn && capBtn.dataset.value === "adb")
     ? "adb" : "scrcpy";
-  const allowedModes = new Set(["background", "background_cursor", "foreground"]);
+  const allowedModes = new Set(["background", "background_sync", "background_cursor", "foreground"]);
   const inputMode = inputBtn && allowedModes.has(inputBtn.dataset.value)
     ? inputBtn.dataset.value : "background";
   return { name, controller, capture, inputMode };
@@ -196,10 +196,14 @@ function promptNewWorkflow() {
         `</div>` +
         `<div class="form-field" id="hub-input-field" style="display:none">` +
           `<span class="form-lbl">Win32 input mode</span>` +
-          `<div class="choice-seg choice-seg-3" data-field="inputMode" role="group" aria-label="Win32 input mode">` +
+          `<div class="choice-seg choice-seg-4" data-field="inputMode" role="group" aria-label="Win32 input mode">` +
             `<button type="button" class="choice on" data-value="background">` +
               `<span class="choice-title">Background</span>` +
               `<span class="choice-sub">PostMessage</span>` +
+            `</button>` +
+            `<button type="button" class="choice" data-value="background_sync">` +
+              `<span class="choice-title">BG sync</span>` +
+              `<span class="choice-sub">SendMessage</span>` +
             `</button>` +
             `<button type="button" class="choice" data-value="background_cursor">` +
               `<span class="choice-title">Cursor</span>` +
@@ -459,6 +463,7 @@ async function createWorkflow() {
 // ── Tool navigation ─────────────────────────────────────────────────────────
 async function openTool(name) {
   document.querySelectorAll(".tool-view").forEach((view) => view.classList.toggle("active", view.id === (name === "workflow" ? "workflow-app" : name === "autoclick" ? "autoclick-app" : "tool-home")));
+  try { await api().autoclick_set_view_active(name === "autoclick"); } catch {}
   if (name === "workflow" && !WORKFLOWS_LOADED) {
     await loadList();
     WORKFLOWS_LOADED = true;
@@ -487,15 +492,25 @@ function newPoint(index) {
   return { id:`point-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`, label:`Point ${index + 1}`,
     enabled:true, targetMode:"fixed", x:0, y:0, button:"left", clickType:"single" };
 }
+function selectedPoint() {
+  const pts = AC_CONFIG.points || [];
+  return pts.find((p) => p.id === AC_CONFIG.selectedPointId) || null;
+}
+function pointSummary(point) {
+  const pos = point.targetMode === "cursor" ? "Cursor" : `${point.x}, ${point.y}`;
+  const btn = point.button === "right" ? "R" : point.button === "middle" ? "M" : "L";
+  return { pos, click: `${btn} · ${point.clickType === "double" ? "2×" : "1×"}` };
+}
+// AC_CONFIG.points is the source of truth (edited via the list + detail panel);
+// only the always-present name / schedule fields are read from the DOM here.
 function readAutoClickConfig() {
-  const points = [...document.querySelectorAll(".point-row")].map((row, index) => ({
-    id:row.dataset.id, label:(row.querySelector('[data-point="label"]').value||`Point ${index+1}`).trim(),
-    enabled:row.querySelector('[data-point="enabled"]').checked,
-    targetMode:row.querySelector('[data-point="targetMode"]').value,
-    x:parseInt(row.querySelector('[data-point="x"]').value,10)||0,
-    y:parseInt(row.querySelector('[data-point="y"]').value,10)||0,
-    button:row.querySelector('[data-point="button"]').value,
-    clickType:row.querySelector('[data-point="clickType"]').value,
+  const points = (AC_CONFIG.points || []).map((point, index) => ({
+    id:point.id, label:(point.label || `Point ${index + 1}`).trim() || `Point ${index + 1}`,
+    enabled:!!point.enabled,
+    targetMode:point.targetMode === "cursor" ? "cursor" : "fixed",
+    x:parseInt(point.x, 10) || 0, y:parseInt(point.y, 10) || 0,
+    button:["left", "right", "middle"].includes(point.button) ? point.button : "left",
+    clickType:point.clickType === "double" ? "double" : "single",
   }));
   return { profileName:($("ac-profile-name").value||"Untitled sequence").trim(), selectedPointId:AC_CONFIG.selectedPointId,
     points, intervalMs:Math.max(10,parseInt($("ac-interval").value,10)||250),
@@ -504,27 +519,57 @@ function readAutoClickConfig() {
 }
 function renderPoints() {
   const host=$("ac-points"); host.innerHTML="";
-  (AC_CONFIG.points||[]).forEach((point,index) => {
+  const points=AC_CONFIG.points||[];
+  points.forEach((point,index) => {
     const row=document.createElement("div");
-    row.className="point-row"+(point.id===AC_CONFIG.selectedPointId?" selected":"")+(point.id===AC_STATE.activePointId?" active":"");
+    row.className="point-row"+(point.id===AC_CONFIG.selectedPointId?" selected":"")+(point.id===AC_STATE.activePointId?" active":"")+(point.enabled?"":" off");
     row.dataset.id=point.id;
-    row.innerHTML=`<div class="point-order"><b>${index+1}</b><span><button type="button" data-point-act="up" ${index===0?"disabled":""} title="Move up" aria-label="Move point up">⌃</button><button type="button" data-point-act="down" ${index===AC_CONFIG.points.length-1?"disabled":""} title="Move down" aria-label="Move point down">⌄</button></span></div>
-      <label class="point-enable" title="Enable point"><input type="checkbox" data-point="enabled" ${point.enabled?"checked":""}><span></span></label>
-      <input class="point-name" data-point="label" value="${escHtml(point.label)}" maxlength="80" aria-label="Point name">
-      <select class="point-mode" data-point="targetMode" aria-label="Position mode"><option value="fixed" ${point.targetMode!=="cursor"?"selected":""}>Fixed</option><option value="cursor" ${point.targetMode==="cursor"?"selected":""}>Cursor</option></select>
-      <button class="point-delete" type="button" data-point-act="delete" title="Delete point" aria-label="Delete point"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M8 10v8M12 10v8M16 10v8M6 7l1 14h10l1-14"/></svg></button>
-      <div class="point-details">
-        <label><span>X</span><input type="number" data-point="x" value="${point.x}" ${point.targetMode==="cursor"?"disabled":""}></label>
-        <label><span>Y</span><input type="number" data-point="y" value="${point.y}" ${point.targetMode==="cursor"?"disabled":""}></label>
-        <label><span>Button</span><select data-point="button"><option value="left" ${point.button==="left"?"selected":""}>Left</option><option value="right" ${point.button==="right"?"selected":""}>Right</option><option value="middle" ${point.button==="middle"?"selected":""}>Middle</option></select></label>
-        <label><span>Action</span><select data-point="clickType"><option value="single" ${point.clickType!=="double"?"selected":""}>Single</option><option value="double" ${point.clickType==="double"?"selected":""}>Double</option></select></label>
-        <button class="point-capture" type="button" data-point-act="capture" title="Capture cursor position"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><kbd>F7</kbd></button>
-      </div>`;
+    const s=pointSummary(point);
+    row.innerHTML=`<span class="point-order"><b>${index+1}</b><span class="point-move"><button type="button" data-point-act="up" ${index===0?"disabled":""} title="Move up" aria-label="Move point up">⌃</button><button type="button" data-point-act="down" ${index===points.length-1?"disabled":""} title="Move down" aria-label="Move point down">⌄</button></span></span>
+      <label class="point-enable" title="${point.enabled?"Enabled — click to disable":"Disabled — click to enable"}"><input type="checkbox" data-point-act="toggle" ${point.enabled?"checked":""} aria-label="Enable point"><span></span></label>
+      <span class="point-title">${escHtml(point.label)}</span>
+      <span class="point-sum"><span class="point-pos">${escHtml(s.pos)}</span><span class="point-click">${s.click}</span></span>
+      <button class="point-delete" type="button" data-point-act="delete" title="Delete point" aria-label="Delete point"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M8 10v8M12 10v8M16 10v8M6 7l1 14h10l1-14"/></svg></button>`;
     host.appendChild(row);
   });
-  $("ac-points-empty").hidden=!!AC_CONFIG.points.length;
-  const enabled=AC_CONFIG.points.filter(p=>p.enabled).length;
-  $("ac-point-summary").textContent=`${AC_CONFIG.points.length} point${AC_CONFIG.points.length===1?"":"s"} · ${enabled} enabled`;
+  $("ac-points-empty").hidden=!!points.length;
+  const enabled=points.filter(p=>p.enabled).length;
+  $("ac-point-summary").textContent=`${points.length} point${points.length===1?"":"s"} · ${enabled} enabled`;
+  renderPointEditor();
+}
+function renderPointEditor() {
+  const host=$("ac-point-editor"); if(!host)return;
+  const points=AC_CONFIG.points||[];
+  const point=points.find(p=>p.id===AC_CONFIG.selectedPointId)||points[0];
+  if(!point){ host.hidden=true; host.innerHTML=""; return; }
+  host.hidden=false;
+  const index=points.indexOf(point), cursor=point.targetMode==="cursor";
+  host.innerHTML=`<div class="pe-head"><span class="pe-badge">${index+1}</span><span class="pe-title">Point settings</span></div>
+    <label class="pe-name"><span>Name</span><input data-pe="label" maxlength="80" value="${escHtml(point.label)}" spellcheck="false"></label>
+    <div class="pe-mode"><span class="pe-lbl">Position</span>
+      <div class="seg-control pe-seg" data-pe-seg="targetMode" role="radiogroup" aria-label="Position mode">
+        <button type="button" class="seg${cursor?"":" on"}" data-value="fixed" role="radio" aria-checked="${!cursor}">Fixed point</button><button type="button" class="seg${cursor?" on":""}" data-value="cursor" role="radio" aria-checked="${cursor}">At cursor</button>
+      </div>
+    </div>
+    ${cursor
+      ? `<p class="pe-hint">Clicks wherever the cursor is when this point runs.</p>`
+      : `<div class="pe-row pe-xy">
+          <label><span>X</span><input type="number" data-pe="x" value="${point.x}"></label>
+          <label><span>Y</span><input type="number" data-pe="y" value="${point.y}"></label>
+          <button class="pe-capture" type="button" data-pe-act="capture" title="Capture cursor position"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Capture<kbd>F7</kbd></button>
+        </div>`}
+    <div class="pe-row pe-click">
+      <label><span>Mouse button</span><select data-pe="button"><option value="left" ${point.button==="left"?"selected":""}>Left</option><option value="right" ${point.button==="right"?"selected":""}>Right</option><option value="middle" ${point.button==="middle"?"selected":""}>Middle</option></select></label>
+      <label><span>Action</span><select data-pe="clickType"><option value="single" ${point.clickType!=="double"?"selected":""}>Single click</option><option value="double" ${point.clickType==="double"?"selected":""}>Double click</option></select></label>
+    </div>`;
+}
+function updatePointRow(point) {
+  const row=document.querySelector(`.point-row[data-id="${CSS.escape(point.id)}"]`);
+  if(!row)return;
+  const s=pointSummary(point);
+  const title=row.querySelector(".point-title"); if(title)title.textContent=point.label||`Point`;
+  const pos=row.querySelector(".point-pos"); if(pos)pos.textContent=s.pos;
+  const click=row.querySelector(".point-click"); if(click)click.textContent=s.click;
 }
 function applyAutoClickConfig(config, clean=false) {
   if(!config)return;
@@ -556,7 +601,7 @@ function renderAutoClick(){
   run.querySelector("small").textContent=running?"Stops after the current action":"Runs enabled points from top to bottom";
   $("ac-form").querySelectorAll("input,select,.seg,button").forEach(el=>{el.disabled=running;});
   $("ac-profile-name").disabled=running; $("ac-profile-select").disabled=running; $("ac-new").disabled=running; $("ac-save").disabled=running;
-  if(!running){const rows=[...document.querySelectorAll(".point-row")];if(rows.length){rows[0].querySelector('[data-point-act="up"]').disabled=true;rows[rows.length-1].querySelector('[data-point-act="down"]').disabled=true;}rows.forEach(row=>{const cursor=row.querySelector('[data-point="targetMode"]').value==="cursor";row.querySelector('[data-point="x"]').disabled=cursor;row.querySelector('[data-point="y"]').disabled=cursor;});}
+  if(!running){const rows=[...document.querySelectorAll(".point-row")];if(rows.length){const up=rows[0].querySelector('[data-point-act="up"]'),down=rows[rows.length-1].querySelector('[data-point-act="down"]');if(up)up.disabled=true;if(down)down.disabled=true;}}
   syncAutoClickFields();
   document.querySelectorAll(".point-row").forEach(row=>row.classList.toggle("active",running&&row.dataset.id===AC_STATE.activePointId));
   const home=$("home-clicker-state"); home.textContent=running?`Running · ${AC_STATE.count||0} actions`:`${enabled} points · F6 run · F8 add`; home.classList.toggle("running",running);
@@ -628,23 +673,54 @@ function wire() {
   $("ac-form").addEventListener("input", queueAutoClickConfigure);
   $("ac-form").addEventListener("change", queueAutoClickConfigure);
   $("ac-add-point").onclick = addAutoClickPointAtCursor;
-  $("ac-points").addEventListener("click", async (e) => {
+  // Point list — select a row, reorder, or delete (enable toggle handled on change).
+  $("ac-points").addEventListener("click", (e) => {
     const row=e.target.closest(".point-row");if(!row||AC_STATE.running)return;
-    AC_CONFIG=readAutoClickConfig();AC_CONFIG.selectedPointId=row.dataset.id;
-    document.querySelectorAll(".point-row").forEach(r=>r.classList.toggle("selected",r===row));
-    const action=e.target.closest("[data-point-act]");
-    if(!action){queueAutoClickConfigure();return;}
-    const index=AC_CONFIG.points.findIndex(p=>p.id===row.dataset.id);
-    if(action.dataset.pointAct==="capture"){await captureAutoClickPosition(row.dataset.id);return;}
-    if(action.dataset.pointAct==="delete"){AC_CONFIG.points.splice(index,1);AC_CONFIG.selectedPointId=AC_CONFIG.points[Math.min(index,AC_CONFIG.points.length-1)]?.id||"";}
-    if(action.dataset.pointAct==="up"&&index>0)[AC_CONFIG.points[index-1],AC_CONFIG.points[index]]=[AC_CONFIG.points[index],AC_CONFIG.points[index-1]];
-    if(action.dataset.pointAct==="down"&&index<AC_CONFIG.points.length-1)[AC_CONFIG.points[index+1],AC_CONFIG.points[index]]=[AC_CONFIG.points[index],AC_CONFIG.points[index+1]];
+    if(e.target.closest(".point-enable"))return; // checkbox → handled by 'change'
+    const id=row.dataset.id, index=AC_CONFIG.points.findIndex(p=>p.id===id);
+    if(index<0)return;
+    const act=(e.target.closest("[data-point-act]")||{}).dataset?.pointAct;
+    if(act==="delete"){
+      AC_CONFIG.points.splice(index,1);
+      AC_CONFIG.selectedPointId=AC_CONFIG.points[Math.min(index,AC_CONFIG.points.length-1)]?.id||"";
+    } else if(act==="up"&&index>0){
+      [AC_CONFIG.points[index-1],AC_CONFIG.points[index]]=[AC_CONFIG.points[index],AC_CONFIG.points[index-1]];AC_CONFIG.selectedPointId=id;
+    } else if(act==="down"&&index<AC_CONFIG.points.length-1){
+      [AC_CONFIG.points[index+1],AC_CONFIG.points[index]]=[AC_CONFIG.points[index],AC_CONFIG.points[index+1]];AC_CONFIG.selectedPointId=id;
+    } else {
+      AC_CONFIG.selectedPointId=id; // plain select
+    }
     renderPoints();setAutoClickDirty(true);queueAutoClickConfigure();
   });
   $("ac-points").addEventListener("change", (e) => {
+    if(e.target.dataset.pointAct!=="toggle"||AC_STATE.running)return;
     const row=e.target.closest(".point-row");if(!row)return;
-    if(e.target.dataset.point==="targetMode"){const cursor=e.target.value==="cursor";row.querySelector('[data-point="x"]').disabled=cursor;row.querySelector('[data-point="y"]').disabled=cursor;}
-    AC_CONFIG=readAutoClickConfig();const enabled=AC_CONFIG.points.filter(p=>p.enabled).length;$("ac-point-summary").textContent=`${AC_CONFIG.points.length} point${AC_CONFIG.points.length===1?"":"s"} · ${enabled} enabled`;renderAutoClick();
+    const point=AC_CONFIG.points.find(p=>p.id===row.dataset.id);if(!point)return;
+    point.enabled=e.target.checked;renderPoints();setAutoClickDirty(true);queueAutoClickConfigure();renderAutoClick();
+  });
+  // Point detail editor — edits the selected point in place.
+  $("ac-point-editor").addEventListener("input", (e) => {
+    const point=selectedPoint();if(!point||AC_STATE.running)return;
+    const key=e.target.dataset.pe;if(!key)return;
+    if(key==="label")point.label=e.target.value;
+    else if(key==="x")point.x=parseInt(e.target.value,10)||0;
+    else if(key==="y")point.y=parseInt(e.target.value,10)||0;
+    updatePointRow(point);setAutoClickDirty(true);queueAutoClickConfigure();
+  });
+  $("ac-point-editor").addEventListener("change", (e) => {
+    const point=selectedPoint();if(!point||AC_STATE.running)return;
+    const key=e.target.dataset.pe;
+    if(key==="button")point.button=e.target.value;
+    else if(key==="clickType")point.clickType=e.target.value;
+    else return;
+    updatePointRow(point);setAutoClickDirty(true);queueAutoClickConfigure();
+  });
+  $("ac-point-editor").addEventListener("click", async (e) => {
+    if(AC_STATE.running)return;
+    const point=selectedPoint();if(!point)return;
+    const seg=e.target.closest(".pe-seg .seg");
+    if(seg){point.targetMode=seg.dataset.value==="cursor"?"cursor":"fixed";renderPointEditor();updatePointRow(point);setAutoClickDirty(true);queueAutoClickConfigure();return;}
+    if(e.target.closest('[data-pe-act="capture"]'))await captureAutoClickPosition(point.id);
   });
   document.addEventListener("keydown", (e) => {if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="s"&&$("autoclick-app").classList.contains("active")){e.preventDefault();saveAutoClickSequence();}});
   document.querySelectorAll(".seg-control").forEach((box) => {

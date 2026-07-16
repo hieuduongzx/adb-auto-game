@@ -28,6 +28,10 @@
     <div id="wf-run-status" class="wf-run-status ok" title="Run status">
       <span class="wf-run-dot"></span>
       <span class="wf-run-txt">Ready</span>
+      <span class="wf-run-elapsed" id="wf-run-elapsed" style="display:none" aria-label="Elapsed run time">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg>
+        <span id="wf-run-time">00:00</span>
+      </span>
     </div>
   </div>
 
@@ -52,6 +56,8 @@
       <span class="tb-tray-sep"></span>
       <button class="btn ico" onclick="wfRunGui()" title="Run GUI — open Runner with the current workflow">
         <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
+      <button class="btn ico" id="wf-build-btn" onclick="wfBuildExe()" title="Build EXE — package this workflow into a standalone Runner .exe">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg></button>
     </div>
   </div>
 
@@ -80,18 +86,6 @@
         <option value="adb">ADB</option>
       </select>
     </div>
-    </div>
-    <div id="tb-win32-tools" class="tb-backend-tools" style="display:none">
-      <div class="tb-tray tb-tray-win32" title="Current Win32 target and input mode">
-        <span class="tb-tray-label">PC target</span>
-        <span class="tb-tray-sep"></span>
-        <span class="tb-device-dot" id="win32-target-dot"></span>
-        <span id="win32-target-label" class="tb-target-label">Not configured</span>
-        <span id="win32-input-label" class="tb-backend-chip">Background</span>
-        <button class="btn ico sm" onclick="wfOpenProjectSettings()" title="Configure Win32 target and input mode">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1-.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-        </button>
-      </div>
     </div>
   </div>
 </div>
@@ -124,7 +118,11 @@
       <div id="wf-functions" class="wf-side-fns wf-act-list"></div>
     </div>
   </div>
-  <div id="wf-side-resizer" title="Drag to resize the left column"></div>
+  <div id="wf-side-resizer" title="Drag to resize the left column">
+    <button type="button" class="wf-sidebar-toggle" id="wf-side-toggle" onclick="wfToggleSidebar('left')" title="Collapse node sidebar" aria-label="Collapse node sidebar" aria-expanded="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 18-6-6 6-6"/></svg>
+    </button>
+  </div>
   <!-- Center: graph canvas -->
   <div id="wf-main" class="card">
     <div id="wf-bar">
@@ -135,6 +133,27 @@
         </button>
         <span class="tb-tray-sep"></span>
         <input id="wf-name" type="text" placeholder="Workflow name" value="My Workflow" aria-label="Workflow name">
+      </div>
+      <!-- Frequent Win32 target, matching, and input controls stay beside the workflow title. -->
+      <div id="wf-bar-win32" class="wf-bar-win32" style="display:none" aria-label="Win32 target controls">
+        <button type="button" class="wf-win-target" id="wf-bar-win32-pick" onclick="wfPickWindow(event, 'bar')" title="Choose an open PC window">
+          <span class="tb-device-dot" id="wf-bar-win32-dot"></span>
+          <span id="wf-bar-win32-label">Choose window</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+        </button>
+        <span class="tb-tray-sep"></span>
+        <select id="wf-bar-win32-matchby" onchange="wfBarWinMatchChanged(this.value)" aria-label="Win32 window matching method" title="How the target window is identified">
+          <option value="title">Title</option>
+          <option value="class">Class</option>
+          <option value="pid">PID</option>
+          <option value="exe">Name / EXE</option>
+        </select>
+        <select id="wf-bar-win32-mode" onchange="wfBarWinInputChanged(this.value)" aria-label="Win32 input mode" title="How input is delivered to the target window">
+          <option value="background">Background — PostMessage</option>
+          <option value="background_sync">Background sync — SendMessage</option>
+          <option value="background_cursor">Background + cursor</option>
+          <option value="foreground">Foreground</option>
+        </select>
       </div>
       <!-- Canvas edit toggles, grouped in a segmented tray. -->
       <span class="wf-tool-tray">
@@ -284,7 +303,11 @@
       </div>
     </div>
   </div>
-  <div id="wf-insp-resizer" title="Drag to resize the right column"></div>
+  <div id="wf-insp-resizer" title="Drag to resize the right column">
+    <button type="button" class="wf-sidebar-toggle" id="wf-insp-toggle" onclick="wfToggleSidebar('right')" title="Collapse properties sidebar" aria-label="Collapse properties sidebar" aria-expanded="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 18-6-6 6-6"/></svg>
+    </button>
+  </div>
   <!-- Right: inspector (node properties in Canvas mode) -->
   <div id="wf-inspector" class="card" style="width:280px;">
     <div class="wf-side-hdr" id="wf-insp-hdr"><span id="wf-insp-title">Properties</span></div>

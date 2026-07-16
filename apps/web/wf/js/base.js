@@ -308,6 +308,8 @@ function wfReapplyRunViz(){
   Object.keys(wfNodeDur).forEach(wfApplyNodeTime);
   const el=wfNodeElById(wfRunNode); if(el) el.classList.add("running");
   if(wfRunStopped) wfMarkUnreached();
+  // Canvas rebuilds wipe delay chips — re-bind the live countdown if one is mid-wait.
+  if(wfDelayState) wfPaintNodeDelay();
 }
 function wfResetRunViz(){
   wfRunNode=null; wfLiveNode=null; wfRunStopped=false; wfSkipIds=null;
@@ -317,13 +319,116 @@ function wfResetRunViz(){
   for(const k in wfNodeDur) delete wfNodeDur[k];
   for(const k in wfFailShots) delete wfFailShots[k];
   document.querySelectorAll(".wf-node-time").forEach(el=>el.remove());
+  wfClearNodeDelay();
   wfResetActStatus();
-  document.querySelectorAll(".wf-node.running,.wf-node.paused,.wf-node.ran-ok,.wf-node.ran-fail,.wf-node.ran-skip")
-    .forEach(el=>el.classList.remove("running","paused","ran-ok","ran-fail","ran-skip"));
+  document.querySelectorAll(".wf-node.running,.wf-node.paused,.wf-node.ran-ok,.wf-node.ran-fail,.wf-node.ran-skip,.wf-node.delaying")
+    .forEach(el=>el.classList.remove("running","paused","ran-ok","ran-fail","ran-skip","delaying"));
   document.querySelectorAll("#wf-wires path.took-wire,#wf-wires path.nottook-wire")
     .forEach(p=>p.classList.remove("took-wire","nottook-wire"));
   document.querySelectorAll(".wf-port.out.took,.wf-port.out.nottook")
     .forEach(p=>p.classList.remove("took","nottook"));
+}
+
+// ── Live delayBefore / delayAfter countdown on the active node ───────────────
+// Engine emits node_delay {id, phase:"before"|"after"|null, seconds} when a
+// per-node wait starts or ends. We tick client-side from the start event so the
+// chip next to the block shows remaining time without flooding the WS.
+let wfDelayState=null;   // {id, phase, endAt, total} while counting; null when idle
+let wfDelayTimer=null;
+function wfFmtRemain(sec){
+  if(sec>=10) return Math.ceil(sec)+"s";
+  if(sec>=1)  return sec.toFixed(1)+"s";
+  return Math.max(0, sec).toFixed(1)+"s";
+}
+function wfRestoreDelayChip(chip){
+  if(!chip) return;
+  chip.classList.remove("counting");
+  chip.style.removeProperty("--pct");
+  const secs=parseFloat(chip.dataset.secs)||0;
+  const phase=chip.dataset.phase;
+  const label=chip.querySelector(".wf-delay-label");
+  const name=phase==="after"?"After":"Before";
+  if(label) label.textContent=name+" "+secs+"s";
+  chip.title="";
+}
+function wfClearNodeDelay(){
+  if(wfDelayTimer){ clearInterval(wfDelayTimer); wfDelayTimer=null; }
+  const prev=wfDelayState; wfDelayState=null;
+  document.querySelectorAll(".wf-node.delaying").forEach(el=>el.classList.remove("delaying"));
+  document.querySelectorAll(".wf-delay-chip.counting").forEach(wfRestoreDelayChip);
+  // Floating badge (shown when the node has no static delay row, e.g. stack join).
+  document.querySelectorAll(".wf-node-delay-live").forEach(el=>el.remove());
+  if(prev){ const el=wfNodeElById(prev.id); if(el) el.querySelectorAll(".wf-delay-chip").forEach(wfRestoreDelayChip); }
+}
+function wfPaintNodeDelay(){
+  const st=wfDelayState; if(!st) return;
+  const remain=Math.max(0,(st.endAt-performance.now())/1000);
+  const pct=st.total>0?Math.max(0,Math.min(100,(remain/st.total)*100)):0;
+  const el=wfNodeElById(st.id);
+  if(!el) return;
+  el.classList.add("delaying");
+  // Prefer the existing static chip for this phase; fall back to a floating badge
+  // when the chip row is hidden (stacked join-bottom) or missing.
+  let chip=el.querySelector(`.wf-delay-chip[data-phase="${st.phase}"]`);
+  if(!chip || getComputedStyle(el.querySelector(".wf-node-delay")||el).display==="none"){
+    chip=null;
+  }
+  const name=st.phase==="after"?"After":"Before";
+  const text=name+" "+wfFmtRemain(remain);
+  if(chip){
+    chip.classList.add("counting");
+    chip.style.setProperty("--pct", pct.toFixed(1));
+    const label=chip.querySelector(".wf-delay-label");
+    if(label) label.textContent=text;
+    else chip.innerHTML=(st.phase==="after"?wfIco("timer"):wfIco("clock"))+
+      `<span class="wf-delay-label">${text}</span>`;
+    chip.title=name+" wait — "+wfFmtRemain(remain)+" left";
+    const live=el.querySelector(".wf-node-delay-live"); if(live) live.remove();
+  } else {
+    let live=el.querySelector(".wf-node-delay-live");
+    if(!live){
+      live=document.createElement("div");
+      live.className="wf-node-delay-live";
+      el.appendChild(live);
+    }
+    live.dataset.phase=st.phase;
+    live.style.setProperty("--pct", pct.toFixed(1));
+    live.innerHTML=(st.phase==="after"?wfIco("timer"):wfIco("clock"))+
+      `<span class="wf-delay-label">${text}</span>`;
+    live.title=name+" wait — "+wfFmtRemain(remain)+" left";
+  }
+  if(remain<=0){
+    // Local clock finished; leave paint until engine's end event restores chips
+    // (or the next node arrives). Don't clear state here so a late end still matches.
+    if(chip){ /* keep counting class at 0 briefly */ }
+  }
+}
+function wfStartNodeDelay(id, phase, seconds){
+  wfClearNodeDelay();
+  const secs=parseFloat(seconds)||0;
+  if(!id || (phase!=="before" && phase!=="after") || secs<=0) return;
+  wfDelayState={id, phase, endAt:performance.now()+secs*1000, total:secs};
+  // Keep the amber "running" look during After wait (node_result already painted
+  // green trail) so the operator still sees which block is holding the graph.
+  if(phase==="after"){
+    const el=wfNodeElById(id);
+    if(el){ el.classList.add("running"); wfRunNode=id; }
+  }
+  wfPaintNodeDelay();
+  if(wfDelayTimer) clearInterval(wfDelayTimer);
+  wfDelayTimer=setInterval(()=>{
+    if(!wfDelayState){ clearInterval(wfDelayTimer); wfDelayTimer=null; return; }
+    wfPaintNodeDelay();
+    if(performance.now()>=wfDelayState.endAt){
+      // Snap to 0 then wait for engine end (or clear on next node / stop).
+      clearInterval(wfDelayTimer); wfDelayTimer=null;
+    }
+  }, 50);
+}
+function wfEndNodeDelay(id){
+  // Only clear if this end matches the active countdown (ignore stale ends).
+  if(wfDelayState && id && wfDelayState.id!==id) return;
+  wfClearNodeDelay();
 }
 
 function appendLog(entry){

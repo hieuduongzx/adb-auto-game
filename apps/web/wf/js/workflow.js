@@ -343,6 +343,9 @@ function wfIns(type){ const def=WF_NODES[type]; return (def&&def.ins)||["in"]; }
 // sel = ids of all selected nodes (multi-select); selectedNode = primary (inspector).
 const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities:[], functions:[],
   globals:[],
+  // Release version stamped onto a standalone Runner .exe built from this
+  // workflow (Build EXE). Saved into the flow JSON (key "buildVersion").
+  buildVersion:"1.0.0",
   // Target Android package for this workflow (ADB). Top-level, not part of speedhack.
   package:"",
   // Speed hack toggle + multiplier only; package lives on WF.package.
@@ -370,6 +373,7 @@ let wfLiveVars={};
 let wfFreshVar=null;       // name of the most-recently-changed var (brief highlight)
 // Corner-panel collapse states persist locally so the canvas reopens as left.
 let wfVarsCollapsed=false, wfActCollapsed=false;
+let wfSideCollapsed=false, wfInspCollapsed=false;
 try{ wfVarsCollapsed=localStorage.getItem("wfVarsCollapsed")==="1";
      wfActCollapsed =localStorage.getItem("wfActCollapsed")==="1"; }catch{}
 function wfPersistPanelState(){
@@ -379,12 +383,14 @@ function wfPersistPanelState(){
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
 function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector");
   const logH = lc && !lc.classList.contains("collapsed") ? lc.offsetHeight : (lc && lc.dataset.openH ? parseInt(lc.dataset.openH,10) : undefined);
-  api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), logH: logH||undefined, sideW: sd?sd.offsetWidth:undefined, inspW: insp?insp.offsetWidth:undefined}); }catch{} }
+  const sideW=sd?(wfSideCollapsed?(parseInt(sd.dataset.openW,10)||254):sd.offsetWidth):undefined;
+  const inspW=insp?(wfInspCollapsed?(parseInt(insp.dataset.openW,10)||280):insp.offsetWidth):undefined;
+  api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), logH: logH||undefined, sideW, inspW, sideCollapsed:wfSideCollapsed, inspCollapsed:wfInspCollapsed}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
-  const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off"); s.classList.toggle("on",wfSnapOn); }
+  const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off")+" — Smart align overrides the grid only on matched axes (hold Alt for free placement)"; s.classList.toggle("on",wfSnapOn); }
   const p=$("wf-preview-btn"); if(p){ p.title="Image preview: "+(wfPreviewAll?"On":"Off"); p.classList.toggle("on",wfPreviewAll); }
-  const a=$("wf-align-btn"); if(a){ a.title="Smart align: "+(wfAlignOn?"On":"Off")+" — dragged blocks snap to other blocks' edges/ports (hold Alt to pause)"; a.classList.toggle("on",wfAlignOn); }
+  const a=$("wf-align-btn"); if(a){ a.title="Smart align: "+(wfAlignOn?"On":"Off")+" — edges, centres, and ports override grid snapping only when matched (hold Alt to pause both)"; a.classList.toggle("on",wfAlignOn); }
   const m=$("wf-minimap-btn"); if(m){ m.title="Minimap: "+(wfMinimapOn?"On":"Off")+" — bird's-eye view of the graph, click to jump the camera"; m.classList.toggle("on",wfMinimapOn); }
   if(typeof wfSyncFocusBtn==="function") wfSyncFocusBtn();
   if(typeof wfSyncDebugOverlayBtn==="function") wfSyncDebugOverlayBtn();
@@ -474,8 +480,8 @@ async function wfSpeedRun(){
   if(!ok){ wfSpeedRunning=false; wfSyncSpeedUI(); }
 }
 
-// ── Project settings popup (package · controller · OCR · Win32 target) ───────
-// Bar only shows the gear + title; everything project-wide lives here.
+// ── Project settings popup (package · controller · OCR · advanced Win32 target) ─
+// Frequent Win32 target/input controls also stay visible beside the title.
 let wfOcrBackendsCache=["tesseract","easyocr","paddleocr"];
 function wfSyncOcrUI(){
   const sel=$("wf-ocr-select"); if(sel) sel.value=WF.ocrBackend||"";
@@ -499,24 +505,30 @@ function wfPopulateOcrBackends(backs){
   const sel=$("wf-ocr-select"); if(sel){ wfFillOcrSelect(sel); }
 }
 // ── Project controller (ADB vs Win32) ────────────────────────────────────────
-const WF_WIN_INPUT_MODES=new Set(["background","background_cursor","foreground"]);
+const WF_WIN_MATCH_MODES=new Set(["title","class","pid","exe"]);
+const WF_WIN_INPUT_MODES=new Set(["background","background_sync","background_cursor","foreground"]);
+function wfNormWinMatchBy(value){
+  const mode=String(value||"").trim().toLowerCase();
+  return WF_WIN_MATCH_MODES.has(mode)?mode:"title";
+}
 function wfNormWinInputMode(value){
   const mode=String(value||"").trim().toLowerCase();
   return WF_WIN_INPUT_MODES.has(mode)?mode:"background";
 }
 function wfSyncBackendChrome(){
   const isWin32=WF.controller==="win32";
-  const adbTools=$("tb-adb-tools"), winTools=$("tb-win32-tools");
+  const adbTools=$("tb-adb-tools"), barTools=$("wf-bar-win32");
   if(adbTools) adbTools.style.display=isWin32?"none":"flex";
-  if(winTools) winTools.style.display=isWin32?"flex":"none";
+  if(barTools) barTools.style.display=isWin32?"inline-flex":"none";
   const cfg=WF.win32||{};
   const target=String(cfg.window||"").trim();
-  const targetEl=$("win32-target-label");
-  if(targetEl){ targetEl.textContent=target||"Launch-first workflow"; targetEl.title=target||"No fixed target — a Launch program node can attach one"; }
-  const dot=$("win32-target-dot"); if(dot) dot.classList.toggle("configured",!!target);
+  const targetEl=$("wf-bar-win32-label");
+  if(targetEl){ targetEl.textContent=target||"Choose window"; targetEl.title=target||"No fixed target — choose an open window"; }
+  const dot=$("wf-bar-win32-dot"); if(dot) dot.classList.toggle("configured",!!target);
+  const matchBy=wfNormWinMatchBy(cfg.matchBy);
+  const matchEl=$("wf-bar-win32-matchby"); if(matchEl && document.activeElement!==matchEl) matchEl.value=matchBy;
   const mode=wfNormWinInputMode(cfg.inputMode);
-  const modeEl=$("win32-input-label");
-  if(modeEl) modeEl.textContent=({background:"Background",background_cursor:"Cursor",foreground:"Foreground"})[mode];
+  const modeEl=$("wf-bar-win32-mode"); if(modeEl && document.activeElement!==modeEl) modeEl.value=mode;
   const footerDeviceDot=$("footer-dot"); if(footerDeviceDot) footerDeviceDot.style.display=isWin32?"none":"";
   // Device details and Android key tools do not apply to a Win32 capture.
   const deviceTab=document.querySelector('#pv-tabs-bar .tab-btn[data-tab="device"]');
@@ -530,7 +542,7 @@ function wfSyncControllerUI(){
   const adbSec=$("wf-proj-adb-sec"); if(adbSec) adbSec.style.display=win32?"none":"";
   const winSec=$("wf-proj-win32-sec"); if(winSec) winSec.style.display=win32?"":"none";
   const win=$("wf-win32-window"); if(win && document.activeElement!==win) win.value=w.window||"";
-  const mb=$("wf-win32-matchby"); if(mb) mb.value=w.matchBy||"title";
+  const mb=$("wf-win32-matchby"); if(mb) mb.value=wfNormWinMatchBy(w.matchBy);
   const md=$("wf-win32-mode"); if(md) md.value=wfNormWinInputMode(w.inputMode);
   wfSyncPackageUI();
   wfSyncSpeedUI();   // speed-hack visibility depends on the controller
@@ -553,12 +565,13 @@ function wfControllerChanged(){
 // game window instead of typing its title. Reuses the .wf-varmenu styling.
 let wfWinMenuEl=null;
 function wfCloseWinMenu(){ if(wfWinMenuEl){ wfWinMenuEl.remove(); wfWinMenuEl=null; document.removeEventListener("mousedown",wfWinMenuOutside,true); } }
-function wfWinMenuOutside(e){ if(wfWinMenuEl && !e.target.closest(".wf-varmenu") && !e.target.closest("#wf-win32-pick")) wfCloseWinMenu(); }
-async function wfPickWindow(ev){
+function wfWinMenuOutside(e){ if(wfWinMenuEl && !e.target.closest(".wf-varmenu") && !e.target.closest("#wf-win32-pick") && !e.target.closest("#wf-bar-win32-pick")) wfCloseWinMenu(); }
+async function wfPickWindow(ev, source){
   if(ev) ev.stopPropagation();
   let wins=[]; try{ wins=await api().list_windows()||[]; }catch{}
   wfCloseWinMenu();
-  const anchor=$("wf-win32-window"); if(!anchor) return;
+  const fromBar=source==="bar";
+  const anchor=fromBar?$("wf-bar-win32-pick"):$("wf-win32-window"); if(!anchor) return;
   const menu=document.createElement("div"); menu.className="wf-varmenu";
   // Sit above the project-settings modal (--z-modal is 70).
   menu.style.zIndex="80";
@@ -569,24 +582,34 @@ async function wfPickWindow(ev){
   function render(filter){
     list.innerHTML="";
     const f=(filter||"").trim().toLowerCase();
-    const shown=wins.filter(w=>!f||w.title.toLowerCase().includes(f)||(w.cls||"").toLowerCase().includes(f)||String(w.pid||"").includes(f));
+    const shown=wins.filter(w=>!f||w.title.toLowerCase().includes(f)||(w.cls||"").toLowerCase().includes(f)||String(w.pid||"").includes(f)||(w.exe||"").toLowerCase().includes(f));
     if(!shown.length){ const e=document.createElement("div"); e.className="wf-varmenu-empty"; e.textContent=wins.length?"No match.":"No windows found."; list.appendChild(e); return; }
     shown.forEach(w=>{
       const row=document.createElement("button"); row.type="button"; row.className="wf-varmenu-item";
-      const meta=[w.pid?("pid "+w.pid):"", w.cls||""].filter(Boolean).join(" · ");
+      const meta=[w.exe||"", w.pid?("pid "+w.pid):"", w.cls||""].filter(Boolean).join(" · ");
       row.innerHTML=`<span class="vn">${escHtml(w.title)}</span><span class="vt">${escHtml(meta)}</span>`;
-      row.title=`Title: ${w.title}\nClass: ${w.cls||""}\nPID: ${w.pid||"?"}`;
+      row.title=`Title: ${w.title}\nEXE: ${w.exe||"?"}\nClass: ${w.cls||""}\nPID: ${w.pid||"?"}`;
       row.onclick=()=>{
-        const by=($("wf-win32-matchby")&&$("wf-win32-matchby").value)||"title";
-        anchor.value = (by==="pid") ? String(w.pid||"") : (by==="class") ? (w.cls||w.title) : w.title;
-        wfWin32FromUI(); wfCloseWinMenu();
+        const cfg=WF.win32||(WF.win32={});
+        const by=wfNormWinMatchBy(($("wf-win32-matchby")&&$("wf-win32-matchby").value)||cfg.matchBy);
+        const value=(by==="pid") ? String(w.pid||"") : (by==="class") ? (w.cls||w.title) : (by==="exe") ? (w.exe||w.title) : w.title;
+        if(fromBar){
+          cfg.window=value; cfg.matchBy=by;
+          const modalInput=$("wf-win32-window"); if(modalInput) modalInput.value=value;
+          wfSyncBackendChrome(); wfPushCaptureSource();
+          if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
+        }else{
+          anchor.value=value; wfWin32FromUI();
+        }
+        wfCloseWinMenu();
       };
       list.appendChild(row);
     });
   }
   render("");
   document.body.appendChild(menu);
-  const r=($("wf-win32-pick")||anchor).getBoundingClientRect();
+  const trigger=fromBar?anchor:($("wf-win32-pick")||anchor);
+  const r=trigger.getBoundingClientRect();
   const mw=Math.max(300, anchor.getBoundingClientRect().width||280);
   menu.style.width=mw+"px";
   let left=Math.min(r.left, window.innerWidth-mw-8);
@@ -599,10 +622,24 @@ function wfWin32FromUI(){
   const w=WF.win32||(WF.win32={});
   const win=$("wf-win32-window"), mb=$("wf-win32-matchby"), md=$("wf-win32-mode");
   if(win) w.window=(win.value||"").trim();
-  if(mb) w.matchBy=mb.value||"title";
+  if(mb) w.matchBy=wfNormWinMatchBy(mb.value);
   if(md) w.inputMode=wfNormWinInputMode(md.value);
   wfSyncBackendChrome();
   wfPushCaptureSource();
+  if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
+}
+function wfBarWinMatchChanged(value){
+  const w=WF.win32||(WF.win32={});
+  w.matchBy=wfNormWinMatchBy(value);
+  const modalMatch=$("wf-win32-matchby"); if(modalMatch) modalMatch.value=w.matchBy;
+  wfSyncBackendChrome(); wfPushCaptureSource();
+  if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
+}
+function wfBarWinInputChanged(value){
+  const w=WF.win32||(WF.win32={});
+  w.inputMode=wfNormWinInputMode(value);
+  const modalMode=$("wf-win32-mode"); if(modalMode) modalMode.value=w.inputMode;
+  wfSyncBackendChrome(); wfPushCaptureSource();
   if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
 }
 
@@ -648,7 +685,7 @@ function wfOpenProjectSettings(){
       rowWin.innerHTML=
         `<label for="wf-win32-window">Target window</label>`+
         `<div class="wf-proj-inline">`+
-          `<input id="wf-win32-window" type="text" placeholder="Title, class, or PID (e.g. Genshin*)" spellcheck="false" autocomplete="off">`+
+          `<input id="wf-win32-window" type="text" placeholder="Title, class, PID, or EXE (e.g. game.exe)" spellcheck="false" autocomplete="off">`+
           `<button type="button" class="btn sm ico" id="wf-win32-pick" title="Pick an open window">`+
             `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>`+
           `</button>`+
@@ -658,12 +695,13 @@ function wfOpenProjectSettings(){
       rowWinOpts.innerHTML=
         `<div class="wf-proj-row">`+
           `<label for="wf-win32-matchby">Match by</label>`+
-          `<select id="wf-win32-matchby"><option value="title">Title</option><option value="class">Class</option><option value="pid">PID</option></select>`+
+          `<select id="wf-win32-matchby"><option value="title">Title</option><option value="class">Class</option><option value="pid">PID</option><option value="exe">Name / EXE</option></select>`+
         `</div>`+
         `<div class="wf-proj-row">`+
           `<label for="wf-win32-mode">Input mode</label>`+
           `<select id="wf-win32-mode" title="How input is delivered to the window">`+
             `<option value="background">Background — PostMessage</option>`+
+            `<option value="background_sync">Background sync — SendMessage</option>`+
             `<option value="background_cursor">Background + cursor — Unity / Unreal</option>`+
             `<option value="foreground">Foreground — real mouse</option>`+
           `</select>`+
@@ -713,7 +751,7 @@ function wfOpenProjectSettings(){
       if(pkg) pkg.value=WF.package||"";
       const w=WF.win32||{};
       if(winEl) winEl.value=w.window||"";
-      if(mb) mb.value=w.matchBy||"title";
+      if(mb) mb.value=wfNormWinMatchBy(w.matchBy);
       if(md) md.value=wfNormWinInputMode(w.inputMode);
       const win32=(WF.controller==="win32");
       const adbSec=q("wf-proj-adb-sec"); if(adbSec) adbSec.style.display=win32?"none":"";
@@ -846,20 +884,59 @@ function wfZoomReset(){
   const wx=(cx-wfPan.x)/wfZoom, wy=(cy-wfPan.y)/wfZoom;
   wfAnimateCamera(cx-wx, cy-wy, 1, 200);
 }
+function wfSidebarLayoutChanged(){
+  requestAnimationFrame(()=>{
+    if(typeof wfDrawWires==="function") wfDrawWires();
+    if(typeof wfMinimapQueue==="function") wfMinimapQueue();
+    if(typeof wfPvResize==="function" && typeof wfPvActive!=="undefined" && wfPvActive) wfPvResize();
+  });
+}
+function wfApplySidebarState(save){
+  const view=$("workflow-view"), side=$("wf-side"), insp=$("wf-inspector");
+  if(!view) return;
+  view.classList.toggle("wf-left-collapsed",wfSideCollapsed);
+  view.classList.toggle("wf-right-collapsed",wfInspCollapsed);
+  const leftBtn=$("wf-side-toggle"), rightBtn=$("wf-insp-toggle");
+  if(leftBtn){
+    leftBtn.title=wfSideCollapsed?"Expand node sidebar":"Collapse node sidebar";
+    leftBtn.setAttribute("aria-label",leftBtn.title);
+    leftBtn.setAttribute("aria-expanded",String(!wfSideCollapsed));
+  }
+  if(rightBtn){
+    rightBtn.title=wfInspCollapsed?"Expand properties sidebar":"Collapse properties sidebar";
+    rightBtn.setAttribute("aria-label",rightBtn.title);
+    rightBtn.setAttribute("aria-expanded",String(!wfInspCollapsed));
+  }
+  if(side&&!wfSideCollapsed&&side.dataset.openW) side.style.width=side.dataset.openW+"px";
+  if(insp&&!wfInspCollapsed&&insp.dataset.openW) insp.style.width=insp.dataset.openW+"px";
+  wfSidebarLayoutChanged();
+  if(save!==false) wfSaveSettings();
+}
+function wfToggleSidebar(which){
+  const side=$("wf-side"), insp=$("wf-inspector");
+  if(which==="left"){
+    if(!wfSideCollapsed&&side) side.dataset.openW=String(side.offsetWidth);
+    wfSideCollapsed=!wfSideCollapsed;
+  }else{
+    if(!wfInspCollapsed&&insp) insp.dataset.openW=String(insp.offsetWidth);
+    wfInspCollapsed=!wfInspCollapsed;
+  }
+  wfApplySidebarState(true);
+}
 // Drag-to-resize the left sidebar; width persists in settings.
 function wfInitSideResizer(){
   const side=$("wf-side"), rez=$("wf-side-resizer"); if(!side||!rez||rez.__wired) return;
   rez.__wired=true; let drag=null;
-  rez.addEventListener("mousedown",e=>{ e.preventDefault(); drag={x:e.clientX, w:side.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
-  window.addEventListener("mousemove",e=>{ if(!drag) return; side.style.width=Math.max(150, Math.min(480, drag.w+(e.clientX-drag.x)))+"px"; });
+  rez.addEventListener("mousedown",e=>{ if(e.target.closest(".wf-sidebar-toggle")||wfSideCollapsed) return; e.preventDefault(); drag={x:e.clientX, w:side.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
+  window.addEventListener("mousemove",e=>{ if(!drag) return; const w=Math.max(150, Math.min(480, drag.w+(e.clientX-drag.x))); side.style.width=w+"px"; side.dataset.openW=String(w); });
   window.addEventListener("mouseup",()=>{ if(!drag) return; drag=null; rez.classList.remove("drag"); document.body.style.cursor=""; wfSaveSettings(); });
 }
 // Drag-to-resize the right inspector; width persists in settings.
 function wfInitInspResizer(){
   const insp=$("wf-inspector"), rez=$("wf-insp-resizer"); if(!insp||!rez||rez.__wired) return;
   rez.__wired=true; let drag=null;
-  rez.addEventListener("mousedown",e=>{ e.preventDefault(); drag={x:e.clientX, w:insp.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
-  window.addEventListener("mousemove",e=>{ if(!drag) return; insp.style.width=Math.max(180, Math.min(520, drag.w-(e.clientX-drag.x)))+"px"; });
+  rez.addEventListener("mousedown",e=>{ if(e.target.closest(".wf-sidebar-toggle")||wfInspCollapsed) return; e.preventDefault(); drag={x:e.clientX, w:insp.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
+  window.addEventListener("mousemove",e=>{ if(!drag) return; const w=Math.max(180, Math.min(520, drag.w-(e.clientX-drag.x))); insp.style.width=w+"px"; insp.dataset.openW=String(w); });
   window.addEventListener("mouseup",()=>{ if(!drag) return; drag=null; rez.classList.remove("drag"); document.body.style.cursor=""; wfSaveSettings(); });
 }
 // Drag-to-resize the bottom log drawer; height persists in settings.

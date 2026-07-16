@@ -465,25 +465,19 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 }
 .task-meta:empty { display: none; }
 
-/* Status pill (per-activity) */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 62px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
-  white-space: nowrap;
+/* Status dot (per-activity) — red / amber / green before the title */
+.act-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
   flex-shrink: 0;
-  border: 1px solid transparent;
-  transition: background 0.2s, color 0.2s;
+  background: #c4cbd4;
+  transition: background 0.2s, box-shadow 0.2s;
 }
-.pill-pending   { background: #f1f3f6; color: #697481; border-color: #e6e9ee; }
-.pill-running   { background: #fdf6e9; color: #9c6c12; border-color: #f0e1c2; }
-.pill-completed { background: #e8f5ed; color: #1c7a44; border-color: #cfead9; }
-.pill-failed    { background: #fcefee; color: #b23a33; border-color: #f3d4d1; }
+.act-dot-pending   { background: #c4cbd4; }
+.act-dot-running   { background: #e5a017; box-shadow: 0 0 0 3px rgba(229,160,23,.22); }
+.act-dot-completed { background: #1f9254; }
+.act-dot-failed    { background: #bb3a33; }
+.act-dot-skipped   { background: #9aa3ae; }
 
 /* Task action buttons */
 .task-btns {
@@ -513,7 +507,8 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
   margin-top: -2px;
 }
 
-/* Inline settings expansion (per-activity vars / poll) */
+/* Inline settings expansion (per-activity vars / poll)
+   Indent: grip(16) + gap + cb(17) + gap + dot(8) + gaps ≈ 59px kept. */
 .task-settings {
   padding: 0 11px 11px 59px;
   display: flex;
@@ -545,6 +540,12 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .setting-unit { font-size: 11px; color: var(--muted); }
 .setting-input { width: 80px; text-align: right; flex-shrink: 0; }
 .setting-row select { flex-shrink: 0; max-width: 110px; }
+.setting-path-control { display:flex; align-items:center; gap:5px; flex:1; min-width:0; }
+.setting-path-input { flex:1; min-width:0; width:auto; text-align:left; }
+.btn-path-pick { height:28px; padding:0 9px; flex-shrink:0; border:1px solid var(--accent-bd);
+  border-radius:7px; background:var(--accent-bg); color:var(--accent); font-size:11px; font-weight:700; }
+.btn-path-pick:hover:not(:disabled) { background:#dceaff; }
+.btn-path-pick:disabled { opacity:.5; cursor:not-allowed; }
 
 /* Empty state */
 .empty-note {
@@ -643,7 +644,20 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
   flex-direction: column;
   min-height: 140px;
   max-height: 200px;
+  transition: min-height 0.15s var(--ease-out), max-height 0.15s var(--ease-out);
 }
+#log-card.collapsed {
+  min-height: 33px;
+  max-height: 33px;
+}
+#log-card.collapsed .log-header {
+  border-bottom: none;
+  border-radius: var(--r-md);
+}
+#log-card.collapsed .log-body { display: none; }
+#log-card.collapsed .log-search-wrap,
+#log-card.collapsed .btn-log-clear { display: none; }
+#log-card.collapsed .log-chevron { transform: rotate(-90deg); }
 .log-header {
   display: flex;
   align-items: center;
@@ -651,6 +665,16 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
   padding: 8px 11px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  transition: background 0.1s;
+}
+.log-header:hover { background: var(--alt); }
+.log-chevron {
+  color: var(--muted);
+  display: inline-flex;
+  transition: transform 0.15s var(--ease-out);
 }
 .log-label {
   font-size: 10.5px;
@@ -659,6 +683,17 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
   color: var(--muted);
   text-transform: uppercase;
 }
+.log-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--alt);
+  border-radius: 999px;
+  padding: 1px 6px;
+  min-width: 17px;
+  text-align: center;
+}
+.log-count:empty { display: none; }
 .log-search-wrap {
   display: flex;
   align-items: center;
@@ -760,6 +795,23 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 }
 #device-select:focus, #capture-backend:focus { outline: none; border-color: var(--accent); }
 #capture-backend { max-width: 88px; }
+.footer-lbl {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+#win32-target {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--dim);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#win32-target.empty { color: var(--muted); font-style: italic; }
 .btn-refresh {
   width: 28px; height: 28px;
   border-radius: 7px;
@@ -907,30 +959,33 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 
   <!-- ── Log panel ───────────────────────────────────────────────────── -->
   <div id="log-card" class="card">
-    <div class="log-header">
+    <div class="log-header" onclick="toggleLog(event)" title="Click để thu gọn / mở nhật ký">
+      <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
       <span class="log-label">NHẬT KÝ</span>
+      <span class="log-count" id="log-count"></span>
       <div style="flex:1"></div>
-      <div class="log-search-wrap">
+      <div class="log-search-wrap" onclick="event.stopPropagation()">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
              stroke="#9aa3ae" stroke-width="2.2" stroke-linecap="round">
           <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
         </svg>
         <input id="log-search" type="text" placeholder="Tìm kiếm" oninput="filterLog(this.value)">
       </div>
-      <button class="btn-log-clear" onclick="onClearLog()">Xoá</button>
+      <button class="btn-log-clear" onclick="event.stopPropagation();onClearLog()">Xoá</button>
     </div>
     <div class="log-body" id="log-body"></div>
   </div>
 
   <!-- ── Footer ──────────────────────────────────────────────────────── -->
   <div id="footer">
-    <div class="footer-row">
+    <!-- ADB footer: device select + capture backend -->
+    <div class="footer-row" id="footer-adb">
       <div id="dev-dot"></div>
       <span id="dev-label">Đang kết nối…</span>
       <select id="device-select" onchange="onDeviceChange(this.value)">
         <option value="">Không có thiết bị</option>
       </select>
-      <span style="font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap;">Nguồn ảnh</span>
+      <span class="footer-lbl">Nguồn ảnh</span>
       <select id="capture-backend" onchange="onCaptureBackendChange(this.value)" title="Nguồn ảnh workflow: scrcpy nhanh/headless · ADB screencap chậm hơn nhưng ổn định">
         <option value="scrcpy">scrcpy</option>
         <option value="adb">ADB</option>
@@ -941,6 +996,13 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
           <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
         </svg>
       </button>
+    </div>
+    <!-- Win32 footer: target window label -->
+    <div class="footer-row" id="footer-win32" style="display:none">
+      <div id="win-dot"></div>
+      <span class="footer-lbl">Cửa sổ</span>
+      <span id="win32-target" class="empty" title="">(chưa cấu hình)</span>
+      <span class="footer-lbl" id="win32-mode-lbl" style="display:none"></span>
     </div>
   </div>
 
@@ -957,11 +1019,14 @@ const S = {
   devices:         [],
   connectedSerial: null,
   captureBackend:  "scrcpy",
+  controller:      "adb",
+  win32:           {},
+  logCount:        0,
   speedhack: { enabled:false, speed:2.0, package:"", active:false },
 };
 
 const $ = id => document.getElementById(id);
-const PILL_TEXT = { pending:"Chưa làm", running:"Đang chạy", completed:"Xong", failed:"Lỗi", skipped:"Bỏ qua" };
+const ACT_DOT_TITLE = { pending:"Chờ", running:"Đang chạy", completed:"Xong", failed:"Lỗi", skipped:"Bỏ qua" };
 const LOG_TAG = { info:"INF", success:"OK ", warning:"WRN", error:"ERR" };
 const CHECK = `<svg class="icon" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>`;
 const GRIP = `<svg width="9" height="14" viewBox="0 0 9 14" fill="currentColor"><circle cx="2" cy="2" r="1.4"/><circle cx="7" cy="2" r="1.4"/><circle cx="2" cy="7" r="1.4"/><circle cx="7" cy="7" r="1.4"/><circle cx="2" cy="12" r="1.4"/><circle cx="7" cy="12" r="1.4"/></svg>`;
@@ -1009,6 +1074,7 @@ function refreshButtons(){
   $("btn-stop").disabled  = !running;
   $("btn-load").disabled  = running;   // loading mid-run would stop the engine
   $("btn-pause").textContent = paused ? "Tiếp tục" : "Tạm dừng";
+  document.querySelectorAll(".runtime-setting-control").forEach(el=>el.disabled=running);
   setStatusPill(running ? (paused ? "paused" : "running") : "ready");
 }
 
@@ -1040,6 +1106,12 @@ function buildRow(a){
     api().toggle_activity(a.id, a.enabled);
   };
 
+  const st = a.status || "pending";
+  const dot = document.createElement("span");
+  dot.className = "act-dot act-dot-" + st;
+  dot.title = ACT_DOT_TITLE[st] || ACT_DOT_TITLE.pending;
+  dot.dataset.dot = "1";
+
   const block = document.createElement("div");
   block.className = "task-name-block";
   const name = document.createElement("div");
@@ -1051,20 +1123,16 @@ function buildRow(a){
   meta.textContent = actMeta(a);
   block.appendChild(meta);
 
-  const pill = document.createElement("span");
-  pill.className = "pill pill-" + (a.status||"pending");
-  pill.textContent = PILL_TEXT[a.status] || PILL_TEXT.pending;
-
   const btns = document.createElement("div");
   btns.className = "task-btns";
-  const hasSettings = (a.vars && a.vars.length) || isBg;
+  const hasSettings = (a.vars && a.vars.length) || (a.runtimeSettings && a.runtimeSettings.length) || isBg;
   if(hasSettings){
     const gear = gearButton(a.id);
     gear.onclick = ()=>toggleSettings(a.id);
     btns.appendChild(gear);
   }
 
-  row.appendChild(handle); row.appendChild(cb); row.appendChild(block); row.appendChild(pill); row.appendChild(btns);
+  row.appendChild(handle); row.appendChild(cb); row.appendChild(dot); row.appendChild(block); row.appendChild(btns);
   return row;
 }
 
@@ -1159,6 +1227,34 @@ function buildSettingsPanel(a){
     panel.appendChild(row);
   }
 
+  (a.runtimeSettings||[]).forEach(setting=>{
+    const row=document.createElement("div");
+    row.className="setting-row"; row.style.paddingTop="8px";
+    const lbl=document.createElement("span"); lbl.className="setting-label";
+    lbl.innerHTML=escHtml(setting.label||"Đường dẫn")+`<span class="sub">${escHtml(setting.nodeLabel||"")}</span>`;
+    const control=document.createElement("div"); control.className="setting-path-control";
+    const inp=document.createElement("input"); inp.type="text";
+    inp.className="setting-path-input runtime-setting-control";
+    inp.value=setting.value||""; inp.placeholder=setting.kind==="folder"?"Chọn thư mục…":"Chọn chương trình…";
+    inp.title=inp.value; inp.disabled=!!S.running;
+    inp.onchange=async()=>{
+      const old=setting.value||"", value=inp.value.trim();
+      let ok=false; try{ ok=await api().set_node_runtime_param(setting.nodeId,setting.param,value); }catch(_){ }
+      if(ok){ syncRuntimeSetting(setting.nodeId,setting.param,value); inp.title=value; }
+      else inp.value=old;
+    };
+    const pick=document.createElement("button"); pick.type="button";
+    pick.className="btn-path-pick runtime-setting-control"; pick.textContent="Chọn…";
+    pick.title=setting.kind==="folder"?"Chọn thư mục":"Chọn file chương trình"; pick.disabled=!!S.running;
+    pick.onclick=async()=>{
+      let value="";
+      try{ value=await api().pick_node_runtime_path(setting.nodeId,setting.param,setting.kind,inp.value); }catch(_){ }
+      if(value){ inp.value=value; inp.title=value; syncRuntimeSetting(setting.nodeId,setting.param,value); }
+    };
+    control.appendChild(inp); control.appendChild(pick);
+    row.appendChild(lbl); row.appendChild(control); panel.appendChild(row);
+  });
+
   (a.vars||[]).forEach(v=>{
     const row = document.createElement("div");
     row.className = "setting-row"; row.style.paddingTop = "8px";
@@ -1187,6 +1283,12 @@ function buildSettingsPanel(a){
   });
 
   return panel;
+}
+
+function syncRuntimeSetting(nodeId,param,value){
+  S.activities.forEach(a=>(a.runtimeSettings||[]).forEach(s=>{
+    if(s.nodeId===nodeId&&s.param===param) s.value=value;
+  }));
 }
 
 function toggleSettings(id){
@@ -1221,11 +1323,15 @@ function populateLists(){
 function setActStatus(id, status){
   const a = S.activities.find(x=>x.id===id);
   if(a) a.status = status;
+  const st = status || "pending";
   const row = document.querySelector(`.task-row[data-id="${id}"]`);
   if(row){
-    const pill = row.querySelector(".pill");
-    if(pill){ pill.className = "pill pill-"+(status||"pending"); pill.textContent = PILL_TEXT[status]||PILL_TEXT.pending; }
-    row.classList.toggle("task-running", status==="running");
+    const dot = row.querySelector("[data-dot]");
+    if(dot){
+      dot.className = "act-dot act-dot-" + st;
+      dot.title = ACT_DOT_TITLE[st] || ACT_DOT_TITLE.pending;
+    }
+    row.classList.toggle("task-running", st==="running");
   }
   updateProgress();
 }
@@ -1251,6 +1357,15 @@ function setConnected(on, name, serial){
 }
 
 // ── Log ──────────────────────────────────────────────────────────────────────
+function updateLogCount(){
+  const el = $("log-count");
+  if(el) el.textContent = S.logCount ? String(S.logCount) : "";
+}
+function toggleLog(e){
+  if(e && e.target && e.target.closest &&
+     (e.target.closest(".log-search-wrap") || e.target.closest(".btn-log-clear"))) return;
+  $("log-card").classList.toggle("collapsed");
+}
 function appendLog(e){
   const body = $("log-body");
   const query = $("log-search").value.trim().toLowerCase();
@@ -1263,7 +1378,11 @@ function appendLog(e){
     `<span class="log-msg">${escHtml(e.msg)}</span>`;
   body.appendChild(line);
   while(body.children.length>500) body.removeChild(body.firstChild);
-  body.scrollTop = body.scrollHeight;
+  S.logCount = body.children.length;
+  updateLogCount();
+  const card = $("log-card");
+  if(card && !card.classList.contains("collapsed"))
+    body.scrollTop = body.scrollHeight;
 }
 function filterLog(query){
   const q = query.trim().toLowerCase();
@@ -1296,13 +1415,56 @@ async function onSpeedCommit(v){
   applySpeedhack(info);
 }
 
+// ── Controller footer (ADB device vs Win32 window) ───────────────────────────
+function applyController(ctrl, win32){
+  S.controller = (ctrl === "win32") ? "win32" : "adb";
+  S.win32 = win32 || {};
+  const isWin = S.controller === "win32";
+  const adbRow = $("footer-adb");
+  const winRow = $("footer-win32");
+  if(adbRow) adbRow.style.display = isWin ? "none" : "";
+  if(winRow) winRow.style.display = isWin ? "" : "none";
+
+  // Speedhack is Frida/ADB-only — hide settings tab for win32.
+  const speedCard = document.querySelector("#tab-settings .settings-card");
+  if(speedCard) speedCard.style.display = isWin ? "none" : "";
+  const setTab = document.querySelector('[data-tab="settings"]');
+  if(setTab) setTab.style.display = isWin ? "none" : "";
+  if(isWin){
+    const active = document.querySelector(".tab-btn.active");
+    if(active && active.dataset.tab === "settings") switchTab("seq");
+  }
+
+  if(!isWin) return;
+  const cfg = S.win32 || {};
+  const target = (cfg.window || "").trim();
+  const el = $("win32-target");
+  if(el){
+    el.textContent = target || "(chưa cấu hình)";
+    el.classList.toggle("empty", !target);
+    el.title = target;
+  }
+  const mode = (cfg.inputMode || "background").replace(/_/g, " ");
+  const modeEl = $("win32-mode-lbl");
+  if(modeEl){
+    modeEl.textContent = mode;
+    modeEl.style.display = target ? "" : "none";
+    modeEl.title = "Input mode: " + mode;
+  }
+  const dot = $("win-dot");
+  if(dot){
+    dot.style.cssText = "width:8px;height:8px;border-radius:50%;flex-shrink:0;background:" +
+      (target ? "var(--ok)" : "var(--muted)");
+  }
+}
+
 // ── Flow ──────────────────────────────────────────────────────────────────────
 function applyFlow(data){
   S.activities = data.activities || [];
   S.loaded = true;
   const nm = $("flow-name");
   nm.textContent = data.name || "(không tên)"; nm.classList.remove("empty");
-  $("flow-sub").textContent = "Macro2k Runner";
+  $("flow-sub").textContent = (data.controller === "win32") ? "Win32 · PC window" : "ADB · Device / emulator";
   populateLists();
   updateProgress();
   // Tab counts
@@ -1316,6 +1478,7 @@ function applyFlow(data){
     S.captureBackend=data.captureBackend;
     const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
   }
+  applyController(data.controller, data.win32);
   refreshButtons();
 }
 
@@ -1324,7 +1487,7 @@ window.__recv = function(raw){
   let ev; try{ ev=JSON.parse(raw); }catch{ return; }
   const { type, data } = ev;
   if(type==="log"){ appendLog(data); return; }
-  if(type==="log_cleared"){ $("log-body").innerHTML=""; return; }
+  if(type==="log_cleared"){ $("log-body").innerHTML=""; S.logCount=0; updateLogCount(); return; }
   if(type==="devices_update"){
     S.devices=data.devices||[]; S.connectedSerial=data.serial||null;
     setConnected(data.connected, data.name, data.serial); rebuildDevices(S.devices, data.serial);
@@ -1398,7 +1561,9 @@ async function init(){
     (st.captureBackends||["scrcpy","adb"]).forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b==="adb"?"ADB":"scrcpy"; capSel.appendChild(o); });
     capSel.value=S.captureBackend;
   }
-  if(st.loaded) applyFlow({name:st.name, activities:st.activities, speedhack:st.speedhack});
+  if(st.loaded) applyFlow({name:st.name, activities:st.activities, speedhack:st.speedhack,
+                           captureBackend:st.captureBackend, controller:st.controller, win32:st.win32});
+  else applyController(st.controller, st.win32);
   S.running=!!st.running; S.paused=!!st.paused;
   refreshButtons();
   (st.log||[]).forEach(appendLog);

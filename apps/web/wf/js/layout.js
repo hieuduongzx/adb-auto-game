@@ -10,42 +10,73 @@ function wfNodeH(n){
 function wfNodeW(n){
   const el=wfNodeElById(n.id); return el?el.offsetWidth:WF_LAY_NODE_W;
 }
-// Build an adjacency map: out-edges only (forward flow), ignoring loop-backs.
+// Arrange from real wire topology. Loop-back inputs are excluded from ranking so
+// a retry edge cannot pull its ancestor below itself; disconnected islands and
+// malformed cycles are still laid out deterministically instead of overlapping.
+function wfLayEdges(g){
+  const ids=new Set((g.nodes||[]).filter(n=>n.type!=="note").map(n=>n.id));
+  return (g.edges||[]).filter(e=>ids.has(e.from)&&ids.has(e.to)&&e.from!==e.to&&(e.toPort||"in")!=="loop");
+}
+function wfLayPortRank(port){
+  port=String(port||"out");
+  if(port==="out"||port==="true") return 0;
+  if(port==="false") return 100;
+  if(port==="default") return 90;
+  const m=/^c(\d+)$/.exec(port); return m?10+parseInt(m[1],10):50;
+}
 function wfAdjForward(g){
   const adj={}; (g.nodes||[]).forEach(n=>adj[n.id]=[]);
-  (g.edges||[]).forEach(e=>{ if(e.to!==e.from && (e.toPort||"in")!=="loop") adj[e.from].push(e.to); });
+  wfLayEdges(g).slice().sort((a,b)=>wfLayPortRank(a.fromPort)-wfLayPortRank(b.fromPort))
+    .forEach(e=>{ if(!adj[e.from].includes(e.to)) adj[e.from].push(e.to); });
   return adj;
 }
-// Topological layers via BFS from the start node (or any node with no in-edges).
-// Returns an array of layers; each layer is an array of node ids.
+// Longest-path topological layering keeps every forward wire moving to a later
+// row/column. A small barycentric pass then orders siblings by their parent wires
+// (and true/case/false port order), reducing crossings at branches and joins.
 function wfTopoLayers(g){
-  const nodes=g.nodes||[];
-  const adj=wfAdjForward(g);
-  // in-degree
-  const indeg={}; nodes.forEach(n=>indeg[n.id]=0);
-  (g.edges||[]).forEach(e=>{ if(e.to!==e.from && (e.toPort||"in")!=="loop") indeg[e.to]=(indeg[e.to]||0)+1; });
-  const start=nodes.find(n=>n.type==="start") || nodes.find(n=>(indeg[n.id]||0)===0);
-  let layer0=start?[start.id]:nodes.filter(n=>(indeg[n.id]||0)===0).map(n=>n.id);
-  if(!layer0.length && nodes.length) layer0=[nodes[0].id];
-  const layers=[layer0];
-  const seen=new Set(layer0);
-  // For a clean visual, every successor enters the NEXT layer (so siblings in the
-  // same fork share a column) — breadth-first.
-  let cur=layer0;
-  while(cur.length){
-    const nxt=[];
-    cur.forEach(id=>{
-      (adj[id]||[]).forEach(t=>{ if(!seen.has(t)){ seen.add(t); nxt.push(t); } });
+  const nodes=(g.nodes||[]).filter(n=>n.type!=="note"), byId=new Map(nodes.map(n=>[n.id,n]));
+  if(!nodes.length) return [];
+  const edges=wfLayEdges(g), adj={}, pred={}, indeg={}, layer={}, original={};
+  nodes.forEach((n,i)=>{ adj[n.id]=[]; pred[n.id]=[]; indeg[n.id]=0; layer[n.id]=0; original[n.id]=i; });
+  edges.forEach(e=>{ adj[e.from].push(e); pred[e.to].push(e); indeg[e.to]++; });
+  const start=nodes.find(n=>n.type==="start");
+  const startId=start&&start.id;
+  const cmpSeed=(a,b)=>(a===b?0:a===startId?-1:b===startId?1:
+    ((byId.get(a).y||0)-(byId.get(b).y||0))||((byId.get(a).x||0)-(byId.get(b).x||0))||original[a]-original[b]);
+  const queue=nodes.filter(n=>indeg[n.id]===0).map(n=>n.id).sort(cmpSeed), seen=new Set();
+  // Break cycles one node at a time when Kahn's queue drains. Incoming wires
+  // from already-ranked nodes still determine the new seed's minimum layer.
+  while(seen.size<nodes.length){
+    if(!queue.length){
+      const id=nodes.map(n=>n.id).filter(id=>!seen.has(id)).sort(cmpSeed)[0];
+      const fromSeen=pred[id].filter(e=>seen.has(e.from));
+      layer[id]=fromSeen.length?Math.max(...fromSeen.map(e=>layer[e.from]+1)):0;
+      queue.push(id);
+    }
+    const id=queue.shift(); if(seen.has(id)) continue; seen.add(id);
+    adj[id].forEach(e=>{
+      if(seen.has(e.to)) return; // cycle/back-edge: keep the earlier node above
+      layer[e.to]=Math.max(layer[e.to],layer[id]+1);
+      indeg[e.to]=Math.max(0,indeg[e.to]-1);
+      if(indeg[e.to]===0) queue.push(e.to);
     });
-    // Also pull in any unseen zero-in-degree nodes (disconnected islands).
-    nodes.forEach(n=>{ if(!seen.has(n.id) && (indeg[n.id]||0)===0){ seen.add(n.id); nxt.push(n.id); } });
-    if(nxt.length) layers.push(nxt);
-    cur=nxt;
   }
-  // Any leftover (cyclic / unreached) → one more layer.
-  const left=nodes.filter(n=>!seen.has(n.id)).map(n=>n.id);
-  if(left.length) layers.push(left);
-  return layers;
+  const layers=[];
+  nodes.forEach(n=>{ const d=layer[n.id]||0; (layers[d]||(layers[d]=[])).push(n.id); });
+  const pos={};
+  layers.forEach((row,depth)=>{
+    row.sort((a,b)=>{
+      const score=id=>{
+        const incoming=pred[id].filter(e=>(layer[e.from]||0)<depth&&pos[e.from]!==undefined);
+        if(!incoming.length) return [Number.MAX_SAFE_INTEGER,50,original[id]];
+        return [incoming.reduce((s,e)=>s+pos[e.from],0)/incoming.length,
+          Math.min(...incoming.map(e=>wfLayPortRank(e.fromPort))),original[id]];
+      };
+      const aa=score(a), bb=score(b); return aa[0]-bb[0]||aa[1]-bb[1]||aa[2]-bb[2];
+    });
+    row.forEach((id,i)=>pos[id]=i);
+  });
+  return layers.filter(Boolean);
 }
 // Layout: vertical columns (top-to-bottom flow), one row per topo layer, each
 // layer centred on a shared axis so a linear chain forms a straight vertical
@@ -63,7 +94,7 @@ function wfLayoutVertical(g){
   let y=40;
   rows.forEach(row=>{
     let x=axis-row.w/2;
-    row.items.forEach(n=>{ n.x=Math.round(x); n.y=Math.round(y); x+=wfNodeW(n)+WF_LAY_GAP_X; });
+    row.items.forEach(n=>{ n.x=wfSnap(x); n.y=wfSnap(y); x+=wfNodeW(n)+WF_LAY_GAP_X; });
     y+=row.h+WF_LAY_GAP_Y;
   });
 }
@@ -81,44 +112,47 @@ function wfLayoutHorizontal(g){
   let x=40;
   cols.forEach(col=>{
     let y=axis-col.h/2;
-    col.items.forEach(n=>{ n.x=Math.round(x); n.y=Math.round(y); y+=wfNodeH(n)+WF_LAY_GAP_Y; });
+    col.items.forEach(n=>{ n.x=wfSnap(x); n.y=wfSnap(y); y+=wfNodeH(n)+WF_LAY_GAP_Y; });
     x+=col.w+WF_LAY_GAP_X;
   });
 }
-// Layout: tree — layers as rows, each branch's children centred under their
-// parent. Subtree width counts each node once (first parent wins) so shared
-// children don't inflate the span.
+// Layout: tidy wire tree. Each node is claimed by its first forward parent;
+// shared joins stay in the longest-path layer but count toward only one subtree,
+// preventing exponential width. Real DOM sizes keep siblings from overlapping.
 function wfLayoutTree(g){
-  const layers=wfTopoLayers(g);
-  const adj=wfAdjForward(g);
-  const inLayers=id=>layers.some(l=>l.includes(id));
-  // Assign each node to a single parent (the first that reaches it) so the tree
-  // is a true tree — shared descendants aren't counted under every parent.
-  const claimed=new Set();
-  const kidsOf={};
-  layers.forEach(layer=>layer.forEach(id=>{
-    kidsOf[id]=(adj[id]||[]).filter(t=>inLayers(t)&&!claimed.has(t));
+  const layers=wfTopoLayers(g); if(!layers.length) return;
+  const byId=new Map((g.nodes||[]).map(n=>[n.id,n])), depth={}, order={};
+  layers.forEach((row,d)=>row.forEach((id,i)=>{ depth[id]=d; order[id]=i; }));
+  const adj=wfAdjForward(g), claimed=new Set(), kidsOf={};
+  layers.flat().forEach(id=>{
+    kidsOf[id]=(adj[id]||[]).filter(t=>depth[t]>depth[id]&&!claimed.has(t))
+      .sort((a,b)=>(depth[a]-depth[b])||(order[a]-order[b]));
     kidsOf[id].forEach(t=>claimed.add(t));
-  }));
-  const widths={};
-  function wOf(id){ if(widths[id]!==undefined) return widths[id];
-    const kids=kidsOf[id]||[];
-    if(!kids.length) return widths[id]=1;
-    return widths[id]=kids.reduce((s,k)=>s+wOf(k),0); }
-  const colW=WF_LAY_NODE_W+WF_LAY_GAP_X;
-  let x=40;
-  layers.forEach((layer,i)=>{
-    let cursor=x;
-    layer.forEach(id=>{
-      const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
-      const w=wOf(id);
-      n.x=Math.round(cursor+(w*colW-WF_LAY_NODE_W)/2);
-      n.y=40+i*(WF_LAY_NODE_H+WF_LAY_GAP_Y);
-      cursor+=w*colW;
-    });
-    const span=layer.reduce((s,id)=>s+wOf(id),0);
-    x=40+Math.max(span*colW, colW);
   });
+  const rowY=[]; let y=40;
+  layers.forEach((row,d)=>{ rowY[d]=y; y+=Math.max(WF_LAY_NODE_H,...row.map(id=>wfNodeH(byId.get(id))))+WF_LAY_GAP_Y; });
+  const widths={};
+  function widthOf(id){
+    if(widths[id]!==undefined) return widths[id];
+    const n=byId.get(id), own=n?wfNodeW(n):WF_LAY_NODE_W, kids=kidsOf[id]||[];
+    if(!kids.length) return widths[id]=own;
+    const childW=kids.reduce((s,k)=>s+widthOf(k),0)+Math.max(0,kids.length-1)*WF_LAY_GAP_X;
+    return widths[id]=Math.max(own,childW);
+  }
+  const placed=new Set();
+  function place(id,left){
+    if(placed.has(id)) return; placed.add(id);
+    const n=byId.get(id), span=widthOf(id), own=wfNodeW(n);
+    n.x=wfSnap(left+(span-own)/2); n.y=wfSnap(rowY[depth[id]]);
+    const kids=kidsOf[id]||[];
+    let childLeft=left+(span-(kids.reduce((s,k)=>s+widthOf(k),0)+Math.max(0,kids.length-1)*WF_LAY_GAP_X))/2;
+    kids.forEach(k=>{ place(k,childLeft); childLeft+=widthOf(k)+WF_LAY_GAP_X; });
+  }
+  let left=40;
+  const roots=layers.flat().filter(id=>!claimed.has(id));
+  roots.forEach(id=>{ place(id,left); left+=widthOf(id)+WF_LAY_GAP_X*2; });
+  // Defensive fallback for malformed cyclic graphs whose forced seed was claimed.
+  layers.flat().forEach(id=>{ if(!placed.has(id)){ place(id,left); left+=widthOf(id)+WF_LAY_GAP_X*2; } });
 }
 // Layout: compact — vertical columns but with tight gaps and nodes packed by
 // topo order into a near-square grid (good for many small blocks).
@@ -129,7 +163,7 @@ function wfLayoutCompact(g){
   layers.forEach(layer=>{
     layer.forEach(id=>{
       const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
-      n.x=x; n.y=y;
+      n.x=wfSnap(x); n.y=wfSnap(y);
       const h=wfNodeH(n); if(h>rowMaxH) rowMaxH=h;
       col++;
       if(col>=cols){ col=0; x=40; y+=rowMaxH+28; rowMaxH=0; }
@@ -137,25 +171,47 @@ function wfLayoutCompact(g){
     });
   });
 }
+function wfLayoutCaptureGroups(g){
+  return (g.groups||[]).map(gr=>({gr, old:{x:gr.x,y:gr.y,w:gr.w,h:gr.h}, ids:(g.nodes||[]).filter(n=>{
+    const w=wfNodeW(n), h=wfNodeH(n), cx=n.x+w/2, cy=n.y+h/2;
+    return cx>=gr.x&&cx<=gr.x+gr.w&&cy>=gr.y&&cy<=gr.y+gr.h;
+  }).map(n=>n.id)}));
+}
+function wfLayoutRefitGroups(captured,g){
+  const byId=new Map((g.nodes||[]).map(n=>[n.id,n]));
+  captured.forEach(({gr,ids})=>{
+    const members=ids.map(id=>byId.get(id)).filter(Boolean); if(!members.length) return;
+    const x0=Math.min(...members.map(n=>n.x)), y0=Math.min(...members.map(n=>n.y));
+    const x1=Math.max(...members.map(n=>n.x+wfNodeW(n))), y1=Math.max(...members.map(n=>n.y+wfNodeH(n)));
+    const pad=typeof WF_GROUP_PAD!=="undefined"?WF_GROUP_PAD:24;
+    const hd=typeof WF_GROUP_HD!=="undefined"?WF_GROUP_HD:24;
+    gr.x=wfSnap(x0-pad); gr.y=wfSnap(y0-pad-hd);
+    gr.w=wfSnap(x1-x0+pad*2); gr.h=wfSnap(y1-y0+pad*2+hd);
+  });
+}
 function wfAutoLayout(kind){
   const g=wfGraph(); if(!g) return;
   wfPushUndo();
-  // Snapshot current positions so we can animate from old → new.
-  const from={}; g.nodes.forEach(n=>{ from[n.id]={x:n.x,y:n.y}; });
+  // Snapshot positions and positional group membership before wires rearrange
+  // the nodes; group frames are rebuilt around those same members afterward.
+  const from={}, capturedGroups=wfLayoutCaptureGroups(g);
+  g.nodes.forEach(n=>{ from[n.id]={x:n.x,y:n.y}; });
   if(kind==="vertical")   wfLayoutVertical(g);
   else if(kind==="horizontal") wfLayoutHorizontal(g);
   else if(kind==="tree")  wfLayoutTree(g);
   else if(kind==="compact") wfLayoutCompact(g);
   else if(kind==="zigzag") wfLayoutZigzag(g);
   else if(kind==="radial") wfLayoutRadial(g);
-  wfAnimateLayout(g, from);
-  setStatus("Layout applied: "+kind);
+  wfLayoutRefitGroups(capturedGroups,g);
+  wfAnimateLayout(g, from, capturedGroups);
+  const wireCount=wfLayEdges(g).length;
+  setStatus("Arranged "+g.nodes.filter(n=>n.type!=="note").length+" blocks from "+wireCount+" wire"+(wireCount===1?"":"s")+" · "+kind);
 }
 // Animate every node from its previous position to the freshly-computed one,
 // redrawing wires on each frame, then fit the view. Respects reduced-motion:
 // falls back to an instant render+fit. Uses a single rAF loop with an ease-out
 // curve so the rearrange reads as one smooth settle instead of a hard jump.
-function wfAnimateLayout(g, from){
+function wfAnimateLayout(g, from, capturedGroups){
   const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const nodes=g.nodes.filter(n=>from[n.id] && (from[n.id].x!==n.x || from[n.id].y!==n.y));
   if(reduce || !nodes.length || (typeof wfPvActive!=="undefined" && wfPvActive)){ wfRenderCanvas(); wfFit(false); return; }
@@ -165,13 +221,21 @@ function wfAnimateLayout(g, from){
   wfFit(false);
   const els=new Map();
   nodes.forEach(n=>{ const el=wfNodeElById(n.id); if(el) els.set(n, {el, x0:from[n.id].x, y0:from[n.id].y, x1:n.x, y1:n.y}); });
+  const groupEls=(capturedGroups||[]).map(({gr,old})=>{
+    const el=document.querySelector(`.wf-group[data-group="${gr.id}"]`);
+    return el?{el,old,fin:{x:gr.x,y:gr.y,w:gr.w,h:gr.h}}:null;
+  }).filter(Boolean);
   const dur=380, t0=performance.now();
   const ease=t=>1-Math.pow(1-t,3);   // cubic ease-out
   function frame(now){
     const t=Math.min(1,(now-t0)/dur), k=ease(t);
-    els.forEach(({el,x0,y0,x1,y1},n)=>{
+    els.forEach(({el,x0,y0,x1,y1})=>{
       const cx=x0+(x1-x0)*k, cy=y0+(y1-y0)*k;
       el.style.left=cx+"px"; el.style.top=cy+"px";
+    });
+    groupEls.forEach(({el,old,fin})=>{
+      el.style.left=(old.x+(fin.x-old.x)*k)+"px"; el.style.top=(old.y+(fin.y-old.y)*k)+"px";
+      el.style.width=(old.w+(fin.w-old.w)*k)+"px"; el.style.height=(old.h+(fin.h-old.h)*k)+"px";
     });
     wfDrawWires();
     if(t<1) requestAnimationFrame(frame);
@@ -201,7 +265,7 @@ function wfLayoutZigzag(g){
     let x=xBase, rowMaxH=0;
     layer.forEach(id=>{
       const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
-      n.x=x; n.y=y;
+      n.x=wfSnap(x); n.y=wfSnap(y);
       const h=wfNodeH(n); if(h>rowMaxH) rowMaxH=h;
       x+=wfNodeW(n)+20;
     });
@@ -216,7 +280,7 @@ function wfLayoutRadial(g){
   const ringGap=210;
   layers.forEach((layer,depth)=>{
     if(!depth){ // centre
-      layer.forEach(id=>{ const n=g.nodes.find(n=>n.id===id); if(n&&n.type!=="note"){ n.x=cx-wfNodeW(n)/2; n.y=cy-20; } });
+      layer.forEach(id=>{ const n=g.nodes.find(n=>n.id===id); if(n&&n.type!=="note"){ n.x=wfSnap(cx-wfNodeW(n)/2); n.y=wfSnap(cy-20); } });
       return;
     }
     const r=depth*ringGap;
@@ -225,8 +289,8 @@ function wfLayoutRadial(g){
       const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
       // spread the ring evenly; offset so depth-1 starts at top.
       const ang=(i/Math.max(1,step))*Math.PI*2 - Math.PI/2;
-      n.x=cx + Math.cos(ang)*r - wfNodeW(n)/2;
-      n.y=cy + Math.sin(ang)*r - 15;
+      n.x=wfSnap(cx + Math.cos(ang)*r - wfNodeW(n)/2);
+      n.y=wfSnap(cy + Math.sin(ang)*r - 15);
     });
   });
 }

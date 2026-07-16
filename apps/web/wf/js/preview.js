@@ -408,7 +408,7 @@ function wfPvDrawEmpty(){
   ctx.textAlign="center";
   const title = err ? "Capture error" : busy ? "Capturing…" : (isWin32 ? "No target window" : "No device connected");
   const sub   = err ? String(wfPvErr) : busy ? "Waiting for the first frame"
-    : (isWin32 ? "Pick a target window in Project settings, then press Capture"
+    : (isWin32 ? "Choose a target window beside the workflow title, then press Capture"
                : "Connect a device or emulator, then press Capture");
   ctx.fillStyle = err ? "#eab3ad" : "#c2cad4";
   ctx.font="600 15px IBM Plex Sans,Segoe UI,sans-serif";

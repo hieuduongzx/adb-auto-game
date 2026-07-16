@@ -1,4 +1,16 @@
+# Keep source diffs stable across Windows development environments.
+* text=auto eol=lf
+
 # Windows batch files must use CRLF or cmd.exe mis-parses them
 # (LF-only .bat + UTF-8 comments -> "'gner' is not recognized" and broken if/else).
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# Binary assets must never be line-ending-normalized.
+*.dll binary
+*.exe binary
+*.jar binary
+*.png binary
+*.pma binary
+*.ttf binary
+*.traineddata binary

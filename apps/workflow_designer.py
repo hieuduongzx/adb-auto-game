@@ -62,6 +62,7 @@ from src.utils import (
     log_info,
     log_success,
     log_warning,
+    push_webview_event,
     remove_log_subscriber,
     titled,
     webview_storage_path,
@@ -223,9 +224,7 @@ class WorkflowDesignerAPI:
         if self._window is None or self._closing:
             return
         try:
-            payload = json.dumps({"type": event_type, "data": data}, ensure_ascii=False)
-            safe = payload.replace("\\", "\\\\").replace("`", "\\`")
-            self._window.evaluate_js(f"window.__recv(`{safe}`)")
+            push_webview_event(self._window, event_type, data)
         except Exception:
             pass
 
@@ -687,12 +686,12 @@ class WorkflowDesignerAPI:
         return str(path)
 
     def list_windows(self) -> list:
-        """List visible top-level windows as ``[{title, cls, pid}]`` for the
-        Win32 window picker in the designer. Returns [] if pywin32 is
-        unavailable."""
+        """List visible top-level windows as ``[{title, cls, pid, exe}]`` for
+        the Win32 window picker. Returns [] if pywin32 is unavailable."""
         try:
             import win32gui
             import win32process
+            from src.core.win32.automation import process_exe_name
         except Exception:
             return []
         out: List[dict] = []
@@ -710,11 +709,12 @@ class WorkflowDesignerAPI:
                     pid = win32process.GetWindowThreadProcessId(hwnd)[1]
                 except Exception:
                     pid = 0
+                exe = process_exe_name(pid) if pid else ""
                 key = (title, cls, pid)
                 if key in seen:
                     return
                 seen.add(key)
-                out.append({"title": title, "cls": cls, "pid": int(pid)})
+                out.append({"title": title, "cls": cls, "pid": int(pid), "exe": exe})
             except Exception:
                 pass
 
@@ -1591,6 +1591,10 @@ class WorkflowDesignerAPI:
         self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
         self._engine.callbacks["on_node_done"] = [
             lambda nid, st, port: self._push("node_result", {"id": nid, "status": st, "port": port})]
+        # Live delayBefore / delayAfter countdown chips next to the active node.
+        self._engine.callbacks["on_node_delay"] = [
+            lambda nid, phase, secs: self._push(
+                "node_delay", {"id": nid, "phase": phase, "seconds": secs})]
         self._engine.callbacks["on_var"] = [
             lambda name, value: self._push("var_update", {"name": name, "value": value})]
         self._engine.callbacks["on_activity_start"] = [
@@ -1928,6 +1932,100 @@ class WorkflowDesignerAPI:
         except Exception as exc:
             log_error(f"Opening Runner failed: {exc}")
             return False
+
+    # ── Build a standalone single-workflow Runner .exe ─────────────────────────
+
+    def build_runner_exe(self, flow_json: str, version: str = "1.0.0") -> dict:
+        """Package the current workflow into a standalone Runner .exe.
+
+        Saves the flow (bundling its templates), then shells out to
+        ``packaging/build_runner.py`` which runs PyInstaller and copies only the
+        vendor pieces this workflow needs. Output lands in
+        ``dist/<Name>-Runner/``. Progress is streamed to the log; a
+        ``build_done`` event is pushed when finished.
+
+        Building requires the dev Python toolchain (PyInstaller), so it is only
+        available when running from source — never inside the frozen app.
+        """
+        if is_frozen():
+            msg = ("Building an .exe needs the dev environment (Python + "
+                   "PyInstaller). Run the Designer from source to build.")
+            log_error(msg)
+            self._push("build_done", {"ok": False, "error": msg})
+            return {"ok": False, "error": msg}
+
+        # Persist the flow first so the on-disk bundle (json + templates) matches
+        # what we ship. Reuse the normal save path.
+        try:
+            path = self._wf_path
+            if not path:
+                flow = json.loads(flow_json)
+                path = self._default_flow_path(flow.get("name") or "workflow")
+            self._write_flow(flow_json, path)
+            self._wf_path = path
+            self._remember_last_workflow(path)
+        except Exception as exc:
+            msg = f"Couldn't save the workflow before building: {exc}"
+            log_error(msg)
+            self._push("build_done", {"ok": False, "error": msg})
+            return {"ok": False, "error": msg}
+
+        workflow_dir = os.path.dirname(os.path.abspath(path))
+        ver = str(version or "1.0.0").strip() or "1.0.0"
+        threading.Thread(
+            target=self._build_runner_worker, args=(workflow_dir, ver),
+            daemon=True,
+        ).start()
+        return {"ok": True, "started": True}
+
+    def _build_runner_worker(self, workflow_dir: str, version: str) -> None:
+        script = os.path.join(_PROJECT_ROOT, "packaging", "build_runner.py")
+        if not os.path.isfile(script):
+            # From source _PROJECT_ROOT is the repo root; be defensive anyway.
+            script = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "packaging", "build_runner.py")
+        cmd = [sys.executable, script, "--workflow", workflow_dir, "--version", version]
+        log_info("Building standalone Runner .exe …")
+        out_path = ""
+        ok = False
+        try:
+            proc = subprocess.Popen(
+                cmd, cwd=os.path.dirname(os.path.dirname(script)),
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1,
+            )
+            for line in proc.stdout:  # type: ignore[union-attr]
+                line = line.rstrip()
+                if not line:
+                    continue
+                body = line[3:] if line.startswith(">> ") else line
+                if body.startswith("DONE: "):
+                    out_path = body[6:].strip()
+                    ok = True
+                    log_success(f"Build complete: {out_path}")
+                elif body.startswith("BUILD FAILED") or body.startswith("ERROR"):
+                    log_error(body)
+                else:
+                    log_info(body)
+            code = proc.wait()
+            if code != 0:
+                ok = False
+        except Exception as exc:
+            log_error(f"Build error: {exc}")
+            ok = False
+        self._push("build_done", {"ok": ok, "path": out_path})
+
+    def reveal_path(self, path: str) -> bool:
+        """Open a folder (or a file's parent) in the OS file manager."""
+        try:
+            target = path if os.path.isdir(path) else os.path.dirname(path)
+            if target and os.path.isdir(target):
+                os.startfile(target)  # noqa: S606 — local tool, user-initiated
+                return True
+        except Exception as exc:
+            log_warning(f"Couldn't open folder: {exc}")
+        return False
 
     # ── Teardown ─────────────────────────────────────────────────────────────
 

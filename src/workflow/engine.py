@@ -346,6 +346,11 @@ class WorkflowEngine:
             # actually taken (a condition's "true"/"false", a loop's "body"/"done",
             # else "out"). Lets the designer paint the executed path + branch taken.
             "on_node_done": [],
+            # fired when a per-node delayBefore/delayAfter wait starts or ends:
+            # (node_id, phase, seconds). phase is "before" | "after" while waiting,
+            # or None when the wait finishes / is cancelled. seconds is the full
+            # wait length on start (0 on end). Designer shows a live countdown.
+            "on_node_delay": [],
             # fired whenever a variable changes: (name, value). Lets the designer
             # show a live "current variables" panel during a test run.
             "on_var": [],
@@ -913,7 +918,9 @@ class WorkflowEngine:
             # legacy single `delay` param is read here as delayBefore.
             db = self._delay_val(node, "delayBefore", params)
             if db > 0:
+                self._emit("on_node_delay", nid, "before", db)
                 self._sleep(db)
+                self._emit("on_node_delay", nid, None, 0)
 
             if kind == "stop":
                 log_info("[workflow] Dừng theo node Stop")
@@ -1173,7 +1180,9 @@ class WorkflowEngine:
             # stop / parallel / join / try_chain), which already terminate here.
             da = self._delay_val(node, "delayAfter", params)
             if da > 0 and cur and not self._stop.is_set():
+                self._emit("on_node_delay", nid, "after", da)
                 self._sleep(da)
+                self._emit("on_node_delay", nid, None, 0)
         return True
 
     def _run_parallel(self, nodes, adj, node_id, depth):

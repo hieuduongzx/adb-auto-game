@@ -94,13 +94,15 @@ function wfSerialize(){
   const isWin32=(WF.controller==="win32");
   return {
     name:$("wf-name").value||"workflow", version:2, templatesDir:WF.templatesDir||"templates",
+    // Release version for a standalone Runner .exe built from this workflow.
+    buildVersion:(WF.buildVersion||"1.0.0"),
     // Target Android package (workflow-level; used by speed hack + as a project hint).
     package:(WF.package||"").trim(),
     controller:isWin32?"win32":"adb",
     ocr:(WF.ocrBackend||"").trim(),
     // ADB frame source for this game/workflow ("scrcpy" | "adb").
     capture:(WF.captureBackend==="adb")?"adb":"scrcpy",
-    win32:{ window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:wfNormWinInputMode(w.inputMode) },
+    win32:{ window:(w.window||"").trim(), matchBy:wfNormWinMatchBy(w.matchBy), inputMode:wfNormWinInputMode(w.inputMode) },
     // Speed hack is ADB-only (Frida). Package lives at the top level (key "package").
     // Force speedhack off in Win32 so a stale enabled flag never starts Frida.
     speedhack:{ enabled:isWin32?false:!!sh.enabled, speed:sh.speed||2.0 },
@@ -165,6 +167,7 @@ function wfHydrateGraph(g){
 }
 function wfHydrate(flow){
   WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"templates";
+  WF.buildVersion=String(flow.buildVersion||"1.0.0").trim()||"1.0.0";
   const sh=flow.speedhack||{};
   // Speed hack is only {enabled, speed}. Package is top-level; migrate legacy
   // speedhack.package when opening older workflow files.
@@ -184,7 +187,7 @@ function wfHydrate(flow){
   // Force speed hack off in Win32 mode (ADB/Frida only) so a file saved with
   // enabled=true under the old cheat.dll path can't revive it.
   if(WF.controller==="win32") WF.speedhack.enabled=false;
-  const w=flow.win32||{}; WF.win32={window:(w.window||"").trim(), matchBy:w.matchBy||"title", inputMode:wfNormWinInputMode(w.inputMode)};
+  const w=flow.win32||{}; WF.win32={window:(w.window||"").trim(), matchBy:wfNormWinMatchBy(w.matchBy), inputMode:wfNormWinInputMode(w.inputMode)};
   WF.functions=(flow.functions||[]).map(f=>({ id:f.id||("fn_"+wfUid().slice(1,6)), name:f.name||"function", graph:wfHydrateGraph(f.graph) }));
   WF.globals = wfHydVars(flow.globals||[]);
   WF.activities=(flow.activities||[]).map(a=>({
@@ -270,19 +273,116 @@ async function wfImport(){
   try{ wfHydrate(JSON.parse(txt)); wfHasFile=true; wfMarkClean(); setStatus("Workflow imported"); uiToast("Opened workflow \""+(WF.name||"")+"\"","success"); }
   catch(e){ uiToast("Invalid JSON file: "+e,"error"); }
 }
+
+// ── Build EXE — package this workflow into a standalone Runner .exe ────────────
+let wfBuilding=false;
+// Normalize a version like "1.2" / " v1.0.0 " → "1.2" / "1.0.0" (digits + dots).
+function wfNormVersion(raw){
+  const cleaned=String(raw||"").trim().replace(/^v/i,"").replace(/[^0-9.]/g,"");
+  const parts=cleaned.split(".").filter(s=>s!=="").slice(0,4);
+  return parts.length ? parts.join(".") : "1.0.0";
+}
+async function wfBuildExe(){
+  if(wfBuilding){ uiToast("A build is already running — check the log.","info"); return; }
+  if(!WF.activities || !WF.activities.length){ uiToast("Add at least one activity before building.","error"); return; }
+  const cur=wfNormVersion(WF.buildVersion||"1.0.0");
+  let verInp=null;
+  const v=await uiModal({
+    title:"Build standalone Runner .exe",
+    width:"440px",
+    body:(bd)=>{
+      bd.innerHTML=
+        `<div class="wf-new-form">`+
+          `<div class="wf-new-field">`+
+            `<div class="ui-modal-lbl">Workflow</div>`+
+            `<div class="hint" style="margin-top:2px">${escHtml(WF.name||"workflow")} — packages the Runner + this one workflow (no Designer). Only the vendor tools it uses are bundled.</div>`+
+          `</div>`+
+          `<div class="wf-new-field">`+
+            `<label class="ui-modal-lbl" for="wf-build-ver">Version</label>`+
+            `<input id="wf-build-ver" class="ui-modal-inp" type="text" value="${escHtml(cur)}" spellcheck="false" autocomplete="off" placeholder="1.0.0">`+
+            `<div class="hint">Stamped onto the .exe. Output: <code>dist/${escHtml((WF.name||"workflow").replace(/[^A-Za-z0-9_\-]+/g,"_"))}-Runner/</code></div>`+
+          `</div>`+
+        `</div>`;
+      verInp=bd.querySelector("#wf-build-ver");
+      setTimeout(()=>{ try{ verInp.focus(); verInp.select(); }catch{} },0);
+    },
+    buttons:[
+      {label:"Cancel", value:null},
+      {label:"Build", value:"ok", kind:"accent"},
+    ],
+  });
+  if(v!=="ok") return;
+  const version=wfNormVersion(verInp && verInp.value);
+  // Persist the version on the flow so it sticks across sessions.
+  if(WF.buildVersion!==version){ WF.buildVersion=version; if(typeof wfMarkDirty==="function") wfMarkDirty(); }
+
+  wfBuilding=true;
+  const btn=$("wf-build-btn");
+  if(btn){ btn.disabled=true; btn.classList.add("saving"); btn.setAttribute("aria-busy","true"); }
+  // Open the log drawer so the streamed PyInstaller progress is visible.
+  const card=$("log-card"); if(card && card.classList.contains("collapsed") && typeof wfToggleLog==="function") wfToggleLog();
+  uiToast("Building "+(WF.name||"workflow")+" v"+version+" … (this can take a minute)","info",{dur:4000});
+  setStatus("Building standalone Runner .exe …");
+  try{
+    const r=await api().build_runner_exe(JSON.stringify(wfSerialize(),null,2), version);
+    if(r && r.ok===false){ wfOnBuildDone({ok:false, error:r.error||"Build could not start"}); }
+    // Otherwise the build runs in a worker thread; wfOnBuildDone fires via event.
+  }catch(e){
+    wfOnBuildDone({ok:false, error:String(e&&e.message||e||"unknown error")});
+  }
+}
+async function wfOnBuildDone(data){
+  wfBuilding=false;
+  const btn=$("wf-build-btn");
+  if(btn){ btn.disabled=false; btn.classList.remove("saving"); btn.removeAttribute("aria-busy"); }
+  if(data && data.ok){
+    setStatus("Build complete");
+    const open=await uiConfirm({title:"Build complete", message:(data.path||"The Runner .exe was built.")+"\n\nOpen the output folder?", ok:"Open folder"});
+    if(open && data.path){ try{ await api().reveal_path(data.path); }catch{} }
+  }else{
+    setStatus("Build failed");
+    uiToast("Build failed — "+((data&&data.error)||"see the log for details"),"error");
+  }
+}
+
 // Play / stop glyphs for the run toggle (icon-only button).
 const WF_ICO_PLAY = '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
 const WF_ICO_STOP = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
+let wfRunStartedAt=0, wfRunClockTimer=null;
+function wfFormatRunTime(ms){
+  const total=Math.max(0,Math.floor(ms/1000)), h=Math.floor(total/3600), m=Math.floor(total%3600/60), s=total%60;
+  return h>0 ? String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")
+    : String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+}
+function wfUpdateRunClock(){
+  const out=$("wf-run-time"); if(out&&wfRunStartedAt) out.textContent=wfFormatRunTime(Date.now()-wfRunStartedAt);
+}
+function wfStartRunClock(){
+  wfRunStartedAt=Date.now();
+  const wrap=$("wf-run-elapsed"); if(wrap) wrap.style.display="inline-flex";
+  wfUpdateRunClock();
+  if(wfRunClockTimer) clearInterval(wfRunClockTimer);
+  wfRunClockTimer=setInterval(wfUpdateRunClock,500);
+}
+function wfStopRunClock(){
+  if(wfRunClockTimer){ clearInterval(wfRunClockTimer); wfRunClockTimer=null; }
+  wfRunStartedAt=0;
+  const wrap=$("wf-run-elapsed"); if(wrap) wrap.style.display="none";
+}
 function wfSetRunning(on){
-  wfRunning=on; const b=$("wf-run-btn");
+  on=!!on; const wasRunning=wfRunning; wfRunning=on;
+  if(on&&!wasRunning) wfStartRunClock(); else if(!on) wfStopRunClock();
+  const b=$("wf-run-btn");
   // While live, the taken wires carry a flowing dash (CSS keys off this class).
   const cvs=$("wf-canvas"); if(cvs) cvs.classList.toggle("wf-running", !!on);
   if(!on){
     if(typeof wfDebugMode!=="undefined") wfDebugMode=false;
     if(typeof wfClearDebugPause==="function") wfClearDebugPause();
+    // Drop any mid-wait delayBefore/After countdown; trail colours stay.
+    if(typeof wfClearNodeDelay==="function") wfClearNodeDelay();
     // Keep the green/red trail so the user can see where execution stopped.
     // Only remove the amber "currently running" pulse and dim unreached blocks.
-    if(wfRunNode){ const _re=wfNodeElById(wfRunNode); if(_re) _re.classList.remove("running"); }
+    if(wfRunNode){ const _re=wfNodeElById(wfRunNode); if(_re) _re.classList.remove("running","delaying"); }
     wfRunNode=null; wfRunStopped=true;
     wfMarkUnreached();
     wfLiveVars={}; wfFreshVar=null;
@@ -384,8 +484,12 @@ async function init(){
     if(st.previewHz){ wfPvHz=Math.max(0.2, Math.min(60, parseFloat(st.previewHz)||30)); const hz=$("wf-pv-hz"); if(hz) hz.value=wfPvHz; }
     if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); }
     if(st.logH){ const lc=$("log-card"); if(lc){ const h=Math.max(80, Math.min(480, parseInt(st.logH,10)||140)); lc.style.height=h+"px"; lc.dataset.openH=String(h); } }
-    if(st.sideW){ const sd=$("wf-side"); if(sd) sd.style.width=Math.max(150,Math.min(480,st.sideW))+"px"; }
-    if(st.inspW){ const insp=$("wf-inspector"); if(insp) insp.style.width=Math.max(180,Math.min(520,st.inspW))+"px"; } }catch{}
+    const sd=$("wf-side"), insp=$("wf-inspector");
+    if(sd){ const w=st.sideW?Math.max(150,Math.min(480,st.sideW)):sd.offsetWidth; sd.style.width=w+"px"; sd.dataset.openW=String(w); }
+    if(insp){ const w=st.inspW?Math.max(180,Math.min(520,st.inspW)):insp.offsetWidth; insp.style.width=w+"px"; insp.dataset.openW=String(w); }
+    wfSideCollapsed=st.sideCollapsed===true; wfInspCollapsed=st.inspCollapsed===true;
+  }catch{}
+  wfApplySidebarState(false);
   wfInitSideResizer();
   wfInitInspResizer();
   if(typeof wfInitLogResizer==="function") wfInitLogResizer();

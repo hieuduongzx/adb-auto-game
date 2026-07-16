@@ -2,6 +2,7 @@
   "name": "Girl Wars",
   "version": 2,
   "templatesDir": "templates",
+  "buildVersion": "1.0.0",
   "package": "com.y2sgames.girlwarsbignewen",
   "controller": "adb",
   "ocr": "easyocr",
@@ -2691,7 +2692,7 @@
       "id": "sequence_hhiq",
       "name": "Dungeon",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [
         {
           "name": "fixMissingStar",
@@ -4743,7 +4744,7 @@
             "y": -82,
             "params": {
               "x1": 362,
-              "y1": 400,
+              "y1": 600,
               "x2": 362,
               "y2": 0,
               "duration": 330
@@ -5250,7 +5251,7 @@
       "id": "background_8g8s",
       "name": "Background task 1",
       "type": "background",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -5707,7 +5708,7 @@
       "id": "background_kpcg",
       "name": "Background task 2",
       "type": "background",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [

@@ -658,22 +658,26 @@ function wfInitCanvas(){
         wfGesture.items.forEach(it=>{ const el=document.querySelector(`.wf-node[data-node="${it.id}"]`); if(el) el.classList.add("wf-dragging"); });
       }
       if(!wfGesture._moving) return;
-      let sx=wfSnap(lead.ox+(e.clientX-wfGesture.sx)/wfZoom);
-      let sy=wfSnap(lead.oy+(e.clientY-wfGesture.sy)/wfZoom);
-      // Port-alignment snap (single node only): if a port of the dragged block
-      // lands within a few px of another block's port row, pin the block so the
-      // two dots line up exactly and the wire runs dead-straight. Handles the
-      // start/end triangles whose lone dot sits higher than a full block's dot.
-      // Then edge/centre magnetism (Figma-style) with visible guides.
-      // Alt = drag free-hand (no magnetism of any kind).
+      const rawX=lead.ox+(e.clientX-wfGesture.sx)/wfZoom;
+      const rawY=lead.oy+(e.clientY-wfGesture.sy)/wfZoom;
+      // Grid is the baseline. Smart align is evaluated from the unsnapped pointer
+      // position, then overrides the grid only on an axis that actually matched.
+      // This prevents a 20px grid from skipping a nearby 6px alignment target,
+      // while the untouched axis remains cleanly on-grid.
+      let sx=e.altKey?Math.round(rawX):wfSnap(rawX);
+      let sy=e.altKey?Math.round(rawY):wfSnap(rawY);
+      // Port/edge/centre alignment belongs to Smart align. Exact alignment wins
+      // over the grid on its axis; a straight port wire is more useful than an
+      // arbitrary grid coordinate. Alt bypasses both grid and Smart align.
       let alignHit=null, portSnapped=false;
-      if(wfGesture.items.length===1 && !e.altKey){
-        const py=wfPortAlignSnapY(wfGesture.dragId, sy);
-        portSnapped = py!==sy; sy=py;
-        if(wfAlignOn){   // Figma-style edge/centre magnetism is a toolbar toggle
-          alignHit=wfAlignSnap(wfGesture.dragId, sx, sy, portSnapped);
-          sx=alignHit.x; sy=alignHit.y;
-        }
+      if(wfGesture.items.length===1 && !e.altKey && wfAlignOn){
+        const py=wfPortAlignSnapY(wfGesture.dragId, rawY);
+        portSnapped = py!==rawY;
+        const alignY=portSnapped?py:rawY;
+        alignHit=wfAlignSnap(wfGesture.dragId, rawX, alignY, portSnapped);
+        if(alignHit.v) sx=alignHit.x;
+        if(portSnapped) sy=py;
+        else if(alignHit.h) sy=alignHit.y;
       }
       const dx=sx-lead.ox, dy=sy-lead.oy;
       wfGesture.items.forEach(it=>{

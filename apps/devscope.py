@@ -65,6 +65,7 @@ from src.utils import (
     log_info,
     log_success,
     log_warning,
+    push_webview_event,
     remove_log_subscriber,
     titled,
     webview_storage_path,
@@ -219,10 +220,7 @@ class DevScopeAPI:
         if self._window is None or self._closing:
             return
         try:
-            payload = json.dumps({"type": event_type, "data": data},
-                                  ensure_ascii=False)
-            safe = payload.replace("\\", "\\\\").replace("`", "\\`")
-            self._window.evaluate_js(f"window.__recv(`{safe}`)")
+            push_webview_event(self._window, event_type, data)
         except Exception:
             pass
 

@@ -5,6 +5,7 @@ Provides simple coloured ``log_*`` helpers backed by the standard ``logging``
 module so that messages are both printed to the console (with colours) and
 captured by any handlers attached to the root logger (e.g. log files).
 """
+import json
 import logging
 import os
 import subprocess
@@ -316,6 +317,20 @@ def webview_storage_path(app_key: str) -> str:
     return path
 
 
+def push_webview_event(window, event_type: str, data: dict) -> None:
+    """Deliver a JSON event to a WebView ``window.__recv`` handler safely.
+
+    The outer ``json.dumps`` produces a quoted JavaScript string literal.
+    Workflow names and log messages may contain backticks or ``${...}``, and
+    neither must be interpreted as JavaScript template-literal syntax.
+    """
+    payload = json.dumps(
+        {"type": event_type, "data": data}, ensure_ascii=False,
+    )
+    js_arg = json.dumps(payload, ensure_ascii=True)
+    window.evaluate_js(f"window.__recv({js_arg})")
+
+
 # Maps a logical app name to (frozen exe basename, source-tree script path
 # relative to the project root). Macro2k.exe hosts Hub + Designer + Runner
 # via CLI switches (default = hub, ``--designer``, ``--runner``).
@@ -380,6 +395,7 @@ __all__ = [
     "APP_VERSION",
     "titled",
     "webview_storage_path",
+    "push_webview_event",
     "launch_tool",
     "setup_logger",
     "set_current_state",

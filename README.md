@@ -35,6 +35,22 @@ pip install -r requirements.txt
 
 Place binaries under `vendor/` as needed (`adb`, `scrcpy`, `tesseract`; `frida` / `scrcpy` may be local-only — see `.gitignore`).
 
+## Quality checks
+
+The regression suite uses the standard library, so it does not require an
+extra test runner:
+
+```powershell
+python -m unittest discover -s tests -v
+python -m compileall -q src apps packaging
+```
+
+JavaScript files can be syntax-checked with Node.js:
+
+```powershell
+Get-ChildItem apps/web -Recurse -Filter *.js | ForEach-Object { node --check $_.FullName }
+```
+
 ## Build (Macro2k only)
 
 ```powershell

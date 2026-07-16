@@ -35,13 +35,6 @@
 .tb-tray-source { height:38px; box-sizing:border-box; padding:0 8px; gap:6px; align-items:center; }
 .tb-tray-device { min-width:260px; max-width:340px; }
 .tb-tray-source { min-width:168px; width:168px; }
-.tb-tray-win32 { height:38px; min-width:280px; max-width:420px; padding:0 8px; gap:7px; }
-.tb-tray-win32 .btn { width:28px; height:28px; flex-shrink:0; }
-.tb-target-label { min-width:0; max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  font-size:12px; font-weight:600; color:var(--ink2); }
-.tb-backend-chip { flex-shrink:0; padding:2px 7px; border-radius:5px; background:var(--cat-win32-bg);
-  color:var(--cat-win32-ink); border:1px solid var(--cat-win32-bd); font-size:9.5px; font-weight:700; }
-#win32-target-dot.configured { background:var(--cat-win32); box-shadow:0 0 0 3px rgba(99,102,241,.15); }
 .tb-tray-device .tb-device-dot { margin-left:0; flex-shrink:0; }
 .tb-tray-device select,
 .tb-tray-source select { font-family:var(--sans); font-size:12px; font-weight:600; color:var(--dim);
@@ -81,14 +74,10 @@
   .tb-tray-label { display:none; }
   .tb-tray-device { min-width:180px; max-width:240px; }
   .tb-tray-source { min-width:132px; width:132px; }
-  .tb-tray-win32 { min-width:220px; max-width:300px; }
-  .tb-target-label { max-width:120px; }
 }
 @media (max-width: 1100px){
   .tb-tray-device { min-width:140px; max-width:200px; }
   .tb-tray-source { min-width:110px; width:110px; }
-  .tb-tray-win32 { min-width:170px; max-width:220px; }
-  .tb-backend-chip { display:none; }
   .wf-run-status .wf-run-txt { display:none; }   /* the pill's dot still shows state */
   .wf-run-status { padding:0 8px; }
 }
@@ -131,6 +120,11 @@
 .wf-run-status.ok .wf-run-dot { background:var(--ok); }
 .wf-run-status.err { background:var(--err-bg); border-color:var(--err-bd); color:var(--err); }
 .wf-run-status.err .wf-run-dot { background:var(--err); }
+.wf-run-elapsed { display:inline-flex; align-items:center; gap:4px; margin-left:2px; padding-left:8px;
+  border-left:1px solid currentColor; font-family:var(--mono); font-size:10.5px; font-variant-numeric:tabular-nums;
+  color:inherit; opacity:.9; }
+.wf-run-elapsed svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:1.8;
+  stroke-linecap:round; stroke-linejoin:round; }
 @keyframes wfRunPulse { 0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,.5)} 50%{box-shadow:0 0 0 4px rgba(249,115,22,0)} }
 
 #workflow-view { flex:1; display:flex; gap:7px; min-height:0; overflow:hidden; }
@@ -138,10 +132,29 @@
 /* Left sidebar: activities + palette */
 #wf-side { width:254px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
 /* Drag handle to resize the left sidebar. A wide hit-area with a thin visible spine. */
-#wf-side-resizer { width:7px; flex-shrink:0; cursor:col-resize; position:relative; align-self:stretch; }
+#wf-side-resizer { width:7px; flex-shrink:0; cursor:col-resize; position:relative; align-self:stretch; z-index:6; }
 #wf-side-resizer::before { content:""; position:absolute; left:2px; top:0; bottom:0; width:3px; border-radius:3px;
   background:transparent; transition:background .12s; }
 #wf-side-resizer:hover::before, #wf-side-resizer.drag::before { background:var(--accent); }
+/* Divider-mounted collapse handles stay reachable after either sidebar closes. */
+.wf-sidebar-toggle { position:absolute; left:50%; top:50%; z-index:1; width:22px; height:30px;
+  padding:0; border:1px solid var(--border2); border-radius:7px; background:var(--panel); color:var(--muted);
+  display:flex; align-items:center; justify-content:center; cursor:pointer; transform:translate(-50%,-50%);
+  opacity:0; pointer-events:none; transition:color .12s, background .12s, border-color .12s, opacity .12s; }
+#wf-side-resizer:hover > .wf-sidebar-toggle,
+#wf-insp-resizer:hover > .wf-sidebar-toggle,
+.wf-sidebar-toggle:focus-visible { opacity:1; pointer-events:auto; }
+.wf-sidebar-toggle:hover, .wf-sidebar-toggle:focus-visible { color:var(--accent); background:var(--accent-bg);
+  border-color:var(--accent-bd); }
+.wf-sidebar-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.wf-sidebar-toggle svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2;
+  stroke-linecap:round; stroke-linejoin:round; transition:transform .18s var(--ease); }
+#workflow-view.wf-left-collapsed #wf-side { display:none; }
+#workflow-view.wf-left-collapsed #wf-side-resizer,
+#workflow-view.wf-right-collapsed #wf-insp-resizer { width:24px; cursor:default; }
+#workflow-view.wf-left-collapsed #wf-side-resizer::before,
+#workflow-view.wf-right-collapsed #wf-insp-resizer::before { background:var(--border); }
+#workflow-view.wf-left-collapsed #wf-side-toggle svg { transform:rotate(180deg); }
 .wf-side-sec { display:flex; flex-direction:column; min-height:0; }
 .wf-side-sec + .wf-side-sec { border-top:1px solid var(--line); }
   .wf-side-hdr { display:flex; align-items:center; gap:var(--s2); font-size:10.5px; font-weight:800; letter-spacing:.06em;
@@ -297,12 +310,34 @@
   border-radius:6px; box-shadow:none; }
 .wf-title-tray #wf-name:hover { background:var(--panel); }
 .wf-title-tray #wf-name:focus { outline:none; background:var(--panel); box-shadow:0 0 0 2px var(--accent-bd); }
+/* Frequent Win32 controls live beside the title: target, match method, and input mode. */
+.wf-bar-win32 { display:inline-flex; align-items:center; gap:2px; height:32px; min-width:0;
+  padding:2px 5px; border-radius:9px; background:var(--alt); border:1px solid var(--border);
+  box-sizing:border-box; flex-shrink:1; }
+.wf-win-target { display:flex; align-items:center; gap:6px; height:26px; min-width:100px; max-width:210px;
+  padding:0 6px; border:0; border-radius:6px; background:transparent; color:var(--ink2);
+  font-family:var(--sans); font-size:11.5px; font-weight:600; cursor:pointer; }
+.wf-win-target:hover { background:var(--panel); color:var(--accent); }
+.wf-win-target:focus-visible, #wf-bar-win32-matchby:focus-visible, #wf-bar-win32-mode:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.wf-win-target #wf-bar-win32-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-win-target > svg { width:13px; height:13px; flex-shrink:0; fill:none; stroke:currentColor;
+  stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+#wf-bar-win32-dot.configured { background:var(--cat-win32); box-shadow:0 0 0 3px rgba(99,102,241,.15); }
+#wf-bar-win32-matchby, #wf-bar-win32-mode { height:26px; padding:0 20px 0 6px; border:0; border-radius:6px;
+  background-color:transparent; color:var(--cat-win32-ink); font-family:var(--sans);
+  font-size:10.5px; font-weight:700; cursor:pointer; box-shadow:none; }
+#wf-bar-win32-matchby { width:86px; }
+#wf-bar-win32-mode { width:176px; }
+#wf-bar-win32-matchby:hover, #wf-bar-win32-mode:hover { background-color:var(--panel); }
 #wf-speed-group { min-width:0; flex-shrink:0; }
 /* Narrow window: labels tighten. */
 @media (max-width: 1400px){
   .wf-speed-title { display:none; }
   .wf-title-tray { max-width:200px; }
   .wf-title-tray #wf-name { width:120px; max-width:140px; }
+  .wf-win-target { max-width:150px; }
+  #wf-bar-win32-matchby { width:76px; }
+  #wf-bar-win32-mode { width:142px; }
 }
 
 /* Project settings modal — stacked labeled rows (package / controller / OCR…). */
@@ -1065,11 +1100,56 @@
   display:flex; align-items:center; gap:8px; pointer-events:none; z-index:1;
   white-space:nowrap; }
 .wf-delay-chip { display:inline-flex; align-items:center; gap:3px;
-  font-size:9px; font-weight:500; line-height:1.3; color:var(--dim); }
+  font-size:9px; font-weight:500; line-height:1.3; color:var(--dim);
+  position:relative; overflow:hidden; border-radius:4px; padding:1px 0;
+  transition:color .12s, background .12s, box-shadow .12s, padding .12s; }
 .wf-delay-chip svg { width:8px; height:8px; flex-shrink:0; opacity:.85; }
+.wf-delay-label { font-variant-numeric:tabular-nums; }
+/* Live countdown while the engine sleeps on delayBefore / delayAfter — amber
+   pill + remaining-time fill so the wait is readable from across the desk. */
+.wf-delay-chip.counting {
+  color:var(--run-live-ink); font-weight:700; padding:1px 5px;
+  background:var(--run-live-hd); box-shadow:0 0 0 1px var(--run-live-hd-bd);
+}
+.wf-delay-chip.counting::before {
+  content:""; position:absolute; left:0; top:0; bottom:0;
+  width:calc(var(--pct, 0) * 1%);
+  background:rgba(249,115,22,.28); pointer-events:none; z-index:0;
+  transition:width .05s linear;
+}
+.wf-delay-chip.counting > * { position:relative; z-index:1; }
+.wf-delay-chip.counting svg { opacity:1; color:var(--run-live-bd); }
+/* Fallback floating badge when the static chip row is hidden (stack join-bot). */
+.wf-node-delay-live {
+  position:absolute; top:100%; left:2px; margin-top:2px; z-index:2;
+  display:inline-flex; align-items:center; gap:4px; pointer-events:none;
+  font-size:10px; font-weight:700; line-height:1.3; color:var(--run-live-ink);
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+  background:var(--run-live-hd); border:1px solid var(--run-live-hd-bd);
+  border-radius:6px; padding:2px 7px; box-shadow:var(--sh-sm);
+  overflow:hidden;
+}
+.wf-node-delay-live::before {
+  content:""; position:absolute; left:0; top:0; bottom:0;
+  width:calc(var(--pct, 0) * 1%);
+  background:rgba(249,115,22,.28); pointer-events:none; z-index:0;
+}
+.wf-node-delay-live > * { position:relative; z-index:1; }
+.wf-node-delay-live svg { width:10px; height:10px; color:var(--run-live-bd); flex-shrink:0; }
+/* Node is mid delayBefore/After wait — keep amber emphasis even after result paint. */
+.wf-node.delaying { z-index:var(--z-node-hover); }
+@media (prefers-reduced-motion: no-preference){
+  .wf-delay-chip.counting, .wf-node-delay-live {
+    animation:wfDelayPulse 1s ease-in-out infinite;
+  }
+}
+@keyframes wfDelayPulse {
+  0%,100%{ box-shadow:0 0 0 1px var(--run-live-hd-bd); }
+  50%{ box-shadow:0 0 0 2px rgba(249,115,22,.45); }
+}
 /* A stack member joined at its bottom sits flush on the next block — the chips
    would cover that block's header, so hide them there (inspector still shows
-   the timing). */
+   the timing). Runtime countdown uses .wf-node-delay-live instead. */
 .wf-node.wf-stk-jbot .wf-node-delay { display:none; }
 
 /* Run-duration chip — how long this block took on the last test run (×n = ran
@@ -1167,10 +1247,13 @@
 
 /* Right inspector */
 #wf-inspector { width:280px; flex-shrink:0; display:flex; flex-direction:column; overflow:hidden; }
-#wf-insp-resizer { width:7px; flex-shrink:0; cursor:col-resize; position:relative; align-self:stretch; }
+#wf-insp-resizer { width:7px; flex-shrink:0; cursor:col-resize; position:relative; align-self:stretch; z-index:6; }
 #wf-insp-resizer::before { content:""; position:absolute; right:2px; top:0; bottom:0; width:3px; border-radius:3px;
   background:transparent; transition:background .12s; }
 #wf-insp-resizer:hover::before, #wf-insp-resizer.drag::before { background:var(--accent); }
+#wf-insp-toggle svg { transform:rotate(180deg); }
+#workflow-view.wf-right-collapsed #wf-inspector { display:none; }
+#workflow-view.wf-right-collapsed #wf-insp-toggle svg { transform:rotate(0); }
 #wf-insp-body { flex:1; min-height:0; overflow-y:auto; padding:0; display:flex; flex-direction:column; gap:0; }
 .wf-insp-empty { font-size:11.5px; color:var(--muted); line-height:1.6; padding:16px 12px; }
 

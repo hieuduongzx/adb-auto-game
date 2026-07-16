@@ -64,14 +64,35 @@ def _lparam(x: int, y: int) -> int:
     return ((int(y) & 0xFFFF) << 16) | (int(x) & 0xFFFF)
 
 
+def process_exe_name(pid: int) -> str:
+    """Return a process executable basename using limited query rights."""
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.OpenProcess.restype = ctypes.c_void_p
+        handle = kernel32.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return ""
+        try:
+            buf = ctypes.create_unicode_buffer(32768)
+            size = ctypes.c_ulong(len(buf))
+            if not kernel32.QueryFullProcessImageNameW(ctypes.c_void_p(handle), 0, buf, ctypes.byref(size)):
+                return ""
+            return os.path.basename(buf.value)
+        finally:
+            kernel32.CloseHandle(ctypes.c_void_p(handle))
+    except Exception:
+        return ""
+
+
 class Win32Controller:
     """ADBController stand-in that talks to a native window instead of a device.
 
-    ``cfg`` keys: ``window`` (title/class/PID to match), ``matchBy`` (``"title"``
-    | ``"class"`` | ``"pid"``), ``inputMode``:
-      - ``"background"``        — pure PostMessage; never touches the mouse. Many
-        GDI apps accept it, but engines that poll the REAL cursor (Unity/Unreal
-        games such as NIKKE) ignore the message coordinates.
+    ``cfg`` keys: ``window`` (title/class/PID/executable to match), ``matchBy``
+    (``"title"`` | ``"class"`` | ``"pid"`` | ``"exe"``), ``inputMode``:
+      - ``"background"``        — asynchronous PostMessage; never touches the mouse.
+      - ``"background_sync"``   — synchronous SendMessageTimeout; useful for apps
+        that drop or defer queued PostMessage input.
       - ``"background_cursor"`` — MaaFramework-style ``SendMessageWithCursorPos``:
         pretend-activate via WM_ACTIVATE, briefly move the hardware cursor to
         the target, send the messages synchronously, restore the cursor. Works
@@ -107,7 +128,7 @@ class Win32Controller:
     @property
     def _match(self) -> Tuple[str, str, str]:
         mode = str(self.cfg.get("inputMode", "background")).strip().lower()
-        if mode not in ("background", "background_cursor", "foreground"):
+        if mode not in ("background", "background_sync", "background_cursor", "foreground"):
             mode = "background"
         return (
             str(self.cfg.get("window", "")).strip(),
@@ -197,18 +218,28 @@ class Win32Controller:
                 log_error(f"[win32] PID không hợp lệ: '{pattern}'")
                 return None
         found: List[int] = []
+        exe_by_pid: dict[int, str] = {}
 
         def _cb(hwnd, _):
             if not win32gui.IsWindowVisible(hwnd):
                 return
-            if by == "pid":
+            if by in ("pid", "exe"):
                 try:
                     pid = win32process.GetWindowThreadProcessId(hwnd)[1]
                 except Exception:
                     return
                 # Only top-level windows with a title, so an invisible helper
                 # window of the same process doesn't win over the real one.
-                ok = (pid == want_pid) and bool(win32gui.GetWindowText(hwnd))
+                if by == "pid":
+                    ok = (pid == want_pid) and bool(win32gui.GetWindowText(hwnd))
+                else:
+                    if pid not in exe_by_pid:
+                        exe_by_pid[pid] = process_exe_name(pid).lower()
+                    exe = exe_by_pid[pid]
+                    stem = os.path.splitext(exe)[0]
+                    ok = bool(win32gui.GetWindowText(hwnd)) and (
+                        fnmatch.fnmatch(exe, low) if use_glob else low in (exe, stem)
+                    )
             elif by == "class":
                 name = win32gui.GetClassName(hwnd) or ""
                 ok = (name == pattern) or (use_glob and fnmatch.fnmatch(name.lower(), low))
@@ -738,10 +769,20 @@ class Win32Controller:
     def _cursor_mode(self) -> bool:
         return self._match[2] == "background_cursor"
 
+    def _sync_mode(self) -> bool:
+        return self._match[2] == "background_sync"
+
     def _send(self, msg: int, wparam: int, lparam: int) -> None:
         """SendMessage with an abort-if-hung timeout so a frozen game can't
         stall the whole engine thread."""
         self._w[1].SendMessageTimeout(self.hwnd, msg, wparam, lparam, _SMTO_ABORTIFHUNG, 1000)
+
+    def _dispatch(self, msg: int, wparam: int, lparam: int) -> None:
+        """Use synchronous SendMessage only in background_sync mode."""
+        if self._sync_mode():
+            self._send(msg, wparam, lparam)
+        else:
+            self._w[1].PostMessage(self.hwnd, msg, wparam, lparam)
 
     def tap(self, x: int, y: int, duration: float = 0.1, tap_count: int = 1) -> bool:
         if not self.hwnd:
@@ -769,11 +810,11 @@ class Win32Controller:
         try:
             for x, y in clean:
                 lp = _lparam(x, y)
-                win32gui.PostMessage(self.hwnd, _WM_MOUSEMOVE, 0, lp)
-                win32gui.PostMessage(self.hwnd, _WM_LBUTTONDOWN, _MK_LBUTTON, lp)
+                self._dispatch(_WM_MOUSEMOVE, 0, lp)
+                self._dispatch(_WM_LBUTTONDOWN, _MK_LBUTTON, lp)
             time.sleep(max(0.02, min(10.0, int(duration_ms) / 1000.0)))
             for x, y in clean:
-                win32gui.PostMessage(self.hwnd, _WM_LBUTTONUP, 0, _lparam(x, y))
+                self._dispatch(_WM_LBUTTONUP, 0, _lparam(x, y))
             return True
         except Exception as exc:
             self._input_error("multi_tap(bg)", exc)
@@ -783,12 +824,12 @@ class Win32Controller:
         win32gui = self._w[1]
         lp = _lparam(x, y)
         try:
-            win32gui.PostMessage(self.hwnd, _WM_MOUSEMOVE, 0, lp)
+            self._dispatch(_WM_MOUSEMOVE, 0, lp)
             for i in range(max(1, int(tap_count))):
                 down = _WM_LBUTTONDBLCLK if (tap_count >= 2 and i > 0) else _WM_LBUTTONDOWN
-                win32gui.PostMessage(self.hwnd, down, _MK_LBUTTON, lp)
+                self._dispatch(down, _MK_LBUTTON, lp)
                 time.sleep(max(0.02, float(duration)))
-                win32gui.PostMessage(self.hwnd, _WM_LBUTTONUP, 0, lp)
+                self._dispatch(_WM_LBUTTONUP, 0, lp)
                 if tap_count >= 2:
                     time.sleep(0.04)
             return True
@@ -918,13 +959,13 @@ class Win32Controller:
                 win32api.mouse_event(_ME_LUP, 0, 0, 0, 0)
             else:
                 win32gui = self._w[1]
-                win32gui.PostMessage(self.hwnd, _WM_LBUTTONDOWN, _MK_LBUTTON, _lparam(x1, y1))
+                self._dispatch(_WM_LBUTTONDOWN, _MK_LBUTTON, _lparam(x1, y1))
                 for i in range(1, steps + 1):
                     cx = int(x1 + (x2 - x1) * i / steps)
                     cy = int(y1 + (y2 - y1) * i / steps)
-                    win32gui.PostMessage(self.hwnd, _WM_MOUSEMOVE, _MK_LBUTTON, _lparam(cx, cy))
+                    self._dispatch(_WM_MOUSEMOVE, _MK_LBUTTON, _lparam(cx, cy))
                     time.sleep(duration / 1000.0 / steps)
-                win32gui.PostMessage(self.hwnd, _WM_LBUTTONUP, 0, _lparam(x2, y2))
+                self._dispatch(_WM_LBUTTONUP, 0, _lparam(x2, y2))
             return True
         except Exception as exc:
             self._input_error("swipe", exc)
@@ -945,7 +986,7 @@ class Win32Controller:
             if self._foreground() and not self.activate():
                 return False
             for ch in str(text):
-                win32gui.PostMessage(self.hwnd, _WM_CHAR, ord(ch), 0)
+                self._dispatch(_WM_CHAR, ord(ch), 0)
                 time.sleep(0.005)
             return True
         except Exception as exc:
@@ -970,10 +1011,9 @@ class Win32Controller:
                 time.sleep(0.03)
                 win32api.keybd_event(vk, 0, _KE_KEYUP, 0)
             else:
-                win32gui = self._w[1]
-                win32gui.PostMessage(self.hwnd, _WM_KEYDOWN, vk, 0)
+                self._dispatch(_WM_KEYDOWN, vk, 0)
                 time.sleep(0.03)
-                win32gui.PostMessage(self.hwnd, _WM_KEYUP, vk, 0)
+                self._dispatch(_WM_KEYUP, vk, 0)
             return True
         except Exception as exc:
             self._input_error("press_key", exc)

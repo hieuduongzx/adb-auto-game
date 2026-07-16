@@ -69,7 +69,7 @@ def _norm_capture(raw: str) -> str:
 
 def _norm_input_mode(raw: str) -> str:
     mode = str(raw or "").strip().lower()
-    return mode if mode in {"background", "background_cursor", "foreground"} else "background"
+    return mode if mode in {"background", "background_sync", "background_cursor", "foreground"} else "background"
 
 
 def _blank_flow(
@@ -83,7 +83,8 @@ def _blank_flow(
     *controller*: ``adb`` | ``win32``
     *capture*: ``scrcpy`` | ``adb`` (ADB frame source; kept for win32 too so a
     later switch back to ADB remembers the choice).
-    *input_mode*: Win32 ``background`` | ``background_cursor`` | ``foreground``.
+    *input_mode*: Win32 ``background`` | ``background_sync`` |
+    ``background_cursor`` | ``foreground``.
     """
     ctrl = _norm_controller(controller)
     cap = _norm_capture(capture)
@@ -218,6 +219,7 @@ class WorkflowHubAPI:
         self._hotkey_thread: Optional[threading.Thread] = None
         self._hotkey_thread_id = 0
         self._hotkeys_ok = False
+        self._autoclick_view_active = threading.Event()
         self._click_config = self._load_click_config()
         self._click_state: Dict[str, Any] = {
             "running": False, "count": 0, "cycles": 0, "activePointId": "",
@@ -386,6 +388,14 @@ class WorkflowHubAPI:
                 "platform": sys.platform,
                 "profilesDir": _AUTOCLICKS_DIR,
             }
+
+    def autoclick_set_view_active(self, active: bool) -> bool:
+        """Enable capture hotkeys only while the Auto Click view is open."""
+        if active:
+            self._autoclick_view_active.set()
+        else:
+            self._autoclick_view_active.clear()
+        return True
 
     def autoclick_configure(self, config: dict) -> dict:
         with self._click_lock:
@@ -695,9 +705,9 @@ class WorkflowHubAPI:
                 if msg.message == 0x0312:  # WM_HOTKEY
                     if msg.wParam == 6001:
                         self._toggle_click_hotkey()
-                    elif msg.wParam == 6002:
+                    elif msg.wParam == 6002 and self._autoclick_view_active.is_set():
                         self.autoclick_capture_position()
-                    elif msg.wParam == 6003:
+                    elif msg.wParam == 6003 and self._autoclick_view_active.is_set():
                         self.autoclick_add_point_at_cursor()
             if ok6:
                 user32.UnregisterHotKey(None, 6001)

@@ -769,10 +769,11 @@ function wfColorDotHtml(n,def){
 // Timing badges (delayBefore / delayAfter) — floating chips anchored under the
 // block's bottom-left corner (absolute), so a delay never stretches the
 // standardized card. Shared by wfNodeEl and the inspector's live update.
+// data-phase lets the runtime countdown highlight/update the active wait chip.
 function wfDelayChipsHtml(n){
   const dp=[];
-  if(n.delayBefore) dp.push(`<span class="wf-delay-chip">${wfIco("clock")}Before ${n.delayBefore}s</span>`);
-  if(n.delayAfter)  dp.push(`<span class="wf-delay-chip">${wfIco("timer")}After ${n.delayAfter}s</span>`);
+  if(n.delayBefore) dp.push(`<span class="wf-delay-chip" data-phase="before" data-secs="${n.delayBefore}">${wfIco("clock")}<span class="wf-delay-label">Before ${n.delayBefore}s</span></span>`);
+  if(n.delayAfter)  dp.push(`<span class="wf-delay-chip" data-phase="after" data-secs="${n.delayAfter}">${wfIco("timer")}<span class="wf-delay-label">After ${n.delayAfter}s</span></span>`);
   return dp.length ? `<div class="wf-node-delay">${dp.join("")}</div>` : "";
 }
 function wfNodeEl(n){
