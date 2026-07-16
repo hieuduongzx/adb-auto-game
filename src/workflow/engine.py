@@ -3,7 +3,7 @@
 The engine wraps an :class:`~src.core.adb.auto.ADBGameAutomation` instance and
 runs the **node graph** of each activity. It is shared by two front-ends:
 
-* the **Run test** button in Workflow2k Designer (design-time preview), and
+* the **Run test** button in Macro2k Designer (design-time preview), and
 * the standalone **runner GUI** (``apps/workflow_runner.py``).
 
 Both feed it the exact same JSON, so a flow that runs in the designer runs
@@ -79,6 +79,7 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "call":       {"label": "Gọi function",  "kind": "call",      "ins": 1, "outs": ["true", "false"]},
     "note":       {"label": "Ghi chú",       "kind": "note",      "ins": 0, "outs": []},
     "tap":        {"label": "Chạm",          "kind": "action",    "ins": 1, "outs": ["out"]},
+    "multi_tap":  {"label": "Chạm nhiều điểm", "kind": "action",    "ins": 1, "outs": ["out"]},
     "double_tap": {"label": "Chạm đúp",      "kind": "action",    "ins": 1, "outs": ["out"]},
     "tap_random": {"label": "Chạm ngẫu nhiên","kind": "action",   "ins": 1, "outs": ["out"]},
     "long_press": {"label": "Giữ",           "kind": "action",    "ins": 1, "outs": ["out"]},
@@ -251,10 +252,11 @@ EMULATOR_CONSOLES: Dict[str, Dict[str, Any]] = {
 # Last successful launch_emulator payload ({emulator, index, port, serial, …}).
 # if_emulator's "last" option reads this back so a flow can check "is the
 # emulator I used before still the one running?" across runs. Resolved via
-# app_dir() so frozen builds write next to the .exe, not inside _MEIPASS.
+# data_root() so frozen builds write to the writable user-data folder (next to
+# the app, or %LOCALAPPDATA% for a read-only install), never inside _MEIPASS.
 def _emulator_state_path() -> str:
-    from src.utils import app_dir
-    return os.path.join(app_dir(), "data", "emulator_state.json")
+    from src.utils import data_root
+    return os.path.join(data_root(), "data", "emulator_state.json")
 
 # Condition node types a switch case may use — only the *instant* ones (no
 # wait_* timeout blocking, no tap_* side-effect), so evaluating one case never
@@ -359,6 +361,7 @@ class WorkflowEngine:
         # Dispatch table for action nodes: type -> handler(node, params) -> bool.
         self._actions: Dict[str, Callable[[Dict, Dict], bool]] = {
             "tap": self._a_tap,
+            "multi_tap": self._a_multi_tap,
             "double_tap": self._a_double_tap,
             "tap_random": self._a_tap_random,
             "long_press": self._a_long_press,
@@ -2433,6 +2436,37 @@ class WorkflowEngine:
         ok = self.auto.tap(x, y, tap_count=taps)
         if ok:
             log_info(f"[workflow] 👆 chạm ({x}, {y})" + (" ×2" if taps == 2 else ""))
+        return ok
+
+    def _a_multi_tap(self, node, p) -> bool:
+        """Start two or more fixed touch points in one concurrent batch."""
+        points = []
+        for raw in p.get("points", []) if isinstance(p.get("points"), list) else []:
+            try:
+                if isinstance(raw, dict):
+                    x, y = int(raw.get("x", 0)), int(raw.get("y", 0))
+                elif isinstance(raw, (list, tuple)) and len(raw) >= 2:
+                    x, y = int(raw[0]), int(raw[1])
+                else:
+                    continue
+                points.append((x, y))
+            except (TypeError, ValueError):
+                continue
+        if len(points) < 2:
+            log_warning("[workflow] multi-point tap cần ít nhất 2 điểm")
+            return False
+        # Most Android devices expose at most ten touch slots. Limiting here also
+        # prevents malformed workflow JSON from spawning an unbounded batch.
+        points = points[:10]
+        try:
+            duration_ms = int(p.get("duration", 80) or 80)
+        except (TypeError, ValueError):
+            duration_ms = 80
+        duration_ms = max(20, min(10_000, duration_ms))
+        ok = bool(self.auto.multi_tap(points, duration_ms=duration_ms))
+        if ok:
+            coords = ", ".join(f"({x}, {y})" for x, y in points)
+            log_info(f"[workflow] 👆 chạm đồng thời {len(points)} điểm: {coords} · {duration_ms}ms")
         return ok
 
     def _a_double_tap(self, node, p) -> bool:

@@ -15,6 +15,24 @@ from src.utils import (
 )
 
 
+def kill_adb_server() -> None:
+    """Stop the background ADB server daemon (``adb.exe`` on port 5037).
+
+    ADB auto-starts this long-lived daemon on the first command and it OUTLIVES
+    the app — leaving ``adb.exe`` in Task Manager and, worse, holding
+    ``vendor/adb/adb.exe`` locked (which blocks updates that replace vendor/).
+    App-close handlers call this to clean up. NB: it stops the *shared* server,
+    so any other ADB client (Android Studio, a manual ``adb`` shell) will simply
+    re-spawn its own on the next command."""
+    try:
+        subprocess.run([get_adb_path(), "kill-server"],
+                       capture_output=True, timeout=5,
+                       creationflags=CREATE_NO_WINDOW)
+        log_debug("ADB server stopped on shutdown")
+    except Exception:
+        pass
+
+
 class DeviceScanner:
     """Scanner for finding ADB devices on emulator ports"""
     

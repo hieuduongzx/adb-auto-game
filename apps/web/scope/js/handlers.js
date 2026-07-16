@@ -9,7 +9,7 @@ async function onCaptureBackendChange(backend){
 async function onRefreshDevices(){ await api().refresh_devices(); }
 async function onScanPorts(){ await api().scan_ports(); }
 async function onRestartAdb(){ await api().restart_adb(); }
-async function openWorkflowDesigner(){ try{ await api().open_workflow_designer(); setStatus("Đang mở Workflow2k…"); }catch{} }
+async function openWorkflowDesigner(){ try{ await api().open_workflow_designer(); setStatus("Đang mở Macro2k…"); }catch{} }
 async function onDeviceChange(serial){ if(serial){S.connectedSerial=serial;await api().select_device(serial);} }
 function onHzChange(v){ api().set_refresh_hz(parseFloat(v)||5); }
 function onToggleAuto(){

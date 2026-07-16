@@ -26,6 +26,85 @@
   ],
   "functions": [
     {
+      "id": "fn_pmuop",
+      "name": "Go Home",
+      "graph": {
+        "nodes": [
+          {
+            "id": "nzb93w65",
+            "type": "start",
+            "x": 60,
+            "y": 20,
+            "params": {}
+          },
+          {
+            "id": "nh0lbqvw",
+            "type": "end",
+            "x": 424,
+            "y": -20,
+            "params": {}
+          },
+          {
+            "id": "niy97gqa",
+            "type": "if_image",
+            "x": 160,
+            "y": 0,
+            "params": {
+              "template": "templates/crop_20260715_152050_355_968_31_31.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nfadsqjp",
+            "type": "tap_image_any",
+            "x": 424,
+            "y": 76,
+            "params": {
+              "templates": [
+                "templates/crop_20260715_152200_1427_32_25_30.png",
+                "templates/crop_20260715_152009_155_28_43_45.png"
+              ],
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "mode": "sequential",
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nzb93w65",
+            "fromPort": "out",
+            "to": "niy97gqa"
+          },
+          {
+            "from": "niy97gqa",
+            "fromPort": "true",
+            "to": "nh0lbqvw"
+          },
+          {
+            "from": "niy97gqa",
+            "fromPort": "false",
+            "to": "nfadsqjp"
+          },
+          {
+            "from": "nfadsqjp",
+            "fromPort": "true",
+            "to": "niy97gqa"
+          },
+          {
+            "from": "nfadsqjp",
+            "fromPort": "false",
+            "to": "niy97gqa"
+          }
+        ],
+        "groups": []
+      }
+    },
+    {
       "id": "fn_ursje",
       "name": "Tap To Continue",
       "graph": {
@@ -77,7 +156,7 @@
   "activities": [
     {
       "id": "sequence_f944",
-      "name": "Activity 1",
+      "name": "Run Game",
       "type": "sequence",
       "enabled": false,
       "vars": [
@@ -101,14 +180,14 @@
           {
             "id": "nbfltbsu",
             "type": "end",
-            "x": 780,
+            "x": 500,
             "y": 84,
             "params": {}
           },
           {
             "id": "ne0tk5h9",
             "type": "win_launch",
-            "x": 200,
+            "x": 120,
             "y": 60,
             "params": {
               "path": "path",
@@ -120,7 +199,7 @@
           {
             "id": "nmvnfd5j",
             "type": "tap",
-            "x": 400,
+            "x": 300,
             "y": 60,
             "params": {
               "target": "pos",
@@ -155,31 +234,80 @@
       "id": "sequence_bhvg",
       "name": "Activity 2",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
           {
             "id": "n4id6dvk",
             "type": "start",
-            "x": 48,
-            "y": 72,
+            "x": -80,
+            "y": 140,
             "params": {}
           },
           {
             "id": "n5wclv6r",
             "type": "end",
-            "x": 680,
-            "y": 380,
+            "x": 640,
+            "y": 300,
             "params": {}
           },
           {
             "id": "note00lp",
             "type": "tap_image",
-            "x": 140,
-            "y": 60,
+            "x": 220,
+            "y": 124,
             "params": {
               "template": "templates/crop_20260715_063825_139_1036_55_17.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "ne9lulz5",
+            "type": "tap_image",
+            "x": 420,
+            "y": 124,
+            "params": {
+              "template": "templates/crop_20260715_151847_283_960_148_19.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n6iw021z",
+            "type": "tap",
+            "x": 660,
+            "y": 220,
+            "params": {
+              "target": "pos",
+              "x": 342,
+              "y": 970,
+              "taps": "1"
+            }
+          },
+          {
+            "id": "ng153i3p",
+            "type": "call",
+            "x": 20,
+            "y": 124,
+            "params": {
+              "fn": "fn_pmuop"
+            }
+          },
+          {
+            "id": "na4tt0v9",
+            "type": "tap_image",
+            "x": 620,
+            "y": 124,
+            "params": {
+              "template": "templates/crop_20260715_152401_999_635_95_25.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
@@ -192,7 +320,22 @@
           {
             "from": "n4id6dvk",
             "fromPort": "out",
+            "to": "ng153i3p"
+          },
+          {
+            "from": "ng153i3p",
+            "fromPort": "true",
             "to": "note00lp"
+          },
+          {
+            "from": "note00lp",
+            "fromPort": "true",
+            "to": "ne9lulz5"
+          },
+          {
+            "from": "ne9lulz5",
+            "fromPort": "true",
+            "to": "na4tt0v9"
           }
         ],
         "groups": []
@@ -203,7 +346,7 @@
       "id": "sequence_pwks",
       "name": "Activity 3",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [

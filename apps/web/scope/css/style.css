@@ -74,7 +74,7 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 .tb-left  { }
 .tb-right { }
 
-/* Trays — matching the Workflow2k tray system */
+/* Trays — matching the Macro2k tray system */
 .tb-tray { display: inline-flex; align-items: center; gap: 2px; padding: 3px;
   border-radius: 10px; background: var(--alt); border: 1px solid var(--border); }
 .tb-tray .btn { border-color: transparent; background: transparent; height: 32px; }

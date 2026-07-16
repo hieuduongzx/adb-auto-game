@@ -752,6 +752,33 @@ class Win32Controller:
             return self._tap_bg_cursor(x, y, duration, tap_count)
         return self._tap_bg(x, y, duration, tap_count)
 
+    def multi_tap(self, points: List[Tuple[int, int]], duration_ms: int = 80) -> bool:
+        """Deliver overlapping button-down/up messages to several client points.
+
+        Native foreground/cursor input has only one hardware pointer, so those
+        modes fall back to a tight sequence. Background message mode can hold all
+        requested points down before releasing them.
+        """
+        clean = [(int(x), int(y)) for x, y in points][:10]
+        if not self.hwnd or not clean:
+            return False
+        if self._foreground() or self._cursor_mode():
+            log_warning("[win32] multi-point tap: current input mode has one cursor; using rapid sequence")
+            return all(self.tap(x, y, duration=0.02, tap_count=1) for x, y in clean)
+        win32gui = self._w[1]
+        try:
+            for x, y in clean:
+                lp = _lparam(x, y)
+                win32gui.PostMessage(self.hwnd, _WM_MOUSEMOVE, 0, lp)
+                win32gui.PostMessage(self.hwnd, _WM_LBUTTONDOWN, _MK_LBUTTON, lp)
+            time.sleep(max(0.02, min(10.0, int(duration_ms) / 1000.0)))
+            for x, y in clean:
+                win32gui.PostMessage(self.hwnd, _WM_LBUTTONUP, 0, _lparam(x, y))
+            return True
+        except Exception as exc:
+            self._input_error("multi_tap(bg)", exc)
+            return False
+
     def _tap_bg(self, x, y, duration, tap_count) -> bool:
         win32gui = self._w[1]
         lp = _lparam(x, y)

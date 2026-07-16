@@ -164,7 +164,7 @@
       "id": "sequence_xguu",
       "name": "Run Game",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -226,7 +226,7 @@
             "id": "ni8wav38",
             "type": "if_app",
             "x": 300,
-            "y": -76,
+            "y": -120,
             "params": {
               "package": "com.neversoft.rpg.erolabs",
               "negate": true,
@@ -237,7 +237,7 @@
             "id": "n3gpedjr",
             "type": "wait_image",
             "x": 700,
-            "y": -76,
+            "y": -120,
             "params": {
               "template": "templates/crop_20260710_233810_872_990_175_33.png",
               "threshold": 0.85,
@@ -249,7 +249,7 @@
             "id": "nsz0mjsw",
             "type": "tap_image",
             "x": 900,
-            "y": -76,
+            "y": -120,
             "params": {
               "template": "templates/crop_20260710_233827_872_990_175_33.png",
               "taps": "1",
@@ -1586,7 +1586,7 @@
           {
             "id": "nqfjv5w0",
             "type": "tap_image",
-            "x": 560,
+            "x": 580,
             "y": 200,
             "params": {
               "template": "templates/crop_20260629_090515_237x73.png",
@@ -1693,8 +1693,8 @@
           {
             "id": "n2f6emxd",
             "type": "loop",
-            "x": 740,
-            "y": 200,
+            "x": 580,
+            "y": 284,
             "params": {
               "count": 3,
               "infinite": true
@@ -1703,8 +1703,8 @@
           {
             "id": "nsxy4t8d",
             "type": "if_var",
-            "x": 920,
-            "y": 200,
+            "x": 780,
+            "y": 284,
             "params": {
               "name": "count",
               "op": ">",

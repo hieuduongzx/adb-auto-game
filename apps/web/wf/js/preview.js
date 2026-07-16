@@ -429,20 +429,25 @@ function wfPvZoomBy(f){ wfPvZoom=Math.max(.3, Math.min(10, wfPvZoom*f)); wfPvDra
 function wfPvFit(){ wfPvResetZoom(); }
 
 // ── Canvas interactions (DevScope parity) ───────────────────────────────────
-//   left-click    → pick a point (sets point + color)
-//   left-drag     → select a region
-//   right-click   → tap the device at that point
-//   middle-drag   → pan
-//   wheel         → zoom (cursor-anchored)
-//   double-click  → reset zoom
+//   left-click        → pick a point (sets point + color)
+//   left-drag         → select a region
+//   space + left-drag → pan (same as middle-drag; mirrors the graph canvas)
+//   right-click       → tap the device at that point
+//   middle-drag       → pan
+//   wheel             → zoom (cursor-anchored)
+//   double-click      → reset zoom
 // Handlers are attached once in wfPvInit.
 function wfPvAttachCanvas(){
   const c=wfPvCanvas; if(!c || c.__pvWired) return; c.__pvWired=true;
+  // True while Space is held (graph global from keyboard.js); guarded so the
+  // preview keeps working even if the graph module isn't loaded.
+  const spaceHeld=()=>typeof wfSpace!=="undefined" && wfSpace;
 
   c.addEventListener("mousedown", e=>{
-    // Middle button → pan.
-    if(e.button===1){ e.preventDefault(); wfPvPanning=true; wfPvPanStart=wfPvCanvasPos(e);
-      wfPvPanBase=[wfPvPanX,wfPvPanY]; c.style.cursor="grab"; return; }
+    // Middle button, or Space + left button → pan (like the graph canvas).
+    if(e.button===1 || (e.button===0 && spaceHeld())){
+      e.preventDefault(); wfPvPanning=true; wfPvPanStart=wfPvCanvasPos(e);
+      wfPvPanBase=[wfPvPanX,wfPvPanY]; c.style.cursor="grabbing"; return; }
     // Right button → tap (click) or swipe (drag) — resolved on mouseup.
     if(e.button===2){ if(!wfPvImg) return; e.preventDefault();
       const p=wfPvCanvasPos(e); wfPvRDrag={s:p, c:p.slice()}; return; }
@@ -454,6 +459,8 @@ function wfPvAttachCanvas(){
     const [cx,cy]=wfPvCanvasPos(e);
     if(wfPvPanning){ wfPvPanX=wfPvPanBase[0]+cx-wfPvPanStart[0];
       wfPvPanY=wfPvPanBase[1]+cy-wfPvPanStart[1]; wfPvDraw(); return; }
+    // Show the grab hand whenever Space is held so the pan affordance is visible.
+    if(!wfPvDragging && !wfPvRDrag) c.style.cursor=spaceHeld()?"grab":"crosshair";
     const p=wfPvCanvasToImg(e.clientX,e.clientY);
     // Hover HUD state: image coords + pixel colour under the cursor.
     wfPvHover=p;
@@ -466,7 +473,8 @@ function wfPvAttachCanvas(){
   });
 
   c.addEventListener("mouseup", async e=>{
-    if(e.button===1){ wfPvPanning=false; c.style.cursor="crosshair"; return; }
+    // End a pan started by either the middle button or Space + left button.
+    if(wfPvPanning){ wfPvPanning=false; c.style.cursor=spaceHeld()?"grab":"crosshair"; return; }
     // Right button released → short = tap · long = swipe on the device.
     if(e.button===2 && wfPvRDrag){
       const s=wfPvRDrag.s, t=wfPvCanvasPos(e); wfPvRDrag=null;

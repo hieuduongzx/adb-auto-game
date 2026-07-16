@@ -12,6 +12,7 @@ const WF_ICONS = {
   octagon:    '<polygon points="8 3 16 3 21 8 21 16 16 21 8 21 3 16 3 8 8 3"/>',
   // basic actions
   pointer:    '<path d="M3 3l7 18 2.5-7.5L20 11 3 3z"/>',
+  touches:    '<circle cx="7" cy="7" r="3"/><circle cx="17" cy="17" r="3"/><path d="M10 7h3a4 4 0 0 1 4 4v3"/><path d="M14 17h-3a4 4 0 0 1-4-4v-3"/>',
   hand:       '<path d="M6 11V6a2 2 0 1 1 4 0v4"/><path d="M10 10V4a2 2 0 1 1 4 0v6"/><path d="M14 10V5a2 2 0 1 1 4 0v7"/><path d="M18 12V8a2 2 0 1 1 4 0v8a6 6 0 0 1-6 6h-3a6 6 0 0 1-5-2.6L4 16a2 2 0 0 1 3-2.6L8 15"/>',
   dice:       '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.2"/><circle cx="15.5" cy="15.5" r="1.2"/><circle cx="12" cy="12" r="1.2"/>',
   timer:      '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M9 2h6"/>',
@@ -121,6 +122,7 @@ const WF_NODES = {
   start:      {label:"Start",   ico:"play", kind:"start", cat:null,    outs:["out"], fields:[]},
   end:        {label:"End",  ico:"square", kind:"end",   cat:"flow",  outs:[],      fields:[]},
   tap:        {label:"Tap",      ico:"pointer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`)+(p.taps=="2"?" ×2":"")},
+  multi_tap:  {label:"Multi-point tap",ico:"touches",kind:"action",cat:"basic",outs:["out"],fields:[{k:"points",lbl:"Touch points",t:"points",d:[{x:0,y:0},{x:100,y:100}]},{k:"duration",lbl:"Hold duration (ms)",t:"num",d:80}],sum:p=>{const a=Array.isArray(p.points)?p.points:[];return `${a.length} points · together · ${Math.max(20,Number(p.duration)||80)}ms`; }},
   // Hidden from the palette — superseded by tap(taps=2); old files still open/run fine.
   double_tap: {label:"Double tap",  ico:"hand",kind:"action",cat:"basic", hidden:true, outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`)+" ×2"},
   tap_random: {label:"Random tap",ico:"dice",kind:"action",cat:"basic", outs:["out"], fields:[

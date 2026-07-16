@@ -130,6 +130,13 @@ function wfHydrateGraph(g){
         params.pkgSrc = (String(params.package||"").trim()) ? "custom" : "project";
       }
     }
+    // Multi-point tap accepts compact legacy [x,y] pairs, but the inspector
+    // edits named coordinates for readable JSON.
+    if(params && n.type==="multi_tap"){
+      params.points=(Array.isArray(params.points)?params.points:[]).map(pt=>Array.isArray(pt)
+        ? {x:Number(pt[0])||0,y:Number(pt[1])||0}
+        : {x:Number(pt&&pt.x)||0,y:Number(pt&&pt.y)||0});
+    }
     // Random tap used to store top-left + width/height. Convert it to two
     // explicit corners so the inspector shows the same region the engine uses.
     if(params && n.type==="tap_random" && !["x1","y1","x2","y2"].some(k=>params[k]!==undefined)){

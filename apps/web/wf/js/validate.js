@@ -34,6 +34,8 @@ function wfValidationIssues(){
         const v=(n.params||{})[f.k];
         if(f.t==="tpl" && !String(v||"").trim()) add("err",`${def.label}: missing template`,ctx,n.id);
         if(f.t==="tpls" && (!Array.isArray(v)||!v.some(x=>String(x||"").trim()))) add("err",`${def.label}: empty template list`,ctx,n.id);
+        if(f.t==="points" && (!Array.isArray(v)||v.length<2)) add("err",`${def.label}: add at least 2 touch points`,ctx,n.id);
+        if(f.t==="points" && Array.isArray(v)&&v.length>10) add("warn",`${def.label}: only the first 10 touch points will run`,ctx,n.id);
         if(f.var && String(v||"").trim() && !varNames.has(String(v).trim())) add("warn",`Variable not declared yet: ${v}`,ctx,n.id);
       });
       if(n.type==="win_launch" && !String((n.params||{}).path||"").trim()) add("err","Launch program: choose an executable or path variable",ctx,n.id);

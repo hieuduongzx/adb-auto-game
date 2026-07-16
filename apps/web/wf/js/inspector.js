@@ -894,6 +894,7 @@ function wfFieldEl(node,f){
     row.appendChild(sel); return row;
   }
   if(f.t==="tpls") return wfTplsField(node,f);
+  if(f.t==="points") return wfPointsField(node,f);
 
   // Color field: native swatch picker + hex text kept in sync both ways.
   if(f.t==="color"){
@@ -987,6 +988,46 @@ function wfTplsField(node,f,row){
   const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Image";
   add.onclick=async()=>{ wfPushUndoDebounced(); const pp=await api().pick_template(); arr().push(pp||""); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
   wrap.appendChild(list); wrap.appendChild(add);
+  return wrap;
+}
+
+// Coordinate list for Multi-point tap. Each row is one finger/target; the
+// runtime dispatches the whole list as one concurrent batch.
+function wfPointsField(node,f){
+  const wrap=document.createElement("div"); wrap.className="wf-field full";
+  const lab=document.createElement("label"); lab.textContent=wfFieldLabel(f); lab.title=f.k; wrap.appendChild(lab);
+  const arr=()=>Array.isArray(node.params[f.k])?node.params[f.k]:(node.params[f.k]=[]);
+  const list=document.createElement("div"); list.className="wf-points-list";
+  const head=document.createElement("div"); head.className="wf-points-head";
+  head.innerHTML="<span>Point</span><span>X</span><span>Y</span><span></span>";
+  const commit=()=>{ wfPushUndoDebounced(); wfUpdNodeSum(node); };
+  function renderList(){
+    list.innerHTML=""; list.appendChild(head);
+    arr().forEach((point,idx)=>{
+      if(!point || typeof point!=="object") point=arr()[idx]={x:0,y:0};
+      const row=document.createElement("div"); row.className="wf-point-row";
+      const num=document.createElement("span"); num.className="num"; num.textContent=String(idx+1);
+      const x=document.createElement("input"); x.type="number"; x.min="0"; x.placeholder="X"; x.setAttribute("aria-label",`Point ${idx+1} X`); x.value=Number(point.x)||0;
+      const y=document.createElement("input"); y.type="number"; y.min="0"; y.placeholder="Y"; y.setAttribute("aria-label",`Point ${idx+1} Y`); y.value=Number(point.y)||0;
+      x.oninput=()=>{ point.x=parseInt(x.value,10)||0; commit(); };
+      y.oninput=()=>{ point.y=parseInt(y.value,10)||0; commit(); };
+      const del=document.createElement("button"); del.type="button"; del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Delete point"; del.setAttribute("aria-label",`Delete point ${idx+1}`);
+      del.onclick=()=>{ wfPushUndoDebounced(); arr().splice(idx,1); wfUpdNodeSum(node); renderList(); };
+      row.appendChild(num); row.appendChild(x); row.appendChild(y); row.appendChild(del); list.appendChild(row);
+    });
+    if(!arr().length){ const empty=document.createElement("div"); empty.className="wf-tpls-empty"; empty.textContent="No touch points — add at least 2."; list.appendChild(empty); }
+  }
+  renderList();
+  const actions=document.createElement("div"); actions.className="wf-points-actions";
+  const add=document.createElement("button"); add.type="button"; add.className="btn sm"; add.textContent="+ Point";
+  add.onclick=()=>{ wfPushUndoDebounced(); const picked=(typeof wfPvPoint!=="undefined"&&Array.isArray(wfPvPoint))?wfPvPoint:null; arr().push({x:picked?picked[0]:0,y:picked?picked[1]:0}); wfUpdNodeSum(node); renderList(); };
+  actions.appendChild(add);
+  if(typeof wfPvPoint!=="undefined" && Array.isArray(wfPvPoint)){
+    const picked=document.createElement("span"); picked.className="wf-points-picked"; picked.textContent=`Last picked: ${wfPvPoint[0]}, ${wfPvPoint[1]}`; actions.appendChild(picked);
+  }
+  const hint=document.createElement("div"); hint.className="wf-insp-tip";
+  hint.textContent="All points start together. Hold duration keeps the touches overlapping; 60–100 ms works for most games.";
+  wrap.appendChild(list); wrap.appendChild(actions); wrap.appendChild(hint);
   return wrap;
 }
 

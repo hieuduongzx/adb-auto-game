@@ -1,6 +1,6 @@
 """PyWebView-based DevScope — device inspector for ADB auto-game.
 
-Reuses the same visual language as Workflow2k (IBM Plex tokens, light surface
+Reuses the same visual language as Macro2k (IBM Plex tokens, light surface
 palette, pill status, slim scrollbars) and exposes a ``DevScopeAPI`` to JavaScript via ``pywebview.api.*``.
 
 Features:
@@ -44,7 +44,7 @@ import cv2
 import numpy as np
 import webview
 
-from src.core.adb import ADBController, DeviceScanner
+from src.core.adb import ADBController, DeviceScanner, kill_adb_server
 from src.core.adb.auto.scrcpy_capture import (
     CAPTURE_BACKENDS,
     capture_screen as capture_screen_frame,
@@ -56,8 +56,8 @@ from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.utils import (
     add_log_subscriber,
-    app_dir,
     bundle_dir,
+    data_root,
     file_url,
     is_frozen,
     launch_tool,
@@ -66,12 +66,14 @@ from src.utils import (
     log_success,
     log_warning,
     remove_log_subscriber,
+    titled,
     webview_storage_path,
 )
 
-# In a frozen build, writable resources (out/, data/) live next to the .exe.
+# In a frozen build, writable resources (out/, data/) live under data_root() —
+# next to the app when writable, else %LOCALAPPDATA% (read-only Program Files).
 if is_frozen():
-    _PROJECT_ROOT = app_dir()
+    _PROJECT_ROOT = data_root()
 
 # Bundled HTML: from source it sits in ``apps/web``; in a frozen build it is
 # collected under ``<_MEIPASS>/web``.
@@ -679,7 +681,7 @@ class DevScopeAPI:
         x, y, w, h = region
         crop = self._screen[y:y + h, x:x + w].copy()
         clean = _sanitize_name(name)
-        # Filename embeds the region so Workflow2k can auto-fill a search region.
+        # Filename embeds the region so Macro2k can auto-fill a search region.
         default = (f"{clean}_{x}_{y}_{w}_{h}.png" if clean
                    else f"region_{_ts()}_{x}_{y}_{w}_{h}.png")
         dialog_ok = True
@@ -727,7 +729,7 @@ class DevScopeAPI:
         """Make sure a saved crop filename ends with _x_y_w_h.ext.
 
         If the user-supplied path already has a coordinate suffix, leave it alone.
-        Otherwise rewrite the basename so Workflow2k can parse the region later.
+        Otherwise rewrite the basename so Macro2k can parse the region later.
         """
         base, ext = os.path.splitext(path)
         suffix = f"_{x}_{y}_{w}_{h}"
@@ -739,7 +741,7 @@ class DevScopeAPI:
         """Return the QuickCrop output folder.
 
         Standalone DevScope keeps crops grouped under ``out/<package>/``. When
-        Workflow2k launches DevScope with a workflow templates folder, that folder
+        Macro2k launches DevScope with a workflow templates folder, that folder
         is already the target bundle, so QuickCrop must not create a package
         subfolder or the designer will not find ``templates/<file>`` assets.
         """
@@ -757,7 +759,7 @@ class DevScopeAPI:
 
         Uses ``name`` (sanitized) when non-empty, otherwise falls back to
         ``crop_<timestamp>_<x>_<y>_<w>_<h>.png`` so no prompt interrupts the flow.
-        The filename embeds the region so Workflow2k can auto-fill it.
+        The filename embeds the region so Macro2k can auto-fill it.
         """
         region = self._region
         if self._screen is None or not region:
@@ -1109,10 +1111,10 @@ class DevScopeAPI:
         """Launch the Workflow Designer in a separate process."""
         try:
             launch_tool("designer")
-            log_success("Đã mở Workflow2k")
+            log_success("Đã mở Macro2k")
             return True
         except Exception as exc:
-            log_error(f"Mở Workflow2k thất bại: {exc}")
+            log_error(f"Mở Macro2k thất bại: {exc}")
             return False
 
     # ── Log ───────────────────────────────────────────────────────────────────
@@ -1128,12 +1130,13 @@ class DevScopeAPI:
     def _close(self) -> None:
         self._closing = True
         stop_scrcpy_sources()
+        kill_adb_server()   # stop the leftover adb.exe daemon (also unlocks vendor/adb)
         remove_log_subscriber(self._on_log)
 
 
 # ── Entry points ──────────────────────────────────────────────────────────────
 
-def create_devscope_window(title: str = "DevScope",
+def create_devscope_window(title: str = titled("DevScope"),
                            out_dir: Optional[str] = None) -> webview.Window:
     api = DevScopeAPI(out_dir=out_dir)
     html_path = os.path.join(_WEB_DIR, "scope", "index.html")

@@ -8,7 +8,7 @@ Activities run in one of two modes:
 * ``background`` — loop the graph in its own thread every ``pollInterval`` s;
   can be toggled on/off while sequence activities run.
 
-Produced by Workflow2k Designer (``apps/workflow_designer.py``) and consumed
+Produced by Macro2k Designer (``apps/workflow_designer.py``) and consumed
 by the Runner (``apps/workflow_runner.py``).
 """
 from .engine import WorkflowEngine, NODE_TYPES

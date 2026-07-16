@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Workflow2k Runner</title>
+<title>Macro2k Runner</title>
 <style>
 /* ── Reset & tokens ─────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -808,7 +808,7 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
   <div id="header-card" class="card">
     <div class="header-top">
       <div class="header-title-block">
-        <div class="app-title empty" id="flow-name">Workflow2k Runner</div>
+        <div class="app-title empty" id="flow-name">Macro2k Runner</div>
         <div class="app-subtitle" id="flow-sub">Chưa tải workflow</div>
       </div>
       <button class="btn-load" id="btn-load" onclick="onLoadJson()" title="Tải workflow đã xuất từ Designer">
@@ -1302,7 +1302,7 @@ function applyFlow(data){
   S.loaded = true;
   const nm = $("flow-name");
   nm.textContent = data.name || "(không tên)"; nm.classList.remove("empty");
-  $("flow-sub").textContent = "Workflow2k Runner";
+  $("flow-sub").textContent = "Macro2k Runner";
   populateLists();
   updateProgress();
   // Tab counts

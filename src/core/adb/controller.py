@@ -342,6 +342,28 @@ class ADBController:
             log_error(f"Error tapping at ({x}, {y}): {e}")
             return False
     
+    def multi_tap(self, points: List[Tuple[int, int]], duration_ms: int = 80) -> bool:
+        """Start several stationary touch gestures in one device-shell batch.
+
+        Android's public ``input`` command has no multi-point subcommand. Running
+        one zero-distance swipe per point in the same shell lets their down/up
+        windows overlap closely without requiring root-only ``sendevent`` access.
+        """
+        clean = [(int(x), int(y)) for x, y in points]
+        if len(clean) < 2:
+            return self.tap(*clean[0]) if clean else False
+        duration_ms = max(20, min(10_000, int(duration_ms)))
+        try:
+            jobs = [
+                f"(input touchscreen swipe {x} {y} {x} {y} {duration_ms}) &"
+                for x, y in clean[:10]
+            ]
+            self.device.shell(" ".join(jobs) + " wait")
+            return True
+        except Exception as e:
+            log_error(f"Error multi-tapping {len(clean)} points: {e}")
+            return False
+
     def swipe(self, x1: int, y1: int, x2: int, y2: int, duration: int = 300) -> bool:
         """Swipe from one point to another"""
         try:

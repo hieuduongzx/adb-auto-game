@@ -1,4 +1,4 @@
-/* Workflow2k Hub — list / run / edit / create workflows. */
+/* Macro2k Hub — list / run / edit / create workflows. */
 
 // ── Tiny helpers ─────────────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
@@ -250,6 +250,15 @@ function promptNewWorkflow() {
 // ── State ────────────────────────────────────────────────────────────────────
 let WORKFLOWS = [];
 let FILTER = "";
+let WORKFLOWS_LOADED = false;
+let AC_STATE = { running:false, count:0, cycles:0, activePointId:"", startedAt:0, elapsed:0, status:"Ready", error:"", hotkeys:false };
+let AC_CONFIG = { profileName:"Untitled sequence", selectedPointId:"point-1", points:[], intervalMs:250, startDelaySec:0, infinite:true, count:100 };
+let AC_CURRENT_FILE = "";
+let AC_PROFILES = [];
+let AC_DIR = "autoclicks";
+let AC_DIRTY = false;
+let _acConfigureTimer = null;
+let _acElapsedTimer = null;
 
 // ── Render ───────────────────────────────────────────────────────────────────
 function filtered() {
@@ -447,14 +456,210 @@ async function createWorkflow() {
   }
 }
 
+// ── Tool navigation ─────────────────────────────────────────────────────────
+async function openTool(name) {
+  document.querySelectorAll(".tool-view").forEach((view) => view.classList.toggle("active", view.id === (name === "workflow" ? "workflow-app" : name === "autoclick" ? "autoclick-app" : "tool-home")));
+  if (name === "workflow" && !WORKFLOWS_LOADED) {
+    await loadList();
+    WORKFLOWS_LOADED = true;
+  }
+  if (name === "autoclick") {
+    renderAutoClick();
+    setTimeout(() => { const run=$("ac-run"); if(run) run.focus(); }, 20);
+  }
+}
+
+function segValue(field) {
+  const on = document.querySelector(`.seg-control[data-ac-field="${field}"] .seg.on`);
+  return on ? on.dataset.value : "";
+}
+function setSegValue(field, value) {
+  const box = document.querySelector(`.seg-control[data-ac-field="${field}"]`);
+  if (!box) return;
+  box.querySelectorAll(".seg").forEach((button) => {
+    const selected = button.dataset.value === String(value);
+    button.classList.toggle("on", selected);
+    button.setAttribute("aria-checked", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+  });
+}
+function newPoint(index) {
+  return { id:`point-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`, label:`Point ${index + 1}`,
+    enabled:true, targetMode:"fixed", x:0, y:0, button:"left", clickType:"single" };
+}
+function readAutoClickConfig() {
+  const points = [...document.querySelectorAll(".point-row")].map((row, index) => ({
+    id:row.dataset.id, label:(row.querySelector('[data-point="label"]').value||`Point ${index+1}`).trim(),
+    enabled:row.querySelector('[data-point="enabled"]').checked,
+    targetMode:row.querySelector('[data-point="targetMode"]').value,
+    x:parseInt(row.querySelector('[data-point="x"]').value,10)||0,
+    y:parseInt(row.querySelector('[data-point="y"]').value,10)||0,
+    button:row.querySelector('[data-point="button"]').value,
+    clickType:row.querySelector('[data-point="clickType"]').value,
+  }));
+  return { profileName:($("ac-profile-name").value||"Untitled sequence").trim(), selectedPointId:AC_CONFIG.selectedPointId,
+    points, intervalMs:Math.max(10,parseInt($("ac-interval").value,10)||250),
+    startDelaySec:Math.max(0,parseInt($("ac-delay").value,10)||0),
+    infinite:segValue("countMode")!=="finite", count:Math.max(1,parseInt($("ac-limit").value,10)||100) };
+}
+function renderPoints() {
+  const host=$("ac-points"); host.innerHTML="";
+  (AC_CONFIG.points||[]).forEach((point,index) => {
+    const row=document.createElement("div");
+    row.className="point-row"+(point.id===AC_CONFIG.selectedPointId?" selected":"")+(point.id===AC_STATE.activePointId?" active":"");
+    row.dataset.id=point.id;
+    row.innerHTML=`<div class="point-order"><b>${index+1}</b><span><button type="button" data-point-act="up" ${index===0?"disabled":""} title="Move up" aria-label="Move point up">⌃</button><button type="button" data-point-act="down" ${index===AC_CONFIG.points.length-1?"disabled":""} title="Move down" aria-label="Move point down">⌄</button></span></div>
+      <label class="point-enable" title="Enable point"><input type="checkbox" data-point="enabled" ${point.enabled?"checked":""}><span></span></label>
+      <input class="point-name" data-point="label" value="${escHtml(point.label)}" maxlength="80" aria-label="Point name">
+      <select class="point-mode" data-point="targetMode" aria-label="Position mode"><option value="fixed" ${point.targetMode!=="cursor"?"selected":""}>Fixed</option><option value="cursor" ${point.targetMode==="cursor"?"selected":""}>Cursor</option></select>
+      <button class="point-delete" type="button" data-point-act="delete" title="Delete point" aria-label="Delete point"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M8 10v8M12 10v8M16 10v8M6 7l1 14h10l1-14"/></svg></button>
+      <div class="point-details">
+        <label><span>X</span><input type="number" data-point="x" value="${point.x}" ${point.targetMode==="cursor"?"disabled":""}></label>
+        <label><span>Y</span><input type="number" data-point="y" value="${point.y}" ${point.targetMode==="cursor"?"disabled":""}></label>
+        <label><span>Button</span><select data-point="button"><option value="left" ${point.button==="left"?"selected":""}>Left</option><option value="right" ${point.button==="right"?"selected":""}>Right</option><option value="middle" ${point.button==="middle"?"selected":""}>Middle</option></select></label>
+        <label><span>Action</span><select data-point="clickType"><option value="single" ${point.clickType!=="double"?"selected":""}>Single</option><option value="double" ${point.clickType==="double"?"selected":""}>Double</option></select></label>
+        <button class="point-capture" type="button" data-point-act="capture" title="Capture cursor position"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><kbd>F7</kbd></button>
+      </div>`;
+    host.appendChild(row);
+  });
+  $("ac-points-empty").hidden=!!AC_CONFIG.points.length;
+  const enabled=AC_CONFIG.points.filter(p=>p.enabled).length;
+  $("ac-point-summary").textContent=`${AC_CONFIG.points.length} point${AC_CONFIG.points.length===1?"":"s"} · ${enabled} enabled`;
+}
+function applyAutoClickConfig(config, clean=false) {
+  if(!config)return;
+  AC_CONFIG={...AC_CONFIG,...config,points:Array.isArray(config.points)?config.points:[]};
+  $("ac-profile-name").value=AC_CONFIG.profileName||"Untitled sequence";
+  $("ac-interval").value=AC_CONFIG.intervalMs; $("ac-delay").value=AC_CONFIG.startDelaySec; $("ac-limit").value=AC_CONFIG.count;
+  setSegValue("countMode",AC_CONFIG.infinite?"infinite":"finite");
+  renderPoints(); syncAutoClickFields();
+  if(clean)setAutoClickDirty(false);
+}
+function setAutoClickDirty(dirty=true){ AC_DIRTY=dirty; const el=$("ac-dirty"); el.hidden=!dirty; }
+function syncAutoClickFields(){ $("ac-limit").disabled=AC_STATE.running||segValue("countMode")!=="finite"; }
+function queueAutoClickConfigure(){
+  if(AC_STATE.running)return;
+  AC_CONFIG=readAutoClickConfig(); setAutoClickDirty(true);
+  clearTimeout(_acConfigureTimer);
+  _acConfigureTimer=setTimeout(async()=>{ try{await api().autoclick_configure(AC_CONFIG);}catch{} },180);
+}
+function formatElapsed(seconds){ seconds=Math.max(0,Math.floor(seconds||0)); const h=Math.floor(seconds/3600),m=Math.floor((seconds%3600)/60),s=seconds%60; return h?`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`:`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`; }
+function renderAutoClick(){
+  const running=!!AC_STATE.running, status=AC_STATE.error?"Error":(AC_STATE.status||(running?"Clicking":"Ready"));
+  $("ac-status").textContent=status; $("ac-count").textContent=String(AC_STATE.count||0); $("ac-cycles").textContent=String(AC_STATE.cycles||0);
+  const enabled=(AC_CONFIG.points||[]).filter(p=>p.enabled).length;
+  $("ac-status-detail").textContent=AC_STATE.error?AC_STATE.error:running?`Running ${enabled} point${enabled===1?"":"s"} in sequence.`:status==="Completed"?`Completed ${AC_STATE.cycles||0} cycles.`:`${enabled} enabled point${enabled===1?"":"s"} ready.`;
+  const header=$("ac-header-state"); header.className="run-state "+(AC_STATE.error?"error":running?"running":"ready"); header.querySelector("span:last-child").textContent=running?"Running":AC_STATE.error?"Error":"Ready";
+  const run=$("ac-run"); run.classList.toggle("running",running);
+  run.querySelector(".run-icon").innerHTML=running?'<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>':'<svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg>';
+  run.querySelector("b").textContent=running?"Stop Auto Click":"Start Sequence";
+  run.querySelector("small").textContent=running?"Stops after the current action":"Runs enabled points from top to bottom";
+  $("ac-form").querySelectorAll("input,select,.seg,button").forEach(el=>{el.disabled=running;});
+  $("ac-profile-name").disabled=running; $("ac-profile-select").disabled=running; $("ac-new").disabled=running; $("ac-save").disabled=running;
+  if(!running){const rows=[...document.querySelectorAll(".point-row")];if(rows.length){rows[0].querySelector('[data-point-act="up"]').disabled=true;rows[rows.length-1].querySelector('[data-point-act="down"]').disabled=true;}rows.forEach(row=>{const cursor=row.querySelector('[data-point="targetMode"]').value==="cursor";row.querySelector('[data-point="x"]').disabled=cursor;row.querySelector('[data-point="y"]').disabled=cursor;});}
+  syncAutoClickFields();
+  document.querySelectorAll(".point-row").forEach(row=>row.classList.toggle("active",running&&row.dataset.id===AC_STATE.activePointId));
+  const home=$("home-clicker-state"); home.textContent=running?`Running · ${AC_STATE.count||0} actions`:`${enabled} points · F6 run · F8 add`; home.classList.toggle("running",running);
+  if(!_acElapsedTimer)_acElapsedTimer=setInterval(()=>{const elapsed=AC_STATE.running&&AC_STATE.startedAt?Date.now()/1000-AC_STATE.startedAt:(AC_STATE.elapsed||0); const out=$("ac-elapsed");if(out)out.textContent=formatElapsed(elapsed);},250);
+}
+async function refreshAutoClickProfiles(selectFile=""){
+  try{const res=await api().autoclick_list_profiles(); if(!res||!res.ok)return; AC_PROFILES=res.profiles||[]; AC_DIR=res.dir||"autoclicks"; $("ac-file-path").textContent=AC_DIR;
+    const select=$("ac-profile-select"); select.innerHTML='<option value="">Open a saved sequence…</option>'+AC_PROFILES.map(p=>`<option value="${escHtml(p.filename)}" ${p.filename===(selectFile||AC_CURRENT_FILE)?"selected":""}>${escHtml(p.name)}${p.invalid?" · invalid":` · ${p.points} points`}</option>`).join("");
+  }catch{}
+}
+async function confirmDiscard(){ if(!AC_DIRTY)return true; return await modal({title:"Discard unsaved changes?",body:"Your current sequence has changes that have not been saved.",buttons:[{label:"Keep editing",value:false},{label:"Discard",value:true,kind:"err"}]}); }
+async function newAutoClickSequence(){
+  if(!await confirmDiscard())return;
+  AC_CURRENT_FILE=""; AC_STATE={...AC_STATE,count:0,cycles:0,status:"Ready",error:"",elapsed:0,startedAt:0};
+  const point=newPoint(0); applyAutoClickConfig({profileName:"Untitled sequence",selectedPointId:point.id,points:[point],intervalMs:250,startDelaySec:0,infinite:true,count:100},true);
+  $("ac-profile-select").value=""; renderAutoClick(); $("ac-profile-name").select();
+}
+async function saveAutoClickSequence(){
+  AC_CONFIG=readAutoClickConfig(); const name=AC_CONFIG.profileName; if(!name){toast("Enter a sequence name.","error");$("ac-profile-name").focus();return;}
+  let res=await api().autoclick_save_profile(name,AC_CONFIG,AC_CURRENT_FILE,!!AC_CURRENT_FILE);
+  if(res&&res.exists){const overwrite=await modal({title:"Replace saved sequence?",body:`<b>${escHtml(res.filename)}</b> already exists in autoclicks/.`,buttons:[{label:"Cancel",value:false},{label:"Replace",value:true,kind:"err"}]}); if(overwrite)res=await api().autoclick_save_profile(name,AC_CONFIG,res.filename,true);}
+  if(!res||!res.ok){toast((res&&res.error)||"Could not save sequence.","error");return;}
+  AC_CURRENT_FILE=res.filename; applyAutoClickConfig(res.config,true); await refreshAutoClickProfiles(AC_CURRENT_FILE); toast(`Saved ${res.filename}`,"success");
+}
+async function loadAutoClickSequence(filename){
+  if(!filename)return; if(!await confirmDiscard()){ $("ac-profile-select").value=AC_CURRENT_FILE; return; }
+  const res=await api().autoclick_load_profile(filename); if(!res||!res.ok){toast((res&&res.error)||"Could not load sequence.","error");return;}
+  AC_CURRENT_FILE=res.filename; AC_STATE={...AC_STATE,count:0,cycles:0,status:"Ready",error:"",elapsed:0,startedAt:0}; applyAutoClickConfig(res.config,true); renderAutoClick(); toast(`Opened ${res.filename}`,"success");
+}
+async function toggleAutoClick(){
+  const a=api();if(!a)return;const run=$("ac-run");run.disabled=true;
+  try{let res;if(AC_STATE.running)res=await a.autoclick_stop();else{if(!$("ac-form").reportValidity())return;AC_CONFIG=readAutoClickConfig();if(!AC_CONFIG.points.some(p=>p.enabled)){toast("Add or enable at least one click point.","error");return;}res=await a.autoclick_start(AC_CONFIG);} if(!res||res.ok===false)toast((res&&res.error)||"Auto Click could not start.","error");else{AC_STATE={...AC_STATE,...res};if(res.config)applyAutoClickConfig(res.config);renderAutoClick();}}
+  catch(error){toast("Auto Click could not update. "+String(error&&error.message||error),"error");}finally{run.disabled=false;}
+}
+async function captureAutoClickPosition(pointId=AC_CONFIG.selectedPointId){
+  try{clearTimeout(_acConfigureTimer);AC_CONFIG=readAutoClickConfig();await api().autoclick_configure(AC_CONFIG);const res=await api().autoclick_capture_position(pointId);if(!res||!res.ok){toast((res&&res.error)||"Could not read cursor position.","error");return;}const point=AC_CONFIG.points.find(p=>p.id===res.pointId);if(point){point.x=res.x;point.y=res.y;}renderPoints();setAutoClickDirty(true);toast(`Captured (${res.x}, ${res.y})`,"success");}catch{toast("Could not read cursor position.","error");}
+}
+async function addAutoClickPointAtCursor(){
+  try{clearTimeout(_acConfigureTimer);AC_CONFIG=readAutoClickConfig();await api().autoclick_configure(AC_CONFIG);const res=await api().autoclick_add_point_at_cursor();if(!res||!res.ok)toast((res&&res.error)||"Could not add cursor position.","error");}
+  catch{toast("Could not add cursor position.","error");}
+}
+function acceptAddedPoint(point){
+  if(!point||AC_CONFIG.points.some(p=>p.id===point.id))return;
+  AC_CONFIG.points.push(point);AC_CONFIG.selectedPointId=point.id;renderPoints();setAutoClickDirty(true);queueAutoClickConfigure();renderAutoClick();
+  const row=document.querySelector(`.point-row[data-id="${point.id}"]`);if(row)row.scrollIntoView({block:"nearest",behavior:"smooth"});
+  toast(`Added ${point.label} at (${point.x}, ${point.y})`,"success");
+}
+function updateHotkeyState(ok){AC_STATE.hotkeys=!!ok;const note=$("ac-hotkey-note");if(!note)return;note.className="hotkey-note "+(ok?"ok":"bad");note.innerHTML=`<span class="hotkey-dot"></span>${ok?"F6 Start/Stop · F7 Update selected point · F8 Add point":"Global hotkeys unavailable — use the on-screen controls"}`;}
+window.__autoClickEvent=(event,data)=>{data=data||{};if(event==="position"){const point=AC_CONFIG.points.find(p=>p.id===data.pointId);if(point){point.x=data.x;point.y=data.y;renderPoints();setAutoClickDirty(true);}}else if(event==="point-added"){acceptAddedPoint(data.point);}else if(event==="tick"){AC_STATE={...AC_STATE,count:data.count||0,cycles:data.cycles||0,activePointId:data.pointId||""};}else if(event==="hotkeys")updateHotkeyState(!!data.ok);else if(event==="state"){AC_STATE={...AC_STATE,...data};if(data.config)applyAutoClickConfig(data.config);}if($("ac-status"))renderAutoClick();};
+
 // ── Events ───────────────────────────────────────────────────────────────────
 function wire() {
+  document.querySelectorAll("[data-open-tool]").forEach((button) => { button.onclick = () => openTool(button.dataset.openTool); });
+  document.querySelectorAll("[data-back-home]").forEach((button) => { button.onclick = () => openTool("home"); });
   $("btn-refresh").onclick = () => loadList();
   $("btn-new").onclick = () => createWorkflow();
   $("btn-empty-new").onclick = () => createWorkflow();
   $("search").addEventListener("input", (e) => {
     FILTER = e.target.value || "";
     render();
+  });
+  $("ac-form").addEventListener("submit", (e) => e.preventDefault());
+  $("ac-run").onclick = toggleAutoClick;
+  $("ac-new").onclick = newAutoClickSequence;
+  $("ac-save").onclick = saveAutoClickSequence;
+  $("ac-folder").onclick = () => api().autoclick_open_folder();
+  $("ac-profile-select").onchange = (e) => loadAutoClickSequence(e.target.value);
+  $("ac-profile-name").addEventListener("input", queueAutoClickConfigure);
+  $("ac-form").addEventListener("input", queueAutoClickConfigure);
+  $("ac-form").addEventListener("change", queueAutoClickConfigure);
+  $("ac-add-point").onclick = addAutoClickPointAtCursor;
+  $("ac-points").addEventListener("click", async (e) => {
+    const row=e.target.closest(".point-row");if(!row||AC_STATE.running)return;
+    AC_CONFIG=readAutoClickConfig();AC_CONFIG.selectedPointId=row.dataset.id;
+    document.querySelectorAll(".point-row").forEach(r=>r.classList.toggle("selected",r===row));
+    const action=e.target.closest("[data-point-act]");
+    if(!action){queueAutoClickConfigure();return;}
+    const index=AC_CONFIG.points.findIndex(p=>p.id===row.dataset.id);
+    if(action.dataset.pointAct==="capture"){await captureAutoClickPosition(row.dataset.id);return;}
+    if(action.dataset.pointAct==="delete"){AC_CONFIG.points.splice(index,1);AC_CONFIG.selectedPointId=AC_CONFIG.points[Math.min(index,AC_CONFIG.points.length-1)]?.id||"";}
+    if(action.dataset.pointAct==="up"&&index>0)[AC_CONFIG.points[index-1],AC_CONFIG.points[index]]=[AC_CONFIG.points[index],AC_CONFIG.points[index-1]];
+    if(action.dataset.pointAct==="down"&&index<AC_CONFIG.points.length-1)[AC_CONFIG.points[index+1],AC_CONFIG.points[index]]=[AC_CONFIG.points[index],AC_CONFIG.points[index+1]];
+    renderPoints();setAutoClickDirty(true);queueAutoClickConfigure();
+  });
+  $("ac-points").addEventListener("change", (e) => {
+    const row=e.target.closest(".point-row");if(!row)return;
+    if(e.target.dataset.point==="targetMode"){const cursor=e.target.value==="cursor";row.querySelector('[data-point="x"]').disabled=cursor;row.querySelector('[data-point="y"]').disabled=cursor;}
+    AC_CONFIG=readAutoClickConfig();const enabled=AC_CONFIG.points.filter(p=>p.enabled).length;$("ac-point-summary").textContent=`${AC_CONFIG.points.length} point${AC_CONFIG.points.length===1?"":"s"} · ${enabled} enabled`;renderAutoClick();
+  });
+  document.addEventListener("keydown", (e) => {if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="s"&&$("autoclick-app").classList.contains("active")){e.preventDefault();saveAutoClickSequence();}});
+  document.querySelectorAll(".seg-control").forEach((box) => {
+    box.addEventListener("click", (e) => {
+      const button=e.target.closest(".seg"); if(!button||button.disabled) return;
+      setSegValue(box.dataset.acField,button.dataset.value); syncAutoClickFields(); queueAutoClickConfigure();
+    });
+    box.addEventListener("keydown", (e) => {
+      if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) return;
+      const buttons=[...box.querySelectorAll(".seg:not(:disabled)")]; if(!buttons.length) return;
+      const current=Math.max(0,buttons.findIndex(b=>b.classList.contains("on")));
+      const delta=(e.key==="ArrowLeft"||e.key==="ArrowUp")?-1:1;
+      const next=buttons[(current+delta+buttons.length)%buttons.length];
+      e.preventDefault(); next.click(); next.focus();
+    });
   });
   $("wf-body").addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-act]");
@@ -476,6 +681,93 @@ function wire() {
   });
 }
 
+// ── Auto-update (Velopack) ────────────────────────────────────────────────────
+// Background check on boot + a click-to-install pill in the footer. `manual`
+// true surfaces "up to date" / error toasts; false stays silent unless there's
+// actually an update to offer.
+async function checkForUpdates(manual) {
+  const btn = $("app-update");
+  let res;
+  try { res = await api().update_check(); } catch { return; }
+  if (!res) return;
+  if (res.available) {
+    if (btn) {
+      btn.hidden = false;
+      btn.disabled = false;
+      btn.textContent = "Update to v" + res.version;
+      btn.onclick = () => applyUpdate(res.version);
+    }
+    toast("Update available: v" + res.version, "info");
+  } else {
+    if (btn) btn.hidden = true;
+    if (manual) {
+      if (res.error) toast("Update check failed: " + res.error, "error");
+      else if (!res.supported) toast("Auto-update only works in the installed build", "info");
+      else toast("You're on the latest version (v" + res.current + ")", "success");
+    }
+  }
+}
+
+// Full-screen progress overlay shown while an update downloads + installs.
+function showUpdateOverlay(version) {
+  hideUpdateOverlay();
+  const wrap = document.createElement("div");
+  wrap.id = "update-overlay";
+  wrap.innerHTML =
+    '<div class="upd-card">' +
+      '<div class="upd-title">Updating Macro2k</div>' +
+      '<div class="upd-sub" id="upd-sub">Downloading v' + escHtml(version) + '…</div>' +
+      '<div class="upd-track"><div class="upd-fill" id="upd-fill"></div></div>' +
+      '<div class="upd-pct" id="upd-pct">0%</div>' +
+    '</div>';
+  document.body.appendChild(wrap);
+}
+function hideUpdateOverlay() { const o = $("update-overlay"); if (o) o.remove(); }
+
+// Called from Python (via evaluate_js) as bytes download: pct 0..100, or -1 for
+// indeterminate (server didn't send a length).
+window.__updateProgress = function (pct) {
+  const wrap = $("update-overlay");
+  if (!wrap) return;
+  const fill = $("upd-fill"), pctEl = $("upd-pct"), sub = $("upd-sub");
+  if (pct < 0) {                        // indeterminate — animate the track
+    wrap.classList.add("indet");
+    if (pctEl) pctEl.textContent = "";
+    return;
+  }
+  wrap.classList.remove("indet");
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  if (fill) fill.style.width = p + "%";
+  if (pctEl) pctEl.textContent = p + "%";
+  if (p >= 100 && sub) sub.textContent = "Installing… the app will restart";
+};
+
+async function applyUpdate(version) {
+  const ok = await modal({
+    title: "Update Macro2k?",
+    body: `Download and install <b>v${escHtml(version)}</b>, then restart the app.`,
+    buttons: [{ label: "Later", value: false }, { label: "Update now", value: true, kind: "accent" }],
+  });
+  if (!ok) return;
+  const btn = $("app-update");
+  if (btn) { btn.disabled = true; btn.textContent = "Updating…"; }
+  showUpdateOverlay(version);
+  try {
+    // On success the app installs the new version and restarts, so this call
+    // never resolves; we only get here when there's nothing to do or it failed.
+    const res = await api().update_apply();
+    hideUpdateOverlay();
+    if (res && res.error) {
+      toast("Update failed: " + res.error, "error");
+      if (btn) { btn.disabled = false; btn.textContent = "Update to v" + version; }
+    }
+  } catch {
+    hideUpdateOverlay();
+    toast("Update failed", "error");
+    if (btn) { btn.disabled = false; btn.textContent = "Update to v" + version; }
+  }
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 async function init() {
   wire();
@@ -488,7 +780,18 @@ async function init() {
     toast("pywebview unavailable", "error");
     return;
   }
-  await loadList();
+  try {
+    const ver = await api().app_version();
+    const vEl = $("app-version");
+    if (vEl && ver) vEl.textContent = "v" + ver;
+  } catch {}
+  checkForUpdates(false);   // background check on boot (never blocks the UI)
+  try {
+    const state=await api().autoclick_state();
+    if(state){ AC_STATE={...AC_STATE,...state}; AC_DIR=state.profilesDir||AC_DIR; applyAutoClickConfig(state.config,true); updateHotkeyState(!!state.hotkeys); renderAutoClick(); }
+    await refreshAutoClickProfiles();
+  } catch { updateHotkeyState(false); }
+  await openTool("home");
 }
 
 if (document.readyState === "loading") {

@@ -13,8 +13,8 @@ wide) and portrait.
 
 ## Product Purpose
 
-An internal tool suite — **Workflow2k Hub** (workflow dashboard: list / run /
-edit / create), **Workflow2k Designer** (node-graph editor), **Workflow2k
+An internal tool suite — **Macro2k Hub** (workflow dashboard: list / run /
+edit / create), **Macro2k Designer** (node-graph editor), **Macro2k
 Runner** (load a JSON flow and run it), and **DevScope** (device inspector).
 The hub is the default entry; the runner's job is load a flow, toggle
 activities, press Start, and monitor progress/log at a glance while it runs

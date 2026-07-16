@@ -15,6 +15,28 @@ from typing import Callable, List, Optional, Sequence
 
 from colorama import init as _colorama_init, Fore, Style
 
+# Re-export the version constants so callers can pull them from the same place
+# they already import the other app helpers (``from src.utils import ...``).
+from src.version import APP_NAME, APP_VERSION, __version__, titled  # noqa: F401
+
+
+def _force_utf8_streams() -> None:
+    """Reconfigure stdout/stderr to UTF-8 so log lines containing emoji or
+    non-Latin diacritics (e.g. Vietnamese ``ắ``) never raise
+    ``UnicodeEncodeError`` under the Windows console/frozen-exe default codec
+    (cp1252 / 'charmap'). ``errors='replace'`` guarantees a write can never
+    crash. Streams may be ``None`` in a windowed (no-console) build."""
+    for _stream in (sys.stdout, sys.stderr):
+        if _stream is None:
+            continue
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_force_utf8_streams()
+
 # Initialise colorama once for Windows ANSI support.
 _colorama_init()
 
@@ -174,11 +196,16 @@ def log_normal(message: str) -> None:
 #
 # These let the same code run from source (``python apps/...``) and from a
 # PyInstaller one-dir build. In a frozen build:
-#   * ``app_dir()``    -> the folder that contains the .exe (where ``vendor/``,
-#                         ``data/`` and ``out/`` live and stay writable);
+#   * ``app_dir()``    -> the folder that contains the .exe (where the shipped,
+#                         read-only ``vendor/`` lives — adb/frida/tesseract);
+#   * ``data_root()``  -> writable user data (``workflows/``, ``data/``, ``out/``,
+#                         ``autoclicks/``, ``logs/``). Same as app_dir() for a
+#                         plain/portable build, but redirected OUT of the install
+#                         folder under a Velopack install so auto-updates (which
+#                         replace ``current/`` wholesale) never wipe user data;
 #   * ``bundle_dir()`` -> PyInstaller's ``_MEIPASS`` (read-only bundled assets
 #                         such as the web/ HTML).
-# From source both resolve to the project root, so behaviour is unchanged.
+# From source all three resolve to the project root, so behaviour is unchanged.
 # ---------------------------------------------------------------------------
 
 # <root>/src/utils/__init__.py -> up 3 dirnames -> <root>
@@ -198,13 +225,59 @@ def is_frozen() -> bool:
 
 
 def app_dir() -> str:
-    """Folder for external, writable resources (``vendor/``, ``data/``, ``out/``).
+    """Install folder — holds the shipped, read-only ``vendor/`` tree.
 
-    Frozen: the directory containing the executable. Source: the project root.
+    Frozen: the directory containing the executable (under a Velopack install
+    this is ``…\\<AppId>\\current``, replaced on every update — which is exactly
+    why *writable* data must use :func:`data_root` instead). Source: repo root.
     """
     if is_frozen():
         return os.path.dirname(os.path.abspath(sys.executable))
     return _SOURCE_ROOT
+
+
+def is_portable_build() -> bool:
+    """True for a frozen build explicitly marked portable — a ``portable.txt``
+    (or ``.portable``) file sitting next to the executable. Portable builds keep
+    all writable data beside the .exe instead of under the user profile."""
+    if not is_frozen():
+        return False
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+    return any(os.path.isfile(os.path.join(exe_dir, m))
+               for m in ("portable.txt", ".portable"))
+
+
+def _dir_writable(path: str) -> bool:
+    """Real write test (not ``os.access``, which lies on Windows): try to create
+    and delete a probe file in ``path``. False if it doesn't exist or is
+    read-only (e.g. ``C:/Program Files`` without elevation)."""
+    probe = os.path.join(path, ".write_probe")
+    try:
+        with open(probe, "w"):
+            pass
+        os.remove(probe)
+        return True
+    except Exception:
+        return False
+
+
+def data_root() -> str:
+    """Writable root for user data (``workflows/``, ``data/``, ``out/`` …).
+
+    Kept **next to the app** whenever that folder is writable — a per-user or
+    custom (e.g. ``D:/Macro2k``) install, or a portable copy — so everything
+    lives in one place. Falls back to ``%LOCALAPPDATA%/<AppName>`` only when the
+    install dir is read-only (an all-users ``C:/Program Files`` install, which a
+    non-elevated app can't write to). Source runs use the repo root."""
+    if not is_frozen():
+        return _SOURCE_ROOT
+    exe_dir = app_dir()
+    if is_portable_build() or _dir_writable(exe_dir):
+        return exe_dir
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    path = os.path.join(base, APP_NAME)
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
 def bundle_dir() -> str:
@@ -238,22 +311,22 @@ def webview_storage_path(app_key: str) -> str:
     (HRESULT ``0x8007139F``) — empty chrome, no HTML.
     """
     key = (app_key or "app").strip().lower() or "app"
-    path = os.path.join(app_dir(), "data", "webview", key)
+    path = os.path.join(data_root(), "data", "webview", key)
     os.makedirs(path, exist_ok=True)
     return path
 
 
 # Maps a logical app name to (frozen exe basename, source-tree script path
-# relative to the project root). Workflow2k.exe hosts Hub + Designer + Runner
+# relative to the project root). Macro2k.exe hosts Hub + Designer + Runner
 # via CLI switches (default = hub, ``--designer``, ``--runner``).
 #
-# Packaging ships only Workflow2k.exe. DevScope is source-only unless you add
+# Packaging ships only Macro2k.exe. DevScope is source-only unless you add
 # it back to packaging/apps_build.spec.
 _APP_MAP = {
-    "hub": ("Workflow2k.exe", os.path.join("apps", "workflow_hub.py")),
-    "designer": ("Workflow2k.exe", os.path.join("apps", "workflow_designer.py")),
+    "hub": ("Macro2k.exe", os.path.join("apps", "workflow_hub.py")),
+    "designer": ("Macro2k.exe", os.path.join("apps", "workflow_designer.py")),
     "devscope": ("DevScope.exe", os.path.join("apps", "devscope.py")),
-    "runner": ("Workflow2k.exe", os.path.join("apps", "workflow_runner.py")),
+    "runner": ("Macro2k.exe", os.path.join("apps", "workflow_runner.py")),
 }
 
 # Frozen CLI flags so one exe can host hub / designer / runner.
@@ -268,8 +341,8 @@ def launch_tool(tool: str, extra_args: Optional[Sequence[str]] = None) -> None:
     """Launch a sibling app process, working both frozen and from source.
 
     Frozen: runs the matching ``*.exe`` next to the current executable
-    (``Workflow2k.exe``, ``Workflow2k.exe --designer <args>``,
-    ``Workflow2k.exe --runner <args>``). Source: runs
+    (``Macro2k.exe``, ``Macro2k.exe --designer <args>``,
+    ``Macro2k.exe --runner <args>``). Source: runs
     ``python apps/<script>.py <args>``.
 
     Raises ``FileNotFoundError`` if the frozen target exe is missing
@@ -299,8 +372,13 @@ __all__ = [
     "CREATE_NO_WINDOW",
     "is_frozen",
     "app_dir",
+    "data_root",
+    "is_portable_build",
     "bundle_dir",
     "file_url",
+    "APP_NAME",
+    "APP_VERSION",
+    "titled",
     "webview_storage_path",
     "launch_tool",
     "setup_logger",

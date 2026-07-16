@@ -1,4 +1,4 @@
-"""Frozen entry point for ``Workflow2k.exe``.
+"""Frozen entry point for ``Macro2k.exe``.
 
 Default behaviour opens the **Hub** (workflow dashboard). Switches:
 

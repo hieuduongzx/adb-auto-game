@@ -526,22 +526,22 @@
           {
             "id": "n6pi9wel",
             "type": "start",
-            "x": 20,
-            "y": 23,
+            "x": 40,
+            "y": 7,
             "params": {}
           },
           {
             "id": "ndi8pf0t",
             "type": "end",
-            "x": 1080,
-            "y": 7,
+            "x": 1120,
+            "y": -25,
             "params": {}
           },
           {
             "id": "nj3zqhb2",
             "type": "launch_emulator",
             "x": 320,
-            "y": 76,
+            "y": 59,
             "params": {
               "emulator": "mumu",
               "index": 0,
@@ -557,8 +557,8 @@
           {
             "id": "nj5xjfpu",
             "type": "launch_app",
-            "x": 524,
-            "y": -21,
+            "x": 520,
+            "y": -37,
             "params": {
               "package": "",
               "wait": 0,
@@ -581,7 +581,7 @@
             "id": "ni8wav38",
             "type": "if_app",
             "x": 320,
-            "y": -21,
+            "y": -37,
             "params": {
               "package": "com.neversoft.rpg.erolabs",
               "negate": true,
@@ -591,8 +591,8 @@
           {
             "id": "nnz4qlmo",
             "type": "call",
-            "x": 700,
-            "y": -21,
+            "x": 720,
+            "y": -37,
             "params": {
               "fn": "fn_hh4kj"
             }
@@ -600,8 +600,8 @@
           {
             "id": "nlf8yrpv",
             "type": "tap",
-            "x": 880,
-            "y": -21,
+            "x": 920,
+            "y": -37,
             "params": {
               "target": "pos",
               "x": 984,
@@ -1700,10 +1700,10 @@
             "x": 980,
             "y": -340,
             "params": {
-              "x": 0,
-              "y": 0,
-              "w": 100,
-              "h": 100
+              "x1": 0,
+              "y1": 0,
+              "x2": 100,
+              "y2": 100
             }
           },
           {
@@ -2691,13 +2691,13 @@
       "id": "sequence_hhiq",
       "name": "Dungeon",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [
         {
           "name": "fixMissingStar",
           "label": "Đánh lại star bị thiếu",
           "type": "bool",
-          "value": true,
+          "value": false,
           "options": []
         }
       ],
@@ -3822,8 +3822,8 @@
           {
             "id": "nitzjubf",
             "type": "tap_image",
-            "x": 620,
-            "y": 120,
+            "x": 640,
+            "y": 160,
             "params": {
               "template": "templates/crop_20260701_012118_1308_377_79_63.png",
               "taps": "1",
@@ -3836,7 +3836,7 @@
           {
             "id": "nfjwvjl8",
             "type": "tap_image",
-            "x": 800,
+            "x": 840,
             "y": 60,
             "params": {
               "template": "templates/crop_20260628_234115_173x182.png",
@@ -3851,7 +3851,7 @@
             "id": "nyr6qwo4",
             "type": "call",
             "x": 440,
-            "y": 120,
+            "y": 160,
             "params": {
               "fn": "fn_yt9m6"
             }
@@ -3870,7 +3870,7 @@
           {
             "id": "nwd2j7zu",
             "type": "tap_image",
-            "x": 980,
+            "x": 1040,
             "y": 60,
             "params": {
               "template": "templates/crop_20260628_232644_38x37.png",
@@ -3884,8 +3884,8 @@
           {
             "id": "nzu0wzc9",
             "type": "tap_image",
-            "x": 1320,
-            "y": 60,
+            "x": 1420,
+            "y": -100,
             "params": {
               "template": "templates/crop_20260628_234149_74x67.png",
               "taps": "1",
@@ -4344,8 +4344,8 @@
           {
             "id": "nbakz5kc",
             "type": "if_image",
-            "x": 1140,
-            "y": 4,
+            "x": 1220,
+            "y": -180,
             "params": {
               "template": "templates/crop_20260709_235145_814_228_293_39.png",
               "threshold": 0.85,
@@ -4356,8 +4356,8 @@
           {
             "id": "nyr0f39v",
             "type": "tap_image",
-            "x": 1320,
-            "y": -44,
+            "x": 1420,
+            "y": -180,
             "params": {
               "template": "templates/crop_20260709_235525_653_746_125_60.png",
               "taps": "1",
@@ -4678,7 +4678,7 @@
       "id": "sequence_ih6c",
       "name": "Dragon Queen",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -4743,7 +4743,7 @@
             "y": -82,
             "params": {
               "x1": 362,
-              "y1": 350,
+              "y1": 400,
               "x2": 362,
               "y2": 0,
               "duration": 330
@@ -4767,7 +4767,7 @@
             "x": 1340,
             "y": -82,
             "params": {
-              "template": "templates/crop_20260708_212339_359_497_56_85.png",
+              "template": "templates/crop_20260716_000730_356_671_67_80.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -5935,6 +5935,213 @@
             "from": "n700dym5",
             "fromPort": "false",
             "to": "nyjp5f12"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_umsv",
+      "name": "Activity 15",
+      "type": "sequence",
+      "enabled": false,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "n4dwkdzc",
+            "type": "start",
+            "x": 20,
+            "y": -100,
+            "params": {}
+          },
+          {
+            "id": "norow6c3",
+            "type": "end",
+            "x": 940,
+            "y": -116,
+            "params": {}
+          },
+          {
+            "id": "n1xgan6c",
+            "type": "if_image",
+            "x": 340,
+            "y": 20,
+            "params": {
+              "template": "templates/crop_20260715_235859_918_710_71_67.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nwk2itxw",
+            "type": "tap",
+            "x": 560,
+            "y": 20,
+            "params": {
+              "target": "pos",
+              "x": 536,
+              "y": 1017,
+              "taps": "1"
+            }
+          },
+          {
+            "id": "nnt8dypo",
+            "type": "tap",
+            "x": 760,
+            "y": -198,
+            "params": {
+              "target": "pos",
+              "x": 1359,
+              "y": 987,
+              "taps": "1"
+            }
+          },
+          {
+            "id": "ndyw26ws",
+            "type": "if_image",
+            "x": 340,
+            "y": -64,
+            "params": {
+              "template": "templates/crop_20260715_235905_922_704_74_69.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "n6ukxyvn",
+            "type": "tap",
+            "x": 760,
+            "y": -116,
+            "params": {
+              "target": "pos",
+              "x": 565,
+              "y": 988,
+              "taps": "1"
+            }
+          },
+          {
+            "id": "nnx0apb3",
+            "type": "parallel",
+            "x": 560,
+            "y": -160,
+            "params": {
+              "count": 3
+            }
+          },
+          {
+            "id": "nfjqgqnp",
+            "type": "tap",
+            "x": 560,
+            "y": -64,
+            "params": {
+              "target": "pos",
+              "x": 1339,
+              "y": 978,
+              "taps": "1"
+            }
+          },
+          {
+            "id": "nz1budx7",
+            "type": "loop",
+            "x": 120,
+            "y": -164,
+            "params": {
+              "infinite": true,
+              "count": 3
+            }
+          },
+          {
+            "id": "n3w0kftt",
+            "type": "if_image_any",
+            "x": 340,
+            "y": -160,
+            "params": {
+              "templates": [
+                "templates/crop_20260716_000019_931_756_65_79.png",
+                "templates/crop_20260715_235830_749_753_462_28.png",
+                "templates/crop_20260716_000345_827_756_264_15.png"
+              ],
+              "threshold": 0.85,
+              "negate": false,
+              "mode": "sequential"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "n1xgan6c",
+            "fromPort": "true",
+            "to": "nwk2itxw"
+          },
+          {
+            "from": "nnx0apb3",
+            "fromPort": "1",
+            "to": "nnt8dypo"
+          },
+          {
+            "from": "nnx0apb3",
+            "fromPort": "2",
+            "to": "n6ukxyvn"
+          },
+          {
+            "from": "ndyw26ws",
+            "fromPort": "true",
+            "to": "nfjqgqnp"
+          },
+          {
+            "from": "ndyw26ws",
+            "fromPort": "false",
+            "to": "n1xgan6c"
+          },
+          {
+            "from": "n4dwkdzc",
+            "fromPort": "out",
+            "to": "nz1budx7"
+          },
+          {
+            "from": "nfjqgqnp",
+            "fromPort": "out",
+            "to": "n1xgan6c"
+          },
+          {
+            "from": "nnt8dypo",
+            "fromPort": "out",
+            "to": "nz1budx7",
+            "toPort": "loop"
+          },
+          {
+            "from": "nwk2itxw",
+            "fromPort": "out",
+            "to": "n3w0kftt"
+          },
+          {
+            "from": "n3w0kftt",
+            "fromPort": "true",
+            "to": "nnx0apb3"
+          },
+          {
+            "from": "nz1budx7",
+            "fromPort": "body",
+            "to": "n3w0kftt"
+          },
+          {
+            "from": "n3w0kftt",
+            "fromPort": "false",
+            "to": "ndyw26ws"
+          },
+          {
+            "from": "n1xgan6c",
+            "fromPort": "false",
+            "to": "nz1budx7",
+            "toPort": "loop"
+          },
+          {
+            "from": "n6ukxyvn",
+            "fromPort": "out",
+            "to": "nz1budx7",
+            "toPort": "loop"
           }
         ],
         "groups": []

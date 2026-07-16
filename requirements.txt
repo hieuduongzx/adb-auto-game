@@ -1,4 +1,4 @@
-# ADB auto-game — core dependencies for Workflow2k apps.
+# ADB auto-game — core dependencies for Macro2k apps.
 # Install:  pip install -r requirements.txt
 
 # ── Capture / vision ────────────────────────────────────────────────────────
@@ -30,6 +30,11 @@ frida>=16.0.0 ; sys_platform == "win32"
 
 # ── Mobile automation ───────────────────────────────────────────────────────
 pure-python-adb>=0.3.0.dev0
+
+# ── Auto-update ─────────────────────────────────────────────────────────────
+# Runtime side uses only the stdlib (urllib) to poll GitHub Releases and run the
+# downloaded Inno Setup installer — no extra dependency. Packaging side is the
+# Inno Setup compiler (ISCC), installed by packaging/build.ps1 when needed.
 
 # ── Utilities ───────────────────────────────────────────────────────────────
 keyboard>=0.13.5      # hotkeys (e.g. q-to-quit on ADBGameAutomation)

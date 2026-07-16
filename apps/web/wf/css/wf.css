@@ -1349,6 +1349,16 @@
 .wf-tpls-hdr input { flex:1; min-width:0; font-size:10px; }
 .wf-tpls-hdr .btn.sm { height:22px; padding:0 6px; font-size:10px; }
 .wf-tpls-empty { font-size:10.5px; color:var(--muted); font-style:italic; padding:2px 0; }
+/* Multi-point tap coordinate editor */
+.wf-points-list { display:flex; flex-direction:column; gap:4px; }
+.wf-points-head, .wf-point-row { display:grid; grid-template-columns:20px minmax(0,1fr) minmax(0,1fr) 22px; align-items:center; gap:4px; }
+.wf-points-head { color:var(--muted); font-size:9.5px; font-weight:600; text-align:center; }
+.wf-point-row .num { display:flex; align-items:center; justify-content:center; width:20px; height:20px;
+  border-radius:50%; background:var(--accent-bg); color:var(--accent); font-family:var(--mono); font-size:9.5px; font-weight:700; }
+.wf-point-row input { width:100%; min-width:0; height:25px; padding:3px 5px; text-align:center; font-size:10.5px; }
+.wf-points-actions { display:flex; align-items:center; gap:7px; }
+.wf-points-picked { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:var(--muted); font-family:var(--mono); font-size:9.5px; }
 /* Variable card in activity inspector */
 .wf-var-card { border:1px solid var(--border2); border-radius:7px; padding:6px; background:var(--panel); display:flex; flex-direction:column; gap:5px; }
 .wf-var-row { display:flex; align-items:center; gap:5px; }

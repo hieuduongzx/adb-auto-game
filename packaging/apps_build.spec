@@ -1,11 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for the Workflow2k one-dir app.
+"""PyInstaller spec for the Macro2k one-dir app.
 
 Output (after ``build.ps1`` merges staging + vendor)::
 
-    dist/Workflow2k/
-        Workflow2k.exe      -> Hub (default) + Designer (--designer) + Runner (--runner)
-        _workflow2k/        -> private runtime files
+    dist/Macro2k/
+        Macro2k.exe      -> Hub (default) + Designer (--designer) + Runner (--runner)
+        _macro2k/        -> private runtime files
         vendor/             -> adb / frida / tesseract (external, not bundled)
 
 ``vendor/`` is NOT bundled here (kept external/updatable). Web HTML assets ARE
@@ -17,11 +17,40 @@ Prefer ``build.ps1`` (handles staging + vendor). Raw build::
     pyinstaller --noconfirm --clean packaging/apps_build.spec
 """
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 ROOT = os.path.dirname(SPECPATH)  # SPECPATH = .../packaging
 APPS = os.path.join(ROOT, "apps")
+
+# --- app version → Windows .exe version resource -----------------------------
+# Single source of truth is src/version.py; mirror it into the PE metadata so
+# right-click → Properties → Details shows the version on the packaged .exe.
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+from src.version import APP_NAME, __version__, version_tuple  # noqa: E402
+
+_vt = (version_tuple() + (0, 0, 0, 0))[:4]  # pad to the 4 ints Windows wants
+from PyInstaller.utils.win32.versioninfo import (  # noqa: E402
+    VSVersionInfo, FixedFileInfo, StringFileInfo, StringTable, StringStruct, VarFileInfo, VarStruct,
+)
+version_info = VSVersionInfo(
+    ffi=FixedFileInfo(filevers=_vt, prodvers=_vt, mask=0x3F, flags=0x0,
+                      OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+    kids=[
+        StringFileInfo([StringTable("040904B0", [
+            StringStruct("CompanyName", APP_NAME),
+            StringStruct("FileDescription", f"{APP_NAME} — desktop automation suite"),
+            StringStruct("FileVersion", __version__),
+            StringStruct("InternalName", APP_NAME),
+            StringStruct("OriginalFilename", f"{APP_NAME}.exe"),
+            StringStruct("ProductName", APP_NAME),
+            StringStruct("ProductVersion", __version__),
+        ])]),
+        VarFileInfo([VarStruct("Translation", [0x409, 1200])]),
+    ],
+)
 
 # --- third-party collection (pywebview EdgeChromium backend via pythonnet) ---
 datas = []
@@ -47,7 +76,7 @@ hiddenimports += [
 ]
 
 # --- bundled web assets (hub + designer + runner; no DevScope) ---------------
-# Under apps/web: hub/, wf/, and runner/ are needed for Workflow2k.
+# Under apps/web: hub/, wf/, and runner/ are needed for Macro2k.
 _web_src = os.path.join(ROOT, "apps", "web")
 web_datas = [
     (os.path.join(_web_src, "hub"), os.path.join("web", "hub")),
@@ -74,7 +103,7 @@ _common = dict(
     noarchive=False,
 )
 
-# ── Workflow2k.exe (Hub + Designer + Runner) ────────────────────────────────
+# ── Macro2k.exe (Hub + Designer + Runner) ────────────────────────────────
 a_designer = Analysis(
     [os.path.join(ROOT, "packaging", "entry_designer.py")],
     datas=datas + web_datas,
@@ -83,11 +112,12 @@ a_designer = Analysis(
 pyz_designer = PYZ(a_designer.pure)
 exe_designer = EXE(
     pyz_designer, a_designer.scripts, [],
-    exclude_binaries=True, name="Workflow2k",
+    exclude_binaries=True, name="Macro2k",
     console=False, disable_windowed_traceback=False,
-    contents_directory="_workflow2k",
+    contents_directory="_macro2k",
+    version=version_info,
 )
 coll_designer = COLLECT(
     exe_designer, a_designer.binaries, a_designer.datas,
-    name="Workflow2k",
+    name="Macro2k",
 )

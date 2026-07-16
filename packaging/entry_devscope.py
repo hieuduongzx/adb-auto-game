@@ -1,6 +1,6 @@
 """Frozen entry point for ``DevScope.exe`` (device inspector app).
 
-Not included in the default ``apps_build.spec`` (Workflow2k-only packaging).
+Not included in the default ``apps_build.spec`` (Macro2k-only packaging).
 Kept so DevScope can be re-added to the build without rewiring imports.
 """
 from __future__ import annotations

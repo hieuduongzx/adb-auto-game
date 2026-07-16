@@ -341,6 +341,16 @@ class ADBGameAutomation:
                 self.visualizer.show_tap(screen, x, y, tap_count)
         return self.adb.tap(x, y, duration, tap_count)
 
+    def multi_tap(self, points, duration_ms: int = 80) -> bool:
+        """Press several coordinates as one overlapping touch batch."""
+        clean = [(int(x), int(y)) for x, y in points]
+        if self.is_debug:
+            screen = self.get_latest_screen()
+            if screen is not None:
+                for x, y in clean:
+                    self.visualizer.show_tap(screen, x, y, 1)
+        return self.adb.multi_tap(clean, duration_ms=duration_ms)
+
     def _resolve_threshold(self, threshold: Optional[float]) -> float:
         """Caller threshold, or the configured default. ``0.0`` is honoured."""
         return threshold if threshold is not None else self.config.default_threshold

@@ -1,12 +1,12 @@
 # Đóng gói app ra .exe
 
-Build **Workflow2k** (Hub mặc định + Designer qua `--designer` + Runner qua
+Build **Macro2k** (Hub mặc định + Designer qua `--designer` + Runner qua
 `--runner`) vào một thư mục kèm **`vendor/`** (adb / frida / tesseract):
 
 ```
-dist/Workflow2k/
-    Workflow2k.exe      Hub (mặc định); --designer / --runner
-    _workflow2k/        file runtime riêng
+dist/Macro2k/
+    Macro2k.exe      Hub (mặc định); --designer / --runner
+    _macro2k/        file runtime riêng
     vendor/             adb / frida / tesseract
 ```
 
@@ -39,14 +39,14 @@ pwsh packaging/build.ps1 -SkipVendor
 - **Asset chỉ-đọc** (HTML `web/hub`, `web/wf`, `web/runner`) được nhúng trong
   bundle — `src.utils.bundle_dir()` → `_MEIPASS`.
 - **Cùng một exe, ba mode:**
-  - `Workflow2k.exe` → Hub (dashboard)
-  - `Workflow2k.exe --designer [flow.json]` → Designer
-  - `Workflow2k.exe --runner [flow.json]` → Runner
+  - `Macro2k.exe` → Hub (dashboard)
+  - `Macro2k.exe --designer [flow.json]` → Designer
+  - `Macro2k.exe --runner [flow.json]` → Runner
   (source: `python apps/workflow_hub.py` / `workflow_designer.py` / `workflow_runner.py`).
 
 ## Lưu ý
 
 - Chỉ bundle backend OCR **Tesseract**; `easyocr/paddle/torch` bị loại khỏi build cho nhẹ.
-- `vendor/` nằm trong `dist/Workflow2k/vendor` — có thể tự xoá bớt tool không dùng nếu cần.
+- `vendor/` nằm trong `dist/Macro2k/vendor` — có thể tự xoá bớt tool không dùng nếu cần.
 - Đổi `console=False` → `True` trong `apps_build.spec` nếu cần xem traceback khi debug.
-- Để phân phối: nén/copy cả thư mục `dist/Workflow2k/` (giữ nguyên cấu trúc bên trong).
+- Để phân phối: nén/copy cả thư mục `dist/Macro2k/` (giữ nguyên cấu trúc bên trong).

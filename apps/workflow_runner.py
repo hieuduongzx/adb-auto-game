@@ -29,6 +29,7 @@ if _PROJECT_ROOT not in sys.path:
 
 import webview
 
+from src.core.adb import kill_adb_server
 from src.core.adb.auto.scrcpy_capture import (
     CAPTURE_BACKENDS,
     get_capture_backend,
@@ -38,8 +39,8 @@ from src.core.adb.auto.scrcpy_capture import (
 from src.workflow import WorkflowEngine
 from src.utils import (
     add_log_subscriber,
-    app_dir,
     bundle_dir,
+    data_root,
     file_url,
     is_frozen,
     log_error,
@@ -47,12 +48,14 @@ from src.utils import (
     log_success,
     log_warning,
     remove_log_subscriber,
+    titled,
     webview_storage_path,
 )
 
-# In a frozen build, writable resources (data/) live next to the .exe.
+# In a frozen build, writable resources (data/) live under data_root() — next to
+# the app when writable, else %LOCALAPPDATA% (read-only Program Files install).
 if is_frozen():
-    _PROJECT_ROOT = app_dir()
+    _PROJECT_ROOT = data_root()
 
 # Bundled HTML: ``apps/web`` from source, ``<_MEIPASS>/web`` when frozen.
 _WEB_DIR = (os.path.join(bundle_dir(), "web") if is_frozen()
@@ -133,7 +136,7 @@ class WorkflowRunnerAPI:
 
     def get_state(self) -> dict:
         return {
-            "title": "Workflow2k Runner",
+            "title": "Macro2k Runner",
             "name": self.flow.get("name", ""),
             "loaded": bool(self.flow),
             "activities": self._activities_payload(),
@@ -175,8 +178,8 @@ class WorkflowRunnerAPI:
 
     def load_json(self) -> dict:
         """Open a file dialog, load the flow, and return the new state."""
-        flows_dir = os.path.join(app_dir(), "workflows")
-        start_dir = flows_dir if os.path.isdir(flows_dir) else app_dir()
+        flows_dir = os.path.join(data_root(), "workflows")
+        start_dir = flows_dir if os.path.isdir(flows_dir) else data_root()
         try:
             wins = webview.windows
             win = wins[0] if wins else None
@@ -417,11 +420,12 @@ class WorkflowRunnerAPI:
         except Exception:
             pass
         stop_scrcpy_sources()
+        kill_adb_server()   # stop the leftover adb.exe daemon (also unlocks vendor/adb)
 
 
 # ── Entry points ────────────────────────────────────────────────────────────
 
-def create_workflow_runner_window(title: str = "Workflow2k Runner",
+def create_workflow_runner_window(title: str = titled("Macro2k Runner"),
                                   auto_load: Optional[str] = None) -> webview.Window:
     api = WorkflowRunnerAPI()
     api._pending_load = auto_load

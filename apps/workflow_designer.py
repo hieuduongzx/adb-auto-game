@@ -38,7 +38,7 @@ if _PROJECT_ROOT not in sys.path:
 
 import webview
 
-from src.core.adb import ADBController, DeviceScanner
+from src.core.adb import ADBController, DeviceScanner, kill_adb_server
 from src.core.adb.auto.scrcpy_capture import (
     CAPTURE_BACKENDS,
     capture_screen as capture_screen_frame,
@@ -53,8 +53,8 @@ from src.core.frida_speedhack import FridaSpeedhackManager
 from src.workflow import NODE_TYPES, WorkflowEngine
 from src.utils import (
     add_log_subscriber,
-    app_dir,
     bundle_dir,
+    data_root,
     file_url,
     is_frozen,
     launch_tool,
@@ -63,12 +63,14 @@ from src.utils import (
     log_success,
     log_warning,
     remove_log_subscriber,
+    titled,
     webview_storage_path,
 )
 
-# In a frozen build, writable resources (data/) live next to the .exe.
+# In a frozen build, writable resources (data/) live under data_root() — next to
+# the app when writable, else %LOCALAPPDATA% (read-only Program Files install).
 if is_frozen():
-    _PROJECT_ROOT = app_dir()
+    _PROJECT_ROOT = data_root()
 
 # Bundled HTML: ``apps/web`` from source, ``<_MEIPASS>/web`` when frozen.
 _WEB_DIR = (os.path.join(bundle_dir(), "web") if is_frozen()
@@ -1944,13 +1946,14 @@ class WorkflowDesignerAPI:
             except Exception:
                 pass
         stop_scrcpy_sources()
+        kill_adb_server()   # stop the leftover adb.exe daemon (also unlocks vendor/adb)
         remove_log_subscriber(self._on_log)
 
 
 # ── Entry points ────────────────────────────────────────────────────────────
 
 def create_workflow_designer_window(
-    title: str = "Workflow2k",
+    title: str = titled(),
     auto_load: Optional[str] = None,
 ) -> webview.Window:
     api = WorkflowDesignerAPI()

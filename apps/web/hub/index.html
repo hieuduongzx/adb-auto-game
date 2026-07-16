@@ -3,88 +3,174 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Workflow2k</title>
+<title>Macro2k Hub</title>
 <link rel="stylesheet" href="css/hub.css">
 </head>
 <body>
 <div id="app">
 
-  <!-- Header -->
-  <header id="header" class="card">
-    <div class="hdr-brand">
-      <div class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1.5"/>
-          <rect x="14" y="3" width="7" height="7" rx="1.5"/>
-          <rect x="3" y="14" width="7" height="7" rx="1.5"/>
-          <path d="M17.5 14v7M14 17.5h7"/>
-        </svg>
-      </div>
-      <div class="brand-text">
-        <h1 class="app-title">Workflow2k</h1>
-        <p class="app-sub">Workflow dashboard</p>
-      </div>
-    </div>
-    <div class="hdr-actions">
-      <button class="btn ico" id="btn-refresh" title="Refresh list" aria-label="Refresh list">
-        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-      </button>
-      <button class="btn accent" id="btn-new" title="Create a new workflow">
-        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        New workflow
-      </button>
-    </div>
-  </header>
-
-  <!-- Toolbar: search + count -->
-  <div id="toolbar" class="card">
-    <div class="search-wrap">
-      <svg class="search-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="search" id="search" placeholder="Search workflows…" autocomplete="off" spellcheck="false">
-    </div>
-    <span id="count" class="count-label">—</span>
-  </div>
-
-  <!-- Table -->
-  <main id="main" class="card">
-    <div class="table-scroll">
-      <table id="wf-table" aria-label="Workflows">
-        <thead>
-          <tr>
-            <th class="col-name">Name</th>
-            <th class="col-acts">Activities</th>
-            <th class="col-ctrl">Controller</th>
-            <th class="col-mod">Modified</th>
-            <th class="col-actions">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="wf-body">
-          <!-- rows injected by hub.js -->
-        </tbody>
-      </table>
-      <div id="empty" class="empty" hidden>
-        <div class="empty-ico" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+  <!-- Tool launcher: the Hub's default view. -->
+  <section id="tool-home" class="tool-view active" aria-labelledby="tools-title">
+    <header class="card suite-header">
+      <div class="hdr-brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/>
+          </svg>
         </div>
-        <p class="empty-title">No workflows yet</p>
-        <p class="empty-msg">Create one to start building automation flows.</p>
-        <button class="btn accent" id="btn-empty-new">
-          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New workflow
+        <div class="brand-text">
+          <h1 class="app-title" id="tools-title">Macro2k Hub</h1>
+          <p class="app-sub">Choose a tool for this session</p>
+        </div>
+      </div>
+      <span class="suite-badge">Tools</span>
+    </header>
+
+    <main class="card tool-picker" aria-label="Available tools">
+      <div class="tool-picker-intro">
+        <h2>What do you want to run?</h2>
+        <p>Open the workflow workspace or start a lightweight desktop clicker.</p>
+      </div>
+      <div class="tool-list">
+        <button class="tool-row" type="button" data-open-tool="workflow">
+          <span class="tool-icon workflow" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h5.5A2 2 0 0 1 17.5 8.5V14"/></svg>
+          </span>
+          <span class="tool-copy"><b>Workflow</b><small>Design, run, and manage automation graphs</small></span>
+          <span class="tool-meta">Designer · Runner</span>
+          <svg class="tool-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <button class="tool-row" type="button" data-open-tool="autoclick">
+          <span class="tool-icon clicker" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 3l7.5 17 2.2-6.3L20 11.5 4 3z"/><path d="m15.5 16.5 4 4"/></svg>
+          </span>
+          <span class="tool-copy"><b>Auto Click</b><small>Build, save, and run multi-point click sequences</small></span>
+          <span class="tool-meta" id="home-clicker-state">F6 run · F7 capture · F8 add</span>
+          <svg class="tool-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
         </button>
       </div>
+    </main>
+
+    <footer class="suite-footer"><span>Macro2k tool suite <span class="app-ver" id="app-version"></span> <button class="app-upd" id="app-update" type="button" hidden></button></span><span>Windows desktop automation</span></footer>
+  </section>
+
+  <!-- Existing workflow dashboard. -->
+  <section id="workflow-app" class="tool-view" aria-labelledby="workflow-title">
+    <header id="header" class="card">
+      <button class="btn ico tool-back" type="button" data-back-home title="Back to tools" aria-label="Back to tools">
+        <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="hdr-brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/>
+          </svg>
+        </div>
+        <div class="brand-text"><h1 class="app-title" id="workflow-title">Workflow</h1><p class="app-sub">Design · run · monitor</p></div>
+      </div>
+      <div class="hdr-actions">
+        <button class="btn ico" id="btn-refresh" title="Refresh workflows" aria-label="Refresh workflows">
+          <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+        <button class="btn accent" id="btn-new" title="Create a new workflow">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New workflow
+        </button>
+      </div>
+    </header>
+
+    <div id="toolbar" class="card">
+      <div class="search-wrap">
+        <svg class="search-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" id="search" placeholder="Search workflows…" autocomplete="off" spellcheck="false" aria-label="Search workflows">
+      </div>
+      <span id="count" class="count-label">—</span>
     </div>
-  </main>
 
-  <!-- Footer -->
-  <footer id="footer">
-    <span id="footer-path" class="foot-path" title=""></span>
-    <span class="foot-hint">Run · Edit · Delete</span>
-  </footer>
+    <main id="main" class="card">
+      <div class="table-scroll">
+        <table id="wf-table" aria-label="Workflows">
+          <thead><tr><th class="col-name">Name</th><th class="col-acts">Activities</th><th class="col-ctrl">Controller</th><th class="col-mod">Modified</th><th class="col-actions">Actions</th></tr></thead>
+          <tbody id="wf-body"></tbody>
+        </table>
+        <div id="empty" class="empty" hidden>
+          <div class="empty-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+          <p class="empty-title">No workflows yet</p><p class="empty-msg">Create one to start building automation flows.</p>
+          <button class="btn accent" id="btn-empty-new"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New workflow</button>
+        </div>
+      </div>
+    </main>
+    <footer id="footer"><span id="footer-path" class="foot-path" title=""></span><span class="foot-hint">Run · Edit · Delete</span></footer>
+  </section>
 
+  <!-- Basic desktop auto clicker. -->
+  <section id="autoclick-app" class="tool-view" aria-labelledby="clicker-title">
+    <header class="card clicker-header">
+      <button class="btn ico tool-back" type="button" data-back-home title="Back to tools" aria-label="Back to tools">
+        <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="hdr-brand">
+        <div class="brand-mark clicker-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 3l7.5 17 2.2-6.3L20 11.5 4 3z"/><path d="m15.5 16.5 4 4"/></svg></div>
+        <div class="brand-text"><h1 class="app-title" id="clicker-title">Auto Click</h1><p class="app-sub">Multi-point sequence runner</p></div>
+      </div>
+      <div class="run-state ready" id="ac-header-state"><span class="run-dot"></span><span>Ready</span></div>
+    </header>
+
+    <main class="clicker-main">
+      <section class="card clicker-status" aria-live="polite">
+        <div><span class="status-label">Status</span><strong id="ac-status">Ready</strong><small id="ac-status-detail">Build a sequence and press Start.</small></div>
+        <div class="status-data"><span><b id="ac-count">0</b><small>actions</small></span><span><b id="ac-cycles">0</b><small>cycles</small></span><span><b id="ac-elapsed">00:00</b><small>elapsed</small></span></div>
+      </section>
+
+      <section class="card ac-filebar" aria-label="Auto Click file">
+        <div class="ac-file-main">
+          <label for="ac-profile-name">Sequence name</label>
+          <div class="ac-name-line"><input id="ac-profile-name" maxlength="100" value="Untitled sequence" spellcheck="false"><span class="ac-dirty" id="ac-dirty" hidden title="Unsaved changes">Unsaved</span></div>
+        </div>
+        <div class="ac-file-actions">
+          <button class="btn" id="ac-new" type="button" title="Create a new sequence"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New</button>
+          <button class="btn accent" id="ac-save" type="button" title="Save sequence as JSON"><svg viewBox="0 0 24 24"><path d="M5 3h12l2 2v16H5zM8 3v6h8V3M8 21v-7h8v7"/></svg>Save</button>
+          <button class="btn ico" id="ac-folder" type="button" title="Open autoclicks folder" aria-label="Open autoclicks folder"><svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3z"/></svg></button>
+        </div>
+        <label class="ac-saved-label" for="ac-profile-select">Saved files</label>
+        <select id="ac-profile-select"><option value="">No saved sequences</option></select>
+        <span class="ac-file-path" id="ac-file-path">autoclicks/</span>
+      </section>
+
+      <form id="ac-form" class="card clicker-form">
+        <fieldset class="setting-group sequence-group">
+          <div class="sequence-heading">
+            <div><legend>Click sequence</legend><span id="ac-point-summary">1 point</span></div>
+            <button class="btn" type="button" id="ac-add-point" title="Add the current cursor position (F8)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add point <kbd>F8</kbd></button>
+          </div>
+          <div class="point-list-head" aria-hidden="true"><span>Point</span><span>Position</span><span>Click</span><span></span></div>
+          <div id="ac-points" class="point-list"></div>
+          <div id="ac-points-empty" class="points-empty" hidden><b>No click points</b><span>Add a point to build your sequence.</span></div>
+          <p class="setting-hint">Points run top to bottom. <kbd>F7</kbd> updates the selected point; <kbd>F8</kbd> captures and adds a new point.</p>
+        </fieldset>
+
+        <fieldset class="setting-group">
+          <legend>Schedule</legend>
+          <div class="numeric-grid">
+            <label><span>Between actions</span><span class="input-unit"><input id="ac-interval" type="number" min="10" max="600000" step="10" value="250"><i>ms</i></span></label>
+            <label><span>Start delay</span><span class="input-unit"><input id="ac-delay" type="number" min="0" max="3600" step="1" value="0"><i>s</i></span></label>
+          </div>
+          <div class="count-row">
+            <div class="seg-control" data-ac-field="countMode" role="radiogroup" aria-label="Run length">
+              <button type="button" class="seg on" data-value="infinite" role="radio" aria-checked="true">Until stopped</button><button type="button" class="seg" data-value="finite" role="radio" aria-checked="false">Fixed cycles</button>
+            </div>
+            <label id="ac-count-wrap"><span>Cycles</span><input id="ac-limit" type="number" min="1" max="1000000" step="1" value="100" disabled></label>
+          </div>
+        </fieldset>
+      </form>
+
+      <button class="clicker-run" id="ac-run" type="button"><span class="run-icon"><svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg></span><span><b>Start Auto Click</b><small>Press F6 to start or stop from anywhere</small></span><kbd>F6</kbd></button>
+      <p class="hotkey-note" id="ac-hotkey-note"><span class="hotkey-dot"></span>Global hotkeys are registering…</p>
+    </main>
+    <footer class="suite-footer"><span>F6 · Start / Stop</span><span>F7 · Update point</span><span>F8 · Add point</span></footer>
+  </section>
 </div>
-
-<!-- Modal host (created by JS when needed) -->
 <script src="js/hub.js"></script>
 </body>
 </html>

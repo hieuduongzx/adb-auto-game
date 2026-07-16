@@ -249,6 +249,7 @@ function wfDefaults(type){
   (def.fields||[]).forEach(f=>{
     if(f.k && f.k.startsWith("_")) return;  // UI-only field (e.g. "_region" group)
     if(f.t==="tpls"){ p[f.k]= Array.isArray(f.d)?f.d.slice():[]; return; }  // fresh array per node
+    if(f.t==="points"){ p[f.k]=Array.isArray(f.d)?f.d.map(pt=>({...pt})):[]; return; }
     p[f.k]= f.d!==undefined?f.d : (f.t==="num"?0 : f.t==="bool"?false : "");
   });
   if(type==="switch") p.cases=[];   // multi-branch starts with no cases
