@@ -4,21 +4,29 @@ async function onCaptureBackendChange(backend){
   const r=await api().set_capture_backend(backend);
   S.captureBackend=(r&&r.backend)||backend;
   const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
-  setStatus("Nguồn ảnh: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (nhanh/headless)"));
+  setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (fast/headless)"));
 }
 async function onRefreshDevices(){ await api().refresh_devices(); }
 async function onScanPorts(){ await api().scan_ports(); }
 async function onRestartAdb(){ await api().restart_adb(); }
-async function openWorkflowDesigner(){ try{ await api().open_workflow_designer(); setStatus("Đang mở Macro2k…"); }catch{} }
+async function openWorkflowDesigner(){ try{ await api().open_workflow_designer(); setStatus("Opening Macro2k…"); }catch{} }
 async function onDeviceChange(serial){ if(serial){S.connectedSerial=serial;await api().select_device(serial);} }
 function onHzChange(v){ api().set_refresh_hz(parseFloat(v)||5); }
 function onToggleAuto(){
   const cb=$("auto-cb"); cb.classList.toggle("on");
-  S.autoRefresh=cb.classList.contains("on"); api().set_auto_refresh(S.autoRefresh);
+  S.autoRefresh=cb.classList.contains("on");
+  document.querySelector(".pill-wrap")?.setAttribute("aria-checked",String(S.autoRefresh));
+  api().set_auto_refresh(S.autoRefresh);
 }
 
 async function onSaveFull(){ await api().save_full($("full-name").value); }
-async function onLoadFile(){ const p=prompt("Đường dẫn ảnh (PNG/JPG):"); if(p) await api().save_full(""); }
+async function onLoadFile(){
+  if(await api().open_image()){
+    S.autoRefresh=false;
+    $("auto-cb").classList.remove("on");
+    document.querySelector(".pill-wrap")?.setAttribute("aria-checked","false");
+  }
+}
 async function onTapPoint(){ await api().tap(parseInt($("pt-x").value||"0"),parseInt($("pt-y").value||"0")); }
 
 async function onCheckColor(){
@@ -27,14 +35,14 @@ async function onCheckColor(){
   if(r.error){el.className="cc-result bad";el.textContent=r.error;return;}
   el.className="cc-result "+(r.match?"ok":"bad");
   el.innerHTML=r.match
-    ?`✓ Khớp &nbsp;·&nbsp; thực tế: <b>${escHtml(r.actual)}</b> &nbsp;·&nbsp; Δ${r.dist}`
-    :`✗ Không khớp &nbsp;·&nbsp; thực tế: <b>${escHtml(r.actual)}</b> &nbsp;·&nbsp; Δ${r.dist}`;
+    ?`✓ Match &nbsp;·&nbsp; actual: <b>${escHtml(r.actual)}</b> &nbsp;·&nbsp; Δ${r.dist}`
+    :`✗ No match &nbsp;·&nbsp; actual: <b>${escHtml(r.actual)}</b> &nbsp;·&nbsp; Δ${r.dist}`;
 }
 
 async function onApplyRegion(){
   const x=parseInt($("rg-x").value||"0"),y=parseInt($("rg-y").value||"0");
   const w=parseInt($("rg-w").value||"0"),h=parseInt($("rg-h").value||"0");
-  if(w>0&&h>0){await api().set_region(x,y,w,h);S.region=[x,y,w,h];S.point=null;setRegionBadge(true);draw();setStatus(`Vùng ${x},${y} · ${w}×${h}`);}
+  if(w>0&&h>0){await api().set_region(x,y,w,h);S.region=[x,y,w,h];S.point=null;setRegionBadge(true);draw();setStatus(`Region ${x},${y} · ${w}×${h}`);}
 }
 async function onSaveCropDialog(){ await api().save_crop_dialog($("crop-name").value); }
 async function onQuickCrop(){ const ok=await api().quick_crop($("crop-name").value); if(ok) onRefreshAssets(); }
@@ -57,7 +65,7 @@ async function onClearRegion(){
 async function onOcrBackendChange(name){
   const r=await api().set_ocr_backend(name);
   const el=$("ocr-engine");
-  el.textContent=r.engine+(r.available?" · sẵn sàng":" · không khả dụng");
+  el.textContent=r.engine+(r.available?" · ready":" · unavailable");
   el.className=r.available?"":"unavailable";
 }
 async function onReadText(){ $("ocr-result").value=await api().read_text($("ocr-wl").value); }

@@ -58,14 +58,20 @@ function pvFillRegion(r){
 
 // ── Tabs + collapsible groups (scope parity) ────────────────────────────────
 function pvSwitchTab(tab){
-  document.querySelectorAll("#wf-scope-panel .tab-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+  document.querySelectorAll("#wf-scope-panel .tab-btn").forEach(b=>{const on=b.dataset.tab===tab;b.classList.toggle("active",on);b.setAttribute("aria-selected",String(on));});
   document.querySelectorAll("#wf-scope-panel .tab-pane").forEach(p=>p.classList.toggle("active",p.id==="pv-tab-"+tab));
   if(tab==="library") pvRefreshAssets();
 }
 function toggleGrp(hdr){
-  if(hdr.target && hdr.target.closest) { if(hdr.target.closest("button,.badge")) return; }
   const g = hdr.closest ? hdr.closest(".group") : hdr.parentElement;
-  if(g) g.classList.toggle("closed");
+  if(g){
+    const closed=g.classList.toggle("closed");
+    hdr.setAttribute("aria-expanded",String(!closed));
+  }
+}
+function pvToggleCheck(button,id){
+  const checked=$(id).classList.toggle("checked");
+  button.setAttribute("aria-checked",String(checked));
 }
 
 // ── Capture / save ──────────────────────────────────────────────────────────
@@ -140,7 +146,7 @@ async function pvRefreshAssets(){
   grid.innerHTML="";
   if(!list.length){ grid.innerHTML='<div style="font-size:11.5px;color:var(--muted);padding:4px 0;">No images.</div>'; return; }
   for(const a of list){
-    const card=document.createElement("div"); card.className="asset-card"; card.dataset.path=a.path;
+    const card=document.createElement("button"); card.type="button"; card.className="asset-card"; card.dataset.path=a.path;
     const thumb=document.createElement("img"); thumb.className="asset-thumb"; thumb.alt=a.name;
     const name=document.createElement("div"); name.className="asset-name"; name.textContent=a.name;
     card.appendChild(thumb); card.appendChild(name);

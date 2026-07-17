@@ -13,13 +13,18 @@ function resetZoom(){
 
 // ── Groups collapsible ────────────────────────────────────────────────────
 function toggleGrp(hdr){
-  if(hdr.target && hdr.target.closest("button,.badge")) return;
-  hdr.closest(".group").classList.toggle("closed");
+  const closed=hdr.closest(".group").classList.toggle("closed");
+  hdr.setAttribute("aria-expanded",String(!closed));
+}
+
+function toggleCheck(button,id){
+  const checked=$(id).classList.toggle("checked");
+  button.setAttribute("aria-checked",String(checked));
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
 function switchTab(tab){
-  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+  document.querySelectorAll(".tab-btn").forEach(b=>{const on=b.dataset.tab===tab;b.classList.toggle("active",on);b.setAttribute("aria-selected",String(on));});
   document.querySelectorAll(".tab-pane").forEach(p=>p.classList.toggle("active",p.id==="tab-"+tab));
   if(tab==="library") onRefreshAssets();
 }

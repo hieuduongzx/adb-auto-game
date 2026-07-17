@@ -1,0 +1,66 @@
+/* Macro2k shared product tokens.
+   Every WebView surface loads this file before its app-specific stylesheet. */
+:root {
+  --bg:        #eef0f3;
+  --panel:     #ffffff;
+  --surface:   #f7f9fc;
+  --alt:       #f3f5f9;
+  --border:    #e4e7ec;
+  --border2:   #dde2e8;
+  --line:      #f1f3f6;
+
+  --ink:       #19222e;
+  --ink2:      #41505f;
+  --dim:       #5a6573;
+  /* At least 4.69:1 on every product surface, including --bg (WCAG AA). */
+  --muted:     #606c7a;
+
+  --accent:       #2f6fed;
+  --accent-hover: #2559c7;
+  --accent-bg:    #eef5ff;
+  --accent-bd:    #d6e4f5;
+  /* --ok remains legible under white button text (4.96:1). */
+  --ok:           #1b8049;
+  --ok-hover:     #166d3f;
+  --ok-bg:        #e8f5ed;
+  --ok-bd:        #cfead9;
+  --warn:         #9c6c12;
+  --warn-bg:      #fdf6e9;
+  --warn-bd:      #e7d5a4;
+  --err:          #bb3a33;
+  --err-hover:    #a8322c;
+  --err-bg:       #fcefee;
+  --err-bd:       #eecdca;
+
+  --log-bg:    #fbfcfd;
+  --log-ink:   #41505f;
+  --log-muted: #606c7a;
+  --shade:     #121316;
+  --shade2:    #1a1d21;
+  --scroll-thumb:       #cbd5e1;
+  --scroll-thumb-hover: #94a3b8;
+  --dot-off:   #d3d9e0;
+  --cb-bd:     #cfd5dd;
+
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", "Cascadia Code", "Consolas", monospace;
+  --r-sm: 7px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --s1: 4px;
+  --s2: 6px;
+  --s3: 8px;
+  --s4: 12px;
+  --s5: 16px;
+  --s6: 24px;
+  --sh-sm: 0 1px 2px rgba(20, 30, 45, .06);
+  --sh-md: 0 2px 8px rgba(20, 30, 45, .08);
+  --sh-lg: 0 10px 30px rgba(20, 30, 45, .16);
+  --z-menu: 50;
+  --z-dropdown: 55;
+  --z-modal: 70;
+  --z-toast: 80;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: var(--ease);
+  color-scheme: light;
+}

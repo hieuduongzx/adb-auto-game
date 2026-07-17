@@ -25,9 +25,9 @@ function canvasToImg(cx,cy){
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   if(!S.img){
-    ctx.fillStyle="#9aa3ae"; ctx.font="13px IBM Plex Sans,Segoe UI,sans-serif";
+    ctx.fillStyle="#606c7a"; ctx.font="13px IBM Plex Sans,Segoe UI,sans-serif";
     ctx.textAlign="center";
-    ctx.fillText("Chưa có ảnh chụp. Nhấn Chụp (F5).",canvas.width/2,canvas.height/2);
+    ctx.fillText("No screenshot. Press Capture (F5).",canvas.width/2,canvas.height/2);
     return;
   }
   const [x0,y0]=imgToCanvas(0,0), [x1,y1]=imgToCanvas(S.imgW,S.imgH);
@@ -99,7 +99,7 @@ canvas.onmouseup = async e => {
       $("color-swatch").style.background=r.hex;
       $("cc-hex").value=r.hex; $("cc-swatch").style.background=r.hex;
     }
-    setStatus(`Đã chọn (${r.x}, ${r.y})`);
+    setStatus(`Selected (${r.x}, ${r.y})`);
   } else {
     const p1=canvasToImg(start[0],start[1]),p2=canvasToImg(end[0],end[1]);
     if(!p1||!p2){draw();return;}
@@ -118,7 +118,7 @@ canvas.onmouseup = async e => {
       $("color-swatch").style.background=r.hex;
       $("cc-hex").value=r.hex; $("cc-swatch").style.background=r.hex;
     }
-    setStatus(`Vùng ${x},${y} · ${w}×${h} — chạm=(${r.centerX},${r.centerY})`);
+    setStatus(`Region ${x},${y} · ${w}×${h} — tap=(${r.centerX},${r.centerY})`);
   }
   draw();
 };

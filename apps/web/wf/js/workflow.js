@@ -927,16 +927,22 @@ function wfToggleSidebar(which){
 function wfInitSideResizer(){
   const side=$("wf-side"), rez=$("wf-side-resizer"); if(!side||!rez||rez.__wired) return;
   rez.__wired=true; let drag=null;
+  const setW=w=>{ w=Math.max(150,Math.min(480,w)); side.style.width=w+"px"; side.dataset.openW=String(w); rez.setAttribute("aria-valuenow",String(Math.round(w))); };
+  setW(side.offsetWidth);
   rez.addEventListener("mousedown",e=>{ if(e.target.closest(".wf-sidebar-toggle")||wfSideCollapsed) return; e.preventDefault(); drag={x:e.clientX, w:side.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
-  window.addEventListener("mousemove",e=>{ if(!drag) return; const w=Math.max(150, Math.min(480, drag.w+(e.clientX-drag.x))); side.style.width=w+"px"; side.dataset.openW=String(w); });
+  rez.addEventListener("keydown",e=>{ if(!["ArrowLeft","ArrowRight"].includes(e.key)||wfSideCollapsed) return; e.preventDefault(); setW(side.offsetWidth+(e.key==="ArrowRight"?10:-10)); wfSaveSettings(); });
+  window.addEventListener("mousemove",e=>{ if(!drag) return; setW(drag.w+(e.clientX-drag.x)); });
   window.addEventListener("mouseup",()=>{ if(!drag) return; drag=null; rez.classList.remove("drag"); document.body.style.cursor=""; wfSaveSettings(); });
 }
 // Drag-to-resize the right inspector; width persists in settings.
 function wfInitInspResizer(){
   const insp=$("wf-inspector"), rez=$("wf-insp-resizer"); if(!insp||!rez||rez.__wired) return;
   rez.__wired=true; let drag=null;
+  const setW=w=>{ w=Math.max(180,Math.min(520,w)); insp.style.width=w+"px"; insp.dataset.openW=String(w); rez.setAttribute("aria-valuenow",String(Math.round(w))); };
+  setW(insp.offsetWidth);
   rez.addEventListener("mousedown",e=>{ if(e.target.closest(".wf-sidebar-toggle")||wfInspCollapsed) return; e.preventDefault(); drag={x:e.clientX, w:insp.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
-  window.addEventListener("mousemove",e=>{ if(!drag) return; const w=Math.max(180, Math.min(520, drag.w-(e.clientX-drag.x))); insp.style.width=w+"px"; insp.dataset.openW=String(w); });
+  rez.addEventListener("keydown",e=>{ if(!["ArrowLeft","ArrowRight"].includes(e.key)||wfInspCollapsed) return; e.preventDefault(); setW(insp.offsetWidth+(e.key==="ArrowLeft"?10:-10)); wfSaveSettings(); });
+  window.addEventListener("mousemove",e=>{ if(!drag) return; setW(drag.w-(e.clientX-drag.x)); });
   window.addEventListener("mouseup",()=>{ if(!drag) return; drag=null; rez.classList.remove("drag"); document.body.style.cursor=""; wfSaveSettings(); });
 }
 // Drag-to-resize the bottom log drawer; height persists in settings.
@@ -944,6 +950,9 @@ function wfInitLogResizer(){
   const card=$("log-card"), rez=$("log-resizer"); if(!card||!rez||rez.__wired) return;
   rez.__wired=true; let drag=null;
   const clampH=h=>Math.max(80, Math.min(Math.floor(window.innerHeight*0.55), Math.min(480, h)));
+  const setH=h=>{ h=clampH(h); card.style.height=h+"px"; card.dataset.openH=String(h); rez.setAttribute("aria-valuenow",String(Math.round(h))); };
+  setH(card.offsetHeight);
+  rez.addEventListener("keydown",e=>{ if(!["ArrowUp","ArrowDown"].includes(e.key)||card.classList.contains("collapsed")) return; e.preventDefault(); setH(card.offsetHeight+(e.key==="ArrowUp"?10:-10)); wfSaveSettings(); });
   rez.addEventListener("mousedown",e=>{
     e.preventDefault(); e.stopPropagation();
     if(card.classList.contains("collapsed")) return;
@@ -955,9 +964,7 @@ function wfInitLogResizer(){
   window.addEventListener("mousemove",e=>{
     if(!drag) return;
     // Dragging the top edge up increases height.
-    const h=clampH(drag.h-(e.clientY-drag.y));
-    card.style.height=h+"px";
-    card.dataset.openH=String(h);
+    setH(drag.h-(e.clientY-drag.y));
   });
   window.addEventListener("mouseup",()=>{
     if(!drag) return;

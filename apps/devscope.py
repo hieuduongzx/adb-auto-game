@@ -57,6 +57,7 @@ from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.utils import (
     add_log_subscriber,
     bundle_dir,
+    confined_path,
     data_root,
     file_url,
     is_frozen,
@@ -184,6 +185,7 @@ class DevScopeAPI:
         # In-flight guards.
         self._capture_lock = threading.Lock()
         self._capture_in_flight = False
+        self._capture_generation = 0
         self._info_lock = threading.Lock()
         self._info_in_flight = False
 
@@ -321,7 +323,7 @@ class DevScopeAPI:
                 serials = {d.get("serial") for d in items if d.get("serial")}
                 wanted = self._selected_serial or self._connected_serial
                 if wanted and wanted not in serials:
-                    self.controller.mark_disconnected("không còn trong adb devices")
+                    self.controller.mark_disconnected("no longer listed by adb devices")
                     self._connected_serial = None
                     if self._auto_refresh_enabled:
                         self._on_device_lost(f"{wanted} not found")
@@ -341,7 +343,7 @@ class DevScopeAPI:
                     })
                 else:
                     if self.controller.device is not None or self._connected_serial:
-                        self.controller.mark_disconnected("không còn device nào")
+                        self.controller.mark_disconnected("no devices remain")
                         self._connected_serial = None
                         if self._auto_refresh_enabled:
                             self._on_device_lost("no devices")
@@ -529,7 +531,8 @@ class DevScopeAPI:
             if self._capture_in_flight:
                 return False
             self._capture_in_flight = True
-        threading.Thread(target=self._capture_worker, daemon=True).start()
+            generation = self._capture_generation
+        threading.Thread(target=self._capture_worker, args=(generation,), daemon=True).start()
         return True
 
     def _on_device_lost(self, reason: str = "") -> None:
@@ -549,14 +552,15 @@ class DevScopeAPI:
         except Exception:
             pass
         msg = reason or "Device not found"
-        log_warning(f"Đã dừng auto-refresh — device mất: {msg}")
+        log_warning(f"Auto-refresh stopped — device disconnected: {msg}")
+        self._push("auto_refresh", {"enabled": False})
         self._push("device_status", {"connected": False, "serial": None, "name": ""})
         if was_refreshing:
             self._push("capture_failed", {
-                "error": f"Device mất kết nối — đã dừng capture ({msg})",
+                "error": f"Device disconnected — capture stopped ({msg})",
             })
 
-    def _capture_worker(self) -> None:
+    def _capture_worker(self, generation: int) -> None:
         try:
             img = capture_screen_frame(self.controller)
             if img is None and self.controller.device is None:
@@ -567,9 +571,12 @@ class DevScopeAPI:
                 return
             self._device_lost_announced = False
             h, w = img.shape[:2]
-            self._screen = img
-            self._screen_w = w
-            self._screen_h = h
+            with self._capture_lock:
+                if generation != self._capture_generation:
+                    return
+                self._screen = img
+                self._screen_w = w
+                self._screen_h = h
             # Resolution change drops stale selections.
             self._push_frame(img)
             self._push("captured", {"w": w, "h": h})
@@ -605,6 +612,7 @@ class DevScopeAPI:
         self._last_auto_capture = time.monotonic()
         if enabled:
             self._device_lost_announced = False
+        self._push("auto_refresh", {"enabled": self._auto_refresh_enabled})
         return True
 
     def set_refresh_hz(self, hz: float) -> bool:
@@ -705,7 +713,7 @@ class DevScopeAPI:
         if dialog_ok:
             # Dialog showed: None / empty = user cancelled
             if not paths:
-                log_info("Lưu bị huỷ")
+                log_info("Save cancelled")
                 return False
             path = paths[0] if isinstance(paths, (list, tuple)) else paths
         else:
@@ -796,6 +804,52 @@ class DevScopeAPI:
             return True
         log_error(f"Failed to write {path}")
         return False
+
+    def open_image(self) -> bool:
+        """Load a local image into DevScope using a native file picker."""
+        try:
+            wins = webview.windows
+            win = wins[0] if wins else None
+            if win is None:
+                log_warning("No window available for file dialog")
+                return False
+            paths = win.create_file_dialog(
+                webview.OPEN_DIALOG,
+                directory=self._start_dir(self._out_dir),
+                allow_multiple=False,
+                file_types=(
+                    "Images (*.png;*.jpg;*.jpeg;*.bmp;*.webp)",
+                    "All files (*.*)",
+                ),
+            )
+        except Exception as exc:
+            log_error(f"File dialog error: {exc}")
+            return False
+        if not paths:
+            return False
+        path = str(paths[0] if isinstance(paths, (list, tuple)) else paths)
+        if Path(path).suffix.lower() not in {".png", ".jpg", ".jpeg", ".bmp", ".webp"}:
+            log_warning("Unsupported image format")
+            return False
+        image = cv2.imread(path, cv2.IMREAD_COLOR)
+        if image is None:
+            log_error(f"Unable to read image: {path}")
+            return False
+        self._auto_refresh_enabled = False
+        self._push("auto_refresh", {"enabled": False})
+        with self._capture_lock:
+            self._capture_generation += 1
+        self._last_dir = os.path.dirname(path)
+        self._screen = image
+        self._screen_h, self._screen_w = image.shape[:2]
+        self._last_point = None
+        self._region = None
+        self._overlay = []
+        self._push("selection_cleared", {})
+        self._push_frame(image)
+        self._push("captured", {"w": self._screen_w, "h": self._screen_h})
+        log_success(f"Opened image: {path}")
+        return True
 
     def pick_out_dir(self) -> str:
         """Open a native folder-picker dialog to change the output directory."""
@@ -1078,7 +1132,10 @@ class DevScopeAPI:
 
     def get_asset_thumbnail(self, path: str) -> str:
         try:
-            img = cv2.imread(path)
+            safe_path = confined_path(self._out_dir, path, (".png", ".jpg", ".jpeg", ".bmp"))
+            if not safe_path:
+                return ""
+            img = cv2.imread(safe_path)
             if img is None:
                 return ""
             h, w = img.shape[:2]
@@ -1095,9 +1152,9 @@ class DevScopeAPI:
 
     def delete_asset(self, path: str) -> bool:
         try:
-            p = Path(path)
-            if p.exists() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp"}:
-                p.unlink()
+            safe_path = confined_path(self._out_dir, path, (".png", ".jpg", ".jpeg", ".bmp"))
+            if safe_path and os.path.isfile(safe_path):
+                os.unlink(safe_path)
                 return True
             return False
         except Exception:
@@ -1109,10 +1166,10 @@ class DevScopeAPI:
         """Launch the Workflow Designer in a separate process."""
         try:
             launch_tool("designer")
-            log_success("Đã mở Macro2k")
+            log_success("Opened Macro2k")
             return True
         except Exception as exc:
-            log_error(f"Mở Macro2k thất bại: {exc}")
+            log_error(f"Failed to open Macro2k: {exc}")
             return False
 
     # ── Log ───────────────────────────────────────────────────────────────────
@@ -1120,7 +1177,6 @@ class DevScopeAPI:
     def clear_log(self) -> bool:
         self._log_buffer.clear()
         self._push("log_cleared", {})
-        log_info("Đã xoá nhật ký")
         return True
 
     # ── Teardown ─────────────────────────────────────────────────────────────

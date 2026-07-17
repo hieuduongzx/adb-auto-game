@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Macro2k</title>
+<link rel="stylesheet" href="../shared/tokens.css">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/wf.css">
 </head>
@@ -68,7 +69,7 @@
       <span class="tb-tray-label">Device</span>
       <span class="tb-tray-sep"></span>
       <span id="device-dot" class="tb-device-dot"></span>
-      <select id="device-select" onchange="onDeviceChange(this.value)">
+      <select id="device-select" onchange="onDeviceChange(this.value)" aria-label="ADB device">
         <option value="">Scanning…</option>
       </select>
       <button class="btn ico sm" onclick="onRefreshDevices()" title="Refresh — rescan connected devices">
@@ -81,7 +82,7 @@
     <div class="tb-tray tb-tray-source">
       <span class="tb-tray-label">Source</span>
       <span class="tb-tray-sep"></span>
-      <select id="capture-backend" onchange="onCaptureBackendChange(this.value)">
+      <select id="capture-backend" onchange="onCaptureBackendChange(this.value)" aria-label="Capture source">
         <option value="scrcpy">scrcpy</option>
         <option value="adb">ADB</option>
       </select>
@@ -106,19 +107,21 @@
       <div id="wf-palette" class="wf-palette"></div>
     </div>
     <div class="wf-side-sec" id="wf-side-fns-sec">
-      <div class="wf-side-hdr wf-side-hdr-toggle" id="wf-fns-hdr" title="Collapse/expand functions">
-        <span class="wf-side-chev">
-          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
-        </span>
-        <span>Functions</span>
-        <span class="side-count" id="wf-fn-count"></span>
+      <div class="wf-side-hdr wf-side-hdr-toggle">
+        <button type="button" class="wf-side-hdr-button" id="wf-fns-hdr" title="Collapse or expand functions" aria-controls="wf-functions" aria-expanded="true">
+          <span class="wf-side-chev">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+          </span>
+          <span>Functions</span>
+          <span class="side-count" id="wf-fn-count"></span>
+        </button>
         <span class="spacer"></span>
         <button class="wf-act-hdr-add" id="wf-fn-add" title="Create new function">+</button>
       </div>
       <div id="wf-functions" class="wf-side-fns wf-act-list"></div>
     </div>
   </div>
-  <div id="wf-side-resizer" title="Drag to resize the left column">
+  <div id="wf-side-resizer" title="Drag or use arrow keys to resize the left column" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize left column" aria-valuemin="150" aria-valuemax="480">
     <button type="button" class="wf-sidebar-toggle" id="wf-side-toggle" onclick="wfToggleSidebar('left')" title="Collapse node sidebar" aria-label="Collapse node sidebar" aria-expanded="true">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 18-6-6 6-6"/></svg>
     </button>
@@ -184,7 +187,7 @@
       <span class="wf-zoom wf-tool-tray">
         <button class="btn sm ico" id="wf-zoom-out" onclick="wfZoomBy(1/1.1)" title="Zoom out">
           <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-        <span id="wf-zoom-lbl" onclick="wfZoomReset()" title="Reset 100%" style="min-width:38px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--dim);cursor:pointer;">100%</span>
+        <button type="button" id="wf-zoom-lbl" onclick="wfZoomReset()" title="Reset zoom to 100%">100%</button>
         <button class="btn sm ico" id="wf-zoom-in" onclick="wfZoomBy(1.1)" title="Zoom in">
           <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         <button class="btn sm ico" id="wf-zoom-fit" onclick="wfFit()" title="Fit view — show all blocks (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/></svg></button>
@@ -218,7 +221,7 @@
       <div id="wf-preview-pane" class="wf-preview-pane" style="display:none">
         <div class="wf-pv-bar">
           <button class="btn sm" id="wf-pv-capture" title="Capture one frame">Capture</button>
-          <button class="pill-wrap" id="wf-pv-auto" title="Auto refresh">
+          <button class="pill-wrap" id="wf-pv-auto" title="Auto refresh" role="switch" aria-checked="true">
             <span class="wf-pv-cb on"><span class="wf-pv-thumb"></span></span>
             <span class="pill-label">Auto</span>
           </button>
@@ -241,14 +244,16 @@
       <div id="wf-act-panel" class="wf-act-panel">
         <div class="wf-act-panel-hdr">
           <div class="wf-act-hdr-row" id="wf-act-hdr-row">
-            <span class="wf-act-hdr-chevron">
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
-            </span>
-            <span class="wf-act-hdr-title" id="wf-act-hdr-title">Activities</span>
-            <button class="wf-act-hdr-tog" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)">
+            <button type="button" class="wf-panel-toggle" id="wf-act-collapse" aria-controls="wf-activities" aria-expanded="true">
+              <span class="wf-act-hdr-chevron">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+              </span>
+              <span class="wf-act-hdr-title" id="wf-act-hdr-title">Activities</span>
+            </button>
+            <button class="wf-act-hdr-tog" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)" aria-pressed="false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>
             </button>
-            <button class="wf-act-hdr-tog" id="wf-act-dbg" title="Debug overlay: Off — when on, every image/color/OCR match draws its box + confidence on Preview">
+            <button class="wf-act-hdr-tog" id="wf-act-dbg" title="Debug overlay: Off — when on, every image/color/OCR match draws its box + confidence on Preview" aria-pressed="false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M12 5v2M12 17v2M5 12H3M21 12h-2"/></svg>
             </button>
             <button class="wf-act-hdr-add" id="wf-act-add" title="Add activity">+</button>
@@ -264,13 +269,15 @@
         </div>
       </div>
       <div id="wf-vars-panel" class="wf-vars-panel">
-        <div class="wf-vars-hdr" onclick="wfToggleVarsPanel(event)">
-          <span class="wf-act-hdr-chevron">
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
-          </span>
-          <span class="wf-vars-title">Variables</span>
-          <span class="wf-vars-count" id="wf-vars-count"></span>
-          <span class="wf-vars-live" id="wf-vars-live" title="● Live — engine is running">●</span>
+        <div class="wf-vars-hdr">
+          <button type="button" class="wf-panel-toggle" id="wf-vars-collapse" onclick="wfToggleVarsPanel()" aria-controls="wf-vars-body" aria-expanded="true">
+            <span class="wf-act-hdr-chevron">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+            </span>
+            <span class="wf-vars-title">Variables</span>
+            <span class="wf-vars-count" id="wf-vars-count"></span>
+            <span class="wf-vars-live" id="wf-vars-live" title="● Live — engine is running">●</span>
+          </button>
           <span class="wf-vars-actions">
             <button id="wf-vars-add" class="wf-vars-add" title="Add variable (global or local)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -303,7 +310,7 @@
       </div>
     </div>
   </div>
-  <div id="wf-insp-resizer" title="Drag to resize the right column">
+  <div id="wf-insp-resizer" title="Drag or use arrow keys to resize the right column" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize right column" aria-valuemin="180" aria-valuemax="520">
     <button type="button" class="wf-sidebar-toggle" id="wf-insp-toggle" onclick="wfToggleSidebar('right')" title="Collapse properties sidebar" aria-label="Collapse properties sidebar" aria-expanded="true">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 18-6-6 6-6"/></svg>
     </button>
@@ -315,43 +322,43 @@
     <!-- Scope tool panel — shown only in Preview mode. Mirrors DevScope so the
          Preview tab doubles as a region picker / action tester. -->
     <div id="wf-scope-panel" style="display:none;flex:1;min-height:0;flex-direction:column;">
-      <div id="pv-tabs-bar">
-        <button class="tab-btn active" data-tab="inspect"  onclick="pvSwitchTab('inspect')">Inspect</button>
-        <button class="tab-btn"        data-tab="template" onclick="pvSwitchTab('template')">Template match</button>
-        <button class="tab-btn"        data-tab="device"   onclick="pvSwitchTab('device')">Device</button>
-        <button class="tab-btn"        data-tab="library"  onclick="pvSwitchTab('library')">Library</button>
+      <div id="pv-tabs-bar" role="tablist" aria-label="Preview tools">
+        <button class="tab-btn active" data-tab="inspect"  onclick="pvSwitchTab('inspect')" role="tab" aria-selected="true" aria-controls="pv-tab-inspect">Inspect</button>
+        <button class="tab-btn"        data-tab="template" onclick="pvSwitchTab('template')" role="tab" aria-selected="false" aria-controls="pv-tab-template">Template match</button>
+        <button class="tab-btn"        data-tab="device"   onclick="pvSwitchTab('device')" role="tab" aria-selected="false" aria-controls="pv-tab-device">Device</button>
+        <button class="tab-btn"        data-tab="library"  onclick="pvSwitchTab('library')" role="tab" aria-selected="false" aria-controls="pv-tab-library">Library</button>
       </div>
 
       <!-- Inspect -->
-      <div class="tab-pane active" id="pv-tab-inspect">
+      <div class="tab-pane active" id="pv-tab-inspect" role="tabpanel">
         <div class="group">
-          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Screenshot</span>
-            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true"><span class="grp-title">Screenshot</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></button>
           <div class="grp-body">
             <div class="btns">
               <button class="btn sm" onclick="pvSaveFull()">Save full image</button>
               <button class="btn sm" onclick="pvCapture()">Capture again</button>
             </div>
             <div class="row"><span class="lbl">Name</span>
-              <input id="pv-full-name" type="text" placeholder="file name (optional)"></div>
+              <input id="pv-full-name" type="text" placeholder="file name (optional)" aria-label="Screenshot filename"></div>
           </div>
         </div>
 
         <div class="group">
-          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Point &amp; Color</span>
-            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true"><span class="grp-title">Point &amp; Color</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></button>
           <div class="grp-body">
             <div class="row">
               <span class="lbl">Point</span>
-              <input id="pv-pt-x" type="text" readonly style="text-align:center;">
-              <input id="pv-pt-y" type="text" readonly style="text-align:center;">
+              <input id="pv-pt-x" type="text" readonly style="text-align:center;" aria-label="Point X">
+              <input id="pv-pt-y" type="text" readonly style="text-align:center;" aria-label="Point Y">
               <button class="icon-btn" onclick="pvCopyText($('pv-pt-x').value+', '+$('pv-pt-y').value, this)" title="Copy x,y">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               </button>
             </div>
             <div class="row">
               <span class="lbl">Color</span>
-              <input id="pv-pt-hex" type="text" readonly>
+              <input id="pv-pt-hex" type="text" readonly aria-label="Point HEX color">
               <button class="icon-btn" onclick="pvCopyEl('pv-pt-hex', this)" title="Copy HEX">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               </button>
@@ -359,7 +366,7 @@
             </div>
             <div class="row">
               <span class="lbl">RGB</span>
-              <input id="pv-pt-rgb" type="text" readonly>
+              <input id="pv-pt-rgb" type="text" readonly aria-label="Point RGB color">
               <button class="icon-btn" onclick="pvCopyEl('pv-pt-rgb', this)" title="Copy RGB">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               </button>
@@ -371,22 +378,22 @@
         </div>
 
         <div class="group closed">
-          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Inspect color</span>
-            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="false"><span class="grp-title">Inspect color</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></button>
           <div class="grp-body">
             <div class="row">
               <span class="lbl">Point</span>
-              <input id="pv-cc-x" type="number" min="0" value="0" style="text-align:center;">
-              <input id="pv-cc-y" type="number" min="0" value="0" style="text-align:center;">
+              <input id="pv-cc-x" type="number" min="0" value="0" style="text-align:center;" aria-label="Color check X">
+              <input id="pv-cc-y" type="number" min="0" value="0" style="text-align:center;" aria-label="Color check Y">
             </div>
             <div class="row">
               <span class="lbl">Sample color</span>
-              <input id="pv-cc-hex" type="text" placeholder="#RRGGBB" oninput="$('pv-cc-swatch').style.background=this.value">
+              <input id="pv-cc-hex" type="text" placeholder="#RRGGBB" oninput="$('pv-cc-swatch').style.background=this.value" aria-label="Target HEX color">
               <div id="pv-cc-swatch"></div>
             </div>
             <div class="row">
               <span class="lbl">Tolerance</span>
-              <input id="pv-cc-tol" type="number" min="0" max="255" value="10" style="width:56px;flex:none;text-align:right;">
+              <input id="pv-cc-tol" type="number" min="0" max="255" value="10" style="width:56px;flex:none;text-align:right;" aria-label="Color tolerance">
               <span class="hz-unit">≤ max(ΔR,ΔG,ΔB)</span>
               <button class="btn sm accent" style="margin-left:auto;" onclick="pvCheckColor()">Inspect</button>
             </div>
@@ -395,25 +402,25 @@
         </div>
 
         <div class="group">
-          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Selection region</span>
+          <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true"><span class="grp-title">Selection region</span>
             <span class="badge cyan" id="pv-region-badge" style="display:none;"><span class="bd"></span>selected</span>
-            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></button>
           <div class="grp-body">
             <div class="row">
               <span class="lbl">Position</span>
-              <input id="pv-rg-x" type="number" min="0" value="0" style="text-align:center;">
-              <input id="pv-rg-y" type="number" min="0" value="0" style="text-align:center;">
+              <input id="pv-rg-x" type="number" min="0" value="0" style="text-align:center;" aria-label="Region X">
+              <input id="pv-rg-y" type="number" min="0" value="0" style="text-align:center;" aria-label="Region Y">
               <button class="icon-btn" onclick="pvCopyText($('pv-rg-x').value+', '+$('pv-rg-y').value+', '+$('pv-rg-w').value+', '+$('pv-rg-h').value, this)" title="Copy x,y,w,h">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               </button>
             </div>
             <div class="row">
               <span class="lbl">Size</span>
-              <input id="pv-rg-w" type="number" min="0" value="0" style="text-align:center;">
-              <input id="pv-rg-h" type="number" min="0" value="0" style="text-align:center;">
+              <input id="pv-rg-w" type="number" min="0" value="0" style="text-align:center;" aria-label="Region width">
+              <input id="pv-rg-h" type="number" min="0" value="0" style="text-align:center;" aria-label="Region height">
             </div>
             <div class="row"><span class="lbl">Name</span>
-              <input id="pv-crop-name" type="text" placeholder="region name (optional)"></div>
+              <input id="pv-crop-name" type="text" placeholder="region name (optional)" aria-label="Region filename"></div>
             <div class="row" style="gap:4px;">
               <span class="lbl">Folder</span>
               <span id="pv-out-dir-label" style="flex:1;min-width:0;font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);" title=""></span>
@@ -426,63 +433,63 @@
         </div>
 
         <div class="group">
-          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Read text (OCR)</span>
+          <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true"><span class="grp-title">Read text (OCR)</span>
             <span id="pv-ocr-engine" style="margin-left:4px;">not loaded</span>
-            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></button>
           <div class="grp-body">
             <div class="row"><span class="lbl">Engine</span>
-              <select id="pv-ocr-backend" onchange="pvOcrBackendChange(this.value)" style="flex:1;min-width:0;"></select></div>
+              <select id="pv-ocr-backend" onchange="pvOcrBackendChange(this.value)" style="flex:1;min-width:0;" aria-label="OCR engine"></select></div>
             <div class="row">
-              <input id="pv-ocr-result" type="text" readonly placeholder="(not read)" style="flex:1;background:var(--surface);font-size:13px;">
+              <input id="pv-ocr-result" type="text" readonly placeholder="(not read)" style="flex:1;background:var(--surface);font-size:13px;" aria-label="OCR result">
               <button class="icon-btn" onclick="pvCopyEl('pv-ocr-result', this)" title="Copy result">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               </button>
             </div>
             <div class="row" style="gap:5px;">
-              <input id="pv-ocr-wl" type="text" placeholder="Whitelist e.g. 0-9/" style="flex:1;min-width:0;font-size:11px;">
+              <input id="pv-ocr-wl" type="text" placeholder="Whitelist e.g. 0-9/" style="flex:1;min-width:0;font-size:11px;" aria-label="OCR character whitelist">
               <button class="btn h30 accent" onclick="pvReadText()">Read</button>
             </div>
           </div>
         </div>
 
         <div class="group">
-          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Actions</span>
-            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true"><span class="grp-title">Actions</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></button>
           <div class="grp-body">
             <div class="row" style="gap:5px;">
               <span class="lbl n" style="font-weight:600;">Tap</span>
-              <input id="pv-tap-x" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
-              <input id="pv-tap-y" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
+              <input id="pv-tap-x" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 3px;" aria-label="Tap X">
+              <input id="pv-tap-y" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 3px;" aria-label="Tap Y">
               <button class="btn sm" onclick="pvSendTap()">Send</button>
             </div>
             <div class="row" style="gap:5px;">
               <span class="lbl n" style="font-weight:600;">Long press</span>
-              <input id="pv-lp-x"   type="number" min="0"   value="0"   style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
-              <input id="pv-lp-y"   type="number" min="0"   value="0"   style="flex:1;min-width:0;text-align:center;padding:5px 3px;">
-              <input id="pv-lp-dur" type="number" min="100" value="800" step="100" style="width:56px;flex:none;text-align:right;padding:5px 3px;font-size:11px;">
+              <input id="pv-lp-x"   type="number" min="0"   value="0"   style="flex:1;min-width:0;text-align:center;padding:5px 3px;" aria-label="Long press X">
+              <input id="pv-lp-y"   type="number" min="0"   value="0"   style="flex:1;min-width:0;text-align:center;padding:5px 3px;" aria-label="Long press Y">
+              <input id="pv-lp-dur" type="number" min="100" value="800" step="100" style="width:56px;flex:none;text-align:right;padding:5px 3px;font-size:11px;" aria-label="Long press duration in milliseconds">
               <span class="hz-unit">ms</span>
               <button class="btn sm" onclick="pvSendLongPress()">Send</button>
             </div>
             <div class="row" style="gap:5px;">
               <span class="lbl n" style="font-weight:600;">Swipe</span>
-              <input id="pv-sw-x1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
-              <input id="pv-sw-y1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+              <input id="pv-sw-x1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe start X">
+              <input id="pv-sw-y1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe start Y">
               <span style="font-size:13px;color:var(--muted);">→</span>
-              <input id="pv-sw-x2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
-              <input id="pv-sw-y2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;">
+              <input id="pv-sw-x2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe end X">
+              <input id="pv-sw-y2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe end Y">
               <button class="btn sm" onclick="pvSendSwipe()">Send</button>
             </div>
             <div class="row" style="gap:5px;">
               <span class="lbl n" style="font-weight:600;">Duration</span>
-              <input id="pv-sw-dur" type="number" min="50" max="100000" step="50" value="300" style="width:72px;flex:none;text-align:right;">
+              <input id="pv-sw-dur" type="number" min="50" max="100000" step="50" value="300" style="width:72px;flex:none;text-align:right;" aria-label="Swipe duration in milliseconds">
               <span class="hz-unit">ms</span>
             </div>
           </div>
         </div>
 
         <div class="group closed">
-          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Keys &amp; Text</span>
-            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="false"><span class="grp-title">Keys &amp; Text</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></button>
           <div class="grp-body">
             <div class="key-strip">
               <button class="btn" onclick="api().send_key('BACK')">Back</button>
@@ -495,12 +502,12 @@
             </div>
             <div class="row" style="gap:5px;">
               <span class="lbl n" style="font-weight:600;">Custom</span>
-              <input id="pv-key-custom" type="text" placeholder="KEYCODE or number" style="flex:1;min-width:0;">
+              <input id="pv-key-custom" type="text" placeholder="KEYCODE or number" style="flex:1;min-width:0;" aria-label="Custom Android keycode">
               <button class="btn sm" onclick="api().send_key($('pv-key-custom').value.trim())">Send</button>
             </div>
             <div class="row" style="gap:5px;">
               <span class="lbl n" style="font-weight:600;">Text</span>
-              <input id="pv-inp-text" type="text" placeholder="Enter text…" style="flex:1;min-width:0;">
+              <input id="pv-inp-text" type="text" placeholder="Enter text…" style="flex:1;min-width:0;" aria-label="Text to send">
               <button class="btn sm" onclick="pvSendText()">Send</button>
             </div>
           </div>
@@ -508,24 +515,24 @@
       </div><!-- /pv-tab-inspect -->
 
       <!-- Template match -->
-      <div class="tab-pane" id="pv-tab-template">
+      <div class="tab-pane" id="pv-tab-template" role="tabpanel">
         <div class="group">
-          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Template match</span>
-            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true"><span class="grp-title">Template match</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></button>
           <div class="grp-body">
             <p style="font-size:11.5px;color:var(--dim);line-height:1.5;">Choose a PNG template image, then match it against the current screenshot.</p>
             <div class="row" style="gap:6px;">
-              <input id="pv-tpl-path" type="text" placeholder="Template PNG path" style="flex:1;min-width:0;font-size:11px;">
+              <input id="pv-tpl-path" type="text" placeholder="Template PNG path" style="flex:1;min-width:0;font-size:11px;" aria-label="PNG template path">
               <button class="btn h30" onclick="pvBrowseTpl()">Choose…</button>
             </div>
             <div class="row"><span class="lbl" style="min-width:64px;">Threshold</span>
-              <input id="pv-tpl-thr" type="number" min="0.1" max="0.999" step="0.05" value="0.85" style="width:80px;flex:none;text-align:right;"></div>
-            <label class="cb-line" onclick="$('pv-cb-gray').classList.toggle('checked')">
+              <input id="pv-tpl-thr" type="number" min="0.1" max="0.999" step="0.05" value="0.85" style="width:80px;flex:none;text-align:right;" aria-label="Template match threshold"></div>
+            <button type="button" class="cb-line" role="checkbox" aria-checked="false" onclick="pvToggleCheck(this,'pv-cb-gray')">
               <span class="cb" id="pv-cb-gray"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg></span>
-              Grayscale</label>
-            <label class="cb-line" onclick="$('pv-cb-multiscale').classList.toggle('checked')">
+              Grayscale</button>
+            <button type="button" class="cb-line" role="checkbox" aria-checked="false" onclick="pvToggleCheck(this,'pv-cb-multiscale')">
               <span class="cb" id="pv-cb-multiscale"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg></span>
-              Multiscale (0.8 .. 1.2)</label>
+              Multiscale (0.8 .. 1.2)</button>
             <div class="btns">
               <button class="btn h30 accent" onclick="pvRunMatch(false)">Find best match</button>
               <button class="btn h30" onclick="pvRunMatch(true)">Find all</button>
@@ -539,10 +546,10 @@
       </div>
 
       <!-- Device -->
-      <div class="tab-pane" id="pv-tab-device">
+      <div class="tab-pane" id="pv-tab-device" role="tabpanel">
         <div class="group">
-          <div class="grp-hdr" onclick="toggleGrp(this)"><span class="grp-title">Device info</span>
-            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></div>
+          <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true"><span class="grp-title">Device info</span>
+            <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg></button>
           <div class="grp-body">
             <div class="info-grid">
               <span class="k">Status</span><span class="v" id="pv-i-status">-</span>
@@ -567,7 +574,7 @@
       </div>
 
       <!-- Library -->
-      <div class="tab-pane" id="pv-tab-library">
+      <div class="tab-pane" id="pv-tab-library" role="tabpanel">
         <div style="display:flex;align-items:center;gap:7px;padding:0 1px 2px;">
           <span id="pv-lib-out-label" style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;" title="">./out/</span>
           <span class="spacer"></span>
@@ -581,15 +588,17 @@
     </div><!-- /wf-scope-panel -->
   </div>
 </div>
-<div id="wf-ctxmenu"></div>
+<div id="wf-ctxmenu" role="menu"></div>
 
 
 <div id="log-card" class="card">
-  <div id="log-resizer" title="Drag to resize log"></div>
-  <div class="log-hdr" onclick="wfToggleLog(event)" title="Click to collapse/open log">
-    <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
-    <span class="log-label">Log</span>
-    <span class="log-count" id="log-count"></span>
+  <div id="log-resizer" title="Drag or use arrow keys to resize the log" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize log" aria-valuemin="80" aria-valuemax="480"></div>
+  <div class="log-hdr">
+    <button type="button" id="log-toggle" class="log-toggle" onclick="wfToggleLog()" title="Collapse or expand log" aria-controls="log-body" aria-expanded="true">
+      <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
+      <span class="log-label">Log</span>
+      <span class="log-count" id="log-count"></span>
+    </button>
     <span class="spacer"></span>
     <span class="log-filters" id="log-filters" role="group" aria-label="Filter log">
       <button class="log-f on" data-f="all" onclick="wfLogFilter('all',event)" title="All levels">All</button>
@@ -602,7 +611,7 @@
     <button class="btn-log-clear" onclick="wfSaveLog(event)" title="Save the whole log to a .txt file" type="button">Save</button>
     <button class="btn-log-clear" onclick="onClearLog(event)" title="Clear the whole log" type="button">Clear</button>
   </div>
-  <div class="log-body" id="log-body"></div>
+  <div class="log-body" id="log-body" role="log" aria-live="polite"></div>
 </div>
 
 <!-- ── Footer ────────────────────────────────────────────────────────────── -->

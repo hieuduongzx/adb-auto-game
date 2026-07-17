@@ -79,6 +79,7 @@ hiddenimports += [
 # Under apps/web: hub/, wf/, and runner/ are needed for Macro2k.
 _web_src = os.path.join(ROOT, "apps", "web")
 web_datas = [
+    (os.path.join(_web_src, "shared"), os.path.join("web", "shared")),
     (os.path.join(_web_src, "hub"), os.path.join("web", "hub")),
     (os.path.join(_web_src, "wf"), os.path.join("web", "wf")),
     (os.path.join(_web_src, "runner"), os.path.join("web", "runner")),

@@ -5,7 +5,9 @@
 opencv-python>=4.8.0
 numpy>=1.24.0
 pillow>=10.0.0
-# scrcpy H.264 decode (optional — capture falls back to ADB screencap)
+# scrcpy H.264 decode (optional — capture falls back to ADB screencap).
+# Do not add the unrelated `scrcpy-client` package: it pins av<10 while this
+# project owns its scrcpy transport and targets the current PyAV API.
 av>=10.0.0
 
 # ── OCR (Tesseract is the default / packaged backend) ───────────────────────

@@ -303,6 +303,31 @@ def file_url(path: str) -> str:
     return Path(os.path.abspath(path)).as_uri()
 
 
+def confined_path(root: str, candidate: str, extensions: Sequence[str] = ()) -> Optional[str]:
+    """Resolve *candidate* only when it remains below *root*.
+
+    This is intended for paths received from WebView code. Resolving real paths
+    also prevents a symlink inside the asset directory from escaping it.
+    """
+    if not root or not candidate:
+        return None
+    try:
+        root_real = os.path.realpath(os.path.abspath(root))
+        candidate_real = os.path.realpath(os.path.abspath(candidate))
+        common = os.path.commonpath([root_real, candidate_real])
+        if os.path.normcase(common) != os.path.normcase(root_real):
+            return None
+        if os.path.normcase(candidate_real) == os.path.normcase(root_real):
+            return None
+    except (OSError, ValueError, TypeError):
+        return None
+    if extensions:
+        allowed = {ext.lower() if ext.startswith(".") else "." + ext.lower() for ext in extensions}
+        if os.path.splitext(candidate_real)[1].lower() not in allowed:
+            return None
+    return candidate_real
+
+
 def webview_storage_path(app_key: str) -> str:
     """Per-app WebView2 user-data folder under the project ``data/`` tree.
 

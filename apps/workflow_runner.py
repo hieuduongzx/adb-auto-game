@@ -105,7 +105,7 @@ class WorkflowRunnerAPI:
             try:
                 self._load_path(self._pending_load)
             except Exception as exc:
-                log_error(f"Auto-load lỗi: {exc}")
+                log_error(f"Auto-load failed: {exc}")
             self._pending_load = None
         threading.Thread(target=self._device_worker, args=(True,), daemon=True).start()
         threading.Thread(target=self._device_poll, daemon=True).start()
@@ -183,7 +183,7 @@ class WorkflowRunnerAPI:
                         os.remove(tmp)
                     except OSError:
                         pass
-                log_warning(f"Không lưu được Runner config: {exc}")
+                log_warning(f"Couldn't save Runner config: {exc}")
                 return False
 
     def _apply_runner_config(self) -> None:
@@ -299,8 +299,8 @@ class WorkflowRunnerAPI:
         """
         functions = {f.get("id"): f for f in (self.flow.get("functions") or []) if f.get("id")}
         labels = {
-            "win_launch": ("Mở chương trình", "Đường dẫn chương trình (.exe)"),
-            "launch_emulator": ("Mở giả lập", "Thư mục cài đặt / console .exe"),
+            "win_launch": ("Launch program", "Program path (.exe)"),
+            "launch_emulator": ("Launch emulator", "Install folder / console .exe"),
         }
         kinds = {"launch_emulator": "folder", "win_launch": "file"}
         found: List[dict] = []
@@ -318,7 +318,7 @@ class WorkflowRunnerAPI:
                 # Every serialized `path` parameter gets a generated setting;
                 # known node types only refine its label and picker kind.
                 if "path" in params:
-                    node_label, field_label = labels.get(node_type, (node_type or "Tác vụ", "Đường dẫn"))
+                    node_label, field_label = labels.get(node_type, (node_type or "Action", "Path"))
                     node_label = str(node.get("note") or node_label)
                     found.append({
                         "id": f"{node_id}:path", "nodeId": node_id, "param": "path",
@@ -382,7 +382,7 @@ class WorkflowRunnerAPI:
         try:
             flow = WorkflowEngine.load_file(path)
         except Exception as exc:
-            log_error(f"Không đọc được flow: {exc}")
+            log_error(f"Couldn't read workflow: {exc}")
             return {"ok": False}
         if self.engine.is_running():
             self.engine.stop()
@@ -394,7 +394,7 @@ class WorkflowRunnerAPI:
         # engine.load applies flow["capture"] process-wide — sync the Source dropdown.
         backend = get_capture_backend()
         self._push("capture_backend", {"backend": backend})
-        log_success(f"Đã tải workflow: {flow.get('name', os.path.basename(path))}")
+        log_success(f"Loaded workflow: {flow.get('name', os.path.basename(path))}")
         ctrl = self._controller()
         state = {"ok": True, "name": flow.get("name", ""),
                  "activities": self._activities_payload(),
@@ -410,7 +410,7 @@ class WorkflowRunnerAPI:
 
     def start(self) -> bool:
         if not self.flow:
-            log_warning("Hãy tải một file JSON trước")
+            log_warning("Load a workflow JSON first")
             return False
         serial = self._connected_serial or self._selected_serial
         if serial:
@@ -418,7 +418,7 @@ class WorkflowRunnerAPI:
                 self.engine.auto.adb.device_id = serial
                 self.engine.auto.adb.select_device(serial)
             except Exception as exc:
-                log_warning(f"Chọn thiết bị lỗi: {exc}")
+                log_warning(f"Couldn't select device: {exc}")
         # Reset UI activity statuses.
         for a in self._activities_payload():
             self._push("activity_update", {"id": a["id"], "status": "pending"})
@@ -548,7 +548,7 @@ class WorkflowRunnerAPI:
         progress to avoid mutating the list mid-iteration.
         """
         if self.engine.is_running():
-            log_warning("Không thể đổi thứ tự khi đang chạy")
+            log_warning("Activities can't be reordered while running")
             return False
         acts = self.flow.get("activities") or []
         by_id = {a.get("id"): a for a in acts}
@@ -588,7 +588,7 @@ class WorkflowRunnerAPI:
                     saved["speed"] = float(speed)
                 self._save_runner_config()
         except Exception as exc:
-            log_error(f"Speedhack lỗi: {exc}")
+            log_error(f"Speed hack failed: {exc}")
         info = self.engine.speedhack_info()
         self._push("speedhack_update", info)
         return info
@@ -606,7 +606,7 @@ class WorkflowRunnerAPI:
                 saved["speed"] = value
                 self._save_runner_config()
         except Exception as exc:
-            log_error(f"Speedhack lỗi: {exc}")
+            log_error(f"Speed hack failed: {exc}")
         info = self.engine.speedhack_info()
         self._push("speedhack_update", info)
         return info

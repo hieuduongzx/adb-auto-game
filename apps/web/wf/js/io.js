@@ -482,7 +482,7 @@ async function init(){
     wfMinimapOn=!!st.minimap;                 // opt-in — default off
     wfAlignOn = st.alignGuides!==false;       // opt-out — default on
     if(st.previewHz){ wfPvHz=Math.max(0.2, Math.min(60, parseFloat(st.previewHz)||30)); const hz=$("wf-pv-hz"); if(hz) hz.value=wfPvHz; }
-    if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); }
+    if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); const t=$("log-toggle"); if(t) t.setAttribute("aria-expanded","false"); }
     if(st.logH){ const lc=$("log-card"); if(lc){ const h=Math.max(80, Math.min(480, parseInt(st.logH,10)||140)); lc.style.height=h+"px"; lc.dataset.openH=String(h); } }
     const sd=$("wf-side"), insp=$("wf-inspector");
     if(sd){ const w=st.sideW?Math.max(150,Math.min(480,st.sideW)):sd.offsetWidth; sd.style.width=w+"px"; sd.dataset.openW=String(w); }

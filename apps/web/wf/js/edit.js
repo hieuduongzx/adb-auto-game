@@ -55,13 +55,13 @@ function wfFocusFollow(nodeId){
 // Reflect the focus flag on the header toggle button (on/off tint).
 function wfSyncFocusBtn(){
   const b=$("wf-act-focus");
-  if(b){ b.classList.toggle("on", wfFocusOn); b.title = wfFocusOn
+  if(b){ b.classList.toggle("on", wfFocusOn); b.setAttribute("aria-pressed",String(wfFocusOn)); b.title = wfFocusOn
     ? "Focus: ON — auto-centre on the running block (follows into/out of functions). Click to turn off."
     : "Focus: OFF — canvas stays put during a run. Click to turn on."; }
 }
 function wfSyncDebugOverlayBtn(){
   const b=$("wf-act-dbg");
-  if(b){ b.classList.toggle("on", wfDebugOverlayOn); b.title = wfDebugOverlayOn
+  if(b){ b.classList.toggle("on", wfDebugOverlayOn); b.setAttribute("aria-pressed",String(wfDebugOverlayOn)); b.title = wfDebugOverlayOn
     ? "Debug overlay: ON — image/color/OCR matches draw box + conf on Preview (doesn't switch tabs). Click to turn off."
     : "Debug overlay: OFF — matches aren't drawn during a run. Click to turn on."; }
 }

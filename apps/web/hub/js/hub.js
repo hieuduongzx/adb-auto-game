@@ -813,7 +813,7 @@ window.__updateProgress = function (pct) {
   }
   wrap.classList.remove("indet");
   const p = Math.max(0, Math.min(100, Math.round(pct)));
-  if (fill) fill.style.width = p + "%";
+  if (fill) fill.style.transform = `scaleX(${p / 100})`;
   if (pctEl) pctEl.textContent = p + "%";
   if (p >= 100 && sub) sub.textContent = "Installing… the app will restart";
 };

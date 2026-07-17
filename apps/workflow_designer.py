@@ -54,6 +54,7 @@ from src.workflow import NODE_TYPES, WorkflowEngine
 from src.utils import (
     add_log_subscriber,
     bundle_dir,
+    confined_path,
     data_root,
     file_url,
     is_frozen,
@@ -854,7 +855,10 @@ class WorkflowDesignerAPI:
 
     def get_asset_thumbnail(self, path: str) -> str:
         try:
-            img = cv2.imread(path)
+            safe_path = confined_path(self._scope_out(), path, (".png", ".jpg", ".jpeg", ".bmp"))
+            if not safe_path:
+                return ""
+            img = cv2.imread(safe_path)
             if img is None:
                 return ""
             h, w = img.shape[:2]
@@ -870,10 +874,9 @@ class WorkflowDesignerAPI:
 
     def delete_asset(self, path: str) -> bool:
         try:
-            from pathlib import Path
-            p = Path(path)
-            if p.exists() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp"}:
-                p.unlink()
+            safe_path = confined_path(self._scope_out(), path, (".png", ".jpg", ".jpeg", ".bmp"))
+            if safe_path and os.path.isfile(safe_path):
+                os.unlink(safe_path)
                 return True
         except Exception:
             pass

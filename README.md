@@ -28,10 +28,19 @@ vendor/         adb / scrcpy / frida / tesseract binaries
 ## Setup
 
 ```powershell
-pip install -r requirements.txt
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m pip check
 # Optional OCR:  pip install easyocr
 #                 pip install paddlepaddle paddleocr
 ```
+
+Use the project virtual environment instead of a shared Python installation.
+The obsolete third-party `scrcpy-client` package pins `av<10` and conflicts with
+Macro2k's direct PyAV capture implementation (`av>=10`); Macro2k does not use or
+require that package.
 
 Place binaries under `vendor/` as needed (`adb`, `scrcpy`, `tesseract`; `frida` / `scrcpy` may be local-only — see `.gitignore`).
 

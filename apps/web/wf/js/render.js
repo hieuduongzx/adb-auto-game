@@ -142,6 +142,7 @@ function wfActAddCurrent(){
 }
 function wfToggleActPanel(){
   const p=$("wf-act-panel"); if(p) p.classList.toggle("collapsed", wfActCollapsed);
+  const toggle=$("wf-act-collapse"); if(toggle) toggle.setAttribute("aria-expanded",String(!wfActCollapsed));
   wfEqualizeCornerPanels();
 }
 // Both corner panels (Activities + Variables) are content-sized: each hugs its
@@ -431,6 +432,7 @@ function wfRenderVarsPanel(){
   const panel=$("wf-vars-panel"); if(!panel) return;
   const body=$("wf-vars-body"); if(!body) return;
   panel.classList.toggle("collapsed", wfVarsCollapsed);
+  const toggle=$("wf-vars-collapse"); if(toggle) toggle.setAttribute("aria-expanded",String(!wfVarsCollapsed));
   panel.classList.toggle("live", Object.keys(wfLiveVars).length>0);
   const declared=wfDeclaredVars();
   // Buckets: globals → activity-declared → node-produced → live-only extras.
@@ -547,7 +549,7 @@ function wfShowLocalsEditor(){
   const pop=document.createElement("div"); pop.id="wf-globs-pop"; pop.className="wf-globs-pop";
   const hdr=document.createElement("div"); hdr.className="wf-vars-hdr";
   const actName=act.name||"activity";
-  hdr.innerHTML='<span>Local · '+escHtml(actName)+'</span><span class="wf-vars-close" style="cursor:pointer" title="Close">'+wfIco("x")+'</span>';
+  hdr.innerHTML='<span>Local · '+escHtml(actName)+'</span><button type="button" class="wf-vars-close" title="Close" aria-label="Close">'+wfIco("x")+'</button>';
   hdr.querySelector(".wf-vars-close").onclick=wfHideGlobsEditor;
   pop.appendChild(hdr);
   const body=document.createElement("div"); body.className="wf-globs-pop-body";
@@ -649,7 +651,7 @@ function wfShowGlobsEditor(){
   if(!Array.isArray(WF.globals)) WF.globals=[];
   const pop=document.createElement("div"); pop.id="wf-globs-pop"; pop.className="wf-globs-pop";
   const hdr=document.createElement("div"); hdr.className="wf-vars-hdr";
-  hdr.innerHTML='<span>Global variables</span><span class="wf-vars-close" style="cursor:pointer" title="Close">'+wfIco("x")+'</span>';
+  hdr.innerHTML='<span>Global variables</span><button type="button" class="wf-vars-close" title="Close" aria-label="Close">'+wfIco("x")+'</button>';
   hdr.querySelector(".wf-vars-close").onclick=wfHideGlobsEditor;
   pop.appendChild(hdr);
   const body=document.createElement("div"); body.className="wf-globs-pop-body";

@@ -1,0 +1,51 @@
+{
+  "name": "My Workflow",
+  "version": 2,
+  "templatesDir": "templates",
+  "buildVersion": "1.0.0",
+  "package": "",
+  "controller": "adb",
+  "ocr": "",
+  "capture": "scrcpy",
+  "win32": {
+    "window": "",
+    "matchBy": "title",
+    "inputMode": "background"
+  },
+  "speedhack": {
+    "enabled": false,
+    "speed": 2
+  },
+  "globals": [],
+  "functions": [],
+  "activities": [
+    {
+      "id": "sequence_qmnj",
+      "name": "Activity 1",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "n6t8t62v",
+            "type": "start",
+            "x": 48,
+            "y": 72,
+            "params": {}
+          },
+          {
+            "id": "n3bjjnro",
+            "type": "end",
+            "x": 140,
+            "y": 72,
+            "params": {}
+          }
+        ],
+        "edges": [],
+        "groups": []
+      },
+      "maxRetries": 1
+    }
+  ]
+}

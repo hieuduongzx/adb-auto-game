@@ -161,15 +161,13 @@ function updateLogCount(){
   const hasErr = !!b.querySelector(".lv-error");
   c.classList.toggle("has-err", hasErr);
 }
-function wfToggleVarsPanel(ev){
-  if(ev && ev.target.closest(".wf-vars-actions")) return;
+function wfToggleVarsPanel(){
   wfVarsCollapsed = !wfVarsCollapsed;
   if(typeof wfPersistPanelState==="function") wfPersistPanelState();
   wfRenderVarsPanel();
 }
 
 function wfToggleLog(ev){
-  if(ev && ev.target.closest(".btn-log-clear, .log-filters, #log-resizer")) return;   // let Clear/Copy/filter/resize act without toggling
   const c=$("log-card"); if(!c) return;
   const isCollapsed = c.classList.contains("collapsed");
   if (isCollapsed) {
@@ -182,6 +180,8 @@ function wfToggleLog(ev){
     if(c.offsetHeight>=80) c.dataset.openH=String(c.offsetHeight);
     c.classList.add("collapsed");
   }
+  const toggle=$("log-toggle");
+  if(toggle) toggle.setAttribute("aria-expanded",String(!c.classList.contains("collapsed")));
   wfSaveSettings();
 }
 

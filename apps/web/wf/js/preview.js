@@ -127,6 +127,7 @@ function wfPvInit(){
   if(autoBtn) autoBtn.onclick = (e)=>{
     e.stopPropagation();
     wfPvAuto = !wfPvAuto;
+    autoBtn.setAttribute("aria-checked",String(wfPvAuto));
     const cb = autoBtn.querySelector(".wf-pv-cb");
     if(cb) cb.classList.toggle("on", wfPvAuto);
     if(wfPvAuto && wfPvActive) wfPvStartAuto();

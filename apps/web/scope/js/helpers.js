@@ -19,7 +19,7 @@ function rebuildDeviceSelect(devices, connected, selected){
   const sel=$("device-select"), prev=sel.value;
   sel.innerHTML="";
   if(!devices||!devices.length){
-    const o=document.createElement("option"); o.value=""; o.textContent="Không có thiết bị";
+    const o=document.createElement("option"); o.value=""; o.textContent="No devices";
     sel.appendChild(o); sel.disabled=true; return;
   }
   sel.disabled=false;
@@ -45,9 +45,11 @@ function appendLog(entry){
 }
 // ── Log drawer (collapsible + copyable) ─────────────────────────────────────
 function updateLogCount(){ const c=$("log-count"), b=$("log-body"); if(c&&b) c.textContent = b.children.length? String(b.children.length):""; }
-function toggleLog(ev){
-  if(ev && ev.target.closest(".btn-log-clear")) return;   // let header buttons act without toggling
-  const c=$("log-card"); if(c) c.classList.toggle("collapsed");
+function toggleLog(){
+  const c=$("log-card"); if(!c) return;
+  const collapsed=c.classList.toggle("collapsed");
+  const toggle=$("log-toggle");
+  if(toggle) toggle.setAttribute("aria-expanded",String(!collapsed));
 }
 function onCopyLog(ev){
   if(ev) ev.stopPropagation();

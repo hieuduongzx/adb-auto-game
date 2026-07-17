@@ -456,7 +456,7 @@ function wfShowMenu(clientX, clientY){
   if(WF.sel.length) items.push({ico:"trash",label:"Delete ("+WF.sel.length+")", fn:()=>wfDeleteSelected()});
   if(!items.length){ wfHideMenu(); return; }
   m.innerHTML="";
-  items.forEach(it=>{ const d=document.createElement("div"); d.className="wf-ctx-item";
+  items.forEach(it=>{ const d=document.createElement("button"); d.type="button"; d.className="wf-ctx-item"; d.setAttribute("role","menuitem");
     d.innerHTML=`<span class="wf-ctx-ico">${wfIco(it.ico||"help")}</span>${escHtml(it.label)}`;
     d.onclick=()=>{ wfHideMenu(); it.fn(); }; m.appendChild(d); });
   const cr=$("wf-canvas").getBoundingClientRect();
@@ -466,7 +466,7 @@ function wfShowMenu(clientX, clientY){
 function wfShowWireMenu(clientX, clientY, ed){
   const m=$("wf-ctxmenu"); if(!m) return;
   m.innerHTML="";
-  const d=document.createElement("div"); d.className="wf-ctx-item"; d.innerHTML=`<span class="wf-ctx-ico">${wfIco("trash")}</span>Delete wire`;
+  const d=document.createElement("button"); d.type="button"; d.className="wf-ctx-item"; d.setAttribute("role","menuitem"); d.innerHTML=`<span class="wf-ctx-ico">${wfIco("trash")}</span>Delete wire`;
   d.onclick=()=>{ wfHideMenu(); wfDeleteWire(ed); }; m.appendChild(d);
   m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
 }
@@ -487,7 +487,7 @@ function wfSetAllActivitiesEnabled(on){
 function wfAppendActMenuItems(m, items){
   items.forEach(it=>{
     if(it.sep){ const s=document.createElement("div"); s.className="wf-ctx-sep"; m.appendChild(s); return; }
-    const d=document.createElement("div"); d.className="wf-ctx-item";
+    const d=document.createElement("button"); d.type="button"; d.className="wf-ctx-item"; d.setAttribute("role","menuitem");
     d.innerHTML=`<span class="wf-ctx-ico">${wfIco(it.ico)}</span>${escHtml(it.label)}`;
     d.onclick=()=>{ wfHideMenu(); it.fn(); }; m.appendChild(d);
   });
@@ -533,7 +533,7 @@ function wfShowGroupMenu(clientX, clientY, gr){
     {ico:"trash",  label:"Delete group",  fn:()=>wfDeleteGroup(gr.id)},
   ];
   items.forEach(it=>{
-    const d=document.createElement("div"); d.className="wf-ctx-item";
+    const d=document.createElement("button"); d.type="button"; d.className="wf-ctx-item"; d.setAttribute("role","menuitem");
     d.innerHTML=`<span class="wf-ctx-ico">${wfIco(it.ico)}</span>${escHtml(it.label)}`;
     d.onclick=()=>{ wfHideMenu(); it.fn(); }; m.appendChild(d);
   });
@@ -560,9 +560,6 @@ function wfInitCanvas(){
     wfShowMenu(e.clientX, e.clientY);
   });
   document.addEventListener("mousedown",e=>{ if(!e.target.closest("#wf-ctxmenu")) wfHideMenu(); if(!e.target.closest("#wf-globs-pop") && !e.target.closest("#wf-vars-mgr") && !e.target.closest("#wf-vars-add") && !e.target.closest("#wf-var-scope-menu")) wfHideGlobsEditor(); if(!e.target.closest("#wf-layout-bar")) wfCloseLayoutMenu(); }, true);
-  // Vars panel header toggles collapse (click-through to drag is fine on body).
-  const vhdr=document.querySelector("#wf-vars-panel .wf-vars-hdr");
-  if(vhdr) vhdr.onclick=(e)=>{ if(e.target.closest(".wf-vars-actions")) return; wfVarsCollapsed=!wfVarsCollapsed; wfPersistPanelState(); wfRenderVarsPanel(); };
   const vadd=$("wf-vars-add");
   if(vadd) vadd.onclick=(e)=>{ e.stopPropagation(); if(typeof wfShowAddVarMenu==="function") wfShowAddVarMenu(); };
   const vmgr=$("wf-vars-mgr");
@@ -578,16 +575,17 @@ function wfInitCanvas(){
   const adbg=$("wf-act-dbg");
   if(adbg) adbg.onclick=(e)=>{ e.stopPropagation(); if(typeof wfToggleDebugOverlay==="function") wfToggleDebugOverlay(); };
   // Only the title row (not the tab bar / header buttons) is the collapse trigger.
-  const ahdr=document.querySelector("#wf-act-hdr-row");
-  if(ahdr) ahdr.onclick=(e)=>{ if(e.target.closest(".wf-act-hdr-add,.wf-act-hdr-tog,.wf-act-hdr-focus")) return; wfActCollapsed=!wfActCollapsed; wfPersistPanelState(); wfToggleActPanel(); };
+  const ahdr=$("wf-act-collapse");
+  if(ahdr) ahdr.onclick=()=>{ wfActCollapsed=!wfActCollapsed; wfPersistPanelState(); wfToggleActPanel(); };
   // Functions section (bottom of the left sidebar): "+" creates, header collapses.
   const fadd=$("wf-fn-add");
   if(fadd) fadd.onclick=(e)=>{ e.stopPropagation(); wfAddFunction(); };
   const fhdr=$("wf-fns-hdr"), fsec=$("wf-side-fns-sec");
   if(fhdr && fsec){
     try{ if(localStorage.getItem("wfFnsCollapsed")==="1") fsec.classList.add("collapsed"); }catch{}
-    fhdr.onclick=(e)=>{ if(e.target.closest(".wf-act-hdr-add")) return;
-      const c=fsec.classList.toggle("collapsed");
+    fhdr.setAttribute("aria-expanded",String(!fsec.classList.contains("collapsed")));
+    fhdr.onclick=()=>{
+      const c=fsec.classList.toggle("collapsed"); fhdr.setAttribute("aria-expanded",String(!c));
       try{ localStorage.setItem("wfFnsCollapsed", c?"1":"0"); }catch{} };
   }
   // Auto-layout menu (bottom-left): toggle open/closed + run a strategy on pick.
