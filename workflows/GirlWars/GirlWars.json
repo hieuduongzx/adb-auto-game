@@ -16,15 +16,7 @@
     "enabled": true,
     "speed": 3
   },
-  "globals": [
-    {
-      "name": "g1",
-      "label": "Global 1",
-      "type": "bool",
-      "value": false,
-      "options": []
-    }
-  ],
+  "globals": [],
   "functions": [
     {
       "id": "fn_yt9m6",
@@ -520,7 +512,7 @@
       "id": "sequence_eu1z",
       "name": "Run Game",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
@@ -4679,21 +4671,21 @@
       "id": "sequence_ih6c",
       "name": "Dragon Queen",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
           {
             "id": "n4kwm7gx",
             "type": "start",
-            "x": 120,
+            "x": 100,
             "y": -25,
             "params": {}
           },
           {
             "id": "ni39yd36",
             "type": "tap_image",
-            "x": 560,
+            "x": 580,
             "y": 20,
             "params": {
               "template": "templates/crop_20260628_222549_80x76_1.png",
@@ -4740,7 +4732,7 @@
           {
             "id": "nb2ox1lq",
             "type": "swipe",
-            "x": 1160,
+            "x": 1172,
             "y": -82,
             "params": {
               "x1": 362,
@@ -4754,7 +4746,7 @@
           {
             "id": "n0zi6fk0",
             "type": "wait_image",
-            "x": 960,
+            "x": 980,
             "y": -82,
             "params": {
               "template": "templates/crop_20260629_002015_58x62.png",
@@ -4765,7 +4757,7 @@
           {
             "id": "njvsxhrz",
             "type": "tap_image",
-            "x": 1340,
+            "x": 1360,
             "y": -82,
             "params": {
               "template": "templates/crop_20260716_000730_356_671_67_80.png",
@@ -4780,7 +4772,7 @@
           {
             "id": "n6px0r8f",
             "type": "tap_image",
-            "x": 1540,
+            "x": 1560,
             "y": -82,
             "params": {
               "template": "templates/crop_20260629_001612_116x35.png",
@@ -4794,8 +4786,8 @@
           {
             "id": "nhgym5xb",
             "type": "tap_image",
-            "x": 1540,
-            "y": 4,
+            "x": 1560,
+            "y": 20,
             "params": {
               "template": "templates/crop_20260629_001620_176x32.png",
               "taps": "1",
@@ -4808,8 +4800,8 @@
           {
             "id": "n4zcjxw5",
             "type": "tap_image",
-            "x": 1720,
-            "y": 80,
+            "x": 1760,
+            "y": 100,
             "params": {
               "template": "templates/crop_20260629_001631_242x38.png",
               "taps": "1",
@@ -4822,8 +4814,8 @@
           {
             "id": "nec3nlcz",
             "type": "tap_image",
-            "x": 1720,
-            "y": 244,
+            "x": 1760,
+            "y": 260,
             "params": {
               "template": "templates/crop_20260628_224052_35x27_1.png",
               "taps": "1",
@@ -4836,10 +4828,10 @@
           {
             "id": "ntxjx9cs",
             "type": "tap_image",
-            "x": 1720,
-            "y": 4,
+            "x": 1760,
+            "y": 20,
             "params": {
-              "template": "templates/crop_20260629_002334_214x34.png",
+              "template": "templates/crop_20260718_000333_1090_759_206_25.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 5,
@@ -4850,8 +4842,8 @@
           {
             "id": "nvu5q396",
             "type": "tap_image",
-            "x": 1920,
-            "y": 244,
+            "x": 1960,
+            "y": 260,
             "params": {
               "template": "templates/crop_20260628_232825_249x36_2.png",
               "taps": "2",
@@ -4865,7 +4857,7 @@
           {
             "id": "na7tjo3z",
             "type": "loop",
-            "x": 760,
+            "x": 780,
             "y": -82,
             "params": {
               "count": 8,
@@ -4875,7 +4867,7 @@
           {
             "id": "n9ln60a4",
             "type": "tap_image_any",
-            "x": 560,
+            "x": 580,
             "y": -82,
             "params": {
               "templates": [
@@ -4894,8 +4886,8 @@
           {
             "id": "n71blg4e",
             "type": "tap_image_any",
-            "x": 1720,
-            "y": 160,
+            "x": 1760,
+            "y": 180,
             "params": {
               "templates": [
                 "templates/crop_20260629_151533_112x33.png",
@@ -4913,8 +4905,8 @@
           {
             "id": "ndhivwqz",
             "type": "tap_image",
-            "x": 1920,
-            "y": 4,
+            "x": 1960,
+            "y": 20,
             "params": {
               "template": "templates/crop_20260629_152052_128x43.png",
               "taps": "1",
@@ -4927,14 +4919,14 @@
           {
             "id": "nirym3mm",
             "type": "end",
-            "x": 2120,
-            "y": 16,
+            "x": 2160,
+            "y": 32,
             "params": {}
           },
           {
             "id": "n97mkfgu",
             "type": "call",
-            "x": 960,
+            "x": 980,
             "y": 20,
             "params": {
               "fn": "fn_yt9m6"
@@ -4943,7 +4935,7 @@
           {
             "id": "ntfxn9wp",
             "type": "if_image",
-            "x": 1160,
+            "x": 1172,
             "y": 20,
             "params": {
               "template": "templates/crop_20260703_200338_1511_940_244_39.png",
@@ -5077,7 +5069,7 @@
         ],
         "groups": []
       },
-      "maxRetries": 1
+      "maxRetries": 3
     },
     {
       "id": "sequence_sr94",
@@ -5251,7 +5243,7 @@
       "id": "background_8g8s",
       "name": "Background task 1",
       "type": "background",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -5708,7 +5700,7 @@
       "id": "background_kpcg",
       "name": "Background task 2",
       "type": "background",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [

@@ -303,7 +303,7 @@ function wfCanvasMouseDown(e){
   // empty-state card) sit above the canvas — a press there must not clear the
   // selection or start a rubber-band box (the re-render it triggers would also
   // swallow the click).
-  if(e.target.closest("#wf-corner-stack,.wf-layout-bar,.wf-minimap,.wf-empty-card")) return;
+  if(e.target.closest("#wf-rail,.wf-layout-bar,.wf-minimap,.wf-empty-card")) return;
   // Middle mouse, or Space+left → pan.
   if(e.button===1 || (e.button===0 && wfSpace)){
     e.preventDefault();

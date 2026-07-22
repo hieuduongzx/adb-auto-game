@@ -11,8 +11,8 @@
 <body>
 <div id="app">
 
-<div id="toolbar" class="card">
-  <!-- ── Left: Project file operations + run status ────────────────────────── -->
+<!-- ── Header: one flush bar — file ops + project · run cluster · device/view ── -->
+<div id="toolbar">
   <div class="tb-zone tb-left">
     <div class="tb-tray tb-tray-doc">
       <button class="btn ico" onclick="wfNew()" title="New — create an empty workflow">
@@ -25,23 +25,39 @@
       <button class="btn ico" onclick="wfExport()" title="Save as… — new JSON file">
         <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
     </div>
-    <span class="tb-divider"></span>
-    <div id="wf-run-status" class="wf-run-status ok" title="Run status">
-      <span class="wf-run-dot"></span>
-      <span class="wf-run-txt">Ready</span>
-      <span class="wf-run-elapsed" id="wf-run-elapsed" style="display:none" aria-label="Elapsed run time">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg>
-        <span id="wf-run-time">00:00</span>
-      </span>
+    <!-- Project identity: gear + name as one tray. -->
+    <div class="wf-title-tray" title="Project — click the gear for package / ADB / OCR settings">
+      <button type="button" class="btn sm ico" id="wf-proj-settings" onclick="wfOpenProjectSettings()" title="Project settings — package, ADB/Win32, OCR…" aria-label="Project settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+      <input id="wf-name" type="text" placeholder="Workflow name" value="My Workflow" aria-label="Workflow name">
+    </div>
+    <!-- Win32 target controls (only when the project controller is Win32). -->
+    <div id="wf-bar-win32" class="wf-bar-win32" style="display:none" aria-label="Win32 target controls">
+      <button type="button" class="wf-win-target" id="wf-bar-win32-pick" onclick="wfPickWindow(event, 'bar')" title="Choose an open PC window">
+        <span class="tb-device-dot" id="wf-bar-win32-dot"></span>
+        <span id="wf-bar-win32-label">Choose window</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+      </button>
+      <span class="tb-tray-sep"></span>
+      <select id="wf-bar-win32-matchby" onchange="wfBarWinMatchChanged(this.value)" aria-label="Win32 window matching method" title="How the target window is identified">
+        <option value="title">Title</option>
+        <option value="class">Class</option>
+        <option value="pid">PID</option>
+        <option value="exe">Name / EXE</option>
+      </select>
+      <select id="wf-bar-win32-mode" onchange="wfBarWinInputChanged(this.value)" aria-label="Win32 input mode" title="How input is delivered to the target window">
+        <option value="background">Background — PostMessage</option>
+        <option value="background_sync">Background sync — SendMessage</option>
+        <option value="background_cursor">Background + cursor</option>
+        <option value="foreground">Foreground</option>
+      </select>
     </div>
   </div>
 
-  <!-- ── Center: primary run control (hero) + secondary run tools tray ─────── -->
+  <!-- Center: the run cluster — primary control + secondary run tools + state. -->
   <div class="tb-zone tb-center">
-    <!-- The one focal action — larger, green, standalone. -->
     <button class="btn ok ico tb-run-btn" id="wf-run-btn" onclick="wfToggleRun()" title="Test run"></button>
-    <!-- All secondary run tooling in one segmented tray: pre-flight check ·
-         step-debug controls · launch external Runner. -->
     <div class="tb-tray tb-run-aux">
       <button class="btn ico" onclick="wfValidateShow()" title="Check workflow — find broken wires, missing templates, and bad branch counts">
         <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></button>
@@ -60,14 +76,27 @@
       <button class="btn ico" id="wf-build-btn" onclick="wfBuildExe()" title="Build EXE — package this workflow into a standalone Runner .exe">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg></button>
     </div>
+    <div id="wf-run-status" class="wf-run-status ok" title="Run status">
+      <span class="wf-run-dot"></span>
+      <span class="wf-run-txt">Ready</span>
+      <span class="wf-run-elapsed" id="wf-run-elapsed" style="display:none" aria-label="Elapsed run time">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg>
+        <span id="wf-run-time">00:00</span>
+      </span>
+    </div>
+    <div id="wf-speed-group" class="wf-speed-group" title="Speed hack — separate from Test run (uses workflow package)">
+      <button class="btn sm ico" id="wf-speed-btn" onclick="wfToggleSpeed()" title="Speed hack: Off (accelerate the game with Frida — root required)">
+        <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></button>
+      <input id="wf-speed-val" type="number" min="0.1" step="0.1" value="2" title="Speed (x)" onchange="wfSpeedChanged()">
+      <span class="hz-unit">x</span>
+      <button class="btn sm ico ok" id="wf-speed-run-btn" onclick="wfSpeedRun()" title="Enable speed hack" style="display:none"></button>
+    </div>
   </div>
 
-  <!-- ── Right: device + capture source ─────────────────────────────────────── -->
+  <!-- Right: device + capture source + view switch. -->
   <div class="tb-zone tb-right">
     <div id="tb-adb-tools" class="tb-backend-tools">
     <div class="tb-tray tb-tray-device">
-      <span class="tb-tray-label">Device</span>
-      <span class="tb-tray-sep"></span>
       <span id="device-dot" class="tb-device-dot"></span>
       <select id="device-select" onchange="onDeviceChange(this.value)" aria-label="ADB device">
         <option value="">Scanning…</option>
@@ -80,21 +109,51 @@
         <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
     </div>
     <div class="tb-tray tb-tray-source">
-      <span class="tb-tray-label">Source</span>
-      <span class="tb-tray-sep"></span>
       <select id="capture-backend" onchange="onCaptureBackendChange(this.value)" aria-label="Capture source">
         <option value="scrcpy">scrcpy</option>
         <option value="adb">ADB</option>
       </select>
     </div>
     </div>
+    <button class="btn ico" onclick="uiShowShortcuts()" title="Keyboard & mouse shortcuts (F1)" aria-label="Shortcuts">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.9.4-1.5 1-1.5 2"/><path d="M12 17h.01"/></svg></button>
+    <div id="wf-view-tabs" class="wf-view-tabs" role="tablist" aria-label="View">
+      <button class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Edit mode — design the workflow graph (Tab)">Edit</button>
+      <button class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview mode — live device mirror + scope tools (Tab)">Preview</button>
+    </div>
   </div>
 </div>
 
 <div id="workflow-view" style="display:flex;">
-  <!-- Left: node palette + functions (pinned at the bottom so they're always
-       one drag away — dragging a function row onto the canvas inserts a call). -->
-  <div id="wf-side" class="card">
+  <!-- Left: library — activities on top, then the node palette, functions pinned
+       at the bottom so they're always one drag away. -->
+  <div id="wf-side">
+    <div class="wf-side-sec" id="wf-act-panel">
+      <div class="wf-side-hdr">
+        <button type="button" class="wf-side-hdr-button" id="wf-act-collapse" aria-controls="wf-act-panel-body" aria-expanded="true">
+          <span class="wf-side-chev">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+          </span>
+          <span id="wf-act-hdr-title">Activities</span>
+        </button>
+        <span class="spacer"></span>
+        <button class="wf-side-mini" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button class="wf-side-mini" id="wf-act-dbg" title="Debug overlay: Off — when on, every image/color/OCR match draws its box + confidence on Preview" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M12 5v2M12 17v2M5 12H3M21 12h-2"/></svg>
+        </button>
+        <button class="wf-side-mini wf-side-add" id="wf-act-add" title="Add activity">+</button>
+      </div>
+      <div class="wf-act-tab-row">
+        <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequence <span class="side-count" id="wf-act-count"></span></button>
+        <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
+      </div>
+      <div id="wf-act-panel-body" class="wf-act-panel-body">
+        <div id="wf-activities" class="wf-act-list"></div>
+        <div id="wf-activities-bg" class="wf-act-list" style="display:none"></div>
+      </div>
+    </div>
     <div class="wf-side-sec" style="flex:1;min-height:0;display:flex;flex-direction:column;">
       <div class="wf-side-hdr"><span>Nodes</span></div>
       <div class="wf-pal-search">
@@ -116,7 +175,7 @@
           <span class="side-count" id="wf-fn-count"></span>
         </button>
         <span class="spacer"></span>
-        <button class="wf-act-hdr-add" id="wf-fn-add" title="Create new function">+</button>
+        <button class="wf-side-mini wf-side-add" id="wf-fn-add" title="Create new function">+</button>
       </div>
       <div id="wf-functions" class="wf-side-fns wf-act-list"></div>
     </div>
@@ -127,77 +186,7 @@
     </button>
   </div>
   <!-- Center: graph canvas -->
-  <div id="wf-main" class="card">
-    <div id="wf-bar">
-      <!-- Project identity: gear + name as one tray so the title doesn't float. -->
-      <div class="wf-title-tray" title="Project — click the gear for package / ADB / OCR settings">
-        <button type="button" class="btn sm ico" id="wf-proj-settings" onclick="wfOpenProjectSettings()" title="Project settings — package, ADB/Win32, OCR…" aria-label="Project settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-        </button>
-        <span class="tb-tray-sep"></span>
-        <input id="wf-name" type="text" placeholder="Workflow name" value="My Workflow" aria-label="Workflow name">
-      </div>
-      <!-- Frequent Win32 target, matching, and input controls stay beside the workflow title. -->
-      <div id="wf-bar-win32" class="wf-bar-win32" style="display:none" aria-label="Win32 target controls">
-        <button type="button" class="wf-win-target" id="wf-bar-win32-pick" onclick="wfPickWindow(event, 'bar')" title="Choose an open PC window">
-          <span class="tb-device-dot" id="wf-bar-win32-dot"></span>
-          <span id="wf-bar-win32-label">Choose window</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
-        </button>
-        <span class="tb-tray-sep"></span>
-        <select id="wf-bar-win32-matchby" onchange="wfBarWinMatchChanged(this.value)" aria-label="Win32 window matching method" title="How the target window is identified">
-          <option value="title">Title</option>
-          <option value="class">Class</option>
-          <option value="pid">PID</option>
-          <option value="exe">Name / EXE</option>
-        </select>
-        <select id="wf-bar-win32-mode" onchange="wfBarWinInputChanged(this.value)" aria-label="Win32 input mode" title="How input is delivered to the target window">
-          <option value="background">Background — PostMessage</option>
-          <option value="background_sync">Background sync — SendMessage</option>
-          <option value="background_cursor">Background + cursor</option>
-          <option value="foreground">Foreground</option>
-        </select>
-      </div>
-      <!-- Canvas edit toggles, grouped in a segmented tray. -->
-      <span class="wf-tool-tray">
-        <button class="btn sm ico" id="wf-snap-btn" onclick="wfToggleSnap()" title="Snap to grid: Off">
-          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></button>
-        <button class="btn sm ico" id="wf-preview-btn" onclick="wfTogglePreview()" title="Image preview: Off">
-          <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-        <button class="btn sm ico" id="wf-group-btn" onclick="wfToggleGroupMode()" title="Create group: Off — click then drag to draw a frame (or select nodes first, then click)">
-          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="4 3"/></svg></button>
-        <button class="btn sm ico" id="wf-align-btn" onclick="wfToggleAlign()" title="Smart align: On">
-          <svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="3 2.5"/><rect x="4" y="6" width="16" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/></svg></button>
-        <button class="btn sm ico" id="wf-minimap-btn" onclick="wfToggleMinimap()" title="Minimap: Off">
-          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="6" y="13" width="7" height="4" rx="1"/></svg></button>
-      </span>
-      <span class="tb-divider"></span>
-      <div id="wf-speed-group" class="wf-speed-group" title="Speed hack — separate from Test run (uses workflow package)">
-        <span class="wf-speed-title">Speed hack</span>
-        <button class="btn sm ico" id="wf-speed-btn" onclick="wfToggleSpeed()" title="Speed hack: Off (accelerate the game with Frida — root required)">
-          <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></button>
-        <input id="wf-speed-val" type="number" min="0.1" step="0.1" value="2" title="Speed (x)" style="width:48px;text-align:right" onchange="wfSpeedChanged()">
-        <span class="hz-unit">x</span>
-        <button class="btn sm ico ok" id="wf-speed-run-btn" onclick="wfSpeedRun()" title="Enable speed hack" style="display:none"></button>
-      </div>
-      <span class="spacer"></span>
-      <button class="btn sm ico" onclick="uiShowShortcuts()" title="Keyboard & mouse shortcuts (F1)" aria-label="Shortcuts">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.9.4-1.5 1-1.5 2"/><path d="M12 17h.01"/></svg></button>
-      <!-- View controls grouped at the right: zoom tray + Canvas/Preview tabs. -->
-      <span class="wf-zoom wf-tool-tray">
-        <button class="btn sm ico" id="wf-zoom-out" onclick="wfZoomBy(1/1.1)" title="Zoom out">
-          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-        <button type="button" id="wf-zoom-lbl" onclick="wfZoomReset()" title="Reset zoom to 100%">100%</button>
-        <button class="btn sm ico" id="wf-zoom-in" onclick="wfZoomBy(1.1)" title="Zoom in">
-          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-        <button class="btn sm ico" id="wf-zoom-fit" onclick="wfFit()" title="Fit view — show all blocks (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/></svg></button>
-      </span>
-      <span class="tb-divider"></span>
-      <div id="wf-view-tabs" class="wf-view-tabs">
-        <button class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Edit mode — design the workflow graph (Tab)">Edit</button>
-        <button class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview mode — live device mirror + scope tools (Tab)">Preview</button>
-      </div>
-    </div>
+  <div id="wf-main">
     <div id="wf-canvas">
       <!-- Soft watermark: name of the open activity/function (top-left of the graph). -->
       <div class="wf-cur-act" id="wf-cur-act" data-empty="1" title="Currently open activity / function" aria-live="polite"></div>
@@ -235,61 +224,33 @@
         </div>
         <div id="wf-pv-wrap"><canvas id="wf-pv-canvas"></canvas></div>
       </div>
-      <!-- Bottom-right corner stack: Activities on top, Variables below. The two
-           panels anchor to each other — collapsing Activities lets Variables
-           rise with it, since they share this flex column pinned to the corner. -->
-      <div id="wf-corner-stack" class="wf-corner-stack">
-      <!-- Activities panel (Sequence / Background tabs — functions live in the
-           left sidebar). Title row (chevron + label + add btn) + tab bar. -->
-      <div id="wf-act-panel" class="wf-act-panel">
-        <div class="wf-act-panel-hdr">
-          <div class="wf-act-hdr-row" id="wf-act-hdr-row">
-            <button type="button" class="wf-panel-toggle" id="wf-act-collapse" aria-controls="wf-activities" aria-expanded="true">
-              <span class="wf-act-hdr-chevron">
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
-              </span>
-              <span class="wf-act-hdr-title" id="wf-act-hdr-title">Activities</span>
-            </button>
-            <button class="wf-act-hdr-tog" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)" aria-pressed="false">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>
-            </button>
-            <button class="wf-act-hdr-tog" id="wf-act-dbg" title="Debug overlay: Off — when on, every image/color/OCR match draws its box + confidence on Preview" aria-pressed="false">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M12 5v2M12 17v2M5 12H3M21 12h-2"/></svg>
-            </button>
-            <button class="wf-act-hdr-add" id="wf-act-add" title="Add activity">+</button>
-          </div>
-          <div class="wf-act-tab-row">
-            <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequence <span class="side-count" id="wf-act-count"></span></button>
-            <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
-          </div>
+      <!-- Canvas tool rail — graph edit toggles + zoom, floating on the left edge.
+           The graph-only group hides in Preview mode; the zoom cluster stays and
+           retargets to the mirror. -->
+      <div id="wf-rail">
+        <div class="wf-rail-sec" id="wf-rail-graph">
+          <button class="btn sm ico" id="wf-snap-btn" onclick="wfToggleSnap()" title="Snap to grid: Off">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></button>
+          <button class="btn sm ico" id="wf-preview-btn" onclick="wfTogglePreview()" title="Image preview: Off">
+            <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button class="btn sm ico" id="wf-group-btn" onclick="wfToggleGroupMode()" title="Create group: Off — click then drag to draw a frame (or select nodes first, then click)">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="4 3"/></svg></button>
+          <button class="btn sm ico" id="wf-align-btn" onclick="wfToggleAlign()" title="Smart align: On">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="3 2.5"/><rect x="4" y="6" width="16" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/></svg></button>
+          <button class="btn sm ico" id="wf-minimap-btn" onclick="wfToggleMinimap()" title="Minimap: Off">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="6" y="13" width="7" height="4" rx="1"/></svg></button>
         </div>
-        <div class="wf-act-panel-body">
-          <div id="wf-activities" class="wf-act-list"></div>
-          <div id="wf-activities-bg" class="wf-act-list" style="display:none"></div>
+        <span class="wf-rail-sep"></span>
+        <div class="wf-rail-sec wf-rail-zoom">
+          <button class="btn sm ico" id="wf-zoom-out" onclick="wfZoomBy(1/1.1)" title="Zoom out">
+            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button type="button" id="wf-zoom-lbl" onclick="wfZoomReset()" title="Reset zoom to 100%">100%</button>
+          <button class="btn sm ico" id="wf-zoom-in" onclick="wfZoomBy(1.1)" title="Zoom in">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="btn sm ico" id="wf-zoom-fit" onclick="wfFit()" title="Fit view — show all blocks (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/></svg></button>
         </div>
       </div>
-      <div id="wf-vars-panel" class="wf-vars-panel">
-        <div class="wf-vars-hdr">
-          <button type="button" class="wf-panel-toggle" id="wf-vars-collapse" onclick="wfToggleVarsPanel()" aria-controls="wf-vars-body" aria-expanded="true">
-            <span class="wf-act-hdr-chevron">
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
-            </span>
-            <span class="wf-vars-title">Variables</span>
-            <span class="wf-vars-count" id="wf-vars-count"></span>
-            <span class="wf-vars-live" id="wf-vars-live" title="● Live — engine is running">●</span>
-          </button>
-          <span class="wf-vars-actions">
-            <button id="wf-vars-add" class="wf-vars-add" title="Add variable (global or local)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            </button>
-            <button id="wf-vars-mgr" class="wf-vars-add" title="Manage global variables"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
-          </span>
-        </div>
-        <div id="wf-vars-body" class="wf-vars-body"></div>
-      </div>
-      </div><!-- /wf-corner-stack -->
-      <!-- Auto-layout — one button that opens a menu of layout strategies.
-           Click again (or outside) to collapse. Each tidies the graph + fits. -->
+      <!-- Auto-layout — one button that opens a menu of layout strategies. -->
       <div id="wf-layout-bar" class="wf-layout-bar">
         <button class="wf-layout-toggle" id="wf-layout-toggle" onclick="wfToggleLayoutMenu(event)" title="Arrange blocks">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
@@ -303,8 +264,7 @@
           <button class="wf-layout-item" data-layout="compact"><span class="ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="12" x2="21" y2="12"/></svg></span><span class="lbl"><b>Compact</b><i>near-square grid</i></span></button>
         </div>
       </div>
-      <!-- Minimap — bird's-eye view; click/drag to jump. Auto-shows only when the
-           graph outgrows the viewport (or has enough blocks to need it). -->
+      <!-- Minimap — bird's-eye view; click/drag to jump. -->
       <div id="wf-minimap" class="wf-minimap" title="Minimap — click or drag to move the view">
         <canvas id="wf-minimap-cv"></canvas>
       </div>
@@ -315,12 +275,30 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 18-6-6 6-6"/></svg>
     </button>
   </div>
-  <!-- Right: inspector (node properties in Canvas mode) -->
-  <div id="wf-inspector" class="card" style="width:280px;">
+  <!-- Right: live variables (always visible) above node properties -->
+  <div id="wf-inspector" style="width:280px;">
+    <div id="wf-vars-panel" class="wf-vars-panel">
+      <div class="wf-vars-hdr">
+        <button type="button" class="wf-panel-toggle" id="wf-vars-collapse" onclick="wfToggleVarsPanel()" aria-controls="wf-vars-body" aria-expanded="true">
+          <span class="wf-act-hdr-chevron">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+          </span>
+          <span class="wf-vars-title">Variables</span>
+          <span class="wf-vars-count" id="wf-vars-count"></span>
+          <span class="wf-vars-live" id="wf-vars-live" title="● Live — engine is running">●</span>
+        </button>
+        <span class="wf-vars-actions">
+          <button id="wf-vars-add" class="wf-vars-add" title="Add variable (global or local)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button id="wf-vars-mgr" class="wf-vars-add" title="Manage global variables"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        </span>
+      </div>
+      <div id="wf-vars-body" class="wf-vars-body"></div>
+    </div>
     <div class="wf-side-hdr" id="wf-insp-hdr"><span id="wf-insp-title">Properties</span></div>
     <div id="wf-insp-body"></div>
-    <!-- Scope tool panel — shown only in Preview mode. Mirrors DevScope so the
-         Preview tab doubles as a region picker / action tester. -->
+    <!-- Scope tool panel — shown only in Preview mode. -->
     <div id="wf-scope-panel" style="display:none;flex:1;min-height:0;flex-direction:column;">
       <div id="pv-tabs-bar" role="tablist" aria-label="Preview tools">
         <button class="tab-btn active" data-tab="inspect"  onclick="pvSwitchTab('inspect')" role="tab" aria-selected="true" aria-controls="pv-tab-inspect">Inspect</button>
@@ -591,7 +569,7 @@
 <div id="wf-ctxmenu" role="menu"></div>
 
 
-<div id="log-card" class="card">
+<div id="log-card">
   <div id="log-resizer" title="Drag or use arrow keys to resize the log" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize log" aria-valuemin="80" aria-valuemax="480"></div>
   <div class="log-hdr">
     <button type="button" id="log-toggle" class="log-toggle" onclick="wfToggleLog()" title="Collapse or expand log" aria-controls="log-body" aria-expanded="true">
@@ -614,7 +592,7 @@
   <div class="log-body" id="log-body" role="log" aria-live="polite"></div>
 </div>
 
-<!-- ── Footer ────────────────────────────────────────────────────────────── -->
+<!-- ── Status strip ──────────────────────────────────────────────────────── -->
 
 <div id="footer">
   <span id="footer-dot"></span>

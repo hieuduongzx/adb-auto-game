@@ -39,15 +39,12 @@
   --branch-loop-bg: #fff7ea;
   --branch-loop-line: #d09030;
   /* Wire palette — the graph's connective tissue. `--wire` is the neutral
-     forward flow; branch/switch wires borrow the semantic hues above. Kept a
-     touch cooler + a hair stronger than the old flat grey so they read cleanly
-     over the dot grid without shouting. */
+     forward flow; branch/switch wires borrow the semantic hues above. */
   --wire:        #8a9bb3;
   --wire-switch: #9a78e6;
   --wire-arrow:  #94a6ba;
   /* Node-category accents — single source of truth for wf.css's .cat-* node
-     styling AND the group-frame colour palette (js/groups.js), so retuning a
-     category's colour here updates both instead of drifting apart. */
+     styling AND the group-frame colour palette (js/groups.js). */
   --cat-basic:  #6f9be8;
   --cat-image:  #2fb0a3;
   --cat-color:  #d6608f;
@@ -61,8 +58,7 @@
   --cat-win32:  #6366f1;
   --cat-misc:   #9aa6b4;
   /* Per-category ink/bg/bd triads — one source for the palette category pills,
-     chip icon tints AND node header tints (previously three separate hardcoded
-     sets in wf.css that could drift apart). ink = readable dark text on bg. */
+     chip icon tints AND node header tints. */
   --cat-basic-ink:#2d64cc;  --cat-basic-bg:#eef5ff;  --cat-basic-bd:#c5d8f5;
   --cat-input-ink:#4338ca;  --cat-input-bg:#eef0ff;  --cat-input-bd:#c4c6f5;
   --cat-image-ink:#0f766e;  --cat-image-bg:#ecfdf9;  --cat-image-bd:#99e6d4;
@@ -86,9 +82,11 @@
   --node-h: 64px;  /* canonical card height: 22px header + ~42px body */
   /* Start / End — round chips (icon only). */
   --term-size: 40px;
-  /* Semantic z-index scale — no arbitrary 999s.
-     dropdown (floating pickers) sits under modal/toast, above menus on canvas. */
+  /* Semantic z-index scale — no arbitrary 999s. */
   --z-node: 2; --z-selbox: 1; --z-node-hover: 6;
+  /* Chrome metrics — the flat console frame. */
+  --hdr-h: 46px;   /* single top bar */
+  --ftr-h: 26px;   /* status strip */
 }
 @media (prefers-reduced-motion: reduce){
   *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
@@ -107,8 +105,7 @@ input, select { font-family: var(--mono); font-size: 11.5px; background: var(--p
   border-radius: var(--r-sm); padding: 5px 8px; }
 input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bd); }
 /* Selects: strip the native OS chrome and draw our own chevron so dropdowns
-   read consistently across platforms. Sans font + room on the right for the
-   arrow; the chevron is an inline SVG data-URI tinted to --muted. */
+   read consistently across platforms. */
 select { font-family: var(--sans); font-weight: 500; cursor: pointer;
   -webkit-appearance: none; -moz-appearance: none; appearance: none;
   padding-right: 26px;
@@ -117,51 +114,22 @@ select { font-family: var(--sans); font-weight: 500; cursor: pointer;
 select:hover { border-color: var(--border2); background-color: var(--surface); }
 option { font-family: var(--sans); font-size: 13px; color: var(--ink); background: var(--panel); padding: 6px; }
 
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
-  ::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-thumb-hover); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-thumb-hover); }
 
-/* ── Layout ─────────────────────────────────────────────────────────────── */
-#app { flex: 1; display: flex; flex-direction: column; gap: 7px;
-  padding: 8px 8px 4px; overflow: hidden; min-height: 0; }
-.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--sh-sm); }
-/* App chrome: slightly quieter frame so content (canvas / graph) is the focus. */
-#app > .card { box-shadow: 0 1px 2px rgba(20,30,45,.04); }
+/* ── App frame — flat console: chrome is flush, regions split by hairlines ── */
+#app { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 
-/* ── Toolbar ────────────────────────────────────────────────────────────── */
-#toolbar { padding: 6px var(--s4); display: flex; align-items: center; gap: var(--s3); flex-shrink: 0; }
-.tb-group { display: flex; align-items: center; gap: var(--s2); }
-.tb-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
-  color: var(--muted); text-transform: uppercase; }
-
-.device-wrap { display: flex; align-items: center; gap: 7px; min-width: 200px; height: 38px;
-  padding: 0 10px; border: 1px solid var(--border2); border-radius: 8px; background: var(--panel); }
-#device-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot-off);
-  flex-shrink: 0; transition: background .2s, box-shadow .2s; }
-#device-dot.connected { background: var(--ok); box-shadow: 0 0 0 3px rgba(31,146,84,.18); }
-/* Device dot inside the new tray layout */
-.tb-device-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot-off);
-  flex-shrink: 0; transition: background .2s, box-shadow .2s; }
-.tb-device-dot.connected { background: var(--ok) !important; box-shadow: 0 0 0 3px rgba(31,146,84,.18); }
-.tb-device-dot:not(.connected) { background: var(--dot-off); }
-#device-select { flex: 1; min-width: 0; border: none; background: transparent; background-image: none;
-  font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--dim);
-  cursor: pointer; -webkit-appearance: none; appearance: none; padding: 0; }
-#device-select:focus { outline: none; box-shadow: none; }
-/* Capture-backend select inside the new source tray */
-#capture-backend { flex: 1; min-width: 0; max-width: none; border: none; border-radius: 0;
-  font-size: 11.5px; color: var(--dim); padding: 0; background: transparent; background-image: none;
-  -webkit-appearance: none; appearance: none; font-family: var(--sans); font-weight: 600;
-  cursor: pointer; }
-
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-    height: 30px; border-radius: 8px; font-weight: 600; font-size: 11.5px;
-    transition: background .15s, opacity .15s, color .15s, border-color .15s, box-shadow .15s, transform .1s;
-    border: 1px solid var(--border); background: var(--panel); color: var(--dim);
-    padding: 0 11px; flex-shrink: 0; }
-  .btn:hover  { background: var(--alt); color: var(--ink); border-color: var(--border2); }
-  .btn:active:not(:disabled) { transform: translateY(0.5px); }
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 30px; border-radius: 8px; font-weight: 600; font-size: 11.5px;
+  transition: background .15s, opacity .15s, color .15s, border-color .15s, box-shadow .15s, transform .1s;
+  border: 1px solid var(--border); background: var(--panel); color: var(--dim);
+  padding: 0 11px; flex-shrink: 0; }
+.btn:hover  { background: var(--alt); color: var(--ink); border-color: var(--border2); }
+.btn:active:not(:disabled) { transform: translateY(0.5px); }
 .btn:disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -173,9 +141,7 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .btn.err:hover { background: #fae2e0; }
 .btn.sm  { height: 26px; padding: 0 9px;  font-size: 11px; }
 .btn.h30 { height: 30px; padding: 0 12px; }
-/* Icon-only toolbar button: square, glyph centered, label lives in the tooltip.
-   Keeps the toolbar compact instead of a wall of text. Colour variants
-   (.accent/.ok/.err) still apply for primary actions (save / run). */
+/* Icon-only button: square, glyph centered, label lives in the tooltip. */
 .btn.ico { width: 30px; padding: 0; }
 .btn.sm.ico { width: 26px; }
 .btn.ico svg { width: 16px; height: 16px; display: block; }
@@ -193,45 +159,13 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .icon-btn.flash { color: var(--ok) !important; }
 
 .hz-wrap { display: flex; align-items: center; gap: 4px; }
-#hz-spin  { width: 54px; height: 30px; text-align: right; padding: 0 8px; }
 .hz-unit  { font-size: 11px; color: var(--muted); flex-shrink: 0; }
 
 .pill-wrap { display: flex; align-items: center; gap: 7px; cursor: pointer; }
-#auto-cb { width: 36px; height: 21px; border-radius: 999px; background: var(--dot-off);
-  position: relative; transition: background .2s; flex-shrink: 0; display: block; }
-#auto-cb.on { background: var(--accent); }
-#auto-thumb { position: absolute; top: 2px; left: 2px; width: 17px; height: 17px;
-  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
-#auto-cb.on #auto-thumb { transform:translateX(15px); }
 .pill-label { font-size: 11.5px; font-weight: 600; color: var(--dim); }
 .spacer { flex: 1; }
 
-/* ── Main split ──────────────────────────────────────────────────────────── */
-#main { flex: 1; display: flex; gap: 7px; min-height: 0; overflow: hidden; }
-
-/* Preview */
-#preview-card { flex: 1; display: flex; flex-direction: column;
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: var(--r-md); overflow: hidden; min-width: 0; }
-.preview-hdr { display: flex; align-items: center; gap: 8px;
-  padding: 7px 12px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
-#size-label  { font-size: 12.5px; font-weight: 700; color: var(--ink); }
-#res-label   { font-family: var(--mono); font-size: 11px; color: var(--muted); }
-.ph-hint     { font-size: 11px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
-.ph-hint .dot{ width: 8px; height: 8px; border-radius: 2px; background: #06b6d4; }
-#zoom-level  { font-family: var(--mono); font-size: 10.5px; color: var(--muted); min-width: 36px; text-align: right; }
-#preview-wrap { flex: 1; position: relative; background: var(--bg); overflow: hidden; min-height: 0; }
-#preview-canvas { display: block; position: absolute; inset: 0;
-  width: 100%; height: 100%; cursor: crosshair; }
-
-/* Tools panel */
-#tools-card { width: 410px; min-width: 320px; flex-shrink: 0;
-  display: flex; flex-direction: column; background: var(--panel);
-  border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
-
-/* Tabs */
-#tabs-bar { display: flex; align-items: center; gap: 1px; padding: 0 2px;
-  border-bottom: 1px solid var(--border); flex-shrink: 0; }
+/* ── Tabs (scope panel) ──────────────────────────────────────────────────── */
 .tab-btn { position: relative; padding: 8px 12px 9px; font-size: 12px; font-weight: 600;
   color: var(--muted); transition: color .15s; }
 .tab-btn::after { content:''; position: absolute; left:0; right:0; bottom:-1px;
@@ -270,9 +204,7 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .btns .btn { flex: 1; min-width: 60px; }
 
 /* Readout & swatch — the live colour preview beside a picked Point / sampled
-   colour. The Preview-tab scope panel uses pv-prefixed ids; they share the same
-   look (previously unstyled → invisible, so no colour showed on pick). A subtle
-   checker underlay shows through translucent samples. */
+   colour. A subtle checker underlay shows through translucent samples. */
 #color-swatch, #cc-swatch, #pv-color-swatch, #pv-cc-swatch {
   width: 28px; height: 26px; border-radius: 6px; flex-shrink: 0;
   border: 1px solid var(--border2);
@@ -285,9 +217,9 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .badge.cyan { color: #0e8aa3; background: #e3f7fb; border: 1px solid #c4ecf3; }
 .badge.cyan .bd { width: 6px; height: 6px; border-radius: 2px; background: #06b6d4; }
 
-#ocr-engine { font-size: 10px; font-weight: 600; color: #1c7a44;
+#pv-ocr-engine { font-size: 10px; font-weight: 600; color: #1c7a44;
   background: var(--ok-bg); border: 1px solid var(--ok-bd); border-radius: 999px; padding: 2px 7px; }
-#ocr-engine.unavailable { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-bd); }
+#pv-ocr-engine.unavailable { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-bd); }
 
 /* Checkboxes */
 .cb-line { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
@@ -330,13 +262,13 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .asset-name  { font-size: 9.5px; color: var(--dim); padding: 3px 5px 4px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ── Log ─────────────────────────────────────────────────────────────────── */
-/* Height is user-resizable via #log-resizer; defaults keep a compact drawer. */
-#log-card { flex-shrink: 0; display: flex; flex-direction: column; height: 140px;
-  min-height: 80px; max-height: min(55vh, 480px); position: relative; }
+/* ── Log — flat docked drawer, one hairline above ────────────────────────── */
+#log-card { flex-shrink: 0; display: flex; flex-direction: column; height: 138px;
+  min-height: 34px; max-height: min(55vh, 480px); position: relative;
+  background: var(--panel); border-top: 1px solid var(--border2); }
 #log-card.resizing { transition: none; }
-#log-card.collapsed { height: 33px !important; min-height: 33px; max-height: 33px; }
-#log-card.collapsed .log-hdr { border-bottom: none; border-radius: var(--r-md); }
+#log-card.collapsed { height: 34px !important; min-height: 34px; max-height: 34px; }
+#log-card.collapsed .log-hdr { border-bottom: none; }
 #log-card.collapsed .log-body { display: none; }
 #log-card.collapsed #log-resizer { display: none; }
 /* Drag handle along the top edge of the log drawer. */
@@ -346,22 +278,22 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
   width: 36px; height: 3px; margin-left: -18px; border-radius: 2px;
   background: transparent; transition: background .12s; }
 #log-resizer:hover::before, #log-resizer.drag::before { background: var(--accent); }
-.log-hdr  { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s4);
-  border-bottom: 1px solid var(--border); flex-shrink: 0; user-select: none;
-  transition: background .1s; border-radius: var(--r-md) var(--r-md) 0 0; }
+.log-hdr  { display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s4);
+  height: 33px; border-bottom: 1px solid var(--line); flex-shrink: 0; user-select: none;
+  transition: background .1s; }
 .log-hdr:hover { background: var(--alt); }
 .log-toggle { display:inline-flex; align-items:center; gap:var(--s2); min-width:0; }
 .log-chevron { color: var(--muted); display: inline-flex; transition: transform .15s var(--ease); }
 #log-card.collapsed .log-chevron { transform: rotate(-90deg); }
-.log-label { font-size: 11px; font-weight: 700; letter-spacing: .04em;
-  color: var(--dim); text-transform: uppercase; }
+.log-label { font-size: 10.5px; font-weight: 800; letter-spacing: .05em;
+  color: var(--ink2); text-transform: uppercase; }
 .log-count { font-family: var(--mono); font-size: 10px; color: var(--muted);
   background: var(--alt); border-radius: 999px; padding: 1px 7px; min-width: 18px; text-align: center; }
 .log-count:empty { display: none; }
 .log-count.has-err { color: var(--err); background: var(--err-bg); }
 .btn-log-clear { font-size: 11px; font-weight: 600; color: var(--muted);
   padding: 3px 7px; border-radius: 5px; transition: color .1s, background .1s; }
-.btn-log-clear:hover { color: var(--dim); background: var(--panel); }
+.btn-log-clear:hover { color: var(--dim); background: var(--alt); }
 .btn-log-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Level filter chips in the log header; data-filter on #log-card hides the rest. */
 .log-filters { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px;
@@ -374,9 +306,8 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 #log-card[data-filter="success"] .log-line:not(.lv-success) { display: none; }
 #log-card[data-filter="warning"] .log-line:not(.lv-warning) { display: none; }
 #log-card[data-filter="error"]   .log-line:not(.lv-error)   { display: none; }
-.log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px;
-  background: var(--log-bg); border-radius: 0 0 var(--r-md) var(--r-md);
-  user-select: text; cursor: text; }
+.log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 12px;
+  background: var(--log-bg); user-select: text; cursor: text; }
 .log-line { display: flex; gap: 7px; font-family: var(--mono); font-size: 10.5px;
   line-height: 1.75; white-space: nowrap; }
 .log-ts  { color: var(--log-muted); flex-shrink: 0; }
@@ -385,21 +316,21 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .log-info    { color: #5b86c9; } .log-success { color: var(--run-ok); }
 .log-warning { color: #c08a1e; } .log-error   { color: var(--run-fail); }
 
-/* ── Footer ──────────────────────────────────────────────────────────────── */
-#footer { display: flex; align-items: center; gap: 6px; padding: 3px 6px 4px; flex-shrink: 0; }
+/* ── Status strip ────────────────────────────────────────────────────────── */
+#footer { display: flex; align-items: center; gap: 6px; height: var(--ftr-h);
+  padding: 0 10px; flex-shrink: 0; background: var(--panel);
+  border-top: 1px solid var(--line); }
 #footer-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot-off);
   flex-shrink: 0; transition: background .2s, box-shadow .2s; }
 #footer-dot.connected { background: var(--ok); box-shadow: 0 0 0 3px rgba(31,146,84,.16); }
 #status-text { font-size: 11px; color: var(--dim); font-weight: 500;
   flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#hover-pos  { font-family: var(--mono); font-size: 10.5px; color: var(--muted); min-width: 88px; text-align: right; }
-#footer-out { font-size: 11px; color: var(--log-muted); font-family: var(--mono); }
 
 @keyframes fadeInUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
 .fade-in { animation: fadeInUp .2s var(--ease) both; }
 
-/* ── Toasts — non-blocking feedback, top-right under the toolbar ───────────── */
-#ui-toasts { position: fixed; top: 54px; right: 12px; z-index: var(--z-toast);
+/* ── Toasts — non-blocking feedback, top-right under the header ──────────── */
+#ui-toasts { position: fixed; top: calc(var(--hdr-h) + 8px); right: 12px; z-index: var(--z-toast);
   display: flex; flex-direction: column; gap: 7px; align-items: flex-end;
   pointer-events: none; }
 .ui-toast { display: flex; align-items: center; gap: 8px; max-width: 360px;
@@ -442,45 +373,22 @@ option { font-family: var(--sans); font-size: 13px; color: var(--ink); backgroun
 .wf-new-field { display: flex; flex-direction: column; gap: 6px; }
 .wf-new-field > .hint { font-size: 10.5px; color: var(--muted); line-height: 1.4; }
 /* Two-option chooser shared by Hub + Designer new-workflow dialogs */
-.choice-seg {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
+.choice-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .choice-seg.disabled { opacity: .48; }
 .choice-seg-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .choice-seg-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.choice {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 9px 11px;
-  border-radius: 9px;
-  border: 1px solid var(--border2);
-  background: var(--surface);
-  color: var(--dim);
-  text-align: left;
-  transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
-}
-.choice:hover:not(:disabled) {
-  background: var(--alt); color: var(--ink); border-color: var(--border2);
-}
-.choice.on {
-  background: var(--accent-bg);
-  border-color: var(--accent-bd);
-  color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent-bd);
-}
+.choice { display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 9px 11px; border-radius: 9px; border: 1px solid var(--border2);
+  background: var(--surface); color: var(--dim); text-align: left;
+  transition: background .12s, border-color .12s, color .12s, box-shadow .12s; }
+.choice:hover:not(:disabled) { background: var(--alt); color: var(--ink); border-color: var(--border2); }
+.choice.on { background: var(--accent-bg); border-color: var(--accent-bd);
+  color: var(--accent); box-shadow: 0 0 0 1px var(--accent-bd); }
 .choice:disabled { cursor: not-allowed; }
 .choice-title { font-size: 12.5px; font-weight: 700; line-height: 1.2; }
-.choice-sub {
-  font-size: 10.5px; font-weight: 500; color: var(--muted); line-height: 1.25;
-}
+.choice-sub { font-size: 10.5px; font-weight: 500; color: var(--muted); line-height: 1.25; }
 .choice.on .choice-sub { color: #4a78c9; }
-@media (max-width: 520px) {
-  .choice-seg-3, .choice-seg-4 { grid-template-columns: 1fr; }
-}
+@media (max-width: 520px) { .choice-seg-3, .choice-seg-4 { grid-template-columns: 1fr; } }
 
 /* Shortcuts cheat-sheet (F1) */
 .ui-keys { display: flex; flex-direction: column; gap: 3px; padding-bottom: 4px; }
