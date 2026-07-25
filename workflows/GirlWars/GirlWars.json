@@ -4671,7 +4671,7 @@
       "id": "sequence_ih6c",
       "name": "Dragon Queen",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -5808,7 +5808,7 @@
             "x": 540,
             "y": 39,
             "params": {
-              "template": "templates/crop_20260703_011049_871_808_201_40.png",
+              "template": "templates/crop_20260725_065624_868_811_201_38.png",
               "threshold": 0.85,
               "negate": false
             }
