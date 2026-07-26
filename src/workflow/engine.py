@@ -2224,18 +2224,23 @@ class WorkflowEngine:
         return {
             "enabled": self._truthy(cfg.get("enabled", False)),
             "speed": speed,
+            "native": self._truthy(cfg.get("native", False)),
             "package": self._resolve_package(),
             "active": bool(self._speedhack and self._speedhack.active),
         }
 
-    def configure_speedhack(self, enabled=None, speed=None, package=None) -> None:
+    def configure_speedhack(self, enabled=None, speed=None, package=None, native=None) -> None:
         """Update the speedhack config; applies live if a run is in progress.
 
         ``package`` updates the workflow-level package (not nested under speedhack).
+        ``native`` picks the compiled-C clock hook (faster, detected by some
+        protected titles) and only takes effect on the next injection.
         """
         cfg = dict(self.speedhack_cfg or {})
         if enabled is not None:
             cfg["enabled"] = bool(enabled)
+        if native is not None:
+            cfg["native"] = bool(native)
         if speed is not None:
             try:
                 cfg["speed"] = float(speed)
@@ -2254,10 +2259,20 @@ class WorkflowEngine:
         if self._truthy(cfg.get("enabled", False)):
             if self._speedhack is None:
                 self._start_speedhack()
-            elif speed is not None:
+            else:
+                # Also covers re-enabling after a park, where only the toggle
+                # changed and ``speed`` came in as None.
                 self.set_speed_scale(cfg.get("speed", self._speed_scale))
-        else:
-            self._stop_speedhack()
+        elif self._speedhack is not None:
+            # Park rather than tear down: unloading a hook that every thread
+            # calls millions of times a second is itself a crash risk, and the
+            # run may well re-enable it. _stop_speedhack() at the end of the run
+            # does the real teardown.
+            try:
+                self._speedhack.reset()
+            except Exception as e:
+                log_warning(f"[speedhack] error while parking: {e}")
+            self._speed_scale = 1.0
 
     def set_speed_scale(self, scale: float) -> bool:
         """Change the live time scale of a running speedhack injection."""
@@ -2287,8 +2302,8 @@ class WorkflowEngine:
             return
         package = self._resolve_package()
         if not package:
-            log_warning("[speedhack] bật nhưng chưa có package game (đặt 'package' "
-                        "cạnh tên workflow hoặc thêm node Mở app)")
+            log_warning("[speedhack] enabled but no game package (set 'package' next "
+                        "to the workflow name, or add a Launch app block)")
             return
         try:
             scale = float(cfg.get("speed", 2.0) or 2.0)
@@ -2296,10 +2311,14 @@ class WorkflowEngine:
             scale = 2.0
         if scale == 1.0:
             return
-        mgr = FridaSpeedhackManager(package=package)
+        mgr = FridaSpeedhackManager(
+            package=package,
+            use_cmodule=self._truthy(cfg.get("native", False)),
+            scale_boottime=self._truthy(cfg.get("boottime", True)),
+        )
         mgr.adb_controller = self.auto.adb
         if not mgr.available:
-            log_warning("[speedhack] không tìm thấy frida-inject trong vendor/frida/")
+            log_warning("[speedhack] frida-inject not found in vendor/frida/")
             return
         self._speedhack = mgr
         self._speed_scale = scale
@@ -2311,20 +2330,29 @@ class WorkflowEngine:
         ).start()
 
     def _speedhack_loop(self, scale: float) -> None:
+        """Arm the speedhack, then keep it armed for the whole run.
+
+        The loop does not stop at the first success: a game restart gives the
+        package a new PID and takes the hook with the old one, so we keep
+        checking and re-inject when the agent is gone. Without that watchdog the
+        run silently continues at normal speed while the UI still says "Live".
+        """
         stop_ev = self._speedhack_stop
         mgr = self._speedhack
-        log_info(f"[speedhack] sẽ tăng tốc '{mgr.package}' x{scale} khi game chạy…")
+        log_info(f"[speedhack] will accelerate '{mgr.package}' x{scale} once the game runs…")
+        armed = False
         while (mgr is not None and not self._stop.is_set()
                and stop_ev is not None and not stop_ev.is_set()):
-            if mgr.active:
-                return
             try:
-                if mgr.set_scale(scale):
-                    log_success(f"[speedhack] đã bật x{scale}")
-                    return
+                if not armed:
+                    if mgr.set_scale(scale):
+                        armed = True
+                        log_success(f"[speedhack] enabled x{scale}")
+                elif not mgr.ensure_alive():
+                    armed = False       # game gone: fall back to waiting for it
             except Exception as e:
-                log_warning(f"[speedhack] thử lại: {e}")
-            # Wait ~5s before retrying (game not up yet), but stay responsive.
+                log_warning(f"[speedhack] retrying: {e}")
+            # Wait ~5s before the next check, but stay responsive to stop.
             for _ in range(50):
                 if self._stop.is_set() or stop_ev.is_set():
                     return
@@ -2343,7 +2371,7 @@ class WorkflowEngine:
         try:
             mgr.detach()
         except Exception as e:
-            log_warning(f"[speedhack] lỗi khi tắt: {e}")
+            log_warning(f"[speedhack] error while disabling: {e}")
 
     def _delay_val(self, node: Dict, key: str, params: Dict) -> float:
         """Per-node pause (seconds) for delayBefore / delayAfter. Falls back to

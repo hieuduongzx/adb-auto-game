@@ -256,7 +256,7 @@ async function wfNew(){
   WF.version=2; WF.templatesDir="templates";
   WF.buildVersion="1.0.0";
   WF.package="";
-  WF.speedhack={enabled:false, speed:2.0};
+  WF.speedhack={enabled:false, speed:2.0, native:false};
   WF.controller=controller;
   WF.win32={window:"", matchBy:"title", inputMode};
   WF.ocrBackend=""; if(typeof wfSyncOcrUI==="function") wfSyncOcrUI();

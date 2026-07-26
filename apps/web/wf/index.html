@@ -98,6 +98,12 @@
           <span class="hz-unit">×</span>
         </div>
         <div class="wf-speed-pop-row">
+          <label class="wf-speed-pop-ck" title="Run the clock hook as compiled C instead of JS: much cheaper per call, so it stays smooth at high speeds. Some protected games crash when Frida compiles it — leave off unless the game tolerates it. Applies on the next injection.">
+            <input id="wf-speed-native" type="checkbox" onchange="wfSpeedChanged()">
+            <span>Native hook</span>
+          </label>
+        </div>
+        <div class="wf-speed-pop-row">
           <button class="btn sm" id="wf-speed-btn" onclick="wfToggleSpeed()" title="Speed hack: Off (accelerate the game with Frida — root required)">Enable</button>
           <button class="btn sm ico ok" id="wf-speed-run-btn" onclick="wfSpeedRun()" title="Enable speed hack" style="display:none"></button>
         </div>

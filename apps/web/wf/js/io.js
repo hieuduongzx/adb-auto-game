@@ -105,7 +105,7 @@ function wfSerialize(){
     win32:{ window:(w.window||"").trim(), matchBy:wfNormWinMatchBy(w.matchBy), inputMode:wfNormWinInputMode(w.inputMode) },
     // Speed hack is ADB-only (Frida). Package lives at the top level (key "package").
     // Force speedhack off in Win32 so a stale enabled flag never starts Frida.
-    speedhack:{ enabled:isWin32?false:!!sh.enabled, speed:sh.speed||2.0 },
+    speedhack:{ enabled:isWin32?false:!!sh.enabled, speed:sh.speed||2.0, native:!!sh.native },
     globals: wfSerialVars(WF.globals||[]),
     functions: WF.functions.map(f=>({ id:f.id, name:f.name, graph:wfCleanGraph(f.graph) })),
     activities: WF.activities.map(a=>{
@@ -171,7 +171,7 @@ function wfHydrate(flow){
   const sh=flow.speedhack||{};
   // Speed hack is only {enabled, speed}. Package is top-level; migrate legacy
   // speedhack.package when opening older workflow files.
-  WF.speedhack={enabled:!!sh.enabled, speed:(parseFloat(sh.speed)||2.0)};
+  WF.speedhack={enabled:!!sh.enabled, speed:(parseFloat(sh.speed)||2.0), native:!!sh.native};
   WF.package=String(flow.package!=null?flow.package:(sh.package||"")).trim();
   WF.controller=(flow.controller==="win32")?"win32":"adb";
   WF.ocrBackend=String(flow.ocr||"").trim().toLowerCase();

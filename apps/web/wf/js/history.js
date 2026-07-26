@@ -80,7 +80,7 @@ function wfRestoreSnapshot(snap) {
   if (snap.speedhack !== undefined) {
     const sh = snap.speedhack || {};
     // Drop legacy nested package if an old snapshot still carries it.
-    WF.speedhack = { enabled: !!sh.enabled, speed: (parseFloat(sh.speed) || 2.0) };
+    WF.speedhack = { enabled: !!sh.enabled, speed: (parseFloat(sh.speed) || 2.0), native: !!sh.native };
     if (snap.package === undefined && sh.package) WF.package = String(sh.package).trim();
   }
 

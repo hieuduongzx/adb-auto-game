@@ -1789,11 +1789,13 @@ class WorkflowDesignerAPI:
     def _sh_push(self, active: bool, running: bool) -> None:
         self._push("speedhack_state", {"active": active, "running": running})
 
-    def speedhack_start(self, speed=2.0, package: str = "") -> bool:
+    def speedhack_start(self, speed=2.0, package: str = "", native=False) -> bool:
         """Start (or live-adjust) the speed hack on its own — no workflow needed.
 
         ADB-only: uses Frida. Win32 projects have no speed hack (the old
         cheat.dll injection was removed) — refuse there with a clear message.
+        ``native`` selects the compiled-C clock hook; it only applies to a fresh
+        injection, so toggling it while one is live changes nothing until stop.
         """
         if self._capture_kind == "win32":
             log_error("[speedhack] not supported in Win32 mode (ADB/Frida only).")
@@ -1817,7 +1819,7 @@ class WorkflowDesignerAPI:
         if not pkg:
             log_error("[speedhack] a game package is required to enable the speed hack")
             return False
-        mgr = FridaSpeedhackManager(package=pkg)
+        mgr = FridaSpeedhackManager(package=pkg, use_cmodule=bool(native))
         mgr.adb_controller = self.controller
         if not mgr.available:
             log_warning("[speedhack] frida-inject not found in vendor/frida/")
@@ -1829,20 +1831,28 @@ class WorkflowDesignerAPI:
         return True
 
     def _sh_loop(self, scale: float) -> None:
-        """Inject in the background, retrying until the game process exists."""
+        """Inject in the background, then keep the injection alive.
+
+        Retries until the game process exists, and afterwards keeps watching: a
+        game restart takes the hook with the old PID, so the agent has to be
+        re-injected or the UI would keep claiming "Live" at normal speed.
+        """
         stop_ev = self._sh_stop
         mgr = self._sh_mgr
         if mgr is None:
             return
         log_info(f"[speedhack] will accelerate '{mgr.package}' x{scale} once the game runs…")
+        armed = False
         while mgr is not None and stop_ev is not None and not stop_ev.is_set():
-            if mgr.active:
-                return
             try:
-                if mgr.set_scale(scale):
-                    log_success(f"[speedhack] enabled x{scale}")
-                    self._sh_push(True, True)
-                    return
+                if not armed:
+                    if mgr.set_scale(scale):
+                        armed = True
+                        log_success(f"[speedhack] enabled x{scale}")
+                        self._sh_push(True, True)
+                elif not mgr.ensure_alive():
+                    armed = False
+                    self._sh_push(False, True)
             except Exception as e:
                 log_warning(f"[speedhack] retrying: {e}")
             for _ in range(50):  # ~5s, stay responsive to stop

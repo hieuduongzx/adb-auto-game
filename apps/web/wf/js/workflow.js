@@ -349,7 +349,9 @@ const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities
   // Target Android package for this workflow (ADB). Top-level, not part of speedhack.
   package:"",
   // Speed hack toggle + multiplier only; package lives on WF.package.
-  speedhack:{enabled:false, speed:2.0},
+  // native = compiled-C clock hook (smoother at high scales, but some protected
+  // titles crash when Frida compiles it — off by default).
+  speedhack:{enabled:false, speed:2.0, native:false},
   // Which backend drives the flow: "adb" (device/emulator) or "win32" (PC window).
   controller:"adb",
   win32:{window:"", matchBy:"title", inputMode:"background"},
@@ -461,6 +463,12 @@ function wfSyncSpeedUI(){
   const spState=$("wf-speed-state");
   if(spState){ spState.textContent = sh.enabled ? (wfSpeedRunning?"Live":"On") : "Off"; spState.classList.toggle("on", sh.enabled); }
   const v=$("wf-speed-val"); if(v && document.activeElement!==v) v.value=sh.speed;
+  const nat=$("wf-speed-native");
+  if(nat){
+    nat.checked=!!sh.native;
+    // Swapping the hook flavour needs a fresh injection, so lock it while live.
+    nat.disabled=wfSpeedRunning;
+  }
   if(grp) grp.classList.toggle("on", sh.enabled);
   const rb=$("wf-speed-run-btn");
   if(rb){
@@ -471,15 +479,29 @@ function wfSyncSpeedUI(){
   }
 }
 function wfSpeedFromUI(){
-  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0});
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,native:false});
   const el=$("wf-speed-val");
   const v=el?parseFloat(el.value):sh.speed; sh.speed=(isNaN(v)||v<=0)?1:v;
+  const nat=$("wf-speed-native"); if(nat) sh.native=!!nat.checked;
   wfPackageFromUI();
 }
 // Speed value edited: persist, and if the hack is live, push the new scale.
-function wfSpeedChanged(){ wfSpeedFromUI(); if(wfSpeedRunning){ const sh=WF.speedhack; api().speedhack_start(sh.speed, wfAutoPackage()); } }
+// Debounced: the number spinner fires change on every arrow click, and each call
+// costs a round of adb work (and a full re-injection if the pipe went stale).
+let wfSpeedPushT=null;
+function wfSpeedChanged(){
+  wfSpeedFromUI();
+  wfSyncSpeedUI();
+  if(!wfSpeedRunning) return;
+  if(wfSpeedPushT) clearTimeout(wfSpeedPushT);
+  wfSpeedPushT=setTimeout(()=>{
+    wfSpeedPushT=null;
+    const sh=WF.speedhack;
+    api().speedhack_start(sh.speed, wfAutoPackage(), !!sh.native);
+  }, 350);
+}
 function wfToggleSpeed(){
-  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0});
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,native:false});
   wfSpeedFromUI(); sh.enabled=!sh.enabled;
   if(!sh.enabled && wfSpeedRunning){ api().speedhack_stop(); wfSpeedRunning=false; }  // disabling stops it
   wfSyncSpeedUI();
@@ -487,12 +509,12 @@ function wfToggleSpeed(){
 // The ▶/⏹ button: actually inject (or stop) the speed hack, on its own.
 // ADB-only (Frida). Win32 mode hides the whole cluster, so this never fires there.
 async function wfSpeedRun(){
-  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0});
+  const sh=WF.speedhack||(WF.speedhack={enabled:false,speed:2.0,native:false});
   wfSpeedFromUI();
   if(wfSpeedRunning){ await api().speedhack_stop(); return; }
   const pkg=wfAutoPackage();
   if(!pkg){ uiToast("Set the app package in Project settings (gear next to the title), or add a Launch app block.","warning"); return; }
-  const ok=await api().speedhack_start(sh.speed, pkg);
+  const ok=await api().speedhack_start(sh.speed, pkg, !!sh.native);
   if(!ok){ wfSpeedRunning=false; wfSyncSpeedUI(); }
 }
 
