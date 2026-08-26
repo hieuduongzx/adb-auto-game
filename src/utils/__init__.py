@@ -5,12 +5,15 @@ Provides simple coloured ``log_*`` helpers backed by the standard ``logging``
 module so that messages are both printed to the console (with colours) and
 captured by any handlers attached to the root logger (e.g. log files).
 """
+import hashlib
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import threading
+import time
 from datetime import datetime
 from typing import Callable, List, Optional, Sequence
 
@@ -303,6 +306,33 @@ def file_url(path: str) -> str:
     return Path(os.path.abspath(path)).as_uri()
 
 
+def sanitize_name(raw: str) -> str:
+    """Reduce *raw* to a safe folder/file stem (``A-Z a-z 0-9 _ -`` only)."""
+    cleaned = re.sub(r"[^A-Za-z0-9_\-]+", "_", (raw or "").strip())
+    return cleaned.strip("._-")
+
+
+def ts_stamp() -> str:
+    """Filename-friendly timestamp, e.g. ``20260821_143005``."""
+    return time.strftime("%Y%m%d_%H%M%S")
+
+
+def slugify_workflow_name(raw: str, max_len: int = 80) -> str:
+    """Filesystem-safe slug for a workflow name (used for per-workflow config
+    folders). Collapses whitespace/punctuation to ``_`` and appends a short
+    hash of the original name so distinct names ("A B" vs "A_B") never map to
+    the same folder."""
+    base = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", str(raw or "").strip())
+    base = re.sub(r"_+", "_", re.sub(r"\s+", "_", base)).strip(" ._-")[:max_len] or "workflow"
+    reserved = {"CON", "PRN", "AUX", "NUL",
+                *(f"COM{i}" for i in range(1, 10)),
+                *(f"LPT{i}" for i in range(1, 10))}
+    if base.upper() in reserved:
+        base = "_" + base
+    digest = hashlib.sha1(str(raw or "").encode("utf-8")).hexdigest()[:8]
+    return f"{base}_{digest}"
+
+
 def confined_path(root: str, candidate: str, extensions: Sequence[str] = ()) -> Optional[str]:
     """Resolve *candidate* only when it remains below *root*.
 
@@ -419,6 +449,9 @@ __all__ = [
     "APP_NAME",
     "APP_VERSION",
     "titled",
+    "sanitize_name",
+    "ts_stamp",
+    "slugify_workflow_name",
     "webview_storage_path",
     "push_webview_event",
     "launch_tool",

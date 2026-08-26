@@ -145,35 +145,10 @@
 </div>
 
 <div id="workflow-view" style="display:flex;">
-  <!-- Left: library — activities on top, then the node palette, functions pinned
-       at the bottom so they're always one drag away. -->
+  <!-- Left: library — node palette, with functions pinned at the bottom so
+       they're always one drag away. Activities now float over the canvas
+       (bottom-right corner), not here. -->
   <div id="wf-side">
-    <div class="wf-side-sec" id="wf-act-panel">
-      <div class="wf-side-hdr">
-        <button type="button" class="wf-side-hdr-button" id="wf-act-collapse" aria-controls="wf-act-panel-body" aria-expanded="true">
-          <span class="wf-side-chev">
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
-          </span>
-          <span id="wf-act-hdr-title">Activities</span>
-        </button>
-        <span class="spacer"></span>
-        <button class="wf-side-mini" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>
-        </button>
-        <button class="wf-side-mini" id="wf-act-dbg" title="Debug overlay: Off — when on, every image/color/OCR match draws its box + confidence on Preview" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M12 5v2M12 17v2M5 12H3M21 12h-2"/></svg>
-        </button>
-        <button class="wf-side-mini wf-side-add" id="wf-act-add" title="Add activity">+</button>
-      </div>
-      <div class="wf-act-tab-row">
-        <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequence <span class="side-count" id="wf-act-count"></span></button>
-        <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
-      </div>
-      <div id="wf-act-panel-body" class="wf-act-panel-body">
-        <div id="wf-activities" class="wf-act-list"></div>
-        <div id="wf-activities-bg" class="wf-act-list" style="display:none"></div>
-      </div>
-    </div>
     <div class="wf-side-sec" style="flex:1;min-height:0;display:flex;flex-direction:column;">
       <div class="wf-side-hdr"><span>Nodes</span></div>
       <div class="wf-pal-search">
@@ -287,6 +262,33 @@
       <!-- Minimap — bird's-eye view; click/drag to jump. -->
       <div id="wf-minimap" class="wf-minimap" title="Minimap — click or drag to move the view">
         <canvas id="wf-minimap-cv"></canvas>
+      </div>
+      <!-- Activities panel — floats over the graph canvas in the bottom-right corner. -->
+      <div class="wf-side-sec" id="wf-act-panel">
+        <div class="wf-side-hdr">
+          <button type="button" class="wf-side-hdr-button" id="wf-act-collapse" aria-controls="wf-act-panel-body" aria-expanded="true">
+            <span class="wf-side-chev">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+            </span>
+            <span id="wf-act-hdr-title">Activities</span>
+          </button>
+          <span class="spacer"></span>
+          <button class="wf-side-mini" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>
+          </button>
+          <button class="wf-side-mini" id="wf-act-dbg" title="Debug overlay: Off — when on, every image/color/OCR match draws its box + confidence on Preview" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M12 5v2M12 17v2M5 12H3M21 12h-2"/></svg>
+          </button>
+          <button class="wf-side-mini wf-side-add" id="wf-act-add" title="Add activity">+</button>
+        </div>
+        <div class="wf-act-tab-row">
+          <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequence <span class="side-count" id="wf-act-count"></span></button>
+          <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
+        </div>
+        <div id="wf-act-panel-body" class="wf-act-panel-body">
+          <div id="wf-activities" class="wf-act-list"></div>
+          <div id="wf-activities-bg" class="wf-act-list" style="display:none"></div>
+        </div>
       </div>
     </div>
   </div>

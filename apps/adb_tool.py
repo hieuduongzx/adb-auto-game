@@ -129,24 +129,24 @@ def cmd_list(args):
         for i, device in enumerate(devices, 1):
             print(f"{i}. Serial: {device.serial}")
             
-            # Try to get device name
+            # Fresh controller per device — never mutate the shared one.
+            dev = None
             try:
-                controller.device = device
-                controller.device_id = device.serial
-                name = controller.get_device_name()
-                print(f"   Name: {name}")
+                dev = ADBController(device_id=device.serial)
+                print(f"   Name: {dev.get_device_name()}")
             except Exception as e:
                 log_warning(f"   Name: (error: {e})")
             
             # Get current app
-            try:
-                app = controller.get_current_app()
-                if app:
-                    app_name = controller.get_app_name(app)
-                    print(f"   App: {app_name}")
-                    print(f"   Package: {app}")
-            except Exception as e:
-                log_warning(f"   App: (error: {e})")
+            if dev is not None:
+                try:
+                    app = dev.get_current_app()
+                    if app:
+                        app_name = dev.get_app_name(app)
+                        print(f"   App: {app_name}")
+                        print(f"   Package: {app}")
+                except Exception as e:
+                    log_warning(f"   App: (error: {e})")
             
             print()
     except Exception as e:

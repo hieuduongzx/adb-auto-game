@@ -24,16 +24,12 @@ from __future__ import annotations
 
 import base64
 import datetime
-import io
-import json
 import os
-import re
-import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # --- bootstrap: make `src.*` importable when run from apps/ ---------------
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
@@ -44,7 +40,7 @@ import cv2
 import numpy as np
 import webview
 
-from src.core.adb import ADBController, DeviceScanner, kill_adb_server
+from src.core.adb import ADBController, DeviceScanner, device_info, lifecycle
 from src.core.adb.auto.scrcpy_capture import (
     CAPTURE_BACKENDS,
     capture_screen as capture_screen_frame,
@@ -57,7 +53,6 @@ from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.utils import (
     add_log_subscriber,
     bundle_dir,
-    confined_path,
     data_root,
     file_url,
     is_frozen,
@@ -68,7 +63,9 @@ from src.utils import (
     log_warning,
     push_webview_event,
     remove_log_subscriber,
+    sanitize_name,
     titled,
+    ts_stamp,
     webview_storage_path,
 )
 
@@ -83,49 +80,16 @@ _WEB_DIR = (os.path.join(bundle_dir(), "web") if is_frozen()
             else os.path.join(os.path.dirname(__file__), "web"))
 DEFAULT_OUT_DIR = os.path.join(_PROJECT_ROOT, "out")
 
-# Properties fetched for the Device tab info panel.
-_DEVICE_INFO_PROPS = (
-    "ro.product.model",
-    "ro.product.manufacturer",
-    "ro.product.brand",
-    "ro.product.device",
-    "ro.product.cpu.abi",
-    "ro.build.version.release",
-    "ro.build.version.sdk",
-    "ro.build.version.security_patch",
-    "ro.build.display.id",
-    "ro.serialno",
-)
+# Properties fetched for the Device tab info panel live in
+# ``src.core.adb.device_info`` (shared with the Workflow Designer).
 
 
 def _ts() -> str:
-    return time.strftime("%Y%m%d_%H%M%S")
-
-
-def _ensure_out_dir() -> str:
-    os.makedirs(DEFAULT_OUT_DIR, exist_ok=True)
-    return DEFAULT_OUT_DIR
+    return ts_stamp()
 
 
 def _sanitize_name(raw: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9_\-]+", "_", raw.strip())
-    cleaned = cleaned.strip("._-")
-    return cleaned
-
-
-def _shell(device, cmd: str) -> str:
-    try:
-        return (device.shell(cmd) or "").strip()
-    except Exception:
-        return ""
-
-
-def _safe_detect_app(device) -> Optional[str]:
-    try:
-        from src.core.adb.controller import _detect_current_app
-        return _detect_current_app(device)
-    except Exception:
-        return None
+    return sanitize_name(raw)
 
 
 class DevScopeAPI:
@@ -136,6 +100,9 @@ class DevScopeAPI:
     INFO_REFRESH_INTERVAL = 2.0  # seconds
 
     def __init__(self, out_dir: Optional[str] = None) -> None:
+        # Register as a live ADB client so a sibling closing down doesn't kill
+        # the shared ADB server out from under us (see src/core/adb/lifecycle).
+        lifecycle.acquire_adb_lease("devscope")
         self.controller = ADBController(auto_connect=False)
         self.scanner = DeviceScanner()
         self.matcher = TemplateMatcher(cache_size=64)
@@ -398,115 +365,10 @@ class DevScopeAPI:
                 return
             self._info_in_flight = True
         try:
-            device = self.controller.device
-            if device is None:
-                self._push("device_info", {
-                    "status": "Disconnected", "serial": "-", "model": "-",
-                    "brand": "-", "android": "-", "abi": "-",
-                    "screen_size": "-", "density": "-", "app": "-",
-                    "battery": "-", "ip": "-", "uptime": "-",
-                })
-                return
-            info: Dict[str, Any] = {"serial": device.serial, "status": "Connected"}
-
-            getprop_cmd = " ; ".join(f"getprop {p}" for p in _DEVICE_INFO_PROPS)
-            values = [v.strip() for v in _shell(device, getprop_cmd).splitlines()]
-            while len(values) < len(_DEVICE_INFO_PROPS):
-                values.append("")
-            for key, val in zip(_DEVICE_INFO_PROPS, values):
-                info[key] = val or "-"
-
-            size_str = "-"
-            for line in _shell(device, "wm size").splitlines():
-                if ":" in line:
-                    size_str = line.split(":", 1)[1].strip()
-                    break
-            info["screen_size"] = size_str or "-"
-
-            density_str = "-"
-            for line in _shell(device, "wm density").splitlines():
-                if ":" in line:
-                    density_str = line.split(":", 1)[1].strip()
-                    break
-            info["screen_density"] = density_str or "-"
-
-            batt = {"level": "-", "status": "-", "temperature": "-",
-                    "AC powered": "-", "USB powered": "-"}
-            for line in _shell(device, "dumpsys battery").splitlines():
-                line = line.strip()
-                for key in list(batt.keys()):
-                    prefix = f"{key}:"
-                    if line.startswith(prefix):
-                        batt[key] = line[len(prefix):].strip()
-            status_map = {"1": "Unknown", "2": "Charging", "3": "Discharging",
-                          "4": "Not charging", "5": "Full"}
-            status_text = status_map.get(batt["status"], batt["status"])
-            temp_c = "-"
-            try:
-                temp_c = f"{int(batt['temperature']) / 10:.1f}C"
-            except (TypeError, ValueError):
-                pass
-            powered = []
-            if batt["AC powered"].lower() == "true":
-                powered.append("AC")
-            if batt["USB powered"].lower() == "true":
-                powered.append("USB")
-            powered_str = ", ".join(powered) if powered else "battery"
-            info["battery"] = f"{batt['level']}% ({status_text}, {powered_str}, {temp_c})"
-
-            pkg = _safe_detect_app(device)
-            app_str = "-"
-            if pkg:
-                app_name = self.controller._get_app_name_for_package(pkg)
-                app_str = (f"{app_name}  ({pkg})"
-                           if app_name and app_name != "-" else pkg)
-            info["app"] = app_str
-
-            ip_addr = "-"
-            for line in _shell(device, "ip route").splitlines():
-                if " src " in line:
-                    parts = line.split(" src ")
-                    if len(parts) > 1:
-                        ip_addr = parts[1].split()[0]
-                        break
-            info["ip"] = ip_addr or "-"
-
-            uptime_str = "-"
-            try:
-                secs = float(_shell(device, "cat /proc/uptime").split()[0])
-                hours, rem = divmod(int(secs), 3600)
-                mins, _ = divmod(rem, 60)
-                uptime_str = f"{hours}h {mins}m"
-            except (ValueError, IndexError):
-                pass
-            info["uptime"] = uptime_str
-
-            android = info.get("ro.build.version.release", "-")
-            sdk = info.get("ro.build.version.sdk", "-")
-            android_str = (f"{android} (SDK {sdk})"
-                           if sdk and sdk != "-" else android)
-            brand = info.get("ro.product.brand", "-")
-            manufacturer = info.get("ro.product.manufacturer", "-")
-            if (manufacturer and manufacturer != "-"
-                    and manufacturer.lower() != brand.lower()):
-                brand_str = f"{brand} / {manufacturer}"
-            else:
-                brand_str = brand
-
-            ui = {
-                "status": "Connected",
-                "serial": info.get("serial", "-"),
-                "model": info.get("ro.product.model", "-"),
-                "brand": brand_str,
-                "android": android_str,
-                "abi": info.get("ro.product.cpu.abi", "-"),
-                "screen_size": info.get("screen_size", "-"),
-                "density": info.get("screen_density", "-"),
-                "app": app_str,
-                "battery": info.get("battery", "-"),
-                "ip": info.get("ip", "-"),
-                "uptime": info.get("uptime", "-"),
-            }
+            ui = device_info.collect_device_info(
+                self.controller.device,
+                app_name_resolver=self.controller.get_app_name,
+            )
             self._push("device_info", ui)
         except Exception as exc:
             log_error(f"Device info error: {exc}")
@@ -640,12 +502,8 @@ class DevScopeAPI:
                 "centerX": cx, "centerY": cy, **color}
 
     def _pixel_color(self, x: int, y: int) -> dict:
-        img = self._screen
-        if img is None or not (0 <= y < self._screen_h and 0 <= x < self._screen_w):
-            return {"hex": "", "rgb": ""}
-        b, g, r = img[y, x][:3]
-        r, g, b = int(r), int(g), int(b)
-        return {"hex": f"#{r:02X}{g:02X}{b:02X}", "rgb": f"{r}, {g}, {b}"}
+        return device_info.pixel_color(self._screen, self._screen_w,
+                                       self._screen_h, int(x), int(y))
 
     def clear_selection(self) -> bool:
         self._region = None
@@ -724,24 +582,16 @@ class DevScopeAPI:
             path += ".png"
         # If the user edits the filename and removes coords, we still try to inject
         # the current region back in when the name contains no coordinate suffix.
-        path = self._ensure_region_in_filename(path, x, y, w, h)
+        path = device_info.ensure_region_in_filename(path, x, y, w, h)
         if cv2.imwrite(path, crop):
             log_success(f"Saved crop: {path}")
             return True
         log_error(f"Failed to write {path}")
         return False
 
-    def _ensure_region_in_filename(self, path: str, x: int, y: int, w: int, h: int) -> str:
-        """Make sure a saved crop filename ends with _x_y_w_h.ext.
-
-        If the user-supplied path already has a coordinate suffix, leave it alone.
-        Otherwise rewrite the basename so Macro2k can parse the region later.
-        """
-        base, ext = os.path.splitext(path)
-        suffix = f"_{x}_{y}_{w}_{h}"
-        if re.search(r"_\d+_\d+_\d+_\d+(?:\.\d+)?$", base):
-            return path
-        return f"{base}{suffix}{ext}"
+    def _ensure_region_in_filename(self, path: str, x, y, w, h) -> str:
+        """Back-compat wrapper — logic lives in ``device_info``."""
+        return device_info.ensure_region_in_filename(path, x, y, w, h)
 
     def _pkg_subdir(self) -> str:
         """Return the QuickCrop output folder.
@@ -754,7 +604,8 @@ class DevScopeAPI:
         if self._pinned_out_dir:
             os.makedirs(self._out_dir, exist_ok=True)
             return self._out_dir
-        pkg = _safe_detect_app(self.controller.device) if self.controller.device is not None else None
+        pkg = (device_info.safe_detect_app(self.controller.device)
+               if self.controller.device is not None else None)
         clean = _sanitize_name(pkg or "unknown_app") or "unknown_app"
         out_dir = os.path.join(self._out_dir, clean)
         os.makedirs(out_dir, exist_ok=True)
@@ -926,57 +777,24 @@ class DevScopeAPI:
         """Run a template match and return overlay rects + summary."""
         if self._screen is None:
             return {"error": "Capture a screenshot first"}
-        path = (template_path or "").strip()
-        if not path or not os.path.exists(path):
-            return {"error": "Pick a valid template path"}
-        grayscale = bool(grayscale)
-        threshold = float(threshold)
-        multiscale = bool(multiscale)
-        all_matches = bool(all_matches)
-
-        tpl = self.matcher.load(path, grayscale=grayscale)
-        if tpl is None:
-            log_error(f"Could not load template: {path}")
-            return {"error": "Could not load template"}
-        th, tw = tpl.shape[:2]
-
-        rects: List[List[float]] = []
+        result = device_info.run_template_match(
+            self.matcher, self._screen, template_path,
+            threshold, grayscale, multiscale, all_matches,
+        )
+        if result.get("error"):
+            log_error(result["error"])
+            return result
+        rects = result["rects"]
         if all_matches:
-            results = self.matcher.match_all(
-                self._screen, tpl,
-                threshold=threshold, use_grayscale=grayscale,
-            )
-            for cx, cy, conf in results:
-                x = max(0, cx - tw // 2)
-                y = max(0, cy - th // 2)
-                rects.append([x, y, tw, th, float(conf)])
-            log_info(f"match_all -> {len(results)} hit(s) (thr={threshold:.2f})")
-            summary = f"Found {len(results)} match(es)."
-        else:
-            scales = [0.8, 0.9, 1.0, 1.1, 1.2] if multiscale else None
-            res = self.matcher.match(
-                self._screen, tpl,
-                threshold=threshold, use_grayscale=grayscale,
-                multi_scale=multiscale, scales=scales,
-            )
-            if res is None:
-                self._overlay = []
-                self._push("overlay", {"rects": []})
-                return {"summary": f"No match >= {threshold:.2f}.", "rects": []}
-            cx, cy, conf, scale = res
-            sw = int(tw * scale)
-            sh = int(th * scale)
-            x = max(0, cx - sw // 2)
-            y = max(0, cy - sh // 2)
-            rects.append([x, y, sw, sh, float(conf)])
-            log_info(f"match -> ({cx},{cy}) conf={conf:.3f} scale={scale:.2f}")
-            summary = (f"Match: center=({cx},{cy}) "
-                       f"conf={conf:.3f} scale={scale:.2f}")
-
+            log_info(f"match_all -> {len(rects)} hit(s) "
+                     f"(thr={float(threshold):.2f})")
+        elif rects:
+            r = rects[0]
+            log_info(f"match -> ({r[0] + r[2] // 2},{r[1] + r[3] // 2}) "
+                     f"conf={r[4]:.3f}")
         self._overlay = [(r[0], r[1], r[2], r[3], r[4]) for r in rects]
         self._push("overlay", {"rects": rects})
-        return {"summary": summary, "rects": rects}
-
+        return result
     def clear_overlay(self) -> bool:
         self._overlay = []
         self._push("overlay", {"rects": []})
@@ -1076,26 +894,9 @@ class DevScopeAPI:
     # ── Color check ──────────────────────────────────────────────────────────
 
     def check_color(self, x: int, y: int, hex_color: str, tolerance: int = 10) -> dict:
-        if self._screen is None:
-            return {"match": False, "error": "No screenshot"}
-        x, y, tolerance = int(x), int(y), int(tolerance)
-        if not (0 <= y < self._screen_h and 0 <= x < self._screen_w):
-            return {"match": False, "error": "Out of bounds"}
-        b, g, r = self._screen[y, x][:3]
-        r, g, b = int(r), int(g), int(b)
-        actual_hex = f"#{r:02X}{g:02X}{b:02X}"
-        target = hex_color.lstrip("#")
-        if len(target) != 6:
-            return {"match": False, "error": "Invalid hex"}
-        try:
-            tr = int(target[0:2], 16)
-            tg = int(target[2:4], 16)
-            tb = int(target[4:6], 16)
-        except ValueError:
-            return {"match": False, "error": "Invalid hex"}
-        dist = max(abs(r - tr), abs(g - tg), abs(b - tb))
-        return {"match": dist <= tolerance, "actual": actual_hex,
-                "dist": dist, "actual_rgb": f"{r}, {g}, {b}"}
+        return device_info.check_color_at(self._screen, self._screen_w,
+                                          self._screen_h, x, y, hex_color,
+                                          tolerance)
 
     # ── Asset library ────────────────────────────────────────────────────────
 
@@ -1104,61 +905,13 @@ class DevScopeAPI:
         subfolders (e.g. QuickCrop's ``out/<package>/``). Names are shown
         relative to the output root so ``pkg/file.png`` stays distinguishable.
         """
-        out_dir = self._out_dir
-        if not os.path.exists(out_dir):
-            return []
-        exts = (".png", ".jpg", ".jpeg", ".bmp")
-        items = []
-        for root, _dirs, files in os.walk(out_dir):
-            for fname in files:
-                if not fname.lower().endswith(exts):
-                    continue
-                path = os.path.join(root, fname)
-                try:
-                    st = os.stat(path)
-                except OSError:
-                    continue
-                rel = os.path.relpath(path, out_dir).replace("\\", "/")
-                items.append({
-                    "name": rel,
-                    "path": path.replace("\\", "/"),
-                    "size": st.st_size,
-                    "mtime": st.st_mtime,
-                })
-        items.sort(key=lambda it: it["mtime"], reverse=True)
-        for it in items:
-            it.pop("mtime", None)
-        return items[:200]
+        return device_info.list_image_assets(self._out_dir)
 
     def get_asset_thumbnail(self, path: str) -> str:
-        try:
-            safe_path = confined_path(self._out_dir, path, (".png", ".jpg", ".jpeg", ".bmp"))
-            if not safe_path:
-                return ""
-            img = cv2.imread(safe_path)
-            if img is None:
-                return ""
-            h, w = img.shape[:2]
-            tw = 96
-            th = max(1, int(h * tw / w))
-            thumb = cv2.resize(img, (tw, th), interpolation=cv2.INTER_AREA)
-            ok, buf = cv2.imencode(".jpg", thumb, [cv2.IMWRITE_JPEG_QUALITY, 80])
-            if not ok:
-                return ""
-            return ("data:image/jpeg;base64,"
-                    + base64.b64encode(buf.tobytes()).decode("ascii"))
-        except Exception:
-            return ""
+        return device_info.asset_thumbnail(self._out_dir, path)
 
     def delete_asset(self, path: str) -> bool:
-        try:
-            safe_path = confined_path(self._out_dir, path, (".png", ".jpg", ".jpeg", ".bmp"))
-            if safe_path and os.path.isfile(safe_path):
-                os.unlink(safe_path)
-                return True
-            return False
-        except Exception:
-            return False
+        return device_info.delete_asset(self._out_dir, path)
 
     # ── Tool switching ─────────────────────────────────────────────────────────
 
@@ -1184,7 +937,9 @@ class DevScopeAPI:
     def _close(self) -> None:
         self._closing = True
         stop_scrcpy_sources()
-        kill_adb_server()   # stop the leftover adb.exe daemon (also unlocks vendor/adb)
+        # Only stop the shared ADB server when no sibling Macro2k process
+        # (Runner / Designer / another DevScope) still holds a lease.
+        lifecycle.release_adb_and_kill_if_last("devscope")
         remove_log_subscriber(self._on_log)
 
 

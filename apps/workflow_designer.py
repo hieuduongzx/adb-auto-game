@@ -20,13 +20,12 @@ import base64
 import datetime
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -38,7 +37,7 @@ if _PROJECT_ROOT not in sys.path:
 
 import webview
 
-from src.core.adb import ADBController, DeviceScanner, kill_adb_server
+from src.core.adb import ADBController, DeviceScanner, device_info, lifecycle
 from src.core.adb.auto.scrcpy_capture import (
     CAPTURE_BACKENDS,
     capture_screen as capture_screen_frame,
@@ -54,7 +53,6 @@ from src.workflow import NODE_TYPES, WorkflowEngine
 from src.utils import (
     add_log_subscriber,
     bundle_dir,
-    confined_path,
     data_root,
     file_url,
     is_frozen,
@@ -65,7 +63,9 @@ from src.utils import (
     log_warning,
     push_webview_event,
     remove_log_subscriber,
+    sanitize_name,
     titled,
+    ts_stamp,
     webview_storage_path,
 )
 
@@ -98,48 +98,20 @@ _TEMPLATE_LIST_PARAM_KEYS = ("templates",)
 
 
 def _sanitize_name(raw: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9_\-]+", "_", raw.strip())
-    return cleaned.strip("._-")
+    return sanitize_name(raw)
 
 
 def _ts() -> str:
-    return time.strftime("%Y%m%d_%H%M%S")
-
-
-def _shell(device, cmd: str) -> str:
-    try:
-        return (device.shell(cmd) or "").strip()
-    except Exception:
-        return ""
-
-
-def _safe_detect_app(device) -> Optional[str]:
-    try:
-        from src.core.adb.controller import _detect_current_app
-        return _detect_current_app(device)
-    except Exception:
-        return None
-
-
-# Properties fetched for the device info panel (mirrors DevScope).
-_DEVICE_INFO_PROPS = (
-    "ro.product.model",
-    "ro.product.manufacturer",
-    "ro.product.brand",
-    "ro.product.device",
-    "ro.product.cpu.abi",
-    "ro.build.version.release",
-    "ro.build.version.sdk",
-    "ro.build.version.security_patch",
-    "ro.build.display.id",
-    "ro.serialno",
-)
+    return ts_stamp()
 
 
 class WorkflowDesignerAPI:
     """Methods exposed to JavaScript as ``window.pywebview.api.*``."""
 
     def __init__(self) -> None:
+        # Register as a live ADB client so a sibling closing down doesn't kill
+        # the shared ADB server out from under us (see src/core/adb/lifecycle).
+        lifecycle.acquire_adb_lease("designer")
         self.controller = ADBController(auto_connect=False)
         self.scanner = DeviceScanner()
 
@@ -474,12 +446,8 @@ class WorkflowDesignerAPI:
                 "centerX": cx, "centerY": cy, **color}
 
     def _pixel_color(self, x: int, y: int) -> dict:
-        img = self._screen
-        if img is None or not (0 <= y < self._screen_h and 0 <= x < self._screen_w):
-            return {"hex": "", "rgb": ""}
-        b, g, r = img[y, x][:3]
-        r, g, b = int(r), int(g), int(b)
-        return {"hex": f"#{r:02X}{g:02X}{b:02X}", "rgb": f"{r}, {g}, {b}"}
+        return device_info.pixel_color(self._screen, self._screen_w,
+                                       self._screen_h, int(x), int(y))
 
     def clear_selection(self) -> bool:
         self._region = None
@@ -489,26 +457,9 @@ class WorkflowDesignerAPI:
         return True
 
     def check_color(self, x: int, y: int, hex_color: str, tolerance: int = 10) -> dict:
-        if self._screen is None:
-            return {"match": False, "error": "No screenshot"}
-        x, y, tolerance = int(x), int(y), int(tolerance)
-        if not (0 <= y < self._screen_h and 0 <= x < self._screen_w):
-            return {"match": False, "error": "Out of bounds"}
-        b, g, r = self._screen[y, x][:3]
-        r, g, b = int(r), int(g), int(b)
-        actual_hex = f"#{r:02X}{g:02X}{b:02X}"
-        target = hex_color.lstrip("#")
-        if len(target) != 6:
-            return {"match": False, "error": "Invalid hex"}
-        try:
-            tr = int(target[0:2], 16)
-            tg = int(target[2:4], 16)
-            tb = int(target[4:6], 16)
-        except ValueError:
-            return {"match": False, "error": "Invalid hex"}
-        dist = max(abs(r - tr), abs(g - tg), abs(b - tb))
-        return {"match": dist <= tolerance, "actual": actual_hex,
-                "dist": dist, "actual_rgb": f"{r}, {g}, {b}"}
+        return device_info.check_color_at(self._screen, self._screen_w,
+                                          self._screen_h, x, y, hex_color,
+                                          tolerance)
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int, dur: int) -> bool:
         # Like tap(): route to whatever the preview captures from (Win32 window
@@ -568,11 +519,7 @@ class WorkflowDesignerAPI:
         return bool(cv2.imwrite(path, self._screen))
 
     def _ensure_region_in_filename(self, path: str, x, y, w, h) -> str:
-        base, ext = os.path.splitext(path)
-        suffix = f"_{x}_{y}_{w}_{h}"
-        if re.search(r"_\d+_\d+_\d+_\d+(?:\.\d+)?$", base):
-            return path
-        return f"{base}{suffix}{ext}"
+        return device_info.ensure_region_in_filename(path, x, y, w, h)
 
     def save_crop_dialog(self, name: str = "") -> bool:
         region = self._region
@@ -765,38 +712,16 @@ class WorkflowDesignerAPI:
                        grayscale: bool, multiscale: bool, all_matches: bool) -> dict:
         if self._screen is None:
             return {"error": "Capture a screenshot first"}
-        path = (template_path or "").strip()
-        if not path or not os.path.exists(path):
-            return {"error": "Pick a valid template path"}
-        grayscale = bool(grayscale)
-        threshold = float(threshold)
-        tpl = self._matcher.load(path, grayscale=grayscale)
-        if tpl is None:
-            return {"error": "Could not load template"}
-        th, tw = tpl.shape[:2]
-        rects: List[List[float]] = []
-        if all_matches:
-            results = self._matcher.match_all(
-                self._screen, tpl, threshold=threshold, use_grayscale=grayscale)
-            for cx, cy, conf in results:
-                rects.append([max(0, cx - tw // 2), max(0, cy - th // 2), tw, th, float(conf)])
-            summary = f"Found {len(results)} match(es)."
-        else:
-            scales = [0.8, 0.9, 1.0, 1.1, 1.2] if multiscale else None
-            res = self._matcher.match(
-                self._screen, tpl, threshold=threshold, use_grayscale=grayscale,
-                multi_scale=multiscale, scales=scales)
-            if res is None:
-                self._overlay = []
-                self._push("overlay", {"rects": []})
-                return {"summary": f"No match >= {threshold:.2f}.", "rects": []}
-            cx, cy, conf, scale = res
-            sw, sh = int(tw * scale), int(th * scale)
-            rects.append([max(0, cx - sw // 2), max(0, cy - sh // 2), sw, sh, float(conf)])
-            summary = f"Match: center=({cx},{cy}) conf={conf:.3f} scale={scale:.2f}"
+        result = device_info.run_template_match(
+            self._matcher, self._screen, template_path,
+            threshold, grayscale, multiscale, all_matches,
+        )
+        if result.get("error"):
+            return result
+        rects = result["rects"]
         self._overlay = [(r[0], r[1], r[2], r[3], r[4]) for r in rects]
         self._push("overlay", {"rects": rects})
-        return {"summary": summary, "rects": rects}
+        return result
 
     def clear_overlay(self) -> bool:
         self._overlay = []
@@ -833,54 +758,13 @@ class WorkflowDesignerAPI:
     # ── Asset library ─────────────────────────────────────────────────────────
 
     def list_assets(self) -> list:
-        out_dir = self._scope_out()
-        if not os.path.exists(out_dir):
-            return []
-        exts = (".png", ".jpg", ".jpeg", ".bmp")
-        items = []
-        for root, _dirs, files in os.walk(out_dir):
-            for fname in files:
-                if not fname.lower().endswith(exts):
-                    continue
-                path = os.path.join(root, fname)
-                try:
-                    st = os.stat(path)
-                except OSError:
-                    continue
-                rel = os.path.relpath(path, out_dir).replace("\\", "/")
-                items.append({"name": rel, "path": path.replace("\\", "/"),
-                              "size": st.st_size})
-        items.sort(key=lambda it: it.get("size", 0), reverse=True)
-        return items[:200]
+        return device_info.list_image_assets(self._scope_out())
 
     def get_asset_thumbnail(self, path: str) -> str:
-        try:
-            safe_path = confined_path(self._scope_out(), path, (".png", ".jpg", ".jpeg", ".bmp"))
-            if not safe_path:
-                return ""
-            img = cv2.imread(safe_path)
-            if img is None:
-                return ""
-            h, w = img.shape[:2]
-            tw = 96
-            th = max(1, int(h * tw / w))
-            thumb = cv2.resize(img, (tw, th), interpolation=cv2.INTER_AREA)
-            ok, buf = cv2.imencode(".jpg", thumb, [cv2.IMWRITE_JPEG_QUALITY, 80])
-            if not ok:
-                return ""
-            return "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode("ascii")
-        except Exception:
-            return ""
+        return device_info.asset_thumbnail(self._scope_out(), path)
 
     def delete_asset(self, path: str) -> bool:
-        try:
-            safe_path = confined_path(self._scope_out(), path, (".png", ".jpg", ".jpeg", ".bmp"))
-            if safe_path and os.path.isfile(safe_path):
-                os.unlink(safe_path)
-                return True
-        except Exception:
-            pass
-        return False
+        return device_info.delete_asset(self._scope_out(), path)
 
     # ── Device info (mirrors DevScope) ────────────────────────────────────────
 
@@ -893,90 +777,13 @@ class WorkflowDesignerAPI:
                 return
             self._info_in_flight = True
         try:
-            device = self.controller.device
-            if device is None:
-                self._push("device_info", {
-                    "status": "Disconnected", "serial": "-", "model": "-",
-                    "brand": "-", "android": "-", "abi": "-", "screen_size": "-",
-                    "density": "-", "app": "-", "battery": "-", "ip": "-", "uptime": "-"})
-                return
-            info: Dict[str, Any] = {"serial": device.serial, "status": "Connected"}
-            cmd = " ; ".join(f"getprop {p}" for p in _DEVICE_INFO_PROPS)
-            values = [v.strip() for v in _shell(device, cmd).splitlines()]
-            while len(values) < len(_DEVICE_INFO_PROPS):
-                values.append("")
-            for key, val in zip(_DEVICE_INFO_PROPS, values):
-                info[key] = val or "-"
-            size_str = "-"
-            for line in _shell(device, "wm size").splitlines():
-                if ":" in line:
-                    size_str = line.split(":", 1)[1].strip()
-                    break
-            info["screen_size"] = size_str or "-"
-            density_str = "-"
-            for line in _shell(device, "wm density").splitlines():
-                if ":" in line:
-                    density_str = line.split(":", 1)[1].strip()
-                    break
-            info["screen_density"] = density_str or "-"
-            batt = {"level": "-", "status": "-", "temperature": "-",
-                    "AC powered": "-", "USB powered": "-"}
-            for line in _shell(device, "dumpsys battery").splitlines():
-                line = line.strip()
-                for key in list(batt.keys()):
-                    if line.startswith(f"{key}:"):
-                        batt[key] = line[len(key) + 1:].strip()
-            status_map = {"1": "Unknown", "2": "Charging", "3": "Discharging",
-                          "4": "Not charging", "5": "Full"}
-            status_text = status_map.get(batt["status"], batt["status"])
-            temp_c = "-"
-            try:
-                temp_c = f"{int(batt['temperature']) / 10:.1f}C"
-            except (TypeError, ValueError):
-                pass
-            powered = []
-            if batt["AC powered"].lower() == "true":
-                powered.append("AC")
-            if batt["USB powered"].lower() == "true":
-                powered.append("USB")
-            powered_str = ", ".join(powered) if powered else "battery"
-            info["battery"] = f"{batt['level']}% ({status_text}, {powered_str}, {temp_c})"
-            pkg = _safe_detect_app(device)
-            app_str = "-"
-            if pkg:
-                app_str = pkg
-            info["app"] = app_str
-            ip_addr = "-"
-            for line in _shell(device, "ip route").splitlines():
-                if " src " in line:
-                    parts = line.split(" src ")
-                    if len(parts) > 1:
-                        ip_addr = parts[1].split()[0]
-                        break
-            info["ip"] = ip_addr or "-"
-            uptime_str = "-"
-            try:
-                secs = float(_shell(device, "cat /proc/uptime").split()[0])
-                hours, rem = divmod(int(secs), 3600)
-                mins, _ = divmod(rem, 60)
-                uptime_str = f"{hours}h {mins}m"
-            except (ValueError, IndexError):
-                pass
-            info["uptime"] = uptime_str
-            android = info.get("ro.build.version.release", "-")
-            sdk = info.get("ro.build.version.sdk", "-")
-            android_str = (f"{android} (SDK {sdk})" if sdk and sdk != "-" else android)
-            brand = info.get("ro.product.brand", "-")
-            self._push("device_info", {
-                "status": "Connected", "serial": info.get("serial", "-"),
-                "model": info.get("ro.product.model", "-"), "brand": brand,
-                "android": android_str, "abi": info.get("ro.product.cpu.abi", "-"),
-                "screen_size": info.get("screen_size", "-"),
-                "density": info.get("screen_density", "-"), "app": app_str,
-                "battery": info.get("battery", "-"), "ip": info.get("ip", "-"),
-                "uptime": info.get("uptime", "-")})
-        except Exception:
-            pass
+            ui = device_info.collect_device_info(
+                self.controller.device,
+                app_name_resolver=self.controller.get_app_name,
+            )
+            self._push("device_info", ui)
+        except Exception as exc:
+            log_warning(f"Device info error: {exc}")
         finally:
             with self._info_lock:
                 self._info_in_flight = False
@@ -1571,7 +1378,7 @@ class WorkflowDesignerAPI:
         if ok:
             # Seed the panel with global vars immediately (activity vars arrive
             # via on_var when each activity starts).
-            self._push("vars_snapshot", {"vars": dict(self._engine._globals)})
+            self._push("vars_snapshot", {"vars": self._engine.globals_snapshot()})
             log_success("Workflow started")
         return ok
 
@@ -1716,7 +1523,7 @@ class WorkflowDesignerAPI:
         ok = self._engine.start_graph(graph, node_id, seed_act=seed_act, step=bool(step))
         self._push("workflow_state", {"running": ok})
         if ok:
-            self._push("vars_snapshot", {"vars": dict(self._engine._globals)})
+            self._push("vars_snapshot", {"vars": self._engine.globals_snapshot()})
             log_success("Workflow debug run started")
         return ok
 
@@ -2057,7 +1864,9 @@ class WorkflowDesignerAPI:
             except Exception:
                 pass
         stop_scrcpy_sources()
-        kill_adb_server()   # stop the leftover adb.exe daemon (also unlocks vendor/adb)
+        # Only stop the shared ADB server when no sibling Macro2k process
+        # (Runner / DevScope / Hub) still holds a lease.
+        lifecycle.release_adb_and_kill_if_last("designer")
         remove_log_subscriber(self._on_log)
 
 

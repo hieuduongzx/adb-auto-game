@@ -329,6 +329,23 @@
 .wf-act.errored { border-color:var(--run-fail); }
 @keyframes wfActBlink { 0%,100%{opacity:1} 50%{opacity:.3} }
 
+/* ── Activities (floating over the graph canvas, bottom-right) ───────────────
+   The panel no longer lives in the left sidebar — it is absolutely positioned
+   inside #wf-canvas so it docks to the bottom-right corner above the graph. */
+#wf-act-panel {
+  position:absolute; right:12px; bottom:12px; z-index:7;
+  width:302px; max-width:calc(100% - 24px); max-height:56%;
+  display:flex; flex-direction:column; min-height:0;
+  background:var(--panel); border:1px solid var(--border);
+  border-top:2px solid var(--accent);
+  border-radius:11px; box-shadow:var(--sh-lg);
+  overflow:hidden;
+}
+#wf-act-panel .wf-act-panel-body { max-height:none; }
+/* Floating panel stays visible even when nothing else is on the canvas, but
+   hides during Preview mode (full-screen device mirror) just as before. */
+#workflow-view.wf-preview-on #wf-act-panel { display:none; }
+
 /* ── Node palette ─────────────────────────────────────────────────────────── */
 #wf-side .wf-palette { padding:0 10px 10px; overflow-y:auto; }
 /* Palette search — a compact rounded field pinned under the sidebar header. */

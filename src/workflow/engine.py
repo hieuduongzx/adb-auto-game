@@ -542,6 +542,11 @@ class WorkflowEngine:
         # Global vars: declared at flow top level (``globals``), seeded into every
         # thread below. Reset the shared runtime dict on (re)load.
         self._globals = self._seed_vars({"vars": self.flow.get("globals") or []})
+
+    def globals_snapshot(self) -> Dict[str, Any]:
+        """Public copy of the shared global-vars dict (for GUI var panels)."""
+        return dict(self._globals or {})
+
         base = (self.flow.get("templatesDir") or "").strip()
         anchors: List[str] = []
         if flow_path:

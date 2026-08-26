@@ -35,6 +35,7 @@ from src.utils import (
     file_url,
     is_frozen,
     launch_tool,
+    sanitize_name as _sanitize_name,
     titled,
     webview_storage_path,
 )
@@ -52,11 +53,6 @@ _TEMPLATES_DIRNAME = "templates"
 _AUTOCLICK_SETTINGS = os.path.join(_PROJECT_ROOT, "data", "autoclick_settings.json")
 # Internal handoff / scratch folder — never listed as a user workflow.
 _SKIP_DIRS = {"_run", "__pycache__"}
-
-
-def _sanitize_name(raw: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9_\-]+", "_", (raw or "").strip())
-    return cleaned.strip("._-")
 
 
 def _norm_controller(raw: str) -> str:
@@ -597,18 +593,44 @@ class WorkflowHubAPI:
         return {"ok": True, **state}
 
     @staticmethod
-    def _mouse_click(button: str, double: bool) -> None:
+    def _send_mouse_input(dw_flags: int) -> None:
+        """Inject one mouse event via ``SendInput`` (the legacy ``mouse_event``
+        API is deprecated by Microsoft and can be swallowed by UIPI)."""
         import ctypes
+
+        PULONG = ctypes.POINTER(ctypes.c_ulong)
+
+        class _MOUSEINPUT(ctypes.Structure):
+            _fields_ = [
+                ("dx", ctypes.c_long), ("dy", ctypes.c_long),
+                ("mouseData", ctypes.c_ulong), ("dwFlags", ctypes.c_ulong),
+                ("time", ctypes.c_ulong), ("dwExtraInfo", PULONG),
+            ]
+
+        class _INPUTUNION(ctypes.Union):
+            _fields_ = [("mi", _MOUSEINPUT)]
+
+        class _INPUT(ctypes.Structure):
+            _anonymous_ = ("union",)
+            _fields_ = [("type", ctypes.c_ulong), ("union", _INPUTUNION)]
+
+        INPUT_MOUSE = 0
+        inp = _INPUT(type=INPUT_MOUSE)
+        inp.mi = _MOUSEINPUT(0, 0, 0, dw_flags, 0, None)
+        user32 = ctypes.windll.user32
+        user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(_INPUT))
+
+    @classmethod
+    def _mouse_click(cls, button: str, double: bool) -> None:
         flags = {
             "left": (0x0002, 0x0004),
             "right": (0x0008, 0x0010),
             "middle": (0x0020, 0x0040),
         }
         down, up = flags.get(button, flags["left"])
-        user32 = ctypes.windll.user32
         for index in range(2 if double else 1):
-            user32.mouse_event(down, 0, 0, 0, 0)
-            user32.mouse_event(up, 0, 0, 0, 0)
+            cls._send_mouse_input(down)
+            cls._send_mouse_input(up)
             if index == 0 and double:
                 time.sleep(0.05)
 

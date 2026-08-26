@@ -17,7 +17,6 @@ from __future__ import annotations
 import datetime
 import json
 import os
-import re
 import sys
 import tempfile
 import threading
@@ -31,7 +30,7 @@ if _PROJECT_ROOT not in sys.path:
 
 import webview
 
-from src.core.adb import kill_adb_server
+from src.core.adb import lifecycle
 from src.core.adb.auto.scrcpy_capture import (
     CAPTURE_BACKENDS,
     get_capture_backend,
@@ -51,6 +50,7 @@ from src.utils import (
     log_warning,
     push_webview_event,
     remove_log_subscriber,
+    slugify_workflow_name,
     titled,
     webview_storage_path,
 )
@@ -69,6 +69,9 @@ class WorkflowRunnerAPI:
     """Methods exposed to JavaScript via ``pywebview.api.*``."""
 
     def __init__(self) -> None:
+        # Register as a live ADB client so a sibling closing down doesn't kill
+        # the shared ADB server out from under us (see src/core/adb/lifecycle).
+        lifecycle.acquire_adb_lease("runner")
         self.engine = WorkflowEngine()
         self.flow: Dict[str, Any] = {}
         self.flow_path: Optional[str] = None
@@ -139,14 +142,15 @@ class WorkflowRunnerAPI:
     # ── State ────────────────────────────────────────────────────────────────
 
     def _config_path_for_flow(self, flow: dict, flow_path: str) -> str:
-        """Readable per-workflow config: data/runner/<workflow>/config.json."""
+        """Readable per-workflow config: data/runner/<slug>_<hash>/config.json.
+
+        The slug comes from ``slugify_workflow_name`` — it appends a short hash
+        of the original name so distinct names ("A B" vs "A_B") can never
+        collide on one config folder."""
         raw = str(flow.get("name") or "").strip()
         if not raw:
             raw = os.path.splitext(os.path.basename(flow_path or "workflow"))[0]
-        slug = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", raw)
-        slug = re.sub(r"_+", "_", re.sub(r"\s+", "_", slug)).strip(" ._-")[:80] or "workflow"
-        if slug.upper() in {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}:
-            slug = "_" + slug
+        slug = slugify_workflow_name(raw)
         return os.path.join(data_root(), "data", "runner", slug, "config.json")
 
     def _load_runner_config(self, flow: dict, flow_path: str) -> None:
@@ -699,7 +703,9 @@ class WorkflowRunnerAPI:
         except Exception:
             pass
         stop_scrcpy_sources()
-        kill_adb_server()   # stop the leftover adb.exe daemon (also unlocks vendor/adb)
+        # Only stop the shared ADB server when no sibling Macro2k process
+        # (Designer / DevScope / Hub) still holds a lease.
+        lifecycle.release_adb_and_kill_if_last("runner")
 
 
 # ── Entry points ────────────────────────────────────────────────────────────
