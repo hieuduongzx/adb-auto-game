@@ -97,7 +97,18 @@ function wfToggleDebugOverlay(){
 function wfWantMatchOverlay(){
   return !!wfDebugOverlayOn || !!(typeof wfNodeTesting!=="undefined" && wfNodeTesting);
 }
-function wfNewNode(type,x,y){ return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",delayBefore:0,delayAfter:0,retryCount:0,retryDelay:0,screenshotOnFail:false,showPreview:false,stack:null}; }
+function wfNewNode(type,x,y){
+  // Seed the universal per-node fields (timing + failure handling) from the
+  // project defaults where set — see WF.nodeDefaults and the Inspector's
+  // Timing ▸ (gear) dialog. Existing nodes are unaffected; this is a stamp.
+  const nd=(typeof WF!=="undefined"&&WF.nodeDefaults)||{};
+  const num=(k,fallback)=>{ const v=parseFloat(nd[k]); return Number.isFinite(v)?v:fallback; };
+  return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",
+    delayBefore:num("delayBefore",0), delayAfter:num("delayAfter",0),
+    retryCount:num("retryCount",0), retryDelay:num("retryDelay",0),
+    screenshotOnFail:!!nd.screenshotOnFail,
+    showPreview:false,stack:null};
+}
 // Every fresh graph seeds both terminals: Start, and an End further right —
 // reaching End is what makes a function call return true, so it should always
 // be there to wire into.

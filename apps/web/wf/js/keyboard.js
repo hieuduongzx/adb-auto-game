@@ -10,6 +10,8 @@ window.addEventListener("keydown", e => {
     if(wfPvActive && wfPvRegion){ pvQuickCrop(); return; }
     wfSave(); return;
   }
+  // Ctrl+K / Ctrl+P — command palette (global, works even while typing).
+  if((e.key==="k"||e.key==="K"||e.key==="p"||e.key==="P") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); if(typeof wfCmdShow==="function") wfCmdShow(); return; }
   // Ctrl+F — node finder (global: works even while typing, like browser find).
   if((e.key==="f"||e.key==="F") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); if(typeof wfFindShow==="function") wfFindShow(); return; }
   // Ctrl+Enter — test the selected block (match overlay on Preview).

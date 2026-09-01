@@ -1,29 +1,31 @@
 /* Macro2k shared product tokens.
    Every WebView surface loads this file before its app-specific stylesheet. */
 :root {
-  --bg:        #eef0f3;
-  --panel:     #ffffff;
-  --surface:   #f7f9fc;
-  --alt:       #f3f5f9;
-  --border:    #e4e7ec;
-  --border2:   #dde2e8;
-  --line:      #f1f3f6;
+  --bg:        #e9edf2;
+  --panel:     #fbfcfe;
+  --surface:   #f4f6f9;
+  --alt:       #eef2f6;
+  --border:    #d8dee7;
+  --border2:   #cbd3de;
+  --line:      #e5e9ef;
 
-  --ink:       #19222e;
-  --ink2:      #41505f;
-  --dim:       #5a6573;
+  --ink:       #17202b;
+  --ink2:      #344150;
+  --dim:       #4d5a69;
   /* At least 4.69:1 on every product surface, including --bg (WCAG AA). */
-  --muted:     #606c7a;
+  --muted:     #667383;
 
-  --accent:       #2f6fed;
-  --accent-hover: #2559c7;
-  --accent-bg:    #eef5ff;
-  --accent-bd:    #d6e4f5;
+  --accent:       #245fc7;
+  --accent-hover: #194b9f;
+  --accent-bg:    #eaf1fb;
+  --accent-bd:    #bfd1ec;
   /* --ok remains legible under white button text (4.96:1). */
   --ok:           #1b8049;
   --ok-hover:     #166d3f;
   --ok-bg:        #e8f5ed;
   --ok-bd:        #cfead9;
+  /* Foreground for success text/badges that sit on --ok-bg. */
+  --ok-ink:       #1c7a44;
   --warn:         #9c6c12;
   --warn-bg:      #fdf6e9;
   --warn-bd:      #e7d5a4;
@@ -32,30 +34,60 @@
   --err-bg:       #fcefee;
   --err-bd:       #eecdca;
 
-  --log-bg:    #fbfcfd;
-  --log-ink:   #41505f;
+  /* Sub-text sitting on --accent-bg (chooser subtitles, selected rows): the
+     accent stepped back far enough to read as secondary but stay in family. */
+  --accent-soft:  #4a78c9;
+  /* Inert fill for a track a value runs along (progress bar, slider rail). */
+  --track:        #e2e7ee;
+  /* Transparency checkerboard behind a colour swatch. */
+  --checker:      #e6e9ee;
+
+  --log-bg:    #f6f8fa;
+  --log-ink:   #344150;
   --log-muted: #606c7a;
+  /* Win32 controller accent (Hub badge, Designer category). */
+  --win32:     #4f46e5;
+  --win32-bg:  #eef2ff;
+  --win32-bd:  #c7d2fe;
   --shade:     #121316;
   --shade2:    #1a1d21;
-  --scroll-thumb:       #cbd5e1;
-  --scroll-thumb-hover: #94a3b8;
-  --dot-off:   #d3d9e0;
-  --cb-bd:     #cfd5dd;
+  --scroll-thumb:       #b9c3cf;
+  --scroll-thumb-hover: #8795a6;
+  --dot-off:   #b9c2cd;
+  --cb-bd:     #b8c2ce;
 
   --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --mono: "IBM Plex Mono", "Cascadia Code", "Consolas", monospace;
-  --r-sm: 7px;
-  --r-md: 10px;
-  --r-lg: 14px;
+  /* Text/icons drawn on top of solid accent/ok fills (buttons, chips). */
+  --on-accent: #ffffff;
+  --on-ok: #ffffff;
+  --on-err: #ffffff;
+
+  /* Type scale — seven steps, and the only sizes the suite is allowed to use.
+     It replaces an ad-hoc 9–19px spread of fourteen sizes that differed between
+     the three apps for no reason (app titles were 15px in the Hub and 17px in
+     the Runner; section labels drifted between 9.5, 10 and 10.5px). Reach for
+     the nearest step rather than adding a new one. */
+  --t-micro: 10.5px;   /* badges, unit suffixes, meta microcopy (AA floor) */
+  --t-caption: 11px;   /* field labels, hints, status-strip text */
+  --t-ui: 11.5px;      /* buttons, chips, dense controls */
+  --t-body: 12.5px;    /* default UI text, list-row names */
+  --t-title: 13.5px;   /* card / section titles */
+  --t-head: 15px;      /* app title in a header card */
+  --t-display: 17px;   /* hero numbers, empty-state headline */
+
+  --r-sm: 5px;
+  --r-md: 7px;
+  --r-lg: 9px;
   --s1: 4px;
   --s2: 6px;
   --s3: 8px;
   --s4: 12px;
   --s5: 16px;
   --s6: 24px;
-  --sh-sm: 0 1px 2px rgba(20, 30, 45, .06);
-  --sh-md: 0 2px 8px rgba(20, 30, 45, .08);
-  --sh-lg: 0 10px 30px rgba(20, 30, 45, .16);
+  --sh-sm: 0 1px 1px rgba(20, 30, 45, .04);
+  --sh-md: 0 4px 12px rgba(20, 30, 45, .09);
+  --sh-lg: 0 14px 32px rgba(20, 30, 45, .18);
   --z-menu: 50;
   --z-dropdown: 55;
   --z-modal: 70;
@@ -63,4 +95,71 @@
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out: var(--ease);
   color-scheme: light;
+}
+
+/* ── Compact density — scales the spacing scale + row/button metrics down.
+   Toggled from Settings; persisted in designer_settings.json. Applied by
+   setting data-density="compact" on <html>. Comfortable (default) is :root. */
+:root[data-density="compact"] {
+  --s1: 3px; --s2: 4px; --s3: 6px; --s4: 9px; --s5: 12px; --s6: 18px;
+  --t-body: 12px; --t-caption: 10.5px;
+}
+
+/* ── Dark theme — remaps surfaces, ink and the semantic tints. Semantic
+   foreground colors (ok/warn/err/accent) are brightened for dark surfaces;
+   the -bg tints become translucent washes of their foreground color so
+   badges/chips keep the same relationship as the light theme. Applied by
+   setting data-theme="dark" on <html>. */
+:root[data-theme="dark"] {
+  --bg:        #161a20;
+  --panel:     #1e242e;
+  --surface:   #232a36;
+  --alt:       #2a3240;
+  --border:    #333d4c;
+  --border2:   #414c5e;
+  --line:      #272f3b;
+
+  --ink:       #e8edf4;
+  --ink2:      #c3ccd9;
+  --dim:       #9aa7b8;
+  --muted:     #7d8a9d;
+
+  --accent:       #5b8def;
+  --accent-hover: #7ba4f5;
+  --accent-bg:    rgba(91, 141, 239, .16);
+  --accent-bd:    rgba(91, 141, 239, .38);
+  --ok:           #3fae72;
+  --ok-hover:     #55c88a;
+  --ok-bg:        rgba(63, 174, 114, .15);
+  --ok-bd:        rgba(63, 174, 114, .36);
+  --ok-ink:       #6fe3a4;
+  --warn:         #d9a83c;
+  --warn-bg:      rgba(217, 168, 60, .14);
+  --warn-bd:      rgba(217, 168, 60, .34);
+  --err:          #e06c64;
+  --err-hover:    #ec857e;
+  --err-bg:       rgba(224, 108, 100, .14);
+  --err-bd:       rgba(224, 108, 100, .36);
+
+  --accent-soft:  #93b4f3;
+  --track:        #2e3746;
+  --checker:      #2a3240;
+
+  --log-bg:    #1a1f27;
+  --log-ink:   #c3ccd9;
+  --log-muted: #7d8a9d;
+  --win32:     #9aa1f8;
+  --win32-bg:  rgba(129, 140, 248, .16);
+  --win32-bd:  rgba(129, 140, 248, .4);
+  --shade:     #05070a;
+  --shade2:    #0b0e12;
+  --scroll-thumb:       #3a4453;
+  --scroll-thumb-hover: #4d5a6d;
+  --dot-off:   #414c5e;
+  --cb-bd:     #4d5a6d;
+
+  --sh-sm: 0 1px 1px rgba(0, 0, 0, .3);
+  --sh-md: 0 4px 12px rgba(0, 0, 0, .42);
+  --sh-lg: 0 14px 32px rgba(0, 0, 0, .55);
+  color-scheme: dark;
 }

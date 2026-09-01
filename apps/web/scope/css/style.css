@@ -15,7 +15,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 input, select { font-family: var(--mono); font-size: 11.5px; background: var(--panel);
   color: var(--ink); border: 1px solid var(--border2);
   border-radius: var(--r-sm); padding: 5px 8px; }
-input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bd); }
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--border2); box-shadow: none; }
 select { font-family: var(--sans); font-weight: 500; cursor: pointer;
   -webkit-appearance: none; -moz-appearance: none; appearance: none;
   padding-right: 26px;
@@ -36,8 +36,6 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 /* ── Toolbar ────────────────────────────────────────────────────────────── */
 #toolbar { padding: 6px var(--s4); display: flex; align-items: center; gap: var(--s3); flex-shrink: 0; }
 .tb-zone { display: flex; align-items: center; gap: var(--s3); min-width: 0; }
-.tb-left  { }
-.tb-right { }
 
 /* Trays — matching the Macro2k tray system */
 .tb-tray { display: inline-flex; align-items: center; gap: 2px; padding: 3px;
@@ -90,7 +88,7 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 .btn svg { stroke: currentColor; fill: none; stroke-width: 2;
   stroke-linecap: round; stroke-linejoin: round; }
 .btn.accent svg, .btn.ok svg, .btn.err svg { stroke-width: 2.1; }
-.btn.ico.on { background: var(--accent-bg); border-color: var(--accent-bd); color: var(--accent); }
+.btn.ico.on { background: var(--accent-bg); border-color: var(--border2); color: var(--accent); }
 
 /* Inline icon button */
 .icon-btn { width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--border2);
@@ -183,12 +181,12 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 /* Badges */
 .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px;
   font-weight: 600; border-radius: 999px; padding: 2px 7px; }
-.badge.cyan { color: #0e8aa3; background: #e3f7fb; border: 1px solid #c4ecf3; }
+.badge.cyan { color: #0e8aa3; background: #e3f7fb; border: 1px solid var(--border); }
 .badge.cyan .bd { width: 6px; height: 6px; border-radius: 2px; background: #06b6d4; }
 
 #ocr-engine { font-size: 10px; font-weight: 600; color: #1c7a44;
   background: var(--ok-bg); border: 1px solid var(--ok-bd); border-radius: 999px; padding: 2px 7px; }
-#ocr-engine.unavailable { color: var(--warn); background: var(--warn-bg); border-color: #e7d5a4; }
+#ocr-engine.unavailable { color: var(--warn); background: var(--warn-bg); border-color: var(--border); }
 
 /* Checkboxes */
 .cb-line { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
@@ -225,8 +223,7 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 .asset-card { display: flex; flex-direction: column; cursor: pointer; text-align:left;
   border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
   transition: border-color .12s, box-shadow .12s; }
-.asset-card:hover  { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,111,237,.12); }
-.asset-card.active { border-color: var(--accent); }
+.asset-card:hover, .asset-card.active { border-color: var(--border2); box-shadow: var(--sh-sm); }
 .asset-thumb { width: 100%; height: 66px; object-fit: contain; background: #1a1d21; display: block; }
 .asset-name  { font-size: 9.5px; color: var(--dim); padding: 3px 5px 4px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

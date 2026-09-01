@@ -38,6 +38,22 @@ pwsh packaging/build.ps1 -SkipVendor   # code-only rebuild, reuse existing vendo
 Prerequisite: `pip install -r requirements.txt`. PyInstaller is auto-installed if
 missing.
 
+## 1b. App icon
+
+`packaging/app.ico` is the icon for `Macro2k.exe`, the single-workflow Runner
+exes, and `Setup.exe`. `build.ps1` regenerates it automatically when it is
+missing or older than the generator, so a normal build needs no extra step.
+
+Regenerate by hand after editing the artwork:
+
+```powershell
+python packaging/make_icon.py     # -> packaging/app.ico + app.png
+```
+
+[`make_icon.py`](make_icon.py) draws the Hub brand mark (three tiles + accent
+plus) on a dark rounded tile and renders each size independently (16 … 256) so
+the small frames stay readable. Only Pillow is required.
+
 ## 2. Build the installer
 
 ```powershell

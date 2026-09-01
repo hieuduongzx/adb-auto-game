@@ -30,12 +30,18 @@ function pvInitDeviceInfoCopy(){
 function pvSetRegionBadge(on){ const b=$("pv-region-badge"); if(b) b.style.display=on?"inline-flex":"none"; }
 
 // Fill the Point & Color readouts from a set_point / set_region result.
+// pvSetXY writes every coordinate tester at once (some rows are Win32-only and
+// may be absent/hidden), so picking a point primes them all.
+function pvSetXY(x,y){
+  [["pv-tap-x","pv-tap-y"],["pv-lp-x","pv-lp-y"],["pv-cc-x","pv-cc-y"],
+   ["pv-win-cx","pv-win-cy"]].forEach(([kx,ky])=>{
+    const ex=$(kx), ey=$(ky); if(ex) ex.value=x; if(ey) ey.value=y;
+  });
+}
 function pvFillPoint(r){
   if(!r) return;
   $("pv-pt-x").value=r.x; $("pv-pt-y").value=r.y;
-  $("pv-tap-x").value=r.x; $("pv-tap-y").value=r.y;
-  $("pv-lp-x").value=r.x;  $("pv-lp-y").value=r.y;
-  $("pv-cc-x").value=r.x;  $("pv-cc-y").value=r.y;
+  pvSetXY(r.x, r.y);
   if(r.hex){
     $("pv-pt-hex").value=r.hex; $("pv-pt-rgb").value=r.rgb;
     $("pv-color-swatch").style.background=r.hex;
@@ -45,10 +51,8 @@ function pvFillPoint(r){
 function pvFillRegion(r){
   if(!r) return;
   $("pv-rg-x").value=r.x; $("pv-rg-y").value=r.y; $("pv-rg-w").value=r.w; $("pv-rg-h").value=r.h;
-  $("pv-tap-x").value=r.centerX; $("pv-tap-y").value=r.centerY;
-  $("pv-lp-x").value=r.centerX;  $("pv-lp-y").value=r.centerY;
+  pvSetXY(r.centerX, r.centerY);
   $("pv-pt-x").value=r.centerX;  $("pv-pt-y").value=r.centerY;
-  $("pv-cc-x").value=r.centerX;  $("pv-cc-y").value=r.centerY;
   if(r.hex){
     $("pv-pt-hex").value=r.hex; $("pv-pt-rgb").value=r.rgb;
     $("pv-color-swatch").style.background=r.hex;
@@ -119,6 +123,15 @@ async function pvSendTap(){ await api().tap(parseInt($("pv-tap-x").value||"0"),p
 async function pvSendLongPress(){ await api().long_press(parseInt($("pv-lp-x").value||"0"),parseInt($("pv-lp-y").value||"0"),parseInt($("pv-lp-dur").value||"800")); }
 async function pvSendSwipe(){ await api().swipe(parseInt($("pv-sw-x1").value||"0"),parseInt($("pv-sw-y1").value||"0"),parseInt($("pv-sw-x2").value||"0"),parseInt($("pv-sw-y2").value||"0"),parseInt($("pv-sw-dur").value||"300")); }
 async function pvSendText(){ const t=$("pv-inp-text").value; if(t){ await api().input_text(t); $("pv-inp-text").value=""; } }
+// Win32-only: right/middle click + mouse wheel (no ADB equivalent).
+async function pvSendWinClick(){
+  await api().preview_click(parseInt($("pv-win-cx").value||"0"),parseInt($("pv-win-cy").value||"0"),
+    $("pv-win-btn").value||"right",1);
+}
+async function pvSendWinScroll(){
+  await api().preview_scroll(parseInt($("pv-win-cx").value||"0"),parseInt($("pv-win-cy").value||"0"),
+    $("pv-win-wdir").value||"down",parseInt($("pv-win-wn").value||"3"));
+}
 
 // ── Template matching ───────────────────────────────────────────────────────
 async function pvBrowseTpl(){ const p=await api().pick_template(); if(p) $("pv-tpl-path").value=p; }

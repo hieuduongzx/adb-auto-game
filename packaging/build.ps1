@@ -75,6 +75,21 @@ if (-not $havePI) {
     if ($LASTEXITCODE -ne 0) { throw "pip install pyinstaller failed" }
 }
 
+# 1b. Ensure the app icon exists (packaging/app.ico drives both the .exe icon and
+#     SetupIconFile in installer.iss). Regenerated only when missing/stale so a
+#     normal build stays fast.
+$IconPy  = Join-Path $PSScriptRoot "make_icon.py"
+$IconIco = Join-Path $PSScriptRoot "app.ico"
+$iconStale = -not (Test-Path $IconIco)
+if (-not $iconStale) {
+    $iconStale = (Get-Item $IconPy).LastWriteTimeUtc -gt (Get-Item $IconIco).LastWriteTimeUtc
+}
+if ($iconStale) {
+    Write-Host "==> Generating app icon (packaging/app.ico)..." -ForegroundColor Cyan
+    python $IconPy
+    if ($LASTEXITCODE -ne 0) { throw "make_icon.py failed (is Pillow installed?)" }
+}
+
 # 2. Build Macro2k into the staging dir.
 Write-Host "==> Running PyInstaller..." -ForegroundColor Cyan
 python -m PyInstaller --noconfirm --clean --distpath $Stage --workpath $Work $Spec

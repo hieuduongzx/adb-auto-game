@@ -654,6 +654,12 @@ window.__autoClickEvent=(event,data)=>{data=data||{};if(event==="position"){cons
 
 // ── Events ───────────────────────────────────────────────────────────────────
 function wire() {
+  // Theme toggle — one button per view header, all driving the shared controller
+  // in web/shared/theme.js, which persists through the backend so the Designer
+  // and Runner open in the same theme.
+  document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
+    button.onclick = () => { if (window.uiTheme) window.uiTheme.toggle(); };
+  });
   document.querySelectorAll("[data-open-tool]").forEach((button) => { button.onclick = () => openTool(button.dataset.openTool); });
   document.querySelectorAll("[data-back-home]").forEach((button) => { button.onclick = () => openTool("home"); });
   $("btn-refresh").onclick = () => loadList();

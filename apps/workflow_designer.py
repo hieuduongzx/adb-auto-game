@@ -57,6 +57,7 @@ from src.utils import (
     file_url,
     is_frozen,
     launch_tool,
+    load_ui_settings,
     log_error,
     log_info,
     log_success,
@@ -64,6 +65,8 @@ from src.utils import (
     push_webview_event,
     remove_log_subscriber,
     sanitize_name,
+    save_ui_settings,
+    theme_background,
     titled,
     ts_stamp,
     webview_storage_path,
@@ -83,7 +86,6 @@ _WEB_DIR = (os.path.join(bundle_dir(), "web") if is_frozen()
 _WORKFLOWS_DIR = os.path.join(_PROJECT_ROOT, "workflows")
 # Transient flow written for the "Run GUI" handoff to the runner.
 _RUN_TMP_DIR = os.path.join(_WORKFLOWS_DIR, "_run")
-_SETTINGS_PATH = os.path.join(_PROJECT_ROOT, "data", "designer_settings.json")
 # Convention: a saved workflow.json is paired with a sibling assets folder of
 # this name, so the pair (json + folder) is a self-contained, movable bundle —
 # the unit we later package into an .exe. Image nodes reference their templates
@@ -378,17 +380,27 @@ class WorkflowDesignerAPI:
         self._refresh_hz = max(0.2, min(30.0, float(hz)))
         return True
 
+    def _win32_ready(self):
+        """The lazily-built Win32 controller, attached — or ``None``.
+
+        Shared by every Preview-tab action tester (tap / swipe / long press /
+        keys / text / click / wheel) so they all route to the same window the
+        preview is capturing.
+        """
+        if self._win32 is None:
+            return None
+        if not self._win32.device:
+            self._win32.attach()
+        return self._win32 if self._win32.device else None
+
     def tap(self, x: int, y: int) -> bool:
         # Preview right-click tap goes to whatever the preview captures from:
         # the Win32 target window in a Win32 project, else the ADB device.
         if self._capture_kind == "win32":
-            if self._win32 is None:
+            ctrl = self._win32_ready()
+            if ctrl is None:
                 return False
-            if not self._win32.device:
-                self._win32.attach()
-            if not self._win32.device:
-                return False
-            return bool(self._win32.tap(int(x), int(y)))
+            return bool(ctrl.tap(int(x), int(y)))
         if self.controller.device is None:
             return False
         return bool(self.controller.tap(int(x), int(y)))
@@ -466,18 +478,22 @@ class WorkflowDesignerAPI:
         # in a Win32 project, else the ADB device) so right-drag swipes work in
         # both project kinds.
         if self._capture_kind == "win32":
-            if self._win32 is None:
+            ctrl = self._win32_ready()
+            if ctrl is None:
                 return False
-            if not self._win32.device:
-                self._win32.attach()
-            if not self._win32.device:
-                return False
-            return bool(self._win32.swipe(int(x1), int(y1), int(x2), int(y2), int(dur)))
+            return bool(ctrl.swipe(int(x1), int(y1), int(x2), int(y2), int(dur)))
         if self.controller.device is None:
             return False
         return bool(self.controller.swipe(int(x1), int(y1), int(x2), int(y2), int(dur)))
 
     def long_press(self, x: int, y: int, duration: int = 800) -> bool:
+        # Like tap()/swipe(): follow the preview's capture source so the Preview
+        # tab's action testers work in Win32 projects too.
+        if self._capture_kind == "win32":
+            ctrl = self._win32_ready()
+            if ctrl is None:
+                return False
+            return bool(ctrl.hold_and_release(int(x), int(y), int(duration)))
         if self.controller.device is None:
             return False
         try:
@@ -488,6 +504,16 @@ class WorkflowDesignerAPI:
             return False
 
     def send_key(self, keycode) -> bool:
+        if self._capture_kind == "win32":
+            ctrl = self._win32_ready()
+            if ctrl is None:
+                return False
+            # Win32 keys are Windows virtual-key codes, not Android keycodes.
+            try:
+                return bool(ctrl.press_key(int(keycode)))
+            except (TypeError, ValueError):
+                log_warning(f"[designer] Win32 cần mã VK dạng số, nhận '{keycode}'")
+                return False
         if self.controller.device is None:
             return False
         try:
@@ -497,7 +523,14 @@ class WorkflowDesignerAPI:
             return False
 
     def input_text(self, text: str) -> bool:
-        if self.controller.device is None or not text:
+        if not text:
+            return False
+        if self._capture_kind == "win32":
+            ctrl = self._win32_ready()
+            if ctrl is None:
+                return False
+            return bool(ctrl.send_text(str(text)))
+        if self.controller.device is None:
             return False
         try:
             safe = (text.replace("\\", "\\\\").replace('"', '\\"')
@@ -506,6 +539,36 @@ class WorkflowDesignerAPI:
             return True
         except Exception:
             return False
+
+    def preview_click(self, x: int, y: int, button: str = "right",
+                      clicks: int = 1) -> bool:
+        """Right/middle-click test from the Preview tab (Win32 projects only)."""
+        if self._capture_kind != "win32":
+            log_warning("[designer] Click phải/giữa chỉ áp dụng cho dự án Win32")
+            return False
+        ctrl = self._win32_ready()
+        if ctrl is None:
+            return False
+        return bool(ctrl.click(int(x), int(y), button=str(button or "right"),
+                               click_count=int(clicks or 1)))
+
+    def preview_scroll(self, x: int, y: int, direction: str = "down",
+                       notches: int = 3) -> bool:
+        """Mouse-wheel test from the Preview tab (Win32 projects only)."""
+        if self._capture_kind != "win32":
+            log_warning("[designer] Cuộn con lăn chỉ áp dụng cho dự án Win32")
+            return False
+        ctrl = self._win32_ready()
+        if ctrl is None:
+            return False
+        d = str(direction or "down").lower()
+        try:
+            n = max(1, int(notches or 3))
+        except (TypeError, ValueError):
+            n = 3
+        signed = n if d in ("up", "right") else -n
+        return bool(ctrl.scroll(int(x), int(y), notches=signed,
+                                horizontal=d in ("left", "right")))
 
     # ── Crop / save ───────────────────────────────────────────────────────────
 
@@ -739,7 +802,7 @@ class WorkflowDesignerAPI:
             engine = self._ocr_reader.backend_name
             available = bool(self._ocr_reader.available)
             return {"engine": engine if engine != "none" else "n/a", "available": available}
-        except Exception as exc:
+        except Exception:
             return {"engine": "n/a", "available": False}
 
     def read_text(self, whitelist: str = "") -> str:
@@ -834,39 +897,17 @@ class WorkflowDesignerAPI:
     # ── Persisted UI settings (snap, global preview, …) ───────────────────────
 
     def get_settings(self) -> dict:
-        try:
-            with open(_SETTINGS_PATH, encoding="utf-8") as f:
-                return json.load(f) or {}
-        except Exception:
-            return {}
+        return load_ui_settings()
 
     def save_settings(self, settings: dict) -> bool:
-        # Merge into the existing file so writing UI prefs (snap, previewAll…) from
-        # JS doesn't wipe keys the backend owns, like ``lastWorkflow``.
-        try:
-            merged = self.get_settings()
-            merged.update(settings or {})
-            os.makedirs(os.path.dirname(_SETTINGS_PATH), exist_ok=True)
-            with open(_SETTINGS_PATH, "w", encoding="utf-8") as f:
-                json.dump(merged, f, ensure_ascii=False, indent=2)
-            return True
-        except Exception as exc:
-            log_warning(f"Saving settings failed: {exc}")
-            return False
+        # Merged, not replaced, so writing UI prefs (theme, snap, previewAll…)
+        # from JS never wipes keys another window owns — the Hub's or the
+        # Runner's, or the backend's own ``lastWorkflow``.
+        return save_ui_settings(settings)
 
     def _remember_last_workflow(self, path: Optional[str]) -> None:
         """Persist (or clear) the path to reopen on the next launch."""
-        try:
-            s = self.get_settings()
-            if path:
-                s["lastWorkflow"] = str(path)
-            else:
-                s.pop("lastWorkflow", None)
-            os.makedirs(os.path.dirname(_SETTINGS_PATH), exist_ok=True)
-            with open(_SETTINGS_PATH, "w", encoding="utf-8") as f:
-                json.dump(s, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+        save_ui_settings({"lastWorkflow": str(path) if path else None})
 
     def get_last_workflow(self) -> dict:
         """Return the workflow to open on startup.
@@ -1885,11 +1926,11 @@ def create_workflow_designer_window(
         title=title,
         url=url,
         js_api=api,
-        width=1320,
-        height=840,
+        width=1440,
+        height=900,
         resizable=True,
-        min_size=(1040, 680),
-        background_color="#eef0f3",
+        min_size=(1040, 700),
+        background_color=theme_background(),
     )
     window.events.loaded += lambda: api._attach(window)
     window.events.closed += lambda: api._close()

@@ -372,6 +372,74 @@ def webview_storage_path(app_key: str) -> str:
     return path
 
 
+# ── Shared UI settings ────────────────────────────────────────────────────────
+# One file backs the whole suite. Hub / Designer / Runner run as separate
+# processes with separate WebView2 stores (see ``webview_storage_path``), so
+# localStorage alone cannot keep a preference in sync between them: a theme
+# picked in the Designer has to be what the Hub opens with. Every window reads
+# and writes these helpers, and ``web/shared/theme.js`` reconciles against them
+# through ``pywebview.api.get_settings()``.
+_UI_SETTINGS_LOCK = threading.Lock()
+
+# Window chrome painted before the first frame, per theme. Keep in step with
+# ``--bg`` in ``apps/web/shared/tokens.css`` — otherwise a dark-theme window
+# flashes light while the WebView boots.
+_THEME_BACKGROUNDS = {"light": "#e9edf2", "dark": "#161a20"}
+
+
+def ui_settings_path() -> str:
+    """Path of the suite-wide settings file (``data/designer_settings.json``).
+
+    Named for the app that first owned it; it now holds every window's UI
+    preferences (theme, density, snap, previewAll, lastWorkflow, …).
+    """
+    return os.path.join(data_root(), "data", "designer_settings.json")
+
+
+def load_ui_settings() -> dict:
+    """Settings dict, or ``{}`` when the file is missing or unreadable."""
+    try:
+        with open(ui_settings_path(), encoding="utf-8") as fh:
+            return json.load(fh) or {}
+    except Exception:
+        return {}
+
+
+def save_ui_settings(patch: Optional[dict]) -> bool:
+    """Merge ``patch`` into the settings file and write it back.
+
+    Merging (rather than replacing) is what lets one window save a single key
+    without clobbering the ones another window owns. A ``None`` value deletes
+    its key. The lock keeps two saves inside the same process from
+    interleaving; cross-process writes are rare enough (a human toggling a
+    preference) not to need file locking.
+    """
+    if not patch:
+        return False
+    with _UI_SETTINGS_LOCK:
+        merged = load_ui_settings()
+        for key, value in patch.items():
+            if value is None:
+                merged.pop(key, None)
+            else:
+                merged[key] = value
+        try:
+            path = ui_settings_path()
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(merged, fh, ensure_ascii=False, indent=2)
+            return True
+        except Exception as exc:
+            log_warning(f"Saving UI settings failed: {exc}")
+            return False
+
+
+def theme_background() -> str:
+    """``background_color`` for ``webview.create_window`` under the saved theme."""
+    theme = str((load_ui_settings() or {}).get("theme", "light")).strip().lower()
+    return _THEME_BACKGROUNDS.get(theme, _THEME_BACKGROUNDS["light"])
+
+
 def push_webview_event(window, event_type: str, data: dict) -> None:
     """Deliver a JSON event to a WebView ``window.__recv`` handler safely.
 

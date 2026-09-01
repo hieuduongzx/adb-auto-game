@@ -1,6 +1,20 @@
 // ── Export / import / run ────────────────────────────────────────────────────
 function wfSerialVars(vars){ return vars.map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[], children:v.children&&v.children.length?wfSerialVars(v.children):undefined})); }
 function wfHydVars(vars){ return (vars||[]).map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[], children:v.children?wfHydVars(v.children):[]})); }
+// Project-wide node defaults — kept to the fields wfNewNode stamps, so an older
+// file just yields zeros (no defaults) instead of a broken object.
+function wfSerialNodeDefaults(d){
+  d=d||{};
+  return { delayBefore:parseFloat(d.delayBefore)||0, delayAfter:parseFloat(d.delayAfter)||0,
+    retryCount:parseInt(d.retryCount,10)||0, retryDelay:parseFloat(d.retryDelay)||0,
+    screenshotOnFail:!!d.screenshotOnFail };
+}
+function wfHydNodeDefaults(d){
+  d=d||{};
+  return { delayBefore:parseFloat(d.delayBefore)||0, delayAfter:parseFloat(d.delayAfter)||0,
+    retryCount:parseInt(d.retryCount,10)||0, retryDelay:parseFloat(d.retryDelay)||0,
+    screenshotOnFail:!!d.screenshotOnFail };
+}
 function wfCleanGraph(g){
   return {
     nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.delayBefore) o.delayBefore=n.delayBefore; if(n.delayAfter) o.delayAfter=n.delayAfter; if(n.retryCount) o.retryCount=n.retryCount; if(n.retryDelay) o.retryDelay=n.retryDelay; if(n.screenshotOnFail) o.screenshotOnFail=true; if(n.showPreview) o.showPreview=true; if(n.stack) o.stack=n.stack; return o; }),
@@ -107,6 +121,7 @@ function wfSerialize(){
     // Force speedhack off in Win32 so a stale enabled flag never starts Frida.
     speedhack:{ enabled:isWin32?false:!!sh.enabled, speed:sh.speed||2.0, native:!!sh.native },
     globals: wfSerialVars(WF.globals||[]),
+    nodeDefaults: wfSerialNodeDefaults(WF.nodeDefaults),
     functions: WF.functions.map(f=>({ id:f.id, name:f.name, graph:wfCleanGraph(f.graph) })),
     activities: WF.activities.map(a=>{
       const o={ id:a.id, name:a.name, type:a.type, enabled:a.enabled,
@@ -188,6 +203,7 @@ function wfHydrate(flow){
   // enabled=true under the old cheat.dll path can't revive it.
   if(WF.controller==="win32") WF.speedhack.enabled=false;
   const w=flow.win32||{}; WF.win32={window:(w.window||"").trim(), matchBy:wfNormWinMatchBy(w.matchBy), inputMode:wfNormWinInputMode(w.inputMode)};
+  WF.nodeDefaults=wfHydNodeDefaults(flow.nodeDefaults);
   WF.functions=(flow.functions||[]).map(f=>({ id:f.id||("fn_"+wfUid().slice(1,6)), name:f.name||"function", graph:wfHydrateGraph(f.graph) }));
   WF.globals = wfHydVars(flow.globals||[]);
   WF.activities=(flow.activities||[]).map(a=>({
@@ -485,8 +501,8 @@ async function init(){
     if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); const t=$("log-toggle"); if(t) t.setAttribute("aria-expanded","false"); }
     if(st.logH){ const lc=$("log-card"); if(lc){ const h=Math.max(80, Math.min(480, parseInt(st.logH,10)||140)); lc.style.height=h+"px"; lc.dataset.openH=String(h); } }
     const sd=$("wf-side"), insp=$("wf-inspector");
-    if(sd){ const w=st.sideW?Math.max(150,Math.min(480,st.sideW)):sd.offsetWidth; sd.style.width=w+"px"; sd.dataset.openW=String(w); }
-    if(insp){ const w=st.inspW?Math.max(180,Math.min(520,st.inspW)):insp.offsetWidth; insp.style.width=w+"px"; insp.dataset.openW=String(w); }
+    if(sd){ const w=st.sideW?Math.max(220,Math.min(480,st.sideW)):sd.offsetWidth; sd.style.width=w+"px"; sd.dataset.openW=String(w); }
+    if(insp){ const w=st.inspW?Math.max(240,Math.min(520,st.inspW)):insp.offsetWidth; insp.style.width=w+"px"; insp.dataset.openW=String(w); }
     wfSideCollapsed=st.sideCollapsed===true; wfInspCollapsed=st.inspCollapsed===true;
   }catch{}
   wfApplySidebarState(false);

@@ -12,11 +12,14 @@ class PerformanceMetrics:
     template_matches: int = 0
     template_failures: int = 0
     avg_match_time: float = 0.0
-    total_operations: int = 0
+
+    @property
+    def total_operations(self) -> int:
+        return self.template_matches + self.template_failures
     
     def get_success_rate(self) -> float:
-        """Calculate success rate percentage"""
-        total = self.template_matches + self.template_failures
+        """Calculate the successful-match ratio in the range 0–1."""
+        total = self.total_operations
         if total == 0:
             return 0.0
         return self.template_matches / total

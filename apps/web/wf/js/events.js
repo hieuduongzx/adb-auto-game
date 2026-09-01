@@ -1,4 +1,22 @@
 // ── Python events ───────────────────────────────────────────────────────────
+// Re-render theme-sensitive canvases when the theme/density changes. The
+// minimap and preview cache their colour palettes at first draw, so invalidate
+// those caches before redrawing.
+window.addEventListener("m2k-theme", () => {
+  try { if (typeof wfMmColors !== "undefined") wfMmColors = null; } catch (_) {}
+  try { if (typeof WF_PV_COLOR !== "undefined") WF_PV_COLOR = null; } catch (_) {}
+  try { if (typeof wfSyncGrid === "function") wfSyncGrid(); } catch (_) {}
+  try { if (typeof wfRenderCanvas === "function") wfRenderCanvas(); } catch (_) {}
+  try { if (typeof wfMinimapDraw === "function") wfMinimapDraw(); } catch (_) {}
+  try { if (typeof wfPvActive !== "undefined" && wfPvActive && typeof wfPvDraw === "function") wfPvDraw(); } catch (_) {}
+});
+// Theme toggle in the header — the same control the Hub and Runner carry.
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-theme-toggle]").forEach(b => {
+    b.onclick = () => { if (window.uiTheme) window.uiTheme.toggle(); };
+  });
+});
+
 window.__recv = function(raw){
   let ev; try{ev=JSON.parse(raw);}catch{return;}
   const {type,data}=ev;

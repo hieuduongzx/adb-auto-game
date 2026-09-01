@@ -50,6 +50,11 @@ WORKFLOW_DIR = os.path.abspath(CFG["workflow_dir"])
 if not os.path.isdir(WORKFLOW_DIR):
     raise SystemExit(f"runner_build.spec: workflow_dir not found: {WORKFLOW_DIR}")
 VERSION = str(CFG.get("version") or "1.0.0").strip() or "1.0.0"
+# Icon: an "icon" path in the build config wins (per-workflow branding), else the
+# shared packaging/app.ico from ``python packaging/make_icon.py``. Missing -> the
+# default PyInstaller icon.
+_icon = str(CFG.get("icon") or "").strip() or os.path.join(SPECPATH, "app.ico")
+ICON = _icon if os.path.isfile(_icon) else None
 # PyAV (ffmpeg, ~65 MB) is only needed for the scrcpy H.264 capture source. When
 # this workflow doesn't use scrcpy, drop it — the import is guarded and capture
 # falls back to ADB screencap anyway.
@@ -149,6 +154,7 @@ exe = EXE(
     exclude_binaries=True, name=APP_NAME,
     console=False, disable_windowed_traceback=False,
     contents_directory="_internal",
+    icon=ICON,
     version=version_info,
 )
 coll = COLLECT(

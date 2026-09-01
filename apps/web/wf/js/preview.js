@@ -17,7 +17,8 @@ let wfPvErr    = "";           // last capture error text (shown until next fram
 
 // Overlay draw colours — pulled from the shared CSS vars (base.css :root) so the
 // canvas overlay stays in sync with the same fail/info/warn hues used elsewhere.
-const WF_PV_COLOR = (function(){
+let WF_PV_COLOR = null;
+function wfPvReadColors(){
   const cs=getComputedStyle(document.documentElement);
   const v=(name,fallback)=>(cs.getPropertyValue(name)||fallback).trim();
   return {
@@ -27,7 +28,11 @@ const WF_PV_COLOR = (function(){
     ok:v("--run-ok","#16a34a") || "#16a34a",
     shade:v("--shade","#121316"),
   };
-})();
+}
+function wfPvColors(){
+  if(!WF_PV_COLOR) WF_PV_COLOR=wfPvReadColors();
+  return WF_PV_COLOR;
+}
 
 // ── View tab switching ──────────────────────────────────────────────────────
 function wfSwitchView(view){
@@ -246,11 +251,12 @@ function wfPvCanvasToImg(clientX, clientY){
 function wfPvCanvasPos(e){ const r=wfPvCanvas.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
 
 function wfPvDraw(){
+  const colors=wfPvColors();
   const cvs=wfPvCanvas; if(!cvs||!wfPvCtx||!wfPvImg) return;
   const ctx=wfPvCtx, cw=cvs.width, ch=cvs.height;
   wfPvRecompute();
   ctx.clearRect(0,0,cw,ch);
-  ctx.fillStyle=WF_PV_COLOR.shade; ctx.fillRect(0,0,cw,ch);
+  ctx.fillStyle=colors.shade; ctx.fillRect(0,0,cw,ch);
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
   const [x0,y0]=wfPvImgToCanvas(0,0), [x1,y1]=wfPvImgToCanvas(wfPvImgW,wfPvImgH);
   ctx.drawImage(wfPvImg, x0, y0, x1-x0, y1-y0);
@@ -261,7 +267,7 @@ function wfPvDraw(){
     if(rw>0&&rh>0){
       const [cx,cy]=wfPvImgToCanvas(rx,ry), [cx2,cy2]=wfPvImgToCanvas(rx+rw,ry+rh);
       ctx.save();
-      ctx.strokeStyle=WF_PV_COLOR.info; ctx.lineWidth=1.5;
+      ctx.strokeStyle=colors.info; ctx.lineWidth=1.5;
       ctx.setLineDash([5,4]);
       ctx.strokeRect(cx,cy,cx2-cx,cy2-cy);
       ctx.restore();
@@ -274,7 +280,7 @@ function wfPvDraw(){
     // r[5] may be missing (legacy DevScope match_template) → treat as ok/hit.
     const ok = r[5]===undefined || r[5]===null ? true : !!r[5];
     const label = r[6] ? String(r[6]) : "";
-    const col = ok ? WF_PV_COLOR.ok : WF_PV_COLOR.fail;
+    const col = ok ? colors.ok : colors.fail;
     const [cx,cy]=wfPvImgToCanvas(r[0],r[1]), [cx2,cy2]=wfPvImgToCanvas(r[0]+r[2],r[1]+r[3]);
     const bw=cx2-cx, bh=cy2-cy;
     ctx.strokeStyle=col; ctx.lineWidth=2;
@@ -300,12 +306,12 @@ function wfPvDraw(){
   if(wfPvRegion){
     const [x,y,w,h]=wfPvRegion;
     const [cx,cy]=wfPvImgToCanvas(x,y), [cx2,cy2]=wfPvImgToCanvas(x+w,y+h);
-    ctx.strokeStyle=WF_PV_COLOR.info; ctx.lineWidth=2; ctx.strokeRect(cx,cy,cx2-cx,cy2-cy);
+    ctx.strokeStyle=colors.info; ctx.lineWidth=2; ctx.strokeRect(cx,cy,cx2-cx,cy2-cy);
   }
   // Picked point (yellow crosshair).
   if(wfPvPoint){
     const [cx,cy]=wfPvImgToCanvas(wfPvPoint[0],wfPvPoint[1]);
-    ctx.strokeStyle=WF_PV_COLOR.warn; ctx.lineWidth=2;
+    ctx.strokeStyle=colors.warn; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(cx-8,cy); ctx.lineTo(cx+8,cy);
     ctx.moveTo(cx,cy-8); ctx.lineTo(cx,cy+8); ctx.stroke();
   }

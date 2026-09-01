@@ -21,7 +21,7 @@ import tempfile
 import urllib.request
 from typing import Optional, Tuple
 
-from src.utils import app_dir, is_frozen, is_portable_build, log_error, log_info
+from src.utils import is_frozen, is_portable_build, log_error, log_info
 from src.version import APP_NAME, APP_VERSION, UPDATE_REPO_URL, version_tuple
 
 _API = "https://api.github.com"

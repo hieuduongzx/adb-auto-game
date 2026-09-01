@@ -35,7 +35,10 @@ from src.utils import (
     file_url,
     is_frozen,
     launch_tool,
+    load_ui_settings,
     sanitize_name as _sanitize_name,
+    save_ui_settings,
+    theme_background,
     titled,
     webview_storage_path,
 )
@@ -229,6 +232,16 @@ class WorkflowHubAPI:
     def app_version(self) -> str:
         """Version string for the Hub UI badge (see ``src/version.py``)."""
         return APP_VERSION
+
+    # ── Shared UI settings ───────────────────────────────────────────────────
+    # Backed by the same file the Designer writes, so a theme or density picked
+    # in any window is what every other window opens with. ``web/shared/
+    # theme.js`` calls both of these.
+    def get_settings(self) -> dict:
+        return load_ui_settings()
+
+    def save_settings(self, settings: dict) -> bool:
+        return save_ui_settings(settings)
 
     # ── Auto-update (Velopack) ───────────────────────────────────────────────
     def update_check(self) -> dict:
@@ -898,9 +911,12 @@ class WorkflowHubAPI:
 # ── Entry points ────────────────────────────────────────────────────────────
 
 # Portrait dashboard (taller than wide) — same family as the Runner panel.
+# Fixed size: the layout is tuned for this single width, so the window is not
+# resizable and opens at what used to be the minimum width. pywebview's WinForms
+# backend turns ``resizable=False`` into a FixedSingle border with the maximize
+# box disabled, so there is nothing to drag.
 # Keep this simple: no native WinForms max-size hooks (those hung the UI thread).
-_HUB_SIZE = (500, 780)
-_HUB_MIN = (420, 560)
+_HUB_SIZE = (460, 800)
 
 
 def create_hub_window(title: str = titled()) -> webview.Window:
@@ -913,11 +929,11 @@ def create_hub_window(title: str = titled()) -> webview.Window:
         js_api=api,
         width=_HUB_SIZE[0],
         height=_HUB_SIZE[1],
-        resizable=True,
+        resizable=False,
         fullscreen=False,
         maximized=False,
-        min_size=_HUB_MIN,
-        background_color="#eef0f3",
+        min_size=_HUB_SIZE,
+        background_color=theme_background(),
     )
     window.events.loaded += lambda: api._attach(window)
     window.events.closed += api.shutdown

@@ -25,9 +25,9 @@ function wfValidationIssues(){
     nodes.forEach(n=>{
       const def=WF_NODES[n.type];
       if(!def){ add("err",`Unknown node type: ${n.type}`,ctx,n.id); return; }
-      const cat=(typeof WF_CATS!=="undefined")?WF_CATS.find(c=>c.key===def.cat):null;
-      if(cat&&cat.ctrl&&cat.ctrl!==WF.controller){
-        add("err",`${def.label} is ${cat.ctrl==="adb"?"ADB-only":"Win32-only"} but this project uses ${WF.controller.toUpperCase()}`,ctx,n.id);
+      const need=(typeof wfNodeCtrl==="function")?wfNodeCtrl(n.type):null;
+      if(need && need!==WF.controller){
+        add("err",`${def.label} is ${need==="adb"?"ADB-only":"Win32-only"} but this project uses ${WF.controller.toUpperCase()}`,ctx,n.id);
       }
       if(def.kind!=="start" && def.kind!=="note" && !edges.some(e=>e.to===n.id)) add("warn","No incoming wire",ctx,n.id);
       (def.fields||[]).forEach(f=>{

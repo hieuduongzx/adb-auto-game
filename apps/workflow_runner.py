@@ -44,13 +44,15 @@ from src.utils import (
     data_root,
     file_url,
     is_frozen,
+    load_ui_settings,
     log_error,
-    log_info,
     log_success,
     log_warning,
     push_webview_event,
     remove_log_subscriber,
+    save_ui_settings,
     slugify_workflow_name,
+    theme_background,
     titled,
     webview_storage_path,
 )
@@ -63,6 +65,11 @@ if is_frozen():
 # Bundled HTML: ``apps/web`` from source, ``<_MEIPASS>/web`` when frozen.
 _WEB_DIR = (os.path.join(bundle_dir(), "web") if is_frozen()
             else os.path.join(os.path.dirname(__file__), "web"))
+
+# Node params that hold a machine-specific absolute path. Each one found in a
+# loaded flow becomes a runner control (and is remembered in the runner config),
+# so a built .exe can be re-pointed on another PC without editing the JSON.
+RUNTIME_PATH_PARAMS = ("path", "apk")
 
 
 class WorkflowRunnerAPI:
@@ -227,8 +234,9 @@ class WorkflowRunnerAPI:
             if not node or not isinstance(values, dict):
                 continue
             params = node.setdefault("params", {})
-            if "path" in values and "path" in params:
-                params["path"] = str(values["path"] or "")
+            for param in RUNTIME_PATH_PARAMS:
+                if param in values and param in params:
+                    params[param] = str(values[param] or "")
         speed = cfg.get("speedhack") or {}
         if isinstance(speed, dict) and speed:
             merged = dict(self.flow.get("speedhack") or {})
@@ -305,8 +313,11 @@ class WorkflowRunnerAPI:
         labels = {
             "win_launch": ("Launch program", "Program path (.exe)"),
             "launch_emulator": ("Launch emulator", "Install folder / console .exe"),
+            "app_install": ("Install app", "APK file"),
         }
-        kinds = {"launch_emulator": "folder", "win_launch": "file"}
+        kinds = {"launch_emulator": "folder", "win_launch": "file", "app_install": "file"}
+        # Params holding a machine-specific absolute path: each one becomes a
+        # runner control so a built .exe can be re-pointed without editing JSON.
         found: List[dict] = []
         seen_nodes: set = set()
         seen_functions: set = set()
@@ -319,16 +330,18 @@ class WorkflowRunnerAPI:
                 seen_nodes.add(node_id)
                 params = node.get("params") or {}
                 node_type = str(node.get("type") or "")
-                # Every serialized `path` parameter gets a generated setting;
+                # Every serialized path-like parameter gets a generated setting;
                 # known node types only refine its label and picker kind.
-                if "path" in params:
+                for param in RUNTIME_PATH_PARAMS:
+                    if param not in params:
+                        continue
                     node_label, field_label = labels.get(node_type, (node_type or "Action", "Path"))
                     node_label = str(node.get("note") or node_label)
                     found.append({
-                        "id": f"{node_id}:path", "nodeId": node_id, "param": "path",
+                        "id": f"{node_id}:{param}", "nodeId": node_id, "param": param,
                         "nodeLabel": node_label, "label": field_label,
                         "kind": kinds.get(node_type, "file"),
-                        "value": str(params.get("path") or ""),
+                        "value": str(params.get(param) or ""),
                     })
                 if node_type == "call":
                     fn_id = str(params.get("fn") or "")
@@ -491,7 +504,7 @@ class WorkflowRunnerAPI:
 
     def set_node_runtime_param(self, node_id: str, param: str, value) -> bool:
         """Update an auto-generated runtime setting in the loaded flow."""
-        if self.engine.is_running() or param != "path":
+        if self.engine.is_running() or param not in RUNTIME_PATH_PARAMS:
             return False
         node = self._find_node(str(node_id or ""))
         if node is None:
@@ -516,7 +529,7 @@ class WorkflowRunnerAPI:
     def pick_node_runtime_path(self, node_id: str, param: str,
                                kind: str = "file", start: str = "") -> str:
         """Open the native file/folder picker for a generated path setting."""
-        if self.engine.is_running() or param != "path" or self._window is None:
+        if self.engine.is_running() or param not in RUNTIME_PATH_PARAMS or self._window is None:
             return ""
         node = self._find_node(str(node_id or ""))
         if node is None or param not in (node.get("params") or {}):
@@ -530,9 +543,12 @@ class WorkflowRunnerAPI:
                 paths = self._window.create_file_dialog(
                     webview.FOLDER_DIALOG, directory=start_dir)
             else:
+                types = (("Android package (*.apk)", "All files (*.*)")
+                         if param == "apk"
+                         else ("Programs (*.exe;*.bat;*.cmd;*.com)", "All files (*.*)"))
                 paths = self._window.create_file_dialog(
                     webview.OPEN_DIALOG, directory=start_dir, allow_multiple=False,
-                    file_types=("Programs (*.exe;*.bat;*.cmd;*.com)", "All files (*.*)"),
+                    file_types=types,
                 )
         except Exception as exc:
             log_warning(f"Dialog error: {exc}")
@@ -619,6 +635,16 @@ class WorkflowRunnerAPI:
         self._log_buffer.clear()
         self._push("log_cleared", {})
         return True
+
+    # ── Shared UI settings ───────────────────────────────────────────────────
+    # Backed by the same file the Designer writes, so a theme or density picked
+    # in any window is what every other window opens with. ``web/shared/
+    # theme.js`` calls both of these.
+    def get_settings(self) -> dict:
+        return load_ui_settings()
+
+    def save_settings(self, settings: dict) -> bool:
+        return save_ui_settings(settings)
 
     # ── Devices ───────────────────────────────────────────────────────────────
 
@@ -720,11 +746,11 @@ def create_workflow_runner_window(title: str = titled("Macro2k Runner"),
         title=title,
         url=url,
         js_api=api,
-        width=440,
-        height=860,
+        width=500,
+        height=820,
         resizable=True,
-        min_size=(380, 620),
-        background_color="#eef0f3",
+        min_size=(420, 620),
+        background_color=theme_background(),
     )
     window.events.loaded += lambda: api._attach(window)
     window.events.closed += lambda: api._close()

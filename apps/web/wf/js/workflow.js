@@ -98,6 +98,16 @@ function wfPkgLabel(p){
   }
   return String((p&&p.package)||"").trim() || "(package)";
 }
+// Same idea for If app running, which is controller-neutral: in a Win32 project
+// there is no package — "project" means the Project-settings target window, and
+// a custom value is matched against that window's title.
+function wfAppTargetLabel(p){
+  if((typeof WF==="undefined") || WF.controller!=="win32") return wfPkgLabel(p);
+  const src=String((p&&p.pkgSrc)||"").trim().toLowerCase();
+  if(src==="custom") return String((p&&p.package)||"").trim() || "(title)";
+  const win=(WF.win32&&String(WF.win32.window||"").trim())||"";
+  return win || "🪟 project window";
+}
 
 // Named Windows virtual keys for the Win32 keyboard node. Values remain VK
 // numbers in JSON/runtime, but users choose readable key names instead of
@@ -115,6 +125,18 @@ function wfWinKeyLabel(value){
   const hit=WF_WIN_KEYS.find(k=>String(k.v)===String(value));
   return hit?hit.t:("VK "+value);
 }
+
+// Comparison operators shared by If variable / Loop until variable / switch
+// cases. The string-shaped ones (contains / starts / ends / regex) matter most
+// for OCR results, which rarely equal a literal exactly.
+const WF_CMP_OPS = [
+  {v:"==",t:"= equals"},{v:"!=",t:"≠ not equal"},
+  {v:">",t:"> greater"},{v:"<",t:"< less"},
+  {v:">=",t:"≥ at least"},{v:"<=",t:"≤ at most"},
+  {v:"contains",t:"⊃ contains"},{v:"!contains",t:"⊅ does not contain"},
+  {v:"starts",t:"^ starts with"},{v:"ends",t:"$ ends with"},
+  {v:"regex",t:".* matches regex"},
+];
 
 // Node catalog: UI source of truth (icon, kind, output ports, param fields).
 // Mirrors src/workflow/engine.py NODE_TYPES. kind: start|end|action|condition|loop.
@@ -166,41 +188,59 @@ const WF_NODES = {
   "break":    {label:"Break loop",ico:"octagon",kind:"action",cat:"flow",  outs:["out"], fields:[], sum:()=>"break"},
   stop:       {label:"Stop all",ico:"octagon",kind:"stop", cat:"flow",  outs:[],      fields:[], sum:()=>"stop session"},
   set_var:    {label:"Set variable",  ico:"pin",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"value",t:"text",varRef:true,d:"0"}], sum:p=>`${p.name||"?"} = ${p.value}`},
-  calc_var:   {label:"Calculate variable", ico:"calculator",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:[{v:"+",t:"+ Add"},{v:"-",t:"− Subtract"},{v:"*",t:"× Multiply"},{v:"/",t:"÷ Divide"},{v:"=",t:"= Assign"}],d:"+"},{k:"value",t:"text",varRef:true,d:"1"}], sum:p=>`${p.name} ${p.op}= ${p.value}`},
-  if_var:     {label:"If variable",  ico:"hash",kind:"condition",cat:"logic",outs:["true","false"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:[{v:"==",t:"= equals"},{v:"!=",t:"≠ not equal"},{v:">",t:"> greater"},{v:"<",t:"< less"},{v:">=",t:"≥ at least"},{v:"<=",t:"≤ at most"}],d:"=="},{k:"value",t:"text",varRef:true,d:"0"}], sum:p=>`${p.name} ${p.op} ${p.value}`},
+  calc_var:   {label:"Calculate variable", ico:"calculator",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:[{v:"+",t:"+ Add"},{v:"-",t:"− Subtract"},{v:"*",t:"× Multiply"},{v:"/",t:"÷ Divide"},{v:"%",t:"% Remainder"},{v:"min",t:"Min of the two"},{v:"max",t:"Max of the two"},{v:"round",t:"Round (value = decimals)"},{v:"abs",t:"Absolute value"},{v:"=",t:"= Assign"}],d:"+"},{k:"value",t:"text",varRef:true,d:"1"}], sum:p=>`${p.name} ${p.op}= ${p.value}`},
+  if_var:     {label:"If variable",  ico:"hash",kind:"condition",cat:"logic",outs:["true","false"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:WF_CMP_OPS,d:"=="},{k:"value",t:"text",varRef:true,d:"0"}], sum:p=>`${p.name} ${p.op} ${p.value}`},
   // Multi-way branch: each case is its own condition; first true case wins its
   // own output port "c{i}", else the "default" port. Ports are dynamic (one per
   // case + default) — see wfNodeEl. Cases edited by wfSwitchCasesEditor.
   "switch":   {label:"Switch",  ico:"git_branch",kind:"switch",cat:"logic",outs:["default"], fields:[], sum:p=>`${(p.cases||[]).length} branches`},
   // ── App lifecycle (ADB package · Win32 window title where noted) ───────────
   // pkgSrc: "project" = workflow package from Project settings; "custom" = free text / var.
-  launch_app: {label:"Launch app",    ico:"rocket",kind:"action",cat:"app",  outs:["out"], fields:[
+  // The category is controller-neutral: launch/stop/uninstall/install are ADB-only
+  // (ctrl:"adb"), while exit + if-running are implemented for BOTH backends.
+  launch_app: {label:"Launch app",    ico:"rocket",kind:"action",cat:"app", ctrl:"adb", outs:["out"], fields:[
     {k:"pkgSrc",lbl:"Package source",t:"select",opts:[{v:"project",t:"Project package"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"package",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
     {k:"wait",lbl:"Launch wait (s)",t:"num",d:0}
   ], sum:p=>wfPkgLabel(p)+(p.wait?` ·wait ${p.wait}s`:"")},
   // Force-stop an app (optionally clear its data) — pairs with Launch app for restart-game flows. ADB-only at runtime.
-  app_stop: {label:"Stop app", ico:"octagon", kind:"action", cat:"app", outs:["out"], fields:[
+  app_stop: {label:"Stop app", ico:"octagon", kind:"action", cat:"app", ctrl:"adb", outs:["out"], fields:[
     {k:"pkgSrc",lbl:"Package source",t:"select",opts:[{v:"project",t:"Project package"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"package",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
     {k:"clearData",lbl:"Clear app data (pm clear)",t:"bool",d:false}
   ], sum:p=>`⛔ ${wfPkgLabel(p)}`+(p.clearData?" +clear":"")},
   // Exit the current app — no package needed (ADB: force-stop foreground · Win32: close the window).
-  app_exit: {label:"Exit current app", ico:"x", kind:"action", cat:"app", outs:["out"], fields:[], sum:()=>"exit current app"},
+  app_exit: {label:"Exit current app", ico:"x", kind:"action", cat:"app", ctrl:null, outs:["out"], fields:[], sum:()=>"exit current app"},
   // Uninstall an app (pm uninstall; -k = keep data). ADB-only at runtime.
-  app_uninstall: {label:"Uninstall app", ico:"trash", kind:"action", cat:"app", outs:["out"], fields:[
+  app_uninstall: {label:"Uninstall app", ico:"trash", kind:"action", cat:"app", ctrl:"adb", outs:["out"], fields:[
     {k:"pkgSrc",lbl:"Package source",t:"select",opts:[{v:"project",t:"Project package"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"package",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
     {k:"keepData",lbl:"Keep data & cache (-k)",t:"bool",d:false}
   ], sum:p=>`🗑 ${wfPkgLabel(p)}`+(p.keepData?" ·keep":"")},
-  // Does the current app package / window title contain a string? (ADB: package · Win32: window title)
-  if_app: {label:"If app running", ico:"smartphone", kind:"condition", cat:"app", outs:["true","false"], fields:[
-    {k:"pkgSrc",lbl:"Package source",t:"select",opts:[{v:"project",t:"Project package"},{v:"custom",t:"Custom…"}],d:"project"},
+  // Install an APK sitting on the PC (adb install) — the missing counterpart of
+  // Uninstall app. ADB-only.
+  app_install: {label:"Install app (APK)", ico:"box", kind:"action", cat:"app", ctrl:"adb", outs:["out"], fields:[
+    {k:"apk",lbl:"APK file",t:"path",d:"",pickFile:true},
+    {k:"reinstall",lbl:"Reinstall, keep data (-r)",t:"bool",d:true},
+    {k:"grantPerms",lbl:"Grant all permissions (-g)",t:"bool",d:false},
+    {k:"timeout",lbl:"Timeout (s)",t:"num",d:180}
+  ], sum:p=>`📦 ${(String(p.apk||"(apk)")).split(/[\\/]/).pop()}`+(p.reinstall?" -r":"")},
+  // ADB: package of the foreground app contains a string · Win32: the TARGET
+  // window's own title contains it (blank = "is my target window still alive?").
+  if_app: {label:"If app running", ico:"smartphone", kind:"condition", cat:"app", ctrl:null, outs:["true","false"], fields:[
+    {k:"pkgSrc",lbl:"Target",t:"select",opts:[{v:"project",t:"From Project settings"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"package",lbl:"Package / title contains",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
     {k:"negate",t:"bool",d:false}
-  ], sum:p=>`${p.negate?"not ":""}app ~ "${wfPkgLabel(p)}"`},
+  ], sum:p=>`${p.negate?"not ":""}app ~ "${wfAppTargetLabel(p)}"`},
   // ── Utilities ──────────────────────────────────────────────────────────────
-  screenshot: {label:"Screenshot",      ico:"camera",kind:"action",cat:"basic", outs:["out"], fields:[], sum:()=>"take screenshot"},
+  // Capture one frame and (by default) write it to disk. Turning "Save" off makes
+  // it a pure "refresh the frame now" step for the node that follows.
+  screenshot: {label:"Screenshot",      ico:"camera",kind:"action",cat:"basic", outs:["out"], fields:[
+    {k:"save",lbl:"Save a PNG file",t:"bool",d:true},
+    {k:"name",lbl:"File name prefix",t:"text",insertVar:true,d:"shot",showWhen:{save:true}},
+    {k:"folder",lbl:"Folder (blank = <workflow>/out/screenshots)",t:"path",d:"",pickFolder:true,showWhen:{save:true}},
+    {k:"pathVar",lbl:"Store saved path in variable",t:"text",d:"",var:true,showWhen:{save:true}}
+  ], sum:p=>(p.save===false?"refresh frame only":`save "${p.name||"shot"}_<time>.png"`)},
   log:        {label:"Log",   ico:"log",kind:"action",cat:"misc",  outs:["out"], fields:[{k:"message",t:"text",insertVar:true}], sum:p=>`"${p.message||""}"`},
   note:          {label:"Note",        ico:"message",  kind:"note",      cat:"misc",   outs:[],             fields:[{k:"text",t:"text",d:"note"}], sum:p=>p.text||""},
   notify:        {label:"Notify",      ico:"bell",   kind:"action",    cat:"misc",   outs:["out"],         fields:[{k:"title",lbl:"Title",t:"text",insertVar:true,d:"Workflow"},{k:"message",lbl:"Message",t:"text",insertVar:true,d:"Completed!"},{k:"sound",lbl:"Play sound",t:"bool",d:true}], sum:p=>`🔔 [${p.title||"Workflow"}] ${p.message||""}`},
@@ -212,6 +252,45 @@ const WF_NODES = {
   // port; image found → "found"; maxLoops exhausted (0 = ∞) → "fail". Replaces
   // the loop-∞ + if_image + break cluster.
   loop_until_image: {label:"Loop until image", ico:"loop", kind:"loop_until", cat:"image", ins:["in","loop"], outs:["body","found","fail"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxLoops",lbl:"Max loops (0 = ∞)",t:"num",varRef:true,d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`↺ until found ${wfBase(p.template)}`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
+  // Same loop_until shape for the other three probe kinds, so "repeat until
+  // <condition>" no longer only exists for images (was: loop ∞ + if_* + break).
+  loop_until_color: {label:"Loop until color", ico:"loop", kind:"loop_until", cat:"color", ins:["in","loop"], outs:["body","found","fail"], fields:[
+    {k:"color",t:"color",d:"#ff0000"},
+    {k:"tolerance",lbl:"Tolerance",t:"num",d:10},
+    {k:"where",lbl:"Check",t:"select",opts:[{v:"point",t:"One point (x, y)"},{v:"anywhere",t:"Anywhere in region"}],d:"point"},
+    {k:"x",t:"num",showWhen:{where:"point"}},{k:"y",t:"num",showWhen:{where:"point"}},
+    {k:"maxLoops",lbl:"Max loops (0 = ∞)",t:"num",varRef:true,d:0},
+    {k:"_region",lbl:"Search region",t:"region"}
+  ], sum:p=>`↺ until ${p.color||"?"} ±${p.tolerance??10}`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
+  loop_until_text: {label:"Loop until text", ico:"loop", kind:"loop_until", cat:"ocr", ins:["in","loop"], outs:["body","found","fail"], fields:[
+    {k:"text",t:"text",varRef:true},
+    {k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},
+    {k:"maxLoops",lbl:"Max loops (0 = ∞)",t:"num",varRef:true,d:0},
+    {k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}
+  ], sum:p=>`↺ until "${p.text||""}"`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
+  loop_until_var: {label:"Loop until variable", ico:"loop", kind:"loop_until", cat:"logic", ins:["in","loop"], outs:["body","found","fail"], fields:[
+    {k:"name",t:"text",d:"i",var:true},
+    {k:"op",t:"select",opts:WF_CMP_OPS,d:">="},
+    {k:"value",t:"text",varRef:true,d:"10"},
+    {k:"maxLoops",lbl:"Max loops (0 = ∞)",t:"num",varRef:true,d:0}
+  ], sum:p=>`↺ until ${p.name||"?"} ${p.op||">="} ${p.value}`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
+  // Find a template and store its centre in two variables — the only way to get
+  // a match position into arithmetic (the implicit "last found" can only be tapped).
+  find_image_pos: {label:"Find image → position", ico:"search", kind:"condition", cat:"image", outs:["true","false"], fields:[
+    {k:"template",t:"tpl"},
+    {k:"nameX",lbl:"X → variable",t:"text",d:"foundX",var:true},
+    {k:"nameY",lbl:"Y → variable",t:"text",d:"foundY",var:true},
+    {k:"threshold",t:"num",d:.85,step:.05},
+    {k:"_region",lbl:"Search region",t:"region"}
+  ], sum:p=>`${wfBase(p.template)} → ${p.nameX||"?"}, ${p.nameY||"?"}`},
+  // Wait for the screen to stop changing (animation / loading settled) instead of
+  // guessing a fixed Wait duration.
+  wait_stable: {label:"Wait until screen settles", ico:"hourglass", kind:"condition", cat:"basic", outs:["true","false"], fields:[
+    {k:"settle",lbl:"Must stay still for (s)",t:"num",d:1,step:.5},
+    {k:"timeout",lbl:"Timeout (s)",t:"num",d:15},
+    {k:"tolerance",lbl:"Pixel change tolerance",t:"num",d:2,step:.5},
+    {k:"_region",lbl:"Search region",t:"region"}
+  ], sum:p=>`🧊 still ${p.settle??1}s · ≤${p.timeout??15}s`},
   // Tap EVERY position matching the template on the current frame (loot-collection sweeps).
   tap_all_images: {label:"Tap all matches", ico:"layers", kind:"condition", cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxTaps",lbl:"Max taps (0 = all)",t:"num",varRef:true,d:0},{k:"delayBetween",lbl:"Delay between taps (s)",t:"num",d:.15,step:.05},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`tap all ${wfBase(p.template)}`+((parseInt(p.maxTaps)||0)>0?` ≤${p.maxTaps}`:"")+(p.taps=="2"?" ×2":"")},
   random_branch: {label:"Random branch",ico:"dice",   kind:"random",    cat:"flow",   outs:[],              fields:[{k:"count",lbl:"Branch count",t:"num",d:2,refresh:true}], sum:p=>`🎲 ${p.count||2} even branches`},
@@ -223,6 +302,14 @@ const WF_NODES = {
   // ── Device (ADB / emulator) ────────────────────────────────────────────────
   device_info:   {label:"Device info → variable", ico:"smartphone", kind:"action", cat:"device", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"info",var:true},{k:"prop",lbl:"Property",t:"select",opts:[{v:"battery",t:"Battery level (%)"},{v:"current_app",t:"Current app package"},{v:"width",t:"Screen width"},{v:"height",t:"Screen height"},{v:"model",t:"Model"},{v:"brand",t:"Brand"},{v:"android",t:"Android version"},{v:"sdk",t:"SDK level"},{v:"serial",t:"Serial"},{v:"ip",t:"IP address"}],d:"battery"}], sum:p=>`${p.name||"?"} = ${p.prop||"battery"}`},
   screen_power:  {label:"Screen power", ico:"power", kind:"action", cat:"device", outs:["out"], fields:[{k:"action",lbl:"Action",t:"select",opts:[{v:"on",t:"Wake / On"},{v:"off",t:"Sleep / Off"},{v:"toggle",t:"Toggle (power key)"}],d:"on"}], sum:p=>`🖥 ${({on:"wake",off:"sleep",toggle:"toggle"})[p.action||"on"]}`},
+  // Read side of Screen power — branch on whether the display is awake.
+  if_screen_on:  {label:"If screen is on", ico:"power", kind:"condition", cat:"device", outs:["true","false"], fields:[{k:"negate",lbl:"Negate (screen is off)",t:"bool",d:false}], sum:p=>`🖥 screen ${p.negate?"off":"on"}?`},
+  // Escape hatch: run any adb shell command and capture stdout into a variable.
+  adb_shell:     {label:"ADB shell → variable", ico:"log", kind:"action", cat:"device", outs:["out"], fields:[
+    {k:"command",lbl:"Shell command",t:"text",insertVar:true,d:"getprop ro.product.model"},
+    {k:"name",lbl:"Output → variable",t:"text",d:"out",var:true},
+    {k:"failIfEmpty",lbl:"Treat empty output as failure",t:"bool",d:false}
+  ], sum:p=>`💻 ${String(p.command||"").slice(0,28)||"(command)"} → ${p.name||"?"}`},
   // Launch the emulator PROCESS on the PC (not an app inside it). Optional "at"
   // waits until a clock time first → "sit idle until 07:00, then boot LDPlayer".
   launch_emulator:{label:"Launch emulator", ico:"monitor", kind:"action", cat:"device", outs:["out"], fields:[
@@ -255,32 +342,79 @@ const WF_NODES = {
     {k:"timeout",lbl:"Timeout (s)",t:"num",d:120},
     {k:"attach",lbl:"Attach as active device when ready",t:"bool",d:true},
   ], sum:p=>`⏳ ${(!p.emulator||p.emulator==="last")?"last used":(p.emulator+((parseInt(p.index)||0)?(" #"+p.index):""))} ≤${p.timeout??120}s`},
-  // ── Win32 (PC program window control) ────────────────────────────────────────
+  // ── Win32 input (PC keyboard & mouse) ────────────────────────────────────────
   // Only used when the project's Controller = Win32. The tap/swipe/image/color/
-  // OCR nodes still work on Win32 through the shared screen-capture pipeline.
+  // OCR nodes still work on Win32 through the shared screen-capture pipeline;
+  // these cover what a single left-button touch model can't express.
   win_send_text:{label:"Input text", ico:"keyboard", kind:"action", cat:"win32", outs:["out"], fields:[{k:"text",t:"text",insertVar:true}], sum:p=>`"${p.text||""}"`},
   win_key:      {label:"Press key", ico:"disc", kind:"action", cat:"win32", outs:["out"], fields:[{k:"keycode",lbl:"Key",t:"select",opts:WF_WIN_KEYS,d:"13"}], sum:p=>wfWinKeyLabel(p.keycode??"13")},
+  // Key + modifiers (Ctrl+C, Alt+Enter, Ctrl+Shift+Esc…). Background modes send
+  // Alt combos as WM_SYSKEYDOWN, which is what apps actually listen for.
+  win_hotkey:   {label:"Hotkey (combo)", ico:"keyboard", kind:"action", cat:"win32", outs:["out"], fields:[
+    {k:"ctrl",lbl:"Ctrl",t:"bool",d:true},
+    {k:"shift",lbl:"Shift",t:"bool",d:false},
+    {k:"alt",lbl:"Alt",t:"bool",d:false},
+    {k:"win",lbl:"Win",t:"bool",d:false},
+    {k:"keycode",lbl:"Key",t:"select",opts:WF_WIN_KEYS,d:"67"}
+  ], sum:p=>[p.ctrl&&"Ctrl",p.shift&&"Shift",p.alt&&"Alt",p.win&&"Win",wfWinKeyLabel(p.keycode??"67")].filter(Boolean).join("+")},
   win_escape:   {label:"Escape key", ico:"back", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"Esc"},
-  win_launch:   {label:"Launch program", ico:"rocket", kind:"action", cat:"win32", outs:["out"], fields:[
+  // Right / middle click (the left button is the shared Tap node).
+  win_click:    {label:"Mouse click", ico:"pointer", kind:"action", cat:"win32", outs:["out"], fields:[
+    {k:"button",lbl:"Button",t:"select",opts:[{v:"right",t:"Right"},{v:"middle",t:"Middle"},{v:"left",t:"Left"}],d:"right"},
+    {k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},
+    {k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}},
+    {k:"clicks",t:"select",opts:[{v:"1",t:"Click"},{v:"2",t:"Double click"}],d:"1"},
+    {k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0}
+  ], sum:p=>`${(p.button||"right")} · `+(p.target==="found"?"↳ last found image":`(${p.x||0}, ${p.y||0})`)+(p.clicks=="2"?" ×2":"")},
+  win_scroll:   {label:"Mouse wheel", ico:"scroll", kind:"action", cat:"win32", outs:["out"], fields:[
+    {k:"direction",lbl:"Direction",t:"select",opts:[{v:"down",t:"↓ Down"},{v:"up",t:"↑ Up"},{v:"left",t:"← Left"},{v:"right",t:"→ Right"}],d:"down"},
+    {k:"notches",lbl:"Notches",t:"num",d:3},
+    {k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},
+    {k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}}
+  ], sum:p=>`${({up:"↑",down:"↓",left:"←",right:"→"})[p.direction]||"↓"} ×${p.notches??3}`},
+  win_mouse_move:{label:"Move mouse (hover)", ico:"move", kind:"action", cat:"win32", outs:["out"], fields:[
+    {k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},
+    {k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}}
+  ], sum:p=>p.target==="found"?"↳ last found image":`hover (${p.x||0}, ${p.y||0})`},
+  // ── Win32 window (lifecycle / geometry / state) ──────────────────────────────
+  win_launch:   {label:"Launch program", ico:"rocket", kind:"action", cat:"window", outs:["out"], fields:[
     {k:"path",lbl:"Program (.exe) path",t:"path",d:"",pickFile:true},
     {k:"args",lbl:"Arguments (optional)",t:"text",d:""},
     {k:"window",lbl:"Wait for window title (optional)",t:"text",d:""},
     {k:"wait",lbl:"Wait for window (s)",t:"num",d:30},
   ], sum:p=>`▶ ${(p.path||"(program)").split(/[\\/]/).pop()}`},
-  win_activate: {label:"Activate window", ico:"monitor", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"bring window to front"},
-  win_close:    {label:"Close window", ico:"x", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"close target window"},
-  win_resize:   {label:"Resize window", ico:"maximize", kind:"action", cat:"win32", outs:["out"], fields:[{k:"width",lbl:"Width",t:"num",d:1280},{k:"height",lbl:"Height",t:"num",d:720}], sum:p=>`${p.width||1280}×${p.height||720}`},
-  win_move:     {label:"Move window", ico:"move", kind:"action", cat:"win32", outs:["out"], fields:[{k:"x",lbl:"Screen X",t:"num",d:0},{k:"y",lbl:"Screen Y",t:"num",d:0}], sum:p=>`(${p.x||0}, ${p.y||0})`},
-  win_minimize: {label:"Minimize window", ico:"minimize", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"minimize"},
-  win_maximize: {label:"Maximize window", ico:"maximize", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"maximize"},
-  win_restore:  {label:"Restore window", ico:"monitor", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"restore"},
-  win_always_on_top: {label:"Always on top", ico:"pin", kind:"action", cat:"win32", outs:["out"], fields:[{k:"enabled",lbl:"Enabled",t:"bool",d:true}], sum:p=>p.enabled?"📌 on top":"📌 normal"},
-  win_set_title: {label:"Set window title", ico:"type", kind:"action", cat:"win32", outs:["out"], fields:[{k:"title",lbl:"New title",t:"text",d:"Game"}], sum:p=>`"${p.title||"?"}"`},
-  win_style:    {label:"Set window style", ico:"settings", kind:"action", cat:"win32", outs:["out"], fields:[{k:"style",lbl:"Style",t:"select",opts:[{v:"windowed",t:"Windowed (with frame)"},{v:"borderless",t:"Borderless"},{v:"popup",t:"Popup"}],d:"windowed"}], sum:p=>`${p.style||"windowed"}`},
+  win_activate: {label:"Activate window", ico:"monitor", kind:"action", cat:"window", outs:["out"], fields:[], sum:()=>"bring window to front"},
+  win_close:    {label:"Close window", ico:"x", kind:"action", cat:"window", outs:["out"], fields:[], sum:()=>"close target window"},
+  win_resize:   {label:"Resize window", ico:"maximize", kind:"action", cat:"window", outs:["out"], fields:[{k:"width",lbl:"Width",t:"num",d:1280},{k:"height",lbl:"Height",t:"num",d:720}], sum:p=>`${p.width||1280}×${p.height||720}`},
+  win_move:     {label:"Move window", ico:"move", kind:"action", cat:"window", outs:["out"], fields:[{k:"x",lbl:"Screen X",t:"num",d:0},{k:"y",lbl:"Screen Y",t:"num",d:0}], sum:p=>`(${p.x||0}, ${p.y||0})`},
+  win_minimize: {label:"Minimize window", ico:"minimize", kind:"action", cat:"window", outs:["out"], fields:[], sum:()=>"minimize"},
+  win_maximize: {label:"Maximize window", ico:"maximize", kind:"action", cat:"window", outs:["out"], fields:[], sum:()=>"maximize"},
+  win_restore:  {label:"Restore window", ico:"monitor", kind:"action", cat:"window", outs:["out"], fields:[], sum:()=>"restore"},
+  win_always_on_top: {label:"Always on top", ico:"pin", kind:"action", cat:"window", outs:["out"], fields:[{k:"enabled",lbl:"Enabled",t:"bool",d:true}], sum:p=>p.enabled?"📌 on top":"📌 normal"},
+  win_set_title: {label:"Set window title", ico:"type", kind:"action", cat:"window", outs:["out"], fields:[{k:"title",lbl:"New title",t:"text",d:"Game"}], sum:p=>`"${p.title||"?"}"`},
+  win_style:    {label:"Set window style", ico:"settings", kind:"action", cat:"window", outs:["out"], fields:[{k:"style",lbl:"Style",t:"select",opts:[{v:"windowed",t:"Windowed (with frame)"},{v:"borderless",t:"Borderless"},{v:"popup",t:"Popup"}],d:"windowed"}], sum:p=>`${p.style||"windowed"}`},
+  // Win32 conditions — the target window's own state (crash detection etc.), not
+  // the foreground window's. Previously Win32 projects had no condition at all.
+  win_if_window:{label:"If window …", ico:"help", kind:"condition", cat:"window", outs:["true","false"], fields:[
+    {k:"state",lbl:"State",t:"select",opts:[{v:"exists",t:"Exists (still running)"},{v:"foreground",t:"Is the active window"},{v:"minimized",t:"Is minimized"}],d:"exists"},
+    {k:"negate",t:"bool",d:false}
+  ], sum:p=>`🪟 ${p.negate?"not ":""}${p.state||"exists"}`},
+  win_wait_window:{label:"Wait for window …", ico:"timer", kind:"condition", cat:"window", outs:["true","false"], fields:[
+    {k:"state",lbl:"State",t:"select",opts:[{v:"exists",t:"Exists (still running)"},{v:"foreground",t:"Is the active window"},{v:"minimized",t:"Is minimized"}],d:"exists"},
+    {k:"timeout",lbl:"Timeout (s)",t:"num",d:30},
+    {k:"negate",lbl:"Negate — wait for the opposite",t:"bool",d:false}
+  ], sum:p=>`🪟 ${p.negate?"not ":""}${p.state||"exists"} ≤${p.timeout??30}s`},
+  // Win32's answer to Device info → variable.
+  win_info:     {label:"Window info → variable", ico:"monitor", kind:"action", cat:"window", outs:["out"], fields:[
+    {k:"name",lbl:"Target variable",t:"text",d:"info",var:true},
+    {k:"prop",lbl:"Property",t:"select",opts:[{v:"width",t:"Client width"},{v:"height",t:"Client height"},{v:"x",t:"Window X (screen)"},{v:"y",t:"Window Y (screen)"},{v:"title",t:"Title"},{v:"class",t:"Class name"},{v:"pid",t:"Process ID"},{v:"exe",t:"Executable"},{v:"hwnd",t:"Window handle"},{v:"foreground",t:"Is foreground (true/false)"},{v:"minimized",t:"Is minimized (true/false)"}],d:"width"}
+  ], sum:p=>`${p.name||"?"} = ${p.prop||"width"}`},
 };
 // `ctrl` restricts a category to one project controller: the Device/emulator
-// Device, Android App, and Android Keys/Input nodes are ADB-only; Win32
-// window/keyboard nodes are PC-only. Visual/basic/flow groups work on both.
+// Device and Android Keys/Input nodes are ADB-only; Win32 window/keyboard nodes
+// are PC-only. Visual/basic/flow groups work on both. A node may override its
+// category with its own `ctrl` (see WF_NODES.app_exit / if_app, which the engine
+// implements for BOTH backends) or clear it with ctrl:null.
 // Order follows task adjacency: direct input first; visual recognition groups
 // stay together (Image → Text → Color); decision/flow groups stay together;
 // platform lifecycle tools sit near each other at the end.
@@ -293,11 +427,26 @@ const WF_CATS = [
   {key:"logic", label:"Variables / Conditions"},
   {key:"flow",  label:"Flow"},
   {key:"time",  label:"Time",    closed:true},
-  {key:"app",   label:"App (ADB)", ctrl:"adb", closed:true},
-  {key:"device",label:"Device",  ctrl:"adb",   closed:true},
-  {key:"win32", label:"Win32 (PC)", ctrl:"win32"},
+  {key:"app",   label:"App", closed:true},
+  {key:"device",label:"Device (ADB)",  ctrl:"adb",   closed:true},
+  {key:"win32", label:"Win32 input (PC)", ctrl:"win32"},
+  {key:"window",label:"Win32 window (PC)", ctrl:"win32"},
   {key:"misc",  label:"Other",   closed:true},
 ];
+// Which controller a node belongs to: its own `ctrl` when set (including null =
+// "both", overriding the category), else its category's. Used by the palette,
+// the validator and the switch-case list so all three agree.
+function wfNodeCtrl(type){
+  const def=WF_NODES[type];
+  if(!def) return null;
+  if(Object.prototype.hasOwnProperty.call(def,"ctrl")) return def.ctrl||null;
+  const cat=WF_CATS.find(c=>c.key===def.cat);
+  return (cat&&cat.ctrl)||null;
+}
+function wfNodeAllowed(type, ctrl){
+  const need=wfNodeCtrl(type);
+  return !need || need===(ctrl||"adb");
+}
 // Palette pairs: related nodes rendered as one framed unit so the relationship
 // is obvious (e.g. Try in order + Next branch). Order of `types` = display order.
 // Search: if any member matches, the whole pair still shows (all members).
@@ -362,6 +511,12 @@ const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities
   // Screen capture source for ADB projects: "scrcpy" (fast/headless) or "adb"
   // (screencap). Saved into the flow JSON (key "capture") per game workflow.
   captureBackend:"scrcpy",
+  // Project-wide defaults applied to EVERY newly-created node (seeded by
+  // wfNewNode). Edited from the Inspector's Timing / Failure-handling gear
+  // (wfNodeDefaultsModal), saved into the flow JSON (key "nodeDefaults") so the
+  // values survive a reload and carry to the Runner. Existing nodes are not
+  // touched — the stamp only applies at creation time.
+  nodeDefaults:{ delayBefore:0, delayAfter:0, retryCount:0, retryDelay:0, screenshotOnFail:false },
   edit:{kind:"activity", id:null}, sel:[], selectedNode:null };
 let wfSpace=false;  // space held → pan instead of box-select
 const WF_GRID=20;   // grid step; snapping is opt-in (default off)
@@ -385,8 +540,8 @@ function wfPersistPanelState(){
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
 function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector");
   const logH = lc && !lc.classList.contains("collapsed") ? lc.offsetHeight : (lc && lc.dataset.openH ? parseInt(lc.dataset.openH,10) : undefined);
-  const sideW=sd?(wfSideCollapsed?(parseInt(sd.dataset.openW,10)||254):sd.offsetWidth):undefined;
-  const inspW=insp?(wfInspCollapsed?(parseInt(insp.dataset.openW,10)||280):insp.offsetWidth):undefined;
+  const sideW=sd?(wfSideCollapsed?(parseInt(sd.dataset.openW,10)||272):sd.offsetWidth):undefined;
+  const inspW=insp?(wfInspCollapsed?(parseInt(insp.dataset.openW,10)||304):insp.offsetWidth):undefined;
   api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), logH: logH||undefined, sideW, inspW, sideCollapsed:wfSideCollapsed, inspCollapsed:wfInspCollapsed}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
@@ -568,6 +723,18 @@ function wfSyncBackendChrome(){
   const mode=wfNormWinInputMode(cfg.inputMode);
   const modeEl=$("wf-bar-win32-mode"); if(modeEl && document.activeElement!==modeEl) modeEl.value=mode;
   const footerDeviceDot=$("footer-dot"); if(footerDeviceDot) footerDeviceDot.style.display=isWin32?"none":"";
+  // Preview action testers: mouse button / wheel are Win32-only; the Android
+  // keycode strip only makes sense for ADB (Win32 takes VK numbers).
+  const show=(id,on)=>{ const el=$(id); if(el) el.style.display=on?"flex":"none"; };
+  show("pv-win-click-row", isWin32);
+  show("pv-win-wheel-row", isWin32);
+  show("pv-key-strip-adb", !isWin32);
+  show("pv-key-strip-win", isWin32);
+  const keyInp=$("pv-key-custom");
+  if(keyInp){
+    keyInp.placeholder=isWin32?"VK number e.g. 13":"KEYCODE or number";
+    keyInp.setAttribute("aria-label",isWin32?"Custom Windows virtual-key code":"Custom Android keycode");
+  }
   // Device details and Android key tools do not apply to a Win32 capture.
   const deviceTab=document.querySelector('#pv-tabs-bar .tab-btn[data-tab="device"]');
   if(deviceTab) deviceTab.style.display=isWin32?"none":"";
@@ -758,6 +925,22 @@ function wfOpenProjectSettings(){
       secOcr.appendChild(rowOcr);
       form.appendChild(secOcr);
 
+      // ── Appearance ────────────────────────────────────────────────────────
+      const secApp=document.createElement("div"); secApp.className="wf-proj-sec";
+      secApp.innerHTML=`<div class="wf-proj-sec-lbl">Appearance</div>`;
+      const rowApp=document.createElement("div"); rowApp.className="wf-proj-grid2";
+      rowApp.innerHTML=
+        `<div class="wf-proj-row">`+
+          `<label for="wf-theme">Theme</label>`+
+          `<select id="wf-theme"><option value="light">Light</option><option value="dark">Dark</option></select>`+
+        `</div>`+
+        `<div class="wf-proj-row">`+
+          `<label for="wf-density">Density</label>`+
+          `<select id="wf-density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select>`+
+        `</div>`;
+      secApp.appendChild(rowApp);
+      form.appendChild(secApp);
+
       bd.appendChild(form);
       // Query inside `form` — the modal is not in document yet during body().
       const q=(id)=>form.querySelector("#"+id);
@@ -783,6 +966,12 @@ function wfOpenProjectSettings(){
       const mb=q("wf-win32-matchby"); if(mb) mb.onchange=()=>wfWin32FromUI();
       const md=q("wf-win32-mode"); if(md) md.onchange=()=>wfWin32FromUI();
       const pick=q("wf-win32-pick"); if(pick) pick.onclick=(e)=>wfPickWindow(e);
+
+      // Appearance — applies immediately and persists via shared/theme.js.
+      const thSel=q("wf-theme"), dSel=q("wf-density");
+      const curT=(window.uiTheme&&window.uiTheme.current())||{theme:"light",density:"comfortable"};
+      if(thSel){ thSel.value=curT.theme; thSel.onchange=()=>window.uiTheme&&window.uiTheme.setTheme(thSel.value); }
+      if(dSel){ dSel.value=curT.density; dSel.onchange=()=>window.uiTheme&&window.uiTheme.setDensity(dSel.value); }
 
       // Seed values immediately (form not in document yet — don't rely on $()).
       if(ctrl) ctrl.value=WF.controller||"adb";
@@ -826,11 +1015,15 @@ function wfSyncGrid(){
   const c=$("wf-canvas"); if(!c) return;
   const z=wfZoom;
   const px=wfCrispPx(wfPan.x), py=wfCrispPx(wfPan.y);
-  const layers=[`radial-gradient(circle, rgba(20,30,45,.10) ${(1.4*z).toFixed(2)}px, transparent ${(1.6*z).toFixed(2)}px)`];
+  // Read the dot color from CSS so the grid follows the active theme.
+  const cs=getComputedStyle(c);
+  const dotMajor=(cs.getPropertyValue("--grid-dot")||"rgba(20,30,45,.10)").trim();
+  const dotMinor=(cs.getPropertyValue("--grid-dot-minor")||"#d9dee6").trim();
+  const layers=[`radial-gradient(circle, ${dotMajor} ${(1.4*z).toFixed(2)}px, transparent ${(1.6*z).toFixed(2)}px)`];
   const sizes=[`${100*z}px ${100*z}px`];
   if(z>=0.55){
     const r=Math.max(.8, z);
-    layers.push(`radial-gradient(circle, #d9dee6 ${r.toFixed(2)}px, transparent ${(r+.2).toFixed(2)}px)`);
+    layers.push(`radial-gradient(circle, ${dotMinor} ${r.toFixed(2)}px, transparent ${(r+.2).toFixed(2)}px)`);
     sizes.push(`${20*z}px ${20*z}px`);
   }
   c.style.backgroundImage=layers.join(",");
@@ -965,7 +1158,7 @@ function wfToggleSidebar(which){
 function wfInitSideResizer(){
   const side=$("wf-side"), rez=$("wf-side-resizer"); if(!side||!rez||rez.__wired) return;
   rez.__wired=true; let drag=null;
-  const setW=w=>{ w=Math.max(150,Math.min(480,w)); side.style.width=w+"px"; side.dataset.openW=String(w); rez.setAttribute("aria-valuenow",String(Math.round(w))); };
+  const setW=w=>{ w=Math.max(220,Math.min(480,w)); side.style.width=w+"px"; side.dataset.openW=String(w); rez.setAttribute("aria-valuenow",String(Math.round(w))); };
   setW(side.offsetWidth);
   rez.addEventListener("mousedown",e=>{ if(e.target.closest(".wf-sidebar-toggle")||wfSideCollapsed) return; e.preventDefault(); drag={x:e.clientX, w:side.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
   rez.addEventListener("keydown",e=>{ if(!["ArrowLeft","ArrowRight"].includes(e.key)||wfSideCollapsed) return; e.preventDefault(); setW(side.offsetWidth+(e.key==="ArrowRight"?10:-10)); wfSaveSettings(); });
@@ -976,7 +1169,7 @@ function wfInitSideResizer(){
 function wfInitInspResizer(){
   const insp=$("wf-inspector"), rez=$("wf-insp-resizer"); if(!insp||!rez||rez.__wired) return;
   rez.__wired=true; let drag=null;
-  const setW=w=>{ w=Math.max(180,Math.min(520,w)); insp.style.width=w+"px"; insp.dataset.openW=String(w); rez.setAttribute("aria-valuenow",String(Math.round(w))); };
+  const setW=w=>{ w=Math.max(240,Math.min(520,w)); insp.style.width=w+"px"; insp.dataset.openW=String(w); rez.setAttribute("aria-valuenow",String(Math.round(w))); };
   setW(insp.offsetWidth);
   rez.addEventListener("mousedown",e=>{ if(e.target.closest(".wf-sidebar-toggle")||wfInspCollapsed) return; e.preventDefault(); drag={x:e.clientX, w:insp.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
   rez.addEventListener("keydown",e=>{ if(!["ArrowLeft","ArrowRight"].includes(e.key)||wfInspCollapsed) return; e.preventDefault(); setW(insp.offsetWidth+(e.key==="ArrowLeft"?10:-10)); wfSaveSettings(); });

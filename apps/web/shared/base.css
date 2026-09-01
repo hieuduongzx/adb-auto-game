@@ -1,0 +1,245 @@
+/* Macro2k shared UI system — app-agnostic primitives.
+   Single source of truth for the "flat operator console" vocabulary used by the
+   Designer, Hub and Runner. Load tokens.css first, then this, then the app
+   stylesheet (hub.css / runner.css / wf.css). Designer-specific chrome (node
+   canvas, log drawer, footer status strip, category tokens) stays in wf/css/. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* Chrome metrics used by a couple of shared components (toast offset). */
+:root { --hdr-h: 46px; --ftr-h: 26px; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  font-family: var(--sans);
+  font-size: var(--t-body);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+button {
+  font-family: var(--sans);
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  line-height: 1;
+  color: inherit;
+}
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+input, select {
+  font-family: var(--mono);
+  font-size: var(--t-ui);
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
+  padding: 5px 8px;
+}
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--border2); box-shadow: none; }
+input:disabled, select:disabled { background: var(--alt); color: var(--muted); cursor: not-allowed; }
+
+/* Selects: strip the native OS chrome and draw our own chevron so dropdowns
+   read consistently across platforms and apps. */
+select {
+  font-family: var(--sans); font-weight: 500; cursor: pointer;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237c8795' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat; background-position: right 8px center; background-size: 12px; }
+select:hover:not(:disabled) { border-color: var(--border2); background-color: var(--surface); }
+option { font-family: var(--sans); font-size: var(--t-body); color: var(--ink); background: var(--panel); padding: 6px; }
+
+kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; padding: 2px 6px; border: 1px solid var(--border2);
+  border-bottom-color: var(--border2); border-radius: var(--r-sm);
+  background: var(--panel); color: var(--dim);
+  font-family: var(--mono); font-size: var(--t-micro); font-weight: 600;
+  box-shadow: 0 1px 0 var(--border2);
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-thumb-hover); }
+
+/* ── App frame — flat console: flush chrome, regions split by hairlines ── */
+#app { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+
+/* Flat card — hairline border, no shadow. Elevation is reserved for overlays. */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 30px; border-radius: var(--r-sm); font-weight: 600; font-size: var(--t-ui);
+  transition: background .15s, opacity .15s, color .15s, border-color .15s, box-shadow .15s, transform .1s;
+  border: 1px solid var(--border); background: var(--panel); color: var(--dim);
+  padding: 0 11px; flex-shrink: 0;
+}
+.btn:hover { background: var(--alt); color: var(--ink); border-color: var(--border2); }
+.btn:active:not(:disabled) { transform: translateY(0.5px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.accent { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn.accent:hover { background: var(--accent-hover); }
+.btn.ok { background: var(--ok); color: var(--on-ok); border-color: var(--ok); box-shadow: var(--sh-sm); }
+.btn.ok:hover { background: var(--ok-hover); }
+.btn.err { border: 1px solid var(--err-bd); background: var(--err-bg); color: var(--err); }
+.btn.err:hover { background: var(--err-bd); }
+.btn.sm { height: 26px; padding: 0 9px; font-size: var(--t-caption); }
+.btn.h30 { height: 30px; padding: 0 12px; }
+.btn.ico { width: 30px; padding: 0; }
+.btn.sm.ico { width: 26px; }
+.btn svg { width: 15px; height: 15px; display: block; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.btn.ico svg { width: 16px; height: 16px; }
+.btn.accent svg, .btn.ok svg, .btn.err svg { stroke-width: 2.1; }
+/* A toggle icon button reads its on/off state from colour, not text. */
+.btn.ico.on { background: var(--accent-bg); border-color: var(--border2); color: var(--accent); }
+
+/* Inline icon button */
+.icon-btn {
+  width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--border2);
+  background: transparent; color: var(--muted); display: inline-flex; align-items: center;
+  justify-content: center; flex-shrink: 0; transition: background .1s, color .1s;
+}
+.icon-btn:hover { background: var(--alt); color: var(--ink); }
+.icon-btn.flash { color: var(--ok) !important; }
+
+/* Custom checkbox */
+.cb {
+  width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--cb-bd);
+  background: var(--panel); flex-shrink: 0; display: flex; align-items: center;
+  justify-content: center; transition: background .12s, border-color .12s;
+}
+.cb.checked { background: var(--accent); border-color: var(--accent); }
+.cb svg { opacity: 0; transition: opacity .1s; }
+.cb.checked svg { opacity: 1; }
+
+/* ── Tabs — underline metaphor (shared by scope panel, runner, wf) ───────── */
+.tab-btn {
+  position: relative; padding: 8px 12px 9px; font-size: var(--t-body); font-weight: 600;
+  color: var(--muted); transition: color .15s;
+}
+.tab-btn::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 2px; border-radius: 2px; background: transparent; transition: background .15s;
+}
+.tab-btn.active { color: var(--accent); }
+.tab-btn.active::after { background: var(--accent); }
+.tab-btn:hover:not(.active) { color: var(--dim); }
+.tab-count {
+  font-family: var(--mono); font-size: var(--t-micro); font-weight: 600; color: var(--muted);
+  background: var(--alt); border-radius: 4px; padding: 1px 6px; min-width: 17px; text-align: center;
+}
+.tab-btn.active .tab-count { color: var(--accent); background: var(--accent-bg); }
+.tab-pane { display: none; flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
+.tab-pane.active { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── Two-option chooser (controller / capture / input mode) ──────────────── */
+.choice-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.choice-seg.disabled { opacity: .48; }
+.choice-seg-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.choice-seg-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.choice {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 9px 11px; border-radius: 9px; border: 1px solid var(--border2);
+  background: var(--surface); color: var(--dim); text-align: left;
+  transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
+}
+.choice:hover:not(:disabled) { background: var(--alt); color: var(--ink); border-color: var(--border2); }
+.choice.on { background: var(--accent-bg); border-color: var(--border2); color: var(--accent); box-shadow: none; }
+.choice:disabled { cursor: not-allowed; }
+.choice-title { font-size: var(--t-body); font-weight: 700; line-height: 1.2; }
+.choice-sub { font-size: var(--t-micro); font-weight: 500; color: var(--muted); line-height: 1.25; }
+.choice.on .choice-sub { color: var(--accent-soft); }
+@media (max-width: 520px) { .choice-seg-3, .choice-seg-4 { grid-template-columns: 1fr; } }
+
+/* ── Toasts — non-blocking feedback, top-right under the header ──────────── */
+#ui-toasts {
+  position: fixed; top: calc(var(--hdr-h) + 8px); right: 12px; z-index: var(--z-toast);
+  display: flex; flex-direction: column; gap: 7px; align-items: flex-end;
+  pointer-events: none;
+}
+.ui-toast {
+  display: flex; align-items: center; gap: 8px; max-width: 360px;
+  padding: 8px 12px; border-radius: 9px; background: var(--panel);
+  border: 1px solid var(--border2); box-shadow: var(--sh-lg);
+  font-size: var(--t-body); font-weight: 600; color: var(--ink2); cursor: pointer;
+  pointer-events: auto; animation: uiToastIn .18s var(--ease) both;
+}
+.ui-toast svg { width: 15px; height: 15px; flex-shrink: 0; }
+.ui-toast-msg { min-width: 0; line-height: 1.45; word-break: break-word; }
+.ui-toast.ui-success { background: var(--ok-bg); color: var(--ok-ink); }
+.ui-toast.ui-error   { background: var(--err-bg); color: var(--err); }
+.ui-toast.ui-warning { background: var(--warn-bg); color: var(--warn); }
+.ui-toast.ui-info    { background: var(--accent-bg); color: var(--accent-hover); }
+.ui-toast.out { animation: uiToastOut .22s var(--ease) both; }
+@keyframes uiToastIn  { from { opacity: 0; transform: translateX(14px); } }
+@keyframes uiToastOut { to   { opacity: 0; transform: translateX(14px); } }
+
+/* ── Modal — confirm / prompt / custom dialogs ───────────────────────────── */
+.ui-modal-wrap {
+  position: fixed; inset: 0; z-index: var(--z-modal);
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--shade) 55%, transparent);
+  animation: uiFade .14s ease-out both;
+}
+@keyframes uiFade { from { opacity: 0; } }
+.ui-modal {
+  width: 380px; max-width: calc(100vw - 40px); max-height: calc(100vh - 60px);
+  display: flex; flex-direction: column; background: var(--panel);
+  border: 1px solid var(--border2); border-radius: var(--r-lg); box-shadow: var(--sh-lg);
+  animation: uiModalIn .16s var(--ease) both;
+}
+.ui-modal.ui-modal-wide { width: min(460px, 100%); }
+@keyframes uiModalIn { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+.ui-modal-hd { padding: 13px 16px 0; font-size: var(--t-title); font-weight: 700; color: var(--ink); }
+.ui-modal-bd { padding: 10px 16px 4px; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.ui-modal-msg { font-size: var(--t-body); color: var(--ink2); line-height: 1.6; white-space: pre-wrap; word-break: break-word; user-select: text; }
+.ui-modal-lbl { font-size: var(--t-ui); font-weight: 600; color: var(--dim); }
+.ui-modal-inp { width: 100%; font-family: var(--sans); font-size: var(--t-body); padding: 7px 10px; }
+.ui-modal-hint { font-size: var(--t-micro); color: var(--muted); line-height: 1.4; }
+.form-field { margin-bottom: 12px; }
+.form-field > label, .form-lbl {
+  display: block; font-size: var(--t-caption); font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+}
+.ui-modal-bd input { width: 100%; height: 34px; font-family: var(--mono); font-size: var(--t-body); }
+/* Inline monospace run — a path or an identifier inside prose. A form control
+   that carries the class wants the face only, not the muted prose colour. */
+.mono { font-family: var(--mono); font-size: var(--t-caption); color: var(--dim); }
+input.mono, select.mono, textarea.mono { font-size: inherit; color: inherit; }
+.ui-modal-hd + .ui-modal-bd { margin-top: 0; }
+.ui-modal-ft { display: flex; justify-content: flex-end; gap: 7px; padding: 12px 16px 14px; }
+.ui-modal-ft .btn { min-width: 74px; }
+
+/* Entry animation for an appended row (log lines in every app's log panel). */
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(4px); } }
+.fade-in { animation: fadeInUp .2s var(--ease) both; }
+
+/* ── Theme toggle — one icon button, dropped into any app header ──────────── */
+/* Markup carries both glyphs and CSS shows the one for the *current* theme, so
+   the control needs no JS beyond a click handler on [data-theme-toggle]. */
+.theme-btn svg { width: 15px; height: 15px; }
+.theme-btn .ico-moon { display: none; }
+:root[data-theme="dark"] .theme-btn .ico-sun  { display: none; }
+:root[data-theme="dark"] .theme-btn .ico-moon { display: block; }

@@ -446,7 +446,7 @@ Examples:
                             help='Also show the current running app for each device found')
     
     # List command
-    list_parser = subparsers.add_parser('list', help='List connected devices')
+    subparsers.add_parser('list', help='List connected devices')
     
     # Info command
     info_parser = subparsers.add_parser('info', help='Show detailed device info')
@@ -479,7 +479,7 @@ Examples:
     shell_parser.add_argument('command', nargs='+', help='Shell command to execute')
     
     # Restart command
-    restart_parser = subparsers.add_parser('restart', help='Restart ADB server')
+    subparsers.add_parser('restart', help='Restart ADB server')
     
     args = parser.parse_args()
     

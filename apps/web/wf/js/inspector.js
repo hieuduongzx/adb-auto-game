@@ -15,12 +15,18 @@ function wfInspId(iconName,title,sub,count){
 }
 
 // One flat section: optional uppercase label (+ count) then its content rows.
-function wfInspBlock(label,count){
+// An optional right-aligned action button (e.g. the Timing ▸ gear) can be
+// passed in; the header becomes a flex row with the action on the far right.
+function wfInspBlock(label,count,action){
   const b=document.createElement("div"); b.className="wf-insp-block";
   if(label){
     const s=document.createElement("div"); s.className="wf-insp-sec";
     s.innerHTML=`<span>${escHtml(label)}</span>`;
     if(count!==undefined&&count!==null&&count!=="") s.innerHTML+=`<span class="sec-count">${escHtml(String(count))}</span>`;
+    if(action){
+      const sp=document.createElement("span"); sp.className="wf-insp-sec-spacer";
+      s.appendChild(sp); s.appendChild(action);
+    }
     b.appendChild(s);
   }
   return b;
@@ -531,8 +537,11 @@ function wfCallPicker(node){
 // Universal per-node timing: a pause before the block runs and a pause after it
 // finishes (before the next block). Stored top-level like note/log, applied by
 // the engine around every block — see src/workflow/engine.py _walk.
+// The header's ⚙ opens the project-wide defaults dialog (wfNodeDefaultsModal):
+// whatever is set there becomes the seed for every NEWLY-created block, so the
+// delay/retry fields below show those values on creation.
 function wfTimingField(node){
-  const b=wfInspBlock("Timing");
+  const b=wfInspBlock("Timing",undefined,wfNodeDefaultsBtn());
   const mk=(key,label,hint)=>{
     const row=document.createElement("div"); row.className="wf-field";
     const l=document.createElement("label"); l.textContent=label; l.title=hint; row.appendChild(l);
@@ -553,6 +562,116 @@ function wfTimingField(node){
   b.appendChild(hint);
   return b;
 }
+
+// ── Project-wide node defaults ────────────────────────────────────────────────
+// The ⚙ next to "Timing" / "Failure handling" opens this dialog. Values set here
+// become WF.nodeDefaults, which wfNewNode stamps onto every newly-created block.
+// "Apply to existing blocks" updates every node already in the flow too (an
+// overwrite, not a merge), so it's a separate explicit button.
+function wfNodeDefaultsBtn(){
+  const b=document.createElement("button"); b.type="button"; b.className="btn sm ico wf-insp-sec-gear";
+  b.innerHTML=wfIco("settings");
+  b.title="Set project-wide defaults for new blocks (Before/After wait, Retry, failure screenshot)";
+  b.setAttribute("aria-label","Set project-wide node defaults");
+  b.onclick=e=>{ e.stopPropagation(); wfNodeDefaultsModal(); };
+  return b;
+}
+function wfGetNodeDefaults(){
+  const d=(typeof WF!=="undefined"&&WF.nodeDefaults)||{};
+  return { delayBefore:parseFloat(d.delayBefore)||0, delayAfter:parseFloat(d.delayAfter)||0,
+    retryCount:parseInt(d.retryCount,10)||0, retryDelay:parseFloat(d.retryDelay)||0,
+    screenshotOnFail:!!d.screenshotOnFail };
+}
+function wfNodeDefaultsModal(){
+  if(typeof uiModal!=="function") return;
+  let boxes={}, shotCb=null;
+  const numRow=(id,label,hint)=>{
+    const row=document.createElement("div"); row.className="wf-field";
+    const l=document.createElement("label"); l.textContent=label; l.title=hint||""; row.appendChild(l);
+    const inp=document.createElement("input"); inp.type="number"; inp.min="0"; inp.step="0.5";
+    inp.value=""; row.appendChild(inp); boxes[id]=inp;
+    const unit=document.createElement("span"); unit.className="hz-unit"; unit.textContent="s"; row.appendChild(unit);
+    return row;
+  };
+  const cur=wfGetNodeDefaults();
+
+  const body=el=>{
+    const tip=document.createElement("div"); tip.className="wf-insp-tip";
+    tip.innerHTML="These become the default <b>Before/After wait</b> &amp; <b>failure handling</b> for every <i>new</i> block you drop onto the canvas. They are stored in the workflow file.";
+    el.appendChild(tip);
+
+    const group=document.createElement("div"); group.className="wf-insp-grid"; group.style.marginTop="8px";
+    group.appendChild(numRow("delayBefore","Before wait","Seconds to pause before a new block runs"));
+    group.appendChild(numRow("delayAfter","After wait","Seconds to pause after a new block runs"));
+    group.appendChild(numRow("retryCount","Retries","Automatic retries when a new block fails"));
+    group.appendChild(numRow("retryDelay","Retry wait","Seconds between retry attempts"));
+    boxes.delayBefore.value=cur.delayBefore||""; boxes.delayBefore.placeholder=cur.delayBefore?"":0;
+    boxes.delayAfter.value=cur.delayAfter||""; boxes.delayAfter.placeholder=cur.delayAfter?"":0;
+    boxes.retryCount.value=cur.retryCount||""; boxes.retryCount.placeholder=cur.retryCount?"":0;
+    boxes.retryDelay.value=cur.retryDelay||""; boxes.retryDelay.placeholder=cur.retryDelay?"":0;
+    el.appendChild(group);
+
+    const shot=document.createElement("div"); shot.className="wf-field";
+    const l=document.createElement("label"); l.textContent="Screenshot on fail"; shot.appendChild(l);
+    const cb=document.createElement("span"); cb.className="cb"+(cur.screenshotOnFail?" checked":""); cb.innerHTML='<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
+    cb.onclick=()=>{ cb.classList.toggle("checked",!cb.classList.contains("checked")); };
+    shot.appendChild(cb);
+    el.appendChild(shot);
+    shotCb=cb;
+
+    const applyExisting=document.createElement("button"); applyExisting.type="button"; applyExisting.className="btn sm";
+    applyExisting.textContent="Apply to existing blocks";
+    applyExisting.title="Overwrite every node already in the flow with these values (timing + failure handling)";
+    applyExisting.onclick=()=>{
+      WF.nodeDefaults=wfReadDefaults(boxes,shotCb);
+      wfApplyNodeDefaults(true);
+      uiModalClose(true);
+      uiToast("Defaults saved and applied to every block.","success");
+    };
+    el.appendChild(applyExisting);
+  };
+
+  uiModal({
+    title:"Project node defaults",
+    width:"380px",
+    body: el=>{ body(el); },
+    buttons:[
+      {label:"Cancel", value:false},
+      {label:"Save defaults", value:true, kind:"accent"},
+    ],
+  }).then(v=>{
+    if(!v) return;
+    WF.nodeDefaults=wfReadDefaults(boxes,shotCb);
+    if(typeof wfMarkDirty==="function") wfMarkDirty();
+    uiToast("Node defaults saved — new blocks will use them.","success");
+  });
+}
+// Read the dialog's inputs into a WF.nodeDefaults-shaped object.
+function wfReadDefaults(boxes,shotCb){
+  return { delayBefore:parseFloat(boxes.delayBefore.value)||0,
+    delayAfter:parseFloat(boxes.delayAfter.value)||0,
+    retryCount:parseInt(boxes.retryCount.value,10)||0,
+    retryDelay:parseFloat(boxes.retryDelay.value)||0,
+    screenshotOnFail:!!(shotCb&&shotCb.classList.contains("checked")) };
+}
+// Stamp the current defaults onto every node in the live flow (all activities +
+// functions). Shares the field names wfNewNode uses so a "Apply to existing
+// blocks" call produces the same shape as a fresh node.
+function wfApplyNodeDefaults(includeRetry){
+  const nd=wfGetNodeDefaults();
+  const apply=n=>{
+    if(!n||n.type==="start") return;
+    n.delayBefore=nd.delayBefore; n.delayAfter=nd.delayAfter;
+    if(includeRetry){ n.retryCount=nd.retryCount; n.retryDelay=nd.retryDelay; n.screenshotOnFail=nd.screenshotOnFail; }
+    if(typeof wfUpdNodeTiming==="function") wfUpdNodeTiming(n);
+    if(typeof wfUpdNodeRetry==="function") wfUpdNodeRetry(n);
+  };
+  const walkGraph=g=>{ (g&&g.nodes||[]).forEach(apply); };
+  (WF.activities||[]).forEach(a=>walkGraph(a.graph));
+  (WF.functions||[]).forEach(f=>walkGraph(f.graph));
+  wfMarkDirty();
+}
+
 function wfUpdNodeTiming(node){
   const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
   // The chips are absolutely positioned under the block, so placement in the
@@ -563,7 +682,7 @@ function wfUpdNodeTiming(node){
 }
 
 function wfRetryField(node){
-  const b=wfInspBlock("Failure handling");
+  const b=wfInspBlock("Failure handling",undefined,wfNodeDefaultsBtn());
   const mkNum=(key,label,step)=>{
     const row=document.createElement("div"); row.className="wf-field";
     const l=document.createElement("label"); l.textContent=label; row.appendChild(l);
@@ -1147,7 +1266,12 @@ function wfSwitchCasesEditor(node){
       const hd=document.createElement("div"); hd.className="wf-case-hdr";
       const num=document.createElement("span"); num.className="wf-case-num"; num.textContent="#"+(idx+1);
       const sel=document.createElement("select");
-      WF_SWITCH_CASE_TYPES.forEach(t=>{ const op=document.createElement("option"); op.value=t;
+      // Only case types valid for this project's controller (see wfSwitchCaseTypes),
+      // plus whatever this case already holds so an imported file is never silently
+      // rewritten.
+      const opts=wfSwitchCaseTypes();
+      if(c.type && !opts.includes(c.type) && WF_NODES[c.type]) opts.push(c.type);
+      opts.forEach(t=>{ const op=document.createElement("option"); op.value=t;
         op.textContent=WF_NODES[t].label; if(c.type===t)op.selected=true; sel.appendChild(op); });
       sel.onchange=()=>{ wfPushUndoDebounced(); c.type=sel.value; c.params=wfDefaults(sel.value); render(); wfUpdNodeSum(node); };
       const up=document.createElement("button"); up.className="btn sm ico"; up.innerHTML=wfIco("chevron_up"); up.title="Up"; up.disabled=idx===0;
@@ -1159,7 +1283,7 @@ function wfSwitchCasesEditor(node){
       hd.appendChild(num); hd.appendChild(sel); hd.appendChild(up); hd.appendChild(dn); hd.appendChild(del);
       item.appendChild(hd);
       const proxy={ id:node.id+"__c"+idx, type:c.type, params:c.params };
-      (WF_NODES[c.type].fields||[]).forEach(f=> item.appendChild(wfFieldEl(proxy,f)));
+      ((WF_NODES[c.type]||{}).fields||[]).forEach(f=> item.appendChild(wfFieldEl(proxy,f)));
       list.appendChild(item);
     });
     if(!cases().length){ const e=document.createElement("div"); e.className="wf-insp-tip"; e.textContent='No branches. Click "+ Branch" or enter a branch count.'; list.appendChild(e); }

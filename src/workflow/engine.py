@@ -140,6 +140,16 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # maxLoops > 0 giới hạn số vòng; hết lượt mà chưa thấy → "fail". Gói gọn
     # pattern phổ biến nhất trong workflow thực tế: loop ∞ + if_image + break.
     "loop_until_image": {"label": "Lặp đến khi thấy ảnh", "kind": "loop_until", "ins": 2, "outs": ["body", "found", "fail"]},
+    # Cùng cơ chế loop_until nhưng điều kiện thoát là màu / chữ / biến — bộ ba
+    # còn thiếu so với bản ảnh (trước đây phải dựng loop ∞ + if_* + break).
+    "loop_until_color": {"label": "Lặp đến khi thấy màu", "kind": "loop_until", "ins": 2, "outs": ["body", "found", "fail"]},
+    "loop_until_text":  {"label": "Lặp đến khi thấy chữ", "kind": "loop_until", "ins": 2, "outs": ["body", "found", "fail"]},
+    "loop_until_var":   {"label": "Lặp đến khi biến thoả", "kind": "loop_until", "ins": 2, "outs": ["body", "found", "fail"]},
+    # Tìm ảnh và LƯU toạ độ tâm vào 2 biến (x/y) — để tính toán offset, so sánh
+    # vị trí… thay vì chỉ dùng được qua "chạm ảnh vừa thấy".
+    "find_image_pos": {"label": "Tìm ảnh → toạ độ", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    # Chờ màn hình NGỪNG thay đổi (hết animation/loading) rồi mới đi tiếp.
+    "wait_stable": {"label": "Chờ màn hình ổn định", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     # Chạm MỌI vị trí khớp template trên màn hình hiện tại (match_all + NMS).
     # true khi chạm được ≥1 vị trí — quét thu thập vật phẩm/phần thưởng.
     "tap_all_images": {"label": "Chạm tất cả ảnh", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
@@ -151,6 +161,10 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "if_app": {"label": "Nếu app đang mở", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     # Gỡ cài đặt app (pm uninstall, tuỳ chọn -k giữ dữ liệu). ADB-only.
     "app_uninstall": {"label": "Gỡ ứng dụng", "kind": "action", "ins": 1, "outs": ["out"]},
+    # Cài APK từ file trên PC (pm install qua adb install) — cặp đối xứng với
+    # app_uninstall. ADB-only.
+    "app_install": {"label": "Cài ứng dụng (APK)", "kind": "action", "ins": 1, "outs": ["out"]},
+
     # Thoát app ĐANG mở (không cần package): ADB force-stop app foreground;
     # Win32 đóng cửa sổ mục tiêu.
     "app_exit": {"label": "Thoát app hiện tại", "kind": "action", "ins": 1, "outs": ["out"]},
@@ -165,6 +179,12 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "if_time":     {"label": "Nếu trong khung giờ","kind": "condition","ins": 1, "outs": ["true", "false"]},
     "device_info": {"label": "Thông tin thiết bị → biến","kind": "action","ins": 1, "outs": ["out"]},
     "screen_power":{"label": "Bật/tắt màn hình", "kind": "action",    "ins": 1, "outs": ["out"]},
+    # Màn hình thiết bị đang bật? (cặp đọc cho screen_power). ADB-only.
+    "if_screen_on":{"label": "Nếu màn hình đang bật", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    # Chạy một câu adb shell tuỳ ý, lưu stdout vào biến — cửa thoát cho những
+    # thứ chưa có node riêng. ADB-only.
+    "adb_shell":   {"label": "ADB shell → biến", "kind": "action", "ins": 1, "outs": ["out"]},
+
     # Launch the *emulator process itself* (LDPlayer/MuMu/Nox/MEmu/BlueStacks) on
     # the PC — unlike ``launch_app`` which opens an app *inside* an already-running
     # device. Optional ``at`` (HH:MM) waits until that clock time first, so a flow
@@ -185,7 +205,13 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # these cover the window-lifecycle actions ADB nodes can't express.
     "win_send_text":{"label": "Nhập văn bản PC", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_key":      {"label": "Phím PC (VK)", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_hotkey":   {"label": "Tổ hợp phím PC", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_escape":   {"label": "Phím Escape", "kind": "action", "ins": 1, "outs": ["out"]},
+    # Chuột phải / giữa + con lăn + di chuột (hover) — những thứ WM_LBUTTON*
+    # không diễn tả được nhưng app/game PC dùng liên tục.
+    "win_click":    {"label": "Click chuột PC", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_scroll":   {"label": "Cuộn con lăn", "kind": "action", "ins": 1, "outs": ["out"]},
+    "win_mouse_move": {"label": "Di chuột (hover)", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_launch":   {"label": "Mở chương trình", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_activate": {"label": "Đưa cửa sổ lên trước", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_close":    {"label": "Đóng cửa sổ", "kind": "action", "ins": 1, "outs": ["out"]},
@@ -197,7 +223,14 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "win_always_on_top": {"label": "Luôn trên cùng", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_set_title": {"label": "Đổi tiêu đề", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_style":    {"label": "Đổi kiểu cửa sổ", "kind": "action", "ins": 1, "outs": ["out"]},
+    # Điều kiện Win32 (trước đây mode Win32 KHÔNG có condition nào): cửa sổ mục
+    # tiêu còn sống / đang foreground / đang thu nhỏ, và bản chờ có timeout.
+    "win_if_window":  {"label": "Nếu cửa sổ …", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    "win_wait_window":{"label": "Chờ cửa sổ …", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    # Đọc thuộc tính cửa sổ mục tiêu vào biến (đối xứng với device_info của ADB).
+    "win_info":     {"label": "Thông tin cửa sổ → biến", "kind": "action", "ins": 1, "outs": ["out"]},
 }
+
 
 # ── Emulator launch specs ─────────────────────────────────────────────────────
 #
@@ -261,7 +294,8 @@ def _emulator_state_path() -> str:
 # Condition node types a switch case may use — only the *instant* ones (no
 # wait_* timeout blocking, no tap_* side-effect), so evaluating one case never
 # stalls the others. Kept in sync with the designer's case-type dropdown.
-SWITCH_CASE_TYPES = ("if_image", "if_image_any", "if_text", "if_var", "if_time", "if_color")
+SWITCH_CASE_TYPES = ("if_image", "if_image_any", "if_text", "if_var", "if_time",
+                     "if_color", "if_app", "if_screen_on", "win_if_window")
 
 
 class WorkflowEngine:
@@ -392,11 +426,16 @@ class WorkflowEngine:
             "wait_until":   self._a_wait_until,
             "device_info":  self._a_device_info,
             "screen_power": self._a_screen_power,
+            "adb_shell":    self._a_adb_shell,
             "read_color":   self._a_read_color,
             "launch_emulator": self._a_launch_emulator,
             "win_send_text":self._a_send_text,
             "win_key":      self._a_key,
+            "win_hotkey":   self._a_win_hotkey,
             "win_escape":   self._a_back,
+            "win_click":    self._a_win_click,
+            "win_scroll":   self._a_win_scroll,
+            "win_mouse_move": self._a_win_mouse_move,
             "win_launch":   self._a_win_launch,
             "win_activate": self._a_win_activate,
             "win_close":    self._a_win_close,
@@ -408,8 +447,10 @@ class WorkflowEngine:
             "win_always_on_top": self._a_win_always_on_top,
             "win_set_title": self._a_win_set_title,
             "win_style":    self._a_win_style,
+            "win_info":     self._a_win_info,
             "app_stop":     self._a_app_stop,
             "app_uninstall": self._a_app_uninstall,
+            "app_install":  self._a_app_install,
             "app_exit":     self._a_app_exit,
         }
 
@@ -543,10 +584,6 @@ class WorkflowEngine:
         # thread below. Reset the shared runtime dict on (re)load.
         self._globals = self._seed_vars({"vars": self.flow.get("globals") or []})
 
-    def globals_snapshot(self) -> Dict[str, Any]:
-        """Public copy of the shared global-vars dict (for GUI var panels)."""
-        return dict(self._globals or {})
-
         base = (self.flow.get("templatesDir") or "").strip()
         anchors: List[str] = []
         if flow_path:
@@ -568,10 +605,13 @@ class WorkflowEngine:
             f"({len(self.activities())} activities), templates@ {self.templates_base}"
         )
 
+    def globals_snapshot(self) -> Dict[str, Any]:
+        """Public copy of the shared global-vars dict (for GUI var panels)."""
+        return dict(self._globals or {})
+
     @staticmethod
     def load_file(path: str) -> Dict[str, Any]:
         """Read + JSON-decode a flow file (raises on bad JSON/IO)."""
-        import json
         with open(path, "r", encoding="utf-8") as fh:
             return json.load(fh)
 
@@ -975,35 +1015,28 @@ class WorkflowEngine:
                 self._emit("on_node_done", nid, "ok", loop_port)
                 cur = self._next(adj, cur, loop_port)
             elif kind == "loop_until":
-                # Lặp đến khi thấy ảnh: mỗi lần (re-)enter node, chụp + tìm
-                # template. Thấy → "found"; break trong thân → "found" (thoát);
-                # hết maxLoops → "fail"; còn lượt → "body" (thân quay về cổng
+                # Lặp đến khi <điều kiện>: mỗi lần (re-)enter node, kiểm tra một
+                # lần. Thoả → "found"; break trong thân → "found" (thoát); hết
+                # maxLoops → "fail"; còn lượt → "body" (thân quay về cổng
                 # "loop"). delayBefore của node đóng vai trò poll interval.
-                tpl = self._resolve_template(params.get("template", ""))
-                threshold = float(params.get("threshold", 0.85))
+                # Điều kiện tuỳ ntype: ảnh / màu / chữ / biến.
+                what = self._loop_until_label(ntype, params)
                 lu_port = None
                 if self._break_loop:
                     self._break_loop = False
-                    log_info(f"[workflow] ↺ thoát 'lặp đến khi thấy ảnh' sau {counters.get(cur, 0)} vòng (break)")
+                    log_info(f"[workflow] ↺ thoát 'lặp đến khi {what}' sau {counters.get(cur, 0)} vòng (break)")
                     counters[cur] = 0
                     lu_port = "found"
                 else:
-                    res = self._find_template(
-                        tpl, threshold=threshold,
-                        region=self._search_region(params),
-                        report=True,  # live overlay each probe on designer
-                    )
-                    if res:
-                        self._last_pos = (res[0], res[1])
-                        log_info(f"[workflow] ↺ thấy ảnh {os.path.basename(tpl)} sau "
-                                 f"{counters.get(cur, 0)} vòng ({res[0]}, {res[1]})")
+                    if self._loop_until_hit(ntype, params):
+                        log_info(f"[workflow] ↺ {what} sau {counters.get(cur, 0)} vòng")
                         counters[cur] = 0
                         lu_port = "found"
                     else:
                         done = counters.get(cur, 0)
                         max_loops = self._resolve_count(params.get("maxLoops", 0), default=0)
                         if max_loops > 0 and done >= max_loops:
-                            log_warning(f"[workflow] ↺ chưa thấy ảnh {os.path.basename(tpl)} sau {done} vòng — nhánh fail")
+                            log_warning(f"[workflow] ↺ chưa {what} sau {done} vòng — nhánh fail")
                             counters[cur] = 0
                             lu_port = "fail"
                         else:
@@ -1766,6 +1799,79 @@ class WorkflowEngine:
         wl = str(params.get("whitelist", "") or "").strip()
         return wl or None
 
+    # ── loop_until family ──────────────────────────────────────────────────────
+    # loop_until_image/color/text/var share the walk logic in _walk; only the
+    # per-iteration probe differs. Each probe returns True when the loop should
+    # exit through "found".
+
+    def _loop_until_label(self, ntype: str, params: Dict) -> str:
+        """Short human label of what the loop is waiting for (log lines)."""
+        if ntype == "loop_until_color":
+            return f"thấy màu {params.get('color') or '?'}"
+        if ntype == "loop_until_text":
+            return f"thấy chữ \"{params.get('text') or ''}\""
+        if ntype == "loop_until_var":
+            return (f"biến {params.get('name') or '?'} "
+                    f"{params.get('op') or '=='} {params.get('value')}")
+        tpl = str(params.get("template") or "")
+        return f"thấy ảnh {os.path.basename(tpl) if tpl else '?'}"
+
+    def _loop_until_hit(self, ntype: str, params: Dict) -> bool:
+        """One probe of a loop_until node's exit condition."""
+        if ntype == "loop_until_color":
+            target = self._parse_hex_color(params.get("color"))
+            if target is None:
+                log_warning(f"[workflow] loop_until_color: màu không hợp lệ "
+                            f"({params.get('color')!r}) — cần #RRGGBB")
+                return False
+            tol = max(0, int(params.get("tolerance", 10) or 0))
+            hex_lbl = self._bgr_to_hex(target)
+            # "anywhere" quét cả vùng tìm; mặc định kiểm 1 điểm x/y như if_color.
+            if str(params.get("where", "point")).strip().lower() == "anywhere":
+                hit = self._find_color(target, tol, region=self._search_region(params))
+                ok = hit is not None
+                if ok:
+                    self._last_pos = (int(hit[0]), int(hit[1]))
+                self._report_match_rects(
+                    [self._rect_from_center(int(hit[0]) if ok else 0, int(hit[1]) if ok else 0,
+                                            1.0 if ok else 0.0, 18, 18, 1.0, ok, hex_lbl)],
+                    ok=ok, label=hex_lbl, conf=1.0 if ok else 0.0,
+                    region=self._search_region(params),
+                )
+                return ok
+            x, y = int(params.get("x", 0)), int(params.get("y", 0))
+            px = self._pixel_at(x, y)
+            ok = px is not None and self._color_close(px, target, tol)
+            if ok:
+                self._last_pos = (x, y)
+            self._report_match_rects(
+                [self._rect_from_center(x, y, 1.0 if ok else 0.0, 18, 18, 1.0, ok, hex_lbl)],
+                ok=ok, label=hex_lbl, conf=1.0 if ok else 0.0,
+            )
+            return ok
+        if ntype == "loop_until_text":
+            needle = str(self._resolve_value(params.get("text", "")))
+            region = self._region(params)
+            found, _read = self.auto.region_find_text(
+                needle, region=region, whitelist=self._ocr_whitelist(params))
+            self._report_ocr_region(region, bool(found), needle)
+            return bool(found)
+        if ntype == "loop_until_var":
+            cur = self._vars.get(str(params.get("name", "")))
+            rhs = self._resolve_value(params.get("value", ""))
+            return self._compare(cur, str(params.get("op", "==")), rhs)
+        # loop_until_image (default)
+        tpl = self._resolve_template(params.get("template", ""))
+        res = self._find_template(
+            tpl, threshold=float(params.get("threshold", 0.85)),
+            region=self._search_region(params),
+            report=True,  # live overlay each probe on designer
+        )
+        if res:
+            self._last_pos = (res[0], res[1])
+            return True
+        return False
+
     def _eval_condition(self, ntype: str, params: Dict) -> bool:
         if ntype in ("if_color", "wait_color", "tap_color"):
             return self._eval_color_condition(ntype, params)
@@ -1808,8 +1914,38 @@ class WorkflowEngine:
             return self._c_if_emulator(params)
         if ntype == "wait_emulator":
             return self._c_wait_emulator(params)
+        if ntype in ("win_if_window", "win_wait_window"):
+            return self._c_win_window(ntype, params)
+        if ntype == "if_screen_on":
+            return self._c_if_screen_on(params)
+        if ntype == "find_image_pos":
+            return self._c_find_image_pos(params)
+        if ntype == "wait_stable":
+            return self._c_wait_stable(params)
         if ntype == "if_app":
             negate = bool(params.get("negate", False))
+            # Win32: hỏi CỬA SỔ MỤC TIÊU, không phải cửa sổ đang foreground —
+            # ở input mode background (mặc định) cửa sổ game hầu như không bao
+            # giờ được focus, nên get_current_app() sẽ luôn trả về sai.
+            if getattr(self, "_controller", "adb") == "win32":
+                # pkgSrc=project ở dự án Win32 = "cửa sổ trong Project settings",
+                # tức chỉ cần hỏi nó còn sống; custom = so khớp chuỗi tiêu đề.
+                needle = ""
+                if str(params.get("pkgSrc") or "").strip().lower() != "project":
+                    needle = str(self._resolve_value(params.get("package", "")) or "").strip().lower()
+                ctrl = getattr(self.auto, "adb", None)
+                title = ""
+                alive = False
+                if ctrl is not None and hasattr(ctrl, "target_title"):
+                    title = ctrl.target_title() or ""
+                    alive = bool(title) or bool(getattr(ctrl, "device", None))
+                elif ctrl is not None:
+                    alive = bool(getattr(ctrl, "device", None))
+                ok = alive if not needle else (needle in title.lower())
+                log_info(f"[workflow] 🪟 cửa sổ mục tiêu: {title or '(không thấy)'} → "
+                         f"{'khớp' if ok else 'không khớp'}"
+                         + (f" '{needle}'" if needle else ""))
+                return ok != negate
             needle = self._node_package(params).lower()
             try:
                 if hasattr(self.auto.adb, "clear_info_cache"):
@@ -1993,6 +2129,25 @@ class WorkflowEngine:
         return int(m.group(1)) * 60 + int(m.group(2))
 
     def _compare(self, cur: Any, op: str, rhs: Any) -> bool:
+        # String-shaped operators first — OCR results almost always need soft
+        # matching ("Stage 3/5" contains "3/5") rather than numeric equality.
+        if op in ("contains", "!contains", "starts", "ends", "regex"):
+            hay = str("" if cur is None else cur)
+            needle = str("" if rhs is None else rhs)
+            if op == "regex":
+                try:
+                    return re.search(needle, hay) is not None
+                except re.error as exc:
+                    log_warning(f"[workflow] regex không hợp lệ /{needle}/: {exc}")
+                    return False
+            h, n = hay.lower(), needle.lower()
+            if op == "contains":
+                return n in h
+            if op == "!contains":
+                return n not in h
+            if op == "starts":
+                return h.startswith(n)
+            return h.endswith(n)
         # Boolean comparison when the right-hand side is true/false.
         if op in ("==", "!=") and str(rhs).strip().lower() in ("true", "false"):
             res = self._truthy(cur) == (str(rhs).strip().lower() == "true")
@@ -2040,7 +2195,7 @@ class WorkflowEngine:
             ev.set()
         t = self._bg_threads.pop(aid, None)
         self._bg_stop.pop(aid, None)
-        if t and t.is_alive():
+        if t and t.is_alive() and t is not threading.current_thread():
             t.join(timeout=0.5)
         log_info(f"[workflow] [bg] stopped '{aid}'")
 
@@ -2052,9 +2207,8 @@ class WorkflowEngine:
             self._last_pos = None
             self._break_loop = False
             self._emit("on_activity_start", act)
-            ok = True
             try:
-                self._run_graph(act.get("graph", {}) or {})
+                ok = self._run_graph(act.get("graph", {}) or {})
             except Exception as e:
                 ok = False
                 log_error(f"[workflow] [bg] '{name}' error: {e}")
@@ -2089,7 +2243,8 @@ class WorkflowEngine:
         self._stop_speedhack()
         for aid in list(self._bg_threads.keys()):
             self.stop_background(aid)
-        if self._seq_thread and self._seq_thread.is_alive():
+        if (self._seq_thread and self._seq_thread.is_alive()
+                and self._seq_thread is not threading.current_thread()):
             self._seq_thread.join(timeout=1.0)
         self.auto.stop_continuous_capture()
         self.running = False
@@ -2102,6 +2257,7 @@ class WorkflowEngine:
     _QUICK_TIMEOUT_TYPES = frozenset({
         "tap_image", "wait_image", "tap_image_any", "wait_image_any",
         "tap_color", "wait_color", "wait_text", "scroll_find",
+        "win_wait_window", "wait_stable",
     })
 
     def run_single_node(self, node: Dict[str, Any]) -> Dict[str, Any]:
@@ -2627,6 +2783,18 @@ class WorkflowEngine:
             res = cur * rhs
         elif op == "/":
             res = cur / rhs if rhs else 0.0
+        elif op == "%":
+            # Modulo — cần cho counter vòng lặp ("mỗi 5 vòng thì …").
+            res = (cur % rhs) if rhs else 0.0
+        elif op == "min":
+            res = min(cur, rhs)
+        elif op == "max":
+            res = max(cur, rhs)
+        elif op == "round":
+            # rhs = số chữ số thập phân.
+            res = round(cur, int(rhs))
+        elif op == "abs":
+            res = abs(cur)
         else:  # "=" assign
             res = rhs
         # Keep ints clean (3.0 -> 3) for nicer comparisons/logs.
@@ -2792,6 +2960,86 @@ class WorkflowEngine:
             log_warning(f"[workflow] app_uninstall lỗi: {exc}")
             return False
 
+    def _a_app_install(self, node, p) -> bool:
+        """Cài một file .apk trên PC vào thiết bị (``adb -s <serial> install``).
+
+        Dùng CLI adb (không phải shell) vì APK nằm trên PC và cần được push.
+        ``reinstall`` (-r) giữ dữ liệu, ``grantPerms`` (-g) cấp sẵn quyền.
+        """
+        if getattr(self, "_controller", "adb") == "win32":
+            log_warning("[workflow] 📦 Cài ứng dụng chỉ áp dụng cho dự án ADB — bỏ qua")
+            return True
+        apk = str(self._resolve_value(p.get("apk", ""))).strip().strip('"')
+        if not apk:
+            log_warning("[workflow] 📦 app_install: chưa chọn file APK")
+            return False
+        if not os.path.isfile(apk):
+            log_warning(f"[workflow] 📦 app_install: không thấy file '{apk}'")
+            return False
+        serial = str(getattr(self.auto.adb, "device_id", "") or "").strip()
+        if not serial:
+            log_warning("[workflow] 📦 app_install: chưa có thiết bị")
+            return False
+        import subprocess
+
+        from src.core.adb.constants import get_adb_path
+        adb = get_adb_path()
+        if not adb:
+            log_warning("[workflow] 📦 app_install: không tìm thấy adb.exe")
+            return False
+        cmd = [adb, "-s", serial, "install"]
+        if self._truthy(p.get("reinstall", True)):
+            cmd.append("-r")
+        if self._truthy(p.get("grantPerms", False)):
+            cmd.append("-g")
+        cmd.append(apk)
+        try:
+            timeout = max(10.0, float(p.get("timeout", 180) or 180))
+            res = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=timeout, check=False,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+            )
+            out = ((res.stdout or "") + (res.stderr or "")).strip()
+            ok = "success" in out.lower()
+            if ok:
+                log_success(f"[workflow] 📦 đã cài '{os.path.basename(apk)}'")
+            else:
+                log_warning(f"[workflow] 📦 cài '{os.path.basename(apk)}' thất bại: "
+                            f"{out or '(không có phản hồi)'}")
+            return ok
+        except Exception as exc:
+            log_warning(f"[workflow] app_install lỗi: {exc}")
+            return False
+
+    def _a_adb_shell(self, node, p) -> bool:
+        """Chạy một câu ``adb shell`` tuỳ ý; lưu stdout vào biến (nếu có tên).
+
+        Cửa thoát cho những gì chưa có node riêng. ``failIfEmpty`` cho phép coi
+        "không có output" là thất bại để rẽ nhánh trong Try in order.
+        """
+        if getattr(self, "_controller", "adb") == "win32":
+            log_warning("[workflow] 💻 ADB shell chỉ áp dụng cho dự án ADB — bỏ qua")
+            return True
+        cmd = str(self._resolve_value(p.get("command", ""))).strip()
+        if not cmd:
+            log_warning("[workflow] 💻 adb_shell: chưa có câu lệnh")
+            return False
+        dev = getattr(self.auto.adb, "device", None)
+        if not dev:
+            log_warning("[workflow] 💻 adb_shell: chưa có thiết bị")
+            return False
+        try:
+            out = (dev.shell(cmd) or "").strip()
+        except Exception as exc:
+            log_warning(f"[workflow] 💻 adb_shell '{cmd}' lỗi: {exc}")
+            return False
+        name = str(p.get("name", "") or "").strip()
+        if name:
+            self._set_var(name, self._coerce(out))
+        log_info(f"[workflow] 💻 {cmd} → {out[:160]!r}"
+                 + (f" (→ {name})" if name else ""))
+        return not (self._truthy(p.get("failIfEmpty", False)) and not out)
+
     def _a_app_exit(self, node, p) -> bool:
         """Thoát app ĐANG mở: ADB force-stop app foreground (không cần biết
         package); Win32 đóng cửa sổ mục tiêu."""
@@ -2849,8 +3097,43 @@ class WorkflowEngine:
         return True
 
     def _a_screenshot(self, node, p) -> bool:
-        self.auto.capture_screen()
-        return True
+        """Chụp màn hình và LƯU thành PNG (trước đây chỉ refresh frame trong RAM).
+
+        ``save`` = false → chỉ làm mới frame (hành vi cũ, dùng khi chỉ cần ép
+        capture lại trước một node ảnh). ``name`` nhận cả {var}; thư mục mặc
+        định là ``out/screenshots`` cạnh workflow (hoặc cwd nếu chưa lưu file).
+        """
+        img = self.auto.capture_screen()
+        if img is None:
+            log_warning("[workflow] 📷 không lấy được frame")
+            return False
+        if not self._truthy(p.get("save", True)):
+            return True
+        raw = self._format_msg(str(p.get("name", "") or "")).strip()
+        stem = re.sub(r"[^\w.\-]+", "_", raw).strip("._") or "shot"
+        folder = str(self._resolve_value(p.get("folder", ""))).strip()
+        if not folder:
+            anchor = (os.path.dirname(self.flow_path) if self.flow_path
+                      else (self.templates_base or os.getcwd()))
+            folder = os.path.join(anchor, "out", "screenshots")
+        try:
+            import cv2
+            os.makedirs(folder, exist_ok=True)
+            path = os.path.join(folder, f"{stem}_{time.strftime('%Y%m%d_%H%M%S')}.png")
+            # Unicode-safe write (cv2.imwrite chokes on non-ASCII Windows paths).
+            ok, buf = cv2.imencode(".png", img)
+            if not ok:
+                log_warning("[workflow] 📷 mã hoá PNG thất bại")
+                return False
+            buf.tofile(path)
+            log_info(f"[workflow] 📷 đã lưu {path}")
+            name = str(p.get("pathVar", "") or "").strip()
+            if name:
+                self._set_var(name, path)
+            return True
+        except Exception as exc:
+            log_warning(f"[workflow] 📷 lưu ảnh lỗi: {exc}")
+            return False
 
     def _a_log(self, node, p) -> bool:
         log_info(f"[workflow] {self._format_msg(p.get('message', ''))}")
@@ -3484,3 +3767,240 @@ class WorkflowEngine:
         ok = bool(ctrl.set_window_style(style))
         log_info(f"[workflow] 🪟 style → {style}")
         return ok
+
+    # ── Win32: extended mouse / keyboard ───────────────────────────────────────
+
+    def _a_win_click(self, node, p) -> bool:
+        """Left/right/middle click at coords (or the last found image position)."""
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        if not hasattr(ctrl, "click"):
+            log_warning("[workflow] 🖱 Backend Win32 không hỗ trợ click nhiều nút")
+            return False
+        x, y = self._pos(p)
+        x += int(p.get("offsetX", 0) or 0)
+        y += int(p.get("offsetY", 0) or 0)
+        button = str(p.get("button", "right")).strip().lower() or "right"
+        clicks = 2 if str(p.get("clicks", "1")) == "2" else 1
+        ok = bool(ctrl.click(x, y, button=button, click_count=clicks))
+        if ok:
+            log_info(f"[workflow] 🖱 click {button} ({x}, {y})" + (" ×2" if clicks == 2 else ""))
+        return ok
+
+    def _a_win_scroll(self, node, p) -> bool:
+        """Mouse wheel at coords. ``direction`` up/down/left/right, ``notches`` count."""
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        if not hasattr(ctrl, "scroll"):
+            log_warning("[workflow] 🖱 Backend Win32 không hỗ trợ con lăn")
+            return False
+        x, y = self._pos(p)
+        direction = str(p.get("direction", "down")).strip().lower()
+        try:
+            notches = max(1, int(p.get("notches", 3) or 3))
+        except (TypeError, ValueError):
+            notches = 3
+        horizontal = direction in ("left", "right")
+        signed = notches if direction in ("up", "right") else -notches
+        ok = bool(ctrl.scroll(x, y, notches=signed, horizontal=horizontal))
+        if ok:
+            log_info(f"[workflow] 🖱 cuộn {direction} ×{notches} tại ({x}, {y})")
+        return ok
+
+    def _a_win_mouse_move(self, node, p) -> bool:
+        """Move the pointer without clicking (hover-activated menus)."""
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        if not hasattr(ctrl, "move_mouse"):
+            log_warning("[workflow] 🖱 Backend Win32 không hỗ trợ di chuột")
+            return False
+        x, y = self._pos(p)
+        ok = bool(ctrl.move_mouse(x, y))
+        if ok:
+            log_info(f"[workflow] 🖱 di chuột → ({x}, {y})")
+        return ok
+
+    def _a_win_hotkey(self, node, p) -> bool:
+        """Press a key with Ctrl/Shift/Alt/Win modifiers (Ctrl+C, Alt+Enter…)."""
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        if not hasattr(ctrl, "press_hotkey"):
+            log_warning("[workflow] ⌨ Backend Win32 không hỗ trợ tổ hợp phím")
+            return False
+        try:
+            vk = int(p.get("keycode", 13))
+        except (TypeError, ValueError):
+            log_warning(f"[workflow] ⌨ win_hotkey: mã phím không hợp lệ ({p.get('keycode')!r})")
+            return False
+        mods = {k: self._truthy(p.get(k, False)) for k in ("ctrl", "shift", "alt", "win")}
+        ok = bool(ctrl.press_hotkey(vk, **mods))
+        if ok:
+            combo = "+".join([k.capitalize() for k, on in mods.items() if on] + [f"VK{vk}"])
+            log_info(f"[workflow] ⌨ {combo}")
+        return ok
+
+    def _a_win_info(self, node, p) -> bool:
+        """Read a target-window property into a variable (Win32's device_info)."""
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        name = str(p.get("name", "")).strip()
+        prop = str(p.get("prop", "width")).strip().lower()
+        info = ctrl.window_info() if hasattr(ctrl, "window_info") else {}
+        val: Any = info.get(prop, "")
+        if isinstance(val, bool):
+            val = "true" if val else "false"
+        if name:
+            self._set_var(name, val)
+            log_info(f"[workflow] 🪟 {name} = {self._vars[name]!r} ({prop})")
+        return True
+
+    # ── Win32 / ADB conditions added alongside the action handlers ─────────────
+
+    def _c_win_window(self, ntype: str, params: Dict) -> bool:
+        """win_if_window / win_wait_window: state of the TARGET window.
+
+        ``state``: ``exists`` (still alive — crash detection) · ``foreground``
+        (is the active window) · ``minimized``. ``win_wait_window`` polls until
+        the state holds or ``timeout`` runs out.
+        """
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        state = str(params.get("state", "exists")).strip().lower()
+        negate = self._truthy(params.get("negate", False))
+
+        def probe() -> bool:
+            try:
+                if state == "foreground":
+                    return bool(ctrl.window_exists()) and bool(ctrl.is_foreground())
+                if state == "minimized":
+                    return bool(ctrl.window_exists()) and bool(ctrl.is_minimized())
+                return bool(ctrl.window_exists())
+            except Exception as exc:
+                log_warning(f"[workflow] 🪟 kiểm tra cửa sổ lỗi: {exc}")
+                return False
+
+        if ntype == "win_if_window":
+            ok = probe()
+            log_info(f"[workflow] 🪟 cửa sổ {state} → {'có' if ok else 'không'}")
+            return ok != negate
+        end = time.time() + max(0.0, float(params.get("timeout", 30) or 0))
+        while not self._stop.is_set():
+            self._pause.wait()
+            if probe() != negate:
+                log_info(f"[workflow] 🪟 cửa sổ {state}{' (đảo)' if negate else ''} — sẵn sàng")
+                return True
+            if time.time() >= end:
+                log_warning(f"[workflow] 🪟 hết thời gian chờ cửa sổ {state}")
+                return False
+            time.sleep(0.25)
+        return False
+
+    def _c_if_screen_on(self, params: Dict) -> bool:
+        """ADB: is the device display awake? (the read side of screen_power)."""
+        if getattr(self, "_controller", "adb") == "win32":
+            log_warning("[workflow] 🖥 'Nếu màn hình đang bật' chỉ áp dụng cho dự án ADB — coi như bật")
+            return not self._truthy(params.get("negate", False))
+        negate = self._truthy(params.get("negate", False))
+        dev = getattr(self.auto.adb, "device", None)
+        if not dev:
+            return False != negate
+        on = False
+        try:
+            out = dev.shell("dumpsys power") or ""
+            m = re.search(r"mWakefulness=(\w+)", out)
+            if m:
+                on = m.group(1).strip().lower() == "awake"
+            else:
+                # Older/AOSP builds: fall back to the display-power state line.
+                on = "mScreenOn=true" in out or "Display Power: state=ON" in out
+        except Exception as exc:
+            log_warning(f"[workflow] if_screen_on lỗi: {exc}")
+            return False != negate
+        log_info(f"[workflow] 🖥 màn hình {'đang bật' if on else 'đang tắt'}")
+        return on != negate
+
+    def _c_find_image_pos(self, params: Dict) -> bool:
+        """Find a template and store its centre in two variables (x / y).
+
+        True when found (and the variables are written); false on a miss, leaving
+        the variables untouched so a previous value isn't silently clobbered.
+        """
+        tpl = self._resolve_template(params.get("template", ""))
+        res = self._find_template(
+            tpl, threshold=float(params.get("threshold", 0.85)),
+            region=self._search_region(params),
+        )
+        if not res:
+            log_info(f"[workflow] 🔍 không thấy {os.path.basename(tpl) if tpl else '?'} — không ghi biến")
+            return False
+        x, y = int(res[0]), int(res[1])
+        self._last_pos = (x, y)
+        nx = str(params.get("nameX", "") or "").strip()
+        ny = str(params.get("nameY", "") or "").strip()
+        if nx:
+            self._set_var(nx, x)
+        if ny:
+            self._set_var(ny, y)
+        log_info(f"[workflow] 🔍 {os.path.basename(tpl) if tpl else '?'} tại ({x}, {y})"
+                 + (f" → {nx}/{ny}" if (nx or ny) else ""))
+        return True
+
+    def _c_wait_stable(self, params: Dict) -> bool:
+        """Wait until the screen stops changing (loading/animation settled).
+
+        Compares consecutive frames (optionally only inside the search region);
+        the screen counts as stable once the mean absolute pixel difference stays
+        under ``tolerance`` for ``settle`` seconds. True when stable, false on
+        timeout — so a flow can branch instead of pushing on into an animation.
+        """
+        import numpy as np
+        settle = max(0.1, float(params.get("settle", 1.0) or 1.0))
+        timeout = max(settle, float(params.get("timeout", 15.0) or 15.0))
+        tol = max(0.0, float(params.get("tolerance", 2.0) or 0))
+        region = self._search_region(params)
+
+        def frame():
+            img = self.auto.capture_screen()
+            if img is None:
+                return None
+            if region:
+                rx, ry, rw, rh = region
+                h, w = img.shape[:2]
+                img = img[max(0, ry):min(h, ry + rh), max(0, rx):min(w, rx + rw)]
+                if img.size == 0:
+                    return None
+            return img.astype(np.float32)
+
+        end = time.time() + timeout
+        prev = frame()
+        stable_since: Optional[float] = None
+        while not self._stop.is_set():
+            self._pause.wait()
+            time.sleep(0.2)
+            cur = frame()
+            if cur is None or prev is None or cur.shape != prev.shape:
+                # No frame yet, or the window resized — restart the settle timer.
+                prev = cur
+                stable_since = None
+            else:
+                diff = float(np.mean(np.abs(cur - prev)))
+                prev = cur
+                if diff <= tol:
+                    if stable_since is None:
+                        stable_since = time.time()
+                    elif time.time() - stable_since >= settle:
+                        log_info(f"[workflow] 🧊 màn hình ổn định (Δ={diff:.2f} ≤ {tol:g})")
+                        return True
+                else:
+                    stable_since = None
+            if time.time() >= end:
+                log_warning(f"[workflow] 🧊 màn hình chưa ổn định sau {timeout:g}s")
+                return False
+        return False
+

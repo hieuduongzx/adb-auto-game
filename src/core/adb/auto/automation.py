@@ -3,7 +3,6 @@ Main automation class for ADB game automation
 """
 import os
 import random
-import cv2
 import keyboard
 import numpy as np
 import time
@@ -628,7 +627,7 @@ class ADBGameAutomation:
         if width <= 0 or height <= 0:
             log_warning("get_random_point: screen size unknown, returning (0, 0)")
             return (0, 0)
-        return random.randint(0, width), random.randint(0, height)
+        return random.randrange(width), random.randrange(height)
     
     def get_performance_metrics(self) -> Optional[Dict[str, Any]]:
         """Get performance metrics"""

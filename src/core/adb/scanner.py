@@ -5,8 +5,7 @@ import socket
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Optional, Tuple, Set
-from ppadb.client import Client as AdbClient
+from typing import Dict, List, Optional, Tuple, Set
 
 from .constants import ALL_EMULATOR_PORTS, EMULATOR_PORT_RANGES, get_adb_path
 from src.utils import (

@@ -31,21 +31,50 @@ _WM_MOUSEMOVE     = 0x0200
 _WM_LBUTTONDOWN   = 0x0201
 _WM_LBUTTONUP     = 0x0202
 _WM_LBUTTONDBLCLK = 0x0203
+_WM_RBUTTONDOWN   = 0x0204
+_WM_RBUTTONUP     = 0x0205
+_WM_RBUTTONDBLCLK = 0x0206
+_WM_MBUTTONDOWN   = 0x0207
+_WM_MBUTTONUP     = 0x0208
+_WM_MBUTTONDBLCLK = 0x0209
+_WM_MOUSEWHEEL    = 0x020A
+_WM_MOUSEHWHEEL   = 0x020E
 _WM_KEYDOWN       = 0x0100
 _WM_KEYUP         = 0x0101
 _WM_CHAR          = 0x0102
+_WM_SYSKEYDOWN    = 0x0104
+_WM_SYSKEYUP      = 0x0105
 _WM_CLOSE         = 0x0010
 _WM_ACTIVATE      = 0x0006
 _WA_ACTIVE        = 1
 _MK_LBUTTON       = 0x0001
+_MK_RBUTTON       = 0x0002
+_MK_MBUTTON       = 0x0010
 _SMTO_ABORTIFHUNG = 0x0002
 _PW_CLIENTONLY        = 0x1
 _PW_RENDERFULLCONTENT = 0x2  # capture DirectComposition/GPU content (Win 8.1+)
 _VK_ESCAPE        = 0x1B
+_VK_SHIFT = 0x10; _VK_CONTROL = 0x11; _VK_MENU = 0x12; _VK_LWIN = 0x5B
+_WHEEL_DELTA      = 120
 # mouse_event flags (foreground)
 _ME_MOVE = 0x0001; _ME_ABSOLUTE = 0x8000
 _ME_LDOWN = 0x0002; _ME_LUP = 0x0004
+_ME_RDOWN = 0x0008; _ME_RUP = 0x0010
+_ME_MDOWN = 0x0020; _ME_MUP = 0x0040
+_ME_WHEEL = 0x0800; _ME_HWHEEL = 0x1000
 _KE_KEYUP = 0x0002
+
+# Per-button message triples used by the generalised click path:
+#   button -> (WM_*BUTTONDOWN, WM_*BUTTONUP, WM_*BUTTONDBLCLK, MK_* flag,
+#              mouse_event down flag, mouse_event up flag)
+_MOUSE_BUTTONS = {
+    "left":   (_WM_LBUTTONDOWN, _WM_LBUTTONUP, _WM_LBUTTONDBLCLK, _MK_LBUTTON, _ME_LDOWN, _ME_LUP),
+    "right":  (_WM_RBUTTONDOWN, _WM_RBUTTONUP, _WM_RBUTTONDBLCLK, _MK_RBUTTON, _ME_RDOWN, _ME_RUP),
+    "middle": (_WM_MBUTTONDOWN, _WM_MBUTTONUP, _WM_MBUTTONDBLCLK, _MK_MBUTTON, _ME_MDOWN, _ME_MUP),
+}
+
+# Modifier name -> virtual-key, for the hotkey (combo) path.
+_MODIFIER_VKS = {"ctrl": _VK_CONTROL, "shift": _VK_SHIFT, "alt": _VK_MENU, "win": _VK_LWIN}
 
 
 def _import_win32():
@@ -678,7 +707,6 @@ class Win32Controller:
             return False
         win32gui, win32con, win32api = self._w[1], self._w[3], self._w[4]
         try:
-            style = win32api.GetWindowLong(self.hwnd, win32con.GWL_STYLE)
             exstyle = win32api.GetWindowLong(self.hwnd, win32con.GWL_EXSTYLE)
             s = str(style_name).strip().lower()
             if s == "windowed":
@@ -806,7 +834,6 @@ class Win32Controller:
         if self._foreground() or self._cursor_mode():
             log_warning("[win32] multi-point tap: current input mode has one cursor; using rapid sequence")
             return all(self.tap(x, y, duration=0.02, tap_count=1) for x, y in clean)
-        win32gui = self._w[1]
         try:
             for x, y in clean:
                 lp = _lparam(x, y)
@@ -821,7 +848,6 @@ class Win32Controller:
             return False
 
     def _tap_bg(self, x, y, duration, tap_count) -> bool:
-        win32gui = self._w[1]
         lp = _lparam(x, y)
         try:
             self._dispatch(_WM_MOUSEMOVE, 0, lp)
@@ -981,7 +1007,6 @@ class Win32Controller:
         """Type text into the window via WM_CHAR (works background & focused)."""
         if not self.hwnd:
             return False
-        win32gui = self._w[1]
         try:
             if self._foreground() and not self.activate():
                 return False
@@ -1025,6 +1050,329 @@ class Win32Controller:
     def go_home(self) -> bool:
         # No desktop analogue; treat as a no-op success so flows don't error.
         return True
+
+    # ── extended mouse input: right / middle button, wheel, bare move ──────────
+    def click(self, x: int, y: int, button: str = "left",
+              duration: float = 0.1, click_count: int = 1) -> bool:
+        """Click any mouse button at a CLIENT-area point.
+
+        ``left`` routes through :meth:`tap` so the existing per-mode paths
+        (foreground / background_cursor / background message) stay the single
+        implementation. Right/middle reuse the same three modes with that
+        button's message triple.
+        """
+        btn = str(button or "left").strip().lower()
+        if btn in ("", "left", "l"):
+            return self.tap(x, y, duration=duration, tap_count=click_count)
+        if btn not in _MOUSE_BUTTONS:
+            log_warning(f"[win32] click: nút '{button}' không hợp lệ (left/right/middle)")
+            return False
+        if not self.hwnd:
+            return False
+        if self._foreground():
+            return self._click_fg(x, y, btn, duration, click_count)
+        if self._cursor_mode():
+            return self._click_bg_cursor(x, y, btn, duration, click_count)
+        return self._click_bg(x, y, btn, duration, click_count)
+
+    def _click_bg(self, x, y, btn, duration, count) -> bool:
+        down, up, dbl, mk, _, _ = _MOUSE_BUTTONS[btn]
+        lp = _lparam(x, y)
+        try:
+            self._dispatch(_WM_MOUSEMOVE, 0, lp)
+            for i in range(max(1, int(count))):
+                msg = dbl if (count >= 2 and i > 0) else down
+                self._dispatch(msg, mk, lp)
+                time.sleep(max(0.02, float(duration)))
+                self._dispatch(up, 0, lp)
+                if count >= 2:
+                    time.sleep(0.04)
+            return True
+        except Exception as exc:
+            self._input_error(f"click({btn},bg)", exc)
+            return False
+
+    def _click_bg_cursor(self, x, y, btn, duration, count) -> bool:
+        """Cursor-pos variant (see :meth:`_tap_bg_cursor`) for any button."""
+        down, up, _, mk, _, _ = _MOUSE_BUTTONS[btn]
+        win32gui, win32api = self._w[1], self._w[4]
+        lp = _lparam(x, y)
+        saved = None
+        try:
+            saved = win32api.GetCursorPos()
+        except Exception:
+            pass
+        try:
+            self._send(_WM_ACTIVATE, _WA_ACTIVE, 0)
+            time.sleep(0.01)
+            sx, sy = win32gui.ClientToScreen(self.hwnd, (int(x), int(y)))
+            for _ in range(max(1, int(count))):
+                win32api.SetCursorPos((sx, sy))
+                time.sleep(0.001)
+                self._send(_WM_MOUSEMOVE, 0, lp)
+                time.sleep(0.01)
+                self._send(down, mk, lp)
+                time.sleep(max(0.02, float(duration)))
+                self._send(up, 0, lp)
+                if count >= 2:
+                    time.sleep(0.04)
+            return True
+        except Exception as exc:
+            self._input_error(f"click({btn},bg+cursor)", exc)
+            return False
+        finally:
+            if saved is not None:
+                try:
+                    win32api.SetCursorPos(saved)
+                except Exception:
+                    pass
+
+    def _click_fg(self, x, y, btn, duration, count) -> bool:
+        _, _, _, _, me_down, me_up = _MOUSE_BUTTONS[btn]
+        win32gui, win32api = self._w[1], self._w[4]
+        try:
+            if not self.activate():
+                return False
+            time.sleep(0.03)
+            sx, sy = win32gui.ClientToScreen(self.hwnd, (int(x), int(y)))
+            win32api.SetCursorPos((sx, sy))
+            for _ in range(max(1, int(count))):
+                win32api.mouse_event(me_down, 0, 0, 0, 0)
+                time.sleep(max(0.02, float(duration)))
+                win32api.mouse_event(me_up, 0, 0, 0, 0)
+                time.sleep(0.03)
+            return True
+        except Exception as exc:
+            self._input_error(f"click({btn},fg)", exc)
+            return False
+
+    def scroll(self, x: int, y: int, notches: int = -3, horizontal: bool = False) -> bool:
+        """Mouse wheel at a CLIENT point. ``notches`` > 0 = up/right, < 0 = down/left.
+
+        WM_MOUSEWHEEL's lParam is in SCREEN coordinates (unlike the button
+        messages), so the client point is converted before dispatch.
+        """
+        if not self.hwnd:
+            return False
+        try:
+            n = int(notches)
+        except (TypeError, ValueError):
+            return False
+        if n == 0:
+            return True
+        win32gui, win32api = self._w[1], self._w[4]
+        try:
+            sx, sy = win32gui.ClientToScreen(self.hwnd, (int(x), int(y)))
+        except Exception as exc:
+            self._input_error("scroll(client_to_screen)", exc)
+            return False
+        try:
+            if self._foreground():
+                if not self.activate():
+                    return False
+                win32api.SetCursorPos((sx, sy))
+                flag = _ME_HWHEEL if horizontal else _ME_WHEEL
+                for _ in range(abs(n)):
+                    win32api.mouse_event(flag, 0, 0, (_WHEEL_DELTA if n > 0 else -_WHEEL_DELTA), 0)
+                    time.sleep(0.02)
+                return True
+            msg = _WM_MOUSEHWHEEL if horizontal else _WM_MOUSEWHEEL
+            lp = _lparam(sx, sy)
+            saved = None
+            if self._cursor_mode():
+                try:
+                    saved = win32api.GetCursorPos()
+                except Exception:
+                    pass
+                self._send(_WM_ACTIVATE, _WA_ACTIVE, 0)
+                win32api.SetCursorPos((sx, sy))
+                time.sleep(0.01)
+            try:
+                for _ in range(abs(n)):
+                    delta = _WHEEL_DELTA if n > 0 else -_WHEEL_DELTA
+                    # wParam high word = signed wheel delta; low word = key flags.
+                    wparam = (delta & 0xFFFF) << 16
+                    self._dispatch(msg, wparam, lp)
+                    time.sleep(0.02)
+                return True
+            finally:
+                if saved is not None:
+                    try:
+                        win32api.SetCursorPos(saved)
+                    except Exception:
+                        pass
+        except Exception as exc:
+            self._input_error("scroll", exc)
+            return False
+
+    def move_mouse(self, x: int, y: int) -> bool:
+        """Move the pointer to a CLIENT point without clicking (hover menus).
+
+        Background message mode only posts WM_MOUSEMOVE; cursor/foreground modes
+        also move the real cursor (and, unlike a click, leave it there — hover is
+        only meaningful while the pointer stays put).
+        """
+        if not self.hwnd:
+            return False
+        lp = _lparam(x, y)
+        try:
+            if self._foreground() or self._cursor_mode():
+                win32gui, win32api = self._w[1], self._w[4]
+                if self._foreground() and not self.activate():
+                    return False
+                sx, sy = win32gui.ClientToScreen(self.hwnd, (int(x), int(y)))
+                win32api.SetCursorPos((sx, sy))
+                if self._cursor_mode():
+                    self._send(_WM_ACTIVATE, _WA_ACTIVE, 0)
+            self._dispatch(_WM_MOUSEMOVE, 0, lp)
+            return True
+        except Exception as exc:
+            self._input_error("move_mouse", exc)
+            return False
+
+    # ── extended keyboard input: modifier combos ────────────────────────────────
+    def press_hotkey(self, keycode: int, ctrl: bool = False, shift: bool = False,
+                     alt: bool = False, win: bool = False) -> bool:
+        """Press ``keycode`` while holding the requested modifiers.
+
+        Foreground mode uses real ``keybd_event`` presses. Background modes hold
+        the modifiers with WM_KEYDOWN and mark the Alt case with WM_SYSKEYDOWN /
+        WM_SYSKEYUP, which is what apps expect for Alt combos.
+        """
+        if not self.hwnd:
+            return False
+        try:
+            vk = int(keycode)
+        except (TypeError, ValueError):
+            return False
+        mods = [_MODIFIER_VKS[n] for n, on in
+                (("ctrl", ctrl), ("shift", shift), ("alt", alt), ("win", win)) if on]
+        if not mods:
+            return self.press_key(vk)
+        try:
+            if self._foreground():
+                win32api = self._w[4]
+                if not self.activate():
+                    return False
+                for m in mods:
+                    win32api.keybd_event(m, 0, 0, 0)
+                    time.sleep(0.01)
+                win32api.keybd_event(vk, 0, 0, 0)
+                time.sleep(0.03)
+                win32api.keybd_event(vk, 0, _KE_KEYUP, 0)
+                for m in reversed(mods):
+                    win32api.keybd_event(m, 0, _KE_KEYUP, 0)
+                    time.sleep(0.01)
+                return True
+            down = _WM_SYSKEYDOWN if alt else _WM_KEYDOWN
+            up = _WM_SYSKEYUP if alt else _WM_KEYUP
+            for m in mods:
+                self._dispatch(_WM_KEYDOWN, m, 0)
+                time.sleep(0.01)
+            self._dispatch(down, vk, 0)
+            time.sleep(0.03)
+            self._dispatch(up, vk, 0)
+            for m in reversed(mods):
+                self._dispatch(_WM_KEYUP, m, 0)
+                time.sleep(0.01)
+            return True
+        except Exception as exc:
+            self._input_error("press_hotkey", exc)
+            return False
+
+    # ── target-window state (the Win32 analogue of "is the app running?") ──────
+    def window_exists(self) -> bool:
+        """True when the configured target window can be found right now.
+
+        Unlike :meth:`get_current_app` (which reports the FOREGROUND window's
+        title), this answers "is my target still alive?" — the check a flow needs
+        to detect a crashed game while running in a background input mode.
+        """
+        win32gui = self._w[1]
+        if self.hwnd:
+            try:
+                if win32gui.IsWindow(self.hwnd):
+                    return True
+            except Exception:
+                pass
+            self.hwnd = None
+        pattern, by, _ = self._match
+        if not pattern:
+            return False
+        hwnd = self._find_hwnd(pattern, by)
+        if hwnd:
+            self.hwnd = hwnd
+            return True
+        return False
+
+    def target_title(self) -> str:
+        """The target window's own title ('' when not attached/alive)."""
+        if not self.window_exists():
+            return ""
+        try:
+            return self._w[1].GetWindowText(self.hwnd) or ""
+        except Exception:
+            return ""
+
+    def is_foreground(self) -> bool:
+        """True when the target window is the active/foreground window."""
+        if not self.hwnd:
+            return False
+        win32gui = self._w[1]
+        try:
+            fg = win32gui.GetForegroundWindow()
+            try:
+                fg = win32gui.GetAncestor(fg, 2) or fg  # GA_ROOT
+            except Exception:
+                pass
+            return fg == self.hwnd
+        except Exception:
+            return False
+
+    def is_minimized(self) -> bool:
+        if not self.hwnd:
+            return False
+        try:
+            return bool(self._w[1].IsIconic(self.hwnd))
+        except Exception:
+            return False
+
+    def window_info(self) -> dict:
+        """Target-window facts for the ``win_info`` node.
+
+        Keys: ``title``, ``class``, ``pid``, ``exe``, ``x``/``y`` (window
+        top-left, screen coords), ``width``/``height`` (CLIENT size — the same
+        space taps and captures use), ``hwnd``, ``foreground``, ``minimized``.
+        """
+        out = {"title": "", "class": "", "pid": 0, "exe": "", "x": 0, "y": 0,
+               "width": 0, "height": 0, "hwnd": 0,
+               "foreground": False, "minimized": False}
+        if not self.window_exists():
+            return out
+        win32gui, win32process = self._w[1], self._w[5]
+        out["hwnd"] = int(self.hwnd)
+        try:
+            out["title"] = win32gui.GetWindowText(self.hwnd) or ""
+        except Exception:
+            pass
+        try:
+            out["class"] = win32gui.GetClassName(self.hwnd) or ""
+        except Exception:
+            pass
+        try:
+            pid = int(win32process.GetWindowThreadProcessId(self.hwnd)[1])
+            out["pid"] = pid
+            out["exe"] = process_exe_name(pid)
+        except Exception:
+            pass
+        rect = self._get_window_rect()
+        if rect:
+            out["x"], out["y"] = int(rect[0]), int(rect[1])
+        w, h = self.get_screen_size()
+        out["width"], out["height"] = int(w), int(h)
+        out["foreground"] = self.is_foreground()
+        out["minimized"] = self.is_minimized()
+        return out
 
 
 class Win32GameAutomation(ADBGameAutomation):

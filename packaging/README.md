@@ -32,6 +32,21 @@ Rebuild nhanh khi chỉ sửa code (bỏ qua copy vendor):
 pwsh packaging/build.ps1 -SkipVendor
 ```
 
+## Icon
+
+`packaging/app.ico` là icon dùng cho `Macro2k.exe`, Runner exe build riêng, và
+`Setup.exe`. `build.ps1` tự tạo lại khi file thiếu hoặc cũ hơn generator, nên
+build bình thường không cần làm gì thêm.
+
+Tạo lại thủ công sau khi sửa artwork (chỉ cần Pillow):
+
+```powershell
+python packaging/make_icon.py     # -> packaging/app.ico + app.png
+```
+
+`make_icon.py` vẽ đúng brand mark của Hub (ba ô vuông + dấu cộng accent) trên nền
+tile tối, render riêng từng size 16 → 256 để frame nhỏ vẫn rõ.
+
 ## Cách hoạt động (frozen-aware)
 
 - **Tài nguyên ghi được** (`vendor/`, `data/`, `out/`) nằm **cạnh `.exe`** —

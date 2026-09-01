@@ -143,16 +143,6 @@ function wfActAddCurrent(){
 function wfToggleActPanel(){
   const p=$("wf-act-panel"); if(p) p.classList.toggle("collapsed", wfActCollapsed);
   const toggle=$("wf-act-collapse"); if(toggle) toggle.setAttribute("aria-expanded",String(!wfActCollapsed));
-  wfEqualizeCornerPanels();
-}
-// Both corner panels (Activities + Variables) are content-sized: each hugs its
-// own list — the Variables panel grows row by row up to ~10 vars then scrolls
-// (see .wf-vars-body max-height). The old behaviour stretched the shorter panel
-// to match the taller one, which padded Variables with empty space; kept as a
-// reset-only hook since renders still call it.
-function wfEqualizeCornerPanels(){
-  const a=$("wf-act-panel"), v=$("wf-vars-panel"); if(!a||!v) return;
-  a.style.minHeight=""; v.style.minHeight="";            // natural (content) height
 }
 // Dragging is armed only while the grip handle is held, so checkbox / select /
 // delete clicks keep working. Rows shuffle live during dragover; on drop the
@@ -282,10 +272,12 @@ function wfRenderPalette(){
   ((typeof WF_PAL_PAIRS!=="undefined")?WF_PAL_PAIRS:[]).forEach(p=>(p.types||[]).forEach(t=>pairTypes.add(t)));
   WF_CATS.forEach(cat=>{
     // Controller-specific categories only appear in their matching project mode
-    // (Device/emulator = ADB, Win32 window nodes = PC).
-    if(cat.ctrl && cat.ctrl!==ctrl) return;
-    // .hidden = merged/retired type: still hydrates + runs (old files), just not draggable as new.
-    let types=Object.keys(WF_NODES).filter(t=>WF_NODES[t].cat===cat.key && !WF_NODES[t].hidden);
+    // (Device/emulator = ADB, Win32 window nodes = PC). A node may override its
+    // category's ctrl (e.g. Exit current app / If app running run on both).
+    let types=Object.keys(WF_NODES).filter(t=>WF_NODES[t].cat===cat.key
+      // .hidden = merged/retired type: still hydrates + runs (old files), just not draggable as new.
+      && !WF_NODES[t].hidden
+      && wfNodeAllowed(t, ctrl));
     // Search: a pair shows when ANY member matches (so "next branch" still
     // surfaces the whole Try pair). Solo chips use normal label/type match.
     if(q){
@@ -453,7 +445,7 @@ function wfRenderVarsPanel(){
   if(!allNames.length){
     const e=document.createElement("div"); e.className="wf-vars-empty";
     e.textContent="No variables yet. Click + to add a global or local variable.";
-    body.appendChild(e); wfEqualizeCornerPanels(); return;
+    body.appendChild(e); return;
   }
   function mkSep(label){ const s=document.createElement("span"); s.className="wf-vars-sep"; s.textContent=label; return s; }
   function mkRow(n, scope){
@@ -485,7 +477,6 @@ function wfRenderVarsPanel(){
   if(actNames.length){ body.appendChild(mkSep("Local · "+((act&&act.name)||"activity"))); actNames.forEach(n=>body.appendChild(mkRow(n,"activity"))); }
   if(nodeNames.length){ body.appendChild(mkSep("Node")); nodeNames.forEach(n=>body.appendChild(mkRow(n,"node"))); }
   if(liveExtra.length){ body.appendChild(mkSep("Live")); liveExtra.forEach(n=>body.appendChild(mkRow(n,"live"))); }
-  wfEqualizeCornerPanels();
 }
 
 // ── Add variable: pick Global vs Local (activity) ─────────────────────────────
@@ -799,7 +790,7 @@ function wfNodeEl(n){
   else if(n.type==="try_chain") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3)+1;
   else if(n.type==="parallel") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3);
   else if(n.type==="random_branch") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||2);
-  else if(n.type==="loop_until_image") dynOutCount=3;   // body/found/fail — grow the card
+  else if(def.kind==="loop_until") dynOutCount=3;   // body/found/fail — grow the card
   if(dynOutCount>2) el.style.minHeight=Math.max(64, 28 + (dynOutCount-1)*16 + 14)+"px";
   // Merged-block membership: hide the join port at the joined edge and flatten
   // that corner so the stack reads as one block.
