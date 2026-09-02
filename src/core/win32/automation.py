@@ -600,7 +600,6 @@ class Win32Controller:
                 return False
             l, t, r, b = rect
 
-            # If maximized, restore first so resize can take effect.
             placement = win32gui.GetWindowPlacement(self.hwnd)
             if placement[1] == win32con.SW_SHOWMAXIMIZED:
                 log_info("[win32] window is maximized → restoring before resize")
@@ -617,9 +616,17 @@ class Win32Controller:
                     "hoặc dùng node 'Win style' để ép windowed (experimental)."
                 )
 
-            # Use MoveWindow (sends WM_SIZE). For borderless outer rect = client rect.
-            win32gui.MoveWindow(self.hwnd, l, t, int(width), int(height), True)
-            log_info(f"[win32] resize_window {l},{t} → {width}×{height}  (borderless={borderless})")
+            w, h = int(width), int(height)
+            SWP_NOZORDER = 0x0004
+            SWP_NOACTIVATE = 0x0010
+            SWP_FRAMECHANGED = 0x0020
+            flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED
+            win32gui.SetWindowPos(self.hwnd, 0, l, t, w, h, flags)
+            WM_SIZE = 0x0005
+            SIZE_RESTORED = 0
+            import win32api
+            win32api.SendMessage(self.hwnd, WM_SIZE, SIZE_RESTORED, (h << 16) | (w & 0xFFFF))
+            log_info(f"[win32] resize_window {l},{t} → {w}×{h}  (borderless={borderless})")
             return True
         except Exception as exc:
             log_warning(f"[win32] resize_window lỗi: {exc}")
