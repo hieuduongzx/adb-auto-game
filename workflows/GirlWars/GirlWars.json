@@ -541,8 +541,8 @@
           {
             "id": "nj3zqhb2",
             "type": "launch_emulator",
-            "x": 320,
-            "y": 59,
+            "x": 300,
+            "y": 47,
             "params": {
               "emulator": "mumu",
               "index": 2,
@@ -581,8 +581,8 @@
           {
             "id": "ni8wav38",
             "type": "if_app",
-            "x": 320,
-            "y": -37,
+            "x": 300,
+            "y": -53,
             "params": {
               "package": "com.neversoft.rpg.erolabs",
               "negate": true,

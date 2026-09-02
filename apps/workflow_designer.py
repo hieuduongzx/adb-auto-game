@@ -1926,10 +1926,10 @@ def create_workflow_designer_window(
         title=title,
         url=url,
         js_api=api,
-        width=1440,
-        height=900,
+        width=1480,
+        height=920,
         resizable=True,
-        min_size=(1040, 700),
+        min_size=(1080, 720),
         background_color=theme_background(),
     )
     window.events.loaded += lambda: api._attach(window)

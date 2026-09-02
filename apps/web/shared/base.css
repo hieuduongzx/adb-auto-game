@@ -11,7 +11,7 @@
 }
 
 /* Chrome metrics used by a couple of shared components (toast offset). */
-:root { --hdr-h: 46px; --ftr-h: 26px; }
+:root { --hdr-h: 48px; --ftr-h: 28px; }
 
 html, body {
   height: 100%;

@@ -90,9 +90,9 @@
   --canvas-bg:         #e7ebf0;
   --canvas-dot:        rgba(23,32,43,.12);
   --canvas-dot-minor:  #d5dbe3;
-  --node-r: 6px;   /* node card corner — compact workbench rectangle */
-  --node-w: 168px; /* canonical card width — every action/condition block */
-  --node-h: 64px;  /* canonical card height: 22px header + ~42px body */
+  --node-r: 7px;   /* node card corner — compact workbench rectangle */
+  --node-w: 172px; /* canonical card width — every action/condition block */
+  --node-h: 66px;  /* canonical card height: 22px header + ~44px body */
   /* Start / End — round chips (icon only). */
   --term-size: 40px;
   /* Semantic z-index scale — no arbitrary 999s. */
@@ -187,7 +187,7 @@
 /* ── Collapsible groups ──────────────────────────────────────────────────── */
 .group { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
 
-.grp-hdr { display: flex; align-items: center; gap: 7px; padding: 8px 11px;
+.grp-hdr { display: flex; align-items: center; gap: 8px; padding: 9px 12px;
   width:100%; text-align:left; cursor: pointer; user-select: none; transition: background .1s; }
 .grp-hdr:hover { background: var(--alt); }
 
@@ -198,8 +198,8 @@
   transition: transform .15s; }
 .group.closed .grp-chevron { transform: rotate(-90deg); }
 
-.grp-body { display: flex; flex-direction: column; gap: 7px;
-  padding: 0 11px 10px; }
+.grp-body { display: flex; flex-direction: column; gap: 8px;
+  padding: 0 12px 11px; }
 .group.closed .grp-body { display: none; }
 
 /* Row inside group */
@@ -265,11 +265,11 @@
 
 
 /* ── Log — flat docked drawer, one hairline above ────────────────────────── */
-#log-card { flex-shrink: 0; display: flex; flex-direction: column; height: 138px;
-  min-height: 34px; max-height: min(55vh, 480px); position: relative;
+#log-card { flex-shrink: 0; display: flex; flex-direction: column; height: 148px;
+  min-height: 38px; max-height: min(55vh, 480px); position: relative;
   background: var(--panel); border-top: 1px solid var(--border2); }
 #log-card.resizing { transition: none; }
-#log-card.collapsed { height: 34px !important; min-height: 34px; max-height: 34px; }
+#log-card.collapsed { height: 38px !important; min-height: 38px; max-height: 38px; }
 #log-card.collapsed .log-hdr { border-bottom: none; }
 #log-card.collapsed .log-body { display: none; }
 #log-card.collapsed #log-resizer { display: none; }
@@ -280,8 +280,8 @@
   width: 36px; height: 3px; margin-left: -18px; border-radius: 2px;
   background: transparent; transition: background .12s; }
 #log-resizer:hover::before, #log-resizer.drag::before { background: var(--accent); }
-.log-hdr  { display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s4);
-  height: 33px; border-bottom: 1px solid var(--line); flex-shrink: 0; user-select: none;
+.log-hdr  { display: flex; align-items: center; gap: var(--s3); padding: 0 var(--s4);
+  height: 37px; border-bottom: 1px solid var(--line); flex-shrink: 0; user-select: none;
   transition: background .1s; }
 .log-hdr:hover { background: var(--alt); }
 .log-toggle { display:inline-flex; align-items:center; gap:var(--s2); min-width:0; }
@@ -319,8 +319,8 @@
 .log-warning { color: var(--warn);  } .log-error   { color: var(--run-fail); }
 
 /* ── Status strip ────────────────────────────────────────────────────────── */
-#footer { display: flex; align-items: center; gap: 6px; height: var(--ftr-h);
-  padding: 0 10px; flex-shrink: 0; background: var(--panel);
+#footer { display: flex; align-items: center; gap: 7px; height: var(--ftr-h);
+  padding: 0 var(--s4); flex-shrink: 0; background: var(--panel);
   border-top: 1px solid var(--line); }
 #footer-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot-off);
   flex-shrink: 0; transition: background .2s, box-shadow .2s; }
