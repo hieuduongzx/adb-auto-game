@@ -417,12 +417,10 @@
 .seg:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 .seg:disabled { opacity:.45; cursor:not-allowed; }
 .numeric-grid label, #ac-count-wrap { display:flex; flex-direction:column; gap:4px; min-width:0; }
-.numeric-grid label > span:first-child, #ac-count-wrap > span,
-.field-label { font-size:var(--t-micro); font-weight:600; color:var(--dim); }
+.numeric-grid label > span:first-child, #ac-count-wrap > span { font-size:var(--t-micro); font-weight:600; color:var(--dim); }
 .numeric-grid input, #ac-limit { width:100%; height:30px; font-family:var(--mono); font-size:var(--t-ui); font-variant-numeric:tabular-nums; }
 .setting-row.split { display:grid; grid-template-columns:1.15fr 1fr; gap:10px; }
 .setting-row.split > div { min-width:0; }
-.setting-row .field-label { display:block; margin-bottom:5px; }
 .numeric-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .input-unit { display:flex; align-items:center; position:relative; }
 .input-unit input { padding-right:32px; }

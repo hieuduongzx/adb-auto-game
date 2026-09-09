@@ -3,13 +3,26 @@ function wfRenderAll(){
   wfRenderActivities(); wfRenderFunctions(); wfRenderPalette(); wfRenderCanvas(); wfRenderInspector();
   const t=wfEditTarget();
   const cur=$("wf-cur-act");
+  // Remember the last activity the user had open so the breadcrumb (and the
+  // back affordance on it) can return there after stepping into a function.
+  if(WF.edit.kind==="activity" && WF.edit.id) wfLastActId=WF.edit.id;
   if(cur){
     const isFn = WF.edit.kind==="function";
     const label = !t ? "" : (isFn ? "ƒ "+t.name : t.name);
     cur.textContent = label;
     cur.dataset.empty = label ? "0" : "1";
     cur.classList.toggle("is-fn", !!isFn && !!label);
-    cur.title = label ? ((isFn?"Function":"Activity")+" · "+(t.name||"")) : "No activity open";
+    cur.title = !isFn ? ((t&&t.name)?("Activity · "+t.name):"No activity open")
+      : "Function · "+((t&&t.name)||"")+" — click to go back to the activity";
+    // One-time wiring: clicking the ƒ breadcrumb returns to the last activity.
+    if(!cur.__backWired){
+      cur.__backWired=true;
+      cur.addEventListener("click",()=>{
+        if(WF.edit.kind!=="function") return;
+        const back=wfActById(wfLastActId);
+        if(back) wfSelectActivity(back.id);
+      });
+    }
   }
 }
 
@@ -64,7 +77,8 @@ function wfRenderActivities(){
     // Apply run-status classes (running / done / errored) from the live tracker
     // so the row keeps its indicator across re-renders during a test run.
     const st=wfActStatus[act.id];
-    el.className="wf-act"+(sel?" sel":"")+(st==="running"?" running":"")+(st==="done"?" done":"")+(st==="errored"?" errored":"");
+    const multisel=(typeof wfActSel!=="undefined")&&wfActSel.has(act.id);
+    el.className="wf-act"+(sel?" sel":"")+(multisel?" multisel":"")+(st==="running"?" running":"")+(st==="done"?" done":"")+(st==="errored"?" errored":"");
     el.dataset.id=act.id;
     el.innerHTML=
       `<span class="wf-act-runbar"></span>
@@ -74,11 +88,22 @@ function wfRenderActivities(){
        <button class="wf-act-del" title="Delete">${wfIco("x")}</button>`;
     el.querySelector(".wf-act-cb").addEventListener("click",e=>wfToggleActivity(act.id,e));
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteActivity(act.id,e));
-    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-cb,.wf-act-del,.wf-act-grip,.wf-act-rename"))return; wfSelectActivity(act.id); });
+    // Explorer-style multi-select: Ctrl+click toggles highlight, Shift+click
+    // takes a range, plain click clears the highlight and opens the activity.
+    el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-cb,.wf-act-del,.wf-act-grip,.wf-act-rename"))return;
+      if(e.ctrlKey||e.metaKey){ e.preventDefault(); wfActSelToggle(act.id); return; }
+      if(e.shiftKey){ e.preventDefault(); wfActSelRange(act.id); return; }
+      if(typeof wfActSelClear==="function") wfActSelClear();
+      wfSelectActivity(act.id); });
     // Right-click a row → run this activity only / toggle / delete (does not bubble
-    // to the panel-level select-all menu).
+    // to the panel-level select-all menu). Ctrl+right-click = run every
+    // HIGHLIGHTED (Ctrl+click'ed) activity straight away.
     el.addEventListener("contextmenu",e=>{
       e.preventDefault(); e.stopPropagation();
+      if(e.ctrlKey || e.metaKey){
+        if(typeof wfRunSelectedActs==="function") wfRunSelectedActs();
+        return;
+      }
       if(typeof wfShowActRowMenu==="function") wfShowActRowMenu(e.clientX, e.clientY, act);
     });
     wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.activities);
@@ -115,6 +140,11 @@ function wfRenderFunctions(){
        <button class="wf-act-del" title="Delete function">${wfIco("x")}</button>`;
     el.querySelector(".wf-act-del").addEventListener("click",e=>wfDeleteFunction(fn.id,e));
     el.addEventListener("click",e=>{ if(e.target.closest(".wf-act-del,.wf-act-grip,.wf-act-rename"))return; wfEditFunction(fn.id); });
+    // Right-click a function row → edit / rename / duplicate / delete.
+    el.addEventListener("contextmenu",e=>{
+      e.preventDefault(); e.stopPropagation();
+      if(typeof wfShowFnRowMenu==="function") wfShowFnRowMenu(e.clientX, e.clientY, fn);
+    });
     wfAttachReorder(el, el.querySelector(".wf-act-grip"), wrap, WF.functions, "call:"+fn.id);
     wrap.appendChild(el);
   });
@@ -127,6 +157,9 @@ let wfActTabCur="seq";
 function wfActTab(which){
   if(which==="fns") which="seq";   // legacy callers — the fns tab moved to the sidebar
   wfActTabCur=which;
+  // Rows change with the tab — drop the Ctrl+click highlight so stale rows
+  // aren't silently part of the next "Run selected".
+  if(typeof wfActSelClear==="function") wfActSelClear();
   document.querySelectorAll(".wf-act-tab").forEach(t=>t.classList.toggle("sel", t.dataset.tab===which));
   const acts=$("wf-activities"), bg=$("wf-activities-bg");
   if(acts) acts.style.display = which==="seq"?"":"none";
@@ -378,7 +411,7 @@ function wfRenderCanvas(){
   wfReflowStacks();   // snap merged blocks flush (needs nodes in the DOM)
   wfDrawWires();
   wfMarkDefaultEntry();  // pill above the block that start.out points to
-  if(wfRunning||wfRunStopped) wfReapplyRunViz();   // keep the run-trail across redraws (live + after stop)
+  wfReapplyRunViz();   // keep the run-trail across redraws (maps are empty before any run — always safe)
   wfRenderVarsPanel();
 }
 
@@ -840,7 +873,7 @@ function wfNodeEl(n){
   el.classList.toggle("showing-thumb", hasRealThumb);
   el.classList.toggle("has-thumb", hasTpl);
   if(isTerminal){
-    // Start is a play circle; End is an octagonal stop marker.
+    // Start is a play glyph; End is a stop square — both sit in the same disc.
     const termIco = def.kind==="end"
       ? '<rect x="7" y="7" width="10" height="10" rx="2"/>'
       : '<polygon points="9 6 18 12 9 18 9 6"/>';

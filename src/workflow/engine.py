@@ -199,6 +199,28 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # sys.boot_completed == 1) or until timeout — true when ready, false on
     # timeout/unresolvable target.
     "wait_emulator": {"label": "Wait emulator ready", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    # Resize the emulator's own PC window (the player UI), not the game inside
+    # it. width/height describe the CLIENT area (the Android screen) — the
+    # title bar is compensated for, otherwise the emulator letterboxes the
+    # device with black side bars. Pure Win32 on the player process' window —
+    # no ADB, no controller, so it works in ADB flows too (e.g. snap MuMu's
+    # screen to 1920×1080 right after Launch emulator). "last" reuses the
+    # instance the last successful launch_emulator saved.
+    "resize_emulator": {"label": "Đổi kích thước giả lập", "kind": "action", "ins": 1, "outs": ["out"]},
+    # Kill the emulator instance: the family's console shutdown when it exists
+    # (LDPlayer/MuMu/Nox/MEmu; BlueStacks has none), else taskkill the player
+    # window. "last" reuses the instance the last successful launch_emulator
+    # saved.
+    "kill_emulator": {"label": "Tắt giả lập", "kind": "action", "ins": 1, "outs": ["out"]},
+    # Reboot a wedged instance (frozen UI / ADB gone) — console reboot when the
+    # family has one, else kill the player + relaunch. Optional wait polls
+    # sys.boot_completed so the next node can drive the fresh boot.
+    "restart_emulator": {"label": "Restart giả lập", "kind": "action", "ins": 1, "outs": ["out"]},
+    # Set the *device* resolution (Android screen px + DPI) — the value the
+    # templates were cropped against. resize_emulator only changes the PC
+    # window, so a 1920×1080 window over a 1600×900 device still letterboxes.
+    # MuMu-only (its console exposes the resolution_* setting keys).
+    "emulator_resolution": {"label": "Resolution giả lập", "kind": "action", "ins": 1, "outs": ["out"]},
     # ── Win32 (điều khiển cửa sổ chương trình PC) ─────────────────────────────
     # Only meaningful when the flow's controller is "win32". Tap/swipe/image/
     # color/OCR nodes already work on Win32 via the shared capture pipeline;
@@ -245,6 +267,8 @@ EMULATOR_CONSOLES: Dict[str, Dict[str, Any]] = {
     "ldplayer": {
         "exes": ["ldconsole.exe", "dnconsole.exe"],
         "args": ["launch", "--index", "{index}"],
+        "quit_args": ["quit", "--index", "{index}"],
+        "restart_args": ["reboot", "--index", "{index}"],
         "dirs": [r"C:\LDPlayer\LDPlayer9", r"C:\LDPlayer\LDPlayer64",
                  r"C:\ChangZhi\LDPlayer9", r"D:\LDPlayer\LDPlayer9"],
         "port0": 5555, "step": 2,
@@ -252,6 +276,18 @@ EMULATOR_CONSOLES: Dict[str, Dict[str, Any]] = {
     "mumu": {
         "exes": ["MuMuManager.exe"],
         "args": ["control", "-v", "{index}", "launch"],
+        "quit_args": ["control", "-v", "{index}", "shutdown"],
+        "restart_args": ["control", "-v", "{index}", "restart"],
+        # ``info`` reports the instance's REAL adb_port — MuMu Global's ports do
+        # not always follow 16384+32*index (index 2 answers on 16449, not
+        # 16448), so asking beats deriving whenever the console is reachable.
+        "info_args": ["info", "-v", "{index}"],
+        # MuMu's console also drives the *device* resolution (settings keys),
+        # which plain Win32 window sizing can't reach.
+        "res_keys": {"width": "resolution_width.custom",
+                     "height": "resolution_height.custom",
+                     "dpi": "resolution_dpi.custom",
+                     "mode": "resolution_mode"},
         # MuMu 12 keeps the console in <install>\shell; the newer 5.x/6.x
         # (incl. Global) builds moved it to <install>\nx_main — "subdirs" lets
         # a bare install dir resolve either layout.
@@ -265,16 +301,22 @@ EMULATOR_CONSOLES: Dict[str, Dict[str, Any]] = {
     "nox": {
         "exes": ["NoxConsole.exe"],
         "args": ["launch", "-index:{index}"],
+        "quit_args": ["quit", "-index:{index}"],
+        "restart_args": ["reboot", "-index:{index}"],
         "dirs": [r"C:\Program Files (x86)\Nox\bin", r"C:\Program Files\Nox\bin"],
         "port0": 62001, "step": 1,
     },
     "memu": {
         "exes": ["memuc.exe"],
         "args": ["start", "-i", "{index}"],
+        "quit_args": ["stop", "-i", "{index}"],
+        "restart_args": ["reboot", "-i", "{index}"],
         "dirs": [r"C:\Program Files\Microvirt\MEmu", r"C:\Program Files (x86)\Microvirt\MEmu"],
         "port0": 21503, "step": 1,
     },
     "bluestacks": {
+        # HD-Player has no shutdown/restart verb — kill/restart fall back to
+        # taskkill + relaunch of the player window's process tree.
         "exes": ["HD-Player.exe"],
         "args": ["--instance", "{instance}"],
         "dirs": [r"C:\Program Files\BlueStacks_nxt", r"C:\Program Files\BlueStacks"],
@@ -290,6 +332,132 @@ EMULATOR_CONSOLES: Dict[str, Dict[str, Any]] = {
 def _emulator_state_path() -> str:
     from src.utils import data_root
     return os.path.join(data_root(), "data", "emulator_state.json")
+
+# Lowercased exe-basename prefixes of each family's *player* UI process — the
+# console exes in EMULATOR_CONSOLES (ldconsole / MuMuManager / …) run headless,
+# so resizing the window means finding the player process instead. Matched via
+# basename prefix: MuMuPlayer.exe → "mumuplayer", HD-Player.exe → "hd-player".
+EMU_PLAYER_EXES: Dict[str, List[str]] = {
+    "ldplayer": ["dnplayer", "ldplayer"],
+    "mumu": ["mumuplayer", "nemuplayer", "mumunxdevice"],
+    "nox": ["nox"],
+    "memu": ["memu"],
+    "bluestacks": ["hd-player", "bluestacks"],
+}
+
+
+def _process_image_path(pid: int) -> str:
+    """Full exe path of *pid* ("" for elevated/protected or non-Windows)."""
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.OpenProcess.restype = ctypes.c_void_p
+        handle = kernel32.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return ""
+        try:
+            buf = ctypes.create_unicode_buffer(32768)
+            size = ctypes.c_ulong(len(buf))
+            if not kernel32.QueryFullProcessImageNameW(ctypes.c_void_p(handle), 0, buf, ctypes.byref(size)):
+                return ""
+            return buf.value
+        finally:
+            kernel32.CloseHandle(ctypes.c_void_p(handle))
+    except Exception:
+        return ""
+
+
+def _emulator_render_child(hwnd: int) -> Optional[tuple]:
+    """Largest child window of an emulator player = its Android render surface.
+
+    MuMu (and the other Qt-based players) put a toolbar strip inside the same
+    client area — MuMu's is 40px tall — so the client rect is NOT the device
+    view: a client of 1920×1080 leaves the render child at 1920×1040, which is
+    no longer 16:9, and the player letterboxes the device inside it → black
+    bars down both sides. Returns ``(hwnd, width, height)`` of that child, or
+    None when the player draws straight into its own client area.
+    """
+    try:
+        import win32gui
+    except ImportError:
+        return None
+    kids: List[int] = []
+    try:
+        win32gui.EnumChildWindows(hwnd, lambda c, _: kids.append(c), None)
+    except Exception:
+        return None
+    best: Optional[tuple] = None
+    for c in kids:
+        try:
+            l, t, r, b = win32gui.GetWindowRect(c)
+        except Exception:
+            continue
+        w, h = r - l, b - t
+        if w <= 0 or h <= 0:
+            continue
+        if best is None or w * h > best[1] * best[2]:
+            best = (c, w, h)
+    return best
+
+
+def _find_emulator_window(kind: str, install_dir: str = "") -> Optional[int]:
+    """Locate an emulator family's visible main window; largest one wins.
+
+    A top-level window qualifies when its process exe basename starts with one
+    of the family's :data:`EMU_PLAYER_EXES` prefixes. When ``install_dir`` is
+    known (node param / saved launch_emulator state), windows whose process
+    lives under it are preferred — several emulator versions installed side by
+    side all match the same family prefixes. Falls back to the window title
+    (which usually carries the brand) when the process path is unreadable.
+    """
+    try:
+        import win32gui
+        import win32process
+    except ImportError:
+        return None
+    prefixes = EMU_PLAYER_EXES.get(kind, [])
+    base = os.path.normcase(os.path.normpath(install_dir)) if install_dir else ""
+    best: Optional[tuple] = None  # (under_install_dir, area, hwnd)
+
+    def _cb(hwnd, _):
+        nonlocal best
+        if not win32gui.IsWindowVisible(hwnd):
+            return
+        title = (win32gui.GetWindowText(hwnd) or "").strip()
+        if not title:
+            return  # skip invisible-named helper windows
+        try:
+            pid = win32process.GetWindowThreadProcessId(hwnd)[1]
+        except Exception:
+            return
+        exe_path = _process_image_path(pid)
+        name = os.path.basename(exe_path or "").lower()
+        under = False
+        if name:
+            if not any(name.startswith(pre) for pre in prefixes):
+                return
+            if base and exe_path:
+                exe_dir = os.path.normcase(os.path.normpath(os.path.dirname(exe_path)))
+                under = exe_dir.startswith(base) or exe_dir.startswith(
+                    os.path.normcase(os.path.normpath(os.path.dirname(base)))
+                )
+        else:
+            # Can't read the exe (elevated) — trust the window title instead.
+            if not any(pre in title.lower() for pre in prefixes + [kind]):
+                return
+        try:
+            l, t, r, b = win32gui.GetWindowRect(hwnd)
+        except Exception:
+            return
+        key = (under, abs((r - l) * (b - t)), hwnd)
+        if best is None or key > best:
+            best = key
+
+    try:
+        win32gui.EnumWindows(_cb, None)
+    except Exception:
+        return None
+    return best[2] if best else None
 
 # Condition node types a switch case may use — only the *instant* ones (no
 # wait_* timeout blocking, no tap_* side-effect), so evaluating one case never
@@ -429,6 +597,10 @@ class WorkflowEngine:
             "adb_shell":    self._a_adb_shell,
             "read_color":   self._a_read_color,
             "launch_emulator": self._a_launch_emulator,
+            "resize_emulator": self._a_resize_emulator,
+            "kill_emulator":   self._a_kill_emulator,
+            "restart_emulator": self._a_restart_emulator,
+            "emulator_resolution": self._a_emulator_resolution,
             "win_send_text":self._a_send_text,
             "win_key":      self._a_key,
             "win_hotkey":   self._a_win_hotkey,
@@ -471,10 +643,6 @@ class WorkflowEngine:
         if name in self._globals:
             self._globals[name] = value
         self._emit("on_var", name, value)
-
-    def _vars_snapshot(self) -> Dict[str, Any]:
-        """A shallow copy of the current thread's vars — for the live panel."""
-        return dict(self._vars)
 
     @property
     def _vars(self) -> Dict[str, Any]:
@@ -983,7 +1151,12 @@ class WorkflowEngine:
                 self._emit("on_node_done", nid, "ok", None)
                 break
             elif kind == "condition":
-                res = self._eval_condition(ntype, params)
+                try:
+                    res = self._eval_condition(ntype, params)
+                except Exception as e:
+                    # A crash inside a condition counts as "false".
+                    res = False
+                    log_error(f"[workflow] Node '{ntype}' error: {e}")
                 port = "true" if res else "false"
                 self._emit("on_node_done", nid, "ok", port)  # branch taken
                 nxt = self._next(adj, cur, port)
@@ -1183,6 +1356,7 @@ class WorkflowEngine:
                     self._reached_end = outer_end
                     if not ok_call:
                         log_warning(f"[workflow] ƒ {fn.get('name', fid)} → false (dead-end, không tới node End)")
+                # Result port: "true" khi function tới node End, "false" khi dead-end.
                 port = "true" if ok_call else "false"
                 self._emit("on_node_done", nid, "ok" if ok_call else "fail", port)
                 nxt = self._next(adj, cur, port)
@@ -3351,7 +3525,17 @@ class WorkflowEngine:
         port = self._emulator_adb_port(p, kind, index)
         host: Optional[str] = None
         if wait > 0:
-            host = self._wait_emulator_adb(port, wait)
+            # The console only publishes the real port once the instance is up,
+            # so keep re-asking it while polling instead of trusting the
+            # pre-boot guess.
+            host = self._wait_emulator_adb(
+                port, wait,
+                resolver=lambda: self._emulator_adb_port(p, kind, index))
+            if host:
+                try:
+                    port = int(host.rsplit(":", 1)[1])
+                except (IndexError, ValueError):
+                    pass
         # Remember which instance this flow booted so if_emulator's "last used"
         # option can re-check the same one on future runs.
         self._save_emulator_state({
@@ -3391,8 +3575,12 @@ class WorkflowEngine:
         """Resolve ``(kind, index, host)`` for if_emulator / wait_emulator.
 
         ``emulator`` = "last" re-checks the instance the last successful
-        launch_emulator saved. Returns None when the target can't be resolved
-        (no saved state, unknown family, missing port).
+        launch_emulator saved. The port comes from the explicit override, then
+        the family console's own report, then the state file, then the
+        port0+index*step formula — the console is asked before the saved value
+        because MuMu Global's real port can differ from the derived one, and a
+        stale saved port would make a healthy emulator look unready. Returns
+        None when the target can't be resolved.
         """
         kind = str(p.get("emulator", "last")).strip().lower() or "last"
         try:
@@ -3408,6 +3596,8 @@ class WorkflowEngine:
                 port = val if val > 0 else None
             except (TypeError, ValueError):
                 port = None
+        saved_port: Optional[int] = None
+        path = str(self._resolve_value(p.get("path", "")) or "").strip()
         if kind == "last":
             saved = self._load_emulator_state()
             if not saved:
@@ -3418,16 +3608,17 @@ class WorkflowEngine:
                 index = int(saved.get("index") or 0)
             except (TypeError, ValueError):
                 index = 0
-            if port is None:
-                try:
-                    val = int(saved.get("port") or 0)
-                    port = val if val > 0 else None
-                except (TypeError, ValueError):
-                    port = None
+            if not path:
+                path = str(saved.get("path") or "").strip()
+            try:
+                val = int(saved.get("port") or 0)
+                saved_port = val if val > 0 else None
+            except (TypeError, ValueError):
+                saved_port = None
         if port is None:
-            spec = EMULATOR_CONSOLES.get(kind)
-            if spec and "port0" in spec:
-                port = spec["port0"] + index * spec["step"]
+            port = self._emulator_adb_port({"path": path}, kind, index)
+        if port is None:
+            port = saved_port
         if port is None:
             log_warning(f"[workflow] 🖥 Can't derive the ADB port for '{kind}' — set 'ADB port override'")
             return None
@@ -3439,6 +3630,326 @@ class WorkflowEngine:
                 and getattr(self, "_controller", "adb") != "win32"
                 and not self.auto.adb.device):
             self._attach_adb_after_boot(host)
+
+    def _emulator_pc_target(self, p: Dict, verb: str) -> Optional[tuple]:
+        """Resolve ``(kind, index, install_dir, instance)`` for the PC-side
+        emulator nodes (resize / kill / restart / device resolution).
+
+        ``emulator`` = "last" reuses the instance the last successful
+        launch_emulator saved (family + index + install path + BlueStacks
+        instance name). Returns None when the family can't be determined; the
+        reason is logged here.
+        """
+        kind = str(p.get("emulator", "last")).strip().lower() or "last"
+        try:
+            index = int(float(p.get("index", 0) or 0))
+        except (TypeError, ValueError):
+            index = 0
+        path = str(self._resolve_value(p.get("path", "")) or "").strip()
+        instance = str(p.get("instance", "") or "").strip()
+        if kind == "last":
+            saved = self._load_emulator_state()
+            if not saved:
+                log_warning(f"[workflow] 🖥 {verb}: chưa có giả lập nào được lưu — "
+                            f"chạy node 'Mở giả lập' trước, hoặc chọn hãng giả lập cụ thể")
+                return None
+            kind = str(saved.get("emulator") or "").lower()
+            try:
+                index = int(saved.get("index") or 0)
+            except (TypeError, ValueError):
+                index = 0
+            if not path:
+                path = str(saved.get("path") or "").strip()
+            if not instance:
+                instance = str(saved.get("instance") or "").strip()
+        if kind not in EMU_PLAYER_EXES:
+            log_warning(f"[workflow] 🖥 {verb}: không nhận diện được hãng giả lập '{kind}' — chọn hãng cụ thể trong node")
+            return None
+        return kind, index, path, instance
+
+    def _run_emulator_console(self, kind: str, path: str, args_key: str,
+                              index: int, extra: Optional[Dict[str, Any]] = None,
+                              timeout: float = 30.0) -> Optional[str]:
+        """Run one console verb (``args_key`` in EMULATOR_CONSOLES) for *index*.
+
+        Returns the command's stdout on success; None when the family has no
+        such verb, the console exe can't be found, or the call raised — the
+        caller then decides whether a Win32 fallback applies.
+        """
+        import subprocess
+        spec = EMULATOR_CONSOLES.get(kind) or {}
+        template = spec.get(args_key)
+        if not template:
+            return None
+        exe = self._resolve_console_exe(
+            path, spec.get("exes", []), spec.get("dirs", []), spec.get("subdirs"))
+        if not exe:
+            return None
+        subs = {"index": str(index), **{k: str(v) for k, v in (extra or {}).items()}}
+        argv = [exe]
+        for a in template:
+            for k, v in subs.items():
+                a = a.replace("{" + k + "}", v)
+            argv.append(a)
+        try:
+            log_info(f"[workflow] 🖥 {' '.join(argv)}")
+            r = subprocess.run(
+                argv, capture_output=True, text=True, timeout=timeout,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
+            return r.stdout or ""
+        except Exception as exc:
+            log_warning(f"[workflow] 🖥 Console '{args_key}' lỗi: {exc}")
+            return None
+
+    def _taskkill_emulator_window(self, kind: str, path: str) -> Optional[bool]:
+        """Force-kill the process tree owning the family's player window.
+
+        True = killed, None = no window found (already closed), False = error.
+        """
+        import subprocess
+        hwnd = _find_emulator_window(kind, path)
+        if not hwnd:
+            return None
+        try:
+            import win32process
+            pid = win32process.GetWindowThreadProcessId(hwnd)[1]
+            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"],
+                           capture_output=True, text=True, timeout=15,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
+            return True
+        except Exception as exc:
+            log_warning(f"[workflow] 🖥 Taskkill giả lập lỗi: {exc}")
+            return False
+
+    def _a_resize_emulator(self, node, p) -> bool:
+        """Resize the emulator's PC window so the ANDROID RENDER AREA becomes
+        width×height — the thing that decides whether the device is letterboxed.
+
+        Two layers of chrome sit between the outer frame and the device view:
+        the title bar/borders, and (on MuMu) a ~40px toolbar strip inside the
+        client area. Sizing either the frame or the client to 1920×1080 leaves
+        the render surface short of 16:9, so the player pillarboxes the device →
+        black bars down both sides. Both deltas are therefore measured live
+        (GetWindowRect vs the largest child window) and added on top. Unlike
+        ``win_resize`` — which resizes the flow's Win32 target window — this
+        needs no controller, so it works in ADB flows; the player window is
+        found via the family's process names ("last" = the instance the last
+        successful launch_emulator saved). Keeps the restore-if-maximized +
+        WM_SIZE nudge, because the Qt/DX player windows otherwise ignore plain
+        SetWindowPos.
+        """
+        target = self._emulator_pc_target(p, "Resize")
+        if not target:
+            return False
+        kind, index, install_dir, _ = target
+        try:
+            w = max(200, int(float(p.get("width", 1920) or 1920)))
+            h = max(200, int(float(p.get("height", 1080) or 1080)))
+        except (TypeError, ValueError):
+            w, h = 1920, 1080
+        hwnd = _find_emulator_window(kind, install_dir)
+        if not hwnd:
+            log_warning(f"[workflow] 🖥 Không thấy cửa sổ giả lập '{kind}' #{index} — giả lập chưa mở?")
+            return False
+        try:
+            import win32api
+            import win32con
+            import win32gui
+            placement = win32gui.GetWindowPlacement(hwnd)
+            if placement[1] == win32con.SW_SHOWMAXIMIZED:
+                win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                time.sleep(0.05)
+            l, t, r, b = win32gui.GetWindowRect(hwnd)
+            # Chrome = outer frame minus the render surface. Fall back to the
+            # client rect for players that draw into their own client area.
+            child = _emulator_render_child(hwnd)
+            if child:
+                _, rw, rh = child
+            else:
+                cl, ct, cr, cb = win32gui.GetClientRect(hwnd)
+                rw, rh = cr - cl, cb - ct
+            dx = max(0, (r - l) - rw)
+            dy = max(0, (b - t) - rh)
+            # Optional reposition — blank X/Y keeps the window where it is, so a
+            # flow can also park several instances side by side.
+            for key in ("x", "y"):
+                val = str(p.get(key, "")).strip()
+                if val in ("", "None"):
+                    continue
+                try:
+                    if key == "x":
+                        l = int(float(val))
+                    else:
+                        t = int(float(val))
+                except (TypeError, ValueError):
+                    pass
+            SWP_NOZORDER, SWP_NOACTIVATE, SWP_FRAMECHANGED = 0x0004, 0x0010, 0x0020
+            win32gui.SetWindowPos(hwnd, 0, l, t, w + dx, h + dy,
+                                  SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED)
+            # WM_SIZE carries the new *client* size (render + toolbar strip).
+            win32api.SendMessage(hwnd, 0x0005, 0, ((h + dy - 4) << 16) | ((w + dx) & 0xFFFF))
+            time.sleep(0.3)  # Qt relayouts the render child asynchronously
+            after = _emulator_render_child(hwnd)
+            got = (after[1], after[2]) if after else None
+            if got and got != (w, h):
+                log_warning(f"[workflow] 🖥 Vùng hiển thị sau resize là {got[0]}×{got[1]} "
+                            f"(yêu cầu {w}×{h}) — window có thể bị kẹp kích thước tối thiểu")
+            log_success(f"[workflow] 🖥 Resize giả lập {kind} #{index} → hiển thị {w}×{h} tại ({l}, {t})")
+            return True
+        except Exception as exc:
+            log_warning(f"[workflow] 🖥 Resize giả lập lỗi: {exc}")
+            return False
+
+    def _a_kill_emulator(self, node, p) -> bool:
+        """Kill the emulator instance — closing the app inside ≠ closing the
+        emulator; the instance keeps running and holds its RAM/CPU + ADB port.
+
+        Preferred path is the family's console shutdown (LDPlayer/MuMu/Nox/
+        MEmu; BlueStacks has none). When the console can't be resolved — or the
+        family has no console shutdown — fall back to taskkilling the process
+        tree that owns the player window (the same window resize_emulator
+        finds). Returns True when the kill command was issued or there was
+        nothing to kill; False only when the target couldn't even be resolved.
+        """
+        target = self._emulator_pc_target(p, "Tắt giả lập")
+        if not target:
+            return False
+        kind, index, path, _ = target
+
+        # 1) console shutdown — leaves no zombie VM process behind.
+        if self._run_emulator_console(kind, path, "quit_args", index) is not None:
+            log_success(f"[workflow] 🖥 Đã tắt giả lập {kind} #{index}")
+            return True
+        # 2) fallback: taskkill the player window's process tree (BlueStacks has
+        #    no console verb; or the console exe couldn't be resolved).
+        killed = self._taskkill_emulator_window(kind, path)
+        if killed is None:
+            log_info(f"[workflow] 🖥 Không thấy cửa sổ giả lập '{kind}' #{index} (đã tắt sẵn? — bỏ qua)")
+            return True
+        if not killed:
+            return False
+        log_success(f"[workflow] 🖥 Đã tắt giả lập {kind} #{index}")
+        return True
+
+    def _a_restart_emulator(self, node, p) -> bool:
+        """Reboot the emulator instance — the fix for a wedged Android session
+        (frozen UI, ADB gone, app stuck) that ``app_stop`` can't clear.
+
+        Console ``reboot``/``restart`` when the family has one, else kill the
+        player and relaunch it via the same argv launch_emulator builds. With
+        ``wait`` > 0 the node then polls the instance's ADB until Android
+        reports ``sys.boot_completed`` so the next node can drive the device.
+        """
+        target = self._emulator_pc_target(p, "Restart giả lập")
+        if not target:
+            return False
+        kind, index, path, instance = target
+        try:
+            wait = max(0.0, float(p.get("wait", 120) or 0))
+        except (TypeError, ValueError):
+            wait = 120.0
+
+        if self._run_emulator_console(kind, path, "restart_args", index) is None:
+            # No console restart verb (BlueStacks) → kill, then relaunch.
+            log_info(f"[workflow] 🖥 '{kind}' không có lệnh restart — tắt rồi mở lại")
+            killed = self._taskkill_emulator_window(kind, path)
+            if killed is False:
+                return False
+            if killed:
+                time.sleep(3.0)  # let the VM processes actually exit
+            argv = self._emulator_launch_argv(
+                {**p, "path": path, "instance": instance, "command": ""}, kind, index)
+            if not argv:
+                log_error(f"[workflow] 🖥 Không dựng được lệnh mở lại '{kind}' — đặt 'Đường dẫn' tới thư mục cài")
+                return False
+            import subprocess
+            try:
+                log_info(f"[workflow] 🖥 Mở lại giả lập: {' '.join(argv)}")
+                subprocess.Popen(argv, creationflags=getattr(
+                    subprocess, "CREATE_NO_WINDOW", 0x08000000))
+            except Exception as exc:
+                log_error(f"[workflow] 🖥 Mở lại giả lập lỗi: {exc}")
+                return False
+
+        if wait <= 0:
+            log_success(f"[workflow] 🖥 Đã gửi lệnh restart giả lập {kind} #{index}")
+            return True
+        # An instance that is still shutting down would answer the *old* ADB
+        # session; give it a moment before polling for the fresh boot.
+        time.sleep(3.0)
+        port = self._emulator_adb_port(p, kind, index)
+        host = f"127.0.0.1:{port}" if port else None
+        if not host:
+            log_warning(f"[workflow] 🖥 Không suy ra được cổng ADB của '{kind}' #{index} — bỏ qua bước chờ")
+            return True
+        end = time.time() + wait
+        while not self._stop.is_set():
+            self._pause.wait()
+            if self._emulator_adb_ready(host):
+                log_success(f"[workflow] 🖥 Giả lập {kind} #{index} đã restart & boot xong ({host})")
+                self._maybe_attach_emulator(p, host)
+                return True
+            if time.time() >= end:
+                break
+            time.sleep(1.0)
+        log_warning(f"[workflow] 🖥 Giả lập {kind} #{index} chưa boot xong sau {wait:.0f}s")
+        return False
+
+    def _a_emulator_resolution(self, node, p) -> bool:
+        """Set the emulator's *device* resolution (Android screen px + DPI).
+
+        This is the setting that actually decides what the templates were
+        cropped against — ``resize_emulator`` only changes the PC window, so a
+        window at 1920×1080 over a 1600×900 device still letterboxes. Only MuMu
+        exposes it on the console (``setting --key resolution_*``); the change
+        needs a restart of the instance to take effect, which ``restart`` does
+        here when asked.
+        """
+        target = self._emulator_pc_target(p, "Đổi resolution")
+        if not target:
+            return False
+        kind, index, path, _ = target
+        spec = EMULATOR_CONSOLES.get(kind) or {}
+        keys = spec.get("res_keys")
+        if not keys:
+            log_warning(f"[workflow] 🖥 '{kind}' không hỗ trợ đổi resolution qua console — "
+                        f"đổi tay trong Settings của giả lập (chỉ MuMu hỗ trợ)")
+            return False
+        try:
+            w = max(200, int(float(p.get("width", 1920) or 1920)))
+            h = max(200, int(float(p.get("height", 1080) or 1080)))
+            dpi = max(80, int(float(p.get("dpi", 280) or 280)))
+        except (TypeError, ValueError):
+            w, h, dpi = 1920, 1080, 280
+        exe = self._resolve_console_exe(
+            path, spec.get("exes", []), spec.get("dirs", []), spec.get("subdirs"))
+        if not exe:
+            log_warning(f"[workflow] 🖥 Không thấy console của '{kind}' — đặt 'Đường dẫn' tới thư mục cài")
+            return False
+        # A custom w/h/dpi only applies when the mode is switched off the presets.
+        argv = [exe, "setting", "-v", str(index),
+                "-k", keys["mode"], "-val", "custom",
+                "-k", keys["width"], "-val", str(w),
+                "-k", keys["height"], "-val", str(h),
+                "-k", keys["dpi"], "-val", str(dpi)]
+        import subprocess
+        try:
+            log_info(f"[workflow] 🖥 {' '.join(argv)}")
+            r = subprocess.run(argv, capture_output=True, text=True, timeout=30,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
+            out = (r.stdout or "") + (r.stderr or "")
+        except Exception as exc:
+            log_warning(f"[workflow] 🖥 Đổi resolution lỗi: {exc}")
+            return False
+        if "errcode" in out.lower() and '"errcode": 0' not in out:
+            log_warning(f"[workflow] 🖥 Console từ chối đổi resolution: {out.strip()[:200]}")
+            return False
+        log_success(f"[workflow] 🖥 Resolution giả lập {kind} #{index} → {w}×{h} @ {dpi}dpi")
+        if bool(p.get("restart", True)):
+            # The instance reads resolution at boot, so it must cycle to apply.
+            return self._a_restart_emulator(node, {**p, "wait": p.get("wait", 120)})
+        log_info("[workflow] 🖥 Cần restart giả lập để resolution mới có hiệu lực")
+        return True
 
     def _c_if_emulator(self, p: Dict) -> bool:
         """True when the target emulator instance is booted and its ADB answers
@@ -3602,8 +4113,14 @@ class WorkflowEngine:
         return None
 
     def _emulator_adb_port(self, p: Dict, kind: str, index: int) -> Optional[int]:
-        """The instance's ADB port: an explicit ``port`` override, else derived
-        from the family's first-instance port + index*step (mirrors constants.py)."""
+        """The instance's ADB port: an explicit ``port`` override, else what the
+        family's console reports for that instance, else derived from the
+        family's first-instance port + index*step (mirrors constants.py).
+
+        Asking the console matters because MuMu Global does not always follow
+        16384+32*index (instance 2 answers on 16449), so a derived port would
+        make the boot-wait time out on a perfectly healthy emulator.
+        """
         # The designer serializes a blank num field as 0 — treat <= 0 as "auto".
         override = str(p.get("port", "")).strip()
         if override:
@@ -3614,30 +4131,61 @@ class WorkflowEngine:
             except ValueError:
                 pass
         spec = EMULATOR_CONSOLES.get(kind)
-        if not spec or "port0" not in spec:
+        if not spec:
+            return None
+        if spec.get("info_args"):
+            out = self._run_emulator_console(
+                kind, str(self._resolve_value(p.get("path", "")) or "").strip(),
+                "info_args", index, timeout=15.0)
+            if out:
+                m = re.search(r'"adb_port"\s*:\s*(\d+)', out)
+                if m:
+                    port = int(m.group(1))
+                    if port > 0:
+                        return port
+        if "port0" not in spec:
             return None
         return spec["port0"] + index * spec["step"]
 
-    def _wait_emulator_adb(self, port: Optional[int], wait: float) -> Optional[str]:
-        """Poll until ``127.0.0.1:<port>`` is ADB-connectable *and* Android
-        reports ``sys.boot_completed`` == 1, or ``wait`` s elapse.
+    def _wait_emulator_adb(self, port: Optional[int], wait: float,
+                           resolver: Optional[Callable[[], Optional[int]]] = None
+                           ) -> Optional[str]:
+        """Poll until an instance's ADB is connectable *and* Android reports
+        ``sys.boot_completed`` == 1, or ``wait`` s elapse.
 
-        Returns the connected ``host:port`` serial, or None. With no known
-        port, just sleep ``wait`` s to let the emulator boot.
+        ``resolver`` is re-asked while polling: a family whose console only
+        publishes the real ADB port once the instance is up (MuMu Global —
+        instance 2 lands on 16449, not the derived 16448) cannot be resolved
+        before the boot, so every candidate port found along the way is probed.
+        Returns the connected ``host:port`` serial, or None. With no port at all
+        it degrades to sleeping ``wait`` s to let the emulator boot.
         """
-        if not port:
+        hosts: List[str] = [f"127.0.0.1:{port}"] if port else []
+        if not hosts and resolver is None:
             log_info(f"[workflow] ▶ Chờ giả lập khởi động {wait:.0f}s (không rõ cổng ADB)")
             self._sleep(wait)
             return None
-        host = f"127.0.0.1:{port}"
         end = time.time() + wait
+        next_resolve = 0.0
         while time.time() < end and not self._stop.is_set():
             self._pause.wait()
-            if self._emulator_adb_ready(host):
-                log_success(f"[workflow] ▶ Giả lập sẵn sàng — ADB {host}")
-                return host
+            if resolver is not None and time.time() >= next_resolve:
+                next_resolve = time.time() + 5.0
+                try:
+                    fresh = resolver()
+                except Exception:
+                    fresh = None
+                if fresh:
+                    host = f"127.0.0.1:{fresh}"
+                    if host not in hosts:
+                        hosts.append(host)
+            for host in hosts:
+                if self._emulator_adb_ready(host):
+                    log_success(f"[workflow] ▶ Giả lập sẵn sàng — ADB {host}")
+                    return host
             time.sleep(1.0)
-        log_warning(f"[workflow] ▶ Chưa thấy ADB {host} sau {wait:.0f}s")
+        label = ", ".join(hosts) or "?"
+        log_warning(f"[workflow] ▶ Chưa thấy ADB {label} sau {wait:.0f}s")
         return None
 
     # ── Win32 handlers ─────────────────────────────────────────────────────────

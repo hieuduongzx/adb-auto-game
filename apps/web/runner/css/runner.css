@@ -132,7 +132,6 @@
 .drag-handle:hover { color: var(--dim); }
 .drag-handle:active { cursor: grabbing; }
 .task-row.dragging { opacity: .55; background: var(--accent-bg); }
-.task-row.drop-target { background: var(--surface); }
 
 /* The checkbox itself is shared/base.css — the list rows only make it clickable. */
 .task-row .cb { cursor: pointer; }

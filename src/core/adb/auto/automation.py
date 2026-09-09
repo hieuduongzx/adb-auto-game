@@ -2,19 +2,17 @@
 Main automation class for ADB game automation
 """
 import os
-import random
-import keyboard
 import numpy as np
 import time
 import threading
 import logging
-from typing import Tuple, Optional, List, Dict, Any
+from typing import Tuple, Optional, List
 
-from src.utils import log_error, log_info, log_warning, log_normal, log_debug
+from src.utils import log_error, log_info, log_warning, log_debug
 from ..controller import ADBController
-from .config import Config, PerformanceMetrics
+from .config import Config
 from .ocr import OCRReader, Region
-from .scrcpy_capture import capture_screen as capture_screen_frame, decode_screencap
+from .scrcpy_capture import capture_screen as capture_screen_frame
 from .template_matcher import TemplateMatcher
 from .visualizer import DebugVisualizer
 
@@ -57,6 +55,13 @@ class ADBGameAutomation:
         self.screen_lock = threading.Lock()
         self.capture_thread: Optional[threading.Thread] = None
         self.capture_running = False
+        # Capture can be requested by many workflow nodes in quick succession.
+        # Keep the first actionable error, but do not flood the UI when ADB is
+        # intentionally offline or a device is still booting.
+        self._capture_error_lock = threading.Lock()
+        self._last_capture_error = ""
+        self._last_capture_error_at = 0.0
+        self._capture_error_interval = 5.0
         
         # Debug settings
         self.is_debug = self.config.debug_mode
@@ -77,7 +82,6 @@ class ADBGameAutomation:
         self.ocr = OCRReader(backend=ocr_backend)
         
         # Performance tracking
-        self.metrics = PerformanceMetrics() if self.config.performance_tracking else None
         
         # Screen dimensions
         self.monitor = {"top": 0, "left": 0, "width": 0, "height": 0}
@@ -102,11 +106,6 @@ class ADBGameAutomation:
             self.monitor["width"] = width
             self.monitor["height"] = height
     
-    @staticmethod
-    def _decode_screencap(raw: Optional[bytes]) -> Optional[np.ndarray]:
-        """Decode raw ``screencap`` PNG bytes into a BGR ndarray (or None)."""
-        return decode_screencap(raw)
-
     def _continuous_capture_worker(self):
         """Background thread for continuous screen capture"""
         log_info("Starting continuous screen capture thread")
@@ -171,23 +170,6 @@ class ADBGameAutomation:
             return self.latest_screen.copy() if self.latest_screen is not None else None
 
     # ==================== Region / OCR helpers ====================
-
-    def crop_region(
-        self,
-        region: Region,
-        last_screen: bool = False,
-    ) -> Optional[np.ndarray]:
-        """Return ``screen[y:y+h, x:x+w]`` as a BGR ndarray, or ``None``.
-
-        Pulls the latest captured screen by default (cheap), falls back
-        to a fresh ``capture_screen()`` when ``last_screen=False``. The
-        region is clipped to the screen bounds, so passing a slightly
-        out-of-bounds rect still returns a valid (possibly smaller) crop.
-        """
-        screen = self.get_latest_screen() if last_screen else self.capture_screen()
-        if screen is None:
-            return None
-        return OCRReader._crop(screen, region)  # noqa: SLF001 - intentional reuse
 
     def read_text(
         self,
@@ -321,14 +303,39 @@ class ADBGameAutomation:
     
     def capture_screen(self) -> Optional[np.ndarray]:
         """Capture screen immediately"""
+        if self.adb.device is None:
+            now = time.monotonic()
+            with self._capture_error_lock:
+                should_log = (
+                    self._last_capture_error != "device"
+                    or now - self._last_capture_error_at >= self._capture_error_interval
+                )
+                if should_log:
+                    self._last_capture_error = "device"
+                    self._last_capture_error_at = now
+            if should_log:
+                log_warning("Screenshot unavailable: connect an ADB device before running the workflow")
+            return None
         try:
             image = capture_screen_frame(self.adb)
             if image is None:
-                log_error("Failed to decode screenshot")
+                now = time.monotonic()
+                with self._capture_error_lock:
+                    should_log = (
+                        self._last_capture_error != "decode"
+                        or now - self._last_capture_error_at >= self._capture_error_interval
+                    )
+                    if should_log:
+                        self._last_capture_error = "decode"
+                        self._last_capture_error_at = now
+                if should_log:
+                    log_warning("Screenshot capture returned an invalid frame; retrying")
                 return None
+            with self._capture_error_lock:
+                self._last_capture_error = ""
             return image
         except Exception as e:
-            log_error(f"Error capturing screen: {e}")
+            log_warning(f"Screenshot capture failed; retrying: {e}")
             return None
     
     
@@ -354,62 +361,6 @@ class ADBGameAutomation:
         """Caller threshold, or the configured default. ``0.0`` is honoured."""
         return threshold if threshold is not None else self.config.default_threshold
 
-    def find_and_tap(
-        self,
-        template_name: str,
-        log_msg: str = "",
-        threshold: Optional[float] = None,
-        tap_count: int = 1,
-        retry_attempts: Optional[int] = None,
-    ) -> bool:
-        """Find template and tap on it, retrying up to ``retry_attempts`` times."""
-        threshold = self._resolve_threshold(threshold)
-        if retry_attempts is None:
-            retry_attempts = self.config.max_retry_attempts
-
-        start_time = time.time()
-
-        for attempt in range(retry_attempts):
-            try:
-                result = self.find_template(template_name, threshold=threshold)
-                if result:
-                    x, y, confidence = result
-                    if self.tap(x, y, tap_count=tap_count):
-                        total_time = time.time() - start_time
-                        log_normal(
-                            f"[FIND TAP] [{x}, {y}] [{os.path.basename(template_name)}] "
-                            f"[conf: {confidence:.2f}, time: {total_time:.2f}s] {log_msg}"
-                        )
-                        return True
-                
-                if attempt < retry_attempts - 1:
-                    time.sleep(self.config.retry_delay)
-                    
-            except Exception as e:
-                log_warning(f"Attempt {attempt + 1} failed: {e}")
-                if attempt < retry_attempts - 1:
-                    time.sleep(self.config.retry_delay)
-        
-        return False
-  
-    def wait_and_tap(
-        self,
-        template_name: str,
-        timeout: float = 10.0,
-        threshold: float = 0.9,
-        offset: Tuple[int, int] = (0, 0),
-    ) -> bool:
-        """Wait for template and tap on it"""
-        result = self.wait_for_template(template_name, timeout=timeout, threshold=threshold)
-        if result:
-            x, y, confidence = result
-            if self.tap(x + offset[0], y + offset[1]):
-                log_normal(
-                    f"[WAIT TAP] [{x}, {y}] [{os.path.basename(template_name)}] [conf: {confidence:.2f}]"
-                )
-                return True
-        return False
-
     def find_template(
         self,
         template_path: str,
@@ -419,14 +370,11 @@ class ADBGameAutomation:
         last_screen: bool = False,
         region: Optional[Tuple[int, int, int, int]] = None,
     ) -> Optional[Tuple[int, int, float]]:
-        """Find template in screen with performance tracking"""
-        start_time = time.time()
+        """Find template in screen"""
         threshold = self._resolve_threshold(threshold)
 
         screen = self.get_latest_screen() if last_screen else self.capture_screen()
         if screen is None:
-            if self.metrics:
-                self.metrics.update_failure()
             return None
 
         # Portrait screens need a wider scale sweep and a slightly looser
@@ -443,8 +391,6 @@ class ADBGameAutomation:
 
         template = self.matcher.load(template_path, grayscale=use_grayscale)
         if template is None:
-            if self.metrics:
-                self.metrics.update_failure()
             return None
 
         result = self.matcher.match(
@@ -453,11 +399,7 @@ class ADBGameAutomation:
             region=region,
         )
 
-        match_time = time.time() - start_time
         if result:
-            if self.metrics:
-                self.metrics.update_match_time(match_time)
-            
             center_x, center_y, confidence, scale = result
 
             if self.is_debug:
@@ -470,9 +412,6 @@ class ADBGameAutomation:
 
             return (center_x, center_y, confidence)
         else:
-            if self.metrics:
-                self.metrics.update_failure()
-
             if self.is_debug and self.is_debug_fail:
                 best = self.matcher.match(
                     screen, template, threshold=0.0,
@@ -546,39 +485,6 @@ class ADBGameAutomation:
         log_debug(f"[WAIT TEMPLATE] Timeout waiting for {template_name}")
         return None
     
-    def wait_for_any_template(
-        self,
-        template_names: List[str],
-        timeout: float = 30.0,
-        interval: float = 0.5,
-        threshold: Optional[float] = None,
-    ) -> Optional[Tuple[str, int, int, float]]:
-        """Wait for any of the given templates to appear"""
-        threshold = self._resolve_threshold(threshold)
-        start_time = time.time()
-        
-        log_info(f"Waiting for any of {len(template_names)} templates (timeout: {timeout}s)")
-        
-        while time.time() - start_time < timeout:
-            if self._stop_event.is_set():
-                log_info("Interrupted while waiting for any template")
-                return None
-            for template_name in template_names:
-                result = self.find_template(template_name, threshold=threshold)
-                if result:
-                    elapsed = time.time() - start_time
-                    x, y, confidence = result
-                    log_info(
-                        f"Template found: {template_name} at ({x}, {y}) conf={confidence:.3f} "
-                        f"after {elapsed:.2f}s"
-                    )
-                    return (template_name, x, y, confidence)
-            
-            time.sleep(interval)
-        
-        log_debug("Timeout waiting for any template")
-        return None
-        
     def swipe(self, x1: int, y1: int, x2: int, y2: int, duration: int = 300) -> bool:
         """Swipe gesture with debug visualization"""
         if self.is_debug:
@@ -620,78 +526,3 @@ class ADBGameAutomation:
             log_warning("get_center_point: screen size unknown, returning (0, 0)")
             return (0, 0)
         return width // 2, height // 2
-
-    def get_random_point(self) -> Tuple[int, int]:
-        """Get a random on-screen point, or ``(0, 0)`` if the size is unknown."""
-        width, height = self.get_screen_size()
-        if width <= 0 or height <= 0:
-            log_warning("get_random_point: screen size unknown, returning (0, 0)")
-            return (0, 0)
-        return random.randrange(width), random.randrange(height)
-    
-    def get_performance_metrics(self) -> Optional[Dict[str, Any]]:
-        """Get performance metrics"""
-        if not self.metrics:
-            return None
-        return self.metrics.to_dict()
-    
-    def set_debug_mode(self, enabled: bool, fail_mode: bool = False):
-        """Enable/disable debug mode"""
-        self.is_debug = enabled
-        self.is_debug_fail = fail_mode
-        if enabled:
-            self.visualizer.enable(fail_mode)
-        else:
-            self.visualizer.disable()
-        log_info(f"Debug mode: {'enabled' if enabled else 'disabled'}")
-    
-    def set_config(self, config: Config):
-        """Update configuration"""
-        self.config = config
-        self.capture_interval = config.capture_interval
-        self.is_debug = config.debug_mode
-        self.is_debug_fail = config.debug_fail_mode
-        self.auto_orientation_detection = config.auto_orientation_detection
-        if self.is_debug:
-            self.visualizer.enable(self.is_debug_fail)
-        log_info("Configuration updated")
-    
-    def start(self):
-        """Start automation loop (to be overridden by subclasses)"""
-        if not self.adb.device:
-            self.adb.check_adb_connection()
-        
-        if not self.adb.device:
-            log_error("Failed to connect to ADB device")
-            return
-        
-        self._update_screen_size()
-        log_info("Starting ADB automation... Press 'q' to quit")
-        self._stop_event.clear()
-        self.running = True
-        self.start_continuous_capture()
-
-        try:
-            while self.running:
-                try:
-                    if keyboard.is_pressed("q"):
-                        log_info("Stopping automation...")
-                        self._stop_event.set()
-                        self.running = False
-                        break
-                    
-                    # Subclasses should override process_game_actions
-                    self.process_game_actions()
-                    
-                    time.sleep(0.1)
-                    
-                except Exception as e:
-                    log_error(f"Error in automation loop: {e}")
-                    time.sleep(0.5)
-        finally:
-            self.stop_continuous_capture()
-            self.visualizer.close()
-    
-    def process_game_actions(self):
-        """Process game actions - override in subclass"""
-        raise NotImplementedError("Subclasses must implement process_game_actions()")

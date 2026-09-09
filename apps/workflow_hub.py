@@ -414,14 +414,6 @@ class WorkflowHubAPI:
             self._save_click_config()
             return {"ok": True, "config": self._copy_click_config(self._click_config)}
 
-    def autoclick_select_point(self, point_id: str) -> bool:
-        with self._click_lock:
-            if point_id not in {point["id"] for point in self._click_config["points"]}:
-                return False
-            self._click_config["selectedPointId"] = point_id
-            self._save_click_config()
-            return True
-
     def autoclick_add_point_at_cursor(self) -> dict:
         pos = self._cursor_pos()
         if pos is None:
@@ -893,20 +885,6 @@ class WorkflowHubAPI:
             }
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
-
-    def open_workflows_folder(self) -> bool:
-        """Reveal the workflows directory in the OS file manager."""
-        try:
-            os.makedirs(_WORKFLOWS_DIR, exist_ok=True)
-            if sys.platform == "win32":
-                os.startfile(_WORKFLOWS_DIR)  # type: ignore[attr-defined]
-            else:
-                import subprocess
-                subprocess.Popen(["xdg-open", _WORKFLOWS_DIR])
-            return True
-        except Exception:
-            return False
-
 
 # ── Entry points ────────────────────────────────────────────────────────────
 

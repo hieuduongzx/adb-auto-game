@@ -51,15 +51,6 @@ class DeviceCache:
             else:
                 self._cache.clear()
     
-    def get_stats(self) -> dict:
-        """Get cache statistics"""
-        with self._lock:
-            return {
-                "total_devices": len(self._cache),
-                "keys_per_device": {k: len(v) for k, v in self._cache.items()},
-            }
-
-
 # Global cache instance
 _global_cache = DeviceCache()
 

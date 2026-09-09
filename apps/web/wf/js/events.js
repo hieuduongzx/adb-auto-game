@@ -127,8 +127,12 @@ window.__recv = function(raw){
     if(typeof wfDelayState!=="undefined" && wfDelayState && wfDelayState.phase==="before")
       wfClearNodeDelay();
     wfNoteNodeDone(data.id);
-    if(data.id && !wfNode(data.id)) return;
+    // Record the result even when the node is in a graph we're not viewing (a
+    // call node's function graph): wfRan/wfRanPort accumulate for the whole
+    // run, so switching back re-paints the full trail. Painting needs the DOM
+    // node, hence the guard below.
     wfMarkNodeResult(data.id, data.status, data.port);
+    if(data.id && !wfNode(data.id)) return;
     if(typeof wfDebugAutoStep==="function") wfDebugAutoStep();
     return;
   }
@@ -282,6 +286,7 @@ async function wfNew(){
   if(typeof wfApplyCaptureBackend==="function") wfApplyCaptureBackend(capture);
   WF.activities=[]; WF.functions=[]; WF.edit={kind:"activity",id:null};
   WF.sel=[]; WF.selectedNode=null; wfPan={x:0,y:0}; wfZoom=1; wfRunNode=null;
+  if(typeof wfResetRunViz==="function") wfResetRunViz();   // blank doc — no stale run trail
   const nm=$("wf-name"); if(nm) nm.value=WF.name;
   if(typeof wfSyncPackageUI==="function") wfSyncPackageUI();
   wfSyncSpeedUI();

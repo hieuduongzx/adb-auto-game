@@ -157,7 +157,6 @@ kbd {
 /* ── Two-option chooser (controller / capture / input mode) ──────────────── */
 .choice-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .choice-seg.disabled { opacity: .48; }
-.choice-seg-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .choice-seg-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .choice {
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
@@ -171,7 +170,7 @@ kbd {
 .choice-title { font-size: var(--t-body); font-weight: 700; line-height: 1.2; }
 .choice-sub { font-size: var(--t-micro); font-weight: 500; color: var(--muted); line-height: 1.25; }
 .choice.on .choice-sub { color: var(--accent-soft); }
-@media (max-width: 520px) { .choice-seg-3, .choice-seg-4 { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .choice-seg-4 { grid-template-columns: 1fr; } }
 
 /* ── Toasts — non-blocking feedback, top-right under the header ──────────── */
 #ui-toasts {

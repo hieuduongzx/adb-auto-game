@@ -184,7 +184,6 @@ let wfRunStopped=false; // true once a finished run's trail is on display (greys
 // True while "Test block" (single node) is in flight — events.js accepts
 // node_active / node_result without requiring a full graph run (wfRunning).
 let wfNodeTesting=false;
-let wfSkipIds=null;     // ids greyed out as "not reached", captured once when the run stops
 const wfRan={};       // nodeId -> "ok" | "fail"
 const wfRanPort={};   // nodeId -> output port actually taken
 // Per-node timing, measured UI-side between node_active and node_result:
@@ -272,6 +271,9 @@ function wfMarkNodeResult(id, status, port){
   if(!id) return;
   wfRan[id] = status==="fail" ? "fail" : "ok";
   if(port!==undefined && port!==null) wfRanPort[id]=port; else delete wfRanPort[id];
+  // Record always — even for nodes in a graph we're not viewing (a call node's
+  // function graph). DOM painting needs the node present, but the result stays
+  // in wfRan so switching back to that graph re-paints its trail/tones.
   const el=wfNodeElById(id); if(!el) return;
   // A condition that took its 'false' branch (e.g. "tap image" didn't find the
   // image) didn't really succeed — paint the node red to match its red false-wire,
@@ -292,15 +294,21 @@ function wfMarkNodeResult(id, status, port){
 // Once a run has stopped, red-bar every executable block it never entered, so the
 // taken path (green) stands out against the skipped branches (dim red top). 'start'
 // has no result event (the walk begins after it) and 'note' isn't executable, so
-// both are left alone. The skip set is captured ONCE at stop time from the graph
-// that ran — so blocks dragged in afterwards (which aren't in it) never get dimmed.
+// both are left alone. Re-evaluated per graph on every call (runs can cross
+// activity/function boundaries), so switching back to a graph still dims its
+// unreached blocks, while nodes added after the run stay undimmed.
 function wfMarkUnreached(){
+  const g=wfGraph(); if(!g) return;             // no graph — nothing to grey out
   if(!Object.keys(wfRan).length) return;        // no run happened — nothing to grey out
-  if(wfSkipIds===null){
-    const g=wfGraph();
-    wfSkipIds = g ? (g.nodes||[]).filter(n=>n.type!=="note"&&n.type!=="start"&&!wfRan[n.id]).map(n=>n.id) : [];
-  }
-  wfSkipIds.forEach(id=>{ const el=wfNodeElById(id); if(el) el.classList.add("ran-skip"); });
+  // Per-graph on every call: a run may cross activity/function boundaries, so
+  // results for THIS graph's nodes drive the skip set. Blocks in a graph we
+  // switch into after the run are dimmed correctly, and never-dragged-in nodes
+  // (added after the run) stay undimmed.
+  const ranSet=new Set(Object.keys(wfRan));
+  (g.nodes||[]).forEach(n=>{
+    if(n.type==="note"||n.type==="start"||ranSet.has(n.id)) return;
+    const el=wfNodeElById(n.id); if(el) el.classList.add("ran-skip");
+  });
 }
 // Re-paint the whole trail after a canvas redraw (nodes/wires are rebuilt fresh).
 function wfReapplyRunViz(){
@@ -312,7 +320,7 @@ function wfReapplyRunViz(){
   if(wfDelayState) wfPaintNodeDelay();
 }
 function wfResetRunViz(){
-  wfRunNode=null; wfLiveNode=null; wfRunStopped=false; wfSkipIds=null;
+  wfRunNode=null; wfLiveNode=null; wfRunStopped=false;
   for(const k in wfRan) delete wfRan[k];
   for(const k in wfRanPort) delete wfRanPort[k];
   for(const k in wfNodeT0) delete wfNodeT0[k];

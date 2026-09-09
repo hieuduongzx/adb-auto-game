@@ -279,28 +279,6 @@ class ADBController:
         log_warning("No devices found on any port")
         return False
     
-    def scan_specific_emulator(self, emulator_type: str = "all") -> bool:
-        """Scan for specific emulator type"""
-        found_devices = self.scanner.scan_emulator(emulator_type)
-        
-        if found_devices:
-            device_serial, host = found_devices[0]
-            
-            # Connect to the device
-            client = AdbClient(host=self.host, port=self.port)
-            devices = client.devices()
-            
-            for device in devices:
-                if device.serial == device_serial:
-                    self.client = client
-                    self.device = device
-                    self.device_id = device.serial
-                    log_success(f"Connected to device: {self.device_id}")
-                    return True
-        
-        log_warning(f"No {emulator_type} devices found")
-        return False
-    
     def _get_app_name_for_package(self, package_name: str) -> str:
         """Get display name for package"""
         return COMMON_APPS.get(

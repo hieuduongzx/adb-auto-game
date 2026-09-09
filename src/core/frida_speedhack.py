@@ -1272,10 +1272,6 @@ class FridaSpeedhackManager:
             log_success(f"[speedhack] re-armed x{self._target_scale}")
             return True
 
-    def get_scale(self) -> Optional[float]:
-        """Return the last requested time scale."""
-        return self._current_scale if self._current_scale != 1.0 else None
-
     def reset(self) -> bool:
         """Park the agent at normal speed, leaving it resident.
 

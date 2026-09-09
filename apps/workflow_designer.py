@@ -49,7 +49,7 @@ from src.core.adb.auto.scrcpy_capture import (
 from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.core.frida_speedhack import FridaSpeedhackManager
-from src.workflow import NODE_TYPES, WorkflowEngine
+from src.workflow import WorkflowEngine
 from src.utils import (
     add_log_subscriber,
     bundle_dir,
@@ -267,6 +267,37 @@ class WorkflowDesignerAPI:
                 log_warning(f"Win32 capture source error: {exc}")
                 return False
         return True
+
+    def capture_now(self) -> dict:
+        """Capture one frame synchronously and return it as a data URL.
+
+        Context-menu node previews need a frame immediately before they build
+        an overlay; the normal ``capture()`` API is deliberately fire-and-forget
+        and arrives later through ``__recvFrame``. This bounded one-shot avoids
+        timing guesses and doesn't alter the auto-refresh loop.
+        """
+        try:
+            if self._capture_kind == "win32":
+                if self._win32 is None:
+                    return {"error": "No Win32 window set"}
+                img = self._win32.capture_frame()
+            else:
+                if self.controller.device is None:
+                    return {"error": "No device selected"}
+                img = capture_screen_frame(self.controller)
+            if img is None:
+                return {"error": "Failed to capture screen"}
+            h, w = img.shape[:2]
+            self._screen = img
+            self._screen_w = w
+            self._screen_h = h
+            ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            if not ok:
+                return {"error": "Failed to encode screen"}
+            data = "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode("ascii")
+            return {"dataUrl": data, "w": w, "h": h}
+        except Exception as exc:
+            return {"error": str(exc)}
 
     def capture(self) -> bool:
         if self._capture_kind == "win32":
@@ -775,6 +806,10 @@ class WorkflowDesignerAPI:
                        grayscale: bool, multiscale: bool, all_matches: bool) -> dict:
         if self._screen is None:
             return {"error": "Capture a screenshot first"}
+        # Workflow nodes normally store paths relative to the JSON directory
+        # (templates/foo.png). Inspector thumbnails already resolve them; match
+        # preview must use the same resolver instead of depending on cwd.
+        template_path = self._resolve_template(template_path)
         result = device_info.run_template_match(
             self._matcher, self._screen, template_path,
             threshold, grayscale, multiscale, all_matches,
@@ -784,6 +819,44 @@ class WorkflowDesignerAPI:
         rects = result["rects"]
         self._overlay = [(r[0], r[1], r[2], r[3], r[4]) for r in rects]
         self._push("overlay", {"rects": rects})
+        return result
+
+    def preview_match_template(self, template_path: str, threshold: float,
+                               all_matches: bool = False,
+                               region_x: int = 0, region_y: int = 0,
+                               region_w: int = 0, region_h: int = 0) -> dict:
+        """Read-only template match for a node's context-menu preview.
+
+        Unlike ``match_template`` this never updates DevScope state and never
+        emits an ``overlay`` event (which is gated by the runtime debug toggle
+        in JS). An optional search region mirrors the node's runtime scope; the
+        returned rectangles are translated back into full-screen coordinates.
+        """
+        if self._screen is None:
+            return {"error": "Capture a screenshot first"}
+        template_path = self._resolve_template(template_path)
+        screen = self._screen
+        ox = oy = 0
+        try:
+            x, y = max(0, int(region_x)), max(0, int(region_y))
+            w, h = int(region_w), int(region_h)
+            if w > 0 and h > 0:
+                x2, y2 = min(self._screen_w, x + w), min(self._screen_h, y + h)
+                if x2 <= x or y2 <= y:
+                    return {"error": "Search region is outside the captured frame"}
+                screen = screen[y:y2, x:x2]
+                ox, oy = x, y
+        except (TypeError, ValueError):
+            pass
+        result = device_info.run_template_match(
+            self._matcher, screen, template_path,
+            float(threshold), False, False, bool(all_matches),
+        )
+        if not result.get("error") and (ox or oy):
+            for rect in result.get("rects", []):
+                if len(rect) >= 2:
+                    rect[0] += ox
+                    rect[1] += oy
         return result
 
     def clear_overlay(self) -> bool:
@@ -1261,10 +1334,6 @@ class WorkflowDesignerAPI:
 
     # ── Workflow file ops ──────────────────────────────────────────────────────
 
-    def workflow_node_types(self) -> dict:
-        return {k: {"label": v["label"], "kind": v["kind"], "outs": v["outs"]}
-                for k, v in NODE_TYPES.items()}
-
     def workflow_new(self, name: str = "") -> bool:
         """Forget the open file so the next save creates
         ``workflows/<name>/workflow.json``."""
@@ -1441,7 +1510,8 @@ class WorkflowDesignerAPI:
         self._engine.callbacks["on_stop"] = [lambda: self._push("workflow_state", {"running": False})]
         self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
         self._engine.callbacks["on_node_done"] = [
-            lambda nid, st, port: self._push("node_result", {"id": nid, "status": st, "port": port})]
+            lambda nid, st, port: self._push("node_result", {
+                "id": nid, "status": st, "port": port})]
         # Live delayBefore / delayAfter countdown chips next to the active node.
         self._engine.callbacks["on_node_delay"] = [
             lambda nid, phase, secs: self._push(
@@ -1514,9 +1584,6 @@ class WorkflowDesignerAPI:
         except Exception as exc:
             log_warning(f"Couldn't open: {exc}")
         return False
-
-    def workflow_running(self) -> bool:
-        return bool(self._engine and self._engine.is_running())
 
     def workflow_run_from_node(self, flow_json: str, edit_kind: str, edit_id: str, node_id: str, step: bool = False) -> bool:
         try:
@@ -1722,9 +1789,6 @@ class WorkflowDesignerAPI:
                 log_warning(f"[speedhack] error while disabling: {e}")
         self._sh_push(False, False)
         return True
-
-    def speedhack_running(self) -> bool:
-        return self._sh_mgr is not None
 
     def _workflow_templates_dir(self, flow_json: str = "") -> Optional[str]:
         """Best-effort path to the current workflow's ``templates/`` folder.

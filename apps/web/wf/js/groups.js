@@ -443,10 +443,19 @@ function wfShowMenu(clientX, clientY){
   if(WF.sel.length===1){
     const _n=wfNode(WF.sel[0]);
     if(_n&&_n.type!=="start") items.push({ico:"play",label:"Set as default", fn:()=>wfSetAsDefault(WF.sel[0])});
+    // Read-only spatial preview: paint point/region/swipe/template geometry on
+    // the live frame without executing the node (Tap must never tap here).
+    if(_n && typeof wfPvCanPreviewNode==="function" && wfPvCanPreviewNode(_n)){
+      items.push({ico:"eye",label:"Show on Preview", fn:()=>wfPvPreviewNodes([_n])});
+    }
     // Test one block: runs on device, paints match overlay on Preview.
     if(_n && wfCanTestNode(_n)){
       items.push({ico:"target",label:"Test block (Ctrl+Enter)", fn:()=>wfRunSingleNode(_n)});
     }
+  }
+  if(WF.sel.length>1 && typeof wfPvCanPreviewNode==="function"){
+    const previewable=WF.sel.map(wfNode).filter(wfPvCanPreviewNode);
+    if(previewable.length) items.push({ico:"eye",label:`Show ${previewable.length} on Preview`,fn:()=>wfPvPreviewNodes(previewable)});
   }
   if(stackSids.length) items.push({ico:"link_off",label:"Unmerge", fn:()=>stackSids.forEach(wfUnmerge)});
   if(WF.sel.length>=1) items.push({ico:"box",label:"Create group around ("+WF.sel.length+")", fn:wfGroupSelection});
@@ -489,6 +498,7 @@ function wfAppendActMenuItems(m, items){
   items.forEach(it=>{
     if(it.sep){ const s=document.createElement("div"); s.className="wf-ctx-sep"; m.appendChild(s); return; }
     const d=document.createElement("button"); d.type="button"; d.className="wf-ctx-item"; d.setAttribute("role","menuitem");
+    if(it.title) d.title=it.title;
     d.innerHTML=`<span class="wf-ctx-ico">${wfIco(it.ico)}</span>${escHtml(it.label)}`;
     d.onclick=()=>{ wfHideMenu(); it.fn(); }; m.appendChild(d);
   });
@@ -507,10 +517,42 @@ function wfShowActRowMenu(clientX, clientY, act){
   m.innerHTML="";
   const items=[
     {ico:"play",  label:"Run this activity only", fn:()=>{ if(typeof wfRunOneActivity==="function") wfRunOneActivity(act.id); }},
+  ];
+  // When the right-clicked row is part of a multi-selection (Ctrl+click), offer
+  // to run the whole highlighted set.
+  if(typeof wfActSel!=="undefined" && wfActSel.size>1 && wfActSel.has(act.id)){
+    items.push({ico:"play", label:`Run ${wfActSel.size} selected activities (Ctrl+right-click)`,
+      title:"Run every highlighted activity, in list order",
+      fn:()=>{ if(typeof wfRunSelectedActs==="function") wfRunSelectedActs(); }});
+  }
+  items.push(
     {ico:"check", label: act.enabled?"Disable":"Enable", fn:()=>wfToggleActivity(act.id)},
+    {ico:"edit",  label:"Rename", fn:()=>{
+      const row=document.querySelector(`.wf-act[data-id="${act.id}"]`);
+      const nameEl=row&&row.querySelector(".wf-act-name");
+      if(nameEl) wfBeginRename(nameEl, act);
+    }},
+    {ico:"copy",  label:"Duplicate activity", fn:()=>wfDuplicateActivity(act.id)},
     {ico:"trash", label:"Delete activity", fn:()=>wfDeleteActivity(act.id)},
     {sep:true},
     ...wfActSelectAllItems(),
+  );
+  wfAppendActMenuItems(m, items);
+  m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
+}
+// Right-click menu on a function row (sidebar) — functions had no context menu.
+function wfShowFnRowMenu(clientX, clientY, fn){
+  const m=$("wf-ctxmenu"); if(!m||!fn) return;
+  m.innerHTML="";
+  const items=[
+    {ico:"edit",  label:"Edit function", fn:()=>wfEditFunction(fn.id)},
+    {ico:"edit",  label:"Rename", fn:()=>{
+      const row=document.querySelector(`.wf-act[data-id="${fn.id}"]`);
+      const nameEl=row&&row.querySelector(".wf-act-name");
+      if(nameEl) wfBeginRename(nameEl, fn);
+    }},
+    {ico:"copy",  label:"Duplicate function", fn:()=>wfDuplicateFunction(fn.id)},
+    {ico:"trash", label:"Delete function", fn:()=>wfDeleteFunction(fn.id)},
   ];
   wfAppendActMenuItems(m, items);
   m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";

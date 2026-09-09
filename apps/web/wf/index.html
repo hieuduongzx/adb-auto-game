@@ -222,11 +222,15 @@
             <input id="wf-pv-hz" type="number" min="0.2" max="60" step="0.5" value="30" title="Refresh rate (Hz)">
             <span class="hz-unit">Hz</span>
           </div>
+          <button type="button" id="wf-pv-node-chip" class="wf-pv-node-chip" hidden onclick="wfPvClearNodePreview()" title="Clear node preview"></button>
           <span class="spacer"></span>
           <span id="wf-pv-res" class="wf-pv-res"></span>
           <span id="wf-pv-hint" class="wf-pv-hint" title="Left click = pick point (read color) · Left drag = select region (crop) · Right click = tap device · Right drag = swipe device · Middle drag = pan · Wheel = zoom">left = point · drag = region · right = tap · right-drag = swipe</span>
         </div>
-        <div id="wf-pv-wrap"><canvas id="wf-pv-canvas"></canvas></div>
+        <div id="wf-pv-wrap">
+          <canvas id="wf-pv-canvas"></canvas>
+          <div id="wf-pv-tpl-strip" class="wf-pv-tpl-strip" hidden aria-label="Templates in node preview"></div>
+        </div>
       </div>
       <!-- Canvas tool rail — graph edit toggles + zoom, floating on the left edge.
            The graph-only group hides in Preview mode; the zoom cluster stays and

@@ -55,20 +55,6 @@ class TemplateMatcher:
             log_error(f"Error loading template {template_path}: {e}")
             return None
     
-    def clear_cache(self):
-        """Clear template cache"""
-        with self._cache_lock:
-            self._cache.clear()
-    
-    def get_cache_stats(self) -> Dict:
-        """Get cache statistics"""
-        with self._cache_lock:
-            return {
-                "cache_size": len(self._cache),
-                "max_size": self._max_cache_size,
-                "templates": list(self._cache.keys()),
-            }
-
     def match(
         self,
         screen: np.ndarray,

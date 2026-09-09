@@ -23,6 +23,7 @@ function wfMmPalette(){
     win32:v("--cat-win32")||"#6366f1", misc:v("--cat-misc")||"#9aa6b4",
     start:v("--term-start")||"#16a34a", end:v("--term-end")||"#dc2626", note:"#e2c56d", def:"#a5b1c2",
     run:v("--run-live")||"#f97316", accent:v("--accent")||"#2f6fed",
+    fail:v("--run-fail")||"#d6483f",
   };
   return wfMmColors;
 }
@@ -91,18 +92,18 @@ function wfMinimapDraw(){
   // Node chips.
   rects.forEach(({n,w,h})=>{
     const running = typeof wfRunNode!=="undefined" && n.id===wfRunNode;
+    // Last-run outcome wins over the category tint: a failed block (or one that
+    // took its false branch) reads red at a glance from the bird's-eye view.
+    const ranFail = typeof wfRan!=="undefined"
+      && (wfRan[n.id]==="fail" || wfRanPort[n.id]==="false");
     const sel = WF.sel.includes(n.id);
-    ctx.fillStyle = running ? P.run : wfMmColorFor(n);
-    ctx.globalAlpha = running||sel ? 1 : .82;
+    ctx.fillStyle = running ? P.run : (ranFail ? P.fail : wfMmColorFor(n));
+    ctx.globalAlpha = running||sel||ranFail ? 1 : .82;
     const px=X(n.x), py=Y(n.y), pw=Math.max(2.5,w*scale), ph=Math.max(2,h*scale);
     const def=WF_NODES[n.type]||{};
     ctx.beginPath();
-    if(def.kind==="start"){
+    if(def.kind==="start"||def.kind==="end"){   // both terminals are discs
       ctx.ellipse(px+pw/2,py+ph/2,pw/2,ph/2,0,0,Math.PI*2);
-    }else if(def.kind==="end"){
-      const c=Math.min(pw,ph)*.26;
-      ctx.moveTo(px+c,py); ctx.lineTo(px+pw-c,py); ctx.lineTo(px+pw,py+c); ctx.lineTo(px+pw,py+ph-c);
-      ctx.lineTo(px+pw-c,py+ph); ctx.lineTo(px+c,py+ph); ctx.lineTo(px,py+ph-c); ctx.lineTo(px,py+c); ctx.closePath();
     }else{
       ctx.roundRect(px,py,pw,ph,n.type==="try_next"?ph/2:1.5);
     }

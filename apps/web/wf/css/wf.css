@@ -307,6 +307,12 @@
   transition:border-color .1s, background .1s, box-shadow .1s; }
 .wf-act:hover { background:var(--alt); }
 .wf-act.sel { border-color:var(--border2); background:var(--accent-bg); box-shadow:none; }
+/* Explorer-style Ctrl+click multi-selection: rows stay highlighted until the
+   next plain click; Ctrl+right-click runs the highlighted set. */
+.wf-act.multisel { border-color:var(--accent); background:var(--accent-bg);
+  box-shadow:inset 0 0 0 1px var(--accent-bd, var(--accent)); }
+.wf-act.multisel .wf-act-name { color:var(--accent-hover); }
+.wf-act.sel.multisel { border-color:var(--accent); }
 .wf-badge { font-size:8.5px; font-weight:700; letter-spacing:.03em; border-radius:4px; padding:2px 4px; flex-shrink:0; }
 .wf-badge.seq { color:var(--accent-hover); background:var(--cat-basic-bg); border:1px solid var(--accent-bd); }
 .wf-badge.bg  { color:var(--warn); background:var(--warn-bg); border:1px solid var(--warn-bd); }
@@ -411,7 +417,6 @@
 #wf-side-fns-sec.collapsed .wf-side-fns { display:none; }
 #wf-side-fns-sec.collapsed .wf-side-hdr { border-bottom:none; }
 .wf-side-fns { overflow-y:auto; min-height:0; padding:8px 10px 10px; }
-.wf-side-fns .wf-insp-empty { padding:2px; }
 .wf-fn { cursor:pointer; }
 .wf-badge.fn { display:inline-flex; align-items:center; justify-content:center; color:var(--on-accent);
   background:var(--cat-logic-ink); border:none; font-size:9.5px; font-weight:800;
@@ -440,6 +445,10 @@
   text-shadow:0 1px 0 color-mix(in srgb, var(--panel) 65%, transparent); }
 .wf-cur-act:empty, .wf-cur-act[data-empty="1"] { display:none; }
 .wf-cur-act.is-fn { opacity:.48; font-family:var(--mono); }
+/* While a FUNCTION is open, the watermark breadcrumb becomes a back button —
+   click it to return to the activity you came from. */
+.wf-cur-act.is-fn { pointer-events:auto; cursor:pointer; }
+.wf-cur-act.is-fn:hover { opacity:.9; text-decoration:underline; text-underline-offset:3px; }
 /* Graph world: pan is left/top (layout), zoom is scale() only when ≠100%. */
 #wf-world { position:absolute; left:0; top:0; z-index:1; width:4000px; height:3000px;
   transform:none; transform-origin:0 0; will-change:auto; }
@@ -613,8 +622,12 @@
 @keyframes wfNodeIn { from { opacity:0; } }
 /* Every card block shares one canonical footprint: --node-w × --node-h. */
 .wf-node:not(.wf-stacked):not(.start):not(.end) { min-height:var(--node-h); }
-.wf-node.sel { border-color:var(--border2); }
-.wf-node.sel::after { box-shadow:var(--sh-md); }
+/* Selected block(s): accent border + glow so a selection (single or rubber-
+   band multi) is unmistakable against the default border and hover shadow. */
+.wf-node.sel { border-color:var(--accent) !important; }
+.wf-node.sel::after { box-shadow:0 0 0 2px var(--accent), var(--sh-md) !important; }
+.wf-node.sel .wf-node-title { color:var(--accent-hover); }
+.wf-node.start.sel::after, .wf-node.end.sel::after { box-shadow:0 0 0 2px var(--accent), var(--sh-md) !important; }
 /* Entry marker — a subtle top accent bar on the default starting block. */
 .wf-node.wf-entry::before { content:""; position:absolute; top:-3px; left:50%;
   transform:translateX(-50%); width:22px; height:3px; border-radius:999px;
@@ -731,20 +744,18 @@
 .wf-node.try_next.running .wf-next-body { border-color:var(--border2); background:var(--run-live-hd); color:var(--run-live-ink); }
 .wf-node.try_next.paused .wf-next-body { border-color:var(--border2); background:var(--accent-bg); color:var(--accent); }
 
-/* ── Terminals: Start is a play circle; End is an octagonal stop marker. ────── */
+/* ── Terminals: Start and End are both solid discs — one silhouette for "the
+   flow begins / the flow ends", told apart by colour and glyph, not shape. ─── */
 .wf-node.start, .wf-node.end {
   width:var(--term-size); height:var(--term-size); min-height:var(--term-size);
   border:none; background:transparent; overflow:visible;
+  border-radius:50%;
 }
-.wf-node.start { border-radius:50%; }
-.wf-node.end { border-radius:10px; }
 .wf-node.start:not(.sel):not(.running):not(.ran-ok):not(.ran-fail):not(.paused),
 .wf-node.end:not(.sel):not(.running):not(.ran-ok):not(.ran-fail):not(.paused) {
   border:none; box-shadow:none;
 }
-.wf-node.start::after, .wf-node.end::after { box-shadow:none; }
-.wf-node.start::after { border-radius:50%; }
-.wf-node.end::after { border-radius:10px; }
+.wf-node.start::after, .wf-node.end::after { box-shadow:none; border-radius:50%; }
 .wf-node.start.running, .wf-node.end.running,
 .wf-node.start.ran-ok, .wf-node.end.ran-ok,
 .wf-node.start.ran-fail, .wf-node.end.ran-fail,
@@ -757,14 +768,12 @@
 .wf-node.start.ran-ok::after, .wf-node.end.ran-ok::after { box-shadow:var(--sh-sm); }
 .wf-node.start.ran-fail::after, .wf-node.end.ran-fail::after { box-shadow:var(--sh-sm); }
 .wf-node.start.running::after, .wf-node.end.running::after { box-shadow:var(--sh-md); }
-/* Terminal body; each terminal supplies its own silhouette. */
+/* Terminal body — the disc itself. */
 .wf-node-tri {
-  position:absolute; inset:0; background:var(--node-accent);
+  position:absolute; inset:0; background:var(--node-accent); border-radius:50%;
   display:flex; align-items:center; justify-content:center; color:var(--on-accent);
   box-shadow:var(--sh-md);
 }
-.wf-node.start .wf-node-tri { border-radius:50%; }
-.wf-node.end .wf-node-tri { border-radius:9px; clip-path:polygon(28% 0,72% 0,100% 28%,100% 72%,72% 100%,28% 100%,0 72%,0 28%); }
 .wf-node-tri svg { width:16px; height:16px; display:block; }
 .wf-node.start .wf-node-tri svg { margin-left:1px; } /* optical centre for play */
 .wf-node-tri-lbl {
@@ -984,7 +993,6 @@
 .wf-port.in.loop { border-color:var(--branch-loop); background:var(--branch-loop-bg); }
 .wf-port.in.loop.connected { border-color:var(--branch-loop); background:var(--branch-loop-bg); }
 .wf-port.in.loop:hover { border-color:var(--accent); background:var(--accent-bg); }
-.wf-port-row { position:absolute; right:-4px; display:flex; align-items:center; }
 .wf-port-lbl { position:absolute; right:10px; font-size:8px; font-weight:700; color:var(--muted); white-space:nowrap; }
 .wf-port-lbl.in { right:auto; left:-26px; width:22px; text-align:right; }
 .wf-port-lbl.in.loop { color:var(--branch-loop-line); }
@@ -994,7 +1002,6 @@
 
 /* ═══ Inspector ═══════════════════════════════════════════════════════════ */
 #wf-insp-body { flex:1; min-height:0; overflow-y:auto; padding:0; display:flex; flex-direction:column; gap:0; }
-.wf-insp-empty { font-size:11.5px; color:var(--muted); line-height:1.6; padding:16px 12px; }
 
 /* ── Inspector — flat, sectioned layout (no nested cards) ─────────────────── */
 .wf-insp-id { position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:10px;
@@ -1332,11 +1339,26 @@
 .wf-pv-bar { display:flex; align-items:center; gap:8px; padding:7px 14px;
   background:var(--panel); border-bottom:1px solid var(--border2); flex-shrink:0; }
 .wf-pv-bar .btn.sm { height:28px; }
+.wf-pv-node-chip { height:24px; max-width:240px; padding:0 9px; border:1px solid var(--accent);
+  border-radius:999px; background:var(--accent-bg); color:var(--accent); font:600 10.5px/1 var(--sans);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+.wf-pv-node-chip:hover { background:var(--accent); color:var(--on-accent); }
+.wf-pv-node-chip:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.wf-pv-node-chip[hidden] { display:none; }
 .wf-pv-res { font-family:var(--mono); font-size:11px; color:var(--muted); flex-shrink:0; }
 .wf-pv-hint { font-size:10.5px; color:var(--muted); }
 #wf-pv-hz { width:50px; height:28px; text-align:right; padding:0 6px; }
 #wf-pv-wrap { flex:1; position:relative; background:var(--shade); overflow:hidden; min-height:0; }
 #wf-pv-canvas { display:block; position:absolute; inset:0; width:100%; height:100%; cursor:crosshair; }
+.wf-pv-tpl-strip { position:absolute; left:12px; bottom:12px; z-index:2; display:flex; gap:7px;
+  max-width:calc(100% - 24px); padding:7px; overflow-x:auto; border:1px solid rgba(255,255,255,.16);
+  border-radius:7px; background:rgba(15,18,22,.88); box-shadow:0 4px 14px rgba(0,0,0,.22); }
+.wf-pv-tpl-strip[hidden] { display:none; }
+.wf-pv-tpl-item { display:flex; align-items:center; gap:7px; flex:0 0 auto; min-width:0; color:#d5e2ee; }
+.wf-pv-tpl-item + .wf-pv-tpl-item { padding-left:7px; border-left:1px solid rgba(255,255,255,.14); }
+.wf-pv-tpl-item img { display:block; max-width:110px; max-height:64px; object-fit:contain; image-rendering:auto; }
+.wf-pv-tpl-item span { max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font:10px/1.25 var(--mono); color:#c2cad4; }
 /* Auto toggle pill */
 .wf-pv-cb { width:36px; height:21px; border-radius:999px; background:var(--dot-off); position:relative;
   transition:background .2s; flex-shrink:0; display:block; }

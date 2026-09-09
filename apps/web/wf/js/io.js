@@ -214,6 +214,10 @@ function wfHydrate(flow){
     graph:wfHydrateGraph(a.graph),
   }));
   WF.edit={kind:"activity", id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+  // A different flow just loaded — drop the previous run's trail/results so
+  // they can't leak onto this file's nodes (wfMarkUnreached would dim blocks
+  // that never ran in a graph the old run never touched).
+  if(typeof wfResetRunViz==="function") wfResetRunViz();
   $("wf-name").value=WF.name;
   wfSyncSpeedUI();
   if(typeof wfSyncControllerUI==="function") wfSyncControllerUI();
@@ -439,9 +443,23 @@ async function wfRunOneActivity(actId){
   if(typeof wfSelectActivity==="function") wfSelectActivity(actId);
   await wfStartRunFlow(actId);
 }
-// Shared pre-flight + engine start. ``onlyId`` null → all enabled activities;
-// otherwise only that activity is marked enabled in the payload.
+// Run the activities currently HIGHLIGHTED via Ctrl+click in the activity list
+// (explorer-style selection — nothing to do with the enable checkboxes).
+// Ctrl+right-click on any row is the quick gesture; the row menu exposes it too.
+async function wfRunSelectedActs(){
+  if(wfRunning){ uiToast("A workflow is already running — stop it first.","warning"); return; }
+  // Keep the designer's list order, not click order.
+  const ids=(WF.activities||[]).filter(a=>wfActSel.has(a.id)).map(a=>a.id);
+  if(!ids.length){
+    uiToast("Ctrl+click activities to highlight several, then Ctrl+right-click to run them.","info",{dur:3500});
+    return;
+  }
+  await wfStartRunFlow(ids);
+}
+// Shared pre-flight + engine start. ``onlyId`` null → all enabled activities; a
+// single id or an id array → only those are marked enabled in the payload.
 async function wfStartRunFlow(onlyId){
+  const onlyIds = Array.isArray(onlyId) ? onlyId.filter(Boolean) : (onlyId ? [onlyId] : null);
   if(typeof wfValidationIssues==="function"){
     const issues=wfValidationIssues();
     const errs=issues.filter(i=>i.sev==="err").length;
@@ -462,10 +480,14 @@ async function wfStartRunFlow(onlyId){
   wfResetRunViz();
   if(typeof wfPvOverlay!=="undefined"){ wfPvOverlay=[]; wfPvMatchRegion=null; wfPvOverlayMeta=null; if(typeof wfPvDraw==="function") wfPvDraw(); }
   const flow=wfSerialize();
-  if(onlyId){
-    (flow.activities||[]).forEach(a=>{ a.enabled = (a.id===onlyId); });
-    const target=(flow.activities||[]).find(a=>a.id===onlyId);
-    setStatus("Running only «"+(target&&target.name?target.name:onlyId)+"»…");
+  if(onlyIds){
+    (flow.activities||[]).forEach(a=>{ a.enabled = onlyIds.includes(a.id); });
+    if(onlyIds.length===1){
+      const target=(flow.activities||[]).find(a=>a.id===onlyIds[0]);
+      setStatus("Running only «"+(target&&target.name?target.name:onlyIds[0])+"»…");
+    } else {
+      setStatus("Running "+onlyIds.length+" checked activities…");
+    }
   }
   wfSetRunning(true);
   const ok=await api().workflow_run(JSON.stringify(flow));

@@ -1416,7 +1416,6 @@ class Win32GameAutomation(ADBGameAutomation):
         self.matcher = TemplateMatcher(cache_size=self.config.template_cache_size)
         self.visualizer = DebugVisualizer()
         self.ocr = OCRReader(backend=ocr_backend)
-        self.metrics = None
 
         self.monitor = {"top": 0, "left": 0, "width": 0, "height": 0}
         self.templates_dir = ""
