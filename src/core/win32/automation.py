@@ -50,6 +50,24 @@ _WA_ACTIVE        = 1
 _MK_LBUTTON       = 0x0001
 _MK_RBUTTON       = 0x0002
 _MK_MBUTTON       = 0x0010
+# SetWindowPos flags used by the window-pos input mode.
+_SWP_NOSIZE = 0x0001; _SWP_NOMOVE = 0x0002
+_SWP_NOZORDER = 0x0004; _SWP_NOACTIVATE = 0x0010
+# Synthetic-pointer (WM_POINTER) injection — see _tap_anchored.
+_PT_TOUCH = 0x00000002
+_POINTER_FLAG_INRANGE    = 0x00000002
+_POINTER_FLAG_INCONTACT  = 0x00000004
+_POINTER_FLAG_PRIMARY    = 0x00002000
+_POINTER_FLAG_CONFIDENCE = 0x00004000
+_POINTER_FLAG_DOWN       = 0x00010000
+_POINTER_FLAG_UPDATE     = 0x00020000
+_POINTER_FLAG_UP         = 0x00040000
+_TOUCH_MASK_CONTACTAREA  = 0x00000001
+_TOUCH_MASK_PRESSURE     = 0x00000004
+_WS_EX_LAYERED    = 0x00080000
+_LWA_ALPHA        = 0x00000002
+_HWND_TOPMOST     = -1
+_HWND_NOTOPMOST   = -2
 _SMTO_ABORTIFHUNG = 0x0002
 _PW_CLIENTONLY        = 0x1
 _PW_RENDERFULLCONTENT = 0x2  # capture DirectComposition/GPU content (Win 8.1+)
@@ -75,6 +93,11 @@ _MOUSE_BUTTONS = {
 
 # Modifier name -> virtual-key, for the hotkey (combo) path.
 _MODIFIER_VKS = {"ctrl": _VK_CONTROL, "shift": _VK_SHIFT, "alt": _VK_MENU, "win": _VK_LWIN}
+
+# Every input transport the Win32 controller understands. The first four route
+# through window messages; the last two use native cursor / pointer injection.
+_INPUT_MODES = ("background", "background_sync", "background_cursor",
+                "background_window", "anchored_touch", "foreground")
 
 
 def _import_win32():
@@ -126,6 +149,15 @@ class Win32Controller:
         pretend-activate via WM_ACTIVATE, briefly move the hardware cursor to
         the target, send the messages synchronously, restore the cursor. Works
         for cursor-polling games while the window stays behind others.
+      - ``"background_window"`` — ``SendMessageWithWindowPos``: briefly slide the
+        WINDOW so the target point sits under the (unmoved) cursor, send the
+        messages, restore. Either the cursor or the window moves — this mode
+        never touches the cursor, so it is safe while the user works elsewhere.
+        The window flickers for a frame per click.
+      - ``"anchored_touch"``    — inject a synthetic touch contact
+        (``InjectSyntheticPointerInput``): the window gets ``WM_POINTER`` events
+        with no cursor movement and no foreground change. Best for touch-aware
+        games (Unity), unavailable before Windows 10 1809.
       - ``"foreground"``        — bring the window forward and use real mouse input.
     """
 
@@ -144,6 +176,10 @@ class Win32Controller:
         # PID of the most recently started program. Used by an initial
         # win_launch node to attach its window without preconfigured title.
         self.last_launch_pid: Optional[int] = None
+        # anchored_touch state: the synthetic touch device (built lazily) and a
+        # one-shot flag so the "not supported" warning isn't logged per click.
+        self._touch_dev = None
+        self._anchored_warned = False
 
     # ── config ────────────────────────────────────────────────────────────────
     def configure(self, cfg: dict) -> None:
@@ -153,11 +189,22 @@ class Win32Controller:
         self.hwnd = None
         self._cap_method = None
         self._wgc_stop()
+        self._touch_stop()
+
+    def _touch_stop(self) -> None:
+        """Release the synthetic touch device (if any) and reset the warning."""
+        dev, self._touch_dev = self._touch_dev, None
+        self._anchored_warned = False
+        if dev:
+            try:
+                dev.close()
+            except Exception:
+                pass
 
     @property
     def _match(self) -> Tuple[str, str, str]:
         mode = str(self.cfg.get("inputMode", "background")).strip().lower()
-        if mode not in ("background", "background_sync", "background_cursor", "foreground"):
+        if mode not in _INPUT_MODES:
             mode = "background"
         return (
             str(self.cfg.get("window", "")).strip(),
@@ -807,6 +854,267 @@ class Win32Controller:
     def _sync_mode(self) -> bool:
         return self._match[2] == "background_sync"
 
+    def _window_mode(self) -> bool:
+        return self._match[2] == "background_window"
+
+    def _anchored_mode(self) -> bool:
+        return self._match[2] == "anchored_touch"
+
+    # ── window-pos input (SendMessageWithWindowPos equivalent) ────────────────
+    def _is_maximized(self) -> bool:
+        """True when the window is maximized (so it can't be slid around).
+
+        ``win32gui.IsZoomed`` is missing from some pywin32 builds, so this reads
+        ``GetWindowPlacement``'s show-command instead, which is always present.
+        """
+        try:
+            win32gui, win32con = self._w[1], self._w[3]
+            return win32gui.GetWindowPlacement(self.hwnd)[1] == win32con.SW_SHOWMAXIMIZED
+        except Exception:
+            return False
+
+    def _send_window_pos(self, x: int, y: int, fn) -> bool:
+        """Send click messages with the WINDOW slid under the unmoved cursor.
+
+        ``fn(dispatch)`` runs while the window is offset so the client point
+        (x, y) sits exactly under the current hardware cursor; the cursor never
+        moves. Some games take the click position from ``GetCursorPos``, so the
+        window — not the pointer — is what has to travel. The window is restored
+        in a ``finally`` even when a send raises.
+        """
+        win32gui, win32api = self._w[1], self._w[4]
+        try:
+            if self._is_maximized():
+                # A maximized window cannot be slid; fall back to messages (the
+                # cursor-polling case simply won't see this click).
+                fn(self._dispatch)
+                return True
+            cx, cy = win32api.GetCursorPos()
+            l, t, _, _ = win32gui.GetWindowRect(self.hwnd)
+            sx, sy = win32gui.ClientToScreen(self.hwnd, (int(x), int(y)))
+            dx, dy = int(cx) - sx, int(cy) - sy
+            moved = (dx != 0 or dy != 0)
+            if moved:
+                win32gui.SetWindowPos(self.hwnd, 0, l + dx, t + dy, 0, 0,
+                                      _SWP_NOSIZE | _SWP_NOZORDER | _SWP_NOACTIVATE)
+                time.sleep(0.02)
+            try:
+                fn(self._send)
+            finally:
+                if moved:
+                    win32gui.SetWindowPos(self.hwnd, 0, l, t, 0, 0,
+                                          _SWP_NOSIZE | _SWP_NOZORDER | _SWP_NOACTIVATE)
+            return True
+        except Exception as exc:
+            self._input_error("send_window_pos", exc)
+            return False
+
+    def _tap_bg_window(self, x, y, duration, tap_count) -> bool:
+        lp = _lparam(x, y)
+        def run(send):
+            send(_WM_MOUSEMOVE, 0, lp)
+            for i in range(max(1, int(tap_count))):
+                down = _WM_LBUTTONDBLCLK if (tap_count >= 2 and i > 0) else _WM_LBUTTONDOWN
+                send(down, _MK_LBUTTON, lp)
+                time.sleep(max(0.02, float(duration)))
+                send(_WM_LBUTTONUP, 0, lp)
+                if tap_count >= 2:
+                    time.sleep(0.04)
+        return self._send_window_pos(x, y, run)
+
+    def _click_bg_window(self, x, y, btn, duration, count) -> bool:
+        down, up, dbl, mk, _, _ = _MOUSE_BUTTONS[btn]
+        lp = _lparam(x, y)
+        def run(send):
+            send(_WM_MOUSEMOVE, 0, lp)
+            for i in range(max(1, int(count))):
+                msg = dbl if (count >= 2 and i > 0) else down
+                send(msg, mk, lp)
+                time.sleep(max(0.02, float(duration)))
+                send(up, 0, lp)
+                if count >= 2:
+                    time.sleep(0.04)
+        return self._send_window_pos(x, y, run)
+
+    # ── anchored-touch input (InjectSyntheticPointerInput) ────────────────────
+    def _touch_device(self):
+        """Lazily build the synthetic touch device (None when unsupported)."""
+        if self._touch_dev is None:
+            try:
+                from .pointer import SyntheticTouch
+                self._touch_dev = SyntheticTouch()
+            except Exception as exc:
+                log_warning(f"[win32] anchored_touch không khả dụng: {exc}")
+                self._touch_dev = False
+        return self._touch_dev or None
+
+    def _anchored_screen_xy(self, x: int, y: int):
+        try:
+            return self._w[1].ClientToScreen(self.hwnd, (int(x), int(y)))
+        except Exception:
+            return None
+
+    def _anchored_ready(self, sx: int, sy: int):
+        """Temporarily raise the window when the contact point is covered.
+
+        Returns a restore callable (or None) plus True/False. Synthetic contacts
+        are routed by the window under the screen point, so an occluded target
+        would receive nothing — worse, the covering window would. When the point
+        is covered we raise the target to topmost with alpha 1 for the duration
+        of the touch and then put its styles back.
+        """
+        win32gui, win32api = self._w[1], self._w[4]
+        try:
+            def top_root(hw):
+                # GA_ROOT (2) — the top-level owner. GA_PARENT would walk all the
+                # way up to the desktop window and never match the target.
+                try:
+                    return win32gui.GetAncestor(hw, 2) or hw
+                except Exception:
+                    return hw
+            if top_root(win32gui.WindowFromPoint((int(sx), int(sy)))) == self.hwnd:
+                return True, None
+            GWL_EXSTYLE = -20
+            ex = win32api.GetWindowLong(self.hwnd, GWL_EXSTYLE)
+            prev_topmost = bool(ex & 0x00000008)   # WS_EX_TOPMOST
+            prev_layered = bool(ex & _WS_EX_LAYERED)
+            if not prev_layered:
+                win32api.SetWindowLong(self.hwnd, GWL_EXSTYLE, ex | _WS_EX_LAYERED)
+                win32gui.SetWindowPos(self.hwnd, 0, 0, 0, 0, 0,
+                                      _SWP_NOMOVE | _SWP_NOSIZE | _SWP_NOZORDER
+                                      | _SWP_NOACTIVATE | 0x0020)  # SWP_FRAMECHANGED
+                win32gui.SetLayeredWindowAttributes(self.hwnd, 0, 1, _LWA_ALPHA)
+            if not prev_topmost:
+                win32gui.SetWindowPos(self.hwnd, _HWND_TOPMOST, 0, 0, 0, 0,
+                                      _SWP_NOMOVE | _SWP_NOSIZE | _SWP_NOACTIVATE)
+
+            def restore():
+                try:
+                    if not prev_topmost:
+                        win32gui.SetWindowPos(self.hwnd, _HWND_NOTOPMOST, 0, 0, 0, 0,
+                                              _SWP_NOMOVE | _SWP_NOSIZE | _SWP_NOACTIVATE)
+                    if not prev_layered:
+                        cur = win32api.GetWindowLong(self.hwnd, GWL_EXSTYLE)
+                        win32api.SetWindowLong(self.hwnd, GWL_EXSTYLE,
+                                               cur & ~_WS_EX_LAYERED)
+                        win32gui.SetWindowPos(self.hwnd, 0, 0, 0, 0, 0,
+                                              _SWP_NOMOVE | _SWP_NOSIZE | _SWP_NOZORDER
+                                              | _SWP_NOACTIVATE | 0x0020)
+                except Exception:
+                    pass
+
+            # The compositor needs a few frames to re-stack; polling beats a
+            # fixed sleep (it can take ~400 ms, but is usually far quicker).
+            deadline = time.monotonic() + 0.6
+            while time.monotonic() < deadline:
+                if top_root(win32gui.WindowFromPoint((int(sx), int(sy)))) == self.hwnd:
+                    return True, restore
+                time.sleep(0.02)
+            restore()
+            return False, None
+        except Exception as exc:
+            log_debug(f"[win32] anchored_touch raise lỗi: {exc}")
+            return False, None
+
+    def _tap_anchored(self, x, y, duration, tap_count) -> bool:
+        dev = self._touch_device()
+        if dev is None or not dev.ready:
+            if not self._anchored_warned:
+                self._anchored_warned = True
+                log_warning("[win32] anchored_touch cần Windows 10 1809+ — "
+                            "tạm dùng PostMessage. Đổi Input mode trong Project settings.")
+            return self._tap_bg(x, y, duration, tap_count)
+        pt = self._anchored_screen_xy(x, y)
+        if pt is None:
+            return False
+        sx, sy = pt
+        ready, restore = self._anchored_ready(sx, sy)
+        if not ready:
+            if not self._anchored_warned:
+                self._anchored_warned = True
+                log_warning("[win32] anchored_touch: điểm chạm bị cửa sổ khác che — "
+                            "không thể đảm bảo đúng cửa sổ nhận input. "
+                            "Hãy để cửa sổ game lộ ra, hoặc dùng input mode khác.")
+            return False
+        try:
+            for i in range(max(1, int(tap_count))):
+                if not dev.down(sx, sy):
+                    return False
+                time.sleep(max(0.02, float(duration)))
+                if not dev.up(sx, sy):
+                    return False
+                if tap_count >= 2:
+                    time.sleep(0.06)
+            return True
+        finally:
+            if restore:
+                restore()
+
+    def _swipe_anchored(self, x1, y1, x2, y2, duration) -> bool:
+        dev = self._touch_device()
+        if dev is None or not dev.ready:
+            if not self._anchored_warned:
+                self._anchored_warned = True
+                log_warning("[win32] anchored_touch cần Windows 10 1809+ — "
+                            "tạm dùng PostMessage swipe.")
+            return self._swipe_bg(x1, y1, x2, y2, duration)
+        p1 = self._anchored_screen_xy(x1, y1)
+        p2 = self._anchored_screen_xy(x2, y2)
+        if p1 is None or p2 is None:
+            return False
+        sx1, sy1 = p1
+        sx2, sy2 = p2
+        ready, restore = self._anchored_ready((sx1 + sx2) // 2, (sy1 + sy2) // 2)
+        if not ready:
+            if not self._anchored_warned:
+                self._anchored_warned = True
+                log_warning("[win32] anchored_touch: điểm chạm bị che — swipe bỏ qua")
+            return False
+        steps = max(2, int(max(1, duration) / 15))
+        try:
+            if not dev.down(sx1, sy1):
+                return False
+            for i in range(1, steps + 1):
+                cx = int(sx1 + (sx2 - sx1) * i / steps)
+                cy = int(sy1 + (sy2 - sy1) * i / steps)
+                if not dev.update(cx, cy):
+                    return False
+                time.sleep(duration / 1000.0 / steps)
+            if not dev.up(sx2, sy2):
+                return False
+            return True
+        finally:
+            if restore:
+                restore()
+
+    def _multi_tap_anchored(self, points, duration_ms) -> bool:
+        dev = self._touch_device()
+        if dev is None or not dev.ready:
+            return all(self._tap_bg(x, y, duration=0.02) for x, y in points)
+        spots = []
+        for x, y in points:
+            pt = self._anchored_screen_xy(x, y)
+            if pt is None:
+                return False
+            spots.append(pt)
+        # One device, several contacts: down all, hold, up all.
+        ready, restore = self._anchored_ready(spots[0][0], spots[0][1])
+        if not ready:
+            return False
+        try:
+            for i, (sx, sy) in enumerate(spots):
+                if not dev.down(sx, sy, contact=i):
+                    return False
+            time.sleep(max(0.02, min(10.0, int(duration_ms) / 1000.0)))
+            ok = True
+            for i, (sx, sy) in enumerate(spots):
+                if not dev.up(sx, sy, contact=i):
+                    ok = False
+            return ok
+        finally:
+            if restore:
+                restore()
+
     def _send(self, msg: int, wparam: int, lparam: int) -> None:
         """SendMessage with an abort-if-hung timeout so a frozen game can't
         stall the whole engine thread."""
@@ -824,6 +1132,10 @@ class Win32Controller:
             return False
         if self._foreground():
             return self._tap_fg(x, y, duration, tap_count)
+        if self._anchored_mode():
+            return self._tap_anchored(x, y, duration, tap_count)
+        if self._window_mode():
+            return self._tap_bg_window(x, y, duration, tap_count)
         if self._cursor_mode():
             return self._tap_bg_cursor(x, y, duration, tap_count)
         return self._tap_bg(x, y, duration, tap_count)
@@ -838,7 +1150,9 @@ class Win32Controller:
         clean = [(int(x), int(y)) for x, y in points][:10]
         if not self.hwnd or not clean:
             return False
-        if self._foreground() or self._cursor_mode():
+        if self._anchored_mode():
+            return self._multi_tap_anchored(clean, duration_ms)
+        if self._foreground() or self._cursor_mode() or self._window_mode():
             log_warning("[win32] multi-point tap: current input mode has one cursor; using rapid sequence")
             return all(self.tap(x, y, duration=0.02, tap_count=1) for x, y in clean)
         try:
@@ -968,15 +1282,38 @@ class Win32Controller:
             self._input_error("tap(fg)", exc)
             return False
 
+    def _swipe_bg(self, x1, y1, x2, y2, duration) -> bool:
+        """Background message swipe (PostMessage / SendMessage per mode)."""
+        steps = max(2, int(max(1, duration) / 15))
+        try:
+            self._dispatch(_WM_LBUTTONDOWN, _MK_LBUTTON, _lparam(x1, y1))
+            for i in range(1, steps + 1):
+                cx = int(x1 + (x2 - x1) * i / steps)
+                cy = int(y1 + (y2 - y1) * i / steps)
+                self._dispatch(_WM_MOUSEMOVE, _MK_LBUTTON, _lparam(cx, cy))
+                time.sleep(duration / 1000.0 / steps)
+            self._dispatch(_WM_LBUTTONUP, 0, _lparam(x2, y2))
+            return True
+        except Exception as exc:
+            self._input_error("swipe(bg)", exc)
+            return False
+
     def swipe(self, x1: int, y1: int, x2: int, y2: int, duration: int = 300) -> bool:
         if not self.hwnd:
             return False
+        if self._anchored_mode():
+            return self._swipe_anchored(x1, y1, x2, y2, duration)
         if self._cursor_mode():
             return self._swipe_bg_cursor(x1, y1, x2, y2, duration)
-        steps = max(2, int(max(1, duration) / 15))
-        try:
-            if self._foreground():
-                win32gui, win32api = self._w[1], self._w[4]
+        if self._window_mode():
+            # Window-pos cannot trace a cursor path without moving the window on
+            # every step (it would jitter the whole frame); a message swipe is
+            # the pragmatic choice, matching how most flows use swipes.
+            return self._swipe_bg(x1, y1, x2, y2, duration)
+        if self._foreground():
+            steps = max(2, int(max(1, duration) / 15))
+            win32gui, win32api = self._w[1], self._w[4]
+            try:
                 if not self.activate():
                     return False
                 time.sleep(0.03)
@@ -990,19 +1327,11 @@ class Win32Controller:
                     win32api.SetCursorPos((px, py))
                     time.sleep(duration / 1000.0 / steps)
                 win32api.mouse_event(_ME_LUP, 0, 0, 0, 0)
-            else:
-                win32gui = self._w[1]
-                self._dispatch(_WM_LBUTTONDOWN, _MK_LBUTTON, _lparam(x1, y1))
-                for i in range(1, steps + 1):
-                    cx = int(x1 + (x2 - x1) * i / steps)
-                    cy = int(y1 + (y2 - y1) * i / steps)
-                    self._dispatch(_WM_MOUSEMOVE, _MK_LBUTTON, _lparam(cx, cy))
-                    time.sleep(duration / 1000.0 / steps)
-                self._dispatch(_WM_LBUTTONUP, 0, _lparam(x2, y2))
-            return True
-        except Exception as exc:
-            self._input_error("swipe", exc)
-            return False
+                return True
+            except Exception as exc:
+                self._input_error("swipe(fg)", exc)
+                return False
+        return self._swipe_bg(x1, y1, x2, y2, duration)
 
     def drag(self, x1: int, y1: int, x2: int, y2: int, duration: int = 300) -> bool:
         return self.swipe(x1, y1, x2, y2, duration)
@@ -1076,10 +1405,18 @@ class Win32Controller:
             return False
         if not self.hwnd:
             return False
+        if self._anchored_mode():
+            # Synthetic pointers carry a touch contact, which has no right/middle
+            # button; fall back to window-pos for those so no cursor is moved.
+            if btn == "left":
+                return self.tap(x, y, duration=duration, tap_count=click_count)
+            return self._click_bg_window(x, y, btn, duration, click_count)
         if self._foreground():
             return self._click_fg(x, y, btn, duration, click_count)
         if self._cursor_mode():
             return self._click_bg_cursor(x, y, btn, duration, click_count)
+        if self._window_mode():
+            return self._click_bg_window(x, y, btn, duration, click_count)
         return self._click_bg(x, y, btn, duration, click_count)
 
     def _click_bg(self, x, y, btn, duration, count) -> bool:
@@ -1185,6 +1522,14 @@ class Win32Controller:
                 return True
             msg = _WM_MOUSEHWHEEL if horizontal else _WM_MOUSEWHEEL
             lp = _lparam(sx, sy)
+            if self._window_mode():
+                def run(send):
+                    for _ in range(abs(n)):
+                        delta = _WHEEL_DELTA if n > 0 else -_WHEEL_DELTA
+                        wparam = (delta & 0xFFFF) << 16
+                        send(msg, wparam, lp)
+                        time.sleep(0.02)
+                return self._send_window_pos(x, y, run)
             saved = None
             if self._cursor_mode():
                 try:
@@ -1222,6 +1567,10 @@ class Win32Controller:
         if not self.hwnd:
             return False
         lp = _lparam(x, y)
+        if self._window_mode():
+            # Slide the window once so the hover point is under the pointer,
+            # post the move, then restore (hover is inherently transient here).
+            return self._send_window_pos(x, y, lambda send: send(_WM_MOUSEMOVE, 0, lp))
         try:
             if self._foreground() or self._cursor_mode():
                 win32gui, win32api = self._w[1], self._w[4]

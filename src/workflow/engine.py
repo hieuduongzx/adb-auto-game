@@ -747,6 +747,19 @@ class WorkflowEngine:
         )
         self._capture_backend = str(cap_raw or "").strip().lower()
         self._apply_capture_backend()
+        # ADB input transport for this flow ("adb" | "scrcpy"). Key "input"
+        # (also accept legacy inputBackend / input_backend); empty keeps the
+        # process default (adb shell). Win32 flows ignore this — their transport
+        # is win32.inputMode instead.
+        in_raw = (
+            self.flow.get("input")
+            if self.flow.get("input") not in (None, "")
+            else self.flow.get("inputBackend")
+            if self.flow.get("inputBackend") not in (None, "")
+            else self.flow.get("input_backend")
+        )
+        self._input_backend = str(in_raw or "").strip().lower()
+        self._apply_input_backend()
         self._functions = {f.get("id"): f for f in (self.flow.get("functions") or []) if f.get("id")}
         # Global vars: declared at flow top level (``globals``), seeded into every
         # thread below. Reset the shared runtime dict on (re)load.
@@ -848,6 +861,27 @@ class WorkflowEngine:
             log_info(f"[workflow] Capture backend: {name}")
         except Exception as e:
             log_warning(f"[workflow] Không đổi được capture backend '{name}': {e}")
+
+    def _apply_input_backend(self) -> None:
+        """Apply the flow's ADB input transport ("adb" shell vs "scrcpy" control).
+
+        Empty / missing key leaves the process default alone. Only meaningful
+        for ADB flows; Win32 uses ``win32.inputMode`` instead.
+        """
+        name = getattr(self, "_input_backend", "") or ""
+        if name not in ("adb", "scrcpy"):
+            return
+        try:
+            from src.core.adb.input import (
+                get_input_backend,
+                set_input_backend,
+            )
+            if get_input_backend() == name:
+                return
+            set_input_backend(name)
+            log_info(f"[workflow] ADB input backend: {name}")
+        except Exception as e:
+            log_warning(f"[workflow] Không đổi được ADB input backend '{name}': {e}")
 
     def _flow_has_node_type(self, *ntypes: str) -> bool:
         """True if any activity/function graph in the loaded flow contains a
@@ -3877,7 +3911,10 @@ class WorkflowEngine:
         # An instance that is still shutting down would answer the *old* ADB
         # session; give it a moment before polling for the fresh boot.
         time.sleep(3.0)
-        port = self._emulator_adb_port(p, kind, index)
+        # Use the resolved install path for console-reported ports. A restart
+        # node using `emulator: "last"` often leaves `path` blank.
+        port_params = {**p, "path": path}
+        port = self._emulator_adb_port(port_params, kind, index)
         host = f"127.0.0.1:{port}" if port else None
         if not host:
             log_warning(f"[workflow] 🖥 Không suy ra được cổng ADB của '{kind}' #{index} — bỏ qua bước chờ")
@@ -4551,4 +4588,3 @@ class WorkflowEngine:
                 log_warning(f"[workflow] 🧊 màn hình chưa ổn định sau {timeout:g}s")
                 return False
         return False
-

@@ -30,6 +30,12 @@ window.__recv = function(raw){
     setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (fast/headless)"));
     return;
   }
+  if(type==="input_backend"){
+    S.inputBackend=data.backend||"adb";
+    const sel=$("wf-input-select"); if(sel) sel.value=S.inputBackend;
+    setStatus("ADB input: "+(S.inputBackend==="scrcpy"?"scrcpy control (fast)":"ADB shell input"));
+    return;
+  }
   if(type==="workflow_state"){ wfSetRunning(!!data.running); return; }
   if(type==="capture_failed"){
     // From the Preview tab's live mirror — surface the error and refresh the
@@ -259,6 +265,25 @@ async function wfApplyCaptureBackend(backend){
   if(typeof WF!=="undefined") WF.captureBackend=S.captureBackend;
   const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
 }
+// ADB input transport (shell vs scrcpy control). Persisted on the workflow so
+// each game keeps its own choice; applied process-wide for preview + runs.
+async function onInputBackendChange(backend){
+  if(typeof WF!=="undefined") WF.inputBackend=(backend==="scrcpy")?"scrcpy":"adb";
+  if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
+  await wfApplyInputBackend(backend);
+  setStatus("ADB input: "+(S.inputBackend==="scrcpy"?"scrcpy control (fast)":"ADB shell input")+" — saved with workflow");
+}
+async function wfApplyInputBackend(backend){
+  const want=(backend==="scrcpy")?"scrcpy":"adb";
+  try{
+    const r=await api().set_input_backend(want);
+    S.inputBackend=(r&&r.backend)||want;
+  }catch{
+    S.inputBackend=want;
+  }
+  if(typeof WF!=="undefined") WF.inputBackend=S.inputBackend;
+  const sel=$("wf-input-select"); if(sel && document.activeElement!==sel) sel.value=S.inputBackend;
+}
 // New blank workflow — name + controller (ADB/Win32) + capture (scrcpy/ADB).
 async function wfNew(){
   if(WF.activities.length || WF.functions.length){
@@ -284,6 +309,8 @@ async function wfNew(){
   WF.ocrBackend=""; if(typeof wfSyncOcrUI==="function") wfSyncOcrUI();
   WF.captureBackend=capture;
   if(typeof wfApplyCaptureBackend==="function") wfApplyCaptureBackend(capture);
+  WF.inputBackend="adb";
+  if(typeof wfApplyInputBackend==="function") wfApplyInputBackend("adb");
   WF.activities=[]; WF.functions=[]; WF.edit={kind:"activity",id:null};
   WF.sel=[]; WF.selectedNode=null; wfPan={x:0,y:0}; wfZoom=1; wfRunNode=null;
   if(typeof wfResetRunViz==="function") wfResetRunViz();   // blank doc — no stale run trail
@@ -351,7 +378,7 @@ function wfPromptNewWorkflow(){
           `</div>`+
           `<div class="wf-new-field" id="wf-new-input-field" style="display:none">`+
             `<div class="ui-modal-lbl">Win32 input mode</div>`+
-            `<div class="choice-seg choice-seg-4" data-field="inputMode" role="group" aria-label="Win32 input mode">`+
+            `<div class="choice-seg" data-field="inputMode" role="group" aria-label="Win32 input mode">`+
               `<button type="button" class="choice on" data-value="background">`+
                 `<span class="choice-title">Background</span>`+
                 `<span class="choice-sub">PostMessage</span>`+
@@ -363,6 +390,14 @@ function wfPromptNewWorkflow(){
               `<button type="button" class="choice" data-value="background_cursor">`+
                 `<span class="choice-title">Cursor</span>`+
                 `<span class="choice-sub">Unity / Unreal</span>`+
+              `</button>`+
+              `<button type="button" class="choice" data-value="background_window">`+
+                `<span class="choice-title">Window</span>`+
+                `<span class="choice-sub">No cursor move</span>`+
+              `</button>`+
+              `<button type="button" class="choice" data-value="anchored_touch">`+
+                `<span class="choice-title">Anchored</span>`+
+                `<span class="choice-sub">WM_POINTER</span>`+
               `</button>`+
               `<button type="button" class="choice" data-value="foreground">`+
                 `<span class="choice-title">Foreground</span>`+

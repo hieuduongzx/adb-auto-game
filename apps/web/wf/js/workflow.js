@@ -65,6 +65,7 @@ const WF_ICONS = {
   move:       '<polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/>',
   // ui chrome
   x:          '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
+  plus:       '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   check:      '<polyline points="4 12.5 9.5 18 20 6"/>',
   chevron_up: '<polyline points="6 15 12 9 18 15"/>',
   chevron_dn: '<polyline points="6 9 12 15 18 9"/>',
@@ -564,6 +565,10 @@ const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities
   // Screen capture source for ADB projects: "scrcpy" (fast/headless) or "adb"
   // (screencap). Saved into the flow JSON (key "capture") per game workflow.
   captureBackend:"scrcpy",
+  // Input transport for ADB projects: "adb" (shell `input`, most compatible) or
+  // "scrcpy" (control socket, far lower latency). Saved into the flow JSON
+  // (key "input") per game workflow.
+  inputBackend:"adb",
   // Project-wide defaults applied to EVERY newly-created node (seeded by
   // wfNewNode). Edited from the Inspector's Timing / Failure-handling gear
   // (wfNodeDefaultsModal), saved into the flow JSON (key "nodeDefaults") so the
@@ -747,7 +752,8 @@ function wfPopulateOcrBackends(backs){
 }
 // ── Project controller (ADB vs Win32) ────────────────────────────────────────
 const WF_WIN_MATCH_MODES=new Set(["title","class","pid","exe"]);
-const WF_WIN_INPUT_MODES=new Set(["background","background_sync","background_cursor","foreground"]);
+const WF_WIN_INPUT_MODES=new Set(["background","background_sync","background_cursor",
+  "background_window","anchored_touch","foreground"]);
 function wfNormWinMatchBy(value){
   const mode=String(value||"").trim().toLowerCase();
   return WF_WIN_MATCH_MODES.has(mode)?mode:"title";
@@ -797,6 +803,8 @@ function wfSyncControllerUI(){
   const win=$("wf-win32-window"); if(win && document.activeElement!==win) win.value=w.window||"";
   const mb=$("wf-win32-matchby"); if(mb) mb.value=wfNormWinMatchBy(w.matchBy);
   const md=$("wf-win32-mode"); if(md) md.value=wfNormWinInputMode(w.inputMode);
+  const inSel=$("wf-input-select");
+  if(inSel && document.activeElement!==inSel) inSel.value=(WF.inputBackend==="scrcpy")?"scrcpy":"adb";
   wfSyncPackageUI();
   wfSyncSpeedUI();   // speed-hack visibility depends on the controller
   wfSyncBackendChrome();
@@ -928,6 +936,15 @@ function wfOpenProjectSettings(){
         `<input id="wf-package" class="mono" type="text" placeholder="com.game.package" spellcheck="false" autocomplete="off" title="Target Android package">`+
         `<div class="hint">Used by speed hack and as a default for Launch / Stop app blocks.</div>`;
       secAdb.appendChild(rowPkg);
+      const rowInput=document.createElement("div"); rowInput.className="wf-proj-row";
+      rowInput.innerHTML=
+        `<label for="wf-input-select">Input method</label>`+
+        `<select id="wf-input-select" title="How taps/swipes reach the device">`+
+          `<option value="adb">ADB shell — compatible</option>`+
+          `<option value="scrcpy">scrcpy control — fast</option>`+
+        `</select>`+
+        `<div class="hint">scrcpy control injects input over the existing mirror socket (much lower latency); falls back to ADB shell automatically.</div>`;
+      secAdb.appendChild(rowInput);
       form.appendChild(secAdb);
 
       // ── Win32 target ──────────────────────────────────────────────────────
@@ -956,6 +973,8 @@ function wfOpenProjectSettings(){
             `<option value="background">Background — PostMessage</option>`+
             `<option value="background_sync">Background sync — SendMessage</option>`+
             `<option value="background_cursor">Background + cursor — Unity / Unreal</option>`+
+            `<option value="background_window">Window-pos — no cursor move</option>`+
+            `<option value="anchored_touch">Anchored touch — WM_POINTER</option>`+
             `<option value="foreground">Foreground — real mouse</option>`+
           `</select>`+
         `</div>`;
@@ -1006,6 +1025,8 @@ function wfOpenProjectSettings(){
         pkg.addEventListener("change",()=>{ if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced(); setStatus(WF.package?("Package: "+WF.package):"Package cleared"); });
       }
       const ocr=q("wf-ocr-select"); if(ocr){ wfFillOcrSelect(ocr); ocr.onchange=()=>wfOcrChanged(); }
+      const inSel=q("wf-input-select");
+      if(inSel) inSel.onchange=()=>{ if(typeof onInputBackendChange==="function") onInputBackendChange(inSel.value); };
       const winEl=q("wf-win32-window");
       if(winEl){
         winEl.addEventListener("input",()=>{ const w=WF.win32||(WF.win32={}); w.window=(winEl.value||"").trim(); });
@@ -1028,6 +1049,7 @@ function wfOpenProjectSettings(){
       if(winEl) winEl.value=w.window||"";
       if(mb) mb.value=wfNormWinMatchBy(w.matchBy);
       if(md) md.value=wfNormWinInputMode(w.inputMode);
+      if(inSel) inSel.value=(WF.inputBackend==="scrcpy")?"scrcpy":"adb";
       const win32=(WF.controller==="win32");
       const adbSec=q("wf-proj-adb-sec"); if(adbSec) adbSec.style.display=win32?"none":"";
       const winSec=q("wf-proj-win32-sec"); if(winSec) winSec.style.display=win32?"":"none";

@@ -48,6 +48,11 @@ from src.core.adb.auto.scrcpy_capture import (
     set_capture_backend,
     stop_scrcpy_sources,
 )
+from src.core.adb.input import (
+    INPUT_BACKENDS as ADB_INPUT_BACKENDS,
+    get_input_backend as get_adb_input_backend,
+    set_input_backend as set_adb_input_backend,
+)
 from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.utils import (
@@ -221,6 +226,8 @@ class DevScopeAPI:
             "outDir": self._out_dir,
             "captureBackend": get_capture_backend(),
             "captureBackends": list(CAPTURE_BACKENDS),
+            "inputBackend": get_adb_input_backend(),
+            "inputBackends": list(ADB_INPUT_BACKENDS),
             "log": self._log_buffer[-300:],
         }
 
@@ -228,6 +235,12 @@ class DevScopeAPI:
         selected = set_capture_backend(backend)
         self._push("capture_backend", {"backend": selected})
         return {"backend": selected, "backends": list(CAPTURE_BACKENDS)}
+
+    def set_input_backend(self, backend: str) -> dict:
+        """Select the ADB input transport (shell "adb" vs "scrcpy" control)."""
+        selected = set_adb_input_backend(backend)
+        self._push("input_backend", {"backend": selected})
+        return {"backend": selected, "backends": list(ADB_INPUT_BACKENDS)}
 
     # ── Device ops ───────────────────────────────────────────────────────────
 

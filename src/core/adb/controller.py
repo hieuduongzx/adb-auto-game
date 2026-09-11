@@ -303,12 +303,32 @@ class ADBController:
             log_error(f"Error getting screen size: {e}")
             return (0, 0)
     
+    def _scrcpy_session(self):
+        """Fast input session for the ``scrcpy`` backend, or None.
+
+        Returns None for the default ``adb`` backend, for a Win32 stand-in, and
+        whenever the device isn't connected — callers then use the shell path.
+        """
+        if self.device is None:
+            return None
+        try:
+            from .input import control_session
+            return control_session(self)
+        except Exception as e:
+            log_debug(f"scrcpy input session unavailable: {e}")
+            return None
+
     def tap(self, x: int, y: int, duration: float = 0.1, tap_count: int = 1) -> bool:
         """Tap at coordinates.
 
         ``duration`` is the delay applied between taps (and after the last tap)
         when ``tap_count > 1``. For a single tap it is the post-tap delay.
         """
+        sess = self._scrcpy_session()
+        if sess is not None and sess.tap(x, y, tap_count=tap_count):
+            if duration > 0:
+                time.sleep(duration)   # same post-tap pacing as the shell path
+            return True
         try:
             cmd = f"input touchscreen tap {x} {y}"
             for i in range(tap_count):
@@ -331,6 +351,9 @@ class ADBController:
         if len(clean) < 2:
             return self.tap(*clean[0]) if clean else False
         duration_ms = max(20, min(10_000, int(duration_ms)))
+        sess = self._scrcpy_session()
+        if sess is not None and sess.multi_tap(clean, duration_ms=duration_ms):
+            return True
         try:
             jobs = [
                 f"(input touchscreen swipe {x} {y} {x} {y} {duration_ms}) &"
@@ -344,6 +367,9 @@ class ADBController:
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int, duration: int = 300) -> bool:
         """Swipe from one point to another"""
+        sess = self._scrcpy_session()
+        if sess is not None and sess.swipe(x1, y1, x2, y2, duration=duration):
+            return True
         try:
             self.device.shell(f"input touchscreen swipe {x1} {y1} {x2} {y2} {duration}")
             return True
@@ -353,6 +379,9 @@ class ADBController:
     
     def drag(self, x1: int, y1: int, x2: int, y2: int, duration: int = 300) -> bool:
         """Drag gesture"""
+        sess = self._scrcpy_session()
+        if sess is not None and sess.swipe(x1, y1, x2, y2, duration=duration):
+            return True
         try:
             self.device.shell(f"input swipe {x1} {y1} {x2} {y2} {duration}")
             return True
@@ -362,6 +391,9 @@ class ADBController:
     
     def hold_and_release(self, x: int, y: int, duration: int = 1000) -> bool:
         """Hold and release at coordinates"""
+        sess = self._scrcpy_session()
+        if sess is not None and sess.tap(x, y, tap_count=1, hold=duration / 1000.0):
+            return True
         try:
             self.device.shell(f"input touchscreen swipe {x} {y} {x} {y} {duration}")
             return True
@@ -376,6 +408,9 @@ class ADBController:
         metacharacters well, so the text is quoted with ``shlex`` and spaces
         are replaced with ``%s`` (the convention recognised by ``input text``).
         """
+        sess = self._scrcpy_session()
+        if sess is not None and sess.send_text(text):
+            return True
         try:
             sanitized = text.replace(" ", "%s")
             self.device.shell(f"input text {shlex.quote(sanitized)}")
@@ -386,6 +421,9 @@ class ADBController:
     
     def press_key(self, keycode: int) -> bool:
         """Press a key by keycode"""
+        sess = self._scrcpy_session()
+        if sess is not None and sess.press_key(keycode):
+            return True
         try:
             self.device.shell(f"input keyevent {keycode}")
             return True

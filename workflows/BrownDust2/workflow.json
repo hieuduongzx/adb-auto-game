@@ -7,10 +7,11 @@
   "controller": "win32",
   "ocr": "",
   "capture": "scrcpy",
+  "input": "adb",
   "win32": {
     "window": "BrownDust II",
     "matchBy": "title",
-    "inputMode": "background_cursor"
+    "inputMode": "foreground"
   },
   "speedhack": {
     "enabled": false,
@@ -71,7 +72,7 @@
             "y": 24,
             "params": {
               "templates": [
-                "templates/crop_20260715_152200_1427_32_25_30.png",
+                "templates/crop_20260911_103328_1784_54_29_21.png",
                 "templates/crop_20260715_152009_155_28_43_45.png"
               ],
               "taps": "1",
@@ -270,6 +271,73 @@
       "maxRetries": 1
     },
     {
+      "id": "sequence_j5eg",
+      "name": "Đóng Bảng Thông Báo",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "ncc3ozlv",
+            "type": "start",
+            "x": 60,
+            "y": 72,
+            "params": {}
+          },
+          {
+            "id": "ndtfw0zt",
+            "type": "end",
+            "x": 520,
+            "y": 72,
+            "params": {}
+          },
+          {
+            "id": "nrh52doh",
+            "type": "call",
+            "x": 120,
+            "y": 60,
+            "params": {
+              "fn": "fn_pmuop"
+            }
+          },
+          {
+            "id": "nf0v911p",
+            "type": "tap",
+            "x": 320,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 1056,
+              "y": 141,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          }
+        ],
+        "edges": [
+          {
+            "from": "ncc3ozlv",
+            "fromPort": "out",
+            "to": "nrh52doh"
+          },
+          {
+            "from": "nrh52doh",
+            "fromPort": "true",
+            "to": "nf0v911p"
+          },
+          {
+            "from": "nf0v911p",
+            "fromPort": "out",
+            "to": "ndtfw0zt"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
       "id": "sequence_3whp",
       "name": "Claim",
       "type": "sequence",
@@ -280,27 +348,40 @@
           {
             "id": "n0kjvi2x",
             "type": "start",
-            "x": 48,
-            "y": 72,
+            "x": -40,
+            "y": 38,
             "params": {}
           },
           {
             "id": "nk5815cu",
             "type": "end",
-            "x": 320,
-            "y": 72,
+            "x": 440,
+            "y": 54,
             "params": {}
           },
           {
             "id": "nxzi0ikl",
             "type": "tap",
-            "x": 120,
-            "y": 60,
+            "x": 240,
+            "y": 26,
             "params": {
               "target": "pos",
               "x": 1413,
               "y": 886,
               "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nwhex63x",
+            "type": "if_image",
+            "x": 40,
+            "y": 26,
+            "params": {
+              "template": "templates/crop_20260911_103126_1393_873_40_26.png",
+              "threshold": 0.85,
+              "negate": false
             },
             "delayBefore": 1,
             "delayAfter": 1
@@ -310,11 +391,21 @@
           {
             "from": "n0kjvi2x",
             "fromPort": "out",
+            "to": "nwhex63x"
+          },
+          {
+            "from": "nwhex63x",
+            "fromPort": "true",
             "to": "nxzi0ikl"
           },
           {
             "from": "nxzi0ikl",
             "fromPort": "out",
+            "to": "nwhex63x"
+          },
+          {
+            "from": "nwhex63x",
+            "fromPort": "false",
             "to": "nk5815cu"
           }
         ],
@@ -357,7 +448,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1,
+            "delayBefore": 3,
             "delayAfter": 1
           },
           {
@@ -610,7 +701,7 @@
           {
             "id": "ngdxu50l",
             "type": "start",
-            "x": -140,
+            "x": -160,
             "y": 72,
             "params": {}
           },
@@ -666,7 +757,8 @@
             "y": 60,
             "params": {
               "fn": "fn_pmuop"
-            }
+            },
+            "delayBefore": 3
           },
           {
             "id": "n67s00px",
@@ -717,6 +809,150 @@
             "from": "n67s00px",
             "fromPort": "false",
             "to": "n99tnosz"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_l1f0",
+      "name": "Refinement",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nmq3q1do",
+            "type": "start",
+            "x": 48,
+            "y": 72,
+            "params": {}
+          },
+          {
+            "id": "nse90g1m",
+            "type": "end",
+            "x": 1340,
+            "y": 72,
+            "params": {}
+          },
+          {
+            "id": "nwq946hu",
+            "type": "call",
+            "x": 120,
+            "y": 60,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 3
+          },
+          {
+            "id": "ni987oqm",
+            "type": "tap",
+            "x": 320,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 366,
+              "y": 981,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nv9dihit",
+            "type": "tap",
+            "x": 520,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 173,
+              "y": 249,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nkaiuege",
+            "type": "tap",
+            "x": 720,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 1171,
+              "y": 579,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n5xd2xuq",
+            "type": "tap",
+            "x": 920,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 1366,
+              "y": 736,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n8kwnftq",
+            "type": "tap",
+            "x": 1120,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 1589,
+              "y": 1007,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          }
+        ],
+        "edges": [
+          {
+            "from": "nmq3q1do",
+            "fromPort": "out",
+            "to": "nwq946hu"
+          },
+          {
+            "from": "nwq946hu",
+            "fromPort": "true",
+            "to": "ni987oqm"
+          },
+          {
+            "from": "ni987oqm",
+            "fromPort": "out",
+            "to": "nv9dihit"
+          },
+          {
+            "from": "nv9dihit",
+            "fromPort": "out",
+            "to": "nkaiuege"
+          },
+          {
+            "from": "nkaiuege",
+            "fromPort": "out",
+            "to": "n5xd2xuq"
+          },
+          {
+            "from": "n5xd2xuq",
+            "fromPort": "out",
+            "to": "n8kwnftq"
+          },
+          {
+            "from": "n8kwnftq",
+            "fromPort": "out",
+            "to": "nse90g1m"
           }
         ],
         "groups": []
@@ -968,29 +1204,29 @@
       "maxRetries": 1
     },
     {
-      "id": "sequence_l1f0",
-      "name": "Refinement",
+      "id": "sequence_mvf6",
+      "name": "Nhà Hàng + Câu Cá",
       "type": "sequence",
       "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
           {
-            "id": "nmq3q1do",
+            "id": "nyq08wux",
             "type": "start",
             "x": 48,
             "y": 72,
             "params": {}
           },
           {
-            "id": "nse90g1m",
+            "id": "nh6zoclg",
             "type": "end",
-            "x": 1340,
-            "y": 72,
+            "x": 1140,
+            "y": 104,
             "params": {}
           },
           {
-            "id": "nwq946hu",
+            "id": "nq2i1hv5",
             "type": "call",
             "x": 120,
             "y": 60,
@@ -999,70 +1235,72 @@
             }
           },
           {
-            "id": "ni987oqm",
+            "id": "nze6stla",
             "type": "tap",
             "x": 320,
             "y": 60,
             "params": {
               "target": "pos",
-              "x": 366,
-              "y": 981,
+              "x": 158,
+              "y": 258,
               "taps": "1"
             },
             "delayBefore": 1,
             "delayAfter": 1
           },
           {
-            "id": "nv9dihit",
+            "id": "n8irom6t",
+            "type": "wait_image",
+            "x": 540,
+            "y": 6,
+            "params": {
+              "template": "templates/crop_20260911_104843_1034_821_114_21.png",
+              "threshold": 0.85,
+              "timeout": 10,
+              "negate": false
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nct8yol4",
+            "type": "tap_image",
+            "x": 740,
+            "y": 6,
+            "params": {
+              "template": "templates/crop_20260911_104843_1034_821_114_21.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n2ilddit",
             "type": "tap",
-            "x": 520,
-            "y": 60,
+            "x": 934,
+            "y": 6,
             "params": {
               "target": "pos",
-              "x": 173,
-              "y": 249,
+              "x": 1569,
+              "y": 777,
               "taps": "1"
             },
             "delayBefore": 1,
             "delayAfter": 1
           },
           {
-            "id": "nkaiuege",
+            "id": "nbvdjj8c",
             "type": "tap",
-            "x": 720,
-            "y": 60,
+            "x": 934,
+            "y": 92,
             "params": {
               "target": "pos",
-              "x": 1171,
-              "y": 579,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "n5xd2xuq",
-            "type": "tap",
-            "x": 920,
-            "y": 60,
-            "params": {
-              "target": "pos",
-              "x": 1366,
-              "y": 736,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "n8kwnftq",
-            "type": "tap",
-            "x": 1120,
-            "y": 60,
-            "params": {
-              "target": "pos",
-              "x": 1589,
-              "y": 1007,
+              "x": 1569,
+              "y": 777,
               "taps": "1"
             },
             "delayBefore": 1,
@@ -1071,39 +1309,39 @@
         ],
         "edges": [
           {
-            "from": "nmq3q1do",
+            "from": "nyq08wux",
             "fromPort": "out",
-            "to": "nwq946hu"
+            "to": "nq2i1hv5"
           },
           {
-            "from": "nwq946hu",
+            "from": "nq2i1hv5",
             "fromPort": "true",
-            "to": "ni987oqm"
+            "to": "nze6stla"
           },
           {
-            "from": "ni987oqm",
+            "from": "nze6stla",
             "fromPort": "out",
-            "to": "nv9dihit"
+            "to": "n8irom6t"
           },
           {
-            "from": "nv9dihit",
-            "fromPort": "out",
-            "to": "nkaiuege"
+            "from": "n8irom6t",
+            "fromPort": "true",
+            "to": "nct8yol4"
           },
           {
-            "from": "nkaiuege",
-            "fromPort": "out",
-            "to": "n5xd2xuq"
+            "from": "nct8yol4",
+            "fromPort": "true",
+            "to": "n2ilddit"
           },
           {
-            "from": "n5xd2xuq",
+            "from": "n2ilddit",
             "fromPort": "out",
-            "to": "n8kwnftq"
+            "to": "nbvdjj8c"
           },
           {
-            "from": "n8kwnftq",
+            "from": "nbvdjj8c",
             "fromPort": "out",
-            "to": "nse90g1m"
+            "to": "nh6zoclg"
           }
         ],
         "groups": []
@@ -1112,7 +1350,7 @@
     },
     {
       "id": "sequence_cuzi",
-      "name": "Activity 8",
+      "name": "Nhận Thưởng Hằng Ngày",
       "type": "sequence",
       "enabled": true,
       "vars": [],
@@ -1128,8 +1366,8 @@
           {
             "id": "nmuw42ke",
             "type": "end",
-            "x": 580,
-            "y": 300,
+            "x": 1020,
+            "y": 160,
             "params": {}
           },
           {
@@ -1204,96 +1442,6 @@
             "from": "n2phzvh8",
             "fromPort": "out",
             "to": "ntmh1oz2"
-          }
-        ],
-        "groups": []
-      },
-      "maxRetries": 1
-    },
-    {
-      "id": "sequence_j5eg",
-      "name": "Activity 7",
-      "type": "sequence",
-      "enabled": false,
-      "vars": [],
-      "graph": {
-        "nodes": [
-          {
-            "id": "ncc3ozlv",
-            "type": "start",
-            "x": 48,
-            "y": 72,
-            "params": {}
-          },
-          {
-            "id": "ndtfw0zt",
-            "type": "end",
-            "x": 440,
-            "y": -180,
-            "params": {}
-          },
-          {
-            "id": "nrh52doh",
-            "type": "call",
-            "x": 120,
-            "y": 60,
-            "params": {
-              "fn": "fn_pmuop"
-            }
-          },
-          {
-            "id": "nxi2za87",
-            "type": "tap",
-            "x": 320,
-            "y": -40,
-            "params": {
-              "target": "pos",
-              "x": 0,
-              "y": 0,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "ndwpnx43",
-            "type": "tap",
-            "x": 320,
-            "y": 160,
-            "params": {
-              "target": "pos",
-              "x": 0,
-              "y": 0,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "nf0v911p",
-            "type": "tap",
-            "x": 320,
-            "y": 60,
-            "params": {
-              "target": "pos",
-              "x": 868,
-              "y": 867,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          }
-        ],
-        "edges": [
-          {
-            "from": "ncc3ozlv",
-            "fromPort": "out",
-            "to": "nrh52doh"
-          },
-          {
-            "from": "nrh52doh",
-            "fromPort": "true",
-            "to": "nf0v911p"
           }
         ],
         "groups": []

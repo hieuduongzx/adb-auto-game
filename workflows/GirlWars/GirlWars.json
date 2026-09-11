@@ -654,11 +654,6 @@
             "to": "ni8wav38"
           },
           {
-            "from": "ni8wav38",
-            "fromPort": "true",
-            "to": "nj5xjfpu"
-          },
-          {
             "from": "nj5xjfpu",
             "fromPort": "out",
             "to": "nnz4qlmo"
@@ -677,6 +672,11 @@
             "from": "ni8wav38",
             "fromPort": "false",
             "to": "ndi8pf0t"
+          },
+          {
+            "from": "ni8wav38",
+            "fromPort": "true",
+            "to": "nj5xjfpu"
           }
         ],
         "groups": []
@@ -783,7 +783,8 @@
               "template": "templates/crop_20260909_145937_527_824_264_66.png",
               "threshold": 0.85,
               "negate": true
-            }
+            },
+            "delayBefore": 2
           }
         ],
         "edges": [
@@ -1225,7 +1226,7 @@
             "id": "nyevc8bu",
             "type": "start",
             "x": 40,
-            "y": 99,
+            "y": 96,
             "params": {}
           },
           {
@@ -2968,8 +2969,8 @@
           {
             "id": "nt73ydf8",
             "type": "end",
-            "x": 966,
-            "y": 200,
+            "x": 1400,
+            "y": 140,
             "params": {}
           },
           {

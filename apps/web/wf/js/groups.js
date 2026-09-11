@@ -261,6 +261,184 @@ function wfConnectTo(toNodeId, clientX, clientY){
   }
   return false;
 }
+
+// Quick-connect menu shown when an output wire is dropped on empty canvas.
+// It turns the most common "drop, add a block, wire it" sequence into one
+// action while keeping normal drops onto an existing node unchanged.
+// `call` is intentionally absent: a Function node is only valid with a chosen
+// function, which is what the Function submenu below is for — a bare call node
+// from here would be an empty, unrunnable block.
+const WF_QUICK_CONNECT = {
+  out:   ["wait", "tap", "if_image", "log"],
+  true:  ["end", "if_image", "wait", "log"],
+  false: ["wait", "wait_image", "log", "end"],
+  body:  ["wait", "tap", "if_image", "break"],
+  done:  ["end", "log", "wait"],
+  found: ["end", "log", "wait"],
+  fail:  ["log", "wait", "end"],
+};
+function wfQuickNodePosition(clientX, clientY){
+  const wr=$("wf-world").getBoundingClientRect();
+  return {x:wfSnap((clientX-wr.left)/wfZoom-70), y:wfSnap((clientY-wr.top)/wfZoom-14)};
+}
+function wfQuickConnectItems(port){
+  const ids=WF_QUICK_CONNECT[port]||WF_QUICK_CONNECT.out;
+  return ids.filter((id,i)=>WF_NODES[id]&&!ids.slice(0,i).includes(id)).map(type=>({
+    type, label:WF_NODES[type].label, ico:WF_NODES[type].ico,
+  }));
+}
+function wfQuickConnectAdd(type, clientX, clientY, source, port){
+  const g=wfGraph(); if(!g||!source) return;
+  const pos=wfQuickNodePosition(clientX,clientY), node=wfNewNode(type,pos.x,pos.y);
+  wfPushUndo();
+  g.nodes.push(node);
+  g.edges=g.edges.filter(e=>!(e.from===source&&e.fromPort===port));
+  const def=WF_NODES[type]||{};
+  // Quick-created nodes are always entered through their primary input. The
+  // catalog's special multi-input nodes can still be wired manually afterward.
+  g.edges.push({from:source,fromPort:port,to:node.id,toPort:"in"});
+  wfSelectOne(node.id); wfRenderCanvas(); wfRenderInspector(); wfPopNodes([node.id]);
+  setStatus(`Created ${def.label||type} and connected`);
+}
+function wfQuickConnectFunction(clientX, clientY, source, port){
+  uiPrompt({title:"Create function", label:"Function name", placeholder:"e.g. Collect rewards"}).then(value=>{
+    const name=(value||"").trim(); if(!name) return;
+    const g=wfGraph(); if(!g||!source) return;
+    const editTarget={kind:WF.edit.kind,id:WF.edit.id};
+    const fnId="fn_"+wfUid().slice(1,6), pos=wfQuickNodePosition(clientX,clientY), node=wfNewNode("call",pos.x,pos.y);
+    wfPushUndo();
+    WF.functions.push({id:fnId,name,graph:wfNewGraph()});
+    node.params={fn:fnId}; g.nodes.push(node);
+    g.edges=g.edges.filter(e=>!(e.from===source&&e.fromPort===port));
+    g.edges.push({from:source,fromPort:port,to:node.id,toPort:"in"});
+    WF.edit=editTarget; wfSelectOne(node.id); wfRenderAll(); wfPopNodes([node.id]);
+    setStatus(`Created function ${name} and connected`);
+  });
+}
+function wfQuickConnectExistingFunction(clientX, clientY, source, port, fnId){
+  const g=wfGraph(); if(!g||!source||!fnId) return;
+  const fn=wfFnById(fnId); if(!fn) return;
+  const pos=wfQuickNodePosition(clientX,clientY), node=wfNewNode("call",pos.x,pos.y);
+  wfPushUndo();
+  node.params={fn:fnId}; g.nodes.push(node);
+  g.edges=g.edges.filter(e=>!(e.from===source&&e.fromPort===port));
+  g.edges.push({from:source,fromPort:port,to:node.id,toPort:"in"});
+  wfSelectOne(node.id); wfRenderCanvas(); wfRenderInspector(); wfPopNodes([node.id]);
+  setStatus(`Connected ${fn.name||"function"}`);
+}
+// Human phrasing for the port a wire comes from — "out"/"true" are internal
+// names; a person choosing the next block reads "Next step" / "On success".
+const WF_QC_PORT = { out:"Next step", "true":"On success", "false":"On fail",
+  body:"Loop body", done:"When done", found:"When found", fail:"On fail" };
+
+function wfShowQuickConnectMenu(clientX, clientY, source, port){
+  const m=$("wf-ctxmenu"); if(!m||!source) return;
+  // Additive class only — the shared #wf-ctxmenu base styles stay applied, and
+  // other menus are untouched. wfHideMenu removes it again.
+  m.classList.add("wf-qc"); m.innerHTML="";
+  const src=wfNode(source);
+  const srcLabel=src?((WF_NODES[src.type]||{}).label||src.type):"block";
+
+  // Header: names the source block and the branch the new block joins, so the
+  // picker reads as "add the next step here", not a bare list of names.
+  const head=document.createElement("div"); head.className="wf-qc-head";
+  const badge=document.createElement("span"); badge.className="wf-qc-port";
+  badge.innerHTML=`<i></i>${escHtml(WF_QC_PORT[port]||WF_PORT_LBL[port]||port||"Output")}`;
+  const title=document.createElement("span"); title.className="wf-qc-title";
+  title.textContent="from "+srcLabel; title.title="from "+srcLabel;
+  const x=document.createElement("button"); x.type="button"; x.className="wf-qc-x";
+  x.setAttribute("aria-label","Cancel"); x.title="Cancel (Esc)";
+  x.innerHTML=wfIco("x"); x.onclick=()=>wfHideMenu();
+  head.append(badge,title,x); m.appendChild(head);
+
+  // Suggested blocks — the nodes that most often follow this port, as a 2-up
+  // chip grid (same icon-tile language as the sidebar palette).
+  const grid=document.createElement("div"); grid.className="wf-qc-grid";
+  wfQuickConnectItems(port).forEach(item=>{
+    const b=document.createElement("button"); b.type="button"; b.className="wf-qc-node";
+    b.title=`Add ${item.label} and connect`;
+    b.innerHTML=`<span class="ico">${wfIco(item.ico||"help")}</span><span class="lbl">${escHtml(item.label)}</span>`;
+    b.onclick=()=>{ wfHideMenu(); wfQuickConnectAdd(item.type,clientX,clientY,source,port); };
+    grid.appendChild(b);
+  });
+  m.appendChild(grid);
+
+  // ── Function picker: one row that reveals the submenu on hover ─────────────
+  // Every function action lives behind this single row, so the card keeps a
+  // fixed, glanceable size however many functions the workflow grows.
+  const existing=(WF.functions||[]).filter(f=>f&&f.id);
+  const fnSec=document.createElement("div"); fnSec.className="wf-qc-fn";
+  const fnWrap=document.createElement("div"); fnWrap.className="wf-qc-subwrap";
+  const fn=document.createElement("button"); fn.type="button"; fn.className="wf-qc-fnbtn";
+  fn.setAttribute("aria-haspopup","menu"); fn.setAttribute("aria-expanded","false");
+  fn.innerHTML=`<span class="ico">${wfIco("function")}</span><span class="lbl">Function</span><span class="arr">›</span>`;
+  const sub=document.createElement("div"); sub.className="wf-qc-submenu"; sub.setAttribute("role","menu");
+
+  // Open on hover, close deferred: a DIAGONAL move from the trigger into a
+  // lower row briefly crosses a dead zone where neither element is hovered, so
+  // an immediate close (or a CSS :hover rule) would hide the panel before the
+  // pointer arrives. Re-entry into either element cancels the pending close —
+  // the classic safe-travel submenu pattern.
+  let pinned=false, closeT=null;
+  const setOpen=v=>{ fnWrap.classList.toggle("open",v); fn.setAttribute("aria-expanded",v?"true":"false"); };
+  const cancelT=()=>{ if(closeT){ clearTimeout(closeT); closeT=null; } };
+  fnWrap.addEventListener("mouseenter",()=>{ cancelT(); setOpen(true); });
+  fnWrap.addEventListener("mouseleave",()=>{ cancelT(); if(pinned) return;
+    closeT=setTimeout(()=>{ closeT=null; setOpen(false); },240); });
+  sub.addEventListener("mouseenter",cancelT);
+  fnWrap.addEventListener("focusout",e=>{ if(!fnWrap.contains(e.relatedTarget)){ pinned=false; cancelT(); setOpen(false); } });
+  fn.addEventListener("click",e=>{ e.stopPropagation(); cancelT(); setOpen(true); });
+  fn.addEventListener("keydown",e=>{
+    if(e.key==="ArrowRight"){
+      e.preventDefault(); e.stopPropagation(); cancelT(); pinned=true; setOpen(true);
+      const first=sub.querySelector("button"); if(first) first.focus();
+    }
+    if(e.key==="ArrowLeft"||e.key==="Escape"){
+      e.preventDefault(); e.stopPropagation(); pinned=false; cancelT(); setOpen(false); fn.focus();
+    }
+  });
+  sub.addEventListener("keydown",e=>{
+    if(e.key==="Escape"||((e.key==="ArrowLeft") && !e.target.closest(".wf-qc-fnbtn"))){
+      e.preventDefault(); e.stopPropagation(); pinned=false; cancelT(); setOpen(false); fn.focus();
+    }
+  });
+
+  const mkSubItem=(ico,label,cls,onPick)=>{
+    const b=document.createElement("button"); b.type="button";
+    b.className="wf-qc-subitem"+(cls?" "+cls:""); b.setAttribute("role","menuitem");
+    b.innerHTML=`<span class="ico">${wfIco(ico)}</span><span class="nm">${escHtml(label)}</span>`;
+    b.onclick=onPick; return b;
+  };
+  sub.appendChild(mkSubItem("plus","New function…","new",()=>{ wfHideMenu(); wfQuickConnectFunction(clientX,clientY,source,port); }));
+  if(existing.length){
+    const hd=document.createElement("div"); hd.className="wf-qc-subhead"; hd.textContent="Existing functions";
+    sub.appendChild(hd);
+    existing.forEach(f=>sub.appendChild(mkSubItem("function",f.name||f.id,"",()=>{
+      wfHideMenu(); wfQuickConnectExistingFunction(clientX,clientY,source,port,f.id); })));
+  }
+  fnWrap.append(fn,sub); fnSec.appendChild(fnWrap); m.appendChild(fnSec);
+
+  m.style.left=clientX+"px"; m.style.top=clientY+"px"; m.style.display="block";
+  // Measure the hidden submenu once (it has no box while display:none): open it
+  // to the left when it would leave the right edge, and lift it so a long
+  // function list stays entirely on-screen.
+  sub.style.display="block"; sub.style.visibility="hidden";
+  const mr=m.getBoundingClientRect(), sr=sub.getBoundingClientRect();
+  sub.style.display=""; sub.style.visibility="";
+  if(mr.right+sr.width+8>window.innerWidth-8) sub.classList.add("flip");
+  let dy=Math.min(0,(window.innerHeight-8-sr.height)-sr.top);
+  dy=Math.max(dy, 8-sr.top);
+  if(dy) sub.style.top=dy+"px";
+
+  // Esc closes from anywhere; the outside-click handler already closes on a
+  // press elsewhere. Listener is removed in wfHideMenu.
+  m.__qcKey=e=>{ if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); wfHideMenu(); } };
+  document.addEventListener("keydown",m.__qcKey,true);
+  // Land keyboard focus on the first suggestion so the picker is reachable
+  // without the mouse (Tab/arrow/Enter); the canvas' Delete shortcuts are
+  // suppressed while focus is inside the menu.
+  const first=grid.querySelector("button"); if(first) first.focus();
+}
 // ── Insert-on-wire (palette drop) ─────────────────────────────────────────────
 // While dragging a chip from the palette, the wire under the cursor lights up;
 // dropping the chip there splices the new block into that wire: old from→to
@@ -434,6 +612,10 @@ async function wfRunSingleNode(node){
   }
 }
 function wfHideMenu(){ const m=$("wf-ctxmenu"); if(!m) return; m.style.display="none";
+  // The quick-connect picker adds an Esc listener and a layout class; tear both
+  // down here so the shared #wf-ctxmenu is pristine for the next menu.
+  if(m.__qcKey){ document.removeEventListener("keydown",m.__qcKey,true); m.__qcKey=null; }
+  m.classList.remove("wf-qc");
   if(m.__btn){ m.__btn.setAttribute("aria-expanded","false"); m.__btn=null; } m.__owner=null; }
 function wfShowMenu(clientX, clientY){
   const m=$("wf-ctxmenu"); if(!m) return;
@@ -835,11 +1017,16 @@ function wfInitCanvas(){
     if(!wfGesture) return;
     if(wfGesture.mode==="connect"){
       const tid=wfNodeUnderPointer(e.clientX,e.clientY);
+      // Snapshot before mutating the graph so Ctrl+Z removes the new wire
+      // instead of recording the already-connected state.
+      if(tid) wfPushUndo();
       const connected = tid ? wfConnectTo(tid, e.clientX, e.clientY) : false;
       wfClearTemp(); wfHighlightTarget(null);
       // A new wire changes which nodes are "wired in" → rebuild so the warning
       // badges refresh; otherwise just redraw the wires (cheaper, no node change).
-      if(connected){ wfPushUndo(); wfRenderCanvas(); } else wfDrawWires();
+      if(connected){ wfRenderCanvas(); }
+      else if(!tid) wfShowQuickConnectMenu(e.clientX,e.clientY,wfGesture.from,wfGesture.port);
+      else wfDrawWires();
     } else if(wfGesture.mode==="groupresize"){
       wfPushUndo(); wfRenderCanvas();
     } else if(wfGesture.mode==="groupdraw"){

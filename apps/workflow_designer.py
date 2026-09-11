@@ -46,6 +46,11 @@ from src.core.adb.auto.scrcpy_capture import (
     stop_scrcpy_sources,
     warm_scrcpy_source,
 )
+from src.core.adb.input import (
+    INPUT_BACKENDS as ADB_INPUT_BACKENDS,
+    get_input_backend as get_adb_input_backend,
+    set_input_backend as set_adb_input_backend,
+)
 from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.core.frida_speedhack import FridaSpeedhackManager
@@ -209,6 +214,8 @@ class WorkflowDesignerAPI:
             "selectedSerial": self._selected_serial,
             "captureBackend": get_capture_backend(),
             "captureBackends": list(CAPTURE_BACKENDS),
+            "inputBackend": get_adb_input_backend(),
+            "inputBackends": list(ADB_INPUT_BACKENDS),
             "ocrBackends": list(KNOWN_BACKENDS),
             "outDir": self._scope_out_dir or "",
             "log": self._log_buffer[-300:],
@@ -222,6 +229,12 @@ class WorkflowDesignerAPI:
         if selected == "scrcpy":
             self._warm_capture_async()
         return {"backend": selected, "backends": list(CAPTURE_BACKENDS)}
+
+    def set_input_backend(self, backend: str) -> dict:
+        """Select the ADB input transport (shell "adb" vs "scrcpy" control)."""
+        selected = set_adb_input_backend(backend)
+        self._push("input_backend", {"backend": selected})
+        return {"backend": selected, "backends": list(ADB_INPUT_BACKENDS)}
 
     # ── Live Preview capture (mirrors DevScope) ─────────────────────────────
     # Only the Preview tab drives these; auto-refresh is OFF by default and the

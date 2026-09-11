@@ -601,6 +601,75 @@
 .wf-ctx-ico svg { width:14px; height:14px; display:block; }
 .wf-ctx-item:hover .wf-ctx-ico { color:var(--accent); }
 .wf-ctx-sep { height:1px; margin:4px 6px; background:var(--border2); }
+/* ── Quick-connect picker ───────────────────────────────────────────────────
+   Shown when an output wire is dropped on empty canvas. Deliberately NOT a
+   plain command list: it reads as a small palette card — a header naming the
+   source block and branch, suggested blocks as a 2-up chip grid (same
+   icon-tile language as the sidebar), and every function action behind one
+   hover submenu. That keeps the card a fixed, glanceable size. */
+#wf-ctxmenu.wf-qc { width:272px; min-width:0; padding:0; border-radius:10px; }
+.wf-qc-head { display:flex; align-items:center; gap:7px; padding:7px 8px 7px 10px;
+  border-bottom:1px solid var(--line); }
+.wf-qc-port { display:inline-flex; align-items:center; gap:5px; flex-shrink:0;
+  font-size:9px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--accent); background:var(--accent-bg); border:1px solid var(--accent-bd);
+  border-radius:999px; padding:2px 7px 2px 6px; }
+.wf-qc-port i { width:5px; height:5px; border-radius:50%; background:currentColor; }
+.wf-qc-title { flex:1; min-width:0; font-size:10.5px; color:var(--muted);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-qc-x { width:20px; height:20px; flex-shrink:0; padding:0; border:none; border-radius:5px;
+  background:none; color:var(--muted); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:color .1s, background .1s; }
+.wf-qc-x:hover { color:var(--err); background:var(--err-bg); }
+.wf-qc-x svg { width:12px; height:12px; display:block; }
+.wf-qc-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:7px; }
+.wf-qc-node { display:flex; align-items:center; gap:7px; min-width:0; padding:6px 7px;
+  border:1px solid var(--border); border-radius:7px; background:var(--panel);
+  cursor:pointer; text-align:left; transition:border-color .1s, background .1s; }
+.wf-qc-node:hover, .wf-qc-node:focus { background:var(--accent-bg); border-color:var(--accent-bd); outline:none; }
+.wf-qc-node .ico { flex-shrink:0; width:20px; height:20px; border-radius:5px;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--accent-bg); color:var(--accent); transition:background .1s; }
+.wf-qc-node:hover .ico, .wf-qc-node:focus .ico { background:var(--accent-bd); }
+.wf-qc-node .ico svg { width:12px; height:12px; display:block; }
+.wf-qc-node .lbl { min-width:0; font-size:11px; font-weight:600; color:var(--ink);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-qc-fn { padding:0 7px 7px; }
+.wf-qc-subwrap { position:relative; }
+.wf-qc-fnbtn { display:flex; align-items:center; gap:7px; width:100%; padding:6px 7px;
+  border:1px solid var(--border); border-radius:7px; background:var(--panel);
+  cursor:pointer; font-family:var(--sans); transition:border-color .1s, background .1s; }
+.wf-qc-fnbtn:hover, .wf-qc-fnbtn:focus, .wf-qc-subwrap.open .wf-qc-fnbtn {
+  background:var(--accent-bg); border-color:var(--accent-bd); outline:none; }
+.wf-qc-fnbtn .ico { flex-shrink:0; width:20px; height:20px; border-radius:5px;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--accent-bg); color:var(--accent); }
+.wf-qc-fnbtn .ico svg { width:12px; height:12px; display:block; }
+.wf-qc-fnbtn .lbl { flex:1; min-width:0; text-align:left; font-size:11.5px; font-weight:600; color:var(--ink); }
+.wf-qc-fnbtn .arr { flex-shrink:0; color:var(--muted); font-size:15px; line-height:1; }
+.wf-qc-submenu { position:absolute; left:calc(100% + 8px); top:0; display:none;
+  min-width:196px; max-width:290px; max-height:320px; overflow-y:auto; padding:4px;
+  background:var(--panel); border:1px solid var(--border2); border-radius:9px;
+  box-shadow:var(--sh-lg); z-index:1; }
+.wf-qc-submenu.flip { left:auto; right:calc(100% + 8px); }
+/* Open state comes from `.open` (set on hover with a deferred close, plus the
+   keyboard path). Fade only — a translate would move the panel out from under
+   the pointer mid-animation. */
+.wf-qc-subwrap.open > .wf-qc-submenu { display:block; animation:wfFade .1s var(--ease); }
+@keyframes wfFade { from { opacity:0; } to { opacity:1; } }
+.wf-qc-subitem { display:flex; align-items:center; gap:7px; width:100%; padding:6px 8px;
+  border:none; border-radius:6px; background:none; cursor:pointer;
+  font-family:var(--sans); font-size:11.5px; color:var(--ink); text-align:left; }
+.wf-qc-subitem:hover, .wf-qc-subitem:focus { background:var(--accent-bg); color:var(--accent); outline:none; }
+.wf-qc-subitem .ico { flex-shrink:0; display:flex; color:var(--muted); }
+.wf-qc-subitem:hover .ico, .wf-qc-subitem:focus .ico { color:var(--accent); }
+.wf-qc-subitem .ico svg { width:13px; height:13px; display:block; }
+.wf-qc-subitem .nm { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-qc-subitem.new { color:var(--accent); font-weight:700; }
+.wf-qc-subitem.new .ico { color:var(--accent); }
+.wf-qc-subhead { font-size:8.5px; font-weight:800; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--muted); padding:6px 8px 3px; }
 
 /* ═══ Nodes ═══════════════════════════════════════════════════════════════ */
 /* Node — a clean rectangular card with one uniform neutral border. Category is

@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const api = () => window.pywebview.api;
 const LOG_TAG = {info:"INF",success:"OK ",warning:"WRN",error:"ERR"};
-const S = { devices:[], connectedSerial:null, captureBackend:"scrcpy" };
+const S = { devices:[], connectedSerial:null, captureBackend:"scrcpy", inputBackend:"adb" };
 function setStatus(msg){ const e=$("status-text"); if(e) e.textContent=msg; }
 function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function setConnected(on){ const a=$("device-dot"),b=$("footer-dot"); if(a)a.classList.toggle("connected",on); if(b)b.classList.toggle("connected",on); }

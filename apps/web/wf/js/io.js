@@ -116,6 +116,8 @@ function wfSerialize(){
     ocr:(WF.ocrBackend||"").trim(),
     // ADB frame source for this game/workflow ("scrcpy" | "adb").
     capture:(WF.captureBackend==="adb")?"adb":"scrcpy",
+    // ADB input transport for this game/workflow ("adb" | "scrcpy").
+    input:(WF.inputBackend==="scrcpy")?"scrcpy":"adb",
     win32:{ window:(w.window||"").trim(), matchBy:wfNormWinMatchBy(w.matchBy), inputMode:wfNormWinInputMode(w.inputMode) },
     // Speed hack is ADB-only (Frida). Package lives at the top level (key "package").
     // Force speedhack off in Win32 so a stale enabled flag never starts Frida.
@@ -199,6 +201,14 @@ function wfHydrate(flow){
     WF.captureBackend=(raw==="adb")?"adb":"scrcpy";
   }
   if(typeof wfApplyCaptureBackend==="function") wfApplyCaptureBackend(WF.captureBackend);
+  // ADB input transport: key "input" (accept legacy aliases), default shell.
+  {
+    const raw=String(flow.input!=null?flow.input
+      :(flow.inputBackend!=null?flow.inputBackend
+        :(flow.input_backend!=null?flow.input_backend:""))).trim().toLowerCase();
+    WF.inputBackend=(raw==="scrcpy")?"scrcpy":"adb";
+  }
+  if(typeof wfApplyInputBackend==="function") wfApplyInputBackend(WF.inputBackend);
   // Force speed hack off in Win32 mode (ADB/Frida only) so a file saved with
   // enabled=true under the old cheat.dll path can't revive it.
   if(WF.controller==="win32") WF.speedhack.enabled=false;
@@ -514,6 +524,7 @@ async function init(){
     (state.captureBackends||["scrcpy","adb"]).forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b==="adb"?"ADB screencap":"scrcpy (fast)"; capSel.appendChild(o); });
     capSel.value=S.captureBackend;
   }
+  S.inputBackend=state.inputBackend||"adb";
   if(typeof wfPopulateOcrBackends==="function") wfPopulateOcrBackends(state.ocrBackends);
   (state.log||[]).forEach(appendLog);
   try{ const st=await api().get_settings(); wfSnapOn=!!st.snap; wfPreviewAll=!!st.previewAll;
