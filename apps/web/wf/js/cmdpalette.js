@@ -35,6 +35,7 @@ function wfCmdCatalog() {
     { t: "Toggle snap to grid", s: "20px grid snap when dragging blocks", k: "", run: () => (typeof wfToggleSnap === "function") && wfToggleSnap() },
     { t: "Toggle align guides", s: "smart alignment guides while dragging", k: "", run: () => (typeof wfToggleAlign === "function") && wfToggleAlign() },
     { t: "Toggle minimap", s: "bird's-eye graph overview", k: "", run: () => (typeof wfToggleMinimap === "function") && wfToggleMinimap() },
+    { t: "Cycle link style", s: "wire shape: spline → linear → straight", k: "", run: () => (typeof wfCycleLinkMode === "function") && wfCycleLinkMode() },
     { t: "Toggle image preview on nodes", s: "show template thumbnails on blocks", k: "", run: () => (typeof wfTogglePreview === "function") && wfTogglePreview() },
     { t: "Toggle dark theme", s: "switch light ↔ dark", k: "", run: () => (window.uiTheme && window.uiTheme.toggle()) },
     { t: "Toggle compact density", s: "tighter spacing + smaller rows", k: "", run: () => { const c = window.uiTheme && window.uiTheme.current(); window.uiTheme && window.uiTheme.setDensity(c && c.density === "compact" ? "comfortable" : "compact"); } },

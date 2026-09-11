@@ -802,6 +802,23 @@ function wfDelayChipsHtml(n){
   if(n.delayAfter)  dp.push(`<span class="wf-delay-chip" data-phase="after" data-secs="${n.delayAfter}">${wfIco("timer")}<span class="wf-delay-label">After ${n.delayAfter}s</span></span>`);
   return dp.length ? `<div class="wf-node-delay">${dp.join("")}</div>` : "";
 }
+// Card geometry, mirroring css/base.css (--node-h, --term-size, --port-sz).
+// Port rows are computed here rather than in CSS because a block's slot count
+// is dynamic (switch cases, try arms, parallel lanes) — keep the two sides in
+// step when either moves.
+const WF_CARD_H=70, WF_TERM_H=40, WF_NEXT_H=44, WF_PORT_SZ=9, WF_PORT_GAP=18;
+const WF_ROW_TOP=Math.round((WF_CARD_H-WF_PORT_SZ)/2);   // primary in/out row
+// Which colour a link is — the ONE place that decides it, for the dot at each
+// end as much as for the path between them. Returns the tone class wf.css uses
+// on .wf-port (and that #wf-wires already paints the path with), so a joint is
+// never a different colour from its own wire.
+function wfWireTone(fromPort, toPort){
+  if(toPort==="loop") return "loop";
+  if(fromPort==="true") return "t";
+  if(fromPort==="false") return "f";
+  if(fromPort==="default" || /^c\d+$/.test(fromPort||"")) return "sw";
+  return "";
+}
 function wfNodeEl(n){
   const def=WF_NODES[n.type]||{label:n.type,ico:"help",kind:"action",outs:["out"],fields:[]};
   const g=wfGraph();
@@ -826,7 +843,8 @@ function wfNodeEl(n){
   else if(n.type==="sequence") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3);
   else if(n.type==="random_branch") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||2);
   else if(def.kind==="loop_until") dynOutCount=3;   // body/found/fail — grow the card
-  if(dynOutCount>2) el.style.minHeight=Math.max(64, 28 + (dynOutCount-1)*16 + 14)+"px";
+  if(dynOutCount>2)
+    el.style.minHeight=Math.max(WF_CARD_H, WF_ROW_TOP + (dynOutCount-1)*WF_PORT_GAP + WF_PORT_SZ + 12)+"px";
   // Merged-block membership: hide the join port at the joined edge and flatten
   // that corner so the stack reads as one block.
   const intIn = n.stack ? wfHasInternalIn(n) : false;
@@ -908,14 +926,19 @@ function wfNodeEl(n){
   else if(n.type==="sequence") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1));
   else outs=(def.outs||[]);
   // Primary port row — single in + first out share this y so chains stay level.
-  // Cards 64px / terminal discs 40px; port is 8px → top = h/2 − 4.
-  // Extra ports (true/false, loop-back…) stack 16px below; card grows as needed.
-  const rowTop = isTerminal ? Math.round(40/2 - 4) : isNextBranch ? 18 : Math.round(64/2 - 4);
-  const outTop = i => rowTop + (outs.length>1 ? i*16 : 0);
+  // Extra ports (true/false, loop-back…) stack one WF_PORT_GAP row below the
+  // last, the way a ComfyUI block lists its slots; the card grows to fit them.
+  const rowTop = isTerminal ? Math.round((WF_TERM_H-WF_PORT_SZ)/2)
+               : isNextBranch ? Math.round((WF_NEXT_H-WF_PORT_SZ)/2)
+               : WF_ROW_TOP;
+  const outTop = i => rowTop + (outs.length>1 ? i*WF_PORT_GAP : 0);
   // Single input → the shared primary row (level with the first output). The
   // loop's in/loop pair stacks from that row downward.
   const nIns = wfIns(n.type).length;
-  const inTop = i => rowTop + (nIns>1 ? i*16 : 0);
+  const inTop = i => rowTop + (nIns>1 ? i*WF_PORT_GAP : 0);
+  // A labelled slot column needs room: the body text stops short of it.
+  el.classList.toggle("slots-out", outs.length>1);
+  el.classList.toggle("slots-in",  nIns>1);
   if(hasTpl){
     if(isTpls){
       const strip=el.querySelector(".wf-node-thumbs");
@@ -936,11 +959,9 @@ function wfNodeEl(n){
       const ip=document.createElement("span");
       // Color the destination input to match the source port's semantic colour.
       const incoming = g && (g.edges||[]).find(e=>e.to===n.id && (e.toPort||"in")===port);
-      const srcPort = incoming ? incoming.fromPort : null;
-      const isConnected = !!incoming;
-      ip.className="wf-port in"+(port==="loop"?" loop":"")+
-        (srcPort==="true"?" t":srcPort==="false"?" f":"")+
-        (isConnected?" connected":"");
+      const tone = port==="loop" ? "loop"
+                 : incoming ? wfWireTone(incoming.fromPort, port) : "";
+      ip.className="wf-port in"+(tone?" "+tone:"")+(incoming?" connected":"");
       ip.dataset.node=n.id; ip.dataset.port=port; ip.style.top=top+"px";
       el.appendChild(ip);
       if(ins.length>1){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl in"+(port==="loop"?" loop":"");
@@ -951,8 +972,11 @@ function wfNodeEl(n){
   outs.forEach((port,i)=>{
     const top = outTop(i);
     const op=document.createElement("span");
-    const isConnected = g && (g.edges||[]).some(e=>e.from===n.id && e.fromPort===port);
-    op.className="wf-port out"+(port==="true"?" t":port==="false"?" f":"")+(isConnected?" connected":"");
+    const outgoing = g && (g.edges||[]).find(e=>e.from===n.id && e.fromPort===port);
+    // Unwired branch slots still show their own hue; a wired one follows its link
+    // (a back-run into a loop port turns the whole thread amber, both ends).
+    const tone = outgoing ? wfWireTone(port, outgoing.toPort||"in") : wfWireTone(port,"in");
+    op.className="wf-port out"+(tone?" "+tone:"")+(outgoing?" connected":"");
     op.dataset.node=n.id; op.dataset.port=port; op.style.top=top+"px";
     el.appendChild(op);
     let lblTxt;

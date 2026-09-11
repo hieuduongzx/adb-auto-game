@@ -1,51 +1,41 @@
 // ── Wires ────────────────────────────────────────────────────────────────────
-// One DOM read pass per draw feeds everything below: node boxes AND port centres
-// come from offsetLeft/offsetTop (already #wf-world layout coords). That makes
-// the geometry zoom-independent, immune to the :hover scale on a port dot, and —
-// because nothing is measured after an element has been appended — costs a
-// single layout flush instead of one forced relayout per port.
-const WF_WIRE_CELL = 256;      // row/column bucket size for the box lookups
-let wfWireIdx = { boxes:[], ports:new Map(), rows:null, cols:null };
-let _wfBandStamp = 0;          // per-query dedupe marker stamped onto the boxes
+// Links are drawn the way ComfyUI/LiteGraph (and Blender's node editor) draw
+// them: a single curve from the output dot to the input dot and nothing else.
+// There is no obstacle avoidance and no lane allocation — a link that passes a
+// block simply runs behind it, because the wire layer paints under the cards.
+// That is the whole trick those editors use: the graph reads from where the
+// blocks sit, so the wires are allowed to stay dumb, calm and predictable.
+//
+// Three render modes, the same three ComfyUI ships (rail button cycles them):
+//   spline   (default) — cubic bezier, horizontal handles ¼ of the port distance
+//   linear             — one straight run with a short stub off each port
+//   straight           — orthogonal Z: stub → vertical at the midpoint → stub
+//
+// One DOM read pass per draw feeds the geometry: port centres come from
+// offsetLeft/offsetTop (already #wf-world layout coords), so it is zoom-
+// independent, immune to the :hover scale on a port dot, and costs a single
+// layout flush instead of one forced relayout per port.
+let wfWireIdx = { ports:new Map() };
 
 function wfWireIndexRebuild(){
-  const boxes=[], portsByNode=new Map(), rows=new Map(), cols=new Map();
-  const bucket=(map,key,b)=>{ let a=map.get(key); if(!a) map.set(key,a=[]); a.push(b); };
+  const portsByNode=new Map();
   document.querySelectorAll("#wf-world .wf-node").forEach(el=>{
-    const x=el.offsetLeft, y=el.offsetTop;
-    const box={ id:el.dataset.node, left:x, top:y,
-                right:x+el.offsetWidth, bottom:y+el.offsetHeight, _s:0 };
-    const ports=new Map();
+    const x=el.offsetLeft, y=el.offsetTop, ports=new Map();
+    const right=x+el.offsetWidth;
     el.querySelectorAll(".wf-port").forEach(p=>{
       const side=p.classList.contains("out")?"out":"in";
-      const pt={ x:x+p.offsetLeft+p.offsetWidth/2, y:y+p.offsetTop+p.offsetHeight/2 };
+      // `edge` = the card border this port hides behind. Dots sit INSIDE the
+      // block, so a link has to swing past that edge to be seen at all — the
+      // router solves for it below rather than guessing a handle length.
+      const pt={ x:x+p.offsetLeft+p.offsetWidth/2, y:y+p.offsetTop+p.offsetHeight/2,
+                 edge: side==="out" ? right : x };
       ports.set(side+":"+p.dataset.port, pt);
       if(!ports.has(side)) ports.set(side, pt);   // first port of a side = fallback
     });
-    portsByNode.set(box.id, ports);
-    boxes.push(box);
-    for(let c=Math.floor(box.top/WF_WIRE_CELL);  c<=Math.floor(box.bottom/WF_WIRE_CELL); c++) bucket(rows,c,box);
-    for(let c=Math.floor(box.left/WF_WIRE_CELL); c<=Math.floor(box.right/WF_WIRE_CELL);  c++) bucket(cols,c,box);
+    portsByNode.set(el.dataset.node, ports);
   });
-  wfWireIdx={ boxes, ports:portsByNode, rows, cols };
+  wfWireIdx={ ports:portsByNode };
 }
-
-// Boxes meeting a horizontal (rows) or vertical (cols) band. Bucket lookups stop
-// a 300-block graph from being rescanned for every riser/shelf probe; a band
-// wider than the bucket sweep is cheaper to answer from the flat list.
-function wfBandBoxes(map, lo, hi, keep){
-  const idx=wfWireIdx;
-  const c0=Math.floor(lo/WF_WIRE_CELL), c1=Math.floor(hi/WF_WIRE_CELL);
-  if(!map || c1-c0>48) return idx.boxes.filter(keep);
-  const out=[], s=++_wfBandStamp;
-  for(let c=c0;c<=c1;c++){
-    const a=map.get(c); if(!a) continue;
-    for(const b of a){ if(b._s===s) continue; b._s=s; if(keep(b)) out.push(b); }
-  }
-  return out;
-}
-const wfBoxesBandY=(y0,y1)=>wfBandBoxes(wfWireIdx.rows,y0,y1,b=>b.bottom>=y0&&b.top<=y1);
-const wfBoxesBandX=(x0,x1)=>wfBandBoxes(wfWireIdx.cols,x0,x1,b=>b.right>=x0&&b.left<=x1);
 
 function wfPortPt(nodeId,port){
   if(!wfWireIdx.ports.size) wfWireIndexRebuild();
@@ -54,254 +44,142 @@ function wfPortPt(nodeId,port){
   return ports.get(side+":"+port) || ports.get(side) || null;
 }
 
-// Arrowhead markers — colours read from the shared CSS vars (base.css :root) so
-// wires/ports/canvas overlays never drift onto a second hex for the same role.
-// Rebuilt after a theme switch: every var below resolves to a different hex per
-// theme, and a once-computed <defs> would keep painting the old arrowheads.
-let _wfWireDefs=null;
-function wfWireDefs(){
-  if(_wfWireDefs) return _wfWireDefs;
-  const cs=getComputedStyle(document.documentElement);
-  const v=(name,fallback)=>(cs.getPropertyValue(name)||fallback).trim();
-  const mk=(id,c)=>`<marker id="${id}" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L6,3 L0,6 Z" fill="${c}"/></marker>`;
-  return _wfWireDefs="<defs>"+
-    mk("wf-ah",v("--wire-arrow","#94a6ba"))+
-    mk("wf-ah-t",v("--branch-t","#1f9d57"))+
-    mk("wf-ah-f",v("--branch-f","#e0792e"))+
-    mk("wf-ah-switch",v("--wire-switch","#9a78e6"))+
-    mk("wf-ah-loop",v("--branch-loop-line","#d09030"))+
-    mk("wf-ah-run-ok",v("--run-ok","#1f9d57"))+
-    mk("wf-ah-run-fail",v("--run-fail","#d6483f"))+
-    mk("wf-ah-hover",v("--accent","#2f6fed"))+
-    mk("wf-ah-temp",v("--accent","#2f6fed"))+
-  "</defs>";
-}
-window.addEventListener("m2k-theme",()=>{ _wfWireDefs=null; });
-// ── Wire shape ────────────────────────────────────────────────────────────────
-// Three shapes, tried in order — the first one that doesn't cut through a block
-// it skips over wins:
-//   1. direct  → a straight line when the ports are level, otherwise one soft
-//                cubic with horizontal handles (the normal node-editor look);
-//   2. bypass  → the same cubic with its handles lifted into the nearest clear
-//                horizontal band, so a single obstacle is arced around instead
-//                of forcing a boxy detour;
-//   3. detour  → stub → riser → shelf → riser → stub. The shelf travels the
-//                nearest clear horizontal band (a gap between node rows, or just
-//                outside the first/last row), each riser slides sideways until it
-//                clears every node box, and a new detour takes a free 10px lane
-//                so detours never overdraw each other's shelf.
+// ── Link render mode ─────────────────────────────────────────────────────────
+const WF_LINK_MODES=["spline","linear","straight"];
+const WF_LINK_MODE_LBL={ spline:"Spline", linear:"Linear", straight:"Straight" };
+let wfLinkMode="spline";
+try{ const m=localStorage.getItem("wfLinkMode"); if(WF_LINK_MODES.includes(m)) wfLinkMode=m; }catch{}
 
-// Exact segment-vs-box rejection for the straight/level case.
-function wfSegBlocked(a,b,skip){
-  const pad=4;
-  const y0=Math.min(a.y,b.y)-pad, y1=Math.max(a.y,b.y)+pad;
-  const x0=Math.min(a.x,b.x)-pad, x1=Math.max(a.x,b.x)+pad;
-  for(const bx of wfBoxesBandY(y0,y1)){
-    if(skip&&skip.has(bx.id)) continue;
-    if(bx.right<x0||bx.left>x1) continue;
-    return true;                      // level segment inside the box's y-band
-  }
-  return false;
+function wfSetLinkMode(mode){
+  if(!WF_LINK_MODES.includes(mode)) return;
+  wfLinkMode=mode;
+  try{ localStorage.setItem("wfLinkMode",mode); }catch{}
+  wfSyncLinkModeBtn();
+  wfDrawWires();
 }
-// Sampled obstruction test for an arbitrary cubic a → c1 → c2 → b: true when it
-// passes through a node box other than the ones owning its endpoints.
-function wfCubicBlocked(a,c1,c2,b,skip){
-  const pad=4;
-  const minX=Math.min(a.x,b.x,c1.x,c2.x)-pad, maxX=Math.max(a.x,b.x,c1.x,c2.x)+pad;
-  const minY=Math.min(a.y,b.y,c1.y,c2.y)-pad, maxY=Math.max(a.y,b.y,c1.y,c2.y)+pad;
-  const boxes=wfBoxesBandY(minY,maxY).filter(bx=>
-    !(skip&&skip.has(bx.id)) && bx.right>=minX && bx.left<=maxX);
-  if(!boxes.length) return false;
-  // Adaptive sampling: long/high-curvature splines need more probes than a short
-  // local hop. Roughly one sample per 10 world px, capped for large maps.
-  const approx=Math.hypot(c1.x-a.x,c1.y-a.y)+Math.hypot(c2.x-c1.x,c2.y-c1.y)+Math.hypot(b.x-c2.x,b.y-c2.y);
-  const steps=Math.max(24,Math.min(128,Math.ceil(approx/10)));
-  for(let i=1;i<steps;i++){
-    const t=i/steps, u=1-t;
-    const w0=u*u*u, w1=3*u*u*t, w2=3*u*t*t, w3=t*t*t;
-    const x=w0*a.x+w1*c1.x+w2*c2.x+w3*b.x;
-    const y=w0*a.y+w1*c1.y+w2*c2.y+w3*b.y;
-    for(const bx of boxes)
-      if(x>bx.left-pad && x<bx.right+pad && y>bx.top-pad && y<bx.bottom+pad) return true;
-  }
-  return false;
+function wfCycleLinkMode(){
+  wfSetLinkMode(WF_LINK_MODES[(WF_LINK_MODES.indexOf(wfLinkMode)+1)%WF_LINK_MODES.length]);
+  if(typeof setStatus==="function") setStatus("Link style: "+WF_LINK_MODE_LBL[wfLinkMode]);
 }
-function wfFwdPull(dx,dy){ return Math.min(130, Math.max(24, Math.abs(dx)*0.45 + Math.abs(dy)*0.12)); }
-
-// A detour's vertical riser at x spanning yA..yB must not pass through a node
-// box. Try sliding toward the port (the sliver before the first blocker), or
-// pushing outward past the blockers — pick the clear option nearer the start.
-// `stubY` is the horizontal stub's row: pushing outward past a box that also
-// covers that row would drag the stub through it, so such a push is rejected.
-function wfRiserX(x0, yA, yB, dir, limit, stubY){
-  const pad=6, y0=Math.min(yA,yB)-2, y1=Math.max(yA,yB)+2;
-  const band=wfBoxesBandY(y0-pad,y1+pad);
-  const hit=x=>{ for(const bx of band)
-      if(x>bx.left-pad && x<bx.right+pad && y1>bx.top-pad && y0<bx.bottom+pad) return bx;
-    return null; };
-  if(!hit(x0)) return x0;
-  let xs=x0, g=0, bs;                        // slide toward the port
-  while((bs=hit(xs)) && g++<8) xs = dir>0 ? bs.left-pad : bs.right+pad;
-  const slideOk = !bs && (dir>0 ? xs>=limit : xs<=limit);
-  let xp=x0, g2=0, bp, pushOk=true;          // push outward past the blockers
-  while((bp=hit(xp)) && g2++<8){
-    if(stubY>bp.top-pad && stubY<bp.bottom+pad){ pushOk=false; break; }
-    xp = dir>0 ? bp.right+pad : bp.left-pad;
-  }
-  pushOk = pushOk && !hit(xp);
-  if(slideOk && (!pushOk || Math.abs(xs-x0)<=Math.abs(xp-x0))) return xs;
-  if(pushOk) return xp;
-  return x0;
+// The rail button shows which of the three shapes is live (icon swaps with it).
+function wfSyncLinkModeBtn(){
+  const b=document.getElementById("wf-link-btn"); if(!b) return;
+  b.dataset.mode=wfLinkMode;
+  b.title="Link style: "+WF_LINK_MODE_LBL[wfLinkMode]+" — click to cycle (spline → linear → straight)";
 }
 
-// Nearest clear horizontal band to `mid` for a leg crossing xLo..xHi: merge the
-// (padded) y-extents of every box in that column range, then pick among the gaps
-// between those bands plus the outside of the first/last band. This lets a long
-// run travel BETWEEN node rows instead of always boxing around the whole graph.
-function wfClearBandY(xLo,xHi,mid,skip){
-  const pad=12, MIN=18, iv=[];
-  for(const bx of wfBoxesBandX(xLo,xHi)){
-    if(skip&&skip.has(bx.id)) continue;
-    iv.push([bx.top-pad, bx.bottom+pad]);
-  }
-  if(!iv.length) return mid;
-  iv.sort((p,q)=>p[0]-q[0]);
-  const bands=[iv[0].slice()];
-  for(let i=1;i<iv.length;i++){
-    const m=bands[bands.length-1];
-    if(iv[i][0]<=m[1]+MIN) m[1]=Math.max(m[1],iv[i][1]); else bands.push(iv[i].slice());
-  }
-  let best=bands[0][0]-12;
-  const consider=y=>{ if(Math.abs(y-mid)<Math.abs(best-mid)) best=y; };
-  for(let i=0;i<bands.length-1;i++) consider((bands[i][1]+bands[i+1][0])/2);
-  consider(bands[bands.length-1][1]+12);
-  return best;
-}
-function wfShelfY(xLo,xHi,a,b){ return wfClearBandY(xLo,xHi,(a.y+b.y)/2); }
-// Vertical clearance from y to the nearest box the shelf passes over (0 = inside one).
-function wfShelfClearance(x0,x1,y){
-  let d=1e9;
-  for(const bx of wfBoxesBandX(x0,x1)){
-    if(y>=bx.top && y<=bx.bottom) return 0;
-    d=Math.min(d, y<bx.top ? bx.top-y : y-bx.bottom);
-  }
-  return d;
-}
-// Detours placed earlier in the current draw pass — a new detour takes a lane
-// clear of any it would overdraw. Overlap is resolved pairwise on real geometry,
-// so unrelated wires never fan apart.
-let wfPlacedDetours=[];
-function wfShelfLaneY(x0,x1,preferred,mid){
-  const occupied=wfPlacedDetours.filter(o=>Math.min(x1,o.x1)>Math.max(x0,o.x0)).map(o=>o.routeY);
-  const ok=y=>wfShelfClearance(x0,x1,y)>=10 && occupied.every(oy=>Math.abs(y-oy)>=10);
-  if(ok(preferred)) return preferred;
-  // Search symmetric 10px lanes and choose the valid one nearest the endpoint
-  // midpoint. Unlike a one-step nudge, this cannot settle inside a node band.
-  for(let step=1;step<=20;step++){
-    const candidates=[preferred-step*10,preferred+step*10].filter(ok);
-    if(candidates.length) return candidates.sort((p,q)=>Math.abs(p-mid)-Math.abs(q-mid))[0];
-  }
-  return preferred;
-}
-function wfDetourGeom(a,b){
-  let routeY=(a.y+b.y)/2, xOut=a.x+16, xIn=b.x-16;
-  for(let i=0;i<2;i++){                       // risers ↔ shelf settle in 2 passes
-    xOut=wfRiserX(a.x+16, a.y, routeY, +1, a.x+6, a.y);
-    xIn =wfRiserX(b.x-16, routeY, b.y, -1, b.x-6, b.y);
-    routeY=wfShelfY(Math.min(xOut,xIn), Math.max(xOut,xIn), a, b);
-  }
-  let x0=Math.min(xOut,xIn), x1=Math.max(xOut,xIn);
-  routeY=wfShelfLaneY(x0,x1,routeY,(a.y+b.y)/2);
-  // The shelf may have moved to avoid another wire. Recompute both risers for
-  // that FINAL shelf, otherwise a previously-clear riser can cross a node.
-  for(let i=0;i<2;i++){
-    xOut=wfRiserX(a.x+16,a.y,routeY,+1,a.x+6,a.y);
-    xIn =wfRiserX(b.x-16,routeY,b.y,-1,b.x-6,b.y);
-  }
-  // Separate coincident risers only when the nudged lane is also node-clear.
-  const yr=(y0,y1,o0,o1)=>Math.min(Math.max(y0,y1),Math.max(o0,o1))>Math.max(Math.min(y0,y1),Math.min(o0,o1));
-  for(const o of wfPlacedDetours){
-    if(Math.abs(xOut-o.xOut)<8 && yr(a.y,routeY,o.ya,o.routeY)){
-      const cand=xOut+8, clear=wfRiserX(cand,a.y,routeY,+1,a.x+6,a.y);
-      if(Math.abs(clear-cand)<.1) xOut=cand;
-    }
-    if(Math.abs(xIn-o.xIn)<8 && yr(routeY,b.y,o.routeY,o.yb)){
-      const cand=xIn-8, clear=wfRiserX(cand,routeY,b.y,-1,b.x-6,b.y);
-      if(Math.abs(clear-cand)<.1) xIn=cand;
-    }
-  }
-  x0=Math.min(xOut,xIn); x1=Math.max(xOut,xIn);
-  return {xOut,xIn,routeY,x0,x1,ya:a.y,yb:b.y};
-}
+// ── Link shapes ──────────────────────────────────────────────────────────────
+const WF_LINK_STUB=14;    // how far a linear/straight link leaves the port before it turns
+// Two blocks nose-to-nose have no room for a full stub — shrink it rather than
+// let the two stubs overshoot each other into a zigzag.
+function wfStub(a,b){ return Math.max(3, Math.min(WF_LINK_STUB, Math.abs(b.x-a.x)/3)); }
 
-// `register` — wfDrawWires passes true so the wire's detour geometry joins
-// wfPlacedDetours (what later wires dodge). The temp wire doesn't register.
-// `skip` — ids of the endpoint nodes, whose own boxes never count as blockers
-// (a port sits ON its node's edge, so proximity tests would always trip).
-function wfWirePath(a,b,register,skip){
+// LiteGraph's spline: horizontal handles set a quarter of the port-to-port
+// distance out from each dot. Level ports therefore give a dead-straight line
+// for free and a short hop stays nearly straight.
+const WF_LINK_MIN=40, WF_LINK_MAX=380;
+const WF_LINK_CLEAR=14;   // px of link that must show past each card's edge
+
+// How far a handle of length k throws the curve beyond its own endpoints.
+// x(t) is a cubic with both handles horizontal, so x'(t)=0 is a quadratic:
+//   (6k−2D)t² − (6k−2D)t + k = 0,  D = b.x − a.x
+// giving the two extrema in closed form — no sampling, no per-frame path
+// measurement. A forward link with a short handle is monotonic (no lobe at all).
+function wfSplineExtent(ax,bx,k){
+  const flat={ max:Math.max(ax,bx), min:Math.min(ax,bx) };
+  const S=6*k-2*(bx-ax);
+  if(S<=0) return flat;
+  const disc=1-4*k/S;
+  if(disc<=0) return flat;
+  const r=Math.sqrt(disc), c1=ax+k, c2=bx-k;
+  const at=t=>{ const u=1-t; return u*u*u*ax+3*u*u*t*c1+3*u*t*t*c2+t*t*t*bx; };
+  const x1=at((1-r)/2), x2=at((1+r)/2);
+  return { max:Math.max(flat.max,x1,x2), min:Math.min(flat.min,x1,x2) };
+}
+// Handle length. Forward links keep LiteGraph's quarter-distance and are done.
+// A back-run is the case that needs care: both of its ends are tucked inside a
+// card, so a short handle leaves nothing on screen but the bare diagonal across
+// the gap — two blocks stacked one above the other showed a link that seemed to
+// come from nowhere. Solve for the shortest handle whose lobes clear both cards.
+function wfSplineOff(a,b){
   const dx=b.x-a.x, dy=b.y-a.y;
-
-  // 1. Forward flow: straight when level, one calm spline otherwise — as long as
-  //    the direct shape doesn't cut through a node it skips over.
-  if(dx>=-20){
-    if(dx>=0 && Math.abs(dy)<5){
-      if(!wfSegBlocked(a,b,skip)) return `M${a.x},${a.y} L${b.x},${b.y}`;
-    } else {
-      const pull=wfFwdPull(dx,dy);
-      const c1={x:a.x+pull,y:a.y}, c2={x:b.x-pull,y:b.y};
-      if(!wfCubicBlocked(a,c1,c2,b,skip))
-        return `M${a.x},${a.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${b.x},${b.y}`;
-    }
-  }
-  // Short backward hop with a real vertical offset (e.g. into the row below):
-  // the classic S-curve is lighter and reads naturally — it travels the gap
-  // between rows instead of boxing around them. Only when the gap is clear.
-  else if(Math.abs(dy)>=40 && dx>-400){
-    const pull=Math.min(180, 40+Math.abs(dx)*0.35+Math.abs(dy)*0.10);
-    const c1={x:a.x+pull,y:a.y}, c2={x:b.x-pull,y:b.y};
-    if(!wfCubicBlocked(a,c1,c2,b,skip))
-      return `M${a.x},${a.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${b.x},${b.y}`;
-  }
-
-  // 2. Bypass arc: keep the single-curve look but lift both handles into the
-  //    nearest clear horizontal band. One block standing between two level ports
-  //    is the common case, and an arc over it reads far better than a detour.
-  if(dx>=-20){
-    const lo=Math.min(a.x,b.x), hi=Math.max(a.x,b.x);
-    const band=wfClearBandY(lo,hi,(a.y+b.y)/2,skip);
-    const lift=Math.abs(band-(a.y+b.y)/2);
-    if(lift>2 && lift<=260){
-      const pull=Math.max(34, Math.min(150, Math.abs(dx)*0.42+lift*0.30));
-      // Handles are pulled to the band, so the curve's apex lands ≈ 3/4 of the
-      // way there — overshoot slightly so the crest actually clears the row.
-      const hy=(a.y+b.y)/2 + (band-(a.y+b.y)/2)*1.34;
-      const c1={x:a.x+pull,y:hy}, c2={x:b.x-pull,y:hy};
-      if(!wfCubicBlocked(a,c1,c2,b,skip))
-        return `M${a.x},${a.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${b.x},${b.y}`;
-    }
-  }
-
-  // 3. Detour: out right → riser → clear shelf band → riser → in from the left.
-  //    The shelf runs rightwards for blocked forward wires and leftwards for
-  //    back-runs (h flips the middle corners).
-  const geom=wfDetourGeom(a,b);
-  if(register) wfPlacedDetours.push(geom);
-  const {xOut,xIn,routeY}=geom, r=10;
-  const h=xIn>=xOut?1:-1, s1=routeY>=a.y?1:-1, s2=b.y>=routeY?1:-1;
-  const room=Math.abs(xIn-xOut)/2;
-  const r1=Math.min(r, Math.abs(routeY-a.y)/2, Math.abs(xOut-a.x)/2, room);
-  const r2=Math.min(r, Math.abs(routeY-b.y)/2, Math.abs(b.x-xIn)/2, room);
-  return `M${a.x},${a.y} L${xOut-r1},${a.y} Q${xOut},${a.y} ${xOut},${a.y+s1*r1}`+
-         ` L${xOut},${routeY-s1*r1} Q${xOut},${routeY} ${xOut+h*r1},${routeY}`+
-         ` L${xIn-h*r2},${routeY} Q${xIn},${routeY} ${xIn},${routeY+s2*r2}`+
-         ` L${xIn},${b.y-s2*r2} Q${xIn},${b.y} ${xIn+r2},${b.y} L${b.x},${b.y}`;
+  const base=Math.min(Math.hypot(dx,dy)*0.25, WF_LINK_MAX);
+  if(dx>=0) return Math.max(base, Math.min(WF_LINK_MIN, dx*0.6));
+  const needR=(a.edge==null?a.x:a.edge)+WF_LINK_CLEAR;
+  const needL=(b.edge==null?b.x:b.edge)-WF_LINK_CLEAR;
+  const ok=k=>{ const e=wfSplineExtent(a.x,b.x,k); return e.max>=needR && e.min<=needL; };
+  let lo=Math.max(base, WF_LINK_MIN);
+  if(ok(lo)) return lo;
+  if(!ok(WF_LINK_MAX)) return WF_LINK_MAX;
+  let hi=WF_LINK_MAX;
+  for(let i=0;i<14;i++){ const mid=(lo+hi)/2; if(ok(mid)) hi=mid; else lo=mid; }
+  return hi;
 }
+function wfSplineLift(dx,dy){
+  // A back-run between near-level ports would fold flat onto itself — lift both
+  // handles so the loop stays readable instead of collapsing into the line.
+  return (dx<0 && Math.abs(dy)<28) ? 30 : 0;
+}
+function wfSplinePath(a,b){
+  const off=wfSplineOff(a,b), lift=wfSplineLift(b.x-a.x, b.y-a.y);
+  return `M${a.x},${a.y} C${a.x+off},${a.y-lift} ${b.x-off},${b.y-lift} ${b.x},${b.y}`;
+}
+function wfLinearPath(a,b){
+  const s=wfStub(a,b);
+  return `M${a.x},${a.y} L${a.x+s},${a.y} L${b.x-s},${b.y} L${b.x},${b.y}`;
+}
+function wfStraightPath(a,b){
+  const s=wfStub(a,b), dy=b.y-a.y;
+  // Forward links turn at the halfway column; a back-run has no halfway column
+  // to use, so it turns just past its own stub and runs the vertical there.
+  const mx=(b.x-a.x > s*2+20) ? (a.x+b.x)/2 : a.x+s+10;
+  if(Math.abs(dy)<1) return `M${a.x},${a.y} L${b.x},${b.y}`;
+  const sy=dy>0?1:-1;
+  const d1=mx-a.x, d2=b.x-mx;
+  const r=Math.max(0, Math.min(9, Math.abs(dy)/2, Math.abs(d1), Math.abs(d2)));
+  const h1=d1>=0?1:-1, h2=d2>=0?1:-1;
+  return `M${a.x},${a.y} L${mx-h1*r},${a.y} Q${mx},${a.y} ${mx},${a.y+sy*r}`+
+         ` L${mx},${b.y-sy*r} Q${mx},${b.y} ${mx+h2*r},${b.y} L${b.x},${b.y}`;
+}
+function wfWirePath(a,b){
+  if(wfLinkMode==="linear")   return wfLinearPath(a,b);
+  if(wfLinkMode==="straight") return wfStraightPath(a,b);
+  return wfSplinePath(a,b);
+}
+
+// Flow marker — ComfyUI puts a dot at each link's midpoint; here it is a small
+// triangle turned along the curve, so the same glyph also says which way the
+// flow runs (this graph is control flow: direction is load-bearing). Computed
+// analytically per shape, never via getPointAtLength — that would force a
+// layout flush per wire on every drag frame.
+function wfLinkMid(a,b){
+  if(wfLinkMode==="linear"){
+    const s=wfStub(a,b), p={x:a.x+s,y:a.y}, q={x:b.x-s,y:b.y};
+    return { x:(p.x+q.x)/2, y:(p.y+q.y)/2, ang:Math.atan2(q.y-p.y,q.x-p.x) };
+  }
+  if(wfLinkMode==="straight"){
+    const s=wfStub(a,b), dy=b.y-a.y;
+    const mx=(b.x-a.x > s*2+20) ? (a.x+b.x)/2 : a.x+s+10;
+    if(Math.abs(dy)<1) return { x:(a.x+b.x)/2, y:a.y, ang:b.x>=a.x?0:Math.PI };
+    return { x:mx, y:(a.y+b.y)/2, ang:dy>0?Math.PI/2:-Math.PI/2 };
+  }
+  const off=wfSplineOff(a,b), lift=wfSplineLift(b.x-a.x, b.y-a.y);
+  const c1={x:a.x+off,y:a.y-lift}, c2={x:b.x-off,y:b.y-lift};
+  return {                                   // B(½) and B′(½) of the cubic
+    x:(a.x+3*c1.x+3*c2.x+b.x)/8,
+    y:(a.y+3*c1.y+3*c2.y+b.y)/8,
+    ang:Math.atan2((b.y+c2.y-c1.y-a.y), (b.x+c2.x-c1.x-a.x)),
+  };
+}
+
 // Wires draw "blind" while #wf-world is display:none (Preview tab): every
 // measurement returns 0 → paths become an invisible M0,0. The guard below skips
 // that draw pass and sets a stale flag; wfSwitchView("canvas") redraws once the
 // canvas is visible again.
 let wfWiresStale=false;
 const WF_NS="http://www.w3.org/2000/svg";
+const WF_FLOW_TRI="M-2.5,-2.8 L3.2,0 L-2.5,2.8 Z";
+
 function wfDrawWires(){
   if(typeof wfMinimapQueue==="function") wfMinimapQueue();   // node moves redraw wires → keep the map live
   const svg=$("wf-wires"), g=wfGraph();
@@ -309,15 +187,14 @@ function wfDrawWires(){
   if(world && world.offsetParent===null){ wfWiresStale=true; return; }   // canvas hidden — measurements would be 0
   wfWiresStale=false;
   const temp=svg.querySelector(".temp");
-  svg.innerHTML=wfWireDefs(); if(temp) svg.appendChild(temp);
+  svg.innerHTML=""; if(temp) svg.appendChild(temp);
   if(!g) return;
   wfWireIndexRebuild();
-  wfPlacedDetours=[];
 
-  // Resolve endpoints first, then route. Shorter wires claim their lanes before
-  // long ones, so a local hop keeps its clean shape and the long back-run is the
-  // one that detours around it. Ties break on a stable key, so geometry no longer
-  // changes merely because JSON import/delete/undo reordered the edge array.
+  // Resolve endpoints first, then sort shortest-first so a long run paints over
+  // the local hops rather than under them. Ties break on a stable key, so paint
+  // order no longer changes merely because JSON import/delete/undo reordered the
+  // edge array.
   const routes=[];
   (g.edges||[]).forEach(ed=>{
     if(wfSameStack(ed.from,ed.to)) return;
@@ -332,8 +209,7 @@ function wfDrawWires(){
 
   const frag=document.createDocumentFragment();
   routes.forEach(({ed,a,b,toPort})=>{
-    const skip=new Set([ed.from,ed.to]);
-    const d=wfWirePath(a,b,true,skip);
+    const d=wfWirePath(a,b);
     const grp=document.createElementNS(WF_NS,"g");
     grp.setAttribute("class","wire-grp"); grp.__edge=ed;
     const hit=document.createElementNS(WF_NS,"path");
@@ -347,7 +223,13 @@ function wfDrawWires(){
     p.setAttribute("class","wire"+(toPort==="loop"?" loopback":""));
     p.dataset.from=ed.from; p.dataset.fromport=ed.fromPort; p.dataset.to=ed.to;
     p.setAttribute("d",d);
-    grp.appendChild(hit); grp.appendChild(p);
+    const m=wfLinkMid(a,b);
+    const tri=document.createElementNS(WF_NS,"path");
+    tri.setAttribute("class","wire-flow"+(toPort==="loop"?" loopback":""));
+    tri.dataset.fromport=ed.fromPort;
+    tri.setAttribute("d",WF_FLOW_TRI);
+    tri.setAttribute("transform",`translate(${m.x.toFixed(1)},${m.y.toFixed(1)}) rotate(${(m.ang*180/Math.PI).toFixed(1)})`);
+    grp.appendChild(hit); grp.appendChild(p); grp.appendChild(tri);
     frag.appendChild(grp);
   });
   svg.appendChild(frag);
@@ -378,8 +260,8 @@ function wfDrawTempWire(mx,my){
   const b={ x:(mx-wr.left)/wfZoom, y:(my-wr.top)/wfZoom };
   const svg=$("wf-wires"); let t=svg.querySelector(".temp");
   if(!t){ t=document.createElementNS(WF_NS,"path"); t.setAttribute("class","temp"); svg.appendChild(t); }
-  if(!wfWireIdx.boxes.length) wfWireIndexRebuild();
-  t.setAttribute("d",wfWirePath(a,b,false,new Set([wfGesture.from])));
+  if(!wfWireIdx.ports.size) wfWireIndexRebuild();
+  t.setAttribute("d",wfWirePath(a,b));
 }
 
 function wfClearTemp(){ const t=$("wf-wires").querySelector(".temp"); if(t)t.remove(); }

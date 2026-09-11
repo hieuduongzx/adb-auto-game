@@ -90,9 +90,15 @@
   --canvas-bg:         #e7ebf0;
   --canvas-dot:        rgba(23,32,43,.12);
   --canvas-dot-minor:  #d5dbe3;
-  --node-r: 7px;   /* node card corner — compact workbench rectangle */
+  --node-r: 10px;  /* node card corner — ComfyUI/Blender-style rounded block */
   --node-w: 172px; /* canonical card width — every action/condition block */
-  --node-h: 66px;  /* canonical card height: 22px header + ~44px body */
+  --node-h: 70px;  /* canonical card height: 26px header + ~44px body */
+  /* Port dots. They sit INSIDE the card by --port-inset, so a wire runs on
+     behind the block instead of stopping at its edge. Row pitch for multi-slot
+     blocks lives in js/render.js (WF_PORT_GAP) because slot counts are
+     dynamic — keep the two in step. */
+  --port-sz: 9px;
+  --port-inset: 6px;
   /* Start / End — round chips (icon only). */
   --term-size: 40px;
   /* Semantic z-index scale — no arbitrary 999s. */

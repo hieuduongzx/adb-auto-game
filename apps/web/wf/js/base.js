@@ -303,11 +303,18 @@ function wfSetRunningNode(id){
   if(typeof wfMinimapQueue==="function") wfMinimapQueue();   // amber chip follows on the map
 }
 function wfColorBranch(id, takenPort){
-  document.querySelectorAll("#wf-wires path.wire").forEach(p=>{
-    if(p.dataset.from!==id) return;
-    p.classList.remove("took-wire","nottook-wire");
-    if(p.dataset.fromport===takenPort) p.classList.add("took-wire");
-    else if(wfIsBranchPort(p.dataset.fromport)) p.classList.add("nottook-wire");
+  // The wire and its flow marker are siblings inside one .wire-grp — paint both
+  // so the marker never keeps its idle colour on a branch the run dimmed.
+  document.querySelectorAll("#wf-wires .wire-grp").forEach(grp=>{
+    const p=grp.querySelector("path.wire");
+    if(!p || p.dataset.from!==id) return;
+    const cls = p.dataset.fromport===takenPort ? "took-wire"
+              : wfIsBranchPort(p.dataset.fromport) ? "nottook-wire" : null;
+    [p, grp.querySelector(".wire-flow")].forEach(el=>{
+      if(!el) return;
+      el.classList.remove("took-wire","nottook-wire");
+      if(cls) el.classList.add(cls);
+    });
   });
 }
 // Ports that are mutually-exclusive branches (so the not-taken ones dim on a run):
@@ -379,7 +386,7 @@ function wfResetRunViz(){
   wfResetActStatus();
   document.querySelectorAll(".wf-node.running,.wf-node.paused,.wf-node.ran-ok,.wf-node.ran-fail,.wf-node.ran-skip,.wf-node.delaying")
     .forEach(el=>el.classList.remove("running","paused","ran-ok","ran-fail","ran-skip","delaying"));
-  document.querySelectorAll("#wf-wires path.took-wire,#wf-wires path.nottook-wire")
+  document.querySelectorAll("#wf-wires .took-wire,#wf-wires .nottook-wire")
     .forEach(p=>p.classList.remove("took-wire","nottook-wire"));
   document.querySelectorAll(".wf-port.out.took,.wf-port.out.nottook")
     .forEach(p=>p.classList.remove("took","nottook"));

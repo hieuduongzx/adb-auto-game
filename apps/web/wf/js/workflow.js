@@ -604,6 +604,7 @@ function wfSyncToggleBtns(){
   const p=$("wf-preview-btn"); if(p){ p.title="Image preview: "+(wfPreviewAll?"On":"Off"); p.classList.toggle("on",wfPreviewAll); }
   const a=$("wf-align-btn"); if(a){ a.title="Smart align: "+(wfAlignOn?"On":"Off")+" — edges, centres, and ports override grid snapping only when matched (hold Alt to pause both)"; a.classList.toggle("on",wfAlignOn); }
   const m=$("wf-minimap-btn"); if(m){ m.title="Minimap: "+(wfMinimapOn?"On":"Off")+" — bird's-eye view of the graph, click to jump the camera"; m.classList.toggle("on",wfMinimapOn); }
+  if(typeof wfSyncLinkModeBtn==="function") wfSyncLinkModeBtn();
   if(typeof wfSyncFocusBtn==="function") wfSyncFocusBtn();
   if(typeof wfSyncDebugOverlayBtn==="function") wfSyncDebugOverlayBtn();
   wfSyncSpeedUI();

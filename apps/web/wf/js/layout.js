@@ -2,7 +2,7 @@
 // Each rearranges every node in the current graph into a tidy arrangement, then
 // fits the result to view. Notes are excluded (they float free). Nodes keep their
 // x/y in world coords; stacks/groups are not touched (members follow their head).
-const WF_LAY_NODE_W=172, WF_LAY_NODE_H=66, WF_LAY_GAP_X=40, WF_LAY_GAP_Y=34;
+const WF_LAY_NODE_W=172, WF_LAY_NODE_H=70, WF_LAY_GAP_X=40, WF_LAY_GAP_Y=34;
 // Approximate node height: real DOM height when available, else the default.
 function wfNodeH(n){
   const el=wfNodeElById(n.id); return el?el.offsetHeight:WF_LAY_NODE_H;

@@ -509,40 +509,50 @@
    click without thickening the visible line. The visible wire is click-through. */
 #wf-wires .wire-hit { fill:none; stroke:transparent; stroke-width:18; pointer-events:stroke;
   cursor:pointer; stroke-linecap:round; }
-/* Wire styles — soft splines with a directional arrowhead. */
-#wf-wires path.wire { fill:none; stroke:var(--wire); stroke-width:1.6; pointer-events:none;
+/* Wire styles — one calm rope per link, ComfyUI-weight. Direction is carried by
+   a single flow marker at the link's midpoint (see .wire-flow) rather than an
+   arrowhead buried in the input dot, so both ends stay clean. */
+#wf-wires path.wire { fill:none; stroke:var(--wire); stroke-width:1.7; pointer-events:none;
   stroke-linecap:round; stroke-linejoin:round;
-  stroke-opacity:0.9; transition:stroke .12s, stroke-width .12s, stroke-opacity .12s;
-  marker-end:url(#wf-ah); }
+  transition:stroke .12s, stroke-width .12s, stroke-opacity .12s; }
+/* Flow marker — a small triangle sitting on the curve, turned along it. */
+#wf-wires .wire-flow { fill:var(--wire); stroke:none; pointer-events:none;
+  transition:fill .12s; }
 /* Semantic branch wires — the source port's colour flows down its own wire. */
-#wf-wires path.wire[data-fromport="true"]    { stroke:var(--branch-t); marker-end:url(#wf-ah-t); }
-#wf-wires path.wire[data-fromport="false"]   { stroke:var(--branch-f); marker-end:url(#wf-ah-f); }
-#wf-wires path.wire[data-fromport^="c"]       { stroke:var(--wire-switch); marker-end:url(#wf-ah-switch); }
-#wf-wires path.wire[data-fromport="default"] { stroke:var(--wire-switch); stroke-opacity:.6; marker-end:url(#wf-ah-switch); }
-/* Stack wire: structural, not a data flow — very faint dotted rule. */
-#wf-wires path.wire.stack { stroke:var(--wire); stroke-width:1.0; stroke-opacity:0.45;
-  stroke-dasharray:2.5 3; }
+#wf-wires path.wire[data-fromport="true"]     { stroke:var(--branch-t); }
+#wf-wires path.wire[data-fromport="false"]    { stroke:var(--branch-f); }
+#wf-wires path.wire[data-fromport^="c"]       { stroke:var(--wire-switch); }
+#wf-wires path.wire[data-fromport="default"]  { stroke:var(--wire-switch); stroke-opacity:.6; }
+#wf-wires .wire-flow[data-fromport="true"]    { fill:var(--branch-t); }
+#wf-wires .wire-flow[data-fromport="false"]   { fill:var(--branch-f); }
+#wf-wires .wire-flow[data-fromport^="c"]      { fill:var(--wire-switch); }
+#wf-wires .wire-flow[data-fromport="default"] { fill:var(--wire-switch); fill-opacity:.6; }
 /* Loop-back wire: amber dashed — "going back" reads different from forward flow. */
-#wf-wires path.wire.loopback { stroke:var(--branch-loop-line); stroke-width:1.7; stroke-opacity:.92;
-  stroke-dasharray:7 5; marker-end:url(#wf-ah-loop); }
-/* Hover: the whole group brightens to accent (wire + arrowhead) and lifts. */
+#wf-wires path.wire.loopback { stroke:var(--branch-loop-line); stroke-dasharray:7 5; }
+#wf-wires .wire-flow.loopback { fill:var(--branch-loop-line); }
+/* Hover: the whole group brightens to accent (wire + marker) and lifts. */
 #wf-wires .wire-grp:hover path.wire,
-#wf-wires .wire-grp:focus-within path.wire { stroke:var(--accent) !important; stroke-width:2.2; stroke-opacity:1;
-  marker-end:url(#wf-ah-hover) !important; }
+#wf-wires .wire-grp:focus-within path.wire { stroke:var(--accent) !important; stroke-width:2.6;
+  stroke-opacity:1; }
+#wf-wires .wire-grp:hover .wire-flow,
+#wf-wires .wire-grp:focus-within .wire-flow { fill:var(--accent) !important; fill-opacity:1; }
 #wf-wires .wire-grp:hover, #wf-wires .wire-grp:focus-within {
   filter:drop-shadow(0 1px 3px color-mix(in srgb, var(--accent) 28%, transparent)); }
 #wf-wires .wire-hit:focus { outline:none; }
 /* While wiring up a connection, wires ignore the pointer. */
 #wf-canvas.wf-connecting .wire-hit { pointer-events:none; }
 /* Palette-drag hovering a wire: dropping here splices the new block in. */
-#wf-wires .wire-grp.wire-insert path.wire { stroke:var(--accent) !important; stroke-width:2.6;
-  stroke-opacity:1; marker-end:url(#wf-ah-hover) !important; }
+#wf-wires .wire-grp.wire-insert path.wire { stroke:var(--accent) !important; stroke-width:2.9;
+  stroke-opacity:1; }
+#wf-wires .wire-grp.wire-insert .wire-flow { fill:var(--accent) !important; fill-opacity:1; }
 #wf-wires .wire-grp.wire-insert { filter:drop-shadow(0 1px 4px color-mix(in srgb, var(--accent) 40%, transparent)); }
 /* Run trail on wires: the path taken (bright green) vs the skipped branch (faint red). */
-#wf-wires path.wire.took-wire    { stroke:var(--run-ok) !important; stroke-width:2.0; stroke-opacity:1 !important; marker-end:url(#wf-ah-run-ok) !important; }
-#wf-wires path.wire.nottook-wire { stroke:var(--run-fail) !important; stroke-opacity:.34 !important; stroke-width:1.1; marker-end:url(#wf-ah-run-fail) !important; }
-#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:1.55; stroke-dasharray:7 5;
-  stroke-linecap:round; pointer-events:none; marker-end:url(#wf-ah-temp); }
+#wf-wires path.wire.took-wire    { stroke:var(--run-ok) !important; stroke-width:2.3; stroke-opacity:1 !important; }
+#wf-wires path.wire.nottook-wire { stroke:var(--run-fail) !important; stroke-opacity:.3 !important; stroke-width:1.2; }
+#wf-wires .wire-flow.took-wire    { fill:var(--run-ok) !important; fill-opacity:1; }
+#wf-wires .wire-flow.nottook-wire { fill:var(--run-fail) !important; fill-opacity:.3; }
+#wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:1.7; stroke-dasharray:7 5;
+  stroke-linecap:round; pointer-events:none; }
 /* Motion on the connective tissue — state, not decoration. */
 @media (prefers-reduced-motion: no-preference){
   #wf-wires path.temp { animation:wfWireFlow .45s linear infinite; }
@@ -562,6 +572,13 @@
 #wf-rail .btn svg { width:16px; height:16px; stroke-width:1.8; }
 #wf-rail .btn:hover { background:var(--alt); color:var(--ink); box-shadow:none; }
 #wf-rail .btn.on { background:var(--accent-bg); color:var(--accent); }
+/* Link-style button — three glyphs stacked, only the live one is shown, so the
+   rail says which wire shape is in force without a second label. */
+#wf-link-btn .wf-link-ico { display:none; }
+#wf-link-btn[data-mode="spline"]   .wf-link-ico[data-for="spline"],
+#wf-link-btn[data-mode="linear"]   .wf-link-ico[data-for="linear"],
+#wf-link-btn[data-mode="straight"] .wf-link-ico[data-for="straight"] { display:block; }
+#wf-link-btn circle { fill:currentColor; stroke:none; }
 #wf-zoom-lbl { font-family:var(--mono); font-size:9.5px; color:var(--dim); height:20px;
   min-width:28px; text-align:center; cursor:pointer; user-select:none; border-radius:5px; }
 #wf-zoom-lbl:hover { color:var(--accent); background:var(--alt); }
@@ -811,11 +828,11 @@
 .wf-node.condition:not(.wf-stacked) { border-radius:2px 10px 2px 10px; }
 .wf-node.condition:not(.wf-stacked)::after { border-radius:2px 10px 2px 10px; }
 .wf-node.condition:not(.wf-stacked) .wf-node-hd { border-radius:1px 9px 0 0; }
-.wf-node.loop:not(.wf-stacked), .wf-node.loop_until:not(.wf-stacked), .wf-node.call:not(.wf-stacked) { border-radius:8px; }
+.wf-node.loop:not(.wf-stacked), .wf-node.loop_until:not(.wf-stacked), .wf-node.call:not(.wf-stacked) { border-radius:14px; }
 .wf-node.loop:not(.wf-stacked)::after, .wf-node.loop_until:not(.wf-stacked)::after,
-  .wf-node.call:not(.wf-stacked)::after { border-radius:8px; }
+  .wf-node.call:not(.wf-stacked)::after { border-radius:14px; }
 .wf-node.loop:not(.wf-stacked) .wf-node-hd, .wf-node.loop_until:not(.wf-stacked) .wf-node-hd,
-  .wf-node.call:not(.wf-stacked) .wf-node-hd { border-radius:7px 7px 0 0; }
+  .wf-node.call:not(.wf-stacked) .wf-node-hd { border-radius:13px 13px 0 0; }
 /* Per-category accent colour (after kind rules so condition blocks get a cat hue). */
 .wf-node.cat-basic  { --node-accent:var(--cat-basic); }
 .wf-node.cat-image  { --node-accent:var(--cat-image); }
@@ -905,7 +922,7 @@
 .wf-node.try_next { width:146px; min-height:44px !important; border:none;
   border-radius:999px; background:transparent !important; }
 .wf-node.try_next::after { border-radius:999px; }
-.wf-next-body { height:44px; display:flex; align-items:center; gap:8px; padding:0 13px 0 11px;
+.wf-next-body { height:44px; display:flex; align-items:center; gap:8px; padding:0 20px;
   border:1px solid var(--cat-flow-bd); border-radius:999px; background:var(--cat-flow-bg);
   box-shadow:var(--sh-sm); color:var(--cat-flow-ink); overflow:hidden; }
 .wf-next-body .ico { width:16px; height:16px; color:var(--cat-flow-ink); }
@@ -922,6 +939,7 @@
 /* ── Terminals: Start and End are both solid discs — one silhouette for "the
    flow begins / the flow ends", told apart by colour and glyph, not shape. ─── */
 .wf-node.start, .wf-node.end {
+  --port-inset:3px;
   width:var(--term-size); height:var(--term-size); min-height:var(--term-size);
   border:none; background:transparent; overflow:visible;
   border-radius:50%;
@@ -981,7 +999,7 @@
   stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
 .wf-node-act-spacer { flex:1; }
 /* Image preview — compact square on the right of the body. */
-.wf-node-prevrow { display:flex; align-items:center; gap:7px; padding:4px 8px; min-height:32px; }
+.wf-node-prevrow { display:flex; align-items:center; gap:7px; padding:4px 18px; min-height:32px; }
 .wf-node-prevrow .wf-node-sum { padding:0; flex:1; min-width:0; }
 .wf-node-thumb { flex-shrink:0; width:26px; height:26px; object-fit:contain;
   background:var(--panel) repeating-conic-gradient(var(--checker) 0% 25%, transparent 0% 50%) 50%/5px 5px;
@@ -1036,10 +1054,12 @@
   z-index:1; pointer-events:none; border-radius:2px; }
 .wf-node { cursor:grab; }
 .wf-node:active { cursor:grabbing; }
-/* Node header: tinted per-category via --nhd-bg/--nhd-bd. */
-.wf-node-hd { display:flex; align-items:center; gap:7px; padding:0 11px; height:23px;
+/* Node header: a title bar in the ComfyUI/Blender sense — the block's colour
+   lives here (tinted per-category via --nhd-bg/--nhd-bd), the body stays neutral. */
+.wf-node-hd { display:flex; align-items:center; gap:7px; padding:0 11px; height:26px;
   border-bottom:1px solid var(--nhd-bd,var(--cat-logic-bd)); background:var(--nhd-bg,var(--cat-logic-bg));
-  border-radius:var(--node-r) var(--node-r) 0 0; transition: background .15s, border-bottom-color .15s; }
+  border-radius:calc(var(--node-r) - 1px) calc(var(--node-r) - 1px) 0 0;
+  transition: background .15s, border-bottom-color .15s; }
 .wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:14px; height:14px; }
 .wf-node .ico svg { width:14px; height:14px; stroke-width:2; display:block; }
 .wf-node.call .ico { font-style:italic; font-weight:700; }
@@ -1073,8 +1093,9 @@
   background:var(--run-warn); color:var(--shade); font-size:10px; font-weight:800; line-height:16px;
   text-align:center; box-shadow:var(--sh-md); z-index:3; cursor:help; }
 .wf-node.has-warn { border-color:var(--border2); }
-/* Default per-block summary line (the auto description under the title). */
-.wf-node-sum { font-family:var(--mono); font-size:10.5px; color:var(--dim); padding:6px 11px 7px;
+/* Default per-block summary line (the auto description under the title). The
+   side padding clears the inset port dots — a card's text never runs under one. */
+.wf-node-sum { font-family:var(--mono); font-size:10.5px; color:var(--dim); padding:6px 19px 7px;
   line-height:1.4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Live colour swatch in a color node's summary line. */
 .wf-node-colordot { display:inline-block; width:8px; height:8px; border-radius:2px;
@@ -1147,34 +1168,52 @@
 .wf-node.ran-fail .wf-node-time { color:var(--run-fail); font-weight:600; }
 .wf-node.wf-stk-jbot .wf-node-time { display:none; }
 
-/* Ports — compact target dots. Unconnected: pale fill, thin colored border.
-   Once wired, the fill lights up and the arrowhead drives into the centre. */
-.wf-port { position:absolute; width:8px; height:8px; border-radius:50%; background:var(--alt);
-  border:1.5px solid var(--cb-bd); cursor:crosshair; z-index:2;
+/* Ports — the joint between a block and its wire. A wired slot is a SOLID dot
+   in its wire's own colour (ComfyUI's rule: dot and rope are one thread, so the
+   eye follows a link straight into the block); an unwired slot is a hollow ring
+   in a dim neutral, or in its branch's hue where the slot already has a meaning.
+   The .t/.f/.sw/.loop tones come from js/render.js (wfWireTone) — the single
+   place that decides which colour a link is, for both the dot and the path. */
+.wf-port { position:absolute; width:var(--port-sz); height:var(--port-sz); border-radius:50%;
+  background:var(--panel); border:1.5px solid var(--cb-bd); cursor:crosshair; z-index:2;
   transition:border-color .12s, background .12s, transform .12s; box-sizing:border-box; }
 /* Generous hit-area so grab/drop still feels easy. */
 .wf-port::before { content:""; position:absolute; inset:-8px; border-radius:50%; }
-.wf-port:hover { border-color:var(--accent); transform:scale(1.35); }
-.wf-port.in  { left:-5px; }
-.wf-port.in:hover { background:var(--accent-bg); }
-.wf-port.in.connected { background:var(--accent-bg); border-color:var(--accent); }
-.wf-port.in.t.connected { background:var(--branch-t-bg); border-color:var(--branch-t); }
-.wf-port.in.f.connected { background:var(--branch-f-bg); border-color:var(--branch-f); }
-.wf-port.out { right:-5px; }
-.wf-port.out.connected { background:var(--node-accent,var(--wire)); border-color:var(--node-accent,var(--wire)); }
-.wf-port.out.t { border-color:var(--branch-t-bd); }
-.wf-port.out.f { border-color:var(--branch-f-bd); }
-.wf-port.out.t.connected { background:var(--branch-t); border-color:var(--branch-t); }
-.wf-port.out.f.connected { background:var(--branch-f); border-color:var(--branch-f); }
-.wf-port.in.loop { border-color:var(--branch-loop); background:var(--branch-loop-bg); }
-.wf-port.in.loop.connected { border-color:var(--branch-loop); background:var(--branch-loop-bg); }
-.wf-port.in.loop:hover { border-color:var(--accent); background:var(--accent-bg); }
-.wf-port-lbl { position:absolute; right:10px; font-size:8px; font-weight:700; color:var(--muted); white-space:nowrap; }
-.wf-port-lbl.in { right:auto; left:-26px; width:22px; text-align:right; }
+/* Dots sit INSIDE the card, inset from its edge — the ComfyUI arrangement. A
+   wire therefore does not stop at the border: it keeps going and slips BEHIND
+   the block (the wire layer paints under the cards), so the rope visually runs
+   under the node and only its dot shows. Nothing hangs off a card any more. */
+.wf-port.in  { left:var(--port-inset); }
+.wf-port.out { right:var(--port-inset); }
+/* Unwired: a ring. Branch slots keep a hint of their hue so a block still reads
+   as "this one has a true/false/loop side" before anything is attached. */
+.wf-port.t { border-color:var(--branch-t-bd); }
+.wf-port.f { border-color:var(--branch-f-bd); }
+.wf-port.sw { border-color:var(--wire-switch); }
+.wf-port.loop { border-color:var(--branch-loop); background:var(--branch-loop-bg); }
+/* Wired: a solid dot in the wire's colour. */
+.wf-port.connected      { background:var(--wire); border-color:var(--wire); }
+.wf-port.connected.t    { background:var(--branch-t); border-color:var(--branch-t); }
+.wf-port.connected.f    { background:var(--branch-f); border-color:var(--branch-f); }
+.wf-port.connected.sw   { background:var(--wire-switch); border-color:var(--wire-switch); }
+.wf-port.connected.loop { background:var(--branch-loop-line); border-color:var(--branch-loop-line); }
+/* Hover — last, so it beats every tone above: the dot you are about to grab. */
+.wf-port:hover { background:var(--accent); border-color:var(--accent); transform:scale(1.35); }
+/* Slot labels sit INSIDE the card next to their dot, the way ComfyUI and
+   Blender label sockets — nothing floats in the canvas gutter any more. The
+   body reserves a gutter for them via .slots-out / .slots-in below. */
+.wf-port-lbl { position:absolute; margin-top:-1px; font-size:9px; font-weight:700;
+  line-height:12px; color:var(--muted); white-space:nowrap; pointer-events:none;
+  right:calc(var(--port-inset) + var(--port-sz) + 4px); }
+.wf-port-lbl.in { right:auto; text-align:left;
+  left:calc(var(--port-inset) + var(--port-sz) + 4px); }
+/* Multi-slot blocks: keep the summary/preview clear of the labelled dot column. */
+.wf-node.slots-out .wf-node-sum, .wf-node.slots-out .wf-node-prevrow { padding-right:40px; }
+.wf-node.slots-in  .wf-node-sum, .wf-node.slots-in  .wf-node-prevrow { padding-left:42px; }
 .wf-port-lbl.in.loop { color:var(--branch-loop-line); }
 /* Run trail on ports: the output taken (filled green) vs the skipped sibling. */
-.wf-port.out.took    { border-color:var(--run-ok); background:var(--run-ok); }
-.wf-port.out.nottook { border-color:var(--run-fail); background:var(--run-fail); }
+.wf-port.out.took    { border-color:var(--run-ok) !important; background:var(--run-ok) !important; }
+.wf-port.out.nottook { border-color:var(--run-fail) !important; background:var(--run-fail) !important; }
 
 /* ═══ Inspector ═══════════════════════════════════════════════════════════ */
 #wf-insp-body { flex:1; min-height:0; overflow-y:auto; padding:0; display:flex; flex-direction:column; gap:0; }

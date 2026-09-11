@@ -56,7 +56,7 @@ function wfMinimapDraw(){
   let nx0=Infinity,ny0=Infinity,nx1=-Infinity,ny1=-Infinity;
   const rects=nodes.map(n=>{
     const el=wfNodeElById(n.id);
-    const w=el?el.offsetWidth:168, h=el?el.offsetHeight:64;
+    const w=el?el.offsetWidth:172, h=el?el.offsetHeight:70;
     if(n.x<nx0)nx0=n.x; if(n.y<ny0)ny0=n.y;
     if(n.x+w>nx1)nx1=n.x+w; if(n.y+h>ny1)ny1=n.y+h;
     return {n,w,h};
