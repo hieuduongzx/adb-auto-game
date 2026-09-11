@@ -118,6 +118,9 @@ window.__recv = function(raw){
     // New node → any previous delayAfter countdown is done.
     if(typeof wfClearNodeDelay==="function") wfClearNodeDelay();
     if(data.id){ wfLiveNode=data.id; wfNoteNodeStart(data.id); }   // the true running node, even if in an off-screen graph
+    // A call block stays ringed for as long as its function runs, on whichever
+    // graph is being viewed — see wfCallStackEnter.
+    if(data.id) wfCallStackEnter(data.id);
     // Follow-focus first: if the running node lives in another graph (a function
     // we stepped into, or the activity we stepped back out to), switch to it and
     // centre. This rebuilds the canvas so the node is now present for the guard.
@@ -133,6 +136,7 @@ window.__recv = function(raw){
     if(typeof wfDelayState!=="undefined" && wfDelayState && wfDelayState.phase==="before")
       wfClearNodeDelay();
     wfNoteNodeDone(data.id);
+    if(data.id) wfCallStackExit(data.id);   // a call reports only once its function ended
     // Record the result even when the node is in a graph we're not viewing (a
     // call node's function graph): wfRan/wfRanPort accumulate for the whole
     // run, so switching back re-paints the full trail. Painting needs the DOM

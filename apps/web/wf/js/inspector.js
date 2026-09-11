@@ -42,7 +42,7 @@ function wfInspJsonBlock(label, getObj, applyObj){
 
   const bar=document.createElement("div"); bar.className="wf-json-bar";
   const toggle=document.createElement("button"); toggle.className="wf-json-toggle"; toggle.type="button";
-  toggle.innerHTML=`<svg class="wf-json-chev" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg><span>Preview</span>`;
+  toggle.innerHTML=`<svg class="wf-json-chev uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg><span>Preview</span>`;
   toggle.title=`Show or edit this ${label}'s JSON`;
   const copyBtn=document.createElement("button"); copyBtn.className="btn sm"; copyBtn.type="button";
   copyBtn.innerHTML=`${wfIco("clipboard")}<span>Copy</span>`;
@@ -219,7 +219,7 @@ function wfRenderInspector(){
 
     const pblock=wfInspBlock("Parameters");
     if(node.type==="call"){ pblock.appendChild(wfCallPicker(node)); }
-    else if(node.type==="switch" || node.type==="try_chain" || node.type==="and"){ pblock.appendChild(wfBranchCountEditor(node)); }
+    else if(node.type==="switch" || node.type==="try_chain" || node.type==="and" || node.type==="sequence"){ pblock.appendChild(wfBranchCountEditor(node)); }
     else {
       if(!(def.fields||[]).length){
         const d=document.createElement("div"); d.className="wf-insp-tip"; d.textContent="This node has no parameters."; pblock.appendChild(d);
@@ -299,7 +299,7 @@ function wfRenderInspector(){
   }
   body.innerHTML=
     `<div class="wf-empty">
-      <div class="wf-empty-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h5.5A2 2 0 0 1 17.5 8.5V14"/></svg></div>
+      <div class="wf-empty-ico" aria-hidden="true"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg></div>
       <div class="wf-empty-t">No activity open</div>
       <div class="wf-empty-s">Select or create an activity in the corner panel, then drag nodes from the left palette onto the canvas.</div>
       <div class="wf-empty-keys">
@@ -422,7 +422,7 @@ function wfShowVarMenu(anchor,onPick,opts){
 function wfVarPickBtn(onPick,title,opts){
   const b=document.createElement("button"); b.type="button"; b.className="btn sm ico wf-var-pick";
   b.title=title||"Pick a variable";
-  b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16M20 4L4 20"/></svg>';
+  b.innerHTML='<svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
   b.onclick=(e)=>{ e.stopPropagation(); wfShowVarMenu(b,onPick,opts); };
   return b;
 }
@@ -513,7 +513,7 @@ function wfPathField(node,f){
 function wfInsertVarBtn(inp){
   const b=document.createElement("button"); b.type="button"; b.className="btn sm ico wf-var-pick";
   b.title="Insert a variable placeholder {name}";
-  b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4H5a1 1 0 0 0-1 1v5a1 1 0 0 1-1 1 1 1 0 0 1 1 1v5a1 1 0 0 0 1 1h2"/><path d="M17 4h2a1 1 0 0 1 1 1v5a1 1 0 0 0 1 1 1 1 0 0 0-1 1v5a1 1 0 0 1-1 1h-2"/></svg>';
+  b.innerHTML='<svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/></svg>';
   b.onclick=(e)=>{ e.stopPropagation(); wfShowVarMenu(b,name=>{
     const token="{"+name+"}";
     const s=inp.value||""; const a=inp.selectionStart??s.length, z=inp.selectionEnd??s.length;
@@ -613,7 +613,7 @@ function wfNodeDefaultsModal(){
 
     const shot=document.createElement("div"); shot.className="wf-field";
     const l=document.createElement("label"); l.textContent="Screenshot on fail"; shot.appendChild(l);
-    const cb=document.createElement("span"); cb.className="cb"+(cur.screenshotOnFail?" checked":""); cb.innerHTML='<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
+    const cb=document.createElement("span"); cb.className="cb"+(cur.screenshotOnFail?" checked":""); cb.innerHTML='<svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
     cb.onclick=()=>{ cb.classList.toggle("checked",!cb.classList.contains("checked")); };
     shot.appendChild(cb);
     el.appendChild(shot);
@@ -698,7 +698,7 @@ function wfRetryField(node){
   b.appendChild(pair);
   const row=document.createElement("div"); row.className="wf-field";
   const l=document.createElement("label"); l.textContent="Screenshot"; row.appendChild(l);
-  const cb=document.createElement("span"); cb.className="cb"+(node.screenshotOnFail?" checked":""); cb.innerHTML='<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
+  const cb=document.createElement("span"); cb.className="cb"+(node.screenshotOnFail?" checked":""); cb.innerHTML='<svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
   cb.onclick=()=>{ wfPushUndoDebounced(); node.screenshotOnFail=!node.screenshotOnFail; cb.classList.toggle("checked", !!node.screenshotOnFail); wfUpdNodeRetry(node); };
   row.appendChild(cb);
   const hint=document.createElement("div"); hint.className="wf-insp-tip"; hint.textContent="Retry re-runs on failure; screenshot saves the device image if the last attempt fails.";
@@ -900,7 +900,7 @@ function wfVarValue(v){
   if((v.type||"bool")==="bool"){
     const cb=document.createElement("span"); cb.className="cb"+(v.value?" checked":""); cb.title="Default value";
     cb.setAttribute("role","checkbox"); cb.tabIndex=0; cb.setAttribute("aria-checked",String(!!v.value));
-    cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
+    cb.innerHTML='<svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
     cb.onclick=()=>{ wfPushUndoDebounced(); v.value=!v.value; cb.classList.toggle("checked",v.value); cb.setAttribute("aria-checked",String(!!v.value)); };
     cb.onkeydown=e=>{ if(e.key===" "||e.key==="Enter"){ e.preventDefault(); cb.click(); } };
     return cb;
@@ -995,7 +995,7 @@ function wfFieldEl(node,f){
   if(f.t==="bool"){
     const cb=document.createElement("span"); cb.className="cb"+(node.params[f.k]?" checked":"");
     cb.setAttribute("role","checkbox"); cb.tabIndex=0; cb.setAttribute("aria-checked",String(!!node.params[f.k]));
-    cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
+    cb.innerHTML='<svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
     // A bool that another field gates on (showWhen) must re-render the inspector
     // so the dependent field appears/disappears (e.g. loop infinite ↔ count).
     const gates=(WF_NODES[node.type]&&WF_NODES[node.type].fields||[]).some(ff=>ff.showWhen&&ff.showWhen[f.k]!==undefined);
@@ -1160,7 +1160,7 @@ function wfRegionField(node,f){
   const cb=document.createElement("span"); cb.className="cb";
   const enabled=()=> !!(node.params.regionX||node.params.regionY||node.params.regionW||node.params.regionH);
   cb.classList.toggle("checked", enabled());
-  cb.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>';
+  cb.innerHTML='<svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
   cb.style.cursor="pointer";
   hdr.appendChild(cb);
   const panel=document.createElement("div"); panel.className="wf-region-panel";
@@ -1231,6 +1231,7 @@ function wfSetBranchCount(node, nextCount){
 function wfCountBranchesEditor(node){
   const wrap=document.createElement("div");
   const isAnd=node.type==="and";
+  const isSeq=node.type==="sequence";
   const fallback=isAnd?2:3;
   const count=()=>wfNormalizeCount(node.params.count, fallback);
   const render=()=>{ wrap.innerHTML="";
@@ -1238,6 +1239,8 @@ function wfCountBranchesEditor(node){
     const hint=document.createElement("div"); hint.className="wf-insp-tip";
     hint.textContent=isAnd
       ? "Wait until this many incoming parallel branches reach this node; continue only if all arrived branches had no errors."
+      : isSeq
+      ? "Run branch #1 → #2 → … #n in order, one step at a time. Every wired branch ALWAYS runs, even when an earlier one fails. No shared output port — each branch carries its own continuation."
       : "Run branch #1 first; if it fails (or hits Next branch), try #2…#n. If all fail, use the 'fail' port.";
     wrap.appendChild(hint);
   };

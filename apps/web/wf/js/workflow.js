@@ -3,86 +3,79 @@
 // node palette reads as a consistent professional tool, not a mixed emoji grab-bag.
 // Each entry is the inner markup of an SVG (paths/shapes) wrapped at render time.
 // Use wfIco(name) to get a full <svg>; unknown names fall back to a dot.
+// Node / palette icon names -> the shared Lucide set (see shared/icons.js).
+// The geometry used to live here as hand-drawn paths whose header claimed
+// "stroke 1.8" while wfIco() rendered them at 2. One set, one weight, one file.
 const WF_ICONS = {
-  // flow / structure
-  play:       '<polygon points="6 3 20 12 6 21 6 3"/>',
-  square:     '<rect x="5" y="5" width="14" height="14" rx="2"/>',
-  loop:       '<path d="M17 2l4 4-4 4"/><path d="M3 11v-2a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
-  parallel:   '<path d="M12 4v16"/><path d="M4 8h4"/><path d="M16 8h4"/><path d="M4 16h4"/><path d="M16 16h4"/>',
-  octagon:    '<polygon points="8 3 16 3 21 8 21 16 16 21 8 21 3 16 3 8 8 3"/>',
-  // basic actions
-  pointer:    '<path d="M3 3l7 18 2.5-7.5L20 11 3 3z"/>',
-  touches:    '<circle cx="7" cy="7" r="3"/><circle cx="17" cy="17" r="3"/><path d="M10 7h3a4 4 0 0 1 4 4v3"/><path d="M14 17h-3a4 4 0 0 1-4-4v-3"/>',
-  hand:       '<path d="M6 11V6a2 2 0 1 1 4 0v4"/><path d="M10 10V4a2 2 0 1 1 4 0v6"/><path d="M14 10V5a2 2 0 1 1 4 0v7"/><path d="M18 12V8a2 2 0 1 1 4 0v8a6 6 0 0 1-6 6h-3a6 6 0 0 1-5-2.6L4 16a2 2 0 0 1 3-2.6L8 15"/>',
-  dice:       '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.2"/><circle cx="15.5" cy="15.5" r="1.2"/><circle cx="12" cy="12" r="1.2"/>',
-  timer:      '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M9 2h6"/>',
-  clock:      '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>',
-  hourglass:  '<path d="M6 3h12"/><path d="M6 21h12"/><path d="M6 3c0 5 6 6 6 9s-6 4-6 9"/><path d="M18 3c0 5-6 6-6 9s6 4 6 9"/>',
-  alarm:      '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5"/><path d="M5 3 2 6"/><path d="M22 6l-3-3"/>',
-  calendar:   '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/>',
-  smartphone: '<rect x="6" y="2" width="12" height="20" rx="2"/><line x1="10" y1="18" x2="14" y2="18"/>',
-  monitor:    '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
-  power:      '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>',
-  battery:    '<rect x="2" y="7" width="16" height="10" rx="2"/><line x1="22" y1="11" x2="22" y2="13"/>',
-  arrow_down: '<line x1="12" y1="4" x2="12" y2="20"/><polyline points="7 15 12 20 17 15"/>',
-  // input
-  keyboard:   '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M7 14h10"/>',
-  disc:       '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/>',
-  back:       '<polyline points="15 18 9 12 15 6"/>',
-  home:       '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
-  // image
-  target:     '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4"/>',
-  eye:        '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
-  help:       '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.9.4-1.5 1-1.5 2"/><circle cx="12" cy="17" r="0.6"/>',
-  layers:     '<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/><path d="M3 17l9 5 9-5"/>',
-  // ocr / text
-  type:       '<polyline points="4 7 4 5 20 5 20 7"/><line x1="9" y1="5" x2="9" y2="19"/><line x1="6" y1="19" x2="12" y2="19"/>',
-  scan_text:  '<path d="M4 7V5a2 2 0 0 1 2-2h2"/><path d="M16 3h2a2 2 0 0 1 2 2v2"/><path d="M4 17v2a2 2 0 0 0 2 2h2"/><path d="M16 21h2a2 2 0 0 0 2-2v-2"/><line x1="4" y1="12" x2="20" y2="12"/>',
-  search:     '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/>',
-  scissors:   '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><line x1="8" y1="8" x2="20" y2="18"/><line x1="8" y1="16" x2="20" y2="6"/>',
-  // color
-  droplet:    '<path d="M12 2s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
-  pipette:    '<path d="m2 22 1-1h2l9-9"/><path d="M3 21v-2l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4z"/>',
-  // logic
-  pin:        '<path d="M12 17v5"/><path d="M7 3h10l-2 7h4l-7 7-7-7h4L7 3z"/>',
-  calculator: '<rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="12" x2="8" y2="12"/><line x1="12" y1="12" x2="12" y2="12"/><line x1="16" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="12" y1="16" x2="12" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>',
-  hash:       '<line x1="9" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="15" y2="21"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="3" y1="15" x2="19" y2="15"/>',
-  git_branch: '<line x1="6" y1="3" x2="6" y2="21"/><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="9" r="2.5"/><path d="M18 11.5a6 6 0 0 1-6 6"/>',
-  git_merge:  '<circle cx="18" cy="18" r="2.5"/><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><line x1="6" y1="8.5" x2="6" y2="15.5"/><path d="M6 8.5a9 9 0 0 0 9 9"/>',
-  // skip-forward: abandon current try_chain arm → try next branch
-  skip:       '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/>',
-  bell:       '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
-  scroll:     '<rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 7h6M9 11h6M9 15h4"/><path d="M17 14l2.5 2.5L17 19"/>',
-  // misc
-  rocket:     '<path d="M5 13c-2 1-3 4-3 7 3 0 6-1 7-3"/><path d="M14 4c3 1 6 4 6 8-2 2-5 3-9 3l-4-4c0-4 1-7 3-9z"/><circle cx="15" cy="9" r="1.4"/>',
-  camera:     '<path d="M4 7h3l2-2h6l2 2h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="3.5"/>',
-  edit:       '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>',
-  message:    '<path d="M21 11.5a8.5 8.5 0 0 1-12 7.7L3 21l1.8-6A8.5 8.5 0 1 1 21 11.5z"/>',
-  function:   '<path d="M15 4h-1a3 3 0 0 0-3 3v10a3 3 0 0 1-3 3"/><line x1="8" y1="11.5" x2="16" y2="11.5"/>',
-  // win32 window controls
-  maximize:   '<rect x="4" y="4" width="16" height="16" rx="2"/><polyline points="9 4 4 4 4 9"/>',
-  minimize:   '<rect x="4" y="4" width="16" height="16" rx="2"/><line x1="8" y1="16" x2="16" y2="16"/>',
-  move:       '<polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/>',
-  // ui chrome
-  x:          '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
-  plus:       '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
-  check:      '<polyline points="4 12.5 9.5 18 20 6"/>',
-  chevron_up: '<polyline points="6 15 12 9 18 15"/>',
-  chevron_dn: '<polyline points="6 9 12 15 18 9"/>',
-  expand:     '<polyline points="8 3 4 3 4 8"/><polyline points="16 3 20 3 20 8"/><polyline points="8 21 4 21 4 16"/><polyline points="16 21 20 21 20 16"/>',
-  settings:   '<circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
-  copy:       '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
-  clipboard:  '<rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>',
-  trash:      '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
-  link_off:   '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 0 1 4 7"/><path d="M8 12h8"/><line x1="3" y1="3" x2="21" y2="21"/>',
-  box:        '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="4 3"/>',
-  log:        '<path d="M14 3v4h4"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>',
-  folder:     '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  play: "play",
+  square: "square",
+  loop: "repeat",
+  parallel: "split",
+  sequence: "list-tree",
+  octagon: "octagon",
+  pointer: "mouse-pointer-2",
+  touches: "pointer",
+  hand: "hand",
+  dice: "dice-5",
+  timer: "timer",
+  clock: "clock",
+  hourglass: "hourglass",
+  alarm: "alarm-clock",
+  calendar: "calendar",
+  smartphone: "smartphone",
+  monitor: "monitor",
+  power: "power",
+  battery: "battery",
+  arrow_down: "arrow-down",
+  keyboard: "keyboard",
+  disc: "disc",
+  back: "chevron-left",
+  home: "house",
+  target: "target",
+  eye: "eye",
+  help: "circle-question-mark",
+  layers: "layers",
+  type: "type",
+  scan_text: "scan-text",
+  search: "search",
+  scissors: "scissors",
+  droplet: "droplet",
+  pipette: "pipette",
+  pin: "pin",
+  calculator: "calculator",
+  hash: "hash",
+  git_branch: "git-branch",
+  git_merge: "git-merge",
+  skip: "skip-forward",
+  bell: "bell",
+  scroll: "scroll-text",
+  rocket: "rocket",
+  camera: "camera",
+  edit: "pencil",
+  message: "message-circle",
+  function: "square-function",
+  maximize: "maximize",
+  minimize: "minimize",
+  move: "move",
+  x: "x",
+  plus: "plus",
+  check: "check",
+  chevron_up: "chevron-up",
+  chevron_dn: "chevron-down",
+  chevron_right: "chevron-right",
+  expand: "maximize",
+  settings: "settings",
+  copy: "copy",
+  clipboard: "clipboard",
+  trash: "trash-2",
+  link_off: "link-2-off",
+  box: "square-dashed",
+  log: "file-text",
+  folder: "folder",
 };
   function wfIco(name){
-    const inner = WF_ICONS[name];
-    if(!inner) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/></svg>';
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+    // Unknown names fall back to a neutral dot rather than a broken glyph.
+    return uiIco(WF_ICONS[name] || "circle-dot");
   }
 
 // Display label for package-bearing nodes (Launch / Stop / Uninstall / If app).
@@ -180,6 +173,10 @@ const WF_NODES = {
   read_color: {label:"Read color → variable",ico:"pipette",kind:"action",cat:"color", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"color",var:true},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>`${p.name||"?"} = px(${p.x||0},${p.y||0})`},
   loop:       {label:"Repeat",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"infinite",t:"bool",d:true},{k:"count",lbl:"Repeat count",t:"num",varRef:true,d:3,showWhen:{infinite:false}}], sum:p=>p.infinite?"∞ infinite":`${p.count}×`},
   parallel:   {label:"Parallel", ico:"parallel",kind:"parallel",cat:"flow", outs:[], fields:[{k:"count",lbl:"Thread count",t:"num",d:3,refresh:true}], sum:p=>`${p.count||3} parallel threads`},
+  // Sequential fan-out: run branches 1..N one after another, ALWAYS. Unlike Try
+  // in order it never stops on a success and never gives up on a failure — every
+  // wired branch runs. No shared output port; each branch carries its own path.
+  sequence:   {label:"Sequence", ico:"sequence",kind:"sequence",cat:"flow", outs:[], fields:[], sum:p=>`${p.count||3} steps · run in order, always`},
   try_chain:  {label:"Try in order",ico:"git_branch",kind:"try_chain",cat:"flow", outs:[], fields:[], sum:p=>`${p.count||3} branches · on fail try next branch`, pair:"try"},
   // Inside a Try in order arm: stop this branch and advance to the next numbered
   // port (or fail if none left). Like Break loop, but for try_chain.
@@ -957,7 +954,7 @@ function wfOpenProjectSettings(){
         `<div class="wf-proj-inline">`+
           `<input id="wf-win32-window" type="text" placeholder="Title, class, PID, or EXE (e.g. game.exe)" spellcheck="false" autocomplete="off">`+
           `<button type="button" class="btn sm ico" id="wf-win32-pick" title="Pick an open window">`+
-            `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>`+
+            `<svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>`+
           `</button>`+
         `</div>`;
       secWin.appendChild(rowWin);

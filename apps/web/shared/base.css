@@ -109,9 +109,8 @@ kbd {
 .btn.h30 { height: 30px; padding: 0 12px; }
 .btn.ico { width: 30px; padding: 0; }
 .btn.sm.ico { width: 26px; }
-.btn svg { width: 15px; height: 15px; display: block; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.btn.ico svg { width: 16px; height: 16px; }
-.btn.accent svg, .btn.ok svg, .btn.err svg { stroke-width: 2.1; }
+.btn svg { width:14px; height:14px; display: block; stroke: currentColor; fill: none; stroke-width:2; stroke-linecap: round; stroke-linejoin: round; }
+.btn.ico svg { width:16px; height:16px; stroke-width:1.8; }
 /* A toggle icon button reads its on/off state from colour, not text. */
 .btn.ico.on { background: var(--accent-bg); border-color: var(--border2); color: var(--accent); }
 
@@ -130,7 +129,7 @@ kbd {
   background: var(--panel); flex-shrink: 0; display: flex; align-items: center;
   justify-content: center; transition: background .12s, border-color .12s;
 }
-.cb.checked { background: var(--accent); border-color: var(--accent); }
+.cb.checked { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .cb svg { opacity: 0; transition: opacity .1s; }
 .cb.checked svg { opacity: 1; }
 
@@ -185,7 +184,7 @@ kbd {
   font-size: var(--t-body); font-weight: 600; color: var(--ink2); cursor: pointer;
   pointer-events: auto; animation: uiToastIn .18s var(--ease) both;
 }
-.ui-toast svg { width: 15px; height: 15px; flex-shrink: 0; }
+.ui-toast svg { width:14px; height:14px; stroke-width:2; flex-shrink: 0; }
 .ui-toast-msg { min-width: 0; line-height: 1.45; word-break: break-word; }
 .ui-toast.ui-success { background: var(--ok-bg); color: var(--ok-ink); }
 .ui-toast.ui-error   { background: var(--err-bg); color: var(--err); }
@@ -238,7 +237,7 @@ input.mono, select.mono, textarea.mono { font-size: inherit; color: inherit; }
 /* ── Theme toggle — one icon button, dropped into any app header ──────────── */
 /* Markup carries both glyphs and CSS shows the one for the *current* theme, so
    the control needs no JS beyond a click handler on [data-theme-toggle]. */
-.theme-btn svg { width: 15px; height: 15px; }
+.theme-btn svg { width:14px; height:14px; stroke-width:2; }
 .theme-btn .ico-moon { display: none; }
 :root[data-theme="dark"] .theme-btn .ico-sun  { display: none; }
 :root[data-theme="dark"] .theme-btn .ico-moon { display: block; }

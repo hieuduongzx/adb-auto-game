@@ -119,6 +119,10 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "if_var":     {"label": "Nếu biến",      "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     "loop":       {"label": "Lặp lại",       "kind": "loop",      "ins": 1, "outs": ["body", "done"]},
     "parallel":   {"label": "Chạy song song","kind": "parallel",  "ins": 1, "outs": []},
+    # Sequential fan-out: run branches 1..N one after another. Unlike try_chain a
+    # branch is NOT skipped when an earlier one fails or succeeds — every wired
+    # branch ALWAYS runs. No shared output port: each branch is its own path.
+    "sequence":   {"label": "Chạy lần lượt","kind": "sequence",  "ins": 1, "outs": []},
     # Sequential fallback: run branch 1; if that branch fails (a block returns
     # false), stop that branch and try branch 2, then 3... If every wired branch
     # fails, continue from the "fail" port.
@@ -1356,6 +1360,45 @@ class WorkflowEngine:
                 if attempted:
                     log_warning("[workflow] tất cả nhánh thử lần lượt đều fail")
                 cur = self._next(adj, cur, "fail")
+            elif kind == "sequence":
+                # Chạy các nhánh 1..N LẦN LƯỢT: dù nhánh trước fail hay thành
+                # công vẫn sang nhánh kế. Mỗi nhánh là một đường độc lập (walk
+                # tới dead-end). Khác try_chain: không dừng ở nhánh thành công
+                # đầu tiên, và không có cổng "fail"/"out" chung.
+                count = max(1, int(params.get("count", 3)))
+                ports = [str(i + 1) for i in range(count)]
+                break0 = self._break_loop
+                try0 = self._try_chain_mode
+                failed0 = self._branch_failed
+
+                any_failed = False
+                ran = 0
+                for port in ports:
+                    if self._stop.is_set():
+                        break
+                    tgt = self._next(adj, cur, port)
+                    if not tgt:
+                        continue
+                    ran += 1
+                    log_info(f"[workflow] ▶ chạy lần lượt nhánh {port}/{count}")
+                    self._emit("on_node_done", nid, "ok", port)
+                    self._branch_failed = False
+                    self._break_loop = False
+                    # Nhánh tuần tự không phải nhánh try_chain: một action fail
+                    # KHÔNG được cắt ngang nhánh (không `break`) để cả nhánh chạy
+                    # hết — lỗi chỉ được ghi nhận.
+                    self._try_chain_mode = False
+                    self._walk(nodes, adj, tgt, {}, depth)
+                    if self._branch_failed:
+                        any_failed = True
+                self._try_chain_mode = try0
+                self._break_loop = break0
+                # Lỗi của bất kỳ nhánh nào vẫn lan ra ngoài (kết quả run / arm
+                # try_chain bao ngoài), nhưng không chặn các nhánh còn lại.
+                self._branch_failed = bool(failed0 or any_failed)
+                if ran:
+                    log_info(f"[workflow] ⇉ chạy xong {ran} nhánh lần lượt")
+                break
             elif kind == "switch":
                 # Evaluate each case top-to-bottom; first true wins its port "c{i}".
                 taken = "default"
@@ -2510,7 +2553,7 @@ class WorkflowEngine:
             elif kind in ("start", "end", "note", "stop", "try_next"):
                 # Terminals/notes/control exits have no side-effects standalone.
                 port = None
-            elif kind in ("loop", "loop_until", "parallel", "and", "join",
+            elif kind in ("loop", "loop_until", "parallel", "sequence", "and", "join",
                           "random", "switch", "try_chain", "call"):
                 # Structural nodes don't make sense standalone; report no-op.
                 log_info(f"[workflow] Block '{ntype}' là cấu trúc — chạy trong luồng")

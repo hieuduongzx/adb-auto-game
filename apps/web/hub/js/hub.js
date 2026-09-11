@@ -30,7 +30,7 @@ function toast(msg, level) {
   const t = document.createElement("div");
   t.className = "ui-toast ui-" + level;
   t.innerHTML =
-    `<svg viewBox="0 0 24 24">${TOAST_ICO[level]}</svg>` +
+    `<svg class="uico" viewBox="0 0 24 24">${TOAST_ICO[level]}</svg>` +
     `<span class="ui-toast-msg">${escHtml(msg)}</span>`;
   t.title = "Click to dismiss";
   host.appendChild(t);
@@ -320,15 +320,15 @@ function render() {
       <td>
         <div class="row-actions">
           <button class="btn sm ok" data-act="run" title="Open Runner GUI">
-            <svg viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>
             Run
           </button>
           <button class="btn sm" data-act="edit" title="Open in Designer">
-            <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
             Edit
           </button>
           <button class="btn sm err ico" data-act="delete" title="Delete workflow" aria-label="Delete">
-            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
         </div>
       </td>
@@ -463,6 +463,13 @@ async function createWorkflow() {
 // ── Tool navigation ─────────────────────────────────────────────────────────
 async function openTool(name) {
   document.querySelectorAll(".tool-view").forEach((view) => view.classList.toggle("active", view.id === (name === "workflow" ? "workflow-app" : name === "autoclick" ? "autoclick-app" : "tool-home")));
+  // The rail is the only "you are here" marker now, so it has to stay honest
+  // whichever route got us here — a rail click, a tool card, or a deep link.
+  document.querySelectorAll("[data-rail]").forEach((b) => {
+    const on = b.dataset.rail === name;
+    b.classList.toggle("on", on);
+    on ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current");
+  });
   try { await api().autoclick_set_view_active(name === "autoclick"); } catch {}
   if (name === "workflow" && !WORKFLOWS_LOADED) {
     await loadList();
@@ -529,7 +536,7 @@ function renderPoints() {
       <label class="point-enable" title="${point.enabled?"Enabled — click to disable":"Disabled — click to enable"}"><input type="checkbox" data-point-act="toggle" ${point.enabled?"checked":""} aria-label="Enable point"><span></span></label>
       <span class="point-title">${escHtml(point.label)}</span>
       <span class="point-sum"><span class="point-pos">${escHtml(s.pos)}</span><span class="point-click">${s.click}</span></span>
-      <button class="point-delete" type="button" data-point-act="delete" title="Delete point" aria-label="Delete point"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M8 10v8M12 10v8M16 10v8M6 7l1 14h10l1-14"/></svg></button>`;
+      <button class="point-delete" type="button" data-point-act="delete" title="Delete point" aria-label="Delete point"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>`;
     host.appendChild(row);
   });
   $("ac-points-empty").hidden=!!points.length;
@@ -556,7 +563,7 @@ function renderPointEditor() {
       : `<div class="pe-row pe-xy">
           <label><span>X</span><input type="number" data-pe="x" value="${point.x}"></label>
           <label><span>Y</span><input type="number" data-pe="y" value="${point.y}"></label>
-          <button class="pe-capture" type="button" data-pe-act="capture" title="Capture cursor position"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Capture<kbd>F7</kbd></button>
+          <button class="pe-capture" type="button" data-pe-act="capture" title="Capture cursor position"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/></svg>Capture<kbd>F7</kbd></button>
         </div>`}
     <div class="pe-row pe-click">
       <label><span>Mouse button</span><select data-pe="button"><option value="left" ${point.button==="left"?"selected":""}>Left</option><option value="right" ${point.button==="right"?"selected":""}>Right</option><option value="middle" ${point.button==="middle"?"selected":""}>Middle</option></select></label>
@@ -596,7 +603,7 @@ function renderAutoClick(){
   $("ac-status-detail").textContent=AC_STATE.error?AC_STATE.error:running?`Running ${enabled} point${enabled===1?"":"s"} in sequence.`:status==="Completed"?`Completed ${AC_STATE.cycles||0} cycles.`:`${enabled} enabled point${enabled===1?"":"s"} ready.`;
   const header=$("ac-header-state"); header.className="run-state "+(AC_STATE.error?"error":running?"running":"ready"); header.querySelector("span:last-child").textContent=running?"Running":AC_STATE.error?"Error":"Ready";
   const run=$("ac-run"); run.classList.toggle("running",running);
-  run.querySelector(".run-icon").innerHTML=running?'<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>':'<svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg>';
+  run.querySelector(".run-icon").innerHTML=running?'<svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>':'<svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>';
   run.querySelector("b").textContent=running?"Stop Auto Click":"Start Sequence";
   run.querySelector("small").textContent=running?"Stops after the current action":"Runs enabled points from top to bottom";
   $("ac-form").querySelectorAll("input,select,.seg,button").forEach(el=>{el.disabled=running;});

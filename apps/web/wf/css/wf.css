@@ -5,13 +5,19 @@
 
 /* ── Header: file/project, run, and device/view zones. Wide screens use one
    row; laptop widths give the run cluster a dedicated second row. ─────────── */
-#toolbar { display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+/* Flex, not grid. `grid-template-columns:1fr auto 1fr` with justify-self:center
+   let the centre zone overflow its track in BOTH directions once the content
+   outgrew the window, so the run cluster drew straight over the device tray.
+   Flex items are laid out sequentially and cannot overlap, whatever the width.
+   The two side zones share the leftover space (`flex:1 1 0`) so the run cluster
+   still sits optically centred; `min-width:0` lets them actually shrink. */
+#toolbar { display:flex; align-items:center;
   gap:var(--s4); height:var(--hdr-h); padding:0 var(--s4); flex-shrink:0;
   background:var(--panel); border-bottom:1px solid var(--border2); }
 .tb-zone { display:flex; align-items:center; gap:var(--s3); min-width:0; }
-.tb-left  { justify-self:start; }
-.tb-center{ justify-self:center; }
-.tb-right { justify-self:end; }
+.tb-left  { flex:1 1 0; justify-content:flex-start; }
+.tb-center{ flex:0 0 auto; }          /* the run cluster is never squeezed */
+.tb-right { flex:1 1 0; justify-content:flex-end; }
 .tb-backend-tools { display:flex; align-items:center; gap:var(--s3); min-width:0; }
 
 /* ── Tray: the one container language — tinted track, ghost buttons ──────────
@@ -21,7 +27,7 @@
   border-radius:var(--r-md); background:var(--surface); border:1px solid var(--border); flex-shrink:0; }
 .tb-tray .btn { border-color:transparent; background:transparent; height:28px; }
 .tb-tray .btn.ico { width:28px; }
-.tb-tray .btn.ico svg { width:15px; height:15px; }
+.tb-tray .btn.ico svg { width:14px; height:14px; stroke-width:2; }
 .tb-tray .btn:hover { background:var(--panel); border-color:transparent; box-shadow:var(--sh-sm); }
 .tb-tray .btn.accent { background:var(--accent); border-color:transparent; color:var(--on-accent); }
 .tb-tray .btn.accent:hover { background:var(--accent-hover); box-shadow:none; }
@@ -31,8 +37,11 @@
 
 /* Device + Source trays: same height/padding/type so they read as a pair. */
 .tb-tray-device, .tb-tray-source { gap:3px; padding:2px 4px; }
-.tb-tray-device { min-width:230px; max-width:320px; }
-.tb-tray-source { width:120px; }
+/* The device tray is the widest thing in the bar and the only one carrying a
+   long string ("No devices — auto-scanning…"), so it is the one that gives way
+   first. A hard min-width here was what pushed the zones past the window edge. */
+.tb-tray-device { flex:0 1 260px; min-width:0; max-width:320px; }
+.tb-tray-source { flex:0 1 120px; min-width:0; }
 .tb-device-dot { width:7px; height:7px; border-radius:50%; background:var(--dot-off);
   flex-shrink:0; margin-left:3px; transition:background .2s, box-shadow .2s; }
 .tb-device-dot.connected { background:var(--ok) !important; box-shadow:none; }
@@ -44,7 +53,7 @@
 .tb-tray-device select:focus, .tb-tray-source select:focus { outline:none; box-shadow:none; }
 .tb-tray-device select:disabled { opacity:.65; cursor:default; color:var(--muted); }
 .tb-tray-device .btn { height:24px; width:24px; flex-shrink:0; }
-.tb-tray-device .btn.ico svg { width:13px; height:13px; }
+.tb-tray-device .btn.ico svg { width:12px; height:12px; stroke-width:2.2; }
 
 /* Next step — hidden until a step-debug session actually pauses (the engine
    toggles .paused), so the header isn't spent on a control that's usually dead. */
@@ -65,7 +74,7 @@
    with a live elapsed clock. Readable from across the desk. */
 #toolbar .tb-run-btn { width:auto; height:34px; padding:0 15px 0 13px; border-radius:var(--r-md);
   gap:7px; font-size:12.5px; }
-#toolbar .tb-run-btn svg { width:16px; height:16px; }
+#toolbar .tb-run-btn svg { width:16px; height:16px; stroke-width:1.8; }
 #toolbar .tb-run-btn::after { content:"Run"; font-weight:700; letter-spacing:.01em; }
 #toolbar .tb-run-btn.err::after { content:"Stop"; }
 #toolbar .tb-run-btn.ok  { box-shadow:0 1px 4px color-mix(in srgb, var(--ok) 35%, transparent); }
@@ -90,7 +99,7 @@
 .wf-run-elapsed { display:inline-flex; align-items:center; gap:4px; margin-left:2px; padding-left:8px;
   border-left:1px solid currentColor; font-family:var(--mono); font-size:10.5px;
   font-variant-numeric:tabular-nums; color:inherit; opacity:.9; }
-.wf-run-elapsed svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:1.8;
+.wf-run-elapsed svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.2;
   stroke-linecap:round; stroke-linejoin:round; }
 @keyframes wfRunPulse { 0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--run-live) 50%, transparent)}
                         50%   {box-shadow:0 0 0 4px transparent} }
@@ -138,7 +147,7 @@
 .wf-title-tray #wf-proj-settings { flex-shrink:0; width:28px; height:28px; color:var(--dim);
   border-color:transparent; background:transparent; }
 .wf-title-tray #wf-proj-settings:hover { color:var(--accent); background:var(--panel); box-shadow:var(--sh-sm); }
-.wf-title-tray #wf-proj-settings svg { width:15px; height:15px; }
+.wf-title-tray #wf-proj-settings svg { width:14px; height:14px; stroke-width:2; }
 .wf-title-tray #wf-name { font-family:var(--sans); font-size:12.5px; font-weight:700;
   flex:1; min-width:64px; width:150px; max-width:210px; height:28px;
   border:none; background:transparent; padding:0 6px; color:var(--ink);
@@ -156,8 +165,8 @@
 .wf-win-target:hover { background:var(--panel); color:var(--accent); }
 .wf-win-target:focus-visible, #wf-bar-win32-matchby:focus-visible, #wf-bar-win32-mode:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 .wf-win-target #wf-bar-win32-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wf-win-target > svg { width:13px; height:13px; flex-shrink:0; fill:none; stroke:currentColor;
-  stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.wf-win-target > svg { width:12px; height:12px; flex-shrink:0; fill:none; stroke:currentColor;
+  stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
 #wf-bar-win32-dot.configured { background:var(--cat-win32); box-shadow:none; }
 #wf-bar-win32-matchby, #wf-bar-win32-mode { height:26px; padding:0 20px 0 6px; border:0; border-radius:6px;
   background-color:transparent; color:var(--cat-win32-ink); font-family:var(--sans);
@@ -176,29 +185,51 @@
 .wf-view-tab.sel { background:var(--panel); color:var(--accent); box-shadow:var(--sh-sm); }
 .wf-view-tab:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 
-/* Laptop width: preserve every high-value control by moving the run cluster to
-   a compact second row. This is more predictable than progressively hiding it. */
+/* Laptop width: the run cluster takes a row of its own. flex-wrap does this
+   without grid areas, and the height is derived from the rows instead of being
+   asserted separately — the old --hdr-h:80px against two 39px rows plus 3px of
+   padding each side came to 84px, which is why the Run row was clipped. */
 @media (max-width: 1320px){
-  :root { --hdr-h:80px; }
-  #toolbar { grid-template-columns:minmax(0,1fr) auto; grid-template-rows:39px 39px;
-    grid-template-areas:"project context" "run run"; height:var(--hdr-h); padding:3px var(--s4); }
-  .tb-left { grid-area:project; }
-  .tb-center { grid-area:run; justify-self:center; }
-  .tb-right { grid-area:context; }
+  :root { --hdr-h:84px; }               /* 2 x 39 row + 2 x 3 padding */
+  #toolbar { flex-wrap:wrap; align-content:center; row-gap:0; padding:3px var(--s4); }
+  .tb-left, .tb-right { height:39px; flex:1 1 auto; }
+  .tb-center { order:3; flex:1 0 100%; height:39px; justify-content:center; }
   .wf-title-tray { max-width:190px; }
   .wf-title-tray #wf-name { width:110px; max-width:130px; }
   .wf-win-target { max-width:140px; }
   #wf-bar-win32-mode { width:140px; }
-  .tb-tray-device { min-width:170px; max-width:230px; }
+  .tb-tray-device { flex-basis:230px; }
 }
 @media (max-width: 1280px){
-  .tb-tray-source { display:none; } /* capture source remains in Project settings */
+  /* capture source remains in Project settings */
+  .tb-tray-source, #tb-lbl-source, #tb-adb-tools > .ctl-sep { display:none; }
+}
+@media (max-width: 1180px){
+  /* Speed hack is root-only and niche; it is the first whole control to go.
+     Everything it does is still reachable from Project settings. */
+  #wf-speed-group { display:none; }
 }
 @media (max-width: 1100px){
   .wf-title-tray { max-width:155px; }
   .wf-title-tray #wf-name { width:82px; }
-  .tb-tray-device { min-width:130px; max-width:180px; }
+  .tb-tray-device { flex-basis:170px; max-width:200px; }
   .tb-right > .theme-btn { display:none; }
+  /* Words go before controls do, and only once nothing else is left to trim. */
+  #tb-lbl-device { display:none; }
+}
+@media (max-width: 980px){
+  /* Check and Test-block are both in the ▾ run menu already, so the tray keeps
+     only the menu itself. Run stays, always — it is the point of the bar. */
+  .tb-run-aux .btn:not(#wf-run-menu-btn):not(#wf-step-next-btn) { display:none; }
+  .wf-run-status .wf-run-txt { display:none; }   /* the dot still carries state */
+  .wf-run-status { padding:0 9px; }
+  #wf-shortcuts-btn { display:none; }            /* F1 still opens it */
+}
+@media (max-width: 860px){
+  .wf-title-tray #wf-name { width:64px; }
+  .tb-tray-device { flex-basis:130px; max-width:150px; }
+  .tb-tray-doc .btn:nth-child(n+7) { display:none; }  /* undo/redo -> Ctrl+Z/Y */
+  .tb-tray-doc .tb-tray-sep:nth-of-type(2) { display:none; }
 }
 
 /* ── Main split ──────────────────────────────────────────────────────────── */
@@ -250,22 +281,42 @@
 /* ── Sidebar sections ─────────────────────────────────────────────────────── */
 .wf-side-sec { display:flex; flex-direction:column; min-height:0; }
 .wf-side-sec + .wf-side-sec { border-top:1px solid var(--border2); }
-.wf-side-hdr { display:flex; align-items:center; gap:var(--s2); height:38px;
-  padding:0 var(--s3) 0 var(--s4); font-size:10px; font-weight:800; letter-spacing:.06em;
-  color:var(--ink2); text-transform:uppercase; border-bottom:1px solid var(--line);
+
+/* Properties / DevScope share one panel below Variables — it takes the rest of
+   the column and scrolls internally. */
+#wf-insp-panel { flex:1; min-height:0; }
+/* .pnl-flush clears all four borders; the hairline splitting Variables from
+   Properties is the column's structure, not the panel's, so restore it. */
+#wf-vars-panel.pnl { border-bottom:1px solid var(--border2); }
+/* A maximized sidebar panel is a free-floating card again, so the column's
+   hairlines and the section divider it inherited must not follow it over. */
+#wf-side .pnl.is-max, #wf-inspector .pnl.is-max, #wf-act-panel.is-max {
+  background:var(--panel); border-top:1px solid var(--border2); }
+/* Its body has room now: give the palette and inspector rows the wider gutter. */
+.pnl.is-max .wf-palette, .pnl.is-max #wf-insp-body { padding:var(--s4) var(--s5) var(--s5); }
+.pnl.is-max .wf-act-panel-body { max-height:none; }
+/* One header grammar for every region (see shared/panel.css rule 1): sentence
+   case at body size, 40px tall, title · count · tools. The old 10px uppercase
+   800-weight label shouted in five different places and still read as chrome
+   rather than as the name of the thing below it. */
+.wf-side-hdr { display:flex; align-items:center; gap:var(--s2); height:var(--pnl-hd-h);
+  padding:0 var(--s2) 0 var(--s4); font-size:var(--t-body); font-weight:600; letter-spacing:0;
+  color:var(--ink); text-transform:none; border-bottom:1px solid var(--line);
   flex-shrink:0; user-select:none; }
 .wf-side-hdr-button { display:inline-flex; align-items:center; gap:7px; min-width:0;
   color:inherit; text-transform:inherit; letter-spacing:inherit; font-size:inherit; font-weight:inherit; }
 .wf-side-chev { display:flex; align-items:center; color:var(--muted);
   transition:transform .15s var(--ease); }
-.side-count { font-family:var(--mono); font-size:9.5px; font-weight:600; color:var(--muted);
+.side-count { font-family:var(--mono); font-size:var(--t-micro); font-weight:600; color:var(--muted);
   background:var(--alt); border-radius:999px; padding:1px 6px; letter-spacing:0; }
 .side-count:empty { display:none; }
-/* Mini ghost buttons on section headers (toggles + add). */
-.wf-side-mini { width:22px; height:22px; padding:0; border-radius:6px; background:transparent;
+/* Mini ghost buttons on section headers — same 26px footprint as .pnl-tool so
+   a header's app-specific tools and its universal maximize/collapse pair sit
+   on one rhythm. */
+.wf-side-mini { width:26px; height:26px; padding:0; border-radius:var(--r-sm); background:transparent;
   color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center;
   flex-shrink:0; transition:color .1s, background .1s, transform .1s; }
-.wf-side-mini svg { width:13px; height:13px; display:block; }
+.wf-side-mini svg { width:14px; height:14px; stroke-width:2; display:block; }
 .wf-side-mini:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-side-mini:active { transform:scale(.92); }
 .wf-side-mini.on { color:var(--accent); background:var(--accent-bg); }
@@ -325,10 +376,10 @@
 .wf-act-rename:focus { outline:2px solid var(--accent); outline-offset:0; box-shadow:none; }
 .wf-act-cb { width:15px; height:15px; border-radius:4px; border:1.5px solid var(--cb-bd); background:var(--panel);
   flex-shrink:0; display:flex; align-items:center; justify-content:center; }
-.wf-act-cb.checked { background:var(--accent); border-color:var(--accent); }
+.wf-act-cb.checked { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 .wf-act-cb svg { opacity:0; } .wf-act-cb.checked svg { opacity:1; }
 .wf-act-del { color:var(--muted); line-height:0; padding:3px; border-radius:4px; flex-shrink:0; display:flex; align-items:center; }
-.wf-act-del svg { width:12px; height:12px; display:block; }
+.wf-act-del svg { width:12px; height:12px; stroke-width:2.2; display:block; }
 .wf-act-del:hover { color:var(--err); background:var(--err-bg); }
 .wf-act-grip { display:flex; align-items:center; justify-content:center; flex-shrink:0; width:11px;
   margin:-6px 0 -6px -4px; align-self:stretch; color:var(--dot-off); cursor:grab; }
@@ -349,7 +400,7 @@
 #wf-side .wf-palette { padding:0 var(--s3) var(--s3); overflow-y:auto; }
 /* Palette search — a compact rounded field pinned under the sidebar header. */
 .wf-pal-search { position:relative; display:flex; align-items:center; margin:var(--s3) var(--s3); }
-.wf-pal-search-ico { position:absolute; left:10px; width:14px; height:14px; color:var(--muted);
+.wf-pal-search-ico { position:absolute; left:10px; width:14px; height:14px; stroke-width:2; color:var(--muted);
   pointer-events:none; }
 #wf-pal-search-inp { flex:1; min-width:0; font-family:var(--sans); font-size:12px;
   padding:7px 28px 7px 29px; border:1px solid var(--border2); border-radius:var(--r-md);
@@ -360,7 +411,7 @@
 .wf-pal-search-clr { position:absolute; right:5px; width:19px; height:19px; padding:0; border:none;
   border-radius:5px; background:none; color:var(--muted); cursor:pointer; display:flex;
   align-items:center; justify-content:center; transition:color .1s, background .1s; }
-.wf-pal-search-clr svg { width:12px; height:12px; }
+.wf-pal-search-clr svg { width:12px; height:12px; stroke-width:2.2; }
 .wf-pal-search-clr:hover { color:var(--err); background:var(--err-bg); }
 .wf-pal-none { font-size:11.5px; color:var(--muted); text-align:center; padding:18px 10px;
   line-height:1.5; border:1px dashed var(--border); border-radius:8px; background:var(--surface);
@@ -406,7 +457,7 @@
 .wf-chip .ico { display:flex; align-items:center; justify-content:center; flex-shrink:0;
   width:22px; height:22px; border-radius:var(--r-sm);
   background:var(--accent-bg); color:var(--accent); transition:background .1s; }
-.wf-chip .ico svg { width:13px; height:13px; display:block; }
+.wf-chip .ico svg { width:12px; height:12px; stroke-width:2.2; display:block; }
 .wf-chip:hover .ico { background:var(--accent-bd); }
 
 /* ── Functions section — pinned at the bottom of the left sidebar ─────────── */
@@ -508,7 +559,7 @@
 .wf-rail-sep { height:1px; margin:4px 5px; background:var(--border2); }
 #wf-rail .btn { width:30px; height:30px; border:none; background:transparent;
   border-radius:var(--r-sm); color:var(--dim); }
-#wf-rail .btn svg { width:16px; height:16px; }
+#wf-rail .btn svg { width:16px; height:16px; stroke-width:1.8; }
 #wf-rail .btn:hover { background:var(--alt); color:var(--ink); box-shadow:none; }
 #wf-rail .btn.on { background:var(--accent-bg); color:var(--accent); }
 #wf-zoom-lbl { font-family:var(--mono); font-size:9.5px; color:var(--dim); height:20px;
@@ -559,7 +610,7 @@
   gap:7px; padding:28px 36px 24px; text-align:center;
   background:var(--panel); border:1px solid var(--border2); border-radius:var(--r-lg);
   box-shadow:var(--sh-md); }
-.wf-empty-card > svg { width:34px; height:34px; color:var(--accent); opacity:.55; margin-bottom:5px; }
+.wf-empty-card > svg { width:32px; height:32px; stroke-width:1.35; color:var(--accent); opacity:.55; margin-bottom:5px; }
 .wf-empty-card .t { font-size:14px; font-weight:700; color:var(--ink); }
 .wf-empty-card .s { font-size:11.5px; color:var(--dim); max-width:280px; line-height:1.6; }
 .wf-empty-card .btn { margin-top:9px; min-width:140px; }
@@ -577,7 +628,7 @@
 .wf-empty .wf-empty-ico { width:28px; height:28px; border-radius:8px; display:flex;
   align-items:center; justify-content:center; background:var(--alt); border:1px solid var(--border);
   color:var(--muted); flex-shrink:0; }
-.wf-empty .wf-empty-ico svg { width:14px; height:14px; }
+.wf-empty .wf-empty-ico svg { width:14px; height:14px; stroke-width:2; }
 .wf-empty .wf-empty-t { font-size:12px; font-weight:700; color:var(--ink2); }
 .wf-empty .wf-empty-s { font-size:11px; color:var(--dim); line-height:1.5; max-width:220px; }
 .wf-empty .wf-empty-keys { display:flex; flex-wrap:wrap; gap:6px 10px; margin-top:2px; }
@@ -598,16 +649,17 @@
 .wf-ctx-item:hover { background:var(--accent-bg); color:var(--accent); }
 .wf-ctx-item:focus-visible { outline:2px solid var(--accent); outline-offset:-1px; }
 .wf-ctx-ico { display:flex; align-items:center; color:var(--muted); }
-.wf-ctx-ico svg { width:14px; height:14px; display:block; }
+.wf-ctx-ico svg { width:14px; height:14px; stroke-width:2; display:block; }
 .wf-ctx-item:hover .wf-ctx-ico { color:var(--accent); }
 .wf-ctx-sep { height:1px; margin:4px 6px; background:var(--border2); }
 /* ── Quick-connect picker ───────────────────────────────────────────────────
-   Shown when an output wire is dropped on empty canvas. Deliberately NOT a
-   plain command list: it reads as a small palette card — a header naming the
-   source block and branch, suggested blocks as a 2-up chip grid (same
-   icon-tile language as the sidebar), and every function action behind one
-   hover submenu. That keeps the card a fixed, glanceable size. */
-#wf-ctxmenu.wf-qc { width:272px; min-width:0; padding:0; border-radius:10px; }
+   Shown when an output wire is dropped on empty canvas. Not a command list:
+   it is a small palette card — a header naming the source block and branch,
+   a search field, then the suggestions for that port followed by the whole
+   catalog in sidebar order. Fixed height with a scrolling body, so the card
+   stays the same size whatever the workflow grows to. */
+#wf-ctxmenu.wf-qc { width:284px; min-width:0; padding:0; border-radius:10px;
+  max-height:min(62vh, 460px); display:flex; flex-direction:column; overflow:hidden; }
 .wf-qc-head { display:flex; align-items:center; gap:7px; padding:7px 8px 7px 10px;
   border-bottom:1px solid var(--line); }
 .wf-qc-port { display:inline-flex; align-items:center; gap:5px; flex-shrink:0;
@@ -622,54 +674,82 @@
   display:flex; align-items:center; justify-content:center;
   transition:color .1s, background .1s; }
 .wf-qc-x:hover { color:var(--err); background:var(--err-bg); }
-.wf-qc-x svg { width:12px; height:12px; display:block; }
-.wf-qc-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:7px; }
+.wf-qc-x svg { width:12px; height:12px; stroke-width:2.2; display:block; }
+/* minmax(0,1fr), not 1fr: a bare 1fr track keeps a min-content floor, so a long
+   label ("Wait until screen settles") widened its column and pushed the grid
+   past the card edge instead of ellipsising. */
+.wf-qc-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:4px; padding:0 7px; }
 .wf-qc-node { display:flex; align-items:center; gap:7px; min-width:0; padding:6px 7px;
   border:1px solid var(--border); border-radius:7px; background:var(--panel);
   cursor:pointer; text-align:left; transition:border-color .1s, background .1s; }
+.wf-qc-node { overflow:hidden; }
 .wf-qc-node:hover, .wf-qc-node:focus { background:var(--accent-bg); border-color:var(--accent-bd); outline:none; }
 .wf-qc-node .ico { flex-shrink:0; width:20px; height:20px; border-radius:5px;
   display:flex; align-items:center; justify-content:center;
   background:var(--accent-bg); color:var(--accent); transition:background .1s; }
 .wf-qc-node:hover .ico, .wf-qc-node:focus .ico { background:var(--accent-bd); }
-.wf-qc-node .ico svg { width:12px; height:12px; display:block; }
-.wf-qc-node .lbl { min-width:0; font-size:11px; font-weight:600; color:var(--ink);
+.wf-qc-node .ico svg { width:12px; height:12px; stroke-width:2.2; display:block; }
+/* flex:1 1 0 is what makes the ellipsis work. Without an explicit flex the
+   label keeps its max-content width and simply paints past the chip, so a long
+   name ("Wait until screen settles") was cut mid-word by the card edge instead
+   of being truncated with an ellipsis inside its own chip. */
+.wf-qc-node .lbl { flex:1 1 0; min-width:0; font-size:11px; font-weight:600; color:var(--ink);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wf-qc-fn { padding:0 7px 7px; }
-.wf-qc-subwrap { position:relative; }
-.wf-qc-fnbtn { display:flex; align-items:center; gap:7px; width:100%; padding:6px 7px;
-  border:1px solid var(--border); border-radius:7px; background:var(--panel);
-  cursor:pointer; font-family:var(--sans); transition:border-color .1s, background .1s; }
-.wf-qc-fnbtn:hover, .wf-qc-fnbtn:focus, .wf-qc-subwrap.open .wf-qc-fnbtn {
-  background:var(--accent-bg); border-color:var(--accent-bd); outline:none; }
-.wf-qc-fnbtn .ico { flex-shrink:0; width:20px; height:20px; border-radius:5px;
-  display:flex; align-items:center; justify-content:center;
-  background:var(--accent-bg); color:var(--accent); }
-.wf-qc-fnbtn .ico svg { width:12px; height:12px; display:block; }
-.wf-qc-fnbtn .lbl { flex:1; min-width:0; text-align:left; font-size:11.5px; font-weight:600; color:var(--ink); }
-.wf-qc-fnbtn .arr { flex-shrink:0; color:var(--muted); font-size:15px; line-height:1; }
-.wf-qc-submenu { position:absolute; left:calc(100% + 8px); top:0; display:none;
+/* Search field — same shape as the palette's, sized for the card. */
+.wf-qc-search { display:flex; align-items:center; gap:6px; flex-shrink:0;
+  margin:7px 7px 0; padding:0 8px; height:30px; border-radius:7px;
+  background:var(--surface); border:1px solid var(--border); }
+.wf-qc-search:focus-within { border-color:var(--accent); }
+.wf-qc-search > svg { color:var(--muted); flex-shrink:0; }
+.wf-qc-search input { flex:1; min-width:0; height:100%; padding:0; border:none;
+  background:none; font-family:var(--sans); font-size:11.5px; font-weight:600; color:var(--ink); }
+.wf-qc-search input:focus { outline:none; box-shadow:none; }
+.wf-qc-search input::placeholder { color:var(--muted); font-weight:500; }
+
+/* Scrolling body — the only part that grows with the catalog. */
+.wf-qc-body { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  padding-bottom:7px; }
+/* Section header. Sticky so the category stays named while you scroll past it. */
+.wf-qc-sec { position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:6px;
+  padding:8px 10px 4px; background:var(--panel);
+  font-size:var(--t-caption); font-weight:600; color:var(--ink2); }
+.wf-qc-sec .n { font-family:var(--mono); font-size:var(--t-micro); font-weight:600;
+  color:var(--muted); background:var(--alt); border-radius:999px; padding:1px 6px; }
+.wf-qc-list { display:flex; flex-direction:column; gap:4px; padding:0 7px; }
+
+/* Functions row — pinned under the search, above the catalog. One line whatever
+   the workflow holds; the list itself is the submenu. */
+.wf-qc-fnbar { flex-shrink:0; padding:7px 7px 0; }
+.wf-qc-fnbtn .n { flex-shrink:0; font-family:var(--mono); font-size:var(--t-micro);
+  font-weight:600; color:var(--muted); background:var(--alt); border-radius:999px; padding:1px 6px; }
+.wf-qc-fnbtn .lbl { flex:1; }
+.wf-qc-fnbtn .arr { flex-shrink:0; display:flex; color:var(--muted); }
+.wf-qc-fnbar.open .wf-qc-fnbtn { background:var(--accent-bg); border-color:var(--accent-bd); }
+.wf-qc-fnbar.open .wf-qc-fnbtn .arr { color:var(--accent); }
+
+/* Submenu — mounted on <body> and positioned in JS, because the card clips its
+   own overflow to keep the scrolling catalog inside its rounded corners. */
+.wf-qc-submenu { position:fixed; z-index:calc(var(--z-menu) + 1); display:none;
   min-width:196px; max-width:290px; max-height:320px; overflow-y:auto; padding:4px;
   background:var(--panel); border:1px solid var(--border2); border-radius:9px;
-  box-shadow:var(--sh-lg); z-index:1; }
-.wf-qc-submenu.flip { left:auto; right:calc(100% + 8px); }
-/* Open state comes from `.open` (set on hover with a deferred close, plus the
-   keyboard path). Fade only — a translate would move the panel out from under
-   the pointer mid-animation. */
-.wf-qc-subwrap.open > .wf-qc-submenu { display:block; animation:wfFade .1s var(--ease); }
-@keyframes wfFade { from { opacity:0; } to { opacity:1; } }
+  box-shadow:var(--sh-lg); animation:wfFade .1s var(--ease); }
+@keyframes wfFade { from { opacity:0; } }
 .wf-qc-subitem { display:flex; align-items:center; gap:7px; width:100%; padding:6px 8px;
   border:none; border-radius:6px; background:none; cursor:pointer;
   font-family:var(--sans); font-size:11.5px; color:var(--ink); text-align:left; }
 .wf-qc-subitem:hover, .wf-qc-subitem:focus { background:var(--accent-bg); color:var(--accent); outline:none; }
 .wf-qc-subitem .ico { flex-shrink:0; display:flex; color:var(--muted); }
 .wf-qc-subitem:hover .ico, .wf-qc-subitem:focus .ico { color:var(--accent); }
-.wf-qc-subitem .ico svg { width:13px; height:13px; display:block; }
 .wf-qc-subitem .nm { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wf-qc-subitem.new { color:var(--accent); font-weight:700; }
-.wf-qc-subitem.new .ico { color:var(--accent); }
-.wf-qc-subhead { font-size:8.5px; font-weight:800; letter-spacing:.06em;
-  text-transform:uppercase; color:var(--muted); padding:6px 8px 3px; }
+.wf-qc-subitem.is-new { color:var(--accent); font-weight:700; }
+.wf-qc-subitem.is-new .ico { color:var(--accent); }
+.wf-qc-subhead { font-size:var(--t-micro); font-weight:600; color:var(--muted); padding:7px 8px 3px; }
+/* A function row spans the card: names are long and must not be truncated to
+   half a column. */
+.wf-qc-wide { width:100%; }
+.wf-qc-node.is-new .lbl { color:var(--accent); font-weight:700; }
+.wf-qc-none { padding:14px 12px 16px; text-align:center;
+  font-size:var(--t-caption); color:var(--muted); line-height:1.6; }
 
 /* ═══ Nodes ═══════════════════════════════════════════════════════════════ */
 /* Node — a clean rectangular card with one uniform neutral border. Category is
@@ -766,15 +846,41 @@
   pointer-events:auto; cursor:move; white-space:nowrap; }
 .wf-group-name { overflow:hidden; text-overflow:ellipsis; }
 .wf-group-del { color:var(--on-accent); opacity:.85; line-height:0; padding:2px; border-radius:4px; flex-shrink:0; cursor:pointer; display:flex; align-items:center; }
-.wf-group-del svg { width:12px; height:12px; display:block; }
+.wf-group-del svg { width:12px; height:12px; stroke-width:2.2; display:block; }
 .wf-group-del:hover { opacity:1; background:color-mix(in srgb, var(--on-accent) 25%, transparent); }
 .wf-group-resize { position:absolute; right:-5px; bottom:-5px; width:14px; height:14px; cursor:nwse-resize; pointer-events:auto;
   border-right:2.5px solid currentColor; border-bottom:2.5px solid currentColor; border-bottom-right-radius:9px; opacity:.6; }
 .wf-group-resize:hover { opacity:1; }
-/* The block the engine is on right now — saturated amber card + pulsing halo. */
-.wf-node.running { border-color:var(--border2) !important; background:var(--run-live-bg);
+/* The block the engine is on right now — saturated amber card + pulsing halo.
+   The border carries the state too, not just the fill: a neutral --border2 here
+   meant "running" read as a tint alone, which is weak against a busy canvas and
+   inconsistent with the ring a call block gets while its function runs. The
+   inset ring doubles the 1px border optically without a pseudo-element, so the
+   drop shadow on ::after is left alone. */
+.wf-node.running { border-color:var(--run-live-bd) !important; background:var(--run-live-bg);
+  box-shadow:inset 0 0 0 1px var(--run-live-bd);
   z-index:var(--z-node-hover); }
 .wf-node.running::after { box-shadow:var(--sh-md); }
+/* A call block whose function is executing. The live node is inside that
+   function's own graph, so this block is not `.running` — but the parent canvas
+   still has to show that something is happening here, otherwise stepping into a
+   function makes the whole activity look idle. A ring around the block reads as
+   "execution is in here", distinct from the solid amber of the live block. */
+/* :not(.running) — when the block is also the live node (focus off, or the
+   instant the call starts) its existing amber already says everything, and this
+   change has no business repainting a state it is not about. */
+.wf-node.running-call:not(.running) { border-color:var(--run-live-bd) !important; }
+.wf-node.running-call::before {
+  content:""; position:absolute; inset:-3px; border-radius:calc(var(--node-r) + 3px);
+  border:2px solid var(--run-live-bd); pointer-events:none; z-index:1; }
+@media (prefers-reduced-motion: no-preference){
+  .wf-node.running-call::before { animation:wfCallRing 1.3s ease-in-out infinite; }
+}
+@keyframes wfCallRing { 0%,100% { opacity:.75; } 50% { opacity:.2; } }
+/* When the block IS the live one too (the moment the call starts, before the
+   function's first node reports), the solid amber already says it — drop the
+   ring so the two markers do not stack. */
+.wf-node.running.running-call::before { display:none; }
 .wf-node.running .wf-node-hd { background:var(--run-live-hd); border-bottom-color:var(--run-live-hd-bd); }
 .wf-node.running .wf-node-title { color:var(--run-live-ink); }
 .wf-node.running .ico { color:var(--run-live-bd); }
@@ -803,7 +909,7 @@
   border:1px solid var(--cat-flow-bd); border-radius:999px; background:var(--cat-flow-bg);
   box-shadow:var(--sh-sm); color:var(--cat-flow-ink); overflow:hidden; }
 .wf-next-body .ico { width:16px; height:16px; color:var(--cat-flow-ink); }
-.wf-next-body .ico svg { width:16px; height:16px; }
+.wf-next-body .ico svg { width:16px; height:16px; stroke-width:1.8; }
 .wf-next-copy { display:flex; flex-direction:column; min-width:0; line-height:1.15; }
 .wf-next-copy b { font-size:10.5px; white-space:nowrap; }
 .wf-next-copy small { margin-top:2px; font-family:var(--mono); font-size:8.5px; font-weight:500;
@@ -843,7 +949,7 @@
   display:flex; align-items:center; justify-content:center; color:var(--on-accent);
   box-shadow:var(--sh-md);
 }
-.wf-node-tri svg { width:16px; height:16px; display:block; }
+.wf-node-tri svg { width:16px; height:16px; stroke-width:1.8; display:block; }
 .wf-node.start .wf-node-tri svg { margin-left:1px; } /* optical centre for play */
 .wf-node-tri-lbl {
   position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:4px;
@@ -856,7 +962,7 @@
   cursor:pointer; display:flex; align-items:center; opacity:0;
   transition:opacity .12s, color .1s, background .1s; }
 .wf-node:hover .wf-node-eye, .wf-node-eye.on { opacity:1; }
-.wf-node-eye svg { width:13px; height:13px; display:block; }
+.wf-node-eye svg { width:12px; height:12px; stroke-width:2.2; display:block; }
 .wf-node-eye:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-node-eye.on { color:var(--accent); }
 /* Action bar — pinned to the top-right corner of a selected node. */
@@ -871,8 +977,8 @@
 .wf-node-actions button:hover { background:var(--alt); color:var(--ink); }
 .wf-node-actions button.on { color:var(--accent); }
 .wf-node-actions .wf-act-del:hover { color:var(--err); background:var(--err-bg); }
-.wf-node-actions button svg { width:9px; height:9px; display:block; stroke:currentColor; fill:none;
-  stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.wf-node-actions button svg { width:10px; height:10px; display:block; stroke:currentColor; fill:none;
+  stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
 .wf-node-act-spacer { flex:1; }
 /* Image preview — compact square on the right of the body. */
 .wf-node-prevrow { display:flex; align-items:center; gap:7px; padding:4px 8px; min-height:32px; }
@@ -935,7 +1041,7 @@
   border-bottom:1px solid var(--nhd-bd,var(--cat-logic-bd)); background:var(--nhd-bg,var(--cat-logic-bg));
   border-radius:var(--node-r) var(--node-r) 0 0; transition: background .15s, border-bottom-color .15s; }
 .wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:14px; height:14px; }
-.wf-node .ico svg { width:14px; height:14px; display:block; }
+.wf-node .ico svg { width:14px; height:14px; stroke-width:2; display:block; }
 .wf-node.call .ico { font-style:italic; font-weight:700; }
 .wf-node-title { font-size:11px; font-weight:700; color:var(--ntitle,var(--cat-logic-ink)); flex:1; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -957,6 +1063,7 @@
 /* Structural kinds that lack a cat class: borrow the nearest category's tint */
 .wf-node.loop       { --nhd-bg:var(--cat-flow-bg);   --nhd-bd:var(--cat-flow-bd);   --ntitle:var(--cat-flow-ink); }
 .wf-node.try_chain  { --nhd-bg:var(--cat-flow-bg);   --nhd-bd:var(--cat-flow-bd);   --ntitle:var(--cat-flow-ink); }
+.wf-node.sequence   { --nhd-bg:var(--cat-flow-bg);   --nhd-bd:var(--cat-flow-bd);   --ntitle:var(--cat-flow-ink); }
 .wf-node.try_next   { --nhd-bg:var(--cat-flow-bg);   --nhd-bd:var(--cat-flow-bd);   --ntitle:var(--cat-flow-ink); }
 .wf-node.call       { --nhd-bg:var(--cat-logic-bg);  --nhd-bd:var(--cat-logic-bd);  --ntitle:var(--cat-logic-ink); }
 .wf-node.switch     { --nhd-bg:var(--cat-logic-bg);  --nhd-bd:var(--cat-logic-bd);  --ntitle:var(--cat-logic-ink); }
@@ -976,7 +1083,7 @@
   color:var(--muted); background:transparent; border-top:1px solid var(--line);
   border-radius:0 0 var(--node-r) var(--node-r); padding:4px 8px 5px; white-space:normal;
   word-break:break-word; line-height:1.35; }
-.wf-node-note svg { width:9px; height:9px; flex-shrink:0; margin-top:1.5px; opacity:.4; }
+.wf-node-note svg { width:10px; height:10px; stroke-width:2.4; flex-shrink:0; margin-top:1.5px; opacity:.4; }
 /* Runtime log line: text auto-emitted to the log panel each time this block runs. */
 .wf-node-log { font-size:9.5px; color:var(--run-info); background:color-mix(in srgb, var(--run-info) 10%, transparent);
   border-top:1px dashed var(--line); border-radius:0 0 var(--node-r) var(--node-r); padding:3px 8px; white-space:normal; word-break:break-word; }
@@ -990,7 +1097,7 @@
   font-size:9px; font-weight:500; line-height:1.3; color:var(--dim);
   position:relative; overflow:hidden; border-radius:4px; padding:1px 0;
   transition:color .12s, background .12s, box-shadow .12s; }
-.wf-delay-chip svg { width:8px; height:8px; flex-shrink:0; opacity:.85; }
+.wf-delay-chip svg { width:10px; height:10px; stroke-width:2.4; flex-shrink:0; opacity:.85; }
 .wf-delay-label { font-variant-numeric:tabular-nums; }
 /* Live countdown while the engine sleeps on delayBefore / delayAfter. */
 .wf-delay-chip.counting {
@@ -1020,7 +1127,7 @@
   background:color-mix(in srgb, var(--run-live) 28%, transparent); pointer-events:none; z-index:0;
 }
 .wf-node-delay-live > * { position:relative; z-index:1; }
-.wf-node-delay-live svg { width:10px; height:10px; color:var(--run-live-bd); flex-shrink:0; }
+.wf-node-delay-live svg { width:10px; height:10px; stroke-width:2.4; color:var(--run-live-bd); flex-shrink:0; }
 .wf-node.delaying { z-index:var(--z-node-hover); }
 @media (prefers-reduced-motion: no-preference){
   .wf-delay-chip.counting, .wf-node-delay-live {
@@ -1078,7 +1185,7 @@
   box-shadow:var(--sh-sm); }
 .wf-insp-id .ic { width:32px; height:32px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
   border-radius:var(--r-md); background:var(--accent-bg); border:1px solid var(--border); color:var(--accent); }
-.wf-insp-id .ic svg { width:17px; height:17px; }
+.wf-insp-id .ic svg { width:16px; height:16px; stroke-width:1.8; }
 .wf-insp-id .meta { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
 .wf-insp-id .title { font-size:13px; font-weight:700; color:var(--ink); line-height:1.25;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -1097,7 +1204,7 @@
   display:inline-flex; align-items:center; justify-content:center;
   color:var(--muted); background:none; border:none; border-radius:5px; }
 .wf-insp-sec-gear:hover { color:var(--ink); background:var(--alt); }
-.wf-insp-sec-gear svg { width:13px; height:13px; }
+.wf-insp-sec-gear svg { width:12px; height:12px; stroke-width:2.2; }
 
 /* Multi-select inspector */
 .wf-msel-list { display:flex; flex-direction:column; gap:2px; }
@@ -1135,7 +1242,7 @@
 .wf-json-bar .btn.sm { flex-shrink:0; }
 .wf-json-bar .btn.sm.flash { background:var(--ok); border-color:var(--ok); color:var(--on-ok); }
 .wf-json-bar .btn.sm.flash-err { background:var(--err); border-color:var(--err); color:var(--on-err); }
-.wf-json-bar .btn.sm svg { width:13px; height:13px; }
+.wf-json-bar .btn.sm svg { width:12px; height:12px; stroke-width:2.2; }
 .wf-json-pre { width:100%; height:220px; resize:vertical; font-family:var(--mono);
   font-size:10.5px; line-height:1.5; color:var(--ink2); background:var(--surface);
   border:1px solid var(--border2); border-radius:var(--r-sm); padding:8px 9px;
@@ -1163,7 +1270,7 @@
 .wf-field > input[type=time]:hover::-webkit-calendar-picker-indicator { opacity:1; }
 .wf-field .cb { width:17px; height:17px; border-radius:5px; border:1.5px solid var(--cb-bd); background:var(--panel);
   display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
-.wf-field .cb.checked { background:var(--accent); border-color:var(--accent); }
+.wf-field .cb.checked { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 .wf-field .cb:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .wf-field .cb svg { opacity:0; } .wf-field .cb.checked svg { opacity:1; }
 .wf-field .btn.sm { height:24px; padding:0 8px; font-size:10.5px; }
@@ -1174,7 +1281,7 @@
 .wf-color-pick:hover { border-color:var(--border2); }
 .wf-node-retry { padding:3px 8px; margin:0; display:flex; gap:6px; flex-wrap:wrap; color:var(--muted); font-size:10px; }
 .wf-node-retry span { display:inline-flex; align-items:center; gap:3px; background:var(--alt); border:1px solid var(--border2); border-radius:999px; padding:1px 6px; }
-.wf-node-retry svg { width:10px; height:10px; }
+.wf-node-retry svg { width:10px; height:10px; stroke-width:2.4; }
 .wf-field.full { flex-direction:column; align-items:stretch; gap:4px; }
 .wf-field.full > label { min-width:auto; }
 .wf-field.full > input, .wf-field.full > select { width:100%; }
@@ -1183,12 +1290,12 @@
 .wf-var-field { align-items:center; }
 .wf-var-field > .wf-var-input { flex:1; min-width:0; font-size:11px; padding:4px 7px; border-radius:var(--r-sm); }
 .btn.sm.ico.wf-var-pick { width:24px; height:24px; padding:0; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; }
-.btn.sm.ico.wf-var-pick svg { width:13px; height:13px; }
+.btn.sm.ico.wf-var-pick svg { width:12px; height:12px; stroke-width:2.2; }
 .btn.sm.ico.wf-var-pick:hover { color:var(--accent); border-color:var(--border2); }
 .wf-path-field { flex-wrap:wrap; }
 .wf-path-field > label { width:100%; max-width:none; }
 .btn.sm.ico.wf-path-browse { width:24px; height:24px; padding:0; flex-shrink:0; }
-.btn.sm.ico.wf-path-browse svg { width:13px; height:13px; }
+.btn.sm.ico.wf-path-browse svg { width:12px; height:12px; stroke-width:2.2; }
 .wf-path-field .wf-var-badge { max-width:44px; }
 .wf-path-field .wf-var-badge .v { display:none; }
 .wf-var-path-value { display:flex; align-items:center; gap:5px; flex:1 1 100%; min-width:0; }
@@ -1225,7 +1332,7 @@
   border-top:1px solid var(--line); background:var(--surface); color:var(--accent); font-size:11px;
   font-weight:600; padding:7px 9px; }
 .wf-varmenu-add:hover { background:var(--accent-bg); }
-.wf-varmenu-add svg { width:13px; height:13px; }
+.wf-varmenu-add svg { width:12px; height:12px; stroke-width:2.2; }
 
 .wf-insp-input { width:100%; font-size:11.5px; padding:6px 8px; border-radius:var(--r-sm); }
 /* Template field: path + picker + compact thumbnail on one row. */
@@ -1271,8 +1378,8 @@
 /* ── Live variables panel — docked at the top of the right sidebar ────────── */
 .wf-vars-panel { flex:0 0 auto; display:flex; flex-direction:column;
   border-bottom:1px solid var(--border2); font-size:11px; }
-.wf-vars-hdr { display:flex; align-items:center; gap:8px; height:38px;
-  padding:0 var(--s3) 0 var(--s4); border-bottom:1px solid var(--line);
+.wf-vars-hdr { display:flex; align-items:center; gap:var(--s2); height:var(--pnl-hd-h);
+  padding:0 var(--s2) 0 var(--s4); border-bottom:1px solid var(--line);
   user-select:none; transition:background .1s; flex-shrink:0; }
 .wf-vars-hdr:hover { background:var(--alt); }
 .wf-vars-panel.collapsed .wf-vars-hdr { border-bottom:none; }
@@ -1281,19 +1388,19 @@
 .wf-panel-toggle { display:inline-flex; align-items:center; gap:7px; min-width:0; color:inherit; flex:1; }
 .wf-act-hdr-chevron { color:var(--muted); display:flex; align-items:center; flex-shrink:0;
   transition:transform .15s var(--ease); }
-.wf-vars-title { font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
-  color:var(--ink2); }
-.wf-vars-count { font-family:var(--mono); font-size:9.5px; color:var(--muted); background:var(--alt);
+.wf-vars-title { font-size:var(--t-body); font-weight:600; letter-spacing:0; text-transform:none;
+  color:var(--ink); }
+.wf-vars-count { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted); background:var(--alt);
   border-radius:999px; padding:1px 6px; letter-spacing:0; }
 .wf-vars-count:empty { display:none; }
 /* The live dot only earns its pixels while the engine runs — hidden at rest. */
 .wf-vars-live { display:none; color:var(--muted); font-size:9px; margin-left:auto; flex-shrink:0; }
 .wf-vars-actions { display:flex; align-items:center; gap:4px; flex-shrink:0; }
-.wf-vars-add { width:22px; height:22px; line-height:1; padding:0; border-radius:6px; background:transparent;
+.wf-vars-add { width:26px; height:26px; line-height:1; padding:0; border-radius:var(--r-sm); background:transparent;
   color:var(--muted); cursor:pointer; font-size:13px;
   display:flex; align-items:center; justify-content:center;
   transition:color .1s, background .1s, transform .1s; }
-.wf-vars-add svg { width:13px; height:13px; display:block; }
+.wf-vars-add svg { width:14px; height:14px; stroke-width:2; display:block; }
 .wf-vars-add:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-vars-add:active { transform:scale(.92); }
 .wf-vars-panel.live .wf-vars-live { display:inline; color:var(--run-ok); animation:wfPulse 1.4s ease-in-out infinite; }
@@ -1346,7 +1453,7 @@
   display:flex; flex-direction:column; overflow:hidden; animation:wfPop .12s var(--ease); }
 .wf-find-bar { display:flex; align-items:center; gap:7px; padding:8px 10px;
   border-bottom:1px solid var(--line); }
-.wf-find-bar svg { width:14px; height:14px; color:var(--muted); flex-shrink:0; }
+.wf-find-bar svg { width:14px; height:14px; stroke-width:2; color:var(--muted); flex-shrink:0; }
 .wf-find-bar input { flex:1; min-width:0; border:none; background:transparent;
   font-family:var(--sans); font-size:12.5px; color:var(--ink); padding:0; }
 .wf-find-bar input:focus { outline:none; box-shadow:none; }
@@ -1372,7 +1479,7 @@
 .wf-vald { width:min(480px, calc(100% - 24px)); }
 .wf-vald-bar { display:flex; align-items:center; gap:8px; padding:8px 10px;
   border-bottom:1px solid var(--line); }
-.wf-vald-bar > svg { width:15px; height:15px; color:var(--warn); flex-shrink:0; }
+.wf-vald-bar > svg { width:14px; height:14px; stroke-width:2; color:var(--warn); flex-shrink:0; }
 .wf-vald-sum { font-size:12px; color:var(--dim); }
 .wf-vald-sum .e  { color:var(--err); font-weight:700; }
 .wf-vald-sum .w  { color:var(--warn); font-weight:700; }

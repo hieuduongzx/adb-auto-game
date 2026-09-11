@@ -49,6 +49,11 @@ function wfValidationIssues(){
         if(!wired) add("err","Try in order has no wired branches",ctx,n.id);
         if(!edges.some(e=>e.from===n.id && e.fromPort==="fail")) add("warn","Try in order has no fail path",ctx,n.id);
       }
+      if(n.type==="sequence"){
+        const count=Math.max(1,parseInt((n.params||{}).count)||3);
+        let wired=0; for(let i=1;i<=count;i++) if(edges.some(e=>e.from===n.id && e.fromPort===String(i))) wired++;
+        if(!wired) add("err","Sequence has no wired branches",ctx,n.id);
+      }
       if(n.type==="and"){
         const expected=Math.max(1,parseInt((n.params||{}).count)||2);
         const incoming=edges.filter(e=>e.to===n.id).length;
@@ -95,12 +100,12 @@ function wfValidatePanelShow(issues){
     ? `<b class="e">${errs} error${errs===1?"":"s"}</b> · <b class="w">${warns} warning${warns===1?"":"s"}</b>`
     : `<b class="ok">✓ No issues found</b>`;
   p.innerHTML=`<div class="wf-vald-bar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
       <span class="wf-vald-sum">${sum}</span>
       <span class="spacer"></span>
       <button class="btn sm" id="wf-vald-re">Re-check</button>
       <button class="wf-pal-search-clr" id="wf-vald-x" title="Close (Esc)" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>
     </div>
     <div class="wf-find-list" id="wf-vald-list"></div>`;

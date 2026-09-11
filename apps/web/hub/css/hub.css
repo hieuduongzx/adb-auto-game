@@ -2,9 +2,19 @@
    Loaded after ../shared/base.css (shared primitives + tokens). Only
    hub-specific layout, table, tool-launcher and Auto Click rules live here. */
 
-/* ── Layout ─────────────────────────────────────────────────────────────── */
+/* ── Layout — rail beside the workspace ─────────────────────────────────────
+   The shell is a row: a fixed navigation rail, then whichever workspace the
+   rail points at. Views no longer carry their own way out. */
 #app {
   flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  min-height: 0;
+}
+.shell-main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -14,6 +24,9 @@
 }
 .tool-view { flex:1; min-height:0; display:none; flex-direction:column; gap:7px; overflow:hidden; }
 .tool-view.active { display:flex; }
+/* The theme toggle borrows .theme-btn for its sun/moon swap but wears the
+   rail's icon size, not the button's. */
+.rail-item.theme-btn svg { width:20px; height:20px; stroke-width:1.6; }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
 #header {
@@ -42,7 +55,7 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.brand-mark svg { width: 18px; height: 18px; }
+.brand-mark svg { width:16px; height:16px; stroke-width:1.8; }
 .brand-text { min-width: 0; }
 .app-title {
   font-size: var(--t-head);
@@ -175,7 +188,7 @@
   .row-actions .btn.sm:not(.ico) {
     width: 26px; padding: 0; font-size: 0; gap: 0;
   }
-  .row-actions .btn.sm:not(.ico) svg { width: 14px; height: 14px; }
+  .row-actions .btn.sm:not(.ico) svg { width:14px; height:14px; stroke-width:2; }
   #footer .foot-hint { display: none; }
   #header { padding: 9px 11px; gap: 8px; }
   .app-sub { display: none; }
@@ -275,8 +288,8 @@
   margin-bottom: 6px;
 }
 .empty-ico svg {
-  width: 22px; height: 22px;
-  stroke: currentColor; fill: none; stroke-width: 1.7;
+  width:20px; height:20px;
+  stroke: currentColor; fill: none; stroke-width:1.6;
   stroke-linecap: round; stroke-linejoin: round;
 }
 .empty-title {
@@ -334,13 +347,13 @@
 .tool-icon { width:44px; height:44px; display:flex; align-items:center; justify-content:center; flex-shrink:0;
   border-radius:6px; border:1px solid var(--border2); background:var(--panel); color:var(--ink2); }
 .tool-icon.clicker { border-color:var(--border2); background:var(--panel); color:var(--ink2); }
-.tool-icon svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+.tool-icon svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
 .tool-copy { display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; }
 .tool-copy b { font-size:var(--t-title); color:var(--ink); letter-spacing:-.01em; }
 .tool-copy small { font-size:var(--t-ui); line-height:1.35; color:var(--dim); }
 .tool-meta { max-width:105px; font-family:var(--mono); font-size:var(--t-micro); line-height:1.35; text-align:right; color:var(--muted); }
 .tool-meta.running { color:var(--ok); font-weight:700; }
-.tool-arrow { width:16px; height:16px; flex-shrink:0; fill:none; stroke:var(--muted); stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
+.tool-arrow { width:16px; height:16px; flex-shrink:0; fill:none; stroke:var(--muted); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
   transition:transform .15s var(--ease), stroke .15s; }
 .tool-row:hover .tool-icon { border-color:var(--border2); color:var(--accent); }
 .tool-row:hover .tool-arrow { transform:translateX(3px); stroke:var(--accent); }
@@ -384,7 +397,7 @@
 
 /* ── Auto Click ────────────────────────────────────────────────────────── */
 .clicker-mark { border-color:var(--ink); background:var(--ink); color:var(--panel); }
-.clicker-mark svg { fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+.clicker-mark svg { fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; }
 .run-state { display:flex; align-items:center; gap:6px; min-width:82px; height:26px; justify-content:center;
   border:1px solid var(--border); border-radius:4px; background:var(--surface); color:var(--dim); font-size:var(--t-micro); font-weight:700; }
 .run-dot { width:7px; height:7px; border-radius:50%; background:var(--muted); }
@@ -434,7 +447,7 @@
 .clicker-run:active { transform:translateY(.5px); }
 .clicker-run:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .clicker-run .run-icon { width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:var(--r-sm); background:color-mix(in srgb, var(--on-ok) 16%, transparent); }
-.clicker-run .run-icon svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.clicker-run .run-icon svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .clicker-run > span:nth-child(2) { display:flex; flex:1; min-width:0; flex-direction:column; gap:3px; }
 .clicker-run b { font-size:var(--t-ui); }
 .clicker-run small { font-size:var(--t-micro); font-weight:500; color:color-mix(in srgb, var(--on-ok) 82%, transparent); }
@@ -494,7 +507,7 @@
 .point-row.selected .point-click { background:var(--panel); border-color:var(--border); color:var(--accent); }
 .point-delete { width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:6px; color:var(--muted); }
 .point-delete:hover { background:var(--err-bg); color:var(--err); }
-.point-delete svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.point-delete svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 
 /* Detail editor for the selected point */
 .point-editor { margin-top:9px; padding:11px 12px; display:flex; flex-direction:column; gap:9px;
@@ -515,7 +528,7 @@
 .pe-capture { height:30px; display:flex; align-items:center; gap:5px; padding:0 11px; white-space:nowrap;
   border:1px solid var(--border2); border-radius:var(--r-sm); background:var(--surface); color:var(--dim); font-size:var(--t-micro); font-weight:600; }
 .pe-capture:hover { border-color:var(--border2); background:var(--accent-bg); color:var(--accent); }
-.pe-capture svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; }
+.pe-capture svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
 .pe-hint { font-size:var(--t-micro); line-height:1.4; color:var(--muted); padding:1px 2px; }
 .points-empty { padding:18px 10px; display:flex; flex-direction:column; align-items:center; gap:4px; border:1px dashed var(--border2); border-radius:8px; color:var(--dim); }
 .points-empty[hidden] { display:none; }

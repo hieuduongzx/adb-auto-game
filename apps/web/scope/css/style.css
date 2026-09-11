@@ -43,8 +43,8 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 .tb-tray .btn { border-color: transparent; background: transparent; height: 32px; }
 .tb-tray .btn.ico { width: 32px; }
 .tb-tray .btn:hover { background: var(--panel); border-color: var(--border2); }
-.tb-tray-label { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
-  color: var(--muted); padding: 0 6px 0 4px; flex-shrink: 0; white-space: nowrap; }
+.tb-tray-label { font-size: var(--t-caption); font-weight: 500; letter-spacing: 0; text-transform: none;
+  color: var(--dim); padding: 0 6px 0 4px; flex-shrink: 0; white-space: nowrap; }
 .tb-tray-sep { width: 1px; align-self: stretch; margin: 3px 2px; background: var(--border2); flex-shrink: 0; }
 .tb-divider { width: 1px; height: 20px; background: var(--border2); flex-shrink: 0; }
 
@@ -84,10 +84,9 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 .btn.h30 { height: 30px; padding: 0 12px; }
 .btn.ico { width: 30px; padding: 0; }
 .btn.sm.ico { width: 26px; }
-.btn.ico svg { width: 16px; height: 16px; display: block; }
-.btn svg { stroke: currentColor; fill: none; stroke-width: 2;
+.btn.ico svg { width:16px; height:16px; stroke-width:1.8; display: block; }
+.btn svg { stroke: currentColor; fill: none;
   stroke-linecap: round; stroke-linejoin: round; }
-.btn.accent svg, .btn.ok svg, .btn.err svg { stroke-width: 2.1; }
 .btn.ico.on { background: var(--accent-bg); border-color: var(--border2); color: var(--accent); }
 
 /* Inline icon button */
@@ -151,12 +150,12 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 /* ── Collapsible groups ──────────────────────────────────────────────────── */
 .group { border: 1px solid #e9ecf1; border-radius: var(--r-md); overflow: hidden; }
 
-.grp-hdr { display: flex; align-items: center; gap: 7px; padding: 8px 11px;
+.grp-hdr { display: flex; align-items: center; gap: 7px; height: var(--pnl-hd-h); padding: 0 11px;
   width: 100%; cursor: pointer; user-select: none; transition: background .1s; text-align: left; }
 .grp-hdr:hover { background: var(--alt); }
 
-.grp-title { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
-  color: var(--muted); text-transform: uppercase; }
+.grp-title { font-size: var(--t-body); font-weight: 600; letter-spacing: 0;
+  color: var(--ink); text-transform: none; }
 
 .grp-chevron { margin-left: auto; color: var(--muted); flex-shrink: 0;
   transition: transform .15s; }
@@ -193,7 +192,7 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 .cb { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--cb-bd);
   background: var(--panel); flex-shrink: 0; display: flex; align-items: center;
   justify-content: center; transition: background .12s, border-color .12s; }
-.cb.checked { background: var(--accent); border-color: var(--accent); }
+.cb.checked { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .cb svg { opacity: 0; transition: opacity .1s; }
 .cb.checked svg { opacity: 1; }
 
@@ -230,18 +229,18 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 
 /* ── Log ─────────────────────────────────────────────────────────────────── */
 #log-card { flex-shrink: 0; display: flex; flex-direction: column; min-height: 100px; max-height: 155px; }
-#log-card.collapsed { min-height: 33px; max-height: 33px; }
+#log-card.collapsed { min-height: var(--pnl-hd-h); max-height: var(--pnl-hd-h); }
 #log-card.collapsed .log-hdr { border-bottom: none; border-radius: var(--r-md); }
 #log-card.collapsed .log-body { display: none; }
-.log-hdr  { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s4);
+.log-hdr  { display: flex; align-items: center; gap: var(--s2); height: var(--pnl-hd-h); padding: 0 var(--s2) 0 var(--s4);
   border-bottom: 1px solid var(--border); flex-shrink: 0; user-select: none;
   transition: background .1s; border-radius: var(--r-md) var(--r-md) 0 0; }
 .log-hdr:hover { background: var(--alt); }
 .log-toggle { display: inline-flex; align-items: center; gap: var(--s2); min-width: 0; }
 .log-chevron { color: var(--muted); display: inline-flex; transition: transform .15s var(--ease); }
 #log-card.collapsed .log-chevron { transform: rotate(-90deg); }
-.log-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
-  color: var(--muted); text-transform: uppercase; }
+.log-label { font-size: var(--t-body); font-weight: 600; letter-spacing: 0;
+  color: var(--ink); text-transform: none; }
 .log-count { font-family: var(--mono); font-size: 10px; color: var(--muted);
   background: var(--alt); border-radius: 999px; padding: 1px 7px; min-width: 18px; text-align: center; }
 .log-count:empty { display: none; }

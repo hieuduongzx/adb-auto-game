@@ -376,8 +376,8 @@ async function wfOnBuildDone(data){
 }
 
 // Play / stop glyphs for the run toggle (icon-only button).
-const WF_ICO_PLAY = '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
-const WF_ICO_STOP = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
+const WF_ICO_PLAY = '<svg class="uico uico-fill" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>';
+const WF_ICO_STOP = '<svg class="uico uico-fill" aria-hidden="true" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>';
 let wfRunStartedAt=0, wfRunClockTimer=null;
 function wfFormatRunTime(ms){
   const total=Math.max(0,Math.floor(ms/1000)), h=Math.floor(total/3600), m=Math.floor(total%3600/60), s=total%60;
@@ -414,6 +414,7 @@ function wfSetRunning(on){
     // Only remove the amber "currently running" pulse and dim unreached blocks.
     if(wfRunNode){ const _re=wfNodeElById(wfRunNode); if(_re) _re.classList.remove("running","delaying"); }
     wfRunNode=null; wfRunStopped=true;
+    if(typeof wfCallStackClear==="function") wfCallStackClear();
     wfMarkUnreached();
     wfLiveVars={}; wfFreshVar=null;
     // Clear any activity still blinking "running" (stopped mid-activity), but

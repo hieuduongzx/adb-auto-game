@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>DevScope</title>
 <link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/panel.css">
+<link rel="stylesheet" href="../shared/icons.css">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -21,15 +23,15 @@
         <option value="">Scanning…</option>
       </select>
       <button class="btn ico sm" onclick="onRefreshDevices()" title="Refresh connected devices" aria-label="Refresh connected devices">
-        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg></button>
+        <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
       <button class="btn ico sm" onclick="onScanPorts()" title="Scan known emulator ports" aria-label="Scan known emulator ports">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+        <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
       <button class="btn ico sm" onclick="onRestartAdb()" title="Restart the ADB server" aria-label="Restart the ADB server">
-        <svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg></button>
+        <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg></button>
     </div>
     <span class="tb-divider"></span>
     <button class="btn ico" onclick="openWorkflowDesigner()" title="Open Macro2k in a new window" aria-label="Open Macro2k in a new window">
-      <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></button>
+      <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
   </div>
   <span class="spacer"></span>
   <div class="tb-zone tb-right">
@@ -51,12 +53,12 @@
     </button>
     <span class="tb-divider"></span>
     <button class="btn ok ico" onclick="onCapture()" title="Capture screen (F5)" aria-label="Capture screen">
-      <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+      <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></button>
   </div>
 </div>
 
 <!-- ── Main split ────────────────────────────────────────────────────────── -->
-<div id="main">
+<div id="main" data-pnl-stage>
 
   <!-- Preview -->
   <div id="preview-card">
@@ -67,7 +69,7 @@
       <span class="ph-hint"><span class="dot"></span>click=point · drag=region · right-click=tap · scroll=zoom</span>
       <span id="zoom-level" style="margin-left:6px;">100%</span>
       <button class="icon-btn" onclick="resetZoom()" title="Reset zoom (Ctrl+0)" aria-label="Reset zoom" style="margin-left:4px;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
       </button>
     </div>
     <div id="preview-wrap"><canvas id="preview-canvas"></canvas></div>
@@ -89,7 +91,7 @@
       <div class="group">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">Screenshot</span>
-          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+          <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
           <div class="btns">
@@ -105,7 +107,7 @@
       <div class="group">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">Point &amp; color</span>
-          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+          <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
           <div class="row">
@@ -113,14 +115,14 @@
             <input id="pt-x" type="text" readonly style="text-align:center;" aria-label="Point X">
             <input id="pt-y" type="text" readonly style="text-align:center;" aria-label="Point Y">
             <button class="icon-btn" onclick="copyText($('pt-x').value+', '+$('pt-y').value, this)" title="Copy x,y" aria-label="Copy point coordinates">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
             </button>
           </div>
           <div class="row">
             <span class="lbl">Color</span>
             <input id="pt-hex" type="text" readonly aria-label="Point HEX color">
             <button class="icon-btn" onclick="copyEl('pt-hex', this)" title="Copy HEX" aria-label="Copy HEX color">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
             </button>
             <div id="color-swatch"></div>
           </div>
@@ -128,7 +130,7 @@
             <span class="lbl">RGB</span>
             <input id="pt-rgb" type="text" readonly aria-label="Point RGB color">
             <button class="icon-btn" onclick="copyEl('pt-rgb', this)" title="Copy RGB" aria-label="Copy RGB color">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
             </button>
           </div>
           <div class="row" style="justify-content:flex-end;">
@@ -141,7 +143,7 @@
       <div class="group closed">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="false">
           <span class="grp-title">Color check</span>
-          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+          <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
           <div class="row">
@@ -171,7 +173,7 @@
           <span class="grp-title">Selection</span>
           <span class="badge cyan" id="region-badge" style="display:none;">
             <span class="bd"></span>selected</span>
-          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+          <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
           <div class="row">
@@ -179,7 +181,7 @@
             <input id="rg-x" type="number" min="0" value="0" style="text-align:center;" aria-label="Region X">
             <input id="rg-y" type="number" min="0" value="0" style="text-align:center;" aria-label="Region Y">
             <button class="icon-btn" onclick="copyText($('rg-x').value+', '+$('rg-y').value+', '+$('rg-w').value+', '+$('rg-h').value, this)" title="Copy x,y,w,h" aria-label="Copy region coordinates">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
             </button>
           </div>
           <div class="row">
@@ -208,7 +210,7 @@
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">Text recognition (OCR)</span>
           <span id="ocr-engine" style="margin-left:4px;">not loaded</span>
-          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+          <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
           <div class="row"><span class="lbl">Engine</span>
@@ -217,7 +219,7 @@
             <input id="ocr-result" type="text" readonly placeholder="(not read yet)" aria-label="OCR result"
                    style="flex:1;background:var(--surface);font-size:13px;">
             <button class="icon-btn" onclick="copyEl('ocr-result', this)" title="Copy result" aria-label="Copy OCR result">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
             </button>
           </div>
           <div class="row" style="gap:5px;">
@@ -231,7 +233,7 @@
       <div class="group">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">Actions</span>
-          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+          <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
           <div class="row" style="gap:5px;">
@@ -270,7 +272,7 @@
       <div class="group closed">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="false">
           <span class="grp-title">Keys &amp; text</span>
-          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+          <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
           <div class="key-strip">
@@ -301,7 +303,7 @@
       <div class="group">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">Template matching</span>
-          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+          <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
           <p style="font-size:11.5px;color:var(--dim);line-height:1.5;">Choose a PNG template and match it against the current screenshot.</p>
@@ -313,10 +315,10 @@
             <input id="tpl-thr" type="number" min="0.1" max="0.999" step="0.05" value="0.85" aria-label="Template match threshold"
                    style="width:80px;flex:none;text-align:right;"></div>
           <button type="button" class="cb-line" role="checkbox" aria-checked="false" onclick="toggleCheck(this,'cb-gray')">
-            <span class="cb" id="cb-gray"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg></span>
+            <span class="cb" id="cb-gray"><svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>
             Grayscale</button>
           <button type="button" class="cb-line" role="checkbox" aria-checked="false" onclick="toggleCheck(this,'cb-multiscale')">
-            <span class="cb" id="cb-multiscale"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg></span>
+            <span class="cb" id="cb-multiscale"><svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>
             Multi-scale (0.8 .. 1.2)</button>
           <div class="btns">
             <button class="btn h30 accent" onclick="onRunMatch(false)">Find best match</button>
@@ -335,7 +337,7 @@
       <div class="group">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">Device information</span>
-          <svg class="grp-chevron" width="10" height="6" viewBox="0 0 12 7" fill="currentColor"><path d="M0 0l6 7 6-7z"/></svg>
+          <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
           <div class="info-grid">
@@ -376,16 +378,17 @@
 </div><!-- /main -->
 
 <!-- ── Log ──────────────────────────────────────────────────────────────── -->
-<div id="log-card" class="card">
-  <div class="log-hdr">
+<div id="log-card" class="card pnl" data-pnl="scope-log" data-pnl-title="Log" data-pnl-tools="max" data-pnl-stage-sel="#main">
+  <div class="log-hdr pnl-hd">
     <button type="button" id="log-toggle" class="log-toggle" onclick="toggleLog()" title="Collapse or expand log" aria-controls="log-body" aria-expanded="true">
-      <span class="log-chevron"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg></span>
+      <span class="log-chevron"><svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
       <span class="log-label">Log</span>
       <span class="log-count" id="log-count"></span>
     </button>
-    <span class="spacer"></span>
-    <button class="btn-log-clear" onclick="onCopyLog(event)">Copy</button>
-    <button class="btn-log-clear" onclick="onClearLog(event)">Clear</button>
+    <span class="pnl-tools">
+      <button class="btn-log-clear" onclick="onCopyLog(event)">Copy</button>
+      <button class="btn-log-clear" onclick="onClearLog(event)">Clear</button>
+    </span>
   </div>
   <div class="log-body" id="log-body" role="log" aria-live="polite"></div>
 </div>
@@ -402,6 +405,8 @@
 
 </div><!-- /app -->
 
+<script src="../shared/icons.js"></script>
+<script src="../shared/panel.js"></script>
 <script src="js/state.js"></script>
 <script src="js/canvas.js"></script>
 <script src="js/keyboard.js"></script>

@@ -237,6 +237,52 @@ function wfResetActStatus(){
   for(const id in wfActStatus) wfSetActStatus(id, null);
 }
 function wfNodeElById(id){ return id ? document.querySelector(`.wf-node[data-node="${id}"]`) : null; }
+
+// ── Call stack ───────────────────────────────────────────────────────────────
+// While a function runs, the live node lives in the FUNCTION's graph, so the
+// call block that started it gets no marker of its own — and with follow-focus
+// on, the editor switches away from the parent entirely. Looking at the parent
+// canvas afterwards you could not tell a function was executing at all.
+// So track which call blocks are currently on the engine's stack and ring them,
+// whichever graph is on screen. Nested calls ring every block on the path.
+let wfCallStack = [];
+// wfNode() only searches the graph being viewed; this one answers "what kind of
+// node is this id, anywhere in the workflow" for ids arriving from the engine.
+function wfNodeAnywhere(id){
+  if(!id) return null;
+  const pools=[(WF.activities||[]), (WF.functions||[])];
+  for(const pool of pools){
+    for(const t of pool){
+      const n=t && t.graph && t.graph.nodes && t.graph.nodes.find(n=>n.id===id);
+      if(n) return n;
+    }
+  }
+  return null;
+}
+// Repaint the rings. Cheap: the class is only ever on a handful of blocks, and
+// this runs on stack changes and after every canvas rebuild.
+function wfPaintCallStack(){
+  document.querySelectorAll(".wf-node.running-call").forEach(el=>{
+    if(!wfCallStack.includes(el.dataset.node)) el.classList.remove("running-call");
+  });
+  wfCallStack.forEach(id=>{ const el=wfNodeElById(id); if(el) el.classList.add("running-call"); });
+}
+function wfCallStackEnter(id){
+  const n=wfNodeAnywhere(id);
+  if(!n || n.type!=="call") return;
+  if(!wfCallStack.includes(id)) wfCallStack.push(id);
+  wfPaintCallStack();
+}
+// A call reports its result only once its function has finished, so seeing one
+// pops it — and anything still above it, which is how an aborted inner call or
+// a dropped event self-heals instead of leaving a ring behind forever.
+function wfCallStackExit(id){
+  const i=wfCallStack.indexOf(id);
+  if(i<0) return;
+  wfCallStack.length=i;
+  wfPaintCallStack();
+}
+function wfCallStackClear(){ wfCallStack.length=0; wfPaintCallStack(); }
 let wfRunLitAt=0;            // when the current amber node lit up (ms)
 const WF_RUN_MIN_MS=220;    // floor on amber dwell, so instant blocks (if image…) still flash yellow
 function wfSetRunningNode(id){
@@ -315,12 +361,14 @@ function wfReapplyRunViz(){
   Object.keys(wfRan).forEach(id=>wfMarkNodeResult(id, wfRan[id], wfRanPort[id]));
   Object.keys(wfNodeDur).forEach(wfApplyNodeTime);
   const el=wfNodeElById(wfRunNode); if(el) el.classList.add("running");
+  wfPaintCallStack();
   if(wfRunStopped) wfMarkUnreached();
   // Canvas rebuilds wipe delay chips — re-bind the live countdown if one is mid-wait.
   if(wfDelayState) wfPaintNodeDelay();
 }
 function wfResetRunViz(){
   wfRunNode=null; wfLiveNode=null; wfRunStopped=false;
+  wfCallStackClear();
   for(const k in wfRan) delete wfRan[k];
   for(const k in wfRanPort) delete wfRanPort[k];
   for(const k in wfNodeT0) delete wfNodeT0[k];

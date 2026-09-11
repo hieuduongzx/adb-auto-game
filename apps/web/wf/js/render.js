@@ -70,7 +70,7 @@ function wfRenderActivities(){
   const bgActs =WF.activities.filter(a=>a.type==="background");
   if(seqCnt) seqCnt.textContent = seqActs.length? String(seqActs.length):"";
   if(bgCnt)  bgCnt.textContent = bgActs.length ? String(bgActs.length) :"";
-  const check=`<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3L9.5 3.5"/></svg>`;
+  const check=`<svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>`;
   function rowInto(wrap, act){
     const sel = WF.edit.kind==="activity" && act.id===WF.edit.id;
     const el=document.createElement("div");
@@ -181,7 +181,7 @@ function wfToggleActPanel(){
 // delete clicks keep working. Rows shuffle live during dragover; on drop the
 // backing array (WF.activities or WF.functions) is reordered to match the DOM —
 // for sequence activities this changes their run order.
-const WF_GRIP = `<svg width="8" height="13" viewBox="0 0 9 14" fill="currentColor"><circle cx="2" cy="2" r="1.3"/><circle cx="7" cy="2" r="1.3"/><circle cx="2" cy="7" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="2" cy="12" r="1.3"/><circle cx="7" cy="12" r="1.3"/></svg>`;
+const WF_GRIP = `<svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>`;
 
 // `paletteType` (optional): if set, the row also acts like a palette chip — it's
 // draggable from anywhere and dropping it on the canvas spawns that node (used by
@@ -261,7 +261,7 @@ function wfPalToggleCat(key){
   try{ localStorage.setItem("wfPalCollapsed", JSON.stringify(wfPalCollapsed)); }catch{}
   wfRenderPalette();
 }
-const WF_PAL_CHEV = `<svg class="wf-pal-chev" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>`;
+const WF_PAL_CHEV = `<svg class="wf-pal-chev uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>`;
 function wfPalPairByType(type){
   const list=(typeof WF_PAL_PAIRS!=="undefined") ? WF_PAL_PAIRS : [];
   return list.find(p=>(p.types||[]).includes(type))||null;
@@ -286,7 +286,7 @@ function wfPalPairEl(pair, catKey){
     if(i>0){
       const link=document.createElement("span"); link.className="wf-pal-pair-link";
       link.setAttribute("aria-hidden","true");
-      link.innerHTML=`<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>`;
+      link.innerHTML=`<svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>`;
       row.appendChild(link);
     }
     row.appendChild(wfChip(WF_NODES[type].ico, WF_NODES[type].label, type, catKey));
@@ -492,10 +492,10 @@ function wfRenderVarsPanel(){
     nm.title=n+(scope==="global"?" · global · click to edit":scope==="activity"?" · local (this activity) · click to edit":"");
     if(scope==="global"){
       nm.style.color="var(--accent)";
-      nm.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>'+n;
+      nm.innerHTML='<svg class="uico" viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>'+n;
     } else if(scope==="activity"){
       nm.style.color="var(--cat-logic-ink,#6d28d9)";
-      nm.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg>'+n;
+      nm.innerHTML='<svg class="uico" viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg>'+n;
     } else { nm.textContent=n; }
     const live=wfLiveVars[n];
     const hasDeclared=declared.hasOwnProperty(n);
@@ -608,7 +608,7 @@ function wfLocalRow(act,v,idx,render){
   r1.style.alignItems="center";
   const tag=document.createElement("span"); tag.className="wf-glob-tag";
   tag.style.color="var(--cat-logic-ink,#6d28d9)";
-  tag.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg>LOCAL';
+  tag.innerHTML='<svg class="uico" viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg>LOCAL';
   const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Child"; addChild.title="Add child variable";
   addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
   const del=document.createElement("button"); del.className="wf-glob-del"; del.textContent="−"; del.title="Delete local variable";
@@ -708,7 +708,7 @@ function wfGlobRow(v,idx,render){
   const card=document.createElement("div"); card.className="wf-glob-card";
   const r1=document.createElement("div"); r1.className="wf-var-row";
   r1.style.alignItems="center";
-  const tag=document.createElement("span"); tag.className="wf-glob-tag"; tag.innerHTML='<svg viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>GLOBAL';
+  const tag=document.createElement("span"); tag.className="wf-glob-tag"; tag.innerHTML='<svg class="uico" viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>GLOBAL';
   const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Child"; addChild.title="Add child variable";
   addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
   const del=document.createElement("button"); del.className="wf-glob-del"; del.textContent="−"; del.title="Delete global variable";
@@ -813,7 +813,8 @@ function wfNodeEl(n){
   // flag them so the header reserves room and the title can't slide under the labels.
   const tfCls = ((def.outs||[]).includes("true") || n.type==="switch") ? " has-tf" : "";
   const typeCls=" type-"+String(n.type||"unknown").replace(/[^a-zA-Z0-9_-]/g,"-");
-  el.className="wf-node "+def.kind+typeCls+catCls+tfCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"");
+  el.className="wf-node "+def.kind+typeCls+catCls+tfCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"")
+    +(typeof wfCallStack!=="undefined" && wfCallStack.includes(n.id)?" running-call":"");
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
   // Dynamic output ports — grow the card so they all sit inside it. Multi-port
   // blocks stack ports from the primary row (≈ card centre), 16px apart.
@@ -822,6 +823,7 @@ function wfNodeEl(n){
   if(n.type==="switch") dynOutCount=((n.params&&n.params.cases)||[]).length+1;
   else if(n.type==="try_chain") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3)+1;
   else if(n.type==="parallel") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3);
+  else if(n.type==="sequence") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3);
   else if(n.type==="random_branch") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||2);
   else if(def.kind==="loop_until") dynOutCount=3;   // body/found/fail — grow the card
   if(dynOutCount>2) el.style.minHeight=Math.max(64, 28 + (dynOutCount-1)*16 + 14)+"px";
@@ -841,9 +843,9 @@ function wfNodeEl(n){
   const hasTpl = !!tplField;
   const showThumb = hasTpl && (wfPreviewAll || n.showPreview);
   // Action bar above the node (hover-only): delete, toggle preview, copy.
-  const delSvg = '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
-  const copySvg = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-  const actEyeSvg = '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const delSvg = '<svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+  const copySvg = '<svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
+  const actEyeSvg = '<svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>';
   const actBar = `<div class="wf-node-actions">
     <button class="wf-act-del" title="Delete">${delSvg}</button>
     <span class="wf-node-act-spacer"></span>
@@ -903,6 +905,7 @@ function wfNodeEl(n){
   else if(n.type==="switch") outs=((n.params&&n.params.cases)||[]).map((_,i)=>"c"+i).concat(["default"]);
   else if(n.type==="try_chain") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1)).concat(["fail"]);
   else if(n.type==="parallel"||n.type==="random_branch") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||(n.type==="parallel"?3:2))},(_,i)=>String(i+1));
+  else if(n.type==="sequence") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1));
   else outs=(def.outs||[]);
   // Primary port row — single in + first out share this y so chains stay level.
   // Cards 64px / terminal discs 40px; port is 8px → top = h/2 − 4.
@@ -954,7 +957,7 @@ function wfNodeEl(n){
     el.appendChild(op);
     let lblTxt;
     if(n.type==="switch") lblTxt = (port==="default") ? "else" : "#"+(i+1);
-    else if(n.type==="parallel"||n.type==="random_branch"||n.type==="try_chain") lblTxt = port;
+    else if(n.type==="parallel"||n.type==="random_branch"||n.type==="try_chain"||n.type==="sequence") lblTxt = port;
     else lblTxt = WF_PORT_LBL[port];
     if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+0)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl); }
   });

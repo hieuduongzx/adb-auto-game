@@ -111,7 +111,7 @@
 .pane-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 6px 0 2px; gap: 6px; overflow: hidden; }
 
 .list-header { display: flex; align-items: center; gap: 4px; padding: 0 2px; flex-shrink: 0; }
-.list-label { font-size: var(--t-micro); font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; flex: 1; }
+.list-label { font-size: var(--t-body); font-weight: 600; letter-spacing: 0; color: var(--ink); text-transform: none; flex: 1; }
 .btn-sel { font-size: var(--t-caption); font-weight: 600; padding: 2px 7px; border-radius: 4px; color: var(--accent); transition: background .1s; }
 .btn-sel:hover { background: var(--accent-bg); }
 .btn-sel.none { color: var(--muted); }
@@ -157,7 +157,7 @@
 .btn-gear { color: var(--muted); }
 .btn-gear.active { color: var(--accent); }
 .btn-gear:hover { background: var(--alt); color: var(--dim); }
-.btn-icon svg { width: 13px; height: 13px; }
+.btn-icon svg { width:12px; height:12px; stroke-width:2.2; }
 
 /* Inline settings expansion */
 .task-settings { padding: 0 11px 11px 55px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); border-top: 1px solid var(--line); }
@@ -180,7 +180,7 @@
 /* ── Settings tab ───────────────────────────────────────────────────────── */
 #tab-settings .pane-inner { overflow-y: auto; }
 .settings-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); padding: 13px 14px; display: flex; flex-direction: column; gap: 12px; }
-.settings-section-title { font-size: var(--t-micro); font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+.settings-section-title { font-size: var(--t-body); font-weight: 600; letter-spacing: 0; color: var(--ink); text-transform: none; }
 .toggle-row { display: flex; align-items: center; gap: 10px; }
 .toggle-text { flex: 1; }
 .toggle-name { font-size: var(--t-body); font-weight: 500; color: var(--ink); }
@@ -206,16 +206,16 @@
 
 /* ── Log panel ─────────────────────────────────────────────────────────── */
 #log-card { flex-shrink: 0; display: flex; flex-direction: column; min-height: 150px; max-height: 210px; }
-#log-card.collapsed { min-height: 33px; max-height: 33px; }
+#log-card.collapsed { min-height: var(--pnl-hd-h); max-height: var(--pnl-hd-h); }
 #log-card.collapsed .log-header { border-bottom: none; border-radius: var(--r-md); }
 #log-card.collapsed .log-body { display: none; }
 #log-card.collapsed .log-search-wrap, #log-card.collapsed .btn-log-clear { display: none; }
 #log-card.collapsed .log-chevron { transform: rotate(-90deg); }
-.log-header { display: flex; align-items: center; gap: 6px; padding: 8px 11px; border-bottom: 1px solid var(--border); flex-shrink: 0; user-select: none; border-radius: var(--r-md) var(--r-md) 0 0; transition: background .1s; }
+.log-header { display: flex; align-items: center; gap: 6px; height: var(--pnl-hd-h); padding: 0 var(--s2) 0 var(--s4); border-bottom: 1px solid var(--border); flex-shrink: 0; user-select: none; border-radius: var(--r-md) var(--r-md) 0 0; transition: background .1s; }
 .log-toggle { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: inherit; }
 .log-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .log-chevron { color: var(--muted); display: inline-flex; transition: transform .15s var(--ease-out); }
-.log-label { font-size: var(--t-micro); font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+.log-label { font-size: var(--t-body); font-weight: 600; letter-spacing: 0; color: var(--ink); text-transform: none; }
 .log-count { font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); background: var(--alt); border-radius: 4px; padding: 1px 6px; min-width: 17px; text-align: center; }
 .log-count:empty { display: none; }
 .log-search-wrap { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
@@ -238,7 +238,7 @@
 /* ── Narrow window (down to the 420px minimum) ──────────────────────────── */
 @media (max-width: 448px) {
   .btn-load { padding: 0 8px; font-size: 0; gap: 0; }
-  .btn-load svg { width: 15px; height: 15px; }
+  .btn-load svg { width:14px; height:14px; stroke-width:2; }
   .list-header { flex-wrap: wrap; }
 }
 

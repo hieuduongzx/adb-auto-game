@@ -1,0 +1,55 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Macro2k icon scale — the paint and size half of the icon system.
+   Load after base.css/panel.css and BEFORE the app stylesheet.
+
+   What this replaces: the suite drew 159 inline SVGs by hand across 14 files,
+   with fifteen different stroke widths (1.0 … 2.6) and fifteen render sizes
+   (8px … 34px), chosen per call site. Two icons in the same toolbar could
+   differ by 40% in stroke weight. That mismatch — not sub-pixel rounding — is
+   what made the set look broken.
+
+   The rules:
+     • One grid. Every icon is Lucide geometry on a 24x24 viewBox.
+     • One OPTICAL weight. Because stroke scales with the glyph, holding
+       stroke-width constant does not hold weight constant: 1.8 renders as
+       0.75px at 10px and 2.4px at 32px. So each step carries the stroke-width
+       that lands its rendered stroke at ~1.0–1.8px, and the set reads as one
+       weight at every size. The table below is the whole trick.
+     • Seven sizes, not fifteen. Reach for the nearest step; do not add one.
+     • Colour is `currentColor`, so an icon is whatever its control is.
+     • The class is `uico`, not `ico`: `.ico` was already taken twice in this
+       codebase (the icon-only button modifier `.btn.ico`, and the chip wrapper
+       `.wf-chip .ico`), and reusing it would have restyled both.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.uico {
+  display: block; flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* Chromium's default `auto` snaps thin diagonals differently from curves,
+     which is a real source of the "that one icon looks wrong" effect. */
+  shape-rendering: geometricPrecision;
+
+  /* step 3 — the default UI icon: buttons, panel tools, toolbars */
+  width: 16px; height: 16px; stroke-width: 1.8;   /* renders 1.20px */
+}
+
+/* The ladder. size → stroke-width → rendered stroke (= stroke * size / 24). */
+.uico-0 { width: 10px; height: 10px; stroke-width: 2.4; }  /* 1.00px — markers inside a chip */
+.uico-1 { width: 12px; height: 12px; stroke-width: 2.2; }  /* 1.10px — dense chips, node badges */
+.uico-2 { width: 14px; height: 14px; stroke-width: 2.0; }  /* 1.17px — menu rows, node cards */
+/*      step 3 is the bare .uico above:  16px / 1.8         1.20px */
+.uico-3 { width: 20px; height: 20px; stroke-width: 1.6; }  /* 1.33px — rail, tool cards */
+.uico-4 { width: 24px; height: 24px; stroke-width: 1.5; }  /* 1.50px — hero marks */
+.uico-5 { width: 32px; height: 32px; stroke-width: 1.35; } /* 1.80px — empty-state art */
+
+/* A solid glyph for the one primary action per screen — a filled play reads as
+   "go" from across the desk in a way an outline does not. Use sparingly: it is
+   the only place the suite leaves the stroke set. */
+.uico-fill { fill: currentColor; stroke: none; }
+
+/* An icon standing for an absent or inactive state keeps its shape and steps
+   back, rather than being swapped for a different (and therefore new) glyph. */
+.uico-quiet { opacity: .45; }

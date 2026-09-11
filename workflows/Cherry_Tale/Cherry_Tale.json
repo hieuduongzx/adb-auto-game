@@ -2,10 +2,12 @@
   "name": "Cherry Tale",
   "version": 2,
   "templatesDir": "templates",
+  "buildVersion": "1.0.0",
   "package": "com.neversoft.rpg.erolabs",
   "controller": "adb",
   "ocr": "",
   "capture": "adb",
+  "input": "adb",
   "win32": {
     "window": "",
     "matchBy": "title",
@@ -13,9 +15,17 @@
   },
   "speedhack": {
     "enabled": false,
-    "speed": 2
+    "speed": 2,
+    "native": false
   },
   "globals": [],
+  "nodeDefaults": {
+    "delayBefore": 0,
+    "delayAfter": 0,
+    "retryCount": 0,
+    "retryDelay": 0,
+    "screenshotOnFail": false
+  },
   "functions": [
     {
       "id": "fn_ppung",
@@ -153,6 +163,172 @@
             "fromPort": "false",
             "to": "nb3rusi6",
             "toPort": "loop"
+          }
+        ],
+        "groups": []
+      }
+    },
+    {
+      "id": "fn_865xf",
+      "name": "IsGameRunning",
+      "graph": {
+        "nodes": [
+          {
+            "id": "n1upjbmz",
+            "type": "start",
+            "x": -100,
+            "y": 172,
+            "params": {}
+          },
+          {
+            "id": "n22cp32m",
+            "type": "end",
+            "x": 1020,
+            "y": 280,
+            "params": {}
+          },
+          {
+            "id": "n04eiluy",
+            "type": "launch_emulator",
+            "x": 200,
+            "y": 268,
+            "params": {
+              "emulator": "mumu",
+              "index": 0,
+              "instance": "",
+              "path": "D:\\Programs\\MuMuPlayerGlobal\\nx_main",
+              "command": "",
+              "at": "",
+              "nextDay": true,
+              "wait": 60,
+              "port": 0
+            }
+          },
+          {
+            "id": "nycvq3mt",
+            "type": "launch_app",
+            "x": 400,
+            "y": 160,
+            "params": {
+              "package": "",
+              "wait": 0,
+              "pkgSrc": "project"
+            }
+          },
+          {
+            "id": "nt9ypv6y",
+            "type": "if_emulator",
+            "x": 0,
+            "y": 160,
+            "params": {
+              "emulator": "last",
+              "index": 0,
+              "port": 0,
+              "attach": true
+            }
+          },
+          {
+            "id": "nrwx4y5q",
+            "type": "if_app",
+            "x": 200,
+            "y": 160,
+            "params": {
+              "package": "com.neversoft.rpg.erolabs",
+              "negate": true,
+              "pkgSrc": "project"
+            }
+          },
+          {
+            "id": "nmg7oh1i",
+            "type": "wait_image",
+            "x": 600,
+            "y": 160,
+            "params": {
+              "template": "templates/crop_20260710_233810_872_990_175_33.png",
+              "threshold": 0.85,
+              "timeout": 120,
+              "negate": false
+            }
+          },
+          {
+            "id": "ngg946m6",
+            "type": "tap_image",
+            "x": 800,
+            "y": 160,
+            "params": {
+              "template": "templates/crop_20260710_233827_872_990_175_33.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 120,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nezaiwb0",
+            "type": "call",
+            "x": 800,
+            "y": 268,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nt9ypv6y",
+            "fromPort": "false",
+            "to": "n04eiluy"
+          },
+          {
+            "from": "n04eiluy",
+            "fromPort": "out",
+            "to": "nrwx4y5q"
+          },
+          {
+            "from": "nt9ypv6y",
+            "fromPort": "true",
+            "to": "nrwx4y5q"
+          },
+          {
+            "from": "nrwx4y5q",
+            "fromPort": "true",
+            "to": "nycvq3mt"
+          },
+          {
+            "from": "nycvq3mt",
+            "fromPort": "out",
+            "to": "nmg7oh1i"
+          },
+          {
+            "from": "nmg7oh1i",
+            "fromPort": "true",
+            "to": "ngg946m6"
+          },
+          {
+            "from": "nrwx4y5q",
+            "fromPort": "false",
+            "to": "nezaiwb0"
+          },
+          {
+            "from": "ngg946m6",
+            "fromPort": "false",
+            "to": "nezaiwb0"
+          },
+          {
+            "from": "ngg946m6",
+            "fromPort": "true",
+            "to": "nezaiwb0"
+          },
+          {
+            "from": "n1upjbmz",
+            "fromPort": "out",
+            "to": "nt9ypv6y"
+          },
+          {
+            "from": "nezaiwb0",
+            "fromPort": "true",
+            "to": "n22cp32m"
           }
         ],
         "groups": []

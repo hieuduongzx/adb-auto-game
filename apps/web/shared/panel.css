@@ -1,0 +1,266 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Macro2k — "panel console" vocabulary.
+
+   Load after tokens.css + base.css, before the app stylesheet.
+
+   Six rules, taken from the reference console UI, that the whole suite obeys:
+
+     1. Every content region is a PANEL with the same header grammar:
+        title · count · [tools] · maximize · collapse. Never a bespoke header.
+     2. Any panel can go solo (maximize) or shrink to its title bar (collapse).
+        The user decides what the screen is about, not the layout.
+     3. One loud control per screen. The primary action is the only filled
+        button; everything else is a ghost icon or a bordered control.
+     4. Controls carry a written label. A row of unlabelled icons is a puzzle;
+        "label + control", separated by hairlines, is a sentence.
+     5. Air over density. 40px header rows, 12-16px gutters, one hairline
+        between regions instead of borders around everything.
+     6. Monochrome plus one accent. Colour means state, never decoration.
+
+   Nothing here is app-specific; the Designer / Hub / Runner / Scope each map
+   their own regions onto these classes.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --rail-w:    68px;   /* left navigation rail */
+  --pnl-hd-h:  40px;   /* panel header — the suite's one header height */
+  --ctlbar-h:  52px;   /* labelled control strip */
+  --dtab-h:    40px;   /* document tab strip */
+  --frow-lbl:  148px;  /* form-row label column */
+}
+:root[data-density="compact"] {
+  --rail-w: 60px; --pnl-hd-h: 34px; --ctlbar-h: 44px; --dtab-h: 34px; --frow-lbl: 130px;
+}
+
+/* ═══ 1. Rail — app-level navigation, always visible ═══════════════════════
+   Destinations only: where you are, never what you do. Actions belong in the
+   control bar or a panel header. The foot holds session-level utilities
+   (theme, settings) so they never compete with destinations. */
+.rail {
+  width: var(--rail-w); flex-shrink: 0; display: flex; flex-direction: column;
+  padding: var(--s2) 0; gap: 2px; background: var(--panel);
+  border-right: 1px solid var(--border); overflow: hidden;
+}
+.rail-item {
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 4px; height: 54px; margin: 0 var(--s2);
+  border-radius: var(--r-md); color: var(--muted); flex-shrink: 0;
+  transition: background .12s, color .12s;
+}
+.rail-item svg { width:20px; height:20px; fill: none; stroke: currentColor;
+  stroke-width:1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rail-label { font-size: var(--t-micro); font-weight: 600; line-height: 1;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-item:hover { background: var(--alt); color: var(--ink2); }
+.rail-item.on { background: var(--accent-bg); color: var(--accent); }
+/* The accent spine — the reference's one unambiguous "you are here" mark. */
+.rail-item.on::before {
+  content: ''; position: absolute; left: calc(var(--s2) * -1); top: 12px; bottom: 12px;
+  width: 3px; border-radius: 0 3px 3px 0; background: var(--accent);
+}
+.rail-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rail-sp { flex: 1; min-height: var(--s3); }
+.rail-sep { height: 1px; margin: var(--s2) var(--s4); background: var(--line); flex-shrink: 0; }
+
+/* ═══ 2. Document tabs — the open things, not the views ════════════════════ */
+.dtabs {
+  display: flex; align-items: stretch; height: var(--dtab-h); flex-shrink: 0;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+}
+.dtabs::-webkit-scrollbar { height: 0; }
+.dtab {
+  position: relative; display: inline-flex; align-items: center; gap: var(--s2);
+  padding: 0 var(--s5); min-width: 118px; max-width: 230px; flex-shrink: 0;
+  font-size: var(--t-body); font-weight: 600; color: var(--muted);
+  transition: color .12s, background .12s;
+}
+/* Hairline between tabs — the reference separates tabs with a rule, not a box. */
+.dtab + .dtab::before {
+  content: ''; position: absolute; left: 0; top: 25%; bottom: 25%;
+  width: 1px; background: var(--line);
+}
+.dtab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dtab::after {
+  content: ''; position: absolute; left: var(--s4); right: var(--s4); bottom: 0;
+  height: 2px; border-radius: 2px 2px 0 0; background: transparent; transition: background .15s;
+}
+.dtab:hover { color: var(--ink2); background: var(--surface); }
+.dtab.on { color: var(--accent); background: transparent; }
+.dtab.on::after { background: var(--accent); }
+.dtab.on + .dtab::before, .dtab.on::before { background: transparent; }
+.dtab:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.dtab-add {
+  width: 34px; flex-shrink: 0; display: inline-flex; align-items: center;
+  justify-content: center; color: var(--muted); transition: color .12s, background .12s;
+}
+.dtab-add:hover { color: var(--accent); background: var(--accent-bg); }
+.dtab-add svg { width:14px; height:14px; fill: none; stroke: currentColor; stroke-width:2; stroke-linecap: round; }
+
+/* ═══ 3. Control bar — labelled controls, then exactly one loud action ═════
+   Reads left to right as a sentence: what source · which controller · which
+   target · [ghost utilities] · RUN. Everything left of the CTA is muted. */
+.ctlbar {
+  display: flex; align-items: center; height: var(--ctlbar-h); flex-shrink: 0;
+  padding: 0 var(--s5); gap: var(--s3); background: var(--panel);
+  border-bottom: 1px solid var(--border); overflow: hidden;
+}
+.ctl { display: inline-flex; align-items: center; gap: var(--s3); min-width: 0; flex-shrink: 0; }
+.ctl.grow { flex: 1 1 auto; min-width: 90px; }
+.ctl-lbl {
+  font-size: var(--t-caption); font-weight: 500; color: var(--dim);
+  white-space: nowrap; flex-shrink: 0;
+}
+.ctl > select, .ctl > input { height: 32px; min-width: 0; }
+.ctl.grow > select, .ctl.grow > input { flex: 1; }
+.ctl-sep { width: 1px; height: 20px; margin: 0 var(--s4); background: var(--border); flex-shrink: 0; }
+.ctlbar-sp { flex: 1 1 auto; min-width: var(--s2); }
+/* The one filled button on the screen. Nothing else in the bar may be filled. */
+.ctlbar .cta { height: 34px; padding: 0 var(--s5); border-radius: var(--r-md); font-size: var(--t-body); }
+.ctlbar .cta svg { width:14px; height:14px; stroke-width:2; }
+
+/* Ghost utility icon — the muted register every non-primary bar action uses. */
+.ghost-ico {
+  width: 30px; height: 30px; border-radius: var(--r-sm); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--muted); background: transparent; border: none;
+  transition: color .12s, background .12s;
+}
+.ghost-ico svg { width:16px; height:16px; fill: none; stroke: currentColor;
+  stroke-width:1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ghost-ico:hover:not(:disabled) { color: var(--accent); background: var(--accent-bg); }
+.ghost-ico.on { color: var(--accent); background: var(--accent-bg); }
+.ghost-ico.danger:hover { color: var(--err); background: var(--err-bg); }
+.ghost-ico:disabled { opacity: .38; cursor: not-allowed; }
+.ghost-ico:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ═══ 4. Panel — the one content container ════════════════════════════════
+   Header grammar, left to right, always in this order:
+     title · count · [panel-specific tools] · maximize · collapse
+   A region that needs a different header needs a better title, not a
+   different header. */
+.pnl {
+  display: flex; flex-direction: column; min-height: 0; min-width: 0;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--r-lg); overflow: hidden;
+}
+/* Docked variant — a panel filling a column already bounded by a hairline
+   carries no border or corner of its own. */
+.pnl.pnl-flush { border: none; border-radius: 0; background: transparent; }
+
+.pnl-hd {
+  display: flex; align-items: center; gap: var(--s2); height: var(--pnl-hd-h);
+  padding: 0 var(--s2) 0 var(--s4); flex-shrink: 0; user-select: none;
+  border-bottom: 1px solid var(--line);
+}
+.pnl.is-collapsed > .pnl-hd { border-bottom: none; }
+/* Title is a button whenever the panel collapses, so the whole label is a
+   target — the reference lets you click the title, not hunt for the chevron. */
+.pnl-title {
+  display: inline-flex; align-items: center; gap: var(--s2); min-width: 0;
+  font-size: var(--t-body); font-weight: 600; color: var(--ink);
+  letter-spacing: 0; text-transform: none;
+}
+button.pnl-title { cursor: pointer; }
+.pnl-title > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pnl-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.pnl-count {
+  font-family: var(--mono); font-size: var(--t-micro); font-weight: 600; color: var(--muted);
+  background: var(--alt); border-radius: 999px; padding: 1px 6px; flex-shrink: 0;
+}
+.pnl-count:empty { display: none; }
+/* The "?" affordance beside a label — explains without spending a row. */
+.pnl-hint, .frow-hint {
+  width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  background: var(--alt); cursor: help; transition: color .12s, background .12s;
+}
+.pnl-hint:hover, .frow-hint:hover { color: var(--accent); background: var(--accent-bg); }
+.pnl-tools { margin-left: auto; display: inline-flex; align-items: center; gap: 1px; flex-shrink: 0; }
+.pnl-tool {
+  width: 26px; height: 26px; border-radius: var(--r-sm); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--muted); transition: color .12s, background .12s, transform .1s;
+}
+.pnl-tool svg { width:14px; height:14px; display: block; fill: none; stroke: currentColor;
+  stroke-width:2; stroke-linecap: round; stroke-linejoin: round; }
+.pnl-tool:hover { color: var(--accent); background: var(--accent-bg); }
+.pnl-tool:active { transform: scale(.92); }
+.pnl-tool.on { color: var(--accent); background: var(--accent-bg); }
+.pnl-tool.danger:hover { color: var(--err); background: var(--err-bg); }
+.pnl-tool:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.pnl-body { flex: 1; min-height: 0; overflow: auto; padding: var(--s4); }
+.pnl-body.pnl-body-flush { padding: 0; }
+.pnl.is-collapsed { flex: 0 0 auto !important; height: var(--pnl-hd-h) !important;
+  min-height: var(--pnl-hd-h) !important; max-height: var(--pnl-hd-h) !important; }
+.pnl.is-collapsed > .pnl-body, .pnl.is-collapsed > .pnl-foot { display: none !important; }
+.pnl-chev { display: inline-flex; color: var(--muted); flex-shrink: 0; transition: transform .18s var(--ease); }
+.pnl-chev svg { width:10px; height:10px; fill: none; stroke: currentColor; stroke-width:2.4;
+  stroke-linecap: round; stroke-linejoin: round; }
+.pnl.is-collapsed .pnl-chev { transform: rotate(-90deg); }
+.pnl-tool[data-pnl-act="collapse"] svg { transition: transform .18s var(--ease); }
+.pnl.is-collapsed .pnl-tool[data-pnl-act="collapse"] svg { transform: rotate(180deg); }
+
+/* Maximize — the panel is lifted onto its stage and owns the workspace.
+   panel.js moves the node so nothing needs a z-index arms race. */
+[data-pnl-stage] { position: relative; }
+[data-pnl-stage].has-max > :not(.pnl.is-max) { visibility: hidden; }
+.pnl.is-max {
+  position: absolute !important; inset: var(--s3) !important; z-index: 30;
+  margin: 0 !important; width: auto !important; height: auto !important;
+  max-height: none !important; min-height: 0 !important; flex: none !important;
+  border: 1px solid var(--border2); border-radius: var(--r-lg);
+  background: var(--panel); box-shadow: var(--sh-lg); visibility: visible;
+  animation: pnlMaxIn .16s var(--ease) both;
+}
+@keyframes pnlMaxIn { from { opacity: 0; transform: scale(.99); } }
+.pnl.is-max > .pnl-body { padding: var(--s5); }
+.pnl.is-max .pnl-tool[data-pnl-act="collapse"] { display: none; }
+
+/* ═══ 5. Form row — label (with optional "?") left, control right ══════════ */
+.frow {
+  display: flex; align-items: center; gap: var(--s4); min-height: 38px;
+  padding: var(--s1) 0;
+}
+.frow-lbl {
+  flex: 0 0 var(--frow-lbl); display: inline-flex; align-items: center; gap: var(--s2);
+  font-size: var(--t-body); font-weight: 500; color: var(--ink2); min-width: 0;
+}
+.frow-lbl > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.frow-ctl { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--s2); }
+.frow-ctl > select, .frow-ctl > input:not([type="checkbox"]) { flex: 1; min-width: 0; height: 32px; }
+.frow-ctl.right { justify-content: flex-end; }
+.frow + .frow { border-top: 1px solid var(--line); }
+.frow-note { font-size: var(--t-caption); color: var(--muted); line-height: 1.6; padding: var(--s2) 0; }
+@media (max-width: 560px) {
+  .frow { flex-direction: column; align-items: stretch; gap: var(--s2); }
+  .frow-lbl { flex: none; }
+}
+
+/* Switch — the reference's on/off control; reads at a glance from a distance. */
+.swx {
+  width: 38px; height: 21px; border-radius: 999px; flex-shrink: 0; padding: 2px;
+  background: var(--track); border: 1px solid var(--border2); position: relative;
+  transition: background .16s var(--ease), border-color .16s;
+}
+.swx::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px;
+  border-radius: 50%; background: var(--panel); box-shadow: var(--sh-sm);
+  transition: transform .16s var(--ease);
+}
+.swx.on { background: var(--accent); border-color: var(--accent); }
+.swx.on::after { transform: translateX(17px); }
+.swx:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ═══ 6. Empty state — centred icon, one line of why, one way out ═════════ */
+.pnl-empty {
+  flex: 1; min-height: 120px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--s3);
+  padding: var(--s6) var(--s5); text-align: center; color: var(--muted);
+}
+.pnl-empty > svg { width:32px; height:32px; fill: none; stroke: currentColor;
+  stroke-width:1.35; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+.pnl-empty-t { font-size: var(--t-body); font-weight: 600; color: var(--dim); }
+.pnl-empty-s { font-size: var(--t-caption); line-height: 1.6; max-width: 30ch; }
