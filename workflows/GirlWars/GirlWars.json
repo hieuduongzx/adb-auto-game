@@ -988,8 +988,8 @@
           {
             "id": "nyn24zmd",
             "type": "end",
-            "x": 1380,
-            "y": 156,
+            "x": 1360,
+            "y": 177,
             "params": {}
           },
           {
@@ -1103,8 +1103,8 @@
           {
             "id": "n6vklznv",
             "type": "call",
-            "x": 160,
-            "y": 44,
+            "x": 140,
+            "y": 41,
             "params": {
               "fn": "fn_yt9m6"
             }
@@ -1455,31 +1455,17 @@
           {
             "id": "nyevc8bu",
             "type": "start",
-            "x": 40,
-            "y": 96,
+            "x": 20,
+            "y": 99,
             "params": {}
           },
           {
             "id": "n5nl9kv0",
             "type": "call",
-            "x": 100,
+            "x": 80,
             "y": 84,
             "params": {
               "fn": "fn_yt9m6"
-            }
-          },
-          {
-            "id": "nok33vnl",
-            "type": "tap_image",
-            "x": 290,
-            "y": 84,
-            "params": {
-              "template": "templates/crop_20260629_003800_74x70.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 5,
-              "offsetX": 0,
-              "offsetY": 0
             }
           },
           {
@@ -1622,21 +1608,25 @@
             "id": "n8twiaxu",
             "type": "end",
             "x": 2040,
-            "y": 52,
+            "y": 55,
             "params": {}
+          },
+          {
+            "id": "nxbncbet",
+            "type": "tap",
+            "x": 280,
+            "y": 84,
+            "params": {
+              "target": "pos",
+              "x": 1710,
+              "y": 368,
+              "taps": "1"
+            },
+            "delayBefore": 0.5,
+            "delayAfter": 0.5
           }
         ],
         "edges": [
-          {
-            "from": "n5nl9kv0",
-            "fromPort": "true",
-            "to": "nok33vnl"
-          },
-          {
-            "from": "nok33vnl",
-            "fromPort": "true",
-            "to": "nupweqg5"
-          },
           {
             "from": "n7xw0wxg",
             "fromPort": "true",
@@ -1691,6 +1681,16 @@
             "from": "n1si36gb",
             "fromPort": "true",
             "to": "n8twiaxu"
+          },
+          {
+            "from": "n5nl9kv0",
+            "fromPort": "true",
+            "to": "nxbncbet"
+          },
+          {
+            "from": "nxbncbet",
+            "fromPort": "out",
+            "to": "nupweqg5"
           }
         ],
         "groups": []
@@ -2069,7 +2069,7 @@
             "id": "nx77gs1h",
             "type": "wait",
             "x": 2880,
-            "y": -292,
+            "y": -289,
             "params": {
               "seconds": 5
             },
@@ -2432,7 +2432,7 @@
             "id": "n4kwm7gx",
             "type": "start",
             "x": 100,
-            "y": -25,
+            "y": -22,
             "params": {}
           },
           {
@@ -2673,7 +2673,7 @@
             "id": "nirym3mm",
             "type": "end",
             "x": 2140,
-            "y": 32,
+            "y": 35,
             "params": {}
           },
           {
@@ -2971,8 +2971,8 @@
           {
             "id": "nj5uvtwf",
             "type": "end",
-            "x": 2320,
-            "y": 86,
+            "x": 2300,
+            "y": 173,
             "params": {}
           },
           {
@@ -3022,7 +3022,7 @@
             "id": "n4xgwcgj",
             "type": "tap",
             "x": 1700,
-            "y": 74,
+            "y": 58,
             "params": {
               "target": "pos",
               "x": 590,
@@ -3034,7 +3034,7 @@
             "id": "nj5lih17",
             "type": "call",
             "x": 2100,
-            "y": 74,
+            "y": 58,
             "params": {
               "fn": "fn_hh4kj"
             }
@@ -3056,7 +3056,7 @@
             "id": "nci6yzy3",
             "type": "tap",
             "x": 1900,
-            "y": 74,
+            "y": 58,
             "params": {
               "target": "pos",
               "x": 1655,
@@ -3356,7 +3356,7 @@
       "id": "sequence_xn71",
       "name": "Guild",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [
         {
           "name": "terrioty",

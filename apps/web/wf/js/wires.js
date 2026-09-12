@@ -69,17 +69,23 @@ function wfSyncLinkModeBtn(){
 }
 
 // ── Link shapes ──────────────────────────────────────────────────────────────
-const WF_LINK_STUB=14;    // how far a linear/straight link leaves the port before it turns
-// Two blocks nose-to-nose have no room for a full stub — shrink it rather than
-// let the two stubs overshoot each other into a zigzag.
-function wfStub(a,b){ return Math.max(3, Math.min(WF_LINK_STUB, Math.abs(b.x-a.x)/3)); }
+const WF_LINK_MIN=40, WF_LINK_MAX=380;
+const WF_LINK_CLEAR=14;   // px of link that must show past each card's edge
+const WF_LINK_STUB=14;    // shortest stub a linear/straight link leaves a port with
+// The stub has the same job the spline's lobe has: a dot sits inside its card,
+// so a stub that stops at the border shows nothing. Reach past the edge by the
+// same clearance, and — for two blocks nose to nose, where there is no room —
+// shrink rather than let the two stubs overshoot each other into a zigzag.
+function wfStub(a,b){
+  const s=Math.max(WF_LINK_STUB,
+    (a.edge==null?a.x:a.edge)-a.x + WF_LINK_CLEAR,
+    b.x-(b.edge==null?b.x:b.edge) + WF_LINK_CLEAR);
+  return b.x>a.x ? Math.max(3, Math.min(s,(b.x-a.x)/3)) : s;
+}
 
 // LiteGraph's spline: horizontal handles set a quarter of the port-to-port
 // distance out from each dot. Level ports therefore give a dead-straight line
 // for free and a short hop stays nearly straight.
-const WF_LINK_MIN=40, WF_LINK_MAX=380;
-const WF_LINK_CLEAR=14;   // px of link that must show past each card's edge
-
 // How far a handle of length k throws the curve beyond its own endpoints.
 // x(t) is a cubic with both handles horizontal, so x'(t)=0 is a quadratic:
 //   (6k−2D)t² − (6k−2D)t + k = 0,  D = b.x − a.x
@@ -120,8 +126,16 @@ function wfSplineLift(dx,dy){
   // handles so the loop stays readable instead of collapsing into the line.
   return (dx<0 && Math.abs(dy)<28) ? 30 : 0;
 }
+// wfSplineOff bisects; the path and its flow marker both want the same answer,
+// so memoise the last one rather than solve it twice per link per frame.
+let _wfOffKey="", _wfOffVal=0;
+function wfSplineOffCached(a,b){
+  const key=a.x+","+a.y+","+a.edge+","+b.x+","+b.y+","+b.edge;
+  if(key!==_wfOffKey){ _wfOffKey=key; _wfOffVal=wfSplineOff(a,b); }
+  return _wfOffVal;
+}
 function wfSplinePath(a,b){
-  const off=wfSplineOff(a,b), lift=wfSplineLift(b.x-a.x, b.y-a.y);
+  const off=wfSplineOffCached(a,b), lift=wfSplineLift(b.x-a.x, b.y-a.y);
   return `M${a.x},${a.y} C${a.x+off},${a.y-lift} ${b.x-off},${b.y-lift} ${b.x},${b.y}`;
 }
 function wfLinearPath(a,b){
@@ -147,11 +161,10 @@ function wfWirePath(a,b){
   return wfSplinePath(a,b);
 }
 
-// Flow marker — ComfyUI puts a dot at each link's midpoint; here it is a small
-// triangle turned along the curve, so the same glyph also says which way the
-// flow runs (this graph is control flow: direction is load-bearing). Computed
-// analytically per shape, never via getPointAtLength — that would force a
-// layout flush per wire on every drag frame.
+// Flow marker — ComfyUI's default LinkMarkerShape.Circle: a filled disc at
+// the link midpoint, same colour as the rope. Direction is already in the
+// curve (left → right). Computed analytically per shape, never via
+// getPointAtLength — that would force a layout flush per wire on every drag.
 function wfLinkMid(a,b){
   if(wfLinkMode==="linear"){
     const s=wfStub(a,b), p={x:a.x+s,y:a.y}, q={x:b.x-s,y:b.y};
@@ -163,7 +176,7 @@ function wfLinkMid(a,b){
     if(Math.abs(dy)<1) return { x:(a.x+b.x)/2, y:a.y, ang:b.x>=a.x?0:Math.PI };
     return { x:mx, y:(a.y+b.y)/2, ang:dy>0?Math.PI/2:-Math.PI/2 };
   }
-  const off=wfSplineOff(a,b), lift=wfSplineLift(b.x-a.x, b.y-a.y);
+  const off=wfSplineOffCached(a,b), lift=wfSplineLift(b.x-a.x, b.y-a.y);
   const c1={x:a.x+off,y:a.y-lift}, c2={x:b.x-off,y:b.y-lift};
   return {                                   // B(½) and B′(½) of the cubic
     x:(a.x+3*c1.x+3*c2.x+b.x)/8,
@@ -178,7 +191,7 @@ function wfLinkMid(a,b){
 // canvas is visible again.
 let wfWiresStale=false;
 const WF_NS="http://www.w3.org/2000/svg";
-const WF_FLOW_TRI="M-2.5,-2.8 L3.2,0 L-2.5,2.8 Z";
+const WF_FLOW_R=3.2;
 
 function wfDrawWires(){
   if(typeof wfMinimapQueue==="function") wfMinimapQueue();   // node moves redraw wires → keep the map live
@@ -219,17 +232,20 @@ function wfDrawWires(){
     hit.setAttribute("aria-label",`Wire ${fromLabel||"out"}; press Delete to remove`);
     const tt=document.createElementNS(WF_NS,"title");
     tt.textContent="Right-click or press Delete to remove wire"; hit.appendChild(tt);
+    const src=(g.nodes||[]).find(n=>n.id===ed.from);
+    const tone=typeof wfWireTone==="function" ? wfWireTone(ed.fromPort, toPort, src) : "";
     const p=document.createElementNS(WF_NS,"path");
-    p.setAttribute("class","wire"+(toPort==="loop"?" loopback":""));
+    p.setAttribute("class","wire"+(toPort==="loop"?" loopback":"")+(tone?" tone-"+tone:""));
     p.dataset.from=ed.from; p.dataset.fromport=ed.fromPort; p.dataset.to=ed.to;
     p.setAttribute("d",d);
     const m=wfLinkMid(a,b);
-    const tri=document.createElementNS(WF_NS,"path");
-    tri.setAttribute("class","wire-flow"+(toPort==="loop"?" loopback":""));
-    tri.dataset.fromport=ed.fromPort;
-    tri.setAttribute("d",WF_FLOW_TRI);
-    tri.setAttribute("transform",`translate(${m.x.toFixed(1)},${m.y.toFixed(1)}) rotate(${(m.ang*180/Math.PI).toFixed(1)})`);
-    grp.appendChild(hit); grp.appendChild(p); grp.appendChild(tri);
+    const dot=document.createElementNS(WF_NS,"circle");
+    dot.setAttribute("class","wire-flow"+(toPort==="loop"?" loopback":"")+(tone?" tone-"+tone:""));
+    dot.dataset.fromport=ed.fromPort;
+    dot.setAttribute("cx", m.x.toFixed(1));
+    dot.setAttribute("cy", m.y.toFixed(1));
+    dot.setAttribute("r", String(WF_FLOW_R));
+    grp.appendChild(hit); grp.appendChild(p); grp.appendChild(dot);
     frag.appendChild(grp);
   });
   svg.appendChild(frag);

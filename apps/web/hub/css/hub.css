@@ -2,88 +2,78 @@
    Loaded after ../shared/base.css (shared primitives + tokens). Only
    hub-specific layout, table, tool-launcher and Auto Click rules live here. */
 
-/* ── Layout — rail beside the workspace ─────────────────────────────────────
-   The shell is a row: a fixed navigation rail, then whichever workspace the
-   rail points at. Views no longer carry their own way out. */
+/* ── Layout — tab bar above the workspace ───────────────────────────────────
+   The shell is a column: a tab bar, then whichever workspace it points at.
+   Three destinations do not justify a 72px side rail, and the workspaces below
+   (a wide table, a two-pane editor) spend every pixel of width they are given.
+   Views still carry no way out of their own — the tabs are always there. */
 #app {
   flex: 1;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   overflow: hidden;
   min-height: 0;
 }
+.topnav {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  height: 44px;
+  padding: 0 10px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.topnav-brand {
+  width: 26px; height: 26px; flex-shrink: 0; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ink); color: var(--panel);
+}
+.topnav-brand svg { width:14px; height:14px; fill:none; stroke:currentColor;
+  stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.topnav-tabs { display:flex; align-items:stretch; height:100%; min-width:0; }
+.topnav-tab {
+  position: relative; display: flex; align-items: center; gap: 7px;
+  padding: 0 13px; color: var(--muted);
+  font-size: var(--t-ui); font-weight: 600; white-space: nowrap;
+  transition: color .12s, background .12s;
+}
+.topnav-tab svg { width:16px; height:16px; fill:none; stroke:currentColor;
+  stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+.topnav-tab:hover { color: var(--ink2); background: var(--alt); }
+.topnav-tab.on { color: var(--accent); }
+/* The accent underline — the tab bar's one unambiguous "you are here" mark. */
+.topnav-tab.on::after {
+  content: ''; position: absolute; left: 9px; right: 9px; bottom: 0; height: 2px;
+  border-radius: 2px 2px 0 0; background: var(--accent);
+}
+.topnav-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.topnav-sp { flex: 1; min-width: var(--s3); }
 .shell-main {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px 10px 5px;
+  padding: 8px 10px 5px;
   overflow: hidden;
   min-height: 0;
 }
 .tool-view { flex:1; min-height:0; display:none; flex-direction:column; gap:7px; overflow:hidden; }
 .tool-view.active { display:flex; }
-/* The theme toggle borrows .theme-btn for its sun/moon swap but wears the
-   rail's icon size, not the button's. */
-.rail-item.theme-btn svg { width:20px; height:20px; stroke-width:1.6; }
-
-/* ── Header ─────────────────────────────────────────────────────────────── */
-#header {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  padding: 10px 14px;
-  flex-shrink: 0;
-}
-.hdr-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex: 1;
-}
-.brand-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  background: var(--ink);
-  border: 1px solid var(--ink);
-  color: var(--panel);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.brand-mark svg { width:16px; height:16px; stroke-width:1.8; }
-.brand-text { min-width: 0; }
-.app-title {
-  font-size: var(--t-head);
-  font-weight: 700;
-  color: var(--ink);
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-}
-.app-sub {
-  font-size: var(--t-caption);
-  color: var(--muted);
-  margin-top: 1px;
-}
-.hdr-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  flex-shrink: 0;
-}
+@media (max-width: 720px) { .topnav-lbl { display:none; } .topnav-tab { padding:0 11px; } }
 
 /* ── Toolbar ────────────────────────────────────────────────────────────── */
+/* One row: find a workflow, see how many there are, act on the list. */
 #toolbar {
   display: flex;
   align-items: center;
-  gap: var(--s4);
-  padding: 8px 12px;
+  gap: var(--s3);
+  padding: 8px 10px;
   flex-shrink: 0;
 }
+#toolbar .btn { flex-shrink: 0; }
+#btn-refresh { margin-left: var(--s2); }
 .search-wrap {
   flex: 1;
   position: relative;
@@ -190,9 +180,8 @@
   }
   .row-actions .btn.sm:not(.ico) svg { width:14px; height:14px; stroke-width:2; }
   #footer .foot-hint { display: none; }
-  #header { padding: 9px 11px; gap: 8px; }
-  .app-sub { display: none; }
-  #btn-new { padding: 0 10px; }
+  #btn-new { padding: 0 10px; font-size: 0; gap: 0; }
+  #btn-new svg { width: 15px; height: 15px; }
 }
 
 .wf-name {
@@ -330,9 +319,6 @@
 }
 
 /* ── Suite tool launcher ───────────────────────────────────────────────── */
-.suite-header, .clicker-header { display:flex; align-items:center; gap:var(--s3); padding:11px 13px; flex-shrink:0; }
-.suite-badge { padding:3px 7px; border-radius:4px; border:1px solid var(--border2);
-  background:var(--surface); color:var(--muted); font-family:var(--mono); font-size:var(--t-micro); font-weight:700; letter-spacing:.06em; }
 .tool-picker { flex:1; min-height:0; display:flex; flex-direction:column; justify-content:center; padding:28px 24px; }
 .tool-picker-intro { padding:0 0 20px; border-bottom:1px solid var(--border2); }
 .tool-picker-intro h2 { font-size:var(--t-display); line-height:1.2; font-weight:700; letter-spacing:-.02em; color:var(--ink); }
@@ -395,33 +381,80 @@
 @keyframes updSweep { 0% { transform:translateX(-100%) } 100% { transform:translateX(286%) } }
 .tool-back { flex-shrink:0; }
 
-/* ── Auto Click ────────────────────────────────────────────────────────── */
-.clicker-mark { border-color:var(--ink); background:var(--ink); color:var(--panel); }
-.clicker-mark svg { fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; }
-.run-state { display:flex; align-items:center; gap:6px; min-width:82px; height:26px; justify-content:center;
-  border:1px solid var(--border); border-radius:4px; background:var(--surface); color:var(--dim); font-size:var(--t-micro); font-weight:700; }
+/* ── Auto Click ────────────────────────────────────────────
+   Settings stack down a fixed left column, the sequence takes the rest, and the
+   run controls sit across the bottom. Only the point list scrolls: everything
+   else is sized to fit, so the window never grows a scrollbar of its own. */
+.ac-body { flex:1; min-height:0; display:grid; grid-template-columns:288px minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr); gap:7px; }
+.ac-side { min-width:0; display:flex; flex-direction:column; gap:7px; overflow-y:auto; }
+.ac-panel { min-width:0; flex-shrink:0; display:flex; flex-direction:column; gap:9px;
+  padding:10px 12px; border:1px solid var(--border); }
+.ac-panel > h2 { font-size:var(--t-micro); font-weight:800; letter-spacing:.05em;
+  text-transform:uppercase; color:var(--ink2); }
+.ac-name { display:flex; align-items:center; gap:6px; min-width:0; }
+#ac-profile-name { width:100%; height:30px; font-weight:600; }
+.ac-dirty { flex-shrink:0; padding:3px 6px; border-radius:999px; background:var(--warn-bg); color:var(--warn); font-size:var(--t-micro); font-weight:700; }
+#ac-profile-select { width:100%; min-width:0; height:30px; }
+.ac-file-row { display:flex; gap:5px; }
+.ac-file-row .btn { height:30px; }
+.ac-file-row .btn:not(.ico) { flex:1; min-width:0; }
+
+/* Sequence pane — header, then the list, which takes the height that is left. */
+.ac-seq { min-width:0; display:flex; flex-direction:column; padding:9px 11px 10px; }
+.ac-pane-hd { display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-shrink:0; }
+.ac-pane-hd h2 { font-size:var(--t-micro); font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--ink2); }
+.ac-pane-hd > span:not(.ac-pane-sp) { font-size:var(--t-micro); color:var(--muted); }
+.ac-pane-sp { flex:1; }
+.ac-pane-hd .btn { height:28px; }
+.point-list { flex:1; min-height:0; display:flex; flex-direction:column; gap:4px; overflow-y:auto; padding-right:2px; scroll-behavior:smooth; }
+
+/* Status strip — state, what that means, and the live counters. One line. */
+.ac-strip { display:flex; align-items:center; gap:10px; padding:7px 11px; flex-shrink:0; min-width:0; }
+.ac-strip > small { font-size:var(--t-caption); color:var(--dim); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ac-strip-sp { flex:1; min-width:var(--s2); }
+.run-state { display:inline-flex; align-items:center; gap:6px; min-width:82px; height:24px; padding:0 9px; justify-content:center; flex-shrink:0;
+  border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--dim); font-size:var(--t-micro); font-weight:700; }
 .run-dot { width:7px; height:7px; border-radius:50%; background:var(--muted); }
-.run-state.running { border-color:var(--border); background:var(--ok-bg); color:var(--ok); }
-.run-state.running .run-dot { background:var(--ok); box-shadow:none; }
-.run-state.error { border-color:var(--border); background:var(--err-bg); color:var(--err); }
+.run-state.running { background:var(--ok-bg); color:var(--ok); }
+.run-state.running .run-dot { background:var(--ok); }
+.run-state.error { background:var(--err-bg); color:var(--err); }
 .run-state.error .run-dot { background:var(--err); }
-.clicker-main { flex:1; min-height:0; display:flex; flex-direction:column; gap:7px; overflow-y:auto; }
-.clicker-status { display:flex; align-items:center; gap:12px; padding:11px 13px; flex-shrink:0; }
-.clicker-status > div:first-child { flex:1; min-width:0; display:grid; grid-template-columns:auto 1fr; align-items:baseline; column-gap:8px; }
-.status-label { grid-column:1; font-size:var(--t-micro); font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
-#ac-status { grid-column:2; font-size:var(--t-body); color:var(--ink); }
-#ac-status-detail { grid-column:1 / -1; margin-top:3px; font-size:var(--t-micro); line-height:1.35; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.status-data { display:flex; align-items:center; flex-shrink:0; }
-.status-data span { min-width:64px; padding:0 10px; display:flex; flex-direction:column; align-items:flex-end; border-left:1px solid var(--line); }
-.status-data b { font-family:var(--mono); font-size:var(--t-ui); color:var(--ink2); font-variant-numeric:tabular-nums; }
-.status-data small { margin-top:2px; font-size:var(--t-micro); color:var(--muted); }
-.clicker-form { flex-shrink:0; padding:0 13px; }
-.setting-group { border:0; min-width:0; padding:12px 0; border-bottom:1px solid var(--line); }
-.setting-group:last-child { border-bottom:none; }
-.setting-group legend { float:left; width:100%; margin-bottom:8px; font-size:var(--t-micro); font-weight:800;
-  letter-spacing:.05em; text-transform:uppercase; color:var(--ink2); }
-.setting-group legend + * { clear:both; }
-.setting-hint { margin-top:7px; font-size:var(--t-micro); line-height:1.4; color:var(--muted); }
+.ac-stats { display:flex; align-items:center; flex-shrink:0; }
+.ac-stats span { min-width:58px; padding:0 9px; display:flex; flex-direction:column; align-items:flex-end; border-left:1px solid var(--line); }
+.ac-stats b { font-family:var(--mono); font-size:var(--t-ui); color:var(--ink2); font-variant-numeric:tabular-nums; }
+.ac-stats small { margin-top:2px; font-size:var(--t-micro); color:var(--muted); }
+
+/* Start / Stop — a pair, so the live one is obvious without reading a label.
+   F6 drives both, which is why both carry the same chip. */
+.ac-run-row { display:grid; grid-template-columns:1fr 1fr; gap:7px; flex-shrink:0; }
+.ac-btn-run, .ac-btn-stop {
+  height:46px; display:flex; align-items:center; justify-content:center; gap:9px;
+  border-radius:var(--r-md); border:1px solid transparent; font-size:var(--t-title);
+  transition:background .15s, border-color .15s, opacity .15s, transform .1s;
+}
+.ac-btn-run b, .ac-btn-stop b { font-size:var(--t-title); font-weight:700; letter-spacing:-.01em; }
+.ac-btn-run svg, .ac-btn-stop svg { width:17px; height:17px; fill:currentColor; stroke:none; }
+.ac-btn-run  { background:var(--ok);  border-color:var(--ok);  color:var(--on-ok); }
+.ac-btn-stop { background:var(--err); border-color:var(--err); color:var(--on-err, #fff); }
+.ac-btn-run:hover:not(:disabled)  { background:var(--ok-hover);  border-color:var(--ok-hover); }
+.ac-btn-stop:hover:not(:disabled) { background:var(--err-hover); border-color:var(--err-hover); }
+.ac-btn-run:active:not(:disabled), .ac-btn-stop:active:not(:disabled) { transform:translateY(.5px); }
+.ac-btn-run:focus-visible, .ac-btn-stop:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+/* Disabled reads as "not this one, the other one" — drained, not greyed out, so
+   the pair still reads as one control. */
+.ac-btn-run:disabled, .ac-btn-stop:disabled {
+  background:var(--surface); border-color:var(--border); color:var(--muted); cursor:default; }
+.ac-btn-run kbd, .ac-btn-stop kbd { background:color-mix(in srgb, currentColor 16%, transparent);
+  border-color:color-mix(in srgb, currentColor 32%, transparent);
+  border-bottom-color:color-mix(in srgb, currentColor 38%, transparent); color:currentColor; box-shadow:none; }
+.hotkey-note { display:flex; align-items:center; justify-content:center; gap:6px; padding:1px 4px; font-size:var(--t-micro); color:var(--muted); flex-shrink:0; }
+.hotkey-dot { width:6px; height:6px; border-radius:50%; background:var(--warn); }
+.hotkey-note.ok .hotkey-dot { background:var(--ok); }
+.hotkey-note.bad { color:var(--err); }
+.hotkey-note.bad .hotkey-dot { background:var(--err); }
+
+/* Schedule fields */
 .seg-control { display:flex; min-width:0; padding:2px; border:1px solid var(--border2); border-radius:8px; background:var(--alt); }
 .seg { flex:1; min-width:0; height:27px; padding:0 8px; border-radius:6px; color:var(--dim); font-size:var(--t-micro); font-weight:600;
   transition:background .12s, color .12s, box-shadow .12s; }
@@ -429,57 +462,18 @@
 .seg.on { background:var(--panel); color:var(--accent); box-shadow:var(--sh-sm); }
 .seg:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 .seg:disabled { opacity:.45; cursor:not-allowed; }
+.numeric-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
 .numeric-grid label, #ac-count-wrap { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .numeric-grid label > span:first-child, #ac-count-wrap > span { font-size:var(--t-micro); font-weight:600; color:var(--dim); }
 .numeric-grid input, #ac-limit { width:100%; height:30px; font-family:var(--mono); font-size:var(--t-ui); font-variant-numeric:tabular-nums; }
-.setting-row.split { display:grid; grid-template-columns:1.15fr 1fr; gap:10px; }
-.setting-row.split > div { min-width:0; }
-.numeric-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .input-unit { display:flex; align-items:center; position:relative; }
 .input-unit input { padding-right:32px; }
 .input-unit i { position:absolute; right:9px; font-style:normal; font-family:var(--mono); font-size:var(--t-micro); color:var(--muted); pointer-events:none; }
-.count-row { display:grid; grid-template-columns:1.5fr .65fr; align-items:end; gap:10px; margin-top:10px; }
 #ac-count-wrap input:disabled { background:var(--alt); color:var(--muted); }
-.clicker-run { position:sticky; bottom:0; z-index:2; width:100%; min-height:52px; display:flex; align-items:center; gap:10px; padding:8px 11px; flex-shrink:0;
-  border:1px solid var(--ok); border-radius:var(--r-md); background:var(--ok); color:var(--on-ok); text-align:left;
-  transition:background .15s, border-color .15s, transform .1s; }
-.clicker-run:hover { background:var(--ok-hover); border-color:var(--ok-hover); }
-.clicker-run:active { transform:translateY(.5px); }
-.clicker-run:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-.clicker-run .run-icon { width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:var(--r-sm); background:color-mix(in srgb, var(--on-ok) 16%, transparent); }
-.clicker-run .run-icon svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-.clicker-run > span:nth-child(2) { display:flex; flex:1; min-width:0; flex-direction:column; gap:3px; }
-.clicker-run b { font-size:var(--t-ui); }
-.clicker-run small { font-size:var(--t-micro); font-weight:500; color:color-mix(in srgb, var(--on-ok) 82%, transparent); }
-.clicker-run kbd { background:color-mix(in srgb, var(--on-ok) 16%, transparent); border-color:color-mix(in srgb, var(--on-ok) 32%, transparent); border-bottom-color:color-mix(in srgb, var(--on-ok) 38%, transparent); color:var(--on-ok); box-shadow:none; }
-.clicker-run.running { background:var(--err); border-color:var(--err); }
-.clicker-run.running:hover { background:var(--err-hover); border-color:var(--err-hover); }
-.hotkey-note { display:flex; align-items:center; justify-content:center; gap:6px; padding:2px 4px; font-size:var(--t-micro); color:var(--muted); }
-.hotkey-dot { width:6px; height:6px; border-radius:50%; background:var(--warn); }
-.hotkey-note.ok .hotkey-dot { background:var(--ok); }
-.hotkey-note.bad { color:var(--err); }
-.hotkey-note.bad .hotkey-dot { background:var(--err); }
 
-/* Auto Click sequence files and point editor */
-.ac-filebar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 10px; padding:10px 12px; flex-shrink:0; }
-.ac-file-main { min-width:0; }
-.ac-file-main > label, .ac-saved-label { display:block; margin-bottom:4px; font-size:var(--t-micro); font-weight:700; color:var(--dim); }
-.ac-name-line { display:flex; align-items:center; gap:6px; }
-#ac-profile-name { width:100%; height:30px; font-weight:600; }
-.ac-dirty { flex-shrink:0; padding:3px 6px; border-radius:999px; background:var(--warn-bg); color:var(--warn); font-size:var(--t-micro); font-weight:700; }
-.ac-file-actions { display:flex; align-items:end; gap:5px; }
-.ac-file-actions .btn { height:30px; }
-.ac-saved-label { grid-column:1 / -1; margin:0 0 -4px; }
-#ac-profile-select { min-width:0; width:100%; height:30px; }
-.ac-file-path { align-self:center; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:rtl; text-align:left; font-family:var(--mono); font-size:var(--t-micro); color:var(--muted); user-select:text; }
-.sequence-group { padding-top:10px; }
-.sequence-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
-.sequence-heading > div { display:flex; align-items:baseline; gap:7px; }
-.sequence-heading legend { float:none; width:auto; margin:0; }
-.sequence-heading span { font-size:var(--t-micro); color:var(--muted); }
-.sequence-heading .btn { height:28px; }
-/* Compact summary rows — one line per point; editing happens in the panel below. */
-.point-list { display:flex; flex-direction:column; gap:4px; max-height:186px; overflow-y:auto; padding-right:2px; scroll-behavior:smooth; }
+/* Compact summary rows — one line per point; editing happens in the side panel.
+   The list's own box is set above (it takes the height the pane has left over);
+   it used to be capped at 186px because the editor sat underneath it. */
 .point-row { display:grid; grid-template-columns:auto auto minmax(0,1fr) auto auto; align-items:center; gap:9px; padding:6px 9px; cursor:pointer;
   border:1px solid var(--border); border-radius:8px; background:var(--surface); transition:border-color .15s,background .15s,box-shadow .15s,opacity .15s; }
 .point-row:hover { border-color:var(--border2); background:var(--panel); }
@@ -510,8 +504,7 @@
 .point-delete svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 
 /* Detail editor for the selected point */
-.point-editor { margin-top:9px; padding:11px 12px; display:flex; flex-direction:column; gap:9px;
-  border:1px solid var(--border2); border-radius:9px; background:var(--panel); box-shadow:var(--sh-sm); }
+.point-editor { min-width:0; flex-shrink:0; padding:10px 12px; display:flex; flex-direction:column; gap:9px; }
 .point-editor[hidden] { display:none; }
 .pe-head { display:flex; align-items:center; gap:7px; }
 .pe-badge { width:18px; height:18px; display:flex; align-items:center; justify-content:center; border-radius:5px; background:var(--accent); color:var(--on-accent); font-family:var(--mono); font-size:var(--t-micro); font-weight:700; }
@@ -527,18 +520,34 @@
 .pe-click { grid-template-columns:1fr 1fr; }
 .pe-capture { height:30px; display:flex; align-items:center; gap:5px; padding:0 11px; white-space:nowrap;
   border:1px solid var(--border2); border-radius:var(--r-sm); background:var(--surface); color:var(--dim); font-size:var(--t-micro); font-weight:600; }
-.pe-capture:hover { border-color:var(--border2); background:var(--accent-bg); color:var(--accent); }
+.pe-capture:hover:not(:disabled) { border-color:var(--border2); background:var(--accent-bg); color:var(--accent); }
+/* It is a button, so a run disables it along with the rest of the form — but it
+   is not a .btn, so it had no disabled look and read as still clickable. */
+.pe-capture:disabled { opacity:.5; cursor:not-allowed; background:var(--alt); color:var(--muted); }
 .pe-capture svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
 .pe-hint { font-size:var(--t-micro); line-height:1.4; color:var(--muted); padding:1px 2px; }
-.points-empty { padding:18px 10px; display:flex; flex-direction:column; align-items:center; gap:4px; border:1px dashed var(--border2); border-radius:8px; color:var(--dim); }
+/* With no points the list contributes nothing, so the placeholder takes the
+   pane instead of being pushed under a flex:1 box that has nothing in it. */
+#ac-points:empty { flex:0 0 auto; }
+.points-empty { flex:1; min-height:110px; padding:18px 10px; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:4px; border:1px dashed var(--border2); border-radius:8px; color:var(--dim); }
 .points-empty[hidden] { display:none; }
 .points-empty b { font-size:var(--t-caption); }
 .points-empty span { font-size:var(--t-micro); color:var(--muted); }
 
+/* Narrow window: the settings column stops paying for itself and goes back above
+   the list, with the whole body scrolling instead of just the list. */
+@media (max-width:900px) {
+  .ac-body { grid-template-columns:minmax(0,1fr); grid-template-rows:none; grid-auto-rows:min-content; overflow-y:auto; }
+  .ac-side { overflow:visible; }
+  /* The list is what this view is for — it leads, and the settings follow it,
+     instead of pushing it off the bottom of a stacked column. */
+  .ac-seq { order:-1; min-height:240px; }
+  .ac-stats span:nth-child(3) { display:none; }
+}
 @media (max-width:560px) {
   .tool-picker { padding:16px 12px; }
   .tool-meta { display:none; }
   .tool-row { min-height:82px; padding-inline:6px; }
-  .setting-row.split { grid-template-columns:1fr; }
-  .clicker-main { gap:6px; }
+  .ac-strip > small { display:none; }
 }

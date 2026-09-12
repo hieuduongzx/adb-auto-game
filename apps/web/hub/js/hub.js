@@ -463,10 +463,10 @@ async function createWorkflow() {
 // ── Tool navigation ─────────────────────────────────────────────────────────
 async function openTool(name) {
   document.querySelectorAll(".tool-view").forEach((view) => view.classList.toggle("active", view.id === (name === "workflow" ? "workflow-app" : name === "autoclick" ? "autoclick-app" : "tool-home")));
-  // The rail is the only "you are here" marker now, so it has to stay honest
-  // whichever route got us here — a rail click, a tool card, or a deep link.
-  document.querySelectorAll("[data-rail]").forEach((b) => {
-    const on = b.dataset.rail === name;
+  // The top tabs are the only "you are here" marker, so they have to stay honest
+  // whichever route got us here — a tab click, a tool card, or a deep link.
+  document.querySelectorAll("[data-nav]").forEach((b) => {
+    const on = b.dataset.nav === name;
     b.classList.toggle("on", on);
     on ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current");
   });
@@ -598,14 +598,14 @@ function queueAutoClickConfigure(){
 function formatElapsed(seconds){ seconds=Math.max(0,Math.floor(seconds||0)); const h=Math.floor(seconds/3600),m=Math.floor((seconds%3600)/60),s=seconds%60; return h?`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`:`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`; }
 function renderAutoClick(){
   const running=!!AC_STATE.running, status=AC_STATE.error?"Error":(AC_STATE.status||(running?"Clicking":"Ready"));
-  $("ac-status").textContent=status; $("ac-count").textContent=String(AC_STATE.count||0); $("ac-cycles").textContent=String(AC_STATE.cycles||0);
+  $("ac-count").textContent=String(AC_STATE.count||0); $("ac-cycles").textContent=String(AC_STATE.cycles||0);
   const enabled=(AC_CONFIG.points||[]).filter(p=>p.enabled).length;
   $("ac-status-detail").textContent=AC_STATE.error?AC_STATE.error:running?`Running ${enabled} point${enabled===1?"":"s"} in sequence.`:status==="Completed"?`Completed ${AC_STATE.cycles||0} cycles.`:`${enabled} enabled point${enabled===1?"":"s"} ready.`;
-  const header=$("ac-header-state"); header.className="run-state "+(AC_STATE.error?"error":running?"running":"ready"); header.querySelector("span:last-child").textContent=running?"Running":AC_STATE.error?"Error":"Ready";
-  const run=$("ac-run"); run.classList.toggle("running",running);
-  run.querySelector(".run-icon").innerHTML=running?'<svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>':'<svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>';
-  run.querySelector("b").textContent=running?"Stop Auto Click":"Start Sequence";
-  run.querySelector("small").textContent=running?"Stops after the current action":"Runs enabled points from top to bottom";
+  // The pill is the only place the run state is spelled out; the Start/Stop pair
+  // says the same thing by which of the two is live.
+  const header=$("ac-header-state"); header.className="run-state "+(AC_STATE.error?"error":running?"running":"ready");
+  header.querySelector("span:last-child").textContent=running?"Running":AC_STATE.error?"Error":status;
+  $("ac-run").disabled=running; $("ac-stop").disabled=!running;
   $("ac-form").querySelectorAll("input,select,.seg,button").forEach(el=>{el.disabled=running;});
   $("ac-profile-name").disabled=running; $("ac-profile-select").disabled=running; $("ac-new").disabled=running; $("ac-save").disabled=running;
   if(!running){const rows=[...document.querySelectorAll(".point-row")];if(rows.length){const up=rows[0].querySelector('[data-point-act="up"]'),down=rows[rows.length-1].querySelector('[data-point-act="down"]');if(up)up.disabled=true;if(down)down.disabled=true;}}
@@ -615,7 +615,8 @@ function renderAutoClick(){
   if(!_acElapsedTimer)_acElapsedTimer=setInterval(()=>{const elapsed=AC_STATE.running&&AC_STATE.startedAt?Date.now()/1000-AC_STATE.startedAt:(AC_STATE.elapsed||0); const out=$("ac-elapsed");if(out)out.textContent=formatElapsed(elapsed);},250);
 }
 async function refreshAutoClickProfiles(selectFile=""){
-  try{const res=await api().autoclick_list_profiles(); if(!res||!res.ok)return; AC_PROFILES=res.profiles||[]; AC_DIR=res.dir||"autoclicks"; $("ac-file-path").textContent=AC_DIR;
+  try{const res=await api().autoclick_list_profiles(); if(!res||!res.ok)return; AC_PROFILES=res.profiles||[]; AC_DIR=res.dir||"autoclicks";
+    const folder=$("ac-folder"); if(folder) folder.title="Open sequence folder — "+AC_DIR;
     const select=$("ac-profile-select"); select.innerHTML='<option value="">Open a saved sequence…</option>'+AC_PROFILES.map(p=>`<option value="${escHtml(p.filename)}" ${p.filename===(selectFile||AC_CURRENT_FILE)?"selected":""}>${escHtml(p.name)}${p.invalid?" · invalid":` · ${p.points} points`}</option>`).join("");
   }catch{}
 }
@@ -639,9 +640,9 @@ async function loadAutoClickSequence(filename){
   AC_CURRENT_FILE=res.filename; AC_STATE={...AC_STATE,count:0,cycles:0,status:"Ready",error:"",elapsed:0,startedAt:0}; applyAutoClickConfig(res.config,true); renderAutoClick(); toast(`Opened ${res.filename}`,"success");
 }
 async function toggleAutoClick(){
-  const a=api();if(!a)return;const run=$("ac-run");run.disabled=true;
+  const a=api();if(!a)return;$("ac-run").disabled=true;$("ac-stop").disabled=true;
   try{let res;if(AC_STATE.running)res=await a.autoclick_stop();else{if(!$("ac-form").reportValidity())return;AC_CONFIG=readAutoClickConfig();if(!AC_CONFIG.points.some(p=>p.enabled)){toast("Add or enable at least one click point.","error");return;}res=await a.autoclick_start(AC_CONFIG);} if(!res||res.ok===false)toast((res&&res.error)||"Auto Click could not start.","error");else{AC_STATE={...AC_STATE,...res};if(res.config)applyAutoClickConfig(res.config);renderAutoClick();}}
-  catch(error){toast("Auto Click could not update. "+String(error&&error.message||error),"error");}finally{run.disabled=false;}
+  catch(error){toast("Auto Click could not update. "+String(error&&error.message||error),"error");}finally{renderAutoClick();}
 }
 async function captureAutoClickPosition(pointId=AC_CONFIG.selectedPointId){
   try{clearTimeout(_acConfigureTimer);AC_CONFIG=readAutoClickConfig();await api().autoclick_configure(AC_CONFIG);const res=await api().autoclick_capture_position(pointId);if(!res||!res.ok){toast((res&&res.error)||"Could not read cursor position.","error");return;}const point=AC_CONFIG.points.find(p=>p.id===res.pointId);if(point){point.x=res.x;point.y=res.y;}renderPoints();setAutoClickDirty(true);toast(`Captured (${res.x}, ${res.y})`,"success");}catch{toast("Could not read cursor position.","error");}
@@ -657,7 +658,7 @@ function acceptAddedPoint(point){
   toast(`Added ${point.label} at (${point.x}, ${point.y})`,"success");
 }
 function updateHotkeyState(ok){AC_STATE.hotkeys=!!ok;const note=$("ac-hotkey-note");if(!note)return;note.className="hotkey-note "+(ok?"ok":"bad");note.innerHTML=`<span class="hotkey-dot"></span>${ok?"F6 Start/Stop · F7 Update selected point · F8 Add point":"Global hotkeys unavailable — use the on-screen controls"}`;}
-window.__autoClickEvent=(event,data)=>{data=data||{};if(event==="position"){const point=AC_CONFIG.points.find(p=>p.id===data.pointId);if(point){point.x=data.x;point.y=data.y;renderPoints();setAutoClickDirty(true);}}else if(event==="point-added"){acceptAddedPoint(data.point);}else if(event==="tick"){AC_STATE={...AC_STATE,count:data.count||0,cycles:data.cycles||0,activePointId:data.pointId||""};}else if(event==="hotkeys")updateHotkeyState(!!data.ok);else if(event==="state"){AC_STATE={...AC_STATE,...data};if(data.config)applyAutoClickConfig(data.config);}if($("ac-status"))renderAutoClick();};
+window.__autoClickEvent=(event,data)=>{data=data||{};if(event==="position"){const point=AC_CONFIG.points.find(p=>p.id===data.pointId);if(point){point.x=data.x;point.y=data.y;renderPoints();setAutoClickDirty(true);}}else if(event==="point-added"){acceptAddedPoint(data.point);}else if(event==="tick"){AC_STATE={...AC_STATE,count:data.count||0,cycles:data.cycles||0,activePointId:data.pointId||""};}else if(event==="hotkeys")updateHotkeyState(!!data.ok);else if(event==="state"){AC_STATE={...AC_STATE,...data};if(data.config)applyAutoClickConfig(data.config);}if($("ac-status-detail"))renderAutoClick();};
 
 // ── Events ───────────────────────────────────────────────────────────────────
 function wire() {
@@ -678,6 +679,7 @@ function wire() {
   });
   $("ac-form").addEventListener("submit", (e) => e.preventDefault());
   $("ac-run").onclick = toggleAutoClick;
+  $("ac-stop").onclick = toggleAutoClick;
   $("ac-new").onclick = newAutoClickSequence;
   $("ac-save").onclick = saveAutoClickSequence;
   $("ac-folder").onclick = () => api().autoclick_open_folder();

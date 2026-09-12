@@ -792,14 +792,19 @@ function wfColorDotHtml(n,def){
   return /^#[0-9a-fA-F]{6}$/.test(v) ? `<span class="wf-node-colordot" style="background:${v}"></span>` : "";
 }
 
-// Timing badges (delayBefore / delayAfter) — floating chips anchored under the
-// block's bottom-left corner (absolute), so a delay never stretches the
-// standardized card. Shared by wfNodeEl and the inspector's live update.
-// data-phase lets the runtime countdown highlight/update the active wait chip.
+// Timing ticks (delayBefore / delayAfter) — a signed duration under the card
+// so a wait never stretches the standardized block. Shared by wfNodeEl and
+// the inspector's live update. data-phase lets the runtime countdown highlight
+// the active wait. Copy is "−1.5s" / "+0.5s" — the sign is the phase.
+function wfDelaySecs(n){
+  const v=parseFloat(n); if(!v) return "0s";
+  const s=Number.isInteger(v)?String(v):String(v);
+  return s+"s";
+}
 function wfDelayChipsHtml(n){
   const dp=[];
-  if(n.delayBefore) dp.push(`<span class="wf-delay-chip" data-phase="before" data-secs="${n.delayBefore}">${wfIco("clock")}<span class="wf-delay-label">Before ${n.delayBefore}s</span></span>`);
-  if(n.delayAfter)  dp.push(`<span class="wf-delay-chip" data-phase="after" data-secs="${n.delayAfter}">${wfIco("timer")}<span class="wf-delay-label">After ${n.delayAfter}s</span></span>`);
+  if(n.delayBefore) dp.push(`<span class="wf-delay-chip" data-phase="before" data-secs="${n.delayBefore}" title="Wait ${wfDelaySecs(n.delayBefore)} before this block"><span class="wf-delay-label">−${wfDelaySecs(n.delayBefore)}</span></span>`);
+  if(n.delayAfter)  dp.push(`<span class="wf-delay-chip" data-phase="after" data-secs="${n.delayAfter}" title="Wait ${wfDelaySecs(n.delayAfter)} after this block"><span class="wf-delay-label">+${wfDelaySecs(n.delayAfter)}</span></span>`);
   return dp.length ? `<div class="wf-node-delay">${dp.join("")}</div>` : "";
 }
 // Card geometry, mirroring css/base.css (--node-h, --term-size, --port-sz).
@@ -807,17 +812,34 @@ function wfDelayChipsHtml(n){
 // is dynamic (switch cases, try arms, parallel lanes) — keep the two sides in
 // step when either moves.
 const WF_CARD_H=70, WF_TERM_H=40, WF_NEXT_H=44, WF_PORT_SZ=9, WF_PORT_GAP=18;
+const WF_PORT_INSET=6;   // mirrors --port-inset in css/base.css
 const WF_ROW_TOP=Math.round((WF_CARD_H-WF_PORT_SZ)/2);   // primary in/out row
 // Which colour a link is — the ONE place that decides it, for the dot at each
 // end as much as for the path between them. Returns the tone class wf.css uses
 // on .wf-port (and that #wf-wires already paints the path with), so a joint is
 // never a different colour from its own wire.
-function wfWireTone(fromPort, toPort){
+// Room a slot label needs: past the dot, plus the text itself. The label is 9px
+// bold in the UI sans — ~5.9px a character is close enough for a gutter, and it
+// only ever errs by a pixel or two on the longest word a port label can be.
+function wfSlotGutter(text){
+  return Math.ceil(WF_PORT_INSET + WF_PORT_SZ + 4 + text.length*5.9 + 3);
+}
+function wfWireTone(fromPort, toPort, fromNode){
   if(toPort==="loop") return "loop";
   if(fromPort==="true") return "t";
   if(fromPort==="false") return "f";
-  if(fromPort==="default" || /^c\d+$/.test(fromPort||"")) return "sw";
-  return "";
+  if(fromPort==="body") return "body";
+  if(fromPort==="done") return "done";
+  if(fromPort==="found") return "found";
+  if(fromPort==="fail") return "fail";
+  if(fromPort==="default") return "sw";
+  if(/^c\d+$/.test(fromPort||"")) return "lane"+((parseInt(fromPort.slice(1),10)%6)+1);
+  if(/^\d+$/.test(fromPort||"")) return "lane"+((parseInt(fromPort,10)-1)%6+1);
+  const def=fromNode && WF_NODES[fromNode.type];
+  if(!def) return "";
+  if(def.kind==="start") return "start";
+  if(def.kind==="end" || def.kind==="stop") return "end";
+  return def.cat||"";
 }
 function wfNodeEl(n){
   const def=WF_NODES[n.type]||{label:n.type,ico:"help",kind:"action",outs:["out"],fields:[]};
@@ -936,6 +958,7 @@ function wfNodeEl(n){
   // loop's in/loop pair stacks from that row downward.
   const nIns = wfIns(n.type).length;
   const inTop = i => rowTop + (nIns>1 ? i*WF_PORT_GAP : 0);
+  let widestOut="", widestIn="";       // longest slot label per side, for the gutter
   // A labelled slot column needs room: the body text stops short of it.
   el.classList.toggle("slots-out", outs.length>1);
   el.classList.toggle("slots-in",  nIns>1);
@@ -959,13 +982,16 @@ function wfNodeEl(n){
       const ip=document.createElement("span");
       // Color the destination input to match the source port's semantic colour.
       const incoming = g && (g.edges||[]).find(e=>e.to===n.id && (e.toPort||"in")===port);
+      const src = incoming && g.nodes.find(x=>x.id===incoming.from);
       const tone = port==="loop" ? "loop"
-                 : incoming ? wfWireTone(incoming.fromPort, port) : "";
+                 : incoming ? wfWireTone(incoming.fromPort, port, src) : "";
       ip.className="wf-port in"+(tone?" "+tone:"")+(incoming?" connected":"");
       ip.dataset.node=n.id; ip.dataset.port=port; ip.style.top=top+"px";
       el.appendChild(ip);
       if(ins.length>1){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl in"+(port==="loop"?" loop":"");
-        lbl.style.top=(top+0)+"px"; lbl.textContent=WF_IN_LBL[port]||port; el.appendChild(lbl); }
+        const txt=WF_IN_LBL[port]||port;
+        lbl.style.top=(top+0)+"px"; lbl.textContent=txt; el.appendChild(lbl);
+        if(txt.length>widestIn.length) widestIn=txt; }
     });
   }
   // output ports (hidden when this member feeds the next block in its stack).
@@ -975,7 +1001,7 @@ function wfNodeEl(n){
     const outgoing = g && (g.edges||[]).find(e=>e.from===n.id && e.fromPort===port);
     // Unwired branch slots still show their own hue; a wired one follows its link
     // (a back-run into a loop port turns the whole thread amber, both ends).
-    const tone = outgoing ? wfWireTone(port, outgoing.toPort||"in") : wfWireTone(port,"in");
+    const tone = outgoing ? wfWireTone(port, outgoing.toPort||"in", n) : wfWireTone(port,"in", n);
     op.className="wf-port out"+(tone?" "+tone:"")+(outgoing?" connected":"");
     op.dataset.node=n.id; op.dataset.port=port; op.style.top=top+"px";
     el.appendChild(op);
@@ -983,8 +1009,14 @@ function wfNodeEl(n){
     if(n.type==="switch") lblTxt = (port==="default") ? "else" : "#"+(i+1);
     else if(n.type==="parallel"||n.type==="random_branch"||n.type==="try_chain"||n.type==="sequence") lblTxt = port;
     else lblTxt = WF_PORT_LBL[port];
-    if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+0)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl); }
+    if(lblTxt){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl"; lbl.style.top=(top+0)+"px"; lbl.textContent=lblTxt; el.appendChild(lbl);
+      if(lblTxt.length>widestOut.length) widestOut=lblTxt; }
   });
+  // Reserve exactly the gutter this block's own labels need. A flat gutter cost
+  // the "1 2 3" blocks as much room as an "else"/"fail" one, and on a 172px card
+  // that is the difference between a readable summary and an ellipsis.
+  if(widestOut) el.style.setProperty("--slot-out", wfSlotGutter(widestOut)+"px");
+  if(widestIn)  el.style.setProperty("--slot-in",  wfSlotGutter(widestIn)+"px");
   // Validation badge (missing template / not wired in) so broken flows show before a run.
   const warns=wfNodeWarnings(n,def,wfGraph());
   if(warns.length){ el.classList.add("has-warn");

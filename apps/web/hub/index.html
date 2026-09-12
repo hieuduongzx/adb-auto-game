@@ -16,51 +16,44 @@
 <body>
 <div id="app">
 
-<!-- Rail — the suite's destinations, always on screen. It replaces the
-     "back to tools" button each view used to carry: you never navigate out of
-     somewhere to get somewhere else, you just pick the other place. -->
-<nav class="rail" aria-label="Workspaces">
-  <button class="rail-item on" type="button" data-open-tool="home" data-rail="home" aria-current="page">
-    <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M3 12h18"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-    <span class="rail-label">Home</span>
-  </button>
-  <button class="rail-item" type="button" data-open-tool="workflow" data-rail="workflow">
-    <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
-    <span class="rail-label">Workflow</span>
-  </button>
-  <button class="rail-item" type="button" data-open-tool="autoclick" data-rail="autoclick">
-    <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg>
-    <span class="rail-label">Auto Click</span>
-  </button>
-  <span class="rail-sp"></span>
-  <!-- Foot: session utilities, never destinations. -->
-  <button class="rail-item theme-btn" type="button" data-theme-toggle title="Switch between the light and dark theme">
+<!-- Top bar — the suite's destinations, always on screen. A row rather than a
+     side rail: the workspaces below want every pixel of width they can get, and
+     three destinations never needed a 72px column of their own. -->
+<header class="topnav">
+  <span class="topnav-brand" aria-hidden="true">
+    <svg class="uico" viewBox="0 0 24 24"><path d="M12 3v17a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1H3"/><path d="M16 19h6"/><path d="M19 22v-6"/></svg>
+  </span>
+  <nav class="topnav-tabs" aria-label="Workspaces">
+    <button class="topnav-tab on" type="button" data-open-tool="home" data-nav="home" aria-current="page">
+      <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M3 12h18"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+      <span class="topnav-lbl">Home</span>
+    </button>
+    <button class="topnav-tab" type="button" data-open-tool="workflow" data-nav="workflow">
+      <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+      <span class="topnav-lbl">Workflow</span>
+    </button>
+    <button class="topnav-tab" type="button" data-open-tool="autoclick" data-nav="autoclick">
+      <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg>
+      <span class="topnav-lbl">Auto Click</span>
+    </button>
+  </nav>
+  <span class="topnav-sp"></span>
+  <!-- Session utilities, never destinations. -->
+  <span class="app-ver" id="app-version"></span>
+  <button class="app-upd" id="app-update" type="button" aria-label="Update Macro2k" hidden></button>
+  <button class="btn ico theme-btn" type="button" data-theme-toggle title="Switch between the light and dark theme" aria-label="Switch theme">
     <svg class="uico ico-sun" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
     <svg class="uico ico-moon" aria-hidden="true" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
-    <span class="rail-label">Theme</span>
   </button>
-</nav>
+</header>
 
 <div class="shell-main">
 
   <!-- Tool launcher: the Hub's default view. -->
   <section id="tool-home" class="tool-view active" aria-labelledby="tools-title">
-    <header class="card suite-header">
-      <div class="hdr-brand">
-        <div class="brand-mark" aria-hidden="true">
-          <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v17a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1H3"/><path d="M16 19h6"/><path d="M19 22v-6"/></svg>
-        </div>
-        <div class="brand-text">
-          <h1 class="app-title" id="tools-title">Macro2k Hub</h1>
-          <p class="app-sub">Desktop automation workspace</p>
-        </div>
-      </div>
-      <span class="suite-badge">WORKSPACE</span>
-    </header>
-
     <main class="card tool-picker" aria-label="Available tools">
       <div class="tool-picker-intro">
-        <h2>Choose a workspace</h2>
+        <h2 id="tools-title">Choose a workspace</h2>
         <p>Build automation graphs or run precise desktop click sequences.</p>
       </div>
       <div class="tool-list">
@@ -83,27 +76,11 @@
       </div>
     </main>
 
-    <footer class="suite-footer"><span>Macro2k tool suite <span class="app-ver" id="app-version"></span> <button class="app-upd" id="app-update" type="button" aria-label="Update Macro2k" hidden></button></span><span>Windows desktop automation</span></footer>
+    <footer class="suite-footer"><span>Macro2k tool suite</span><span>Windows desktop automation</span></footer>
   </section>
 
   <!-- Existing workflow dashboard. -->
-  <section id="workflow-app" class="tool-view" aria-labelledby="workflow-title">
-    <header id="header" class="card">
-      <div class="hdr-brand">
-        <div class="brand-mark" aria-hidden="true">
-          <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v17a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1H3"/><path d="M16 19h6"/><path d="M19 22v-6"/></svg>
-        </div>
-        <div class="brand-text"><h1 class="app-title" id="workflow-title">Workflow</h1><p class="app-sub">Design · run · monitor</p></div>
-      </div>
-      <div class="hdr-actions">
-        <button class="btn ico" id="btn-refresh" title="Refresh workflows" aria-label="Refresh workflows">
-          <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-        </button>
-        <button class="btn accent" id="btn-new" title="Create a new workflow">
-          <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New workflow
-        </button>
-      </div>
-    </header>
+  <section id="workflow-app" class="tool-view" aria-label="Workflow">
 
     <div id="toolbar" class="card">
       <div class="search-wrap">
@@ -111,6 +88,12 @@
         <input type="search" id="search" placeholder="Search workflows…" autocomplete="off" spellcheck="false" aria-label="Search workflows">
       </div>
       <span id="count" class="count-label">—</span>
+      <button class="btn ico" id="btn-refresh" title="Refresh workflows" aria-label="Refresh workflows">
+        <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+      </button>
+      <button class="btn accent" id="btn-new" title="Create a new workflow">
+        <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New workflow
+      </button>
     </div>
 
     <main id="main" class="card">
@@ -129,68 +112,79 @@
     <footer id="footer"><span id="footer-path" class="foot-path" title=""></span><span class="foot-hint">Run · Edit · Delete</span></footer>
   </section>
 
-  <!-- Basic desktop auto clicker. -->
-  <section id="autoclick-app" class="tool-view" aria-labelledby="clicker-title">
-    <header class="card clicker-header">
-      <div class="hdr-brand">
-        <div class="brand-mark clicker-mark" aria-hidden="true"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></div>
-        <div class="brand-text"><h1 class="app-title" id="clicker-title">Auto Click</h1><p class="app-sub">Multi-point sequence runner</p></div>
-      </div>
-      <div class="run-state ready" id="ac-header-state"><span class="run-dot"></span><span>Ready</span></div>
-    </header>
-
-    <main class="clicker-main">
-      <section class="card clicker-status" aria-live="polite">
-        <div><span class="status-label">Status</span><strong id="ac-status">Ready</strong><small id="ac-status-detail">Build a sequence and press Start.</small></div>
-        <div class="status-data"><span><b id="ac-count">0</b><small>actions</small></span><span><b id="ac-cycles">0</b><small>cycles</small></span><span><b id="ac-elapsed">00:00</b><small>elapsed</small></span></div>
-      </section>
-
-      <section class="card ac-filebar" aria-label="Auto Click file">
-        <div class="ac-file-main">
-          <label for="ac-profile-name">Sequence name</label>
-          <div class="ac-name-line"><input id="ac-profile-name" maxlength="100" value="Untitled sequence" spellcheck="false"><span class="ac-dirty" id="ac-dirty" hidden title="Unsaved changes">Unsaved</span></div>
-        </div>
-        <div class="ac-file-actions">
-          <button class="btn" id="ac-new" type="button" title="Create a new sequence"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New</button>
-          <button class="btn accent" id="ac-save" type="button" title="Save sequence as JSON"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg>Save</button>
-          <button class="btn ico" id="ac-folder" type="button" title="Open autoclicks folder" aria-label="Open autoclicks folder"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></button>
-        </div>
-        <label class="ac-saved-label" for="ac-profile-select">Saved files</label>
-        <select id="ac-profile-select"><option value="">No saved sequences</option></select>
-        <span class="ac-file-path" id="ac-file-path">autoclicks/</span>
-      </section>
-
-      <form id="ac-form" class="card clicker-form">
-        <fieldset class="setting-group sequence-group">
-          <div class="sequence-heading">
-            <div><legend>Click sequence</legend><span id="ac-point-summary">1 point</span></div>
-            <button class="btn" type="button" id="ac-add-point" title="Add the current cursor position (F8)"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Add point <kbd>F8</kbd></button>
+  <!-- Auto Click. Settings stack on the left, the sequence fills the right, and
+       the two things you look at while it runs — the status strip and the
+       Start/Stop pair — sit across the bottom. Nothing scrolls but the list. -->
+  <section id="autoclick-app" class="tool-view" aria-label="Auto Click">
+    <!-- The form wraps both columns: renderAutoClick() disables every control
+         inside #ac-form while a run is live, and that has to include the point
+         rows and the point editor, not just the schedule. -->
+    <form id="ac-form" class="ac-body">
+      <aside class="ac-side">
+        <section class="card ac-panel" aria-labelledby="ac-h-seq">
+          <h2 id="ac-h-seq">Sequence</h2>
+          <div class="ac-name">
+            <input id="ac-profile-name" maxlength="100" value="Untitled sequence" spellcheck="false" aria-label="Sequence name">
+            <span class="ac-dirty" id="ac-dirty" hidden title="Unsaved changes">Unsaved</span>
           </div>
-          <div id="ac-points" class="point-list"></div>
-          <div id="ac-points-empty" class="points-empty" hidden><b>No click points</b><span>Add a point, or press <kbd>F8</kbd> to capture the cursor.</span></div>
-          <div id="ac-point-editor" class="point-editor" hidden></div>
-          <p class="setting-hint">Points run top to bottom. Select one to edit it below — <kbd>F7</kbd> sets its position from the cursor, <kbd>F8</kbd> adds a new point.</p>
-        </fieldset>
+          <select id="ac-profile-select" aria-label="Open a saved sequence"><option value="">No saved sequences</option></select>
+          <div class="ac-file-row">
+            <button class="btn" id="ac-new" type="button" title="Create a new sequence"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New</button>
+            <button class="btn accent" id="ac-save" type="button" title="Save sequence as JSON"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg>Save</button>
+            <button class="btn ico" id="ac-folder" type="button" title="Open sequence folder" aria-label="Open sequence folder"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></button>
+          </div>
+        </section>
 
-        <fieldset class="setting-group">
-          <legend>Schedule</legend>
+        <section class="card ac-panel" aria-labelledby="ac-h-sched">
+          <h2 id="ac-h-sched">Schedule</h2>
           <div class="numeric-grid">
-            <label><span>Between actions</span><span class="input-unit"><input id="ac-interval" type="number" min="10" max="600000" step="10" value="250"><i>ms</i></span></label>
+            <label><span>Click every</span><span class="input-unit"><input id="ac-interval" type="number" min="10" max="600000" step="10" value="250"><i>ms</i></span></label>
             <label><span>Start delay</span><span class="input-unit"><input id="ac-delay" type="number" min="0" max="3600" step="1" value="0"><i>s</i></span></label>
           </div>
-          <div class="count-row">
-            <div class="seg-control" data-ac-field="countMode" role="radiogroup" aria-label="Run length">
-              <button type="button" class="seg on" data-value="infinite" role="radio" aria-checked="true">Until stopped</button><button type="button" class="seg" data-value="finite" role="radio" aria-checked="false">Fixed cycles</button>
-            </div>
-            <label id="ac-count-wrap"><span>Cycles</span><input id="ac-limit" type="number" min="1" max="1000000" step="1" value="100" disabled></label>
+          <div class="seg-control" data-ac-field="countMode" role="radiogroup" aria-label="Run length">
+            <button type="button" class="seg on" data-value="infinite" role="radio" aria-checked="true">Until stopped</button><button type="button" class="seg" data-value="finite" role="radio" aria-checked="false">Fixed cycles</button>
           </div>
-        </fieldset>
-      </form>
+          <label id="ac-count-wrap"><span>Cycles</span><input id="ac-limit" type="number" min="1" max="1000000" step="1" value="100" disabled></label>
+        </section>
 
-      <button class="clicker-run" id="ac-run" type="button"><span class="run-icon"><svg class="uico uico-fill" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg></span><span><b>Start Auto Click</b><small>Press F6 to start or stop from anywhere</small></span><kbd>F6</kbd></button>
-      <p class="hotkey-note" id="ac-hotkey-note"><span class="hotkey-dot"></span>Global hotkeys are registering…</p>
-    </main>
-    <footer class="suite-footer"><span>F6 · Start / Stop</span><span>F7 · Update point</span><span>F8 · Add point</span></footer>
+        <div id="ac-point-editor" class="card ac-panel point-editor" hidden></div>
+      </aside>
+
+      <section class="card ac-seq">
+        <div class="ac-pane-hd">
+          <h2>Click sequence</h2>
+          <span id="ac-point-summary">1 point</span>
+          <span class="ac-pane-sp"></span>
+          <button class="btn" type="button" id="ac-add-point" title="Add the current cursor position (F8)"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Add point <kbd>F8</kbd></button>
+        </div>
+        <div id="ac-points" class="point-list"></div>
+        <div id="ac-points-empty" class="points-empty" hidden><b>No click points</b><span>Add a point, or press <kbd>F8</kbd> to capture the cursor.</span></div>
+      </section>
+    </form>
+
+    <!-- What it is doing, said once. -->
+    <div class="card ac-strip" aria-live="polite">
+      <span class="run-state ready" id="ac-header-state"><span class="run-dot"></span><span>Ready</span></span>
+      <small id="ac-status-detail">Build a sequence and press Start.</small>
+      <span class="ac-strip-sp"></span>
+      <div class="ac-stats">
+        <span><b id="ac-count">0</b><small>actions</small></span>
+        <span><b id="ac-cycles">0</b><small>cycles</small></span>
+        <span><b id="ac-elapsed">00:00</b><small>elapsed</small></span>
+      </div>
+    </div>
+
+    <div class="ac-run-row">
+      <button class="ac-btn-run" id="ac-run" type="button">
+        <svg class="uico uico-fill" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>
+        <b>Start</b><kbd>F6</kbd>
+      </button>
+      <button class="ac-btn-stop" id="ac-stop" type="button" disabled>
+        <svg class="uico uico-fill" aria-hidden="true" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="2"/></svg>
+        <b>Stop</b><kbd>F6</kbd>
+      </button>
+    </div>
+    <p class="hotkey-note" id="ac-hotkey-note"><span class="hotkey-dot"></span>Global hotkeys are registering…</p>
   </section>
 </div><!-- /shell-main -->
 </div>

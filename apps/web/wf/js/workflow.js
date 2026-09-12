@@ -505,7 +505,10 @@ const WF_PAL_PAIRS = [
   { id:"try", types:["try_chain","try_next"], label:"Try pair",
     hint:"Try arms 1→2→… · Next branch skips to the next arm" },
 ];
-const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"loop", done:"done", found:"found", fail:"fail", "1":"1", "2":"2", "3":"3" };
+// "body" is where the loop's contents hang off; the loop-back INPUT is what is
+// labelled "loop" (WF_IN_LBL). Calling both of them "loop" made a Repeat block
+// read as if it had the same port twice.
+const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"body", done:"done", found:"found", fail:"fail", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
 const WF_IN_LBL = { in:"in", loop:"loop" };
 
@@ -1126,8 +1129,20 @@ function wfApplyTransform(){
   w.style.top=wfPan.y+"px";
   w.style.transform = wfZoom===1 ? "none" : `scale(${wfZoom})`;
   wfSyncGrid();
+  wfSyncLod();
   if(typeof wfMinimapQueue==="function") wfMinimapQueue();
   const lbl=$("wf-zoom-lbl"); if(lbl) lbl.textContent=Math.round(wfZoom*100)+"%";
+}
+// Level of detail. Zoomed out far enough, 9px slot labels, flow markers and
+// timing chips stop being information and turn into speckle — the same call
+// every node editor makes. Two steps: "far" drops the fine print, "tiny" leaves
+// blocks as coloured plates you navigate by shape. Driven by a data attribute
+// so the whole decision lives in CSS next to the styles it turns off.
+const WF_LOD_FAR=0.65, WF_LOD_TINY=0.45;
+function wfSyncLod(){
+  const c=$("wf-canvas"); if(!c) return;
+  const lod = wfZoom<WF_LOD_TINY ? "tiny" : wfZoom<WF_LOD_FAR ? "far" : "near";
+  if(c.dataset.lod!==lod) c.dataset.lod=lod;
 }
 // ── Camera animation ─────────────────────────────────────────────────────────
 // One shared tween for every programmatic camera move (fit view, zoom buttons,

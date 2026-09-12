@@ -33,8 +33,8 @@
   /* Terminal (start/end/stop) accents — also read by minimap.js chips. */
   --term-start: #059669; /* modern emerald — start / go */
   --term-end:   #e11d48; /* modern rose-red — end / stop */
-  /* Branch-port semantics (condition true/false, loop back-edge) — one hex per
-     role, shared between the port dots, wires and their SVG arrowheads. */
+   /* Branch-port semantics (condition true/false, loop back-edge) — one hex per
+      role, shared between the port dots, wires and their SVG midpoint discs. */
   --branch-t:    #1f9d57;
   --branch-t-bg: #e8f5ed;
   --branch-t-bd: #9fd4b5;
@@ -44,11 +44,24 @@
   --branch-loop:    #e0a64b;
   --branch-loop-bg: #fff7ea;
   --branch-loop-line: #d09030;
-  /* Wire palette — the graph's connective tissue. `--wire` is the neutral
-     forward flow; branch/switch wires borrow the semantic hues above. */
-  --wire:        #8a9bb3;
-  --wire-switch: #9a78e6;
-  --wire-arrow:  #94a6ba;
+   /* Wire palette — idle / unmatched rope only. A connected link paints in the
+      source node's category (or a branch hue), matching ComfyUI's type-coloured
+      sockets. Pitched for a 1.7px line over --canvas-bg and white cards. */
+   --wire:        #6e7f96;
+   --wire-switch: #8a63e0;
+   /* Named multi-outs that are not true/false — Repeat body/done, loop-until
+      found/fail — plus a 6-hue cycle for numbered lanes (parallel / sequence /
+      try-in-order / switch cases). Shared by ports, wires, midpoint discs. */
+   --wire-body:  #2f7ae5;
+   --wire-done:  #1f9d57;
+   --wire-found: #1f9d57;
+   --wire-fail:  #d6483f;
+   --lane-1: #2f7ae5;
+   --lane-2: #c45aad;
+   --lane-3: #d48a1a;
+   --lane-4: #1aa88a;
+   --lane-5: #6d5bd4;
+   --lane-6: #c45a3a;
   /* Node-category accents — single source of truth for wf.css's .cat-* node
      styling AND the group-frame colour palette (js/groups.js). */
   --cat-basic:  #6f9be8;
@@ -139,9 +152,18 @@
   --branch-loop:    #eab308;
   --branch-loop-bg: rgba(234, 179, 8, .16);
   --branch-loop-line: #eab308;
-  --wire:        #5a6b82;
-  --wire-switch: #a78bfa;
-  --wire-arrow:  #6b7d94;
+   --wire:        #6b7f99;
+   --wire-switch: #a78bfa;
+   --wire-body:  #5b9cf5;
+   --wire-done:  #34c370;
+   --wire-found: #34c370;
+   --wire-fail:  #ec6f66;
+   --lane-1: #5b9cf5;
+   --lane-2: #e07bc4;
+   --lane-3: #f0b040;
+   --lane-4: #3ec9bb;
+   --lane-5: #a78bfa;
+   --lane-6: #f08a6a;
   --cat-basic:  #7ba7f0;
   --cat-image:  #3ec9bb;
   --cat-color:  #ec7fb0;

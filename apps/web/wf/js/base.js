@@ -403,6 +403,7 @@ function wfFmtRemain(sec){
   if(sec>=1)  return sec.toFixed(1)+"s";
   return Math.max(0, sec).toFixed(1)+"s";
 }
+function wfDelaySign(phase){ return phase==="after"?"+":"−"; }
 function wfRestoreDelayChip(chip){
   if(!chip) return;
   chip.classList.remove("counting");
@@ -410,9 +411,9 @@ function wfRestoreDelayChip(chip){
   const secs=parseFloat(chip.dataset.secs)||0;
   const phase=chip.dataset.phase;
   const label=chip.querySelector(".wf-delay-label");
-  const name=phase==="after"?"After":"Before";
-  if(label) label.textContent=name+" "+secs+"s";
-  chip.title="";
+  const shown=typeof wfDelaySecs==="function"?wfDelaySecs(secs):secs+"s";
+  if(label) label.textContent=wfDelaySign(phase)+shown;
+  chip.title=phase==="after"?"Wait "+shown+" after this block":"Wait "+shown+" before this block";
 }
 function wfClearNodeDelay(){
   if(wfDelayTimer){ clearInterval(wfDelayTimer); wfDelayTimer=null; }
@@ -436,16 +437,16 @@ function wfPaintNodeDelay(){
   if(!chip || getComputedStyle(el.querySelector(".wf-node-delay")||el).display==="none"){
     chip=null;
   }
-  const name=st.phase==="after"?"After":"Before";
-  const text=name+" "+wfFmtRemain(remain);
+  const sign=wfDelaySign(st.phase);
+  const left=wfFmtRemain(remain);
+  const text=sign+left;
   if(chip){
     chip.classList.add("counting");
     chip.style.setProperty("--pct", pct.toFixed(1));
     const label=chip.querySelector(".wf-delay-label");
     if(label) label.textContent=text;
-    else chip.innerHTML=(st.phase==="after"?wfIco("timer"):wfIco("clock"))+
-      `<span class="wf-delay-label">${text}</span>`;
-    chip.title=name+" wait — "+wfFmtRemain(remain)+" left";
+    else chip.innerHTML=`<span class="wf-delay-label">${text}</span>`;
+    chip.title=(st.phase==="after"?"After":"Before")+" wait — "+left+" left";
     const live=el.querySelector(".wf-node-delay-live"); if(live) live.remove();
   } else {
     let live=el.querySelector(".wf-node-delay-live");
@@ -456,9 +457,8 @@ function wfPaintNodeDelay(){
     }
     live.dataset.phase=st.phase;
     live.style.setProperty("--pct", pct.toFixed(1));
-    live.innerHTML=(st.phase==="after"?wfIco("timer"):wfIco("clock"))+
-      `<span class="wf-delay-label">${text}</span>`;
-    live.title=name+" wait — "+wfFmtRemain(remain)+" left";
+    live.innerHTML=`<span class="wf-delay-label">${text}</span>`;
+    live.title=(st.phase==="after"?"After":"Before")+" wait — "+left+" left";
   }
   if(remain<=0){
     // Local clock finished; leave paint until engine's end event restores chips
