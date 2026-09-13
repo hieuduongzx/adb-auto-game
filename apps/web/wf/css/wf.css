@@ -294,7 +294,8 @@
   background:var(--panel); border-top:1px solid var(--border2); }
 /* Its body has room now: give the palette and inspector rows the wider gutter. */
 .pnl.is-max .wf-palette, .pnl.is-max #wf-insp-body { padding:var(--s4) var(--s5) var(--s5); }
-.pnl.is-max .wf-act-panel-body { max-height:none; }
+/* Maximized, the stage sets the height — drop both the dragged basis and cap. */
+.pnl.is-max .wf-act-panel-body { flex-basis:0%; max-height:none; }
 /* One header grammar for every region (see shared/panel.css rule 1): sentence
    case at body size, 40px tall, title · count · tools. The old 10px uppercase
    800-weight label shouted in five different places and still read as chrome
@@ -335,6 +336,19 @@
 #wf-act-panel.collapsed .wf-act-panel-body { display:none; }
 #wf-act-panel.collapsed .wf-side-hdr { border-bottom:none; }
 #wf-act-panel.collapsed .wf-side-chev { transform:rotate(-90deg); }
+/* Drag handle along the panel's top edge: the card is pinned to the canvas'
+   bottom-right corner, so growing the list pushes the top edge up. Sits inside
+   the panel (which clips to its radius) rather than 3px above it like the log
+   drawer's. Hidden when there is no list to size — collapsed or maximized. */
+#wf-act-resizer { position:absolute; left:0; right:0; top:0; height:7px;
+  cursor:row-resize; z-index:9; }
+#wf-act-resizer::before { content:""; position:absolute; left:50%; top:2px;
+  width:36px; height:3px; margin-left:-18px; border-radius:2px;
+  background:transparent; transition:background .12s; }
+#wf-act-resizer:hover::before, #wf-act-resizer.drag::before { background:var(--accent); }
+#wf-act-resizer:focus-visible::before { background:var(--accent); }
+#wf-act-panel.collapsed #wf-act-resizer, #wf-act-panel.is-max #wf-act-resizer { display:none; }
+#wf-act-panel.resizing .wf-act-panel-body { scroll-behavior:auto; }
 /* Tab bar — a segmented control on a tinted track. */
 .wf-act-tab-row { display:flex; align-items:stretch; gap:2px; margin:8px 11px 9px; padding:2px;
   background:var(--alt); border:1px solid var(--border); border-radius:var(--r-sm); flex-shrink:0; }
@@ -346,10 +360,17 @@
 .wf-act-tab .side-count { margin-left:2px; padding:0 5px; font-size:9px;
   background:var(--alt); color:var(--muted); }
 .wf-act-tab.sel .side-count { background:var(--accent-bg); color:var(--accent); }
-/* Seven 31px rows plus six 4px gaps. Additional activities scroll here while
-   the header and Sequence/Background tabs remain fixed. */
-.wf-act-panel-body { flex:1; min-height:0; max-height:241px; overflow-y:auto;
-  overscroll-behavior:contain; padding:0 10px 9px; }
+/* Seven 31px rows plus six 4px gaps — the default ceiling, overridden by
+   --act-h once the top edge is dragged (see #wf-act-resizer). The card still
+   hugs a short list; the ceiling only caps how far it may grow. Additional
+   activities scroll here while the header and Sequence/Background tabs remain
+   fixed. */
+/* --act-h drives the flex base size *and* the ceiling together, so a dragged
+   height is exact: short lists stop hugging their rows and stand at the height
+   the user chose, long ones scroll inside it. Unset, the 0% basis restores the
+   hug-then-cap-at-241px default. */
+.wf-act-panel-body { flex:1 1 var(--act-h, 0%); min-height:0; max-height:var(--act-h, 241px);
+  overflow-y:auto; overscroll-behavior:contain; padding:0 10px 9px; }
 .wf-act-list { display:flex; flex-direction:column; gap:4px; }
 #wf-activities, #wf-activities-bg, #wf-functions { padding:0; }
 /* Activity rows */
@@ -378,6 +399,15 @@
   flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 .wf-act-cb.checked { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 .wf-act-cb svg { opacity:0; } .wf-act-cb.checked svg { opacity:1; }
+/* Crash marker on an activity row — click jumps to the block it died on.
+   Always red (it is only ever rendered when there IS a crash), so it stays
+   readable after the row's own run status is cleared by the next run. */
+.wf-act-crash { color:var(--run-fail); background:var(--err-bg); line-height:0; padding:3px;
+  border:none; border-radius:4px; flex-shrink:0; display:flex; align-items:center; cursor:pointer;
+  transition:background .1s, transform .1s; }
+.wf-act-crash svg { width:12px; height:12px; stroke-width:2.2; display:block; }
+.wf-act-crash:hover { background:var(--run-fail); color:var(--on-accent, #fff); }
+.wf-act-crash:active { transform:scale(.92); }
 .wf-act-del { color:var(--muted); line-height:0; padding:3px; border-radius:4px; flex-shrink:0; display:flex; align-items:center; }
 .wf-act-del svg { width:12px; height:12px; stroke-width:2.2; display:block; }
 .wf-act-del:hover { color:var(--err); background:var(--err-bg); }
@@ -989,6 +1019,19 @@
 .wf-node.running .wf-node-hd { background:var(--run-live-hd); border-bottom-color:var(--run-live-hd-bd); }
 .wf-node.running .wf-node-title { color:var(--run-live-ink); }
 .wf-node.running .ico { color:var(--run-live-bd); }
+/* Crash point: the block the last failed run actually died on. Outlives the
+   run trail (.ran-fail and friends are wiped when the next run starts), so it
+   needs a marker that does not read as live run state — a dashed red ring plus
+   a red header tint, kept clear of every live-run marker.
+   An outline, not a ::before ring: the card's pseudo-elements are already spoken
+   for (.wf-entry's tick, .paused's chip, .running-call's ring), and an outline
+   draws outside the border box without laying claim to either of them. */
+.wf-node.crashed { outline:2px dashed var(--run-fail); outline-offset:3px; }
+.wf-node.crashed::after { box-shadow:var(--sh-md); }
+.wf-node.crashed .wf-node-hd { background:var(--run-fail-hd); border-bottom-color:var(--run-fail-hd-bd); }
+/* Live state wins while a run is on this block — the crash mark is history, and
+   two rings around one card read as noise. */
+.wf-node.running.crashed, .wf-node.running-call.crashed, .wf-node.paused.crashed { outline:none; }
 /* Step-debug pause: steady accent-blue ring + a ⏸ chip. */
 .wf-node.paused { border-color:var(--border2) !important; background:var(--accent-bg); }
 .wf-node.paused::after { animation:none; box-shadow:var(--sh-md); }

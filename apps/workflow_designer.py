@@ -780,6 +780,58 @@ class WorkflowDesignerAPI:
         out.sort(key=lambda w: w["title"].lower())
         return out
 
+    # ── Unity Bridge (in-game plugin for the unity_bridge input mode) ──────────
+
+    @staticmethod
+    def _unity_bridge_port(cfg: Optional[dict]) -> int:
+        from src.core.win32 import unity_bridge
+        try:
+            return int((cfg or {}).get("bridgePort") or unity_bridge.DEFAULT_PORT)
+        except (TypeError, ValueError):
+            return unity_bridge.DEFAULT_PORT
+
+    @staticmethod
+    def _unity_bridge_exe(cfg: Optional[dict]) -> str:
+        """Executable of the project's target window, or "" when it isn't open."""
+        cfg = cfg or {}
+        if not str(cfg.get("window", "")).strip():
+            return ""
+        try:
+            import win32process
+            from src.core.win32 import Win32Controller
+            from src.core.win32.automation import process_exe_path
+            ctrl = Win32Controller(cfg)
+            if not ctrl.attach():
+                return ""
+            pid = win32process.GetWindowThreadProcessId(ctrl.hwnd)[1]
+            return process_exe_path(pid)
+        except Exception:
+            return ""
+
+    def unity_bridge_status(self, cfg: Optional[dict] = None, exe: str = "") -> dict:
+        """Inspect the target game (from ``exe`` or the project's window) and
+        ping the bridge — drives the deploy prompt in the designer."""
+        try:
+            from src.core.win32 import unity_bridge
+            # Running game first; else the project game path (Project settings).
+            exe = (exe or self._unity_bridge_exe(cfg)
+                   or str((cfg or {}).get("path") or "").strip())
+            return unity_bridge.status(exe, self._unity_bridge_port(cfg))
+        except Exception as exc:
+            log_warning(f"Unity Bridge status error: {exc}")
+            return {"exe": exe, "problems": [str(exc)], "bridgeRunning": False}
+
+    def unity_bridge_deploy(self, exe: str) -> dict:
+        """Copy BepInEx (if missing) + the bridge plugin into the game folder."""
+        try:
+            from src.core.win32 import unity_bridge
+            result = unity_bridge.deploy(exe)
+        except Exception as exc:
+            result = {"ok": False, "error": str(exc)}
+        if not result.get("ok"):
+            log_warning(f"Unity Bridge deploy failed: {result.get('error')}")
+        return result
+
     # ── Template matching ─────────────────────────────────────────────────────
 
     def pick_template(self) -> str:
@@ -1150,11 +1202,17 @@ class WorkflowDesignerAPI:
 
     def _device_poll(self) -> None:
         """Light refresh every 5s; when no device is connected, also deep-scan
-        emulator ports about every 30s so a newly started instance is found."""
+        emulator ports about every 30s so a newly started instance is found.
+
+        Parked for the whole time a Win32 project is open: the preview captures
+        a window, so polling the ADB server would just be noise (and would start
+        it if it wasn't running)."""
         while not self._closing:
             time.sleep(5)
             if self._closing:
                 break
+            if self._capture_kind == "win32":
+                continue
             deep = False
             # Deep-scan when nothing is connected — a light adb-devices poll is
             # enough while a device is live; offline, re-probe emulator ports.
@@ -1327,6 +1385,27 @@ class WorkflowDesignerAPI:
                         params[pk] = [relocate(v) if v else v for v in vals]
         return len(copied)
 
+    # Top-level keys other tools write into the workflow JSON and the Designer
+    # page never loads — the Hub build's runnerUpdate (update repo, last built
+    # version). Without carrying them over, every save forgot the chosen repo.
+    _EXTERNAL_FLOW_KEYS = ("runnerUpdate",)
+
+    @classmethod
+    def _keep_external_keys(cls, flow: dict, path: str) -> None:
+        """Copy :attr:`_EXTERNAL_FLOW_KEYS` from the file on disk into ``flow``."""
+        if not isinstance(flow, dict) or not os.path.isfile(path):
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                old = json.load(fh) or {}
+        except Exception:
+            return
+        if not isinstance(old, dict):
+            return
+        for key in cls._EXTERNAL_FLOW_KEYS:
+            if key not in flow and key in old:
+                flow[key] = old[key]
+
     def _write_flow(self, flow_json: str, path: str) -> None:
         """Write a flow to ``path``, bundling its templates into a sibling folder.
 
@@ -1336,6 +1415,7 @@ class WorkflowDesignerAPI:
         text = flow_json
         try:
             flow = json.loads(flow_json)
+            self._keep_external_keys(flow, path)
             n = self._materialize_templates(flow, os.path.dirname(os.path.abspath(path)))
             text = json.dumps(flow, ensure_ascii=False, indent=2)
             if n:
@@ -1536,6 +1616,11 @@ class WorkflowDesignerAPI:
         self._engine.callbacks["on_activity_complete"] = [
             lambda act, ok: self._push("activity_result",
                                        {"id": act.get("id"), "status": "ok" if ok else "fail"})]
+        # Where a failed activity actually died, so the panel can offer a
+        # one-click jump back to that block after the run.
+        self._engine.callbacks["on_activity_crash"] = [
+            lambda act, crash: self._push("activity_crash",
+                                          {"id": act.get("id"), "crash": crash or None})]
         self._engine.callbacks["on_fail_shot"] = [
             lambda nid, path: self._push("node_fail_shot", {"id": nid, "path": path})]
         self._engine.callbacks["on_match"] = [self._on_engine_match]
@@ -1926,6 +2011,7 @@ class WorkflowDesignerAPI:
         cmd = [sys.executable, script, "--workflow", workflow_dir, "--version", version]
         log_info("Building standalone Runner .exe …")
         out_path = ""
+        req_path = ""   # requirements/ beside the exe (from workflows/<Name>/vendor/)
         ok = False
         try:
             proc = subprocess.Popen(
@@ -1942,6 +2028,9 @@ class WorkflowDesignerAPI:
                     out_path = body[6:].strip()
                     ok = True
                     log_success(f"Build complete: {out_path}")
+                elif body.startswith("REQUIREMENTS: "):
+                    req_path = body[len("REQUIREMENTS: "):].strip()
+                    log_warning(f"Game files for players to copy into the game folder: {req_path}")
                 elif body.startswith("BUILD FAILED") or body.startswith("ERROR"):
                     log_error(body)
                 else:
@@ -1952,7 +2041,7 @@ class WorkflowDesignerAPI:
         except Exception as exc:
             log_error(f"Build error: {exc}")
             ok = False
-        self._push("build_done", {"ok": ok, "path": out_path})
+        self._push("build_done", {"ok": ok, "path": out_path, "requirements": req_path})
 
     def reveal_path(self, path: str) -> bool:
         """Open a folder (or a file's parent) in the OS file manager."""

@@ -2,7 +2,7 @@
   "name": "BrownDust2",
   "version": 2,
   "templatesDir": "templates",
-  "buildVersion": "1.0.0",
+  "buildVersion": "1.0.6",
   "package": "",
   "controller": "win32",
   "ocr": "",
@@ -11,7 +11,8 @@
   "win32": {
     "window": "BrownDust II",
     "matchBy": "title",
-    "inputMode": "foreground"
+    "inputMode": "unity_bridge",
+    "path": "D:\\Neowiz\\Browndust2\\BrownDust2_10000002\\BrownDust II.exe"
   },
   "speedhack": {
     "enabled": false,
@@ -25,11 +26,18 @@
       "type": "bool",
       "value": false,
       "options": []
+    },
+    {
+      "name": "isFirstGoHome",
+      "label": "IsFirstGoHome",
+      "type": "bool",
+      "value": true,
+      "options": []
     }
   ],
   "nodeDefaults": {
     "delayBefore": 1,
-    "delayAfter": 1,
+    "delayAfter": 0,
     "retryCount": 0,
     "retryDelay": 0,
     "screenshotOnFail": false
@@ -43,22 +51,15 @@
           {
             "id": "nzb93w65",
             "type": "start",
-            "x": 60,
-            "y": 20,
-            "params": {}
-          },
-          {
-            "id": "nh0lbqvw",
-            "type": "end",
-            "x": 340,
-            "y": -60,
+            "x": -160,
+            "y": 55,
             "params": {}
           },
           {
             "id": "niy97gqa",
             "type": "if_image",
             "x": 120,
-            "y": 8,
+            "y": 40,
             "params": {
               "template": "templates/crop_20260905_012728_410_39_28_26.png",
               "threshold": 0.85,
@@ -68,8 +69,8 @@
           {
             "id": "nfadsqjp",
             "type": "tap_image_any",
-            "x": 334,
-            "y": 24,
+            "x": 360,
+            "y": 58,
             "params": {
               "templates": [
                 "templates/crop_20260911_103328_1784_54_29_21.png",
@@ -85,12 +86,66 @@
             "delayAfter": 3
           },
           {
-            "id": "ngrubo5c",
-            "type": "win_key",
-            "x": 540,
-            "y": 24,
+            "id": "nptr10t9",
+            "type": "call",
+            "x": -80,
+            "y": 40,
             "params": {
-              "keycode": "72"
+              "fn": "fn_d074r"
+            }
+          },
+          {
+            "id": "nfqqrgle",
+            "type": "if_var",
+            "x": 360,
+            "y": -30,
+            "params": {
+              "name": "isFirstGoHome",
+              "op": "==",
+              "value": "true"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n1j4x8v4",
+            "type": "end",
+            "x": 980,
+            "y": 70,
+            "params": {}
+          },
+          {
+            "id": "nkd6mcpb",
+            "type": "tap",
+            "x": 760,
+            "y": -30,
+            "params": {
+              "target": "pos",
+              "x": 1056,
+              "y": 141,
+              "taps": "1"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "n9uo6dnv",
+            "type": "loop",
+            "x": 560,
+            "y": -30,
+            "params": {
+              "infinite": false,
+              "count": 1
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nv93mcdp",
+            "type": "set_var",
+            "x": 760,
+            "y": 55,
+            "params": {
+              "name": "isFirstGoHome",
+              "value": "false"
             },
             "delayBefore": 1,
             "delayAfter": 1
@@ -98,34 +153,204 @@
         ],
         "edges": [
           {
-            "from": "nzb93w65",
-            "fromPort": "out",
-            "to": "niy97gqa"
-          },
-          {
-            "from": "niy97gqa",
-            "fromPort": "true",
-            "to": "nh0lbqvw"
-          },
-          {
             "from": "niy97gqa",
             "fromPort": "false",
             "to": "nfadsqjp"
           },
           {
-            "from": "nfadsqjp",
-            "fromPort": "true",
-            "to": "ngrubo5c"
+            "from": "nzb93w65",
+            "fromPort": "out",
+            "to": "nptr10t9"
           },
           {
-            "from": "ngrubo5c",
-            "fromPort": "out",
+            "from": "nptr10t9",
+            "fromPort": "true",
             "to": "niy97gqa"
           },
           {
+            "from": "niy97gqa",
+            "fromPort": "true",
+            "to": "nfqqrgle"
+          },
+          {
+            "from": "n9uo6dnv",
+            "fromPort": "body",
+            "to": "nkd6mcpb"
+          },
+          {
+            "from": "nkd6mcpb",
+            "fromPort": "out",
+            "to": "n9uo6dnv",
+            "toPort": "loop"
+          },
+          {
+            "from": "nfqqrgle",
+            "fromPort": "true",
+            "to": "n9uo6dnv"
+          },
+          {
+            "from": "n9uo6dnv",
+            "fromPort": "done",
+            "to": "nv93mcdp"
+          },
+          {
+            "from": "nv93mcdp",
+            "fromPort": "out",
+            "to": "n1j4x8v4"
+          },
+          {
             "from": "nfadsqjp",
+            "fromPort": "true",
+            "to": "niy97gqa"
+          },
+          {
+            "from": "nfqqrgle",
             "fromPort": "false",
-            "to": "ngrubo5c"
+            "to": "n1j4x8v4"
+          }
+        ],
+        "groups": []
+      }
+    },
+    {
+      "id": "fn_d074r",
+      "name": "IsGameRunning",
+      "graph": {
+        "nodes": [
+          {
+            "id": "ntscvrp0",
+            "type": "start",
+            "x": 180,
+            "y": 332,
+            "params": {}
+          },
+          {
+            "id": "nxeeg0sp",
+            "type": "end",
+            "x": 986,
+            "y": 440,
+            "params": {}
+          },
+          {
+            "id": "nu5wjlni",
+            "type": "win_resize",
+            "x": 720,
+            "y": 262,
+            "params": {
+              "width": 1920,
+              "height": 1080,
+              "center": true
+            },
+            "note": "Resize window game về 1920×1080 — khớp template & tọa độ đã ghi",
+            "delayBefore": 15
+          },
+          {
+            "id": "nlen4rj4",
+            "type": "win_launch",
+            "x": 500,
+            "y": 262,
+            "params": {
+              "path": "",
+              "args": "",
+              "window": "",
+              "wait": 30,
+              "pathSrc": "project"
+            }
+          },
+          {
+            "id": "nan17tve",
+            "type": "if_app",
+            "x": 280,
+            "y": 317,
+            "params": {
+              "pkgSrc": "project",
+              "package": "",
+              "negate": true
+            }
+          },
+          {
+            "id": "n74cfcst",
+            "type": "tap_random",
+            "x": 920,
+            "y": 262,
+            "params": {
+              "x1": 0,
+              "y1": 0,
+              "x2": 100,
+              "y2": 100
+            },
+            "delayBefore": 15
+          },
+          {
+            "id": "n5ysn9zz",
+            "type": "win_resize",
+            "x": 720,
+            "y": 425,
+            "params": {
+              "width": 1920,
+              "height": 1080
+            },
+            "note": "Resize window game về 1920×1080 — khớp template & tọa độ đã ghi"
+          },
+          {
+            "id": "nbr6eg7r",
+            "type": "win_if_window",
+            "x": 500,
+            "y": 425,
+            "params": {
+              "state": "size",
+              "width": 1920,
+              "height": 1080,
+              "tolerance": 0,
+              "negate": true
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nan17tve",
+            "fromPort": "true",
+            "to": "nlen4rj4"
+          },
+          {
+            "from": "nlen4rj4",
+            "fromPort": "out",
+            "to": "nu5wjlni"
+          },
+          {
+            "from": "nu5wjlni",
+            "fromPort": "out",
+            "to": "n74cfcst"
+          },
+          {
+            "from": "n74cfcst",
+            "fromPort": "out",
+            "to": "nxeeg0sp"
+          },
+          {
+            "from": "ntscvrp0",
+            "fromPort": "out",
+            "to": "nan17tve"
+          },
+          {
+            "from": "n5ysn9zz",
+            "fromPort": "out",
+            "to": "nxeeg0sp"
+          },
+          {
+            "from": "nan17tve",
+            "fromPort": "false",
+            "to": "nbr6eg7r"
+          },
+          {
+            "from": "nbr6eg7r",
+            "fromPort": "true",
+            "to": "n5ysn9zz"
+          },
+          {
+            "from": "nbr6eg7r",
+            "fromPort": "false",
+            "to": "nxeeg0sp"
           }
         ],
         "groups": []
@@ -182,88 +407,134 @@
   ],
   "activities": [
     {
-      "id": "sequence_f944",
-      "name": "Run Game",
+      "id": "sequence_3whp",
+      "name": "Claim Gluppy",
       "type": "sequence",
       "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
           {
-            "id": "nbhlomw0",
+            "id": "n0kjvi2x",
             "type": "start",
-            "x": 40,
-            "y": 72,
+            "x": -320,
+            "y": 120,
             "params": {}
           },
           {
-            "id": "nbfltbsu",
-            "type": "end",
-            "x": 740,
-            "y": 52,
-            "params": {}
-          },
-          {
-            "id": "nij75lxv",
-            "type": "win_resize",
+            "id": "nxzi0ikl",
+            "type": "tap",
             "x": 540,
-            "y": 40,
+            "y": 105,
             "params": {
-              "width": 1920,
-              "height": 1080
+              "target": "pos",
+              "x": 1413,
+              "y": 886,
+              "taps": "1"
             },
-            "note": "Resize window game về 1920×1080 — khớp template & tọa độ đã ghi",
-            "delayBefore": 15
+            "delayBefore": 1,
+            "delayAfter": 1
           },
           {
-            "id": "ndk693nv",
-            "type": "win_launch",
+            "id": "nwhex63x",
+            "type": "if_image",
             "x": 340,
-            "y": 60,
+            "y": 105,
             "params": {
-              "path": "D:\\Neowiz\\Browndust2\\BrownDust2_10000002\\BrownDust II.exe",
-              "args": "",
-              "window": "",
-              "wait": 30
-            }
+              "template": "templates/crop_20260911_103126_1393_873_40_26.png",
+              "threshold": 0.85,
+              "negate": false,
+              "regionX": 0,
+              "regionY": 0,
+              "regionW": 0,
+              "regionH": 0
+            },
+            "delayBefore": 10,
+            "delayAfter": 1
           },
           {
-            "id": "ni8qmd1q",
-            "type": "if_app",
-            "x": 120,
-            "y": 60,
+            "id": "nslp72tj",
+            "type": "call",
+            "x": -260,
+            "y": 105,
             "params": {
-              "pkgSrc": "project",
-              "package": "",
-              "negate": true
-            }
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nsyzja63",
+            "type": "tap",
+            "x": -60,
+            "y": 105,
+            "params": {
+              "target": "pos",
+              "x": 1707,
+              "y": 978,
+              "taps": "1"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nvb5wrv4",
+            "type": "tap_image",
+            "x": 140,
+            "y": 105,
+            "params": {
+              "template": "templates/crop_20260913_222314_197_259_137_45.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nx2aejhp",
+            "type": "end",
+            "x": 760,
+            "y": 120,
+            "params": {},
+            "delayBefore": 1
           }
         ],
         "edges": [
           {
-            "from": "nbhlomw0",
-            "fromPort": "out",
-            "to": "ni8qmd1q"
-          },
-          {
-            "from": "ni8qmd1q",
+            "from": "nwhex63x",
             "fromPort": "true",
-            "to": "ndk693nv"
+            "to": "nxzi0ikl"
           },
           {
-            "from": "ndk693nv",
+            "from": "n0kjvi2x",
             "fromPort": "out",
-            "to": "nij75lxv"
+            "to": "nslp72tj"
           },
           {
-            "from": "ni8qmd1q",
+            "from": "nslp72tj",
+            "fromPort": "true",
+            "to": "nsyzja63"
+          },
+          {
+            "from": "nsyzja63",
+            "fromPort": "out",
+            "to": "nvb5wrv4"
+          },
+          {
+            "from": "nvb5wrv4",
+            "fromPort": "true",
+            "to": "nwhex63x"
+          },
+          {
+            "from": "nxzi0ikl",
+            "fromPort": "out",
+            "to": "nx2aejhp"
+          },
+          {
+            "from": "nwhex63x",
             "fromPort": "false",
-            "to": "nij75lxv"
-          },
-          {
-            "from": "nij75lxv",
-            "fromPort": "out",
-            "to": "nbfltbsu"
+            "to": "nx2aejhp"
           }
         ],
         "groups": []
@@ -281,15 +552,15 @@
           {
             "id": "ncc3ozlv",
             "type": "start",
-            "x": 60,
-            "y": 72,
+            "x": 40,
+            "y": 75,
             "params": {}
           },
           {
             "id": "ndtfw0zt",
             "type": "end",
-            "x": 520,
-            "y": 72,
+            "x": 606,
+            "y": 140,
             "params": {}
           },
           {
@@ -304,13 +575,25 @@
           {
             "id": "nf0v911p",
             "type": "tap",
-            "x": 320,
+            "x": 540,
             "y": 60,
             "params": {
               "target": "pos",
               "x": 1056,
               "y": 141,
               "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nga84fdu",
+            "type": "loop",
+            "x": 340,
+            "y": 60,
+            "params": {
+              "infinite": false,
+              "count": 10
             },
             "delayBefore": 1,
             "delayAfter": 1
@@ -325,11 +608,22 @@
           {
             "from": "nrh52doh",
             "fromPort": "true",
+            "to": "nga84fdu"
+          },
+          {
+            "from": "nga84fdu",
+            "fromPort": "body",
             "to": "nf0v911p"
           },
           {
             "from": "nf0v911p",
             "fromPort": "out",
+            "to": "nga84fdu",
+            "toPort": "loop"
+          },
+          {
+            "from": "nga84fdu",
+            "fromPort": "done",
             "to": "ndtfw0zt"
           }
         ],
@@ -338,75 +632,174 @@
       "maxRetries": 1
     },
     {
-      "id": "sequence_3whp",
-      "name": "Claim",
+      "id": "sequence_mvf6",
+      "name": "Business Manager",
       "type": "sequence",
       "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
           {
-            "id": "n0kjvi2x",
+            "id": "nyq08wux",
             "type": "start",
-            "x": -40,
-            "y": 38,
+            "x": 60,
+            "y": 75,
             "params": {}
           },
           {
-            "id": "nk5815cu",
+            "id": "nh6zoclg",
             "type": "end",
-            "x": 440,
-            "y": 54,
+            "x": 1320,
+            "y": 155,
             "params": {}
           },
           {
-            "id": "nxzi0ikl",
+            "id": "nq2i1hv5",
+            "type": "call",
+            "x": 120,
+            "y": 60,
+            "params": {
+              "fn": "fn_pmuop"
+            }
+          },
+          {
+            "id": "nze6stla",
             "type": "tap",
-            "x": 240,
-            "y": 26,
+            "x": 320,
+            "y": 60,
             "params": {
               "target": "pos",
-              "x": 1413,
-              "y": 886,
+              "x": 158,
+              "y": 258,
               "taps": "1"
             },
             "delayBefore": 1,
             "delayAfter": 1
           },
           {
-            "id": "nwhex63x",
-            "type": "if_image",
-            "x": 40,
-            "y": 26,
+            "id": "n8irom6t",
+            "type": "wait_image",
+            "x": 520,
+            "y": 60,
             "params": {
-              "template": "templates/crop_20260911_103126_1393_873_40_26.png",
+              "template": "templates/crop_20260911_104843_1034_821_114_21.png",
               "threshold": 0.85,
+              "timeout": 10,
               "negate": false
             },
             "delayBefore": 1,
             "delayAfter": 1
+          },
+          {
+            "id": "nct8yol4",
+            "type": "tap_image",
+            "x": 720,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260911_104843_1034_821_114_21.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n2ilddit",
+            "type": "tap",
+            "x": 920,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 1569,
+              "y": 777,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nqleypbj",
+            "type": "tap",
+            "x": 920,
+            "y": 140,
+            "params": {
+              "target": "pos",
+              "x": 1174,
+              "y": 283,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n9wv4wsn",
+            "type": "tap_image",
+            "x": 1120,
+            "y": 140,
+            "params": {
+              "template": "templates/crop_20260913_221649_293_244_22_16.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 15
           }
         ],
         "edges": [
           {
-            "from": "n0kjvi2x",
+            "from": "nyq08wux",
             "fromPort": "out",
-            "to": "nwhex63x"
+            "to": "nq2i1hv5"
           },
           {
-            "from": "nwhex63x",
+            "from": "nq2i1hv5",
             "fromPort": "true",
-            "to": "nxzi0ikl"
+            "to": "nze6stla"
           },
           {
-            "from": "nxzi0ikl",
+            "from": "nze6stla",
             "fromPort": "out",
-            "to": "nwhex63x"
+            "to": "n8irom6t"
           },
           {
-            "from": "nwhex63x",
+            "from": "n8irom6t",
+            "fromPort": "true",
+            "to": "nct8yol4"
+          },
+          {
+            "from": "nct8yol4",
+            "fromPort": "true",
+            "to": "n2ilddit"
+          },
+          {
+            "from": "nqleypbj",
+            "fromPort": "out",
+            "to": "n9wv4wsn"
+          },
+          {
+            "from": "n9wv4wsn",
+            "fromPort": "true",
+            "to": "nh6zoclg"
+          },
+          {
+            "from": "n8irom6t",
             "fromPort": "false",
-            "to": "nk5815cu"
+            "to": "nze6stla"
+          },
+          {
+            "from": "n2ilddit",
+            "fromPort": "out",
+            "to": "nqleypbj"
+          },
+          {
+            "from": "n9wv4wsn",
+            "fromPort": "false",
+            "to": "nh6zoclg"
           }
         ],
         "groups": []
@@ -425,7 +818,7 @@
             "id": "n4id6dvk",
             "type": "start",
             "x": -40,
-            "y": 92,
+            "y": 95,
             "params": {}
           },
           {
@@ -691,275 +1084,6 @@
       "maxRetries": 1
     },
     {
-      "id": "sequence_pwks",
-      "name": "Nhận Thư",
-      "type": "sequence",
-      "enabled": true,
-      "vars": [],
-      "graph": {
-        "nodes": [
-          {
-            "id": "ngdxu50l",
-            "type": "start",
-            "x": -160,
-            "y": 72,
-            "params": {}
-          },
-          {
-            "id": "nshc9lto",
-            "type": "end",
-            "x": 920,
-            "y": 88,
-            "params": {}
-          },
-          {
-            "id": "nlker6td",
-            "type": "tap_image",
-            "x": 120,
-            "y": 60,
-            "params": {
-              "template": "templates/crop_20260715_063913_1625_47_38_25.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 10,
-              "offsetX": 0,
-              "offsetY": 0
-            }
-          },
-          {
-            "id": "n99tnosz",
-            "type": "tap_image",
-            "x": 520,
-            "y": 76,
-            "params": {
-              "template": "templates/crop_20260716_152607_1631_997_108_18.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 10,
-              "offsetX": 0,
-              "offsetY": 0
-            }
-          },
-          {
-            "id": "nqouejkr",
-            "type": "call",
-            "x": 720,
-            "y": 76,
-            "params": {
-              "fn": "fn_ursje"
-            },
-            "delayBefore": 1
-          },
-          {
-            "id": "nfeqlqat",
-            "type": "call",
-            "x": -80,
-            "y": 60,
-            "params": {
-              "fn": "fn_pmuop"
-            },
-            "delayBefore": 3
-          },
-          {
-            "id": "n67s00px",
-            "type": "if_image",
-            "x": 320,
-            "y": 60,
-            "params": {
-              "template": "templates/crop_20260903_142311_278_38_275_34.png",
-              "threshold": 0.85,
-              "negate": true
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          }
-        ],
-        "edges": [
-          {
-            "from": "n99tnosz",
-            "fromPort": "true",
-            "to": "nqouejkr"
-          },
-          {
-            "from": "nqouejkr",
-            "fromPort": "true",
-            "to": "nshc9lto"
-          },
-          {
-            "from": "ngdxu50l",
-            "fromPort": "out",
-            "to": "nfeqlqat"
-          },
-          {
-            "from": "nfeqlqat",
-            "fromPort": "true",
-            "to": "nlker6td"
-          },
-          {
-            "from": "nlker6td",
-            "fromPort": "true",
-            "to": "n67s00px"
-          },
-          {
-            "from": "n67s00px",
-            "fromPort": "true",
-            "to": "nlker6td"
-          },
-          {
-            "from": "n67s00px",
-            "fromPort": "false",
-            "to": "n99tnosz"
-          }
-        ],
-        "groups": []
-      },
-      "maxRetries": 1
-    },
-    {
-      "id": "sequence_l1f0",
-      "name": "Refinement",
-      "type": "sequence",
-      "enabled": true,
-      "vars": [],
-      "graph": {
-        "nodes": [
-          {
-            "id": "nmq3q1do",
-            "type": "start",
-            "x": 48,
-            "y": 72,
-            "params": {}
-          },
-          {
-            "id": "nse90g1m",
-            "type": "end",
-            "x": 1340,
-            "y": 72,
-            "params": {}
-          },
-          {
-            "id": "nwq946hu",
-            "type": "call",
-            "x": 120,
-            "y": 60,
-            "params": {
-              "fn": "fn_pmuop"
-            },
-            "delayBefore": 3
-          },
-          {
-            "id": "ni987oqm",
-            "type": "tap",
-            "x": 320,
-            "y": 60,
-            "params": {
-              "target": "pos",
-              "x": 366,
-              "y": 981,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "nv9dihit",
-            "type": "tap",
-            "x": 520,
-            "y": 60,
-            "params": {
-              "target": "pos",
-              "x": 173,
-              "y": 249,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "nkaiuege",
-            "type": "tap",
-            "x": 720,
-            "y": 60,
-            "params": {
-              "target": "pos",
-              "x": 1171,
-              "y": 579,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "n5xd2xuq",
-            "type": "tap",
-            "x": 920,
-            "y": 60,
-            "params": {
-              "target": "pos",
-              "x": 1366,
-              "y": 736,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "n8kwnftq",
-            "type": "tap",
-            "x": 1120,
-            "y": 60,
-            "params": {
-              "target": "pos",
-              "x": 1589,
-              "y": 1007,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          }
-        ],
-        "edges": [
-          {
-            "from": "nmq3q1do",
-            "fromPort": "out",
-            "to": "nwq946hu"
-          },
-          {
-            "from": "nwq946hu",
-            "fromPort": "true",
-            "to": "ni987oqm"
-          },
-          {
-            "from": "ni987oqm",
-            "fromPort": "out",
-            "to": "nv9dihit"
-          },
-          {
-            "from": "nv9dihit",
-            "fromPort": "out",
-            "to": "nkaiuege"
-          },
-          {
-            "from": "nkaiuege",
-            "fromPort": "out",
-            "to": "n5xd2xuq"
-          },
-          {
-            "from": "n5xd2xuq",
-            "fromPort": "out",
-            "to": "n8kwnftq"
-          },
-          {
-            "from": "n8kwnftq",
-            "fromPort": "out",
-            "to": "nse90g1m"
-          }
-        ],
-        "groups": []
-      },
-      "maxRetries": 1
-    },
-    {
       "id": "sequence_mh8l",
       "name": "Quick Hunt",
       "type": "sequence",
@@ -970,8 +1094,8 @@
           {
             "id": "n49idrfx",
             "type": "start",
-            "x": 48,
-            "y": 272,
+            "x": 40,
+            "y": 275,
             "params": {}
           },
           {
@@ -1204,71 +1328,243 @@
       "maxRetries": 1
     },
     {
-      "id": "sequence_mvf6",
-      "name": "Nhà Hàng + Câu Cá",
+      "id": "sequence_l1f0",
+      "name": "Refinement",
       "type": "sequence",
       "enabled": true,
       "vars": [],
       "graph": {
         "nodes": [
           {
-            "id": "nyq08wux",
+            "id": "nmq3q1do",
             "type": "start",
-            "x": 48,
-            "y": 72,
+            "x": 60,
+            "y": 75,
             "params": {}
           },
           {
-            "id": "nh6zoclg",
+            "id": "nse90g1m",
             "type": "end",
-            "x": 1140,
-            "y": 104,
+            "x": 1520,
+            "y": 75,
             "params": {}
           },
           {
-            "id": "nq2i1hv5",
+            "id": "nwq946hu",
             "type": "call",
             "x": 120,
             "y": 60,
             "params": {
               "fn": "fn_pmuop"
-            }
+            },
+            "delayBefore": 3
           },
           {
-            "id": "nze6stla",
+            "id": "ni987oqm",
             "type": "tap",
             "x": 320,
             "y": 60,
             "params": {
               "target": "pos",
-              "x": 158,
-              "y": 258,
+              "x": 366,
+              "y": 981,
               "taps": "1"
             },
             "delayBefore": 1,
             "delayAfter": 1
           },
           {
-            "id": "n8irom6t",
-            "type": "wait_image",
-            "x": 540,
-            "y": 6,
+            "id": "nv9dihit",
+            "type": "tap",
+            "x": 520,
+            "y": 60,
             "params": {
-              "template": "templates/crop_20260911_104843_1034_821_114_21.png",
-              "threshold": 0.85,
-              "timeout": 10,
-              "negate": false
+              "target": "pos",
+              "x": 173,
+              "y": 249,
+              "taps": "1"
             },
             "delayBefore": 1,
             "delayAfter": 1
           },
           {
-            "id": "nct8yol4",
-            "type": "tap_image",
-            "x": 740,
-            "y": 6,
+            "id": "nkaiuege",
+            "type": "tap",
+            "x": 720,
+            "y": 60,
             "params": {
-              "template": "templates/crop_20260911_104843_1034_821_114_21.png",
+              "target": "pos",
+              "x": 1171,
+              "y": 579,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n5xd2xuq",
+            "type": "tap",
+            "x": 920,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 1366,
+              "y": 736,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n8kwnftq",
+            "type": "tap",
+            "x": 1120,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 1589,
+              "y": 1007,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nr7163l7",
+            "type": "call",
+            "x": 1320,
+            "y": 60,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          }
+        ],
+        "edges": [
+          {
+            "from": "nmq3q1do",
+            "fromPort": "out",
+            "to": "nwq946hu"
+          },
+          {
+            "from": "nwq946hu",
+            "fromPort": "true",
+            "to": "ni987oqm"
+          },
+          {
+            "from": "ni987oqm",
+            "fromPort": "out",
+            "to": "nv9dihit"
+          },
+          {
+            "from": "nv9dihit",
+            "fromPort": "out",
+            "to": "nkaiuege"
+          },
+          {
+            "from": "nkaiuege",
+            "fromPort": "out",
+            "to": "n5xd2xuq"
+          },
+          {
+            "from": "n5xd2xuq",
+            "fromPort": "out",
+            "to": "n8kwnftq"
+          },
+          {
+            "from": "n8kwnftq",
+            "fromPort": "out",
+            "to": "nr7163l7"
+          },
+          {
+            "from": "nr7163l7",
+            "fromPort": "true",
+            "to": "nse90g1m"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_52iz",
+      "name": "Dismantle",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "ne4gu8md",
+            "type": "start",
+            "x": 60,
+            "y": 75,
+            "params": {}
+          },
+          {
+            "id": "n4bgk9ca",
+            "type": "end",
+            "x": 1920,
+            "y": 315,
+            "params": {}
+          },
+          {
+            "id": "nqv7spaa",
+            "type": "call",
+            "x": 120,
+            "y": 60,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 3
+          },
+          {
+            "id": "n18n2zyu",
+            "type": "tap",
+            "x": 320,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 366,
+              "y": 981,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nt25cwe3",
+            "type": "tap",
+            "x": 520,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 173,
+              "y": 249,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n8265caa",
+            "type": "call",
+            "x": 1720,
+            "y": 300,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n1pkgf0i",
+            "type": "tap_image",
+            "x": 720,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260913_210531_1646_993_119_23.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
@@ -1279,28 +1575,104 @@
             "delayAfter": 1
           },
           {
-            "id": "n2ilddit",
+            "id": "nxzzsrhc",
+            "type": "tap_image",
+            "x": 920,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260913_210545_1602_993_38_23.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nbsilgcu",
             "type": "tap",
-            "x": 934,
-            "y": 6,
+            "x": 1120,
+            "y": 60,
             "params": {
               "target": "pos",
-              "x": 1569,
-              "y": 777,
+              "x": 1387,
+              "y": 497,
               "taps": "1"
             },
             "delayBefore": 1,
             "delayAfter": 1
           },
           {
-            "id": "nbvdjj8c",
+            "id": "ndo81oae",
             "type": "tap",
-            "x": 934,
-            "y": 92,
+            "x": 1120,
+            "y": 140,
             "params": {
               "target": "pos",
-              "x": 1569,
-              "y": 777,
+              "x": 1502,
+              "y": 488,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nac6e9v8",
+            "type": "tap",
+            "x": 1120,
+            "y": 220,
+            "params": {
+              "target": "pos",
+              "x": 1630,
+              "y": 489,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "noai5d1t",
+            "type": "tap_image",
+            "x": 1320,
+            "y": 220,
+            "params": {
+              "template": "templates/crop_20260913_210647_1766_992_30_24.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n3oiqdxh",
+            "type": "tap_image",
+            "x": 1320,
+            "y": 300,
+            "params": {
+              "template": "templates/crop_20260913_210722_991_721_108_25.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n4bz0kdj",
+            "type": "tap",
+            "x": 1520,
+            "y": 300,
+            "params": {
+              "target": "pos",
+              "x": 1000,
+              "y": 849,
               "taps": "1"
             },
             "delayBefore": 1,
@@ -1309,39 +1681,1287 @@
         ],
         "edges": [
           {
-            "from": "nyq08wux",
+            "from": "ne4gu8md",
             "fromPort": "out",
-            "to": "nq2i1hv5"
+            "to": "nqv7spaa"
           },
           {
-            "from": "nq2i1hv5",
+            "from": "nqv7spaa",
             "fromPort": "true",
-            "to": "nze6stla"
+            "to": "n18n2zyu"
           },
           {
-            "from": "nze6stla",
+            "from": "n18n2zyu",
             "fromPort": "out",
-            "to": "n8irom6t"
+            "to": "nt25cwe3"
           },
           {
-            "from": "n8irom6t",
+            "from": "n8265caa",
             "fromPort": "true",
-            "to": "nct8yol4"
+            "to": "n4bgk9ca"
           },
           {
-            "from": "nct8yol4",
+            "from": "nt25cwe3",
+            "fromPort": "out",
+            "to": "n1pkgf0i"
+          },
+          {
+            "from": "n1pkgf0i",
             "fromPort": "true",
-            "to": "n2ilddit"
+            "to": "nxzzsrhc"
           },
           {
-            "from": "n2ilddit",
-            "fromPort": "out",
-            "to": "nbvdjj8c"
+            "from": "nxzzsrhc",
+            "fromPort": "true",
+            "to": "nbsilgcu"
           },
           {
-            "from": "nbvdjj8c",
+            "from": "nbsilgcu",
             "fromPort": "out",
-            "to": "nh6zoclg"
+            "to": "ndo81oae"
+          },
+          {
+            "from": "ndo81oae",
+            "fromPort": "out",
+            "to": "nac6e9v8"
+          },
+          {
+            "from": "nac6e9v8",
+            "fromPort": "out",
+            "to": "noai5d1t"
+          },
+          {
+            "from": "noai5d1t",
+            "fromPort": "true",
+            "to": "n3oiqdxh"
+          },
+          {
+            "from": "n3oiqdxh",
+            "fromPort": "true",
+            "to": "n4bz0kdj"
+          },
+          {
+            "from": "n4bz0kdj",
+            "fromPort": "out",
+            "to": "n8265caa"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_m8k3",
+      "name": "PvP",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nsnuysf0",
+            "type": "start",
+            "x": 48,
+            "y": 72,
+            "params": {}
+          },
+          {
+            "id": "nley008w",
+            "type": "call",
+            "x": 120,
+            "y": 57,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nt09wo02",
+            "type": "tap_random",
+            "x": 1700,
+            "y": 1040,
+            "params": {
+              "x1": 0,
+              "y1": 0,
+              "x2": 100,
+              "y2": 100
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nmabn4ky",
+            "type": "tap",
+            "x": 320,
+            "y": 57,
+            "params": {
+              "target": "pos",
+              "x": 1692,
+              "y": 964,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "ng1t5mh6",
+            "type": "tap_image",
+            "x": 520,
+            "y": 57,
+            "params": {
+              "template": "templates/crop_20260912_192923_212_255_126_41.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nbu1nf5x",
+            "type": "if_image",
+            "x": 720,
+            "y": -20,
+            "params": {
+              "template": "templates/crop_20260912_192951_915_996_92_17.png",
+              "threshold": 0.85,
+              "negate": false
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nqsej3ht",
+            "type": "tap_image",
+            "x": 920,
+            "y": -20,
+            "params": {
+              "template": "templates/crop_20260912_192951_915_996_92_17.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "na80q7s4",
+            "type": "win_key",
+            "x": 920,
+            "y": 80,
+            "params": {
+              "keycode": "37",
+              "mode": "press",
+              "hold": 300
+            },
+            "delayBefore": 5,
+            "delayAfter": 1
+          },
+          {
+            "id": "ne6kvbjy",
+            "type": "win_key",
+            "x": 920,
+            "y": 160,
+            "params": {
+              "keycode": "40",
+              "mode": "press",
+              "hold": 300
+            },
+            "delayBefore": 3,
+            "delayAfter": 1
+          },
+          {
+            "id": "npx7h2zd",
+            "type": "tap_image",
+            "x": 1120,
+            "y": 160,
+            "params": {
+              "template": "templates/crop_20260913_214100_1713_963_103_45.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n9xk68fw",
+            "type": "tap",
+            "x": 1554,
+            "y": 160,
+            "params": {
+              "target": "pos",
+              "x": 1491,
+              "y": 52,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nj8ys5nw",
+            "type": "if_image",
+            "x": 1320,
+            "y": 160,
+            "params": {
+              "template": "templates/crop_20260913_214159_1701_997_58_26.png",
+              "threshold": 0.85,
+              "negate": true
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "naw969hn",
+            "type": "tap_image",
+            "x": 1554,
+            "y": 240,
+            "params": {
+              "template": "templates/crop_20260913_214159_1701_997_58_26.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n231q4cq",
+            "type": "end",
+            "x": 1746,
+            "y": 255,
+            "params": {},
+            "delayBefore": 1,
+            "delayAfter": 1
+          }
+        ],
+        "edges": [
+          {
+            "from": "nsnuysf0",
+            "fromPort": "out",
+            "to": "nley008w"
+          },
+          {
+            "from": "nley008w",
+            "fromPort": "true",
+            "to": "nmabn4ky"
+          },
+          {
+            "from": "nmabn4ky",
+            "fromPort": "out",
+            "to": "ng1t5mh6"
+          },
+          {
+            "from": "ng1t5mh6",
+            "fromPort": "true",
+            "to": "nbu1nf5x"
+          },
+          {
+            "from": "nbu1nf5x",
+            "fromPort": "true",
+            "to": "nqsej3ht"
+          },
+          {
+            "from": "na80q7s4",
+            "fromPort": "out",
+            "to": "ne6kvbjy"
+          },
+          {
+            "from": "nbu1nf5x",
+            "fromPort": "false",
+            "to": "na80q7s4"
+          },
+          {
+            "from": "nqsej3ht",
+            "fromPort": "true",
+            "to": "na80q7s4"
+          },
+          {
+            "from": "ne6kvbjy",
+            "fromPort": "out",
+            "to": "npx7h2zd"
+          },
+          {
+            "from": "npx7h2zd",
+            "fromPort": "true",
+            "to": "nj8ys5nw"
+          },
+          {
+            "from": "nj8ys5nw",
+            "fromPort": "true",
+            "to": "n9xk68fw"
+          },
+          {
+            "from": "n9xk68fw",
+            "fromPort": "out",
+            "to": "nj8ys5nw"
+          },
+          {
+            "from": "nj8ys5nw",
+            "fromPort": "false",
+            "to": "naw969hn"
+          },
+          {
+            "from": "naw969hn",
+            "fromPort": "true",
+            "to": "n231q4cq"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_5zy5",
+      "name": "Pass",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "n2m6d7re",
+            "type": "start",
+            "x": 48,
+            "y": 72,
+            "params": {}
+          },
+          {
+            "id": "nzdjms39",
+            "type": "end",
+            "x": 1380,
+            "y": 135,
+            "params": {}
+          },
+          {
+            "id": "n5qqdt89",
+            "type": "call",
+            "x": 120,
+            "y": 57,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nn6u3rmt",
+            "type": "tap",
+            "x": 320,
+            "y": 57,
+            "params": {
+              "target": "pos",
+              "x": 1666,
+              "y": 268,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nfqykdw1",
+            "type": "sequence",
+            "x": 520,
+            "y": 57,
+            "params": {
+              "count": 4
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n221uiwx",
+            "type": "tap_image",
+            "x": 740,
+            "y": -40,
+            "params": {
+              "template": "templates/crop_20260912_192140_1338_745_169_39.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nma6nm8u",
+            "type": "tap",
+            "x": 740,
+            "y": 36,
+            "params": {
+              "target": "pos",
+              "x": 417,
+              "y": 416,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n3xm8ndf",
+            "type": "tap",
+            "x": 740,
+            "y": 120,
+            "params": {
+              "target": "pos",
+              "x": 413,
+              "y": 523,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nj43pog9",
+            "type": "tap",
+            "x": 740,
+            "y": 205,
+            "params": {
+              "target": "pos",
+              "x": 413,
+              "y": 624,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nwa65taq",
+            "type": "tap_image",
+            "x": 940,
+            "y": 36,
+            "params": {
+              "template": "templates/crop_20260912_192140_1338_745_169_39.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nporq6r1",
+            "type": "tap_image",
+            "x": 940,
+            "y": 120,
+            "params": {
+              "template": "templates/crop_20260912_192140_1338_745_169_39.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nhnlhv17",
+            "type": "tap_image",
+            "x": 940,
+            "y": 207,
+            "params": {
+              "template": "templates/crop_20260912_192140_1338_745_169_39.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nu6h932s",
+            "type": "tap",
+            "x": 1160,
+            "y": 120,
+            "params": {
+              "target": "pos",
+              "x": 1755,
+              "y": 346,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n7jk9rxt",
+            "type": "tap_random",
+            "x": 1700,
+            "y": 1040,
+            "params": {
+              "x1": 0,
+              "y1": 0,
+              "x2": 100,
+              "y2": 100
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          }
+        ],
+        "edges": [
+          {
+            "from": "n2m6d7re",
+            "fromPort": "out",
+            "to": "n5qqdt89"
+          },
+          {
+            "from": "n5qqdt89",
+            "fromPort": "true",
+            "to": "nn6u3rmt"
+          },
+          {
+            "from": "nn6u3rmt",
+            "fromPort": "out",
+            "to": "nfqykdw1"
+          },
+          {
+            "from": "nfqykdw1",
+            "fromPort": "1",
+            "to": "n221uiwx"
+          },
+          {
+            "from": "nfqykdw1",
+            "fromPort": "2",
+            "to": "nma6nm8u"
+          },
+          {
+            "from": "nfqykdw1",
+            "fromPort": "3",
+            "to": "n3xm8ndf"
+          },
+          {
+            "from": "nfqykdw1",
+            "fromPort": "4",
+            "to": "nj43pog9"
+          },
+          {
+            "from": "nma6nm8u",
+            "fromPort": "out",
+            "to": "nwa65taq"
+          },
+          {
+            "from": "n3xm8ndf",
+            "fromPort": "out",
+            "to": "nporq6r1"
+          },
+          {
+            "from": "nj43pog9",
+            "fromPort": "out",
+            "to": "nhnlhv17"
+          },
+          {
+            "from": "nwa65taq",
+            "fromPort": "true",
+            "to": "nu6h932s"
+          },
+          {
+            "from": "nporq6r1",
+            "fromPort": "true",
+            "to": "nu6h932s"
+          },
+          {
+            "from": "nhnlhv17",
+            "fromPort": "true",
+            "to": "nu6h932s"
+          },
+          {
+            "from": "n221uiwx",
+            "fromPort": "true",
+            "to": "nu6h932s"
+          },
+          {
+            "from": "nu6h932s",
+            "fromPort": "out",
+            "to": "nzdjms39"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_pwks",
+      "name": "Nhận Thư",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "ngdxu50l",
+            "type": "start",
+            "x": -160,
+            "y": 72,
+            "params": {}
+          },
+          {
+            "id": "nshc9lto",
+            "type": "end",
+            "x": 920,
+            "y": 88,
+            "params": {}
+          },
+          {
+            "id": "nlker6td",
+            "type": "tap_image",
+            "x": 120,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260715_063913_1625_47_38_25.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n99tnosz",
+            "type": "tap_image",
+            "x": 520,
+            "y": 76,
+            "params": {
+              "template": "templates/crop_20260716_152607_1631_997_108_18.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nqouejkr",
+            "type": "call",
+            "x": 720,
+            "y": 76,
+            "params": {
+              "fn": "fn_ursje"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nfeqlqat",
+            "type": "call",
+            "x": -80,
+            "y": 60,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 3
+          },
+          {
+            "id": "n67s00px",
+            "type": "if_image",
+            "x": 320,
+            "y": 60,
+            "params": {
+              "template": "templates/crop_20260903_142311_278_38_275_34.png",
+              "threshold": 0.85,
+              "negate": true
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          }
+        ],
+        "edges": [
+          {
+            "from": "n99tnosz",
+            "fromPort": "true",
+            "to": "nqouejkr"
+          },
+          {
+            "from": "nqouejkr",
+            "fromPort": "true",
+            "to": "nshc9lto"
+          },
+          {
+            "from": "ngdxu50l",
+            "fromPort": "out",
+            "to": "nfeqlqat"
+          },
+          {
+            "from": "nfeqlqat",
+            "fromPort": "true",
+            "to": "nlker6td"
+          },
+          {
+            "from": "nlker6td",
+            "fromPort": "true",
+            "to": "n67s00px"
+          },
+          {
+            "from": "n67s00px",
+            "fromPort": "true",
+            "to": "nlker6td"
+          },
+          {
+            "from": "n67s00px",
+            "fromPort": "false",
+            "to": "n99tnosz"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_614i",
+      "name": "Event Battle",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nzee4vng",
+            "type": "start",
+            "x": 8,
+            "y": 75,
+            "params": {}
+          },
+          {
+            "id": "nj0k3fg2",
+            "type": "end",
+            "x": 460,
+            "y": 220,
+            "params": {}
+          },
+          {
+            "id": "nm9h0i5l",
+            "type": "call",
+            "x": 80,
+            "y": 60,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nnacflgw",
+            "type": "tap",
+            "x": 288,
+            "y": 60,
+            "params": {
+              "target": "pos",
+              "x": 1679,
+              "y": 787,
+              "taps": "1"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "n6omcv7m",
+            "type": "tap",
+            "x": 544,
+            "y": -72,
+            "params": {
+              "target": "pos",
+              "x": 458,
+              "y": 852,
+              "taps": "1"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nox1hgam",
+            "type": "if_image",
+            "x": 744,
+            "y": -72,
+            "params": {
+              "template": "templates/crop_20260913_223356_1649_953_114_84.png",
+              "threshold": 0.85,
+              "negate": false
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "n6ynqp48",
+            "type": "tap_image",
+            "x": 944,
+            "y": -72,
+            "params": {
+              "template": "templates/crop_20260913_223356_1649_953_114_84.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "n0lh129b",
+            "type": "tap_image",
+            "x": 1144,
+            "y": -72,
+            "params": {
+              "template": "templates/crop_20260913_223435_1136_425_70_30.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "ngb39h81",
+            "type": "tap_image",
+            "x": 1344,
+            "y": -72,
+            "params": {
+              "template": "templates/crop_20260913_223453_979_825_74_33.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "ngdsh2cz",
+            "type": "wait_image",
+            "x": 1544,
+            "y": -72,
+            "params": {
+              "template": "templates/crop_20260913_223723_1532_992_91_32.png",
+              "threshold": 0.85,
+              "timeout": 300,
+              "negate": false
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "ns3k8f5s",
+            "type": "tap_image",
+            "x": 1744,
+            "y": -72,
+            "params": {
+              "template": "templates/crop_20260913_223723_1532_992_91_32.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "n1j8so0z",
+            "type": "tap",
+            "x": 540,
+            "y": 100,
+            "params": {
+              "target": "pos",
+              "x": 660,
+              "y": 854,
+              "taps": "1"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "niok96hy",
+            "type": "if_image",
+            "x": 740,
+            "y": 100,
+            "params": {
+              "template": "templates/crop_20260913_223356_1649_953_114_84.png",
+              "threshold": 0.85,
+              "negate": false
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nxi5zyqa",
+            "type": "tap_image",
+            "x": 940,
+            "y": 100,
+            "params": {
+              "template": "templates/crop_20260913_223356_1649_953_114_84.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "n1lgyz1d",
+            "type": "tap_image",
+            "x": 1140,
+            "y": 100,
+            "params": {
+              "template": "templates/crop_20260913_223435_1136_425_70_30.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nhwdbavx",
+            "type": "tap_image",
+            "x": 1340,
+            "y": 100,
+            "params": {
+              "template": "templates/crop_20260913_223453_979_825_74_33.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nnm8uotf",
+            "type": "wait_image",
+            "x": 1540,
+            "y": 100,
+            "params": {
+              "template": "templates/crop_20260913_223723_1532_992_91_32.png",
+              "threshold": 0.85,
+              "timeout": 300,
+              "negate": false
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "n1y0i576",
+            "type": "tap_image",
+            "x": 1740,
+            "y": 100,
+            "params": {
+              "template": "templates/crop_20260913_223723_1532_992_91_32.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          }
+        ],
+        "edges": [
+          {
+            "from": "nzee4vng",
+            "fromPort": "out",
+            "to": "nm9h0i5l"
+          },
+          {
+            "from": "nm9h0i5l",
+            "fromPort": "true",
+            "to": "nnacflgw"
+          },
+          {
+            "from": "n6omcv7m",
+            "fromPort": "out",
+            "to": "nox1hgam"
+          },
+          {
+            "from": "nox1hgam",
+            "fromPort": "true",
+            "to": "n6ynqp48"
+          },
+          {
+            "from": "n6ynqp48",
+            "fromPort": "true",
+            "to": "n0lh129b"
+          },
+          {
+            "from": "n0lh129b",
+            "fromPort": "true",
+            "to": "ngb39h81"
+          },
+          {
+            "from": "ngb39h81",
+            "fromPort": "true",
+            "to": "ngdsh2cz"
+          },
+          {
+            "from": "ngdsh2cz",
+            "fromPort": "true",
+            "to": "ns3k8f5s"
+          },
+          {
+            "from": "n1j8so0z",
+            "fromPort": "out",
+            "to": "niok96hy"
+          },
+          {
+            "from": "niok96hy",
+            "fromPort": "true",
+            "to": "nxi5zyqa"
+          },
+          {
+            "from": "nxi5zyqa",
+            "fromPort": "true",
+            "to": "n1lgyz1d"
+          },
+          {
+            "from": "n1lgyz1d",
+            "fromPort": "true",
+            "to": "nhwdbavx"
+          },
+          {
+            "from": "nhwdbavx",
+            "fromPort": "true",
+            "to": "nnm8uotf"
+          },
+          {
+            "from": "nnm8uotf",
+            "fromPort": "true",
+            "to": "n1y0i576"
+          },
+          {
+            "from": "nnacflgw",
+            "fromPort": "out",
+            "to": "n1j8so0z"
+          }
+        ],
+        "groups": [
+          {
+            "id": "gl4550e5",
+            "name": "Normal",
+            "x": 520,
+            "y": -120,
+            "w": 1420,
+            "h": 142,
+            "color": 0
+          }
+        ]
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_zsir",
+      "name": "Event",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nltchzy6",
+            "type": "start",
+            "x": 20,
+            "y": -85,
+            "params": {}
+          },
+          {
+            "id": "nz4uoe64",
+            "type": "end",
+            "x": 440,
+            "y": 72,
+            "params": {}
+          },
+          {
+            "id": "n73ra5w8",
+            "type": "call",
+            "x": 100,
+            "y": -100,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nk1el0l5",
+            "type": "tap_image",
+            "x": 300,
+            "y": -100,
+            "params": {
+              "template": "templates/crop_20260913_224002_865_1010_54_19.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nu7rhzzr",
+            "type": "swipe",
+            "x": 500,
+            "y": -100,
+            "params": {
+              "x1": 442,
+              "y1": 732,
+              "x2": 442,
+              "y2": 318,
+              "duration": 300
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nssgtef4",
+            "type": "tap_image",
+            "x": 700,
+            "y": -100,
+            "params": {
+              "template": "templates/crop_20260913_224207_327_370_89_18.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nxekbssc",
+            "type": "tap_image",
+            "x": 900,
+            "y": -20,
+            "params": {
+              "template": "templates/crop_20260913_224228_1412_744_159_20.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nh3ht3db",
+            "type": "tap",
+            "x": 900,
+            "y": 57,
+            "params": {
+              "target": "pos",
+              "x": 1773,
+              "y": 795,
+              "taps": "1"
+            },
+            "delayBefore": 10
+          },
+          {
+            "id": "njhgnryu",
+            "type": "loop",
+            "x": 900,
+            "y": -100,
+            "params": {
+              "infinite": false,
+              "count": 2
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "ns3gq6f6",
+            "type": "tap_image",
+            "x": 1100,
+            "y": -82,
+            "params": {
+              "template": "templates/crop_20260913_224454_1207_745_127_21.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nxrt2esd",
+            "type": "tap",
+            "x": 1100,
+            "y": -2,
+            "params": {
+              "target": "pos",
+              "x": 1773,
+              "y": 795,
+              "taps": "1"
+            },
+            "delayBefore": 10
+          },
+          {
+            "id": "ndrup0tb",
+            "type": "call",
+            "x": 1320,
+            "y": -2,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1
+          }
+        ],
+        "edges": [
+          {
+            "from": "nltchzy6",
+            "fromPort": "out",
+            "to": "n73ra5w8"
+          },
+          {
+            "from": "n73ra5w8",
+            "fromPort": "true",
+            "to": "nk1el0l5"
+          },
+          {
+            "from": "nk1el0l5",
+            "fromPort": "true",
+            "to": "nu7rhzzr"
+          },
+          {
+            "from": "nxekbssc",
+            "fromPort": "true",
+            "to": "nh3ht3db"
+          },
+          {
+            "from": "njhgnryu",
+            "fromPort": "body",
+            "to": "nxekbssc"
+          },
+          {
+            "from": "nu7rhzzr",
+            "fromPort": "out",
+            "to": "nssgtef4"
+          },
+          {
+            "from": "nssgtef4",
+            "fromPort": "true",
+            "to": "njhgnryu"
+          },
+          {
+            "from": "nh3ht3db",
+            "fromPort": "out",
+            "to": "njhgnryu",
+            "toPort": "loop"
+          },
+          {
+            "from": "njhgnryu",
+            "fromPort": "done",
+            "to": "ns3gq6f6"
+          },
+          {
+            "from": "ns3gq6f6",
+            "fromPort": "true",
+            "to": "nxrt2esd"
+          },
+          {
+            "from": "nxrt2esd",
+            "fromPort": "out",
+            "to": "ndrup0tb"
           }
         ],
         "groups": []
@@ -1359,15 +2979,15 @@
           {
             "id": "nqhs6oue",
             "type": "start",
-            "x": 48,
-            "y": 72,
+            "x": 60,
+            "y": 75,
             "params": {}
           },
           {
             "id": "nmuw42ke",
             "type": "end",
-            "x": 1020,
-            "y": 160,
+            "x": 940,
+            "y": 175,
             "params": {}
           },
           {
@@ -1420,6 +3040,50 @@
             },
             "delayBefore": 1,
             "delayAfter": 1
+          },
+          {
+            "id": "nktl1fej",
+            "type": "tap",
+            "x": 320,
+            "y": 160,
+            "params": {
+              "target": "pos",
+              "x": 302,
+              "y": 227,
+              "taps": "1"
+            },
+            "note": "Weekly",
+            "log": "Claim weekly reward",
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n9qipvmq",
+            "type": "tap",
+            "x": 514,
+            "y": 160,
+            "params": {
+              "target": "pos",
+              "x": 1688,
+              "y": 1005,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nfup8gdi",
+            "type": "tap_random",
+            "x": 720,
+            "y": 160,
+            "params": {
+              "x1": 0,
+              "y1": 0,
+              "x2": 100,
+              "y2": 100
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
           }
         ],
         "edges": [
@@ -1442,11 +3106,35 @@
             "from": "n2phzvh8",
             "fromPort": "out",
             "to": "ntmh1oz2"
+          },
+          {
+            "from": "ntmh1oz2",
+            "fromPort": "out",
+            "to": "nktl1fej"
+          },
+          {
+            "from": "nktl1fej",
+            "fromPort": "out",
+            "to": "n9qipvmq"
+          },
+          {
+            "from": "n9qipvmq",
+            "fromPort": "out",
+            "to": "nfup8gdi"
+          },
+          {
+            "from": "nfup8gdi",
+            "fromPort": "out",
+            "to": "nmuw42ke"
           }
         ],
         "groups": []
       },
       "maxRetries": 1
     }
-  ]
+  ],
+  "runnerUpdate": {
+    "lastVersion": "1.0.6",
+    "repo": "hieuduongzx/adb-auto-game"
+  }
 }

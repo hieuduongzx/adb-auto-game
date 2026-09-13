@@ -381,12 +381,13 @@ function wfShowVarMenu(anchor,onPick,opts){
   const addGlobal=document.createElement("button"); addGlobal.type="button"; addGlobal.className="wf-varmenu-add";
   addGlobal.innerHTML=`${wfIco("pin")}<span>New global variable…</span>`;
   addGlobal.onclick=()=>{
-    uiPrompt({title:"New global variable", label:"Variable name", placeholder:"e.g. round"}).then(v=>{
-      const nm=(v||"").trim();
-      if(!nm) return;
+    uiPrompt({title:"New global variable", label:"Title", placeholder:"e.g. Đọc email"}).then(v=>{
+      const title=(v||"").trim();
+      if(!title) return;
       wfPushUndoDebounced();
       if(!Array.isArray(WF.globals)) WF.globals=[];
-      if(!WF.globals.some(x=>x.name===nm)) WF.globals.push({name:nm, label:nm, type:opts.newType||"text", value:"", children:[]});
+      const nm=wfUniqVarName(wfVarSlug(title)||"g"+(WF.globals.length+1), WF.globals.map(x=>x.name));
+      WF.globals.push({name:nm, label:title, type:opts.newType||"text", value:"", children:[]});
       wfRenderVarsPanel(); onPick(nm); wfCloseVarMenu();
     });
   };
@@ -396,12 +397,13 @@ function wfShowVarMenu(anchor,onPick,opts){
     const addLocal=document.createElement("button"); addLocal.type="button"; addLocal.className="wf-varmenu-add";
     addLocal.innerHTML=`${wfIco("pin")}<span>New local variable…</span>`;
     addLocal.onclick=()=>{
-      uiPrompt({title:"New local variable", label:`Name (activity «${act.name||"activity"}»)`, placeholder:"e.g. step"}).then(v=>{
-        const nm=(v||"").trim();
-        if(!nm) return;
+      uiPrompt({title:"New local variable", label:`Title (activity «${act.name||"activity"}»)`, placeholder:"e.g. Đọc email"}).then(v=>{
+        const title=(v||"").trim();
+        if(!title) return;
         wfPushUndoDebounced();
         if(!Array.isArray(act.vars)) act.vars=[];
-        if(!act.vars.some(x=>x.name===nm)) act.vars.push({name:nm, label:nm, type:opts.newType||"text", value:"", children:[]});
+        const nm=wfUniqVarName(wfVarSlug(title)||"v"+(act.vars.length+1), act.vars.map(x=>x.name));
+        act.vars.push({name:nm, label:title, type:opts.newType||"text", value:"", children:[]});
         wfRenderVarsPanel(); onPick(nm); wfCloseVarMenu();
       });
     };
@@ -803,7 +805,7 @@ function wfVarAddBtn(act, parentVar, parentIdx){
     wfPushUndoDebounced();
     const arr=parentVar?parentVar.children:(act.vars);
     const n=arr.length+1; const prefix=parentVar?(parentVar.name||"sub")+"_":"";
-    arr.push({name:prefix+"var"+n, label:"Setting "+n, type:"bool", value:false, children:[]});
+    arr.push({name:prefix+wfVarSlug("Setting "+n), label:"Setting "+n, type:"bool", value:false, children:[]});
     wfRenderInspector();
   };
   return add;
@@ -835,7 +837,13 @@ function wfVarRow(act,v,idx,depth){
   chip.addEventListener("dragend",()=>{ wfPaletteDrag=null; });
   r1.appendChild(chip);
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Title (shown in settings)"; lbl.style.cssText="flex:1;min-width:0;font-weight:600;";
-  lbl.oninput=()=>{ wfPushUndoDebounced(); v.label=lbl.value; };
+  // While the code name has never been edited by hand, keep it in sync with the
+  // Title the user types ("Đọc email" → "doc_email").
+  let autoName = !v.name || v.name===v.label || v.name===wfVarSlug(v.label||"");
+  lbl.oninput=()=>{
+    wfPushUndoDebounced(); v.label=lbl.value;
+    if(autoName){ const s=wfVarSlug(lbl.value); if(s){ v.name=s; nm.value=s; } }
+  };
   r1.appendChild(lbl);
   const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Child"; addChild.title="Add child variable (nested)";
   addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); wfRenderInspector(); };
@@ -853,7 +861,7 @@ function wfVarRow(act,v,idx,depth){
   // Line 2: name + type + default value.
   const r2=document.createElement("div"); r2.className="wf-var-row";
   const nm=document.createElement("input"); nm.type="text"; nm.value=v.name||""; nm.placeholder="variable (e.g. isClaim)"; nm.style.cssText="flex:1;min-width:0;font-size:10.5px;font-family:var(--mono);";
-  nm.oninput=()=>{ wfPushUndoDebounced(); v.name=nm.value; };
+  nm.oninput=()=>{ wfPushUndoDebounced(); v.name=nm.value; autoName=!v.name || v.name===wfVarSlug(v.label||""); };
   r2.appendChild(nm);
   const ty=document.createElement("select");
   [["bool","bool"],["number","number"],["text","text"],["path","path"],["select","select"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });

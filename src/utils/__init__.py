@@ -203,7 +203,7 @@ def log_normal(message: str) -> None:
 #   * ``app_dir()``    -> the folder that contains the .exe (where the shipped,
 #                         read-only ``vendor/`` lives — adb/frida/tesseract);
 #   * ``data_root()``  -> writable user data (``workflows/``, ``data/``, ``out/``,
-#                         ``autoclicks/``, ``logs/``). Same as app_dir() for a
+#                         ``logs/``). Same as app_dir() for a
 #                         plain/portable build, but redirected OUT of the install
 #                         folder under a Velopack install so auto-updates (which
 #                         replace ``current/`` wholesale) never wipe user data;

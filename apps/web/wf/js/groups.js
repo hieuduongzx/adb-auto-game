@@ -432,6 +432,28 @@ function wfShowQuickConnectMenu(clientX, clientY, source, port){
   function render(raw){
     const q=(raw||"").trim().toLowerCase();
     body.innerHTML=""; let shown=0;
+    // Recent + frequently used blocks sit above everything else: the handful a
+    // person keeps reaching for should be one click away, not buried under the
+    // category list. Same controller/hidden gates as the catalog so a block the
+    // project cannot use never appears here either.
+    if(!q && typeof wfNodeUsePicks==="function"){
+      const picks=wfNodeUsePicks(6,6);
+      const allow=t=>WF_NODES[t]&&!WF_NODES[t].hidden&&wfNodeAllowed(t,ctrl);
+      const recent=picks.recent.filter(allow);
+      const freq=picks.freq.filter(allow);
+      if(recent.length){
+        body.appendChild(sec("Recent",recent.length));
+        const g=document.createElement("div"); g.className="wf-qc-grid";
+        recent.forEach(t=>{ g.appendChild(chip(t)); shown++; });
+        body.appendChild(g);
+      }
+      if(freq.length){
+        body.appendChild(sec("Frequently used",freq.length));
+        const g=document.createElement("div"); g.className="wf-qc-grid";
+        freq.forEach(t=>{ g.appendChild(chip(t)); shown++; });
+        body.appendChild(g);
+      }
+    }
     if(!q && suggested.length){
       body.appendChild(sec("Suggested"));
       const g=document.createElement("div"); g.className="wf-qc-grid";

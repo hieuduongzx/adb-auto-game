@@ -6,11 +6,15 @@
 // Enter = primary button, backdrop click = cancel.
 
 // ── Toast ────────────────────────────────────────────────────────────────────
+// Level -> the shared icon of the same name. These four used to be hand-drawn
+// here (a fat polyline check, a 9px info circle) and were wrapped in an <svg>
+// with its own stroke-width, so a Designer toast read heavier than everything
+// around it — and than the Hub's, which drew the same four glyphs differently.
 const UI_TOAST_ICO = {
-  success: '<polyline points="4 12.5 9.5 18 20 6"/>',
-  error:   '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
-  warning: '<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
-  info:    '<circle cx="12" cy="12" r="9"/><line x1="12" y1="10.5" x2="12" y2="16"/><circle cx="12" cy="7.6" r="0.7"/>',
+  success: "check",
+  error:   "x",
+  warning: "triangle-alert",
+  info:    "info",
 };
 function uiToastHost(){
   let h=document.getElementById("ui-toasts");
@@ -24,7 +28,7 @@ function uiToast(msg, level, opts){
   const host=uiToastHost();
   const t=document.createElement("div");
   t.className="ui-toast ui-"+level;
-  t.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${UI_TOAST_ICO[level]}</svg>`+
+  t.innerHTML = uiIco(UI_TOAST_ICO[level], "uico-2") +
     `<span class="ui-toast-msg">${escHtml(String(msg))}</span>`;
   t.title="Click to dismiss";
   host.appendChild(t);

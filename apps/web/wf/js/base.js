@@ -5,6 +5,26 @@ const LOG_TAG = {info:"INF",success:"OK ",warning:"WRN",error:"ERR"};
 const S = { devices:[], connectedSerial:null, captureBackend:"scrcpy", inputBackend:"adb" };
 function setStatus(msg){ const e=$("status-text"); if(e) e.textContent=msg; }
 function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+// Turn a human Title into a variable code name: strip accents (Vietnamese
+// included), lowercase, spaces/punctuation → "_". "Đọc email" → "doc_email",
+// "Mày là con chó" → "may_la_con_cho". Returns "" when nothing usable remains.
+function wfVarSlug(title){
+  let s=String(title==null?"":title).normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/[đĐ]/g,"d")
+    .toLowerCase().trim();
+  s=s.replace(/[^a-z0-9]+/g,"_").replace(/_{2,}/g,"_").replace(/^_+|_+$/g,"");
+  if(s && /^[0-9]/.test(s)) s="v_"+s;
+  return s;
+}
+// Make a variable name unique against a list of existing names (suffix _2, _3…).
+function wfUniqVarName(base,existing){
+  base=base||"var";
+  const set=new Set((existing||[]).map(n=>String(n||"")));
+  if(!set.has(base)) return base;
+  let i=2; while(set.has(base+"_"+i)) i++;
+  return base+"_"+i;
+}
 function setConnected(on){ const a=$("device-dot"),b=$("footer-dot"); if(a)a.classList.toggle("connected",on); if(b)b.classList.toggle("connected",on); }
 
 // Load a template thumbnail (data-URL from Python) into an <img>, hide if none.
@@ -235,6 +255,62 @@ function wfSetActStatus(id, status){
 // Clear every activity's run-status (called when a run starts or stops).
 function wfResetActStatus(){
   for(const id in wfActStatus) wfSetActStatus(id, null);
+}
+
+// ── Crash point ──────────────────────────────────────────────────────────────
+// activityId -> {node,type,label,name,reason,message,ts}: the block an activity
+// actually died on, from the engine's on_activity_crash. Deliberately OUTLIVES
+// the run-trail reset (wfResetRunViz) — after a long unattended run the whole
+// point is that the marker is still there when you come back, and after the
+// NEXT run starts you can still see where the previous one stopped. An entry
+// clears only when that activity starts running again (a fresh verdict is
+// coming) or when its crash block is edited away.
+const wfActCrash={};
+// nodeId -> activityId, so the canvas can mark the block itself without
+// scanning every activity on each render.
+const wfCrashNodes={};
+function wfIsCrashNode(id){ return !!id && Object.prototype.hasOwnProperty.call(wfCrashNodes, id); }
+function wfSetActCrash(actId, info){
+  if(!actId) return;
+  wfClearActCrash(actId);
+  if(!info || !info.node) return;
+  wfActCrash[actId]=info;
+  wfCrashNodes[info.node]=actId;
+  const el=wfNodeElById(info.node); if(el) el.classList.add("crashed");
+}
+function wfClearActCrash(actId){
+  const prev=wfActCrash[actId];
+  if(!prev) return;
+  delete wfActCrash[actId];
+  if(prev.node){
+    delete wfCrashNodes[prev.node];
+    const el=wfNodeElById(prev.node); if(el) el.classList.remove("crashed");
+  }
+}
+function wfClearAllActCrash(){
+  Object.keys(wfActCrash).forEach(wfClearActCrash);
+}
+// One-line "why it stopped" for tooltips and the status bar.
+function wfCrashWhy(info){
+  if(!info) return "";
+  const what = info.name || info.label || info.type || "block";
+  const why = { failed:"khối này chạy không thành công",
+                error:"khối này ném lỗi",
+                dead_end:"nhánh đi ra chưa nối đi đâu" }[info.reason] || info.reason || "";
+  return `${what}${why?" — "+why:""}${info.message?": "+info.message:""}`;
+}
+// Jump the editor to an activity's crash block: switch to its graph, select it
+// and centre the camera — the same move as clicking a validation issue.
+function wfJumpToCrash(actId){
+  const info=wfActCrash[actId]; if(!info || !info.node) return false;
+  const owner=(typeof wfFindNodeOwner==="function") ? wfFindNodeOwner(info.node) : null;
+  if(!owner){ setStatus("Khối đó không còn trong workflow"); wfClearActCrash(actId); wfRenderActivities(); return false; }
+  if(owner.kind==="activity") wfSelectActivity(owner.id); else wfEditFunction(owner.id);
+  WF.sel=[info.node]; WF.selectedNode=info.node;
+  wfRenderCanvas(); wfRenderInspector();
+  const n=wfNode(info.node); if(n) wfCenterOnNode(n);
+  setStatus("Dừng tại: "+wfCrashWhy(info));
+  return true;
 }
 function wfNodeElById(id){ return id ? document.querySelector(`.wf-node[data-node="${id}"]`) : null; }
 

@@ -184,7 +184,9 @@ kbd {
   font-size: var(--t-body); font-weight: 600; color: var(--ink2); cursor: pointer;
   pointer-events: auto; animation: uiToastIn .18s var(--ease) both;
 }
-.ui-toast svg { width:14px; height:14px; stroke-width:2; flex-shrink: 0; }
+/* Size comes from the shared ladder — the toast's icon markup carries `uico-2`.
+   A bare `svg` rule here would out-specify that class and re-introduce the
+   off-ladder widths this cleanup removed. */
 .ui-toast-msg { min-width: 0; line-height: 1.45; word-break: break-word; }
 .ui-toast.ui-success { background: var(--ok-bg); color: var(--ok-ink); }
 .ui-toast.ui-error   { background: var(--err-bg); color: var(--err); }

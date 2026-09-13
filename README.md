@@ -18,8 +18,7 @@ Frozen exe modes: `Macro2k.exe` (hub), `--designer [flow]`, `--runner [flow]`.
 ```
 apps/           Product apps + web UI (hub / wf / runner / scope)
 src/            Library: ADB core, OCR, Win32, workflow engine, utils
-workflows/      User flows: <Name>/*.json + templates/
-autoclicks/     Saved Auto Click sequences (*.json)
+workflows/      Game projects: <Name>/*.json + templates/ + assets/cover.png
 data/           Runtime settings (gitignored machine-local files)
 packaging/      PyInstaller → dist/Macro2k/
 vendor/         adb / scrcpy / frida / tesseract binaries

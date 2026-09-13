@@ -50,9 +50,30 @@ Regenerate by hand after editing the artwork:
 python packaging/make_icon.py     # -> packaging/app.ico + app.png
 ```
 
-[`make_icon.py`](make_icon.py) draws the Hub brand mark (three tiles + accent
-plus) on a dark rounded tile and renders each size independently (16 … 256) so
-the small frames stay readable. Only Pillow is required.
+[`make_icon.py`](make_icon.py) draws the Hub's brand mark — the shared
+`grid-2x2-plus` glyph — on a dark rounded tile and renders each size
+independently (16 … 256) so the small frames stay readable. It fills the tiles
+and stains the plus `--accent`, where the in-app mark is a one-colour outline:
+same geometry, two treatments, because a hairline outline vanishes on a dark
+taskbar at 16 px. Only Pillow is required.
+
+## 1c. Icon-set guard
+
+`apps/web/shared/icons.js` is the only copy of any icon geometry in the suite.
+[`check_icons.py`](check_icons.py) enforces it and runs automatically in both
+`build.ps1` and `build_runner.py`:
+
+```powershell
+python packaging/check_icons.py           # ICONS_OK, or a report and exit 1
+python packaging/check_icons.py --list    # also show ratchet progress
+```
+
+It checks three things: every `uiIco("name")` / `data-ico="name"` names an icon
+that exists (an unknown name renders *nothing*, silently); no app inlines its own
+`<svg>`; and the ladder in `shared/icons.css` still lands each step's rendered
+stroke in the 1.0–1.8 px band. The Hub and Runner must stay at zero inline
+`<svg>`; the Designer and DevScope are ratcheted down file by file — lower a
+file's number in `LEGACY` when it shrinks, and delete the entry at zero.
 
 ## 2. Build the installer
 
@@ -115,6 +136,26 @@ pwsh packaging/build.ps1 -Upload
 The version flows automatically to: window titles, the Hub version badge, the
 `.exe` file metadata, the installer filename, and the GitHub release tag.
 
+## 5. Standalone Runner — game requirements
+
+A single-workflow Runner (Hub **Build**, Designer **Build EXE**, or
+`python packaging/build_runner.py --workflow workflows/<Name>`) ships whatever is
+in `workflows/<Name>/vendor/` — files the player must put into the **game's own
+install folder** (BepInEx, an in-game plugin, configs…):
+
+```
+dist/<Name>-Runner/
+    <Name>.exe
+    requirements/        a copy of workflows/<Name>/vendor/ (not bundled into the exe)
+    REQUIREMENTS.txt     install steps for players (Vietnamese + English)
+```
+
+No `vendor/` folder (or an empty one) → neither is produced. The Hub's Build
+dialog lists the file count and the finished build panel has **Open
+requirements**. The built Runner warns on load until the files are found in the
+game folder, and Settings → **Game files** can copy them next to the Game path's
+`.exe`.
+
 ## How auto-update works
 
 [`src/updater.py`](../src/updater.py) polls the GitHub Releases API of
@@ -127,7 +168,7 @@ token via `MACRO2K_UPDATE_TOKEN` / `GITHUB_TOKEN`).
 ## Where user data lives
 
 `data_root()` ([`src/utils/__init__.py`](../src/utils/__init__.py)) keeps
-`workflows/`, `data/`, `out/`, `autoclicks/` **next to the app** when that folder
+`workflows/`, `data/`, `out/` **next to the app** when that folder
 is writable (per-user or custom install, or a portable copy), and falls back to
 `%LOCALAPPDATA%\Macro2k` only for a read-only `C:\Program Files` install. Either
 way, user data survives updates. Drop a `portable.txt` next to `Macro2k.exe` to

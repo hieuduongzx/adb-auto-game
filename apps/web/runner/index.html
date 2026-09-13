@@ -19,14 +19,12 @@
   <!-- ── Header card ─────────────────────────────────────────────────── -->
   <div id="header-card" class="card">
     <div class="header-top">
+      <span class="app-icon" id="app-icon" aria-hidden="true" hidden></span>
       <div class="header-title-block">
         <div class="app-title empty" id="flow-name">Macro2k Runner</div>
         <div class="app-subtitle" id="flow-sub">No workflow loaded</div>
       </div>
-      <button class="btn-load" id="btn-load" onclick="onLoadJson()" title="Load a workflow exported from Designer">
-        <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
-        Load JSON
-      </button>
+      <button class="update-pill" id="update-pill" type="button" onclick="showUpdates()" hidden>Update</button>
       <div id="status-pill" class="status-ready">
         <div id="status-dot"></div>
         <div id="status-text">READY</div>
@@ -40,124 +38,226 @@
     </div>
 
     <div class="header-btns">
-      <button class="btn btn-start" id="btn-start" onclick="onStart()" disabled>
-        <svg class="icon uico uico-fill" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>
-        Start
+      <!-- One primary button: Start while idle, Stop while running (see
+           setPrimary in runner.js). A separate icon-only Stop would be a second
+           way to do the same thing, so there isn't one. -->
+      <button class="btn btn-start" id="btn-primary" type="button" onclick="onPrimary()" disabled>
+        <i data-ico="play" data-ico-size="uico-fill" aria-hidden="true"></i>Start
       </button>
       <button class="btn btn-pause" id="btn-pause" onclick="onPause()" disabled>Pause</button>
-      <button class="btn btn-stop" id="btn-stop" onclick="onStop()" title="Stop workflow" aria-label="Stop workflow" disabled>
-        <svg class="icon uico uico-fill" aria-hidden="true" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
-      </button>
     </div>
   </div>
 
-  <!-- ── Tabs ────────────────────────────────────────────────────────── -->
-  <div id="tabs-bar" role="tablist" aria-label="Runner views">
-    <button class="tab-btn active" data-tab="seq"      onclick="switchTab('seq')" role="tab" aria-selected="true" aria-controls="tab-seq">Sequence</button>
-    <button class="tab-btn"        data-tab="bg"       onclick="switchTab('bg')" role="tab" aria-selected="false" aria-controls="tab-bg">Background</button>
-    <button class="tab-btn"        data-tab="settings" onclick="switchTab('settings')" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
-  </div>
+  <!-- ── Main body: split (left activities / right panels) + footer ──── -->
+  <div id="main-body" data-pnl-stage>
+  <div id="main-split">
 
-  <!-- ── Tab wrapper ─────────────────────────────────────────────────── -->
-  <div id="tab-wrapper" data-pnl-stage>
-
-    <!-- Sequential tab -->
-    <div class="tab-pane active" id="tab-seq" role="tabpanel">
-      <div class="pane-inner">
-        <div class="list-header">
-          <span class="list-label">Sequence activities</span>
-          <button class="btn-sel"      onclick="selectAll('sequence',true)">Select all</button>
-          <button class="btn-sel none" onclick="selectAll('sequence',false)">Clear</button>
-        </div>
-        <div class="task-list" id="seq-list">
-          <div class="empty-note">Select <b>Load JSON</b> to open a workflow exported from Designer.</div>
-        </div>
+    <!-- LEFT: activity lists -->
+    <div id="pane-left">
+      <div id="tabs-bar" role="tablist" aria-label="Runner views">
+        <button class="tab-btn active" data-tab="seq" onclick="switchTab('seq')" role="tab" aria-selected="true" aria-controls="tab-seq">Sequence</button>
+        <button class="tab-btn"        data-tab="bg"  onclick="switchTab('bg')"  role="tab" aria-selected="false" aria-controls="tab-bg">Background</button>
       </div>
-    </div>
 
-    <!-- Background tab -->
-    <div class="tab-pane" id="tab-bg" role="tabpanel">
-      <div class="pane-inner">
-        <div class="list-header">
-          <span class="list-label">Background activities</span>
-          <button class="btn-sel"      onclick="selectAll('background',true)">Select all</button>
-          <button class="btn-sel none" onclick="selectAll('background',false)">Clear</button>
-        </div>
-        <div class="list-hint" id="bg-hint">Runs in parallel after Start · toggle each activity independently</div>
-        <div class="task-list" id="bg-list">
-          <div class="empty-note">No background activities.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Settings tab -->
-    <div class="tab-pane" id="tab-settings" role="tabpanel">
-      <div class="pane-inner">
-        <div class="settings-card">
-          <div class="settings-section-title">Speed hack</div>
-          <div class="toggle-row">
-            <button type="button" class="toggle" id="speed-toggle" onclick="onSpeedToggle()" role="switch" aria-label="Enable speed hack" aria-checked="false"></button>
-            <div class="toggle-text">
-              <div class="toggle-name">Speed hack</div>
-              <div class="toggle-hint">Frida acceleration. Root access required.</div>
+      <div id="tab-wrapper">
+        <!-- Sequential tab -->
+        <div class="tab-pane active" id="tab-seq" role="tabpanel">
+          <div class="pane-inner">
+            <div class="list-header">
+              <span class="list-label">Sequence activities</span>
+              <button class="btn-sel"      onclick="selectAll('sequence',true)">Select all</button>
+              <button class="btn-sel none" onclick="selectAll('sequence',false)">Clear</button>
+            </div>
+            <div class="task-list" id="seq-list">
+              <div class="empty-note">No workflow loaded. Open a game from the <b>Macro2k Hub</b> and press Run.</div>
             </div>
           </div>
-          <div class="speed-row">
-            <input type="range" id="speed-range" min="0.5" max="5" step="0.1" value="2" disabled aria-label="Speed multiplier"
-                   oninput="onSpeedInput(this.value)" onchange="onSpeedCommit(this.value)">
-            <span id="speed-val">2.0x</span>
-          </div>
-          <div id="speed-pkg">(load a workflow to configure)</div>
         </div>
 
-        <div class="settings-card" id="appearance-card">
-          <div class="settings-section-title">Appearance</div>
-          <div class="setting-block">
-            <span class="form-lbl">Theme</span>
-            <div class="choice-seg" id="theme-seg" role="radiogroup" aria-label="Theme">
-              <button type="button" class="choice" data-theme-set="light" role="radio" aria-checked="true">
-                <span class="choice-title">Light</span><span class="choice-sub">Default console</span>
-              </button>
-              <button type="button" class="choice" data-theme-set="dark" role="radio" aria-checked="false">
-                <span class="choice-title">Dark</span><span class="choice-sub">Low-light rooms</span>
-              </button>
+        <!-- Background tab -->
+        <div class="tab-pane" id="tab-bg" role="tabpanel">
+          <div class="pane-inner">
+            <div class="list-header">
+              <span class="list-label">Background activities</span>
+              <button class="btn-sel"      onclick="selectAll('background',true)">Select all</button>
+              <button class="btn-sel none" onclick="selectAll('background',false)">Clear</button>
+            </div>
+            <div class="list-hint" id="bg-hint">Runs in parallel after Start · toggle each activity independently</div>
+            <div class="task-list" id="bg-list">
+              <div class="empty-note">No background activities.</div>
             </div>
           </div>
-          <div class="setting-block">
-            <span class="form-lbl">Density</span>
-            <div class="choice-seg" id="density-seg" role="radiogroup" aria-label="Density">
-              <button type="button" class="choice" data-density-set="comfortable" role="radio" aria-checked="true">
-                <span class="choice-title">Comfortable</span><span class="choice-sub">Roomier rows</span>
-              </button>
-              <button type="button" class="choice" data-density-set="compact" role="radio" aria-checked="false">
-                <span class="choice-title">Compact</span><span class="choice-sub">More on screen</span>
-              </button>
-            </div>
-          </div>
-          <p class="settings-note">Shared with the Hub and the Designer — every Macro2k window opens with what you pick here.</p>
         </div>
       </div>
-    </div>
+    </div><!-- /pane-left -->
 
-  </div><!-- /tab-wrapper -->
-
-  <!-- ── Log panel ───────────────────────────────────────────────────── -->
-  <div id="log-card" class="card pnl" data-pnl="run-log" data-pnl-title="Log" data-pnl-tools="max" data-pnl-stage-sel="#tab-wrapper">
-    <div class="log-header pnl-hd">
-      <button type="button" class="log-toggle" id="log-toggle" onclick="toggleLog()" title="Collapse or expand log" aria-controls="log-body" aria-expanded="true">
-        <span class="log-chevron"><svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
-        <span class="log-label">Log</span>
-        <span class="log-count" id="log-count"></span>
-      </button>
-      <div style="flex:1"></div>
-      <div class="log-search-wrap">
-        <svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
-        <input id="log-search" type="search" aria-label="Search log" placeholder="Search" oninput="filterLog(this.value)">
+    <!-- RIGHT: Activity settings | Log | Settings, then Preview -->
+    <div id="pane-right">
+      <div id="r-tabs" role="tablist" aria-label="Runner panels">
+        <button class="rtab active" data-rtab="act"      onclick="switchRTab('act')"      role="tab" aria-selected="true"  aria-controls="r-act">Activity settings</button>
+        <button class="rtab"        data-rtab="log"      onclick="switchRTab('log')"      role="tab" aria-selected="false" aria-controls="r-log">Log<span class="tab-count" id="rtab-log-count"></span></button>
+        <button class="rtab"        data-rtab="settings" onclick="switchRTab('settings')" role="tab" aria-selected="false" aria-controls="r-settings">Settings</button>
       </div>
-      <span class="pnl-tools"><button class="btn-log-clear" onclick="onClearLog()">Clear</button></span>
-    </div>
-    <div class="log-body" id="log-body" role="log" aria-live="polite" aria-relevant="additions"></div>
-  </div>
+
+      <div id="r-content">
+        <!-- Activity settings -->
+        <div class="rpane active" id="r-act" role="tabpanel">
+          <div class="act-set-hd">
+            <span class="act-set-title" id="act-set-title">Activity settings</span>
+            <button type="button" class="act-set-x" id="act-set-close" onclick="closeActivitySettings()" title="Close" aria-label="Close settings">×</button>
+          </div>
+          <div class="act-set-body" id="act-set-body">
+            <div class="act-set-empty">Select the <b>⚙</b> on an activity to edit its settings here.</div>
+          </div>
+        </div>
+
+        <!-- Log -->
+        <div class="rpane" id="r-log" role="tabpanel">
+          <div class="rpane-hd">
+            <span class="rpane-title">Log</span>
+            <span class="log-count" id="log-count"></span>
+            <div class="rpane-sp"></div>
+            <div class="log-search-wrap">
+              <i data-ico="search" data-ico-size="uico-0" aria-hidden="true"></i>
+              <input id="log-search" type="search" aria-label="Search log" placeholder="Search" oninput="filterLog(this.value)">
+            </div>
+            <button class="btn-log-clear" onclick="onClearLog()">Clear</button>
+          </div>
+          <div class="log-body" id="log-body" role="log" aria-live="polite" aria-relevant="additions"></div>
+        </div>
+
+        <!-- Settings (project-wide) -->
+        <div class="rpane" id="r-settings" role="tabpanel">
+          <div class="rpane-scroll">
+            <div class="settings-card" id="game-card" style="display:none">
+              <div class="settings-section-title">Game</div>
+              <div class="setting-block">
+                <label class="form-lbl" for="game-path">Game path (.exe)</label>
+                <div class="setting-path-control">
+                  <input type="text" id="game-path" class="setting-path-input runtime-setting-control" spellcheck="false" autocomplete="off"
+                         placeholder="Choose the game's .exe…" onchange="onGamePathChange(this.value)">
+                  <button type="button" class="btn-path-pick runtime-setting-control" id="game-path-pick" onclick="onGamePathPick()" title="Choose the game .exe">Choose…</button>
+                </div>
+              </div>
+              <p class="settings-note" id="game-path-note">Launch program blocks set to “Project game path” start this program. Clear it to use the workflow's default.</p>
+            </div>
+
+            <div class="settings-card" id="req-card" style="display:none">
+              <div class="settings-section-title">Game files</div>
+              <p class="req-status" id="req-status" role="status" aria-live="polite"></p>
+              <ul class="req-list mono" id="req-list" aria-label="Required game files"></ul>
+              <div class="req-actions">
+                <button class="btn" type="button" onclick="onReqOpen()">Open folder</button>
+                <button class="btn ok" id="btn-req-copy" type="button" onclick="onReqCopy()">Copy into game folder</button>
+              </div>
+              <p class="settings-note">This game needs these files inside its own install folder (next to the game's .exe). Copy them by hand, or let the Runner copy them into the folder of the Game path. Restart the game afterwards.</p>
+            </div>
+
+            <div class="settings-card" id="emu-card" style="display:none">
+              <div class="settings-section-title">Emulator</div>
+              <div class="setting-block">
+                <label class="form-lbl" for="emu-kind">Family</label>
+                <select id="emu-kind" class="runtime-setting-control" onchange="onEmulatorKindChange(this.value)">
+                  <option value="ldplayer">LDPlayer</option>
+                  <option value="mumu">MuMu</option>
+                  <option value="nox">Nox</option>
+                  <option value="memu">MEmu</option>
+                  <option value="bluestacks">BlueStacks</option>
+                </select>
+              </div>
+              <div class="setting-block">
+                <label class="form-lbl" for="emu-path">Install folder</label>
+                <div class="setting-path-control">
+                  <input type="text" id="emu-path" class="setting-path-input runtime-setting-control" spellcheck="false" autocomplete="off"
+                         placeholder="Choose the emulator install folder…" onchange="onEmulatorPathChange(this.value)">
+                  <button type="button" class="btn-path-pick runtime-setting-control" id="emu-path-pick" onclick="onEmulatorPathPick()" title="Choose the emulator install folder">Choose…</button>
+                </div>
+              </div>
+              <p class="settings-note" id="emu-note">Launch / Resize / Kill / Restart emulator blocks set to “Project emulator setting” use this family and folder. Clear the folder to auto-detect.</p>
+            </div>
+
+            <div class="settings-card" id="speed-card">
+              <div class="settings-section-title">Speed hack</div>
+              <div class="toggle-row">
+                <button type="button" class="toggle" id="speed-toggle" onclick="onSpeedToggle()" role="switch" aria-label="Enable speed hack" aria-checked="false"></button>
+                <div class="toggle-text">
+                  <div class="toggle-name">Speed hack</div>
+                  <div class="toggle-hint">Frida acceleration. Root access required.</div>
+                </div>
+              </div>
+              <div class="speed-row">
+                <input type="range" id="speed-range" min="0.5" max="5" step="0.1" value="2" disabled aria-label="Speed multiplier"
+                       oninput="onSpeedInput(this.value)" onchange="onSpeedCommit(this.value)">
+                <span id="speed-val">2.0x</span>
+              </div>
+              <div id="speed-pkg">(load a workflow to configure)</div>
+            </div>
+
+            <div class="settings-card" id="updates-card">
+              <div class="settings-section-title">Updates</div>
+              <dl class="upd-facts">
+                <dt>Version</dt><dd class="mono" id="upd-version">—</dd>
+                <dt>Source</dt><dd class="mono" id="upd-repo">—</dd>
+              </dl>
+              <p class="upd-status" id="upd-status" role="status" aria-live="polite">Updates are available in a Runner built from the Macro2k Hub.</p>
+              <div class="upd-bar" id="upd-bar" hidden><div class="upd-bar-fill" id="upd-bar-fill"></div></div>
+              <div class="upd-actions">
+                <button class="btn" id="btn-upd-check" type="button" onclick="onUpdateCheck()">Check for updates</button>
+                <button class="btn ok" id="btn-upd-apply" type="button" onclick="onUpdateApply()" hidden>Update &amp; restart</button>
+              </div>
+            </div>
+
+            <div class="settings-card" id="appearance-card">
+              <div class="settings-section-title">Appearance</div>
+              <div class="setting-block">
+                <span class="form-lbl">Theme</span>
+                <div class="choice-seg" id="theme-seg" role="radiogroup" aria-label="Theme">
+                  <button type="button" class="choice" data-theme-set="light" role="radio" aria-checked="true">
+                    <span class="choice-title">Light</span><span class="choice-sub">Default console</span>
+                  </button>
+                  <button type="button" class="choice" data-theme-set="dark" role="radio" aria-checked="false">
+                    <span class="choice-title">Dark</span><span class="choice-sub">Low-light rooms</span>
+                  </button>
+                </div>
+              </div>
+              <div class="setting-block">
+                <span class="form-lbl">Density</span>
+                <div class="choice-seg" id="density-seg" role="radiogroup" aria-label="Density">
+                  <button type="button" class="choice" data-density-set="comfortable" role="radio" aria-checked="true">
+                    <span class="choice-title">Comfortable</span><span class="choice-sub">Roomier rows</span>
+                  </button>
+                  <button type="button" class="choice" data-density-set="compact" role="radio" aria-checked="false">
+                    <span class="choice-title">Compact</span><span class="choice-sub">More on screen</span>
+                  </button>
+                </div>
+              </div>
+              <p class="settings-note">Shared with the Hub and the Designer — every Macro2k window opens with what you pick here.</p>
+            </div>
+          </div>
+        </div>
+      </div><!-- /r-content -->
+
+      <!-- Live preview (game screen) -->
+      <div id="preview-card" class="card">
+        <div class="pv-hd">
+          <span class="pv-title">Preview</span>
+          <span class="pv-state" id="pv-state"></span>
+          <div class="pv-sp"></div>
+          <button type="button" class="pv-btn" id="pv-max" onclick="togglePreviewMax()" title="Maximize preview" aria-label="Maximize preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          </button>
+          <button type="button" class="pv-btn" id="pv-hide" onclick="togglePreviewHide()" title="Hide preview" aria-label="Hide preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+        <div class="pv-body" id="pv-body">
+          <img id="pv-img" alt="Game preview">
+          <div class="pv-empty" id="pv-empty">No preview</div>
+        </div>
+      </div>
+    </div><!-- /pane-right -->
+
+  </div><!-- /main-split -->
 
   <!-- ── Footer ──────────────────────────────────────────────────────── -->
   <div id="footer">
@@ -174,7 +274,7 @@
         <option value="adb">ADB</option>
       </select>
       <button class="btn-refresh" id="btn-refresh" onclick="onRefresh()" title="Refresh devices" aria-label="Refresh devices">
-        <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+        <i data-ico="rotate-cw" data-ico-size="uico-1" aria-hidden="true"></i>
       </button>
     </div>
     <!-- Win32 footer: target window label -->
@@ -184,7 +284,8 @@
       <span id="win32-target" class="empty" title="">(not configured)</span>
       <span class="footer-lbl" id="win32-mode-lbl" style="display:none"></span>
     </div>
-  </div>
+  </div><!-- /footer -->
+  </div><!-- /main-body -->
 
 </div><!-- /app -->
 

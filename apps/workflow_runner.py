@@ -1,22 +1,26 @@
 """PyWebView runner GUI for JSON workflows.
 
-A sibling of ``apps/workflow_designer.py`` (a *loaded JSON file* drives this
-one instead of the graph editor). Press **Load JSON** to pick a flow exported
-from the designer; its sequence/background activities then appear with the
-same enable toggles, Start / Stop / Pause controls, and live log.
+A sibling of ``apps/workflow_designer.py`` (a workflow file drives this one
+instead of the graph editor). The workflow is always handed in at launch — by
+the Hub's Run button, the Designer, or bundled into a standalone Runner .exe —
+there is no in-app file picker. Its sequence/background activities appear with
+enable toggles, a per-activity Run button, Start / Stop / Pause controls, and a
+live log.
 
 The actual execution is delegated to :class:`src.workflow.WorkflowEngine`, so a
 flow behaves identically here and in the designer's *Run test*.
 
 Run::
 
-    python apps/workflow_runner.py
+    python apps/workflow_runner.py workflows/<Name>/workflow.json
 """
 from __future__ import annotations
 
+import base64
 import datetime
 import json
 import os
+import shutil
 import sys
 import tempfile
 import threading
@@ -30,6 +34,7 @@ if _PROJECT_ROOT not in sys.path:
 
 import webview
 
+from src import runner_update
 from src.core.adb import lifecycle
 from src.core.adb.auto.scrcpy_capture import (
     CAPTURE_BACKENDS,
@@ -40,6 +45,7 @@ from src.core.adb.auto.scrcpy_capture import (
 from src.workflow import WorkflowEngine
 from src.utils import (
     add_log_subscriber,
+    app_dir,
     bundle_dir,
     data_root,
     file_url,
@@ -71,20 +77,46 @@ _WEB_DIR = (os.path.join(bundle_dir(), "web") if is_frozen()
 # so a built .exe can be re-pointed on another PC without editing the JSON.
 RUNTIME_PATH_PARAMS = ("path", "apk")
 
+# PC-side emulator nodes whose install folder comes from the shared project
+# emulator setting (Runner Settings → Emulator) unless the node picks "Custom".
+# Their path is therefore NOT offered as a per-activity control.
+EMULATOR_NODE_TYPES = frozenset({
+    "launch_emulator", "resize_emulator", "kill_emulator",
+    "restart_emulator", "emulator_resolution",
+})
+
+# Families the shared emulator setting can name (a node may still use a custom
+# command locally, but the project setting only carries a known family).
+EMULATOR_KINDS = ("ldplayer", "mumu", "nox", "memu", "bluestacks")
+
+# Game requirements — files the player copies into the game's install folder.
+# A built Runner ships them as <exe folder>/requirements/ (packaging/build_runner.py
+# copies the workflow's vendor/ there); from source they are the workflow's vendor/.
+REQUIREMENTS_DIR = "requirements"
+REQUIREMENTS_SRC = "vendor"
+REQUIREMENTS_SKIP = (".gitkeep", "Thumbs.db", "desktop.ini", ".DS_Store")
+
 
 class WorkflowRunnerAPI:
     """Methods exposed to JavaScript via ``pywebview.api.*``."""
 
     def __init__(self) -> None:
-        # Register as a live ADB client so a sibling closing down doesn't kill
-        # the shared ADB server out from under us (see src/core/adb/lifecycle).
-        lifecycle.acquire_adb_lease("runner")
+        # The ADB lease is taken lazily, the first time this Runner actually
+        # becomes an ADB consumer (see _ensure_adb_lease). Taking it here would
+        # make a standalone Win32 build claim a stake in the shared server it
+        # never uses — and then kill that server on close.
+        self._adb_lease: Optional[str] = None
         self.engine = WorkflowEngine()
         self.flow: Dict[str, Any] = {}
         self.flow_path: Optional[str] = None
         self._runner_config: Dict[str, Any] = {}
         self._runner_config_path: Optional[str] = None
         self._runner_config_lock = threading.RLock()
+        # win32.path as the workflow ships it — what a cleared override falls back to.
+        self._flow_game_path = ""
+        # emulator.{kind,path} as the workflow ships it — default for the
+        # Runner's Settings → Emulator override.
+        self._flow_emulator: Dict[str, Any] = {}
 
         self._window: Optional[webview.Window] = None
         self._closing = False
@@ -94,6 +126,18 @@ class WorkflowRunnerAPI:
         self._device_lock = threading.Lock()
         self._selected_serial: Optional[str] = None
         self._connected_serial: Optional[str] = None
+
+        # Live preview: a background thread pushes JPEG frames to the page while
+        # the Preview panel is open (set_auto_refresh). Frames come from the same
+        # capture backend the engine uses, so what you see is what a run sees.
+        self._auto_refresh_enabled = False
+        self._refresh_hz = 6.0
+        self._refresh_thread: Optional[threading.Thread] = None
+        self._capture_lock = threading.Lock()
+
+        # A standalone Runner build knows its own version + update repo.
+        self._runner_info: Dict[str, Any] = runner_update.build_info()
+        self._update: Dict[str, Any] = {}
 
         # Mirror engine running/paused into the UI.
         self.engine.on("on_start", self._on_engine_start)
@@ -117,8 +161,12 @@ class WorkflowRunnerAPI:
             except Exception as exc:
                 log_error(f"Auto-load failed: {exc}")
             self._pending_load = None
-        threading.Thread(target=self._device_worker, args=(True,), daemon=True).start()
+        # The poll thread lives for the session but stays idle unless an ADB
+        # workflow is loaded — a Win32 game must never touch the ADB server.
         threading.Thread(target=self._device_poll, daemon=True).start()
+        self._kick_device_scan()
+        if runner_update.updates_supported(self._runner_info):
+            threading.Thread(target=self._auto_check_update, daemon=True).start()
 
     def _on_engine_start(self) -> None:
         self._push("running_state", {"running": True, "paused": False})
@@ -220,6 +268,22 @@ class WorkflowRunnerAPI:
             for var in act.get("vars", []) or []:
                 if var.get("name") in saved_vars:
                     var["value"] = saved_vars[var.get("name")]
+        # Retry count: the workflow's own ``maxRetries`` is the default the Runner
+        # shows, and a Runner override (saved in this Runner's config) beats it.
+        # Only the override is written to flow, in memory — the workflow file is
+        # never written back.
+        for act in acts:
+            saved = act_cfg.get(str(act.get("id"))) if isinstance(act_cfg, dict) else None
+            if isinstance(saved, dict) and saved.get("retries") is not None:
+                try:
+                    act["maxRetries"] = max(1, int(float(saved["retries"])))
+                    continue
+                except (TypeError, ValueError):
+                    pass
+            try:
+                act["maxRetries"] = max(1, int(act.get("maxRetries", 1) or 1))
+            except (TypeError, ValueError):
+                act["maxRetries"] = 1
         order = cfg.get("order") or []
         if not isinstance(order, list):
             order = []
@@ -250,6 +314,161 @@ class WorkflowRunnerAPI:
             self.flow["speedhack"] = merged
         if cfg.get("capture") in CAPTURE_BACKENDS:
             self.flow["capture"] = cfg["capture"]
+        # Project game path (Win32): the Settings tab override beats the path
+        # chosen in the Designer; an empty override keeps the workflow's own.
+        win = self.flow.get("win32")
+        if not isinstance(win, dict):
+            win = self.flow["win32"] = {}
+        self._flow_game_path = str(win.get("path") or "").strip()
+        override = str(cfg.get("win32Path") or "").strip()
+        if override:
+            win["path"] = override
+        # Shared emulator setting (ADB): the Settings tab override beats the
+        # workflow's own kind/folder; empty fields keep the workflow's own.
+        emu = self.flow.get("emulator")
+        if not isinstance(emu, dict):
+            emu = self.flow["emulator"] = {}
+        # Older files kept the emulator install folder on each node. Seed the
+        # shared setting from the first one so consolidating doesn't lose it and
+        # the Settings → Emulator card can re-point it.
+        if not str(emu.get("path") or "").strip():
+            for node in self._graph_nodes():
+                if str(node.get("type") or "") not in EMULATOR_NODE_TYPES:
+                    continue
+                params = node.get("params") or {}
+                if not str(params.get("path") or "").strip():
+                    continue
+                emu["path"] = str(params.get("path")).strip()
+                kind = str(params.get("emulator") or "").strip().lower()
+                if kind and kind not in ("custom", "last"):
+                    emu["kind"] = kind
+                break
+        if not str(emu.get("kind") or "").strip():
+            emu["kind"] = "ldplayer"
+        self._flow_emulator = dict(emu)
+        saved_emu = cfg.get("emulator")
+        if isinstance(saved_emu, dict):
+            if str(saved_emu.get("kind") or "").strip():
+                emu["kind"] = str(saved_emu.get("kind")).strip()
+            if str(saved_emu.get("path") or "").strip():
+                emu["path"] = str(saved_emu.get("path")).strip()
+
+    @staticmethod
+    def _launch_uses_project_path(node: dict) -> bool:
+        """True when a win_launch node takes the project game path rather than
+        its own ``path`` (same rule as WorkflowEngine._win_launch_path)."""
+        if str(node.get("type") or "") != "win_launch":
+            return False
+        params = node.get("params") or {}
+        src = str(params.get("pathSrc") or "").strip().lower()
+        if src:
+            return src == "project"
+        return not str(params.get("path") or "").strip()
+
+    @staticmethod
+    def _emulator_uses_project(node: dict) -> bool:
+        """True when an emulator node takes the shared project emulator install
+        folder rather than its own ``path``. Only an explicit "custom" source
+        keeps a per-activity control; legacy nodes without ``pathSrc`` follow the
+        shared setting (their old path is seeded into it on load)."""
+        if str(node.get("type") or "") not in EMULATOR_NODE_TYPES:
+            return False
+        params = node.get("params") or {}
+        return str(params.get("pathSrc") or "").strip().lower() != "custom"
+
+    def _graph_nodes(self, activity_ids: Optional[List[str]] = None) -> List[dict]:
+        """Every node a run of these activities (all when ``None``) can reach,
+        following function calls."""
+        functions = {f.get("id"): f for f in (self.flow.get("functions") or []) if f.get("id")}
+        acts = list(self.flow.get("activities") or [])
+        if activity_ids is not None:
+            wanted = {str(a) for a in activity_ids}
+            acts = [a for a in acts if str(a.get("id")) in wanted]
+        found: List[dict] = []
+        seen_functions: set = set()
+
+        def scan(graph: dict) -> None:
+            for node in (graph or {}).get("nodes", []) or []:
+                found.append(node)
+                if node.get("type") == "call":
+                    fn_id = str((node.get("params") or {}).get("fn") or "")
+                    if fn_id in functions and fn_id not in seen_functions:
+                        seen_functions.add(fn_id)
+                        scan(functions[fn_id].get("graph") or {})
+
+        for act in acts:
+            scan(act.get("graph") or {})
+        return found
+
+    def _game_path_status(self) -> dict:
+        """Whether this game needs the project game path, and if it is usable.
+
+        Needed by a Win32 game whose Launch program uses the project path, or
+        that ships requirements to copy into the game folder."""
+        path = str((self.flow.get("win32") or {}).get("path") or "").strip()
+        needed = bool(self.flow) and self._controller() == "win32" and (
+            any(self._launch_uses_project_path(n) for n in self._graph_nodes())
+            or bool(self._requirements_dir()))
+        return {"needed": needed, "path": path, "exists": bool(path) and os.path.isfile(path)}
+
+    def _launch_preflight(self, activity_ids: Optional[List[str]]) -> List[dict]:
+        """Launch program nodes that would stop the run: no path, or nothing at
+        it. Checked before Start so a missing game shows up front, not minutes
+        into a run. A path held in a variable is only known at run time — the
+        node itself stops the run then."""
+        if not self.flow or self._controller() != "win32":
+            return []
+        if activity_ids is None:
+            activity_ids = [str(a.get("id")) for a in (self.flow.get("activities") or [])
+                            if a.get("enabled", True)]
+        var_names = {str(v.get("name")) for v in (self.flow.get("globals") or []) if v.get("name")}
+        for act in self.flow.get("activities") or []:
+            var_names |= {str(v.get("name")) for v in (act.get("vars") or []) if v.get("name")}
+        game = str((self.flow.get("win32") or {}).get("path") or "").strip()
+        problems: List[dict] = []
+        seen: set = set()
+        for node in self._graph_nodes(activity_ids):
+            if node.get("type") != "win_launch" or node.get("id") in seen:
+                continue
+            seen.add(node.get("id"))
+            label = str(node.get("note") or "Launch program")
+            if self._launch_uses_project_path(node):
+                if not game:
+                    message = f"{label}: no game path — choose the game's .exe in Settings → Game"
+                elif not os.path.isfile(game):
+                    message = f"{label}: game not found at {game} — choose the game's .exe again"
+                else:
+                    continue
+                problems.append({"message": message, "gamePath": True})
+                continue
+            raw = str((node.get("params") or {}).get("path") or "").strip()
+            if raw in var_names or ("{" in raw and "}" in raw):
+                continue
+            if not raw:
+                message = f"{label}: no program path — set it in the activity's settings"
+            elif not os.path.isfile(raw):
+                message = f"{label}: program not found at {raw} — fix it in the activity's settings"
+            else:
+                continue
+            problems.append({"message": message, "gamePath": False})
+        # One line per distinct problem (several nodes can share the project path).
+        unique = {p["message"]: p for p in problems}
+        return list(unique.values())
+
+    def _blocked_by_launch_paths(self, activity_ids: Optional[List[str]]) -> bool:
+        """Refuse to start when a Launch program can't find its program; the
+        page shows the problems and offers to choose the game path."""
+        problems = self._launch_preflight(activity_ids)
+        if not problems:
+            return False
+        for problem in problems:
+            log_error(f"Can't start: {problem['message']}")
+        self._push("launch_blocked", {
+            "problems": [p["message"] for p in problems],
+            "needsGamePath": any(p["gamePath"] for p in problems),
+            "gamePath": self._game_path_status(),
+        })
+        return True
 
     def _activity_runner_config(self, activity_id: str) -> dict:
         acts = self._runner_config.get("activities")
@@ -278,8 +497,74 @@ class WorkflowRunnerAPI:
             "captureBackends": list(CAPTURE_BACKENDS),
             "controller": self._controller(),
             "win32": dict(self.flow.get("win32") or {}),
+            "gamePathDefault": self._flow_game_path,
+            "emulator": dict(self.flow.get("emulator") or {}),
+            "emulatorDefault": self._flow_emulator,
+            "requirements": self._requirements_payload(),
+            "gamePath": self._game_path_status(),
             "configPath": self._runner_config_path or "",
+            "runner": self._runner_payload(),
+            "icon": self._icon_url(),
+            "iconKey": self._icon_key(),
         }
+
+    def _icon_url(self) -> str:
+        """The game icon for the header: a built Runner's own icon, else the
+        workflow's assets/icon.* or assets/cover.* ("" → the page draws initials)."""
+        bundled = os.path.join(bundle_dir(), "runner_icon.png")
+        if is_frozen() and os.path.isfile(bundled):
+            return file_url(bundled)
+        if self.flow_path:
+            assets = os.path.join(os.path.dirname(os.path.abspath(self.flow_path)), "assets")
+            for name in ("icon.png", "icon.jpg", "icon.jpeg", "icon.webp", "icon.ico",
+                         "cover.png", "cover.jpg", "cover.jpeg", "cover.webp"):
+                path = os.path.join(assets, name)
+                if os.path.isfile(path):
+                    return file_url(path)
+        return ""
+
+    def _icon_key(self) -> str:
+        """Workflow folder name — the key the Hub hashes a game's hue from."""
+        if self._runner_info.get("folder"):
+            return str(self._runner_info["folder"])
+        return os.path.basename(os.path.dirname(os.path.abspath(self.flow_path))) if self.flow_path else ""
+
+    # ── Version + self-update (standalone Runner builds) ─────────────────────
+
+    def _runner_payload(self) -> dict:
+        info = self._runner_info
+        return {
+            "version": str(info.get("version") or ""),
+            "appName": str(info.get("appName") or ""),
+            "repo": str(info.get("repo") or ""),
+            "builtAt": str(info.get("builtAt") or ""),
+            "supported": runner_update.updates_supported(info),
+            "update": dict(self._update),
+        }
+
+    def _auto_check_update(self) -> None:
+        result = runner_update.check(self._runner_info)
+        self._update = result
+        if result.get("available"):
+            log_success(f"Update available: v{result.get('version')}")
+            self._push("update_available", result)
+
+    def update_check(self) -> dict:
+        """Ask GitHub for a newer release of this Runner."""
+        result = runner_update.check(self._runner_info)
+        self._update = result
+        return result
+
+    def update_apply(self) -> dict:
+        """Download + install the newest release and restart. Returns only on
+        failure or when already up to date."""
+        if self.engine.is_running():
+            return {"applied": False, "error": "Stop the run before updating", "upToDate": False}
+        return runner_update.apply(
+            self._runner_info,
+            on_progress=lambda pct, stage: self._push("update_progress", {"pct": pct, "stage": stage}),
+            before_exit=self._close,
+        )
 
     def _controller(self) -> str:
         raw = str((self.flow or {}).get("controller") or "adb").strip().lower()
@@ -335,6 +620,14 @@ class WorkflowRunnerAPI:
                 for param in RUNTIME_PATH_PARAMS:
                     if param not in params:
                         continue
+                    # A Launch program on the project path is set once in the
+                    # Settings tab (Game path), not per activity.
+                    if param == "path" and self._launch_uses_project_path(node):
+                        continue
+                    # Emulator nodes on the shared project setting (Settings →
+                    # Emulator) likewise don't need a per-activity control.
+                    if param == "path" and self._emulator_uses_project(node):
+                        continue
                     node_label, field_label = labels.get(node_type, (node_type or "Action", "Path"))
                     node_label = str(node.get("note") or node_label)
                     found.append({
@@ -372,28 +665,7 @@ class WorkflowRunnerAPI:
             })
         return out
 
-    # ── Load JSON ────────────────────────────────────────────────────────────
-
-    def load_json(self) -> dict:
-        """Open a file dialog, load the flow, and return the new state."""
-        flows_dir = os.path.join(data_root(), "workflows")
-        start_dir = flows_dir if os.path.isdir(flows_dir) else data_root()
-        try:
-            wins = webview.windows
-            win = wins[0] if wins else None
-            if win is None:
-                return {"ok": False}
-            paths = win.create_file_dialog(
-                webview.OPEN_DIALOG, directory=start_dir, allow_multiple=False,
-                file_types=("JSON (*.json)", "All files (*.*)"),
-            )
-        except Exception as exc:
-            log_error(f"Dialog error: {exc}")
-            return {"ok": False}
-        if not paths:
-            return {"ok": False}
-        path = paths[0] if isinstance(paths, (list, tuple)) else paths
-        return self._load_path(str(path))
+    # ── Workflow (handed in at launch) ───────────────────────────────────────
 
     def _load_path(self, path: str) -> dict:
         try:
@@ -412,6 +684,10 @@ class WorkflowRunnerAPI:
         backend = get_capture_backend()
         self._push("capture_backend", {"backend": backend})
         log_success(f"Loaded workflow: {flow.get('name', os.path.basename(path))}")
+        req = self._requirements_payload()
+        if req and not req.get("installed"):
+            log_warning(f"This game needs extra files: copy everything in {req['folder']} "
+                        "into the game folder (Settings → Game files)")
         ctrl = self._controller()
         state = {"ok": True, "name": flow.get("name", ""),
                  "activities": self._activities_payload(),
@@ -419,16 +695,25 @@ class WorkflowRunnerAPI:
                  "captureBackend": backend,
                  "controller": ctrl,
                  "win32": dict(flow.get("win32") or {}),
-                 "configPath": self._runner_config_path or ""}
+                 "gamePathDefault": self._flow_game_path,
+                 "emulator": dict(flow.get("emulator") or {}),
+                 "emulatorDefault": self._flow_emulator,
+                 "requirements": self._requirements_payload(),
+                 "gamePath": self._game_path_status(),
+                 "configPath": self._runner_config_path or "",
+                 "icon": self._icon_url(),
+                 "iconKey": self._icon_key()}
         self._push("flow_loaded", state)
+        # The controller just changed: start (or park) ADB device watching.
+        self._kick_device_scan()
         return state
 
     # ── Controls ─────────────────────────────────────────────────────────────
 
-    def start(self) -> bool:
-        if not self.flow:
-            log_warning("Load a workflow JSON first")
-            return False
+    def _select_run_device(self) -> None:
+        """Point the engine at the device chosen in the footer before a run."""
+        if not self._adb_workflow():
+            return                      # Win32 drives a window, not a device
         serial = self._connected_serial or self._selected_serial
         if serial:
             try:
@@ -436,10 +721,34 @@ class WorkflowRunnerAPI:
                 self.engine.auto.adb.select_device(serial)
             except Exception as exc:
                 log_warning(f"Couldn't select device: {exc}")
+
+    def start(self) -> bool:
+        if not self.flow:
+            log_warning("No workflow loaded — open this Runner from the Macro2k Hub")
+            return False
+        if self._blocked_by_launch_paths(None):
+            return False
+        self._select_run_device()
         # Reset UI activity statuses.
         for a in self._activities_payload():
             self._push("activity_update", {"id": a["id"], "status": "pending"})
         return self.engine.start(background=True)
+
+    def run_activity(self, activity_id: str) -> bool:
+        """Run a single activity on its own, whether or not it is enabled.
+
+        A sequence activity runs once; a background activity loops until Stop."""
+        if not self.flow:
+            log_warning("No workflow loaded — open this Runner from the Macro2k Hub")
+            return False
+        if self.engine.is_running():
+            log_warning("Stop the current run before running a single activity")
+            return False
+        if self._blocked_by_launch_paths([str(activity_id or "")]):
+            return False
+        self._select_run_device()
+        self._push("activity_update", {"id": str(activity_id), "status": "pending"})
+        return self.engine.start_activity(str(activity_id or ""))
 
     def stop(self) -> bool:
         self.engine.stop()
@@ -483,6 +792,25 @@ class WorkflowRunnerAPI:
                     self._save_runner_config()
                 return True
         return False
+
+    def set_activity_retries(self, activity_id: str, value) -> dict:
+        """Runner-only retry count for one activity.
+
+        This is a Runner setting: it overrides ``maxRetries`` in memory for the
+        run and is saved to this Runner's own config — the workflow file is never
+        touched. Returns ``{"ok", "retries"}``."""
+        try:
+            retries = max(1, int(float(value)))
+        except (TypeError, ValueError):
+            return {"ok": False, "retries": 1}
+        for a in self.flow.get("activities", []) or []:
+            if a.get("id") == activity_id:
+                a["maxRetries"] = retries
+                with self._runner_config_lock:
+                    self._activity_runner_config(activity_id)["retries"] = retries
+                    self._save_runner_config()
+                return {"ok": True, "retries": retries}
+        return {"ok": False, "retries": 1}
 
     def set_activity_var(self, activity_id: str, name: str, value) -> bool:
         """Override an activity variable's value (used at run time)."""
@@ -534,6 +862,17 @@ class WorkflowRunnerAPI:
         node = self._find_node(str(node_id or ""))
         if node is None or param not in (node.get("params") or {}):
             return ""
+        types = (("Android package (*.apk)", "All files (*.*)") if param == "apk"
+                 else ("Programs (*.exe;*.bat;*.cmd;*.com)", "All files (*.*)"))
+        value = self._ask_path(kind, start, types)
+        if not value:
+            return ""
+        return value if self.set_node_runtime_param(node_id, param, value) else ""
+
+    def _ask_path(self, kind: str, start: str, types: tuple) -> str:
+        """Native file/folder picker opened near ``start``; "" when cancelled."""
+        if self._window is None:
+            return ""
         start = str(start or "")
         start_dir = start if os.path.isdir(start) else os.path.dirname(start)
         if not start_dir or not os.path.isdir(start_dir):
@@ -543,9 +882,6 @@ class WorkflowRunnerAPI:
                 paths = self._window.create_file_dialog(
                     webview.FOLDER_DIALOG, directory=start_dir)
             else:
-                types = (("Android package (*.apk)", "All files (*.*)")
-                         if param == "apk"
-                         else ("Programs (*.exe;*.bat;*.cmd;*.com)", "All files (*.*)"))
                 paths = self._window.create_file_dialog(
                     webview.OPEN_DIALOG, directory=start_dir, allow_multiple=False,
                     file_types=types,
@@ -556,8 +892,150 @@ class WorkflowRunnerAPI:
         if not paths:
             return ""
         path = paths[0] if isinstance(paths, (list, tuple)) else paths
-        value = str(path or "")
-        return value if self.set_node_runtime_param(node_id, param, value) else ""
+        return str(path or "")
+
+    # ── Project game path (Win32) ────────────────────────────────────────────
+
+    def set_game_path(self, value: str) -> dict:
+        """Override the project game path used by Launch program nodes set to
+        "Project game path". An empty value restores the workflow's own path."""
+        if self.engine.is_running() or not self.flow or self._controller() != "win32":
+            return {"ok": False, "path": str((self.flow.get("win32") or {}).get("path") or "")}
+        override = str(value or "").strip()
+        effective = override or self._flow_game_path
+        self.engine.set_win32_path(effective)   # also writes self.flow["win32"]["path"]
+        with self._runner_config_lock:
+            if override:
+                self._runner_config["win32Path"] = override
+            else:
+                self._runner_config.pop("win32Path", None)
+            self._save_runner_config()
+        return {"ok": True, "path": effective, "requirements": self._requirements_payload(),
+                "gamePath": self._game_path_status()}
+
+    # ── Game requirements (files for the game's own folder) ──────────────────
+
+    def _requirements_dir(self) -> str:
+        """Folder holding the game requirements, or "" when there are none."""
+        if is_frozen():
+            folder = os.path.join(app_dir(), REQUIREMENTS_DIR)
+        elif self.flow_path:
+            folder = os.path.join(os.path.dirname(os.path.abspath(self.flow_path)), REQUIREMENTS_SRC)
+        else:
+            return ""
+        return folder if self._requirement_files(folder) else ""
+
+    @staticmethod
+    def _requirement_files(folder: str) -> List[str]:
+        """Relative paths of every shipped file under ``folder``."""
+        found: List[str] = []
+        for root, _dirs, files in os.walk(folder):
+            for name in files:
+                if name not in REQUIREMENTS_SKIP:
+                    found.append(os.path.relpath(os.path.join(root, name), folder))
+        return found
+
+    def _game_dir(self) -> str:
+        """Folder of the project game path (Settings → Game), if it exists."""
+        path = str((self.flow.get("win32") or {}).get("path") or "").strip()
+        folder = os.path.dirname(path) if path else ""
+        return folder if folder and os.path.isdir(folder) else ""
+
+    def _requirements_payload(self) -> dict:
+        """``{}`` when this game ships no requirements; else what to copy and
+        whether every file is already present in the game folder."""
+        folder = self._requirements_dir()
+        if not folder:
+            return {}
+        files = self._requirement_files(folder)
+        game_dir = self._game_dir()
+        missing = ([f for f in files if not os.path.exists(os.path.join(game_dir, f))]
+                   if game_dir else files)
+        items = sorted((n + (os.sep if os.path.isdir(os.path.join(folder, n)) else "")
+                        for n in os.listdir(folder) if n not in REQUIREMENTS_SKIP), key=str.lower)
+        return {"folder": folder, "items": items, "fileCount": len(files),
+                "gameDir": game_dir, "missing": len(missing),
+                "installed": bool(game_dir) and not missing}
+
+    def open_requirements(self) -> bool:
+        """Reveal the requirements folder in Explorer."""
+        folder = self._requirements_dir()
+        if not folder:
+            return False
+        try:
+            os.startfile(folder)  # type: ignore[attr-defined]
+            return True
+        except Exception as exc:
+            log_warning(f"Couldn't open {folder}: {exc}")
+            return False
+
+    def copy_requirements_to_game(self) -> dict:
+        """Copy the requirements into the game folder (merging, overwriting)."""
+        if self.engine.is_running():
+            return {"ok": False, "error": "Stop the run first"}
+        folder = self._requirements_dir()
+        if not folder:
+            return {"ok": False, "error": "This game has no required files"}
+        game_dir = self._game_dir()
+        if not game_dir:
+            return {"ok": False, "error": "Choose the game's .exe in Settings → Game first"}
+        try:
+            shutil.copytree(folder, game_dir, dirs_exist_ok=True,
+                            ignore=shutil.ignore_patterns(*REQUIREMENTS_SKIP))
+        except (shutil.Error, OSError) as exc:
+            detail = exc.args[0][0][2] if isinstance(exc, shutil.Error) and exc.args and exc.args[0] else exc
+            log_error(f"Couldn't copy game files into {game_dir}: {detail}")
+            return {"ok": False, "requirements": self._requirements_payload(),
+                    "error": f"Couldn't copy into {game_dir} — close the game, or copy "
+                             f"the files by hand if the folder needs admin rights ({detail})"}
+        log_success(f"Copied game files into {game_dir} — restart the game to load them")
+        return {"ok": True, "requirements": self._requirements_payload()}
+
+    def pick_game_path(self, start: str = "") -> dict:
+        """Choose the game .exe with the native picker, then save it."""
+        if self.engine.is_running() or not self.flow:
+            return {"ok": False, "path": ""}
+        value = self._ask_path("file", start or self._flow_game_path,
+                               ("Programs (*.exe;*.bat;*.cmd;*.com)", "All files (*.*)"))
+        if not value:
+            return {"ok": False, "path": ""}
+        return self.set_game_path(value)
+
+    # ── Shared emulator setting (ADB) ────────────────────────────────────────
+
+    def set_emulator(self, kind: str, path: str) -> dict:
+        """Override the shared emulator family + install folder used by emulator
+        nodes on "Project emulator setting". Returns the effective setting."""
+        if self.engine.is_running() or not self.flow or self._controller() == "win32":
+            return {"ok": False, "emulator": dict(self.flow.get("emulator") or {})}
+        kind = str(kind or "").strip().lower()
+        if kind not in EMULATOR_KINDS:
+            kind = str((self.flow.get("emulator") or {}).get("kind") or "ldplayer").strip().lower()
+        if kind not in EMULATOR_KINDS:
+            kind = "ldplayer"
+        path = str(path or "").strip()
+        self.engine.set_emulator_config(kind, path)
+        with self._runner_config_lock:
+            emu = self._runner_config.get("emulator")
+            if not isinstance(emu, dict):
+                emu = {}
+                self._runner_config["emulator"] = emu
+            emu["kind"] = kind
+            emu["path"] = path
+            self._save_runner_config()
+        return {"ok": True, "emulator": {"kind": kind, "path": path},
+                "emulatorDefault": self._flow_emulator}
+
+    def pick_emulator_path(self, start: str = "") -> dict:
+        """Choose the emulator install folder with the native picker, then save."""
+        if self.engine.is_running() or not self.flow or self._controller() == "win32":
+            return {"ok": False, "emulator": dict(self.flow.get("emulator") or {})}
+        cur = dict(self.flow.get("emulator") or {})
+        value = self._ask_path("folder", start or str(cur.get("path") or ""),
+                               ("All files (*.*)",))
+        if not value:
+            return {"ok": False, "emulator": cur}
+        return self.set_emulator(str(cur.get("kind") or ""), value)
 
     def reorder_activities(self, ordered_ids: List[str]) -> bool:
         """Reorder ``flow['activities']`` to match the drag-and-drop order.
@@ -646,12 +1124,104 @@ class WorkflowRunnerAPI:
     def save_settings(self, settings: dict) -> bool:
         return save_ui_settings(settings)
 
+    # ── Live preview ─────────────────────────────────────────────────────────
+
+    def _grab_frame(self):
+        """One BGR frame from the active backend, or None when unavailable.
+
+        ADB flows grab from the connected device; Win32 flows build/attach their
+        window capture backend lazily (same path a run uses)."""
+        try:
+            auto = getattr(self.engine, "auto", None)
+            if auto is None:
+                return None
+            if self._controller() == "win32":
+                try:
+                    from src.core.win32 import Win32GameAutomation
+                    if not isinstance(auto, Win32GameAutomation):
+                        self.engine._ensure_ready_win32()
+                        auto = self.engine.auto
+                except Exception:
+                    pass
+            return auto.capture_screen()
+        except Exception:
+            return None
+
+    def _encode_frame(self, bgr) -> Optional[dict]:
+        try:
+            import cv2
+            ok, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            if not ok:
+                return None
+            h, w = bgr.shape[:2]
+            b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+            return {"dataUrl": "data:image/jpeg;base64," + b64, "w": int(w), "h": int(h)}
+        except Exception:
+            return None
+
+    def _push_frame(self, frame: Optional[dict]) -> None:
+        if self._window is None or self._closing or not frame:
+            return
+        try:
+            self._window.evaluate_js(
+                'window.__recvFrame && window.__recvFrame("%s",%d,%d)'
+                % (frame["dataUrl"], frame["w"], frame["h"]))
+        except Exception:
+            pass
+
+    def capture_now(self) -> dict:
+        """One synchronous frame for the Preview panel ({} when no frame)."""
+        if self._window is None:
+            return {}
+        with self._capture_lock:
+            img = self._grab_frame()
+        return (self._encode_frame(img) if img is not None else None) or {}
+
+    def capture(self) -> bool:
+        """Fire-and-forget frame push, so the page never blocks on a capture."""
+        if self._window is None or self._closing:
+            return False
+        threading.Thread(target=self._capture_once, daemon=True).start()
+        return True
+
+    def _capture_once(self) -> None:
+        with self._capture_lock:
+            img = self._grab_frame()
+            frame = self._encode_frame(img) if img is not None else None
+        self._push_frame(frame)
+
+    def set_refresh_hz(self, hz: float) -> bool:
+        try:
+            self._refresh_hz = max(0.5, min(30.0, float(hz)))
+        except (TypeError, ValueError):
+            pass
+        return True
+
+    def set_auto_refresh(self, enabled: bool) -> bool:
+        """Start/stop the preview frame loop. The page calls this when the
+        Preview panel is shown or hidden, so nothing captures while it's shut."""
+        self._auto_refresh_enabled = bool(enabled)
+        if self._auto_refresh_enabled:
+            if self._refresh_thread is None or not self._refresh_thread.is_alive():
+                self._refresh_thread = threading.Thread(target=self._auto_refresh_loop, daemon=True)
+                self._refresh_thread.start()
+        return True
+
+    def _auto_refresh_loop(self) -> None:
+        while not self._closing and self._auto_refresh_enabled:
+            start = time.time()
+            self._capture_once()
+            delay = (1.0 / max(0.5, self._refresh_hz)) - (time.time() - start)
+            time.sleep(max(0.03, delay))
+
     # ── Devices ───────────────────────────────────────────────────────────────
 
     def refresh_devices(self) -> None:
-        threading.Thread(target=self._device_worker, args=(True,), daemon=True).start()
+        self._kick_device_scan()
 
     def select_device(self, serial: str) -> bool:
+        if not self._adb_workflow():
+            return False
         try:
             self._selected_serial = serial
             self.engine.auto.adb.device_id = serial
@@ -675,7 +1245,41 @@ class WorkflowRunnerAPI:
         except Exception as e:
             log_error(f"Connect device error: {e}")
 
+    def _adb_workflow(self) -> bool:
+        """True only when the loaded workflow drives a device over ADB.
+
+        Everything below reaches the shared ADB server (``adb devices``, server
+        start-up, emulator port scanning), so a Win32 project must not call any
+        of it — that was the "why is my win32 game checking ADB" bug."""
+        return self._controller() == "adb"
+
+    def _ensure_adb_lease(self) -> None:
+        """Claim this process as a live ADB client, once, on first need.
+
+        Held so a sibling Macro2k app closing down doesn't ``kill-server`` out
+        from under an in-flight ADB run. A Win32-only Runner never calls this,
+        so it neither blocks nor triggers that teardown (see lifecycle)."""
+        if self._adb_lease:
+            return
+        self._adb_lease = lifecycle.acquire_adb_lease("runner")
+
+    def _kick_device_scan(self) -> None:
+        """One device scan in the background, ADB workflows only."""
+        if self._adb_workflow():
+            self._ensure_adb_lease()
+            threading.Thread(target=self._device_worker, args=(True,), daemon=True).start()
+        else:
+            # Clear any device state left over from an ADB project so the UI
+            # doesn't keep a stale "Connecting…" around.
+            self._selected_serial = None
+            self._connected_serial = None
+            self._push("devices_update", {"devices": [], "connected": False,
+                                          "serial": None, "name": ""})
+
     def _device_worker(self, force_scan: bool = False) -> None:
+        # The one place ADB is actually reached — hold the lease for as long as
+        # that's true, however this got called.
+        self._ensure_adb_lease()
         adb = self.engine.auto.adb
         with self._device_lock:
             try:
@@ -716,13 +1320,14 @@ class WorkflowRunnerAPI:
     def _device_poll(self) -> None:
         while not self._closing:
             time.sleep(5)
-            if not self._closing:
+            if not self._closing and self._adb_workflow():
                 self._device_worker(force_scan=False)
 
     # ── Teardown ─────────────────────────────────────────────────────────────
 
     def _close(self) -> None:
         self._closing = True
+        self._auto_refresh_enabled = False
         remove_log_subscriber(self._on_log)
         try:
             self.engine.stop()
@@ -730,14 +1335,22 @@ class WorkflowRunnerAPI:
             pass
         stop_scrcpy_sources()
         # Only stop the shared ADB server when no sibling Macro2k process
-        # (Designer / DevScope / Hub) still holds a lease.
-        lifecycle.release_adb_and_kill_if_last("runner")
+        # (Designer / DevScope / Hub) still holds a lease. A Win32-only Runner
+        # never took one, so it has nothing to release and must not kill a
+        # server some other app is still using.
+        if self._adb_lease:
+            lifecycle.release_adb_and_kill_if_last("runner")
 
 
 # ── Entry points ────────────────────────────────────────────────────────────
 
-def create_workflow_runner_window(title: str = titled("Macro2k Runner"),
+def create_workflow_runner_window(title: Optional[str] = None,
                                   auto_load: Optional[str] = None) -> webview.Window:
+    if not title:
+        # A standalone Runner is titled after its game and its own version.
+        info = runner_update.build_info()
+        title = (f"{info.get('name') or info.get('appName')} {info['version']}"
+                 if info.get("version") else titled("Macro2k Runner"))
     api = WorkflowRunnerAPI()
     api._pending_load = auto_load
     html_path = os.path.join(_WEB_DIR, "runner", "index.html")
@@ -746,8 +1359,8 @@ def create_workflow_runner_window(title: str = titled("Macro2k Runner"),
         title=title,
         url=url,
         js_api=api,
-        width=500,
-        height=820,
+        width=800,
+        height=1000,
         resizable=True,
         min_size=(420, 620),
         background_color=theme_background(),
@@ -767,6 +1380,6 @@ def run(auto_load: Optional[str] = None) -> None:
 
 
 if __name__ == "__main__":
-    # Optional: a flow JSON path to auto-load (the designer's "Chạy GUI" passes one).
+    # The flow JSON to load — the Hub's Run and the designer's "Chạy GUI" pass one.
     auto = sys.argv[1] if len(sys.argv) > 1 else None
     run(auto)

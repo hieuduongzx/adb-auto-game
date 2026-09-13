@@ -33,6 +33,12 @@ frida>=16.0.0 ; sys_platform == "win32"
 # ── Mobile automation ───────────────────────────────────────────────────────
 pure-python-adb>=0.3.0.dev0
 
+# ── Build tools ─────────────────────────────────────────────────────────────
+# The Hub's Build button packages a standalone Runner .exe by shelling out to
+# PyInstaller *in the interpreter running the Hub*, so it must be installed
+# here, not just globally. (packaging/build.ps1 also uses it for the suite.)
+pyinstaller>=6.0
+
 # ── Auto-update ─────────────────────────────────────────────────────────────
 # Runtime side uses only the stdlib (urllib) to poll GitHub Releases and run the
 # downloaded Inno Setup installer — no extra dependency. Packaging side is the

@@ -1,8 +1,9 @@
-"""Macro2k Hub — navigation dashboard for workflows.
+"""Macro2k Hub — game library launcher.
 
-Lists every workflow under ``workflows/``, and launches the Runner (Run) or
-Designer (Edit). **New workflow** scaffolds ``workflows/<Name>/workflow.json``
-and opens the Designer on it.
+Shows every game project under ``workflows/`` as a cover card
+(``workflows/<Name>/assets/cover.png``) and launches the Runner (Run) or
+Designer (Edit). **New game** scaffolds ``workflows/<Name>/workflow.json`` and
+opens the Designer on it.
 
 This is the default entry of ``Macro2k.exe`` (see
 ``packaging/entry_designer.py``). Run from source::
@@ -11,10 +12,12 @@ This is the default entry of ``Macro2k.exe`` (see
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -25,6 +28,9 @@ from typing import Any, Dict, List, Optional
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
+# The repo root even in a frozen build (where _PROJECT_ROOT moves to data_root):
+# packaging/build_runner.py and dist/ live here.
+_SOURCE_ROOT = _PROJECT_ROOT
 
 import webview
 
@@ -51,9 +57,10 @@ if is_frozen():
 _WEB_DIR = (os.path.join(bundle_dir(), "web") if is_frozen()
             else os.path.join(os.path.dirname(__file__), "web"))
 _WORKFLOWS_DIR = os.path.join(_PROJECT_ROOT, "workflows")
-_AUTOCLICKS_DIR = os.path.join(_PROJECT_ROOT, "autoclicks")
 _TEMPLATES_DIRNAME = "templates"
-_AUTOCLICK_SETTINGS = os.path.join(_PROJECT_ROOT, "data", "autoclick_settings.json")
+# Cover art and icon looked up in <project>/assets/, first match wins.
+_COVER_NAMES = ("cover.png", "cover.jpg", "cover.jpeg", "cover.webp")
+_ICON_NAMES = ("icon.png", "icon.jpg", "icon.jpeg", "icon.webp", "icon.ico")
 # Internal handoff / scratch folder — never listed as a user workflow.
 _SKIP_DIRS = {"_run", "__pycache__"}
 
@@ -66,9 +73,30 @@ def _norm_capture(raw: str) -> str:
     return "adb" if str(raw or "").strip().lower() == "adb" else "scrcpy"
 
 
+_WIN_INPUT_MODES: Optional[tuple] = None
+
+
+def _win_input_modes() -> tuple:
+    """Every Win32 input transport the controller accepts.
+
+    Read from ``src/core/win32/automation.py`` so the Hub can never silently
+    downgrade a mode the engine supports (it used to coerce ``anchored_touch``
+    and ``unity_bridge`` back to ``background`` on create)."""
+    global _WIN_INPUT_MODES
+    if _WIN_INPUT_MODES is None:
+        try:
+            from src.core.win32.automation import _INPUT_MODES
+            _WIN_INPUT_MODES = tuple(_INPUT_MODES)
+        except Exception:
+            _WIN_INPUT_MODES = ("background", "background_sync", "background_cursor",
+                                "background_window", "anchored_touch", "unity_bridge",
+                                "foreground")
+    return _WIN_INPUT_MODES
+
+
 def _norm_input_mode(raw: str) -> str:
     mode = str(raw or "").strip().lower()
-    return mode if mode in {"background", "background_sync", "background_cursor", "foreground"} else "background"
+    return mode if mode in _win_input_modes() else "background"
 
 
 def _blank_flow(
@@ -152,6 +180,87 @@ def _find_workflow_json(folder: str) -> Optional[str]:
     return os.path.join(folder, names[0])
 
 
+def _find_cover(folder: str) -> str:
+    return _find_asset(folder, _COVER_NAMES)
+
+
+def _find_icon(folder: str) -> str:
+    return _find_asset(folder, _ICON_NAMES)
+
+
+def _find_asset(folder: str, names: tuple) -> str:
+    """``file://`` URL of the first ``<folder>/assets/<name>`` that exists, or "".
+
+    The file's mtime rides as a query string so a replaced image shows up on
+    the next refresh instead of the WebView's cached copy."""
+    assets = os.path.join(folder, "assets")
+    for name in names:
+        path = os.path.join(assets, name)
+        if os.path.isfile(path):
+            try:
+                stamp = int(os.path.getmtime(path))
+            except OSError:
+                stamp = 0
+            return f"{file_url(path)}?v={stamp}"
+    return ""
+
+
+_REPO_RE = re.compile(r"[\w.-]+/[\w.-]+")
+_BUILD_LOG_LIMIT = 4000
+
+
+def _repo_slug(url_or_slug: str) -> str:
+    """``https://github.com/owner/name(.git)`` or ``owner/name`` → ``owner/name``."""
+    text = re.sub(r"^https?://github\.com/", "", str(url_or_slug or "").strip()).strip("/")
+    return text[:-4] if text.endswith(".git") else text
+
+
+def _remember_update_repo(flow_path: str, repo: str) -> None:
+    """Store ``runnerUpdate.repo`` in the workflow JSON as soon as a build starts.
+
+    build_runner.py records it too, but only after a successful build — so a
+    repo changed in the Build dialog was forgotten whenever the build or its
+    publish failed. Best effort: that later save still runs on success."""
+    try:
+        with open(flow_path, "r", encoding="utf-8") as fh:
+            flow = json.load(fh) or {}
+        update = flow.get("runnerUpdate") if isinstance(flow.get("runnerUpdate"), dict) else {}
+        if update.get("repo") == repo:
+            return
+        update["repo"] = repo
+        flow["runnerUpdate"] = update
+        with open(flow_path, "w", encoding="utf-8") as fh:
+            json.dump(flow, fh, ensure_ascii=False, indent=2)
+            fh.write("\n")
+    except Exception:
+        pass
+
+
+def _bump_patch(version: str) -> str:
+    """``1.2.3`` → ``1.2.4`` (padded to three parts)."""
+    nums = [int(p) for p in re.findall(r"\d+", version or "")][:3]
+    nums += [0] * (3 - len(nums))
+    nums[2] += 1
+    return ".".join(str(n) for n in nums)
+
+
+_build_module: Any = None
+
+
+def _load_build_module() -> Any:
+    """``packaging/build_runner.py`` as a module (for its vendor/name rules), or None."""
+    global _build_module
+    if _build_module is None:
+        script = os.path.join(_SOURCE_ROOT, "packaging", "build_runner.py")
+        if not os.path.isfile(script):
+            return None
+        spec = importlib.util.spec_from_file_location("macro2k_build_runner", script)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)  # type: ignore[union-attr]
+        _build_module = module
+    return _build_module
+
+
 def _read_meta(path: str, folder_name: str) -> Dict[str, Any]:
     name = folder_name
     controller = "adb"
@@ -198,6 +307,8 @@ def _read_meta(path: str, folder_name: str) -> Dict[str, Any]:
         "file": file_name,
         "relPath": rel,
         "path": path,
+        "cover": _find_cover(os.path.dirname(path)),
+        "icon": _find_icon(os.path.dirname(path)),
         "controller": controller,
         "capture": capture,
         "activityCount": activity_count,
@@ -212,22 +323,18 @@ class WorkflowHubAPI:
 
     def __init__(self) -> None:
         self._window: Optional[webview.Window] = None
-        self._click_lock = threading.RLock()
-        self._click_stop = threading.Event()
-        self._click_thread: Optional[threading.Thread] = None
-        self._hotkey_thread: Optional[threading.Thread] = None
-        self._hotkey_thread_id = 0
-        self._hotkeys_ok = False
-        self._autoclick_view_active = threading.Event()
-        self._click_config = self._load_click_config()
-        self._click_state: Dict[str, Any] = {
-            "running": False, "count": 0, "cycles": 0, "activePointId": "",
-            "startedAt": 0.0, "elapsed": 0.0, "status": "Ready", "error": "",
-        }
+        # One standalone-Runner build at a time: its state, full log, and the
+        # lines not yet pushed to the page (batched so PyInstaller's chatter
+        # doesn't turn into thousands of evaluate_js calls).
+        self._build_lock = threading.Lock()
+        self._build: Optional[Dict[str, Any]] = None
+        self._build_log: List[str] = []
+        self._build_pending: List[str] = []
+        self._build_pushed_at = 0.0
+        self._build_proc: Optional[subprocess.Popen] = None
 
     def _attach(self, window: webview.Window) -> None:
         self._window = window
-        self._start_hotkeys()
 
     def app_version(self) -> str:
         """Version string for the Hub UI badge (see ``src/version.py``)."""
@@ -268,495 +375,12 @@ class WorkflowHubAPI:
 
         return apply_latest(_push)
 
-    # ── Auto Click ──────────────────────────────────────────────────────────
-    @staticmethod
-    def _default_click_config() -> Dict[str, Any]:
-        return {
-            "profileName": "Untitled sequence", "selectedPointId": "point-1",
-            "points": [{
-                "id": "point-1", "label": "Point 1", "enabled": True,
-                "targetMode": "fixed", "x": 0, "y": 0,
-                "button": "left", "clickType": "single",
-            }],
-            "intervalMs": 250, "startDelaySec": 0,
-            "infinite": True, "count": 100,
-        }
-
-    @staticmethod
-    def _copy_click_config(config: dict) -> dict:
-        return json.loads(json.dumps(config, ensure_ascii=False))
-
-    def _load_click_config(self) -> Dict[str, Any]:
-        cfg = self._default_click_config()
-        try:
-            with open(_AUTOCLICK_SETTINGS, "r", encoding="utf-8") as fh:
-                raw = json.load(fh) or {}
-            if isinstance(raw, dict):
-                cfg = raw
-        except Exception:
-            pass
-        return self._normalise_click_config(cfg)
-
-    @classmethod
-    def _normalise_click_config(cls, raw: Optional[dict]) -> Dict[str, Any]:
-        src = dict(raw or {})
-        if isinstance(src.get("settings"), dict):
-            src = {**src["settings"], "points": src.get("points", []),
-                   "profileName": src.get("name") or src.get("profileName")}
-        cfg = cls._default_click_config()
-        cfg["profileName"] = str(src.get("profileName") or "Untitled sequence").strip()[:100]
-        cfg["infinite"] = bool(src.get("infinite", True))
-        for key, default, lo, hi in (
-            ("intervalMs", 250, 10, 600000), ("startDelaySec", 0, 0, 3600),
-            ("count", 100, 1, 1000000),
-        ):
-            try:
-                val = int(float(src.get(key, default)))
-            except (TypeError, ValueError):
-                val = default
-            cfg[key] = max(lo, min(hi, val))
-
-        points_raw = src.get("points")
-        if not isinstance(points_raw, list):
-            points_raw = [{
-                "id": "point-1", "label": "Point 1", "enabled": True,
-                "targetMode": src.get("targetMode", "fixed"),
-                "x": src.get("x", 0), "y": src.get("y", 0),
-                "button": src.get("button", "left"),
-                "clickType": src.get("clickType", "single"),
-            }]
-        points: List[Dict[str, Any]] = []
-        used_ids = set()
-        for index, item in enumerate(points_raw[:500]):
-            if not isinstance(item, dict):
-                continue
-            point_id = re.sub(r"[^A-Za-z0-9_-]", "", str(item.get("id") or ""))[:40]
-            if not point_id or point_id in used_ids:
-                point_id = f"point-{index + 1}"
-                while point_id in used_ids:
-                    point_id += "x"
-            used_ids.add(point_id)
-            try:
-                x = max(-100000, min(100000, int(float(item.get("x", 0)))))
-                y = max(-100000, min(100000, int(float(item.get("y", 0)))))
-            except (TypeError, ValueError):
-                x, y = 0, 0
-            points.append({
-                "id": point_id,
-                "label": str(item.get("label") or f"Point {index + 1}").strip()[:80] or f"Point {index + 1}",
-                "enabled": bool(item.get("enabled", True)),
-                "targetMode": "cursor" if item.get("targetMode") == "cursor" else "fixed",
-                "x": x, "y": y,
-                "button": item.get("button") if item.get("button") in {"left", "right", "middle"} else "left",
-                "clickType": "double" if item.get("clickType") == "double" else "single",
-            })
-        cfg["points"] = points
-        selected = str(src.get("selectedPointId") or "")
-        cfg["selectedPointId"] = selected if selected in used_ids else (points[0]["id"] if points else "")
-        return cfg
-
-    def _save_click_config(self) -> None:
-        try:
-            os.makedirs(os.path.dirname(_AUTOCLICK_SETTINGS), exist_ok=True)
-            with open(_AUTOCLICK_SETTINGS, "w", encoding="utf-8") as fh:
-                json.dump(self._click_config, fh, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
-
-    def _push_click(self, event: str, data: Optional[dict] = None) -> None:
-        win = self._window
-        if win is None:
-            return
-        payload = json.dumps(data or {}, ensure_ascii=False)
-        try:
-            win.evaluate_js(f"window.__autoClickEvent && window.__autoClickEvent({json.dumps(event)}, {payload})")
-        except Exception:
-            pass
-
-    @staticmethod
-    def _cursor_pos() -> Optional[tuple]:
-        if sys.platform != "win32":
-            return None
-        try:
-            import ctypes
-            class POINT(ctypes.Structure):
-                _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
-            pt = POINT()
-            if ctypes.windll.user32.GetCursorPos(ctypes.byref(pt)):
-                return int(pt.x), int(pt.y)
-        except Exception:
-            pass
-        return None
-
-    def autoclick_state(self) -> dict:
-        with self._click_lock:
-            return {
-                **self._click_state,
-                "config": self._copy_click_config(self._click_config),
-                "hotkeys": self._hotkeys_ok,
-                "platform": sys.platform,
-                "profilesDir": _AUTOCLICKS_DIR,
-            }
-
-    def autoclick_set_view_active(self, active: bool) -> bool:
-        """Enable capture hotkeys only while the Auto Click view is open."""
-        if active:
-            self._autoclick_view_active.set()
-        else:
-            self._autoclick_view_active.clear()
-        return True
-
-    def autoclick_configure(self, config: dict) -> dict:
-        with self._click_lock:
-            if self._click_state["running"]:
-                return {"ok": False, "error": "Stop Auto Click before changing settings."}
-            self._click_config = self._normalise_click_config(config)
-            self._save_click_config()
-            return {"ok": True, "config": self._copy_click_config(self._click_config)}
-
-    def autoclick_add_point_at_cursor(self) -> dict:
-        pos = self._cursor_pos()
-        if pos is None:
-            return {"ok": False, "error": "Cursor position is only available on Windows."}
-        with self._click_lock:
-            if self._click_state["running"]:
-                return {"ok": False, "error": "Stop Auto Click before adding a point."}
-            used = {point["id"] for point in self._click_config["points"]}
-            point_id = f"point-{int(time.time() * 1000)}"
-            while point_id in used:
-                point_id += "x"
-            point = {
-                "id": point_id,
-                "label": f"Point {len(self._click_config['points']) + 1}",
-                "enabled": True, "targetMode": "fixed",
-                "x": pos[0], "y": pos[1], "button": "left", "clickType": "single",
-            }
-            self._click_config["points"].append(point)
-            self._click_config["selectedPointId"] = point_id
-            self._save_click_config()
-            result = {"ok": True, "point": self._copy_click_config(point)}
-        self._push_click("point-added", result)
-        return result
-
-    def autoclick_capture_position(self, point_id: str = "") -> dict:
-        pos = self._cursor_pos()
-        if pos is None:
-            return {"ok": False, "error": "Cursor position is only available on Windows."}
-        with self._click_lock:
-            if self._click_state["running"]:
-                return {"ok": False, "error": "Stop Auto Click before capturing a position."}
-            wanted = point_id or self._click_config.get("selectedPointId")
-            point = next((p for p in self._click_config["points"] if p["id"] == wanted), None)
-            if point is None and self._click_config["points"]:
-                point = self._click_config["points"][0]
-            if point is None:
-                return {"ok": False, "error": "Add a point before capturing a position."}
-            point["x"], point["y"] = pos
-            self._click_config["selectedPointId"] = point["id"]
-            self._save_click_config()
-            result = {"ok": True, "pointId": point["id"], "x": pos[0], "y": pos[1]}
-        self._push_click("position", result)
-        return result
-
-    @staticmethod
-    def _profile_filename(name: str) -> str:
-        clean = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", str(name or "").strip())
-        clean = clean.rstrip(". ")[:80] or "Untitled sequence"
-        return clean if clean.lower().endswith(".json") else clean + ".json"
-
-    @staticmethod
-    def _profile_path(filename: str) -> Optional[str]:
-        raw = str(filename or "").strip()
-        base = os.path.basename(raw)
-        if not base or base != raw or not base.lower().endswith(".json"):
-            return None
-        path = os.path.abspath(os.path.join(_AUTOCLICKS_DIR, base))
-        return path if os.path.dirname(path) == os.path.abspath(_AUTOCLICKS_DIR) else None
-
-    def autoclick_list_profiles(self) -> dict:
-        items: List[Dict[str, Any]] = []
-        try:
-            os.makedirs(_AUTOCLICKS_DIR, exist_ok=True)
-            for filename in os.listdir(_AUTOCLICKS_DIR):
-                if filename.startswith(".") or not filename.lower().endswith(".json"):
-                    continue
-                path = os.path.join(_AUTOCLICKS_DIR, filename)
-                if not os.path.isfile(path):
-                    continue
-                try:
-                    with open(path, "r", encoding="utf-8") as fh:
-                        raw = json.load(fh)
-                    config = self._normalise_click_config(raw if isinstance(raw, dict) else {})
-                    items.append({
-                        "filename": filename,
-                        "name": str((raw or {}).get("name") or config["profileName"]),
-                        "points": len(config["points"]), "modified": os.path.getmtime(path),
-                    })
-                except Exception:
-                    items.append({"filename": filename, "name": os.path.splitext(filename)[0],
-                                  "points": None, "invalid": True, "modified": os.path.getmtime(path)})
-        except Exception as exc:
-            return {"ok": False, "error": str(exc), "dir": _AUTOCLICKS_DIR, "profiles": []}
-        items.sort(key=lambda item: (-(item.get("modified") or 0), item["name"].lower()))
-        return {"ok": True, "dir": _AUTOCLICKS_DIR, "profiles": items}
-
-    def autoclick_load_profile(self, filename: str) -> dict:
-        path = self._profile_path(filename)
-        if path is None or not os.path.isfile(path):
-            return {"ok": False, "error": "Auto Click file not found."}
-        with self._click_lock:
-            if self._click_state["running"]:
-                return {"ok": False, "error": "Stop Auto Click before loading a file."}
-            try:
-                with open(path, "r", encoding="utf-8") as fh:
-                    raw = json.load(fh)
-                if not isinstance(raw, dict):
-                    raise ValueError("The JSON root must be an object.")
-                self._click_config = self._normalise_click_config(raw)
-                self._save_click_config()
-                return {"ok": True, "filename": os.path.basename(path),
-                        "config": self._copy_click_config(self._click_config)}
-            except Exception as exc:
-                return {"ok": False, "error": f"Could not load file: {exc}"}
-
-    def autoclick_save_profile(self, name: str, config: dict, filename: str = "", overwrite: bool = False) -> dict:
-        with self._click_lock:
-            if self._click_state["running"]:
-                return {"ok": False, "error": "Stop Auto Click before saving."}
-            clean_name = str(name or "").strip()[:100]
-            if not clean_name:
-                return {"ok": False, "error": "Sequence name is required."}
-            target_name = filename or self._profile_filename(clean_name)
-            path = self._profile_path(target_name)
-            if path is None:
-                return {"ok": False, "error": "Invalid filename."}
-            if os.path.exists(path) and not overwrite:
-                return {"ok": False, "exists": True, "filename": os.path.basename(path),
-                        "error": "A sequence with this name already exists."}
-            normal = self._normalise_click_config({**dict(config or {}), "profileName": clean_name})
-            document = {
-                "version": 1, "type": "macro2k-autoclick", "name": clean_name,
-                "settings": {key: normal[key] for key in ("intervalMs", "startDelaySec", "infinite", "count")},
-                "points": normal["points"],
-            }
-            try:
-                os.makedirs(_AUTOCLICKS_DIR, exist_ok=True)
-                temp = path + ".tmp"
-                with open(temp, "w", encoding="utf-8") as fh:
-                    json.dump(document, fh, ensure_ascii=False, indent=2)
-                    fh.write("\n")
-                os.replace(temp, path)
-                self._click_config = normal
-                self._save_click_config()
-                return {"ok": True, "filename": os.path.basename(path),
-                        "config": self._copy_click_config(normal)}
-            except Exception as exc:
-                return {"ok": False, "error": f"Could not save file: {exc}"}
-
-    def autoclick_open_folder(self) -> bool:
-        try:
-            os.makedirs(_AUTOCLICKS_DIR, exist_ok=True)
-            if sys.platform == "win32":
-                os.startfile(_AUTOCLICKS_DIR)  # type: ignore[attr-defined]
-            else:
-                import subprocess
-                subprocess.Popen(["xdg-open", _AUTOCLICKS_DIR])
-            return True
-        except Exception:
-            return False
-
-    def autoclick_start(self, config: Optional[dict] = None) -> dict:
-        if sys.platform != "win32":
-            return {"ok": False, "error": "Auto Click currently requires Windows."}
-        with self._click_lock:
-            if self._click_state["running"]:
-                return {"ok": True, **self.autoclick_state()}
-            if config is not None:
-                self._click_config = self._normalise_click_config(config)
-                self._save_click_config()
-            if not any(point["enabled"] for point in self._click_config["points"]):
-                return {"ok": False, "error": "Add or enable at least one click point."}
-            self._click_stop.clear()
-            self._click_state.update({
-                "running": True, "count": 0, "cycles": 0, "activePointId": "",
-                "startedAt": time.time(), "elapsed": 0.0,
-                "status": "Starting", "error": "",
-            })
-            self._click_thread = threading.Thread(target=self._click_loop, daemon=True)
-            self._click_thread.start()
-            state = self.autoclick_state()
-        self._push_click("state", state)
-        return {"ok": True, **state}
-
-    def autoclick_stop(self) -> dict:
-        self._click_stop.set()
-        with self._click_lock:
-            if self._click_state["running"]:
-                self._click_state["status"] = "Stopping"
-            state = self.autoclick_state()
-        self._push_click("state", state)
-        return {"ok": True, **state}
-
-    @staticmethod
-    def _send_mouse_input(dw_flags: int) -> None:
-        """Inject one mouse event via ``SendInput`` (the legacy ``mouse_event``
-        API is deprecated by Microsoft and can be swallowed by UIPI)."""
-        import ctypes
-
-        PULONG = ctypes.POINTER(ctypes.c_ulong)
-
-        class _MOUSEINPUT(ctypes.Structure):
-            _fields_ = [
-                ("dx", ctypes.c_long), ("dy", ctypes.c_long),
-                ("mouseData", ctypes.c_ulong), ("dwFlags", ctypes.c_ulong),
-                ("time", ctypes.c_ulong), ("dwExtraInfo", PULONG),
-            ]
-
-        class _INPUTUNION(ctypes.Union):
-            _fields_ = [("mi", _MOUSEINPUT)]
-
-        class _INPUT(ctypes.Structure):
-            _anonymous_ = ("union",)
-            _fields_ = [("type", ctypes.c_ulong), ("union", _INPUTUNION)]
-
-        INPUT_MOUSE = 0
-        inp = _INPUT(type=INPUT_MOUSE)
-        inp.mi = _MOUSEINPUT(0, 0, 0, dw_flags, 0, None)
-        user32 = ctypes.windll.user32
-        user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(_INPUT))
-
-    @classmethod
-    def _mouse_click(cls, button: str, double: bool) -> None:
-        flags = {
-            "left": (0x0002, 0x0004),
-            "right": (0x0008, 0x0010),
-            "middle": (0x0020, 0x0040),
-        }
-        down, up = flags.get(button, flags["left"])
-        for index in range(2 if double else 1):
-            cls._send_mouse_input(down)
-            cls._send_mouse_input(up)
-            if index == 0 and double:
-                time.sleep(0.05)
-
-    def _click_loop(self) -> None:
-        import ctypes
-        with self._click_lock:
-            cfg = self._copy_click_config(self._click_config)
-        points = [point for point in cfg["points"] if point["enabled"]]
-        completed = 0
-        cycles = 0
-        last_push = 0.0
-        try:
-            delay = cfg["startDelaySec"]
-            if delay:
-                with self._click_lock:
-                    self._click_state["status"] = f"Starting in {delay}s"
-                self._push_click("state", self.autoclick_state())
-                if self._click_stop.wait(delay):
-                    return
-            with self._click_lock:
-                self._click_state["status"] = "Clicking"
-            self._push_click("state", self.autoclick_state())
-            limit = None if cfg["infinite"] else cfg["count"]
-            while not self._click_stop.is_set() and (limit is None or cycles < limit):
-                cycle_complete = True
-                for point_index, point in enumerate(points):
-                    if self._click_stop.is_set():
-                        cycle_complete = False
-                        break
-                    if point["targetMode"] == "fixed":
-                        ctypes.windll.user32.SetCursorPos(point["x"], point["y"])
-                    with self._click_lock:
-                        self._click_state["activePointId"] = point["id"]
-                    self._mouse_click(point["button"], point["clickType"] == "double")
-                    completed += 1
-                    now = time.monotonic()
-                    with self._click_lock:
-                        self._click_state["count"] = completed
-                    if now - last_push >= 0.08:
-                        self._push_click("tick", {"count": completed, "cycles": cycles,
-                                                  "pointId": point["id"], "pointIndex": point_index})
-                        last_push = now
-                    final_action = (limit is not None and cycles + 1 >= limit and point_index == len(points) - 1)
-                    if not final_action and self._click_stop.wait(cfg["intervalMs"] / 1000.0):
-                        cycle_complete = False
-                        break
-                if cycle_complete:
-                    cycles += 1
-                    with self._click_lock:
-                        self._click_state["cycles"] = cycles
-                    self._push_click("tick", {"count": completed, "cycles": cycles, "pointId": ""})
-        except Exception as exc:
-            with self._click_lock:
-                self._click_state["error"] = str(exc)
-                self._click_state["status"] = "Error"
-        finally:
-            stopped = self._click_stop.is_set()
-            with self._click_lock:
-                self._click_state["running"] = False
-                self._click_state["activePointId"] = ""
-                self._click_state["elapsed"] = max(0.0, time.time() - self._click_state["startedAt"])
-                if not self._click_state["error"]:
-                    self._click_state["status"] = "Stopped" if stopped else "Completed"
-                state = self.autoclick_state()
-            self._push_click("state", state)
-
-    def _toggle_click_hotkey(self) -> None:
-        if self.autoclick_state()["running"]:
-            self.autoclick_stop()
-        else:
-            self.autoclick_start()
-
-    def _start_hotkeys(self) -> None:
-        if sys.platform != "win32" or (self._hotkey_thread and self._hotkey_thread.is_alive()):
-            return
-        self._hotkey_thread = threading.Thread(target=self._hotkey_loop, daemon=True)
-        self._hotkey_thread.start()
-
-    def _hotkey_loop(self) -> None:
-        try:
-            import ctypes
-            from ctypes import wintypes
-            user32 = ctypes.windll.user32
-            kernel32 = ctypes.windll.kernel32
-            self._hotkey_thread_id = int(kernel32.GetCurrentThreadId())
-            # MOD_NOREPEAT prevents held keys from rapidly toggling the clicker.
-            ok6 = bool(user32.RegisterHotKey(None, 6001, 0x4000, 0x75))  # F6
-            ok7 = bool(user32.RegisterHotKey(None, 6002, 0x4000, 0x76))  # F7
-            ok8 = bool(user32.RegisterHotKey(None, 6003, 0x4000, 0x77))  # F8
-            self._hotkeys_ok = ok6 and ok7 and ok8
-            self._push_click("hotkeys", {"ok": self._hotkeys_ok})
-            msg = wintypes.MSG()
-            while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
-                if msg.message == 0x0312:  # WM_HOTKEY
-                    if msg.wParam == 6001:
-                        self._toggle_click_hotkey()
-                    elif msg.wParam == 6002 and self._autoclick_view_active.is_set():
-                        self.autoclick_capture_position()
-                    elif msg.wParam == 6003 and self._autoclick_view_active.is_set():
-                        self.autoclick_add_point_at_cursor()
-            if ok6:
-                user32.UnregisterHotKey(None, 6001)
-            if ok7:
-                user32.UnregisterHotKey(None, 6002)
-            if ok8:
-                user32.UnregisterHotKey(None, 6003)
-        except Exception:
-            self._hotkeys_ok = False
-            self._push_click("hotkeys", {"ok": False})
-
-    def shutdown(self) -> None:
-        self._click_stop.set()
-        if sys.platform == "win32" and self._hotkey_thread_id:
-            try:
-                import ctypes
-                ctypes.windll.user32.PostThreadMessageW(self._hotkey_thread_id, 0x0012, 0, 0)  # WM_QUIT
-            except Exception:
-                pass
-
+    # ── Game library ─────────────────────────────────────────────────────────
     def list_workflows(self) -> dict:
-        """Return every workflow under ``workflows/`` (newest first)."""
+        """Return every game project under ``workflows/``, sorted by name.
+
+        Alphabetical rather than most-recently-edited: a library grid whose
+        cards jump around after every save is hard to find things in."""
         items: List[Dict[str, Any]] = []
         root = _WORKFLOWS_DIR
         if os.path.isdir(root):
@@ -774,7 +398,7 @@ class WorkflowHubAPI:
                 if not path:
                     continue
                 items.append(_read_meta(path, name))
-        items.sort(key=lambda w: (-(w.get("mtime") or 0), (w.get("name") or "").lower()))
+        items.sort(key=lambda w: ((w.get("name") or "").lower(), w.get("folder") or ""))
         return {"dir": root, "workflows": items}
 
     def run_workflow(self, path: str) -> bool:
@@ -799,8 +423,264 @@ class WorkflowHubAPI:
         except Exception:
             return False
 
+    # ── Build a standalone Runner .exe ───────────────────────────────────────
+    def build_info(self, path: str) -> dict:
+        """What building this game would produce, or why it can't be built.
+
+        Feeds the Hub's Build dialog: exe name, output folder, the vendor tools
+        the workflow needs, and the version to stamp (``buildVersion``)."""
+        path = (path or "").strip()
+        if not path or not os.path.isfile(path):
+            return {"ok": False, "error": "Workflow file not found"}
+        if is_frozen():
+            return {"ok": False, "error": "Building a Runner .exe needs Macro2k running from "
+                                          "source (python apps/workflow_hub.py)."}
+        module = _load_build_module()
+        if module is None:
+            return {"ok": False, "error": "packaging/build_runner.py is missing"}
+        if importlib.util.find_spec("PyInstaller") is None:
+            return {"ok": False, "error": f"PyInstaller is not installed for {sys.executable}. "
+                                          "Run: python -m pip install pyinstaller"}
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                flow = json.load(fh) or {}
+        except Exception as exc:
+            return {"ok": False, "error": f"Couldn't read workflow: {exc}"}
+        folder = os.path.dirname(os.path.abspath(path))
+        name = str(flow.get("name") or os.path.basename(folder))
+        app_name = module._sanitize(name)
+        out_folder = os.path.join(_SOURCE_ROOT, "dist", f"{app_name}-Runner")
+        from src import runner_update
+        from src.version import UPDATE_REPO_URL
+        update = flow.get("runnerUpdate") if isinstance(flow.get("runnerUpdate"), dict) else {}
+        repo = _repo_slug(update.get("repo") or UPDATE_REPO_URL)
+        last = str(update.get("lastVersion") or "")
+        prefix = module.tag_prefix(app_name)
+        # Newest version already on GitHub, so the dialog can suggest past it.
+        published = ""
+        try:
+            best = runner_update.latest_release(repo, prefix, runner_update.fetch_releases(repo, timeout=6))
+            published = best["version"] if best else ""
+        except Exception:
+            pass
+        newest = max((v for v in (last, published) if v), key=runner_update.parse_version, default="")
+        has_gh = shutil.which("gh") is not None
+        icon_preview = ""
+        try:
+            icon_preview = module.icon_preview_data_uri(folder, name, 64)
+        except Exception:
+            pass  # no Pillow in this Python — the build falls back as well
+        return {
+            "ok": True,
+            "path": path,
+            "name": name,
+            "exeName": f"{app_name}.exe",
+            "folder": out_folder,
+            "exists": os.path.isdir(out_folder),
+            "version": _bump_patch(newest) if newest else str(flow.get("buildVersion") or "1.0.0"),
+            "lastVersion": last,
+            "published": published,
+            "repo": repo,
+            "tagPrefix": prefix,
+            "canPublish": has_gh,
+            "publishNote": "" if has_gh else "Install the GitHub CLI (gh) to publish updates",
+            "iconPreview": icon_preview,
+            "iconSource": module.describe_icon_source(folder),
+            "vendor": sorted(module.compute_vendor_needs(flow)),
+            # workflows/<Name>/vendor/ → requirements/ beside the exe.
+            "requirements": module.find_requirements(folder),
+        }
+
+    def build_runner(self, path: str, version: str = "", publish: bool = False,
+                     repo: str = "", dry_run: bool = False) -> dict:
+        """Start building ``dist/<Name>-Runner/<Name>.exe`` in the background,
+        optionally publishing it as this Runner's next GitHub Release.
+
+        Progress, log lines and the result arrive through ``window.__buildEvent``;
+        ``dry_run`` zips but skips the upload (tests)."""
+        info = self.build_info(path)
+        if not info.get("ok"):
+            return info
+        from src import runner_update
+        version = str(version or info["version"]).strip()
+        if not re.fullmatch(r"\d+(\.\d+){0,3}", version):
+            return {"ok": False, "error": "Version must look like 1.0.0"}
+        publish = bool(publish)
+        repo = _repo_slug(repo or info["repo"])
+        if publish or dry_run:
+            if not _REPO_RE.fullmatch(repo):
+                return {"ok": False, "error": "Update repo must look like owner/name"}
+            if publish and not info.get("canPublish"):
+                return {"ok": False, "error": info.get("publishNote") or "Publishing needs the GitHub CLI"}
+            published = info.get("published") or ""
+            if published and runner_update.parse_version(version) <= runner_update.parse_version(published):
+                return {"ok": False, "error": f"v{published} is already published — use a newer version"}
+        if _REPO_RE.fullmatch(repo):
+            _remember_update_repo(info["path"], repo)
+        with self._build_lock:
+            if self._build is not None and self._build.get("state") in ("running", "cancelling"):
+                return {"ok": False, "error": f"Already building {self._build.get('name')}"}
+            self._build = {
+                "path": info["path"], "name": info["name"], "version": version,
+                "publish": publish or dry_run, "repo": repo, "state": "running",
+                "progress": 0, "stage": "Starting", "startedAt": time.time(), "endedAt": 0,
+                "folder": info["folder"], "exe": "", "releaseUrl": "", "error": "",
+                "requirements": "",
+            }
+            self._build_log = []
+            self._build_pending = []
+            state = dict(self._build)
+        threading.Thread(target=self._build_worker, args=(info, version, publish, repo, dry_run),
+                         daemon=True).start()
+        return {"ok": True, **state}
+
+    def build_state(self) -> dict:
+        """The current or last build plus its full log, for a reloaded Hub page."""
+        with self._build_lock:
+            if not self._build:
+                return {}
+            return {**self._build, "log": list(self._build_log)}
+
+    def cancel_build(self) -> bool:
+        """Kill the running build (PyInstaller included)."""
+        with self._build_lock:
+            proc = self._build_proc
+            if proc is None or not self._build or self._build.get("state") != "running":
+                return False
+            self._build.update(state="cancelling", stage="Cancelling")
+        try:
+            if sys.platform == "win32":
+                subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                               capture_output=True, creationflags=0x08000000)
+            else:
+                proc.kill()
+        except Exception:
+            pass
+        self._update_build(force=True)
+        return True
+
+    def _update_build(self, lines: Optional[List[str]] = None, force: bool = False,
+                      **changes: Any) -> None:
+        """Apply state changes / new log lines and push them to the page.
+
+        Log lines are batched: a push happens on any state change, when forced,
+        or at most every 150 ms."""
+        with self._build_lock:
+            if self._build is None:
+                return
+            self._build.update(changes)
+            if lines:
+                self._build_log.extend(lines)
+                if len(self._build_log) > _BUILD_LOG_LIMIT:
+                    del self._build_log[:-_BUILD_LOG_LIMIT]
+                self._build_pending.extend(lines)
+            now = time.monotonic()
+            if not (force or changes) and now - self._build_pushed_at < 0.15:
+                return
+            pending, self._build_pending = self._build_pending, []
+            self._build_pushed_at = now
+            payload = {**self._build, "lines": pending}
+        win = self._window
+        if win is None:
+            return
+        try:
+            win.evaluate_js(f"window.__buildEvent && window.__buildEvent({json.dumps(payload)})")
+        except Exception:
+            pass
+
+    def _build_worker(self, info: Dict[str, Any], version: str, publish: bool,
+                      repo: str, dry_run: bool) -> None:
+        script = os.path.join(_SOURCE_ROOT, "packaging", "build_runner.py")
+        folder = os.path.dirname(os.path.abspath(info["path"]))
+        cmd = [sys.executable, "-u", script, "--workflow", folder, "--version", version,
+               "--repo", repo, "--verbose", "--save-version"]
+        if publish:
+            cmd.append("--publish")
+        elif dry_run:
+            cmd.append("--publish-dry-run")
+        # build_runner prints non-ASCII (…, −); a cp1252 pipe would crash it.
+        env = dict(os.environ, PYTHONIOENCODING="utf-8")
+        flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
+        exe_path = release_url = error = requirements = ""
+        code = -1
+        try:
+            proc = subprocess.Popen(
+                cmd, cwd=_SOURCE_ROOT, env=env, creationflags=flags,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding="utf-8", errors="replace", bufsize=1,
+            )
+            with self._build_lock:
+                self._build_proc = proc
+            assert proc.stdout is not None
+            for raw in proc.stdout:
+                line = raw.rstrip("\r\n")
+                if not line.strip():
+                    continue
+                if line.startswith(">> PROGRESS "):
+                    pct, _, stage = line[len(">> PROGRESS "):].partition(" ")
+                    if pct.isdigit():
+                        self._update_build(progress=int(pct), stage=stage)
+                    continue
+                if line.startswith(">>"):
+                    message = line[2:].strip()
+                    if message.startswith("DONE:"):
+                        exe_path = message[len("DONE:"):].strip()
+                    elif message.startswith("RELEASE:"):
+                        release_url = message[len("RELEASE:"):].strip()
+                    elif message.startswith("REQUIREMENTS:"):
+                        requirements = message[len("REQUIREMENTS:"):].strip()
+                    elif message.startswith("BUILD FAILED:"):
+                        error = message[len("BUILD FAILED:"):].strip()
+                    # Milestones keep their ">> " so the log can set them apart.
+                    self._update_build(lines=[f">> {message}"])
+                else:
+                    self._update_build(lines=[line[3:] if line.startswith(".. ") else line])
+            code = proc.wait()
+        except Exception as exc:
+            error = str(exc)
+        with self._build_lock:
+            self._build_proc = None
+            cancelled = bool(self._build and self._build.get("state") == "cancelling")
+        ended = time.time()
+        if cancelled:
+            self._update_build(force=True, state="cancelled", stage="Cancelled", endedAt=ended)
+        elif code == 0 and exe_path:
+            self._update_build(force=True, state="done", progress=100,
+                               stage="Published" if release_url else "Built",
+                               exe=exe_path, folder=os.path.dirname(exe_path),
+                               releaseUrl=release_url, requirements=requirements,
+                               endedAt=ended)
+        else:
+            self._update_build(force=True, state="failed", stage="Failed", endedAt=ended,
+                               error=error or f"build_runner exited with code {code}")
+
+    def open_url(self, url: str) -> bool:
+        """Open a GitHub page (a published release) in the default browser."""
+        url = str(url or "")
+        if not url.startswith("https://github.com/"):
+            return False
+        try:
+            import webbrowser
+            return bool(webbrowser.open(url))
+        except Exception:
+            return False
+
+    def open_folder(self, path: str) -> bool:
+        """Reveal a build output folder in Explorer."""
+        path = os.path.abspath(str(path or ""))
+        if not os.path.isdir(path):
+            return False
+        try:
+            if sys.platform == "win32":
+                os.startfile(path)  # type: ignore[attr-defined]
+            else:
+                subprocess.Popen(["xdg-open", path])
+            return True
+        except Exception:
+            return False
+
     def delete_workflow(self, path: str) -> dict:
-        """Delete a workflow folder (JSON + templates) under ``workflows/``.
+        """Delete a workflow folder (JSON + templates + assets) under ``workflows/``.
 
         Only paths that resolve inside ``_WORKFLOWS_DIR`` are accepted.
         Deletes the whole project folder (e.g. ``workflows/GirlWars/``).
@@ -843,7 +723,7 @@ class WorkflowHubAPI:
         capture: str = "scrcpy",
         input_mode: str = "background",
     ) -> dict:
-        """Scaffold ``workflows/<Name>/workflow.json`` (+ empty templates/).
+        """Scaffold ``workflows/<Name>/workflow.json`` (+ empty templates/ and assets/).
 
         *controller*: ``adb`` | ``win32``
         *capture*: ``scrcpy`` | ``adb`` (ADB screen-capture backend)
@@ -870,6 +750,8 @@ class WorkflowHubAPI:
         mode = _norm_input_mode(input_mode)
         try:
             os.makedirs(os.path.join(folder, _TEMPLATES_DIRNAME), exist_ok=True)
+            # Where the Hub looks for the cover art (assets/cover.png).
+            os.makedirs(os.path.join(folder, "assets"), exist_ok=True)
             flow = _blank_flow(display, controller=ctrl, capture=cap, input_mode=mode)
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(flow, fh, ensure_ascii=False, indent=2)
@@ -888,13 +770,11 @@ class WorkflowHubAPI:
 
 # ── Entry points ────────────────────────────────────────────────────────────
 
-# Portrait dashboard (taller than wide) — same family as the Runner panel.
-# Fixed size: the layout is tuned for this single width, so the window is not
-# resizable and opens at what used to be the minimum width. pywebview's WinForms
-# backend turns ``resizable=False`` into a FixedSingle border with the maximize
-# box disabled, so there is nothing to drag.
+# Landscape library: five cover cards per row with two rows in view. The window
+# is resizable; hub.css sizes the cards from the window so two rows always fit.
 # Keep this simple: no native WinForms max-size hooks (those hung the UI thread).
-_HUB_SIZE = (460, 800)
+_HUB_SIZE = (1280, 820)
+_HUB_MIN_SIZE = (1040, 700)
 
 
 def create_hub_window(title: str = titled()) -> webview.Window:
@@ -907,14 +787,13 @@ def create_hub_window(title: str = titled()) -> webview.Window:
         js_api=api,
         width=_HUB_SIZE[0],
         height=_HUB_SIZE[1],
-        resizable=False,
+        resizable=True,
         fullscreen=False,
         maximized=False,
-        min_size=_HUB_SIZE,
+        min_size=_HUB_MIN_SIZE,
         background_color=theme_background(),
     )
     window.events.loaded += lambda: api._attach(window)
-    window.events.closed += api.shutdown
     return window
 
 

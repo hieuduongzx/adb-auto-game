@@ -118,7 +118,11 @@ function wfSerialize(){
     capture:(WF.captureBackend==="adb")?"adb":"scrcpy",
     // ADB input transport for this game/workflow ("adb" | "scrcpy").
     input:(WF.inputBackend==="scrcpy")?"scrcpy":"adb",
-    win32:{ window:(w.window||"").trim(), matchBy:wfNormWinMatchBy(w.matchBy), inputMode:wfNormWinInputMode(w.inputMode) },
+    // path = the game .exe Launch program nodes use on "Project game path".
+    win32:{ window:(w.window||"").trim(), matchBy:wfNormWinMatchBy(w.matchBy), inputMode:wfNormWinInputMode(w.inputMode), path:String(w.path||"").trim() },
+    // Shared emulator choice (ADB): family + install folder used by emulator
+    // blocks set to "Project emulator setting".
+    emulator:{ kind:String((WF.emulator&&WF.emulator.kind)||"ldplayer").trim()||"ldplayer", path:String((WF.emulator&&WF.emulator.path)||"").trim() },
     // Speed hack is ADB-only (Frida). Package lives at the top level (key "package").
     // Force speedhack off in Win32 so a stale enabled flag never starts Frida.
     speedhack:{ enabled:isWin32?false:!!sh.enabled, speed:sh.speed||2.0, native:!!sh.native },
@@ -149,6 +153,21 @@ function wfHydrateGraph(g){
         params.pkgSrc = (String(params.package||"").trim()) ? "custom" : "project";
       }
     }
+    // Launch program: same migration — an explicit path stays "custom", a blank
+    // one now follows the Project-settings game path.
+    if(params && n.type==="win_launch" && !params.pathSrc){
+      params.pathSrc = (String(params.path||"").trim()) ? "custom" : "project";
+    }
+    // Emulator nodes now take their family + install folder from the shared
+    // project setting. A custom-command launch stays "custom"; everything else
+    // follows the project so the old per-node path moves to WF.emulator (seeded
+    // in wfHydrate) instead of forcing a per-activity Runner control.
+    if(params && WF_EMU_NODE_TYPES.includes(n.type) && !params.pathSrc){
+      params.pathSrc = (n.type==="launch_emulator" && String(params.emulator||"").trim().toLowerCase()==="custom")
+        ? "custom" : "project";
+    }
+    // Press key predates Action / Hold: it was always a quick press.
+    if(params && n.type==="win_key" && !params.mode) params.mode="press";
     // Multi-point tap accepts compact legacy [x,y] pairs, but the inspector
     // edits named coordinates for readable JSON.
     if(params && n.type==="multi_tap"){
@@ -212,7 +231,24 @@ function wfHydrate(flow){
   // Force speed hack off in Win32 mode (ADB/Frida only) so a file saved with
   // enabled=true under the old cheat.dll path can't revive it.
   if(WF.controller==="win32") WF.speedhack.enabled=false;
-  const w=flow.win32||{}; WF.win32={window:(w.window||"").trim(), matchBy:wfNormWinMatchBy(w.matchBy), inputMode:wfNormWinInputMode(w.inputMode)};
+  const w=flow.win32||{}; WF.win32={window:(w.window||"").trim(), matchBy:wfNormWinMatchBy(w.matchBy), inputMode:wfNormWinInputMode(w.inputMode), path:String(w.path||"").trim()};
+  // Shared emulator choice. If the file predates it, seed from the first
+  // emulator node that carried a path so switching nodes to the project default
+  // below doesn't drop an install folder the user had already set.
+  const e=flow.emulator||{};
+  WF.emulator={kind:String(e.kind||"ldplayer").trim()||"ldplayer", path:String(e.path||"").trim()};
+  if(!WF.emulator.path){
+    const emuNodes=[];
+    (flow.activities||[]).forEach(a=>emuNodes.push(...((a.graph||{}).nodes||[])));
+    (flow.functions||[]).forEach(f=>emuNodes.push(...((f.graph||{}).nodes||[])));
+    const seed=emuNodes.find(n=>WF_EMU_NODE_TYPES.includes(n.type)&&String((n.params||{}).path||"").trim());
+    if(seed){
+      const sp=seed.params||{};
+      WF.emulator.path=String(sp.path||"").trim();
+      const k=String(sp.emulator||"").trim().toLowerCase();
+      if(k && k!=="custom" && k!=="last") WF.emulator.kind=k;
+    }
+  }
   WF.nodeDefaults=wfHydNodeDefaults(flow.nodeDefaults);
   WF.functions=(flow.functions||[]).map(f=>({ id:f.id||("fn_"+wfUid().slice(1,6)), name:f.name||"function", graph:wfHydrateGraph(f.graph) }));
   WF.globals = wfHydVars(flow.globals||[]);
@@ -228,6 +264,9 @@ function wfHydrate(flow){
   // they can't leak onto this file's nodes (wfMarkUnreached would dim blocks
   // that never ran in a graph the old run never touched).
   if(typeof wfResetRunViz==="function") wfResetRunViz();
+  // Crash markers outlive a run on purpose, but not a document swap — their
+  // node ids belong to the file we just closed.
+  if(typeof wfClearAllActCrash==="function") wfClearAllActCrash();
   $("wf-name").value=WF.name;
   wfSyncSpeedUI();
   if(typeof wfSyncControllerUI==="function") wfSyncControllerUI();
@@ -367,7 +406,11 @@ async function wfOnBuildDone(data){
   if(btn){ btn.disabled=false; btn.classList.remove("saving"); btn.removeAttribute("aria-busy"); }
   if(data && data.ok){
     setStatus("Build complete");
-    const open=await uiConfirm({title:"Build complete", message:(data.path||"The Runner .exe was built.")+"\n\nOpen the output folder?", ok:"Open folder"});
+    // workflows/<Name>/vendor/ shipped as requirements\ — players must copy it into the game folder.
+    const req=data.requirements
+      ? "\n\nGame files: "+data.requirements+"\nPlayers must copy everything in requirements\\ into the game folder (see REQUIREMENTS.txt)."
+      : "";
+    const open=await uiConfirm({title:"Build complete", message:(data.path||"The Runner .exe was built.")+req+"\n\nOpen the output folder?", ok:"Open folder"});
     if(open && data.path){ try{ await api().reveal_path(data.path); }catch{} }
   }else{
     setStatus("Build failed");
@@ -537,12 +580,14 @@ async function init(){
     const sd=$("wf-side"), insp=$("wf-inspector");
     if(sd){ const w=st.sideW?Math.max(220,Math.min(480,st.sideW)):sd.offsetWidth; sd.style.width=w+"px"; sd.dataset.openW=String(w); }
     if(insp){ const w=st.inspW?Math.max(240,Math.min(520,st.inspW)):insp.offsetWidth; insp.style.width=w+"px"; insp.dataset.openW=String(w); }
+    if(st.actH){ wfActH=Math.max(72, Math.min(600, parseInt(st.actH,10)||0)); }
     wfSideCollapsed=st.sideCollapsed===true; wfInspCollapsed=st.inspCollapsed===true;
   }catch{}
   wfApplySidebarState(false);
   wfInitSideResizer();
   wfInitInspResizer();
   if(typeof wfInitLogResizer==="function") wfInitLogResizer();
+  if(typeof wfInitActResizer==="function") wfInitActResizer();
   wfSetupSortable($("wf-activities"));
   if($("wf-activities-bg")) wfSetupSortable($("wf-activities-bg"));
   if($("wf-functions")) wfSetupSortable($("wf-functions"));

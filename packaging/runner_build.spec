@@ -10,6 +10,7 @@ Runner only — no Hub, no Designer, no DevScope. Output (after
         _internal/        -> private runtime files
         vendor/            -> only the pieces this workflow needs (external)
         workflow/          -> workflow.json + templates/  (bundled into the exe)
+        requirements/      -> the workflow's vendor/, for the game folder (optional)
 
 Driven by a build-config JSON whose path is passed in the
 ``MACRO2K_RUNNER_BUILD_CFG`` environment variable (written by
@@ -120,8 +121,27 @@ _web_src = os.path.join(ROOT, "apps", "web")
 extra_datas = [
     (os.path.join(_web_src, "shared"), os.path.join("web", "shared")),
     (os.path.join(_web_src, "runner"), os.path.join("web", "runner")),
-    (WORKFLOW_DIR, "workflow"),
 ]
+# The workflow folder entry by entry, minus "workflow_excludes" (its vendor/
+# ships beside the exe as requirements/ instead). Empty folders are skipped —
+# PyInstaller rejects a data source that matches no files.
+_wf_excludes = {str(x).lower() for x in (CFG.get("workflow_excludes") or [])}
+for _entry in sorted(os.listdir(WORKFLOW_DIR)):
+    if _entry.lower() in _wf_excludes:
+        continue
+    _src = os.path.join(WORKFLOW_DIR, _entry)
+    if os.path.isfile(_src):
+        extra_datas.append((_src, "workflow"))
+    elif any(_files for _r, _d, _files in os.walk(_src)):
+        extra_datas.append((_src, os.path.join("workflow", _entry)))
+# runner_build.json — this Runner's version + update repo (src/runner_update.py).
+_build_info = str(CFG.get("build_info") or "")
+if _build_info and os.path.isfile(_build_info):
+    extra_datas.append((_build_info, "."))
+# runner_icon.png — the game icon shown in the Runner header.
+_icon_png = str(CFG.get("icon_png") or "")
+if _icon_png and os.path.isfile(_icon_png):
+    extra_datas.append((_icon_png, "."))
 
 # --- exclude the world we don't ship -----------------------------------------
 # On top of the shared exclusions, drop the designer/hub-only heavy deps: the

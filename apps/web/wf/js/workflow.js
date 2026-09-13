@@ -72,10 +72,13 @@ const WF_ICONS = {
   box: "square-dashed",
   log: "file-text",
   folder: "folder",
+  crash: "triangle-alert",
 };
   function wfIco(name){
     // Unknown names fall back to a neutral dot rather than a broken glyph.
-    return uiIco(WF_ICONS[name] || "circle-dot");
+    // "disc" is the shared set's dot — "circle-dot" was never in it, so every
+    // unmapped name used to render as nothing at all.
+    return uiIco(WF_ICONS[name] || "disc");
   }
 
 // Display label for package-bearing nodes (Launch / Stop / Uninstall / If app).
@@ -101,6 +104,35 @@ function wfAppTargetLabel(p){
   if(src==="custom") return String((p&&p.package)||"").trim() || "(title)";
   const win=(WF.win32&&String(WF.win32.window||"").trim())||"";
   return win || "🪟 project window";
+}
+
+// Display label for Launch program: pathSrc "project" → the Project-settings
+// game path; "custom" → the node's own path. Legacy nodes (no pathSrc) use their
+// own path when set, else the project one — same rule as the engine.
+function wfLaunchPathLabel(p){
+  const src=String((p&&p.pathSrc)||"").trim().toLowerCase();
+  const own=String((p&&p.path)||"").trim();
+  const base=s=>s.split(/[\\/]/).pop();
+  if(src==="custom" || (!src && own)) return own ? base(own) : "(program)";
+  const proj=(typeof WF!=="undefined" && WF.win32)?String(WF.win32.path||"").trim():"";
+  return proj ? base(proj) : "⚙ project game path";
+}
+
+// States shared by If window … / Wait for window …. "size" compares the CLIENT
+// area (what captures and templates use) with W×H, give or take `tolerance` px.
+const WF_WIN_STATES = [
+  {v:"exists",t:"Exists (still running)"},{v:"foreground",t:"Is the active window"},
+  {v:"minimized",t:"Is minimized"},{v:"size",t:"Has client size W×H"},
+];
+const WF_WIN_SIZE_FIELDS = [
+  {k:"width",lbl:"Client width",t:"num",d:1280,showWhen:{state:"size"}},
+  {k:"height",lbl:"Client height",t:"num",d:720,showWhen:{state:"size"}},
+  {k:"tolerance",lbl:"Tolerance (px)",t:"num",d:0,showWhen:{state:"size"}},
+];
+function wfWinStateLabel(p){
+  if((p&&p.state)!=="size") return (p&&p.state)||"exists";
+  const tol=Number(p.tolerance)||0;
+  return `${p.width??1280}×${p.height??720}${tol?`±${tol}`:""}`;
 }
 
 // Named Windows virtual keys for the Win32 keyboard node. Values remain VK
@@ -311,16 +343,17 @@ const WF_NODES = {
   // Launch the emulator PROCESS on the PC (not an app inside it). Optional "at"
   // waits until a clock time first → "sit idle until 07:00, then boot LDPlayer".
   launch_emulator:{label:"Launch emulator", ico:"monitor", kind:"action", cat:"device", outs:["out"], fields:[
-    {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"},{v:"custom",t:"Custom command"}],d:"ldplayer"},
+    {k:"pathSrc",lbl:"Emulator",t:"select",opts:[{v:"project",t:"Project emulator setting"},{v:"custom",t:"Custom…"}],d:"project"},
+    {k:"emulator",lbl:"Family",t:"select",opts:[{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"},{v:"custom",t:"Custom command"}],d:"ldplayer",showWhen:{pathSrc:"custom"}},
     {k:"index",lbl:"Instance index",t:"num",d:0},
-    {k:"instance",lbl:"Instance name (BlueStacks)",t:"text",d:"",showWhen:{emulator:"bluestacks"}},
-    {k:"path",lbl:"Install folder / console .exe (blank = auto)",t:"path",d:"",pickFolder:true},
-    {k:"command",lbl:"Custom command ({index})",t:"text",d:"",showWhen:{emulator:"custom"}},
+    {k:"instance",lbl:"Instance name (BlueStacks)",t:"text",d:"",showWhen:{pathSrc:"custom",emulator:"bluestacks"}},
+    {k:"path",lbl:"Install folder / console .exe (blank = auto)",t:"path",d:"",pickFolder:true,showWhen:{pathSrc:"custom"}},
+    {k:"command",lbl:"Custom command ({index})",t:"text",d:"",showWhen:{pathSrc:"custom",emulator:"custom"}},
     {k:"at",lbl:"Schedule at (blank = now)",t:"time",d:""},
     {k:"nextDay",lbl:"If time passed → wait next day",t:"bool",d:true},
     {k:"wait",lbl:"Wait for ADB ready (s)",t:"num",d:60},
     {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
-  ], sum:p=>`▶ ${p.emulator||"ldplayer"}${(p.index?(" #"+p.index):"")}${p.at?(" ⏰"+p.at):""}`},
+  ], sum:p=>`▶ ${p.pathSrc==="project"?"project emulator":(p.emulator||"ldplayer")}${(p.index?(" #"+p.index):"")}${p.at?(" ⏰"+p.at):""}`},
   // Is an emulator instance booted & its ADB responding (sys.boot_completed)?
   // "Last used" re-checks the instance saved by the last successful Launch
   // emulator (data/emulator_state.json) — skip the boot when it's already up.
@@ -349,7 +382,8 @@ const WF_NODES = {
   resize_emulator:{label:"Resize emulator", ico:"maximize", kind:"action", cat:"device", outs:["out"], fields:[
     {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"}],d:"last"},
     {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
-    {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true},
+    {k:"pathSrc",lbl:"Install folder",t:"select",opts:[{v:"project",t:"Project emulator setting"},{v:"custom",t:"Custom…"}],d:"project"},
+    {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true,showWhen:{pathSrc:"custom"}},
     {k:"width",lbl:"Client width (Android screen)",t:"num",d:1920},
     {k:"height",lbl:"Client height (Android screen)",t:"num",d:1080},
     {k:"x",lbl:"Window X (blank = keep)",t:"num"},
@@ -363,7 +397,8 @@ const WF_NODES = {
   kill_emulator:{label:"Kill emulator", ico:"octagon", kind:"action", cat:"device", outs:["out"], fields:[
     {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"}],d:"last"},
     {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
-    {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true},
+    {k:"pathSrc",lbl:"Install folder",t:"select",opts:[{v:"project",t:"Project emulator setting"},{v:"custom",t:"Custom…"}],d:"project"},
+    {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true,showWhen:{pathSrc:"custom"}},
   ], sum:p=>`⏹ ${(!p.emulator||p.emulator==="last")?"last used":(p.emulator+((parseInt(p.index)||0)?(" #"+p.index):""))}`},
   // Reboot a wedged instance (frozen UI, ADB gone, app stuck) — what app_stop
   // can't fix. Console reboot when the family has one (LDPlayer/MuMu/Nox/MEmu),
@@ -372,7 +407,8 @@ const WF_NODES = {
   restart_emulator:{label:"Restart emulator", ico:"loop", kind:"action", cat:"device", outs:["out"], fields:[
     {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"}],d:"last"},
     {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
-    {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true},
+    {k:"pathSrc",lbl:"Install folder",t:"select",opts:[{v:"project",t:"Project emulator setting"},{v:"custom",t:"Custom…"}],d:"project"},
+    {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true,showWhen:{pathSrc:"custom"}},
     {k:"wait",lbl:"Wait for boot (s · 0 = don't wait)",t:"num",d:120},
     {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
     {k:"attach",lbl:"Attach as active device when ready",t:"bool",d:true},
@@ -384,7 +420,8 @@ const WF_NODES = {
   emulator_resolution:{label:"Emulator resolution", ico:"smartphone", kind:"action", cat:"device", outs:["out"], fields:[
     {k:"emulator",lbl:"Emulator (MuMu only)",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"mumu",t:"MuMu"}],d:"last"},
     {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
-    {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true},
+    {k:"pathSrc",lbl:"Install folder",t:"select",opts:[{v:"project",t:"Project emulator setting"},{v:"custom",t:"Custom…"}],d:"project"},
+    {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true,showWhen:{pathSrc:"custom"}},
     {k:"width",lbl:"Device width (px)",t:"num",d:1920},
     {k:"height",lbl:"Device height (px)",t:"num",d:1080},
     {k:"dpi",lbl:"DPI",t:"num",d:280},
@@ -398,7 +435,13 @@ const WF_NODES = {
   // OCR nodes still work on Win32 through the shared screen-capture pipeline;
   // these cover what a single left-button touch model can't express.
   win_send_text:{label:"Input text", ico:"keyboard", kind:"action", cat:"win32", outs:["out"], fields:[{k:"text",t:"text",insertVar:true}], sum:p=>`"${p.text||""}"`},
-  win_key:      {label:"Press key", ico:"disc", kind:"action", cat:"win32", outs:["out"], fields:[{k:"keycode",lbl:"Key",t:"select",opts:WF_WIN_KEYS,d:"13"}], sum:p=>wfWinKeyLabel(p.keycode??"13")},
+  // mode: press = down → hold → up (a game only moves while the key is down, so
+  // walking wants a few hundred ms); down / up keep a key held across blocks.
+  win_key:      {label:"Press key", ico:"disc", kind:"action", cat:"win32", outs:["out"], fields:[
+    {k:"keycode",lbl:"Key",t:"select",opts:WF_WIN_KEYS,d:"13"},
+    {k:"mode",lbl:"Action",t:"select",opts:[{v:"press",t:"Press (down → hold → up)"},{v:"down",t:"Hold down (until Release)"},{v:"up",t:"Release (key up)"}],d:"press"},
+    {k:"hold",lbl:"Hold (ms)",t:"num",d:80,showWhen:{mode:"press"}},
+  ], sum:p=>`${({down:"⬇ hold ",up:"⬆ release "})[p.mode]||""}${wfWinKeyLabel(p.keycode??"13")}${(!p.mode||p.mode==="press")?` ${p.hold??80}ms`:""}`},
   // Key + modifiers (Ctrl+C, Alt+Enter, Ctrl+Shift+Esc…). Background modes send
   // Alt combos as WM_SYSKEYDOWN, which is what apps actually listen for.
   win_hotkey:   {label:"Hotkey (combo)", ico:"keyboard", kind:"action", cat:"win32", outs:["out"], fields:[
@@ -428,15 +471,25 @@ const WF_NODES = {
     {k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}}
   ], sum:p=>p.target==="found"?"↳ last found image":`hover (${p.x||0}, ${p.y||0})`},
   // ── Win32 window (lifecycle / geometry / state) ──────────────────────────────
+  // pathSrc: "project" = game path from Project settings (re-pointable in the
+  // Runner's Settings tab); "custom" = this node's own path / path variable.
   win_launch:   {label:"Launch program", ico:"rocket", kind:"action", cat:"window", outs:["out"], fields:[
-    {k:"path",lbl:"Program (.exe) path",t:"path",d:"",pickFile:true},
+    {k:"pathSrc",lbl:"Game path",t:"select",opts:[{v:"project",t:"Project game path"},{v:"custom",t:"Custom…"}],d:"project"},
+    {k:"path",lbl:"Program (.exe) path",t:"path",d:"",pickFile:true,showWhen:{pathSrc:"custom"}},
     {k:"args",lbl:"Arguments (optional)",t:"text",d:""},
     {k:"window",lbl:"Wait for window title (optional)",t:"text",d:""},
     {k:"wait",lbl:"Wait for window (s)",t:"num",d:30},
-  ], sum:p=>`▶ ${(p.path||"(program)").split(/[\\/]/).pop()}`},
+  ], sum:p=>`▶ ${wfLaunchPathLabel(p)}`},
   win_activate: {label:"Activate window", ico:"monitor", kind:"action", cat:"window", outs:["out"], fields:[], sum:()=>"bring window to front"},
   win_close:    {label:"Close window", ico:"x", kind:"action", cat:"window", outs:["out"], fields:[], sum:()=>"close target window"},
-  win_resize:   {label:"Resize window", ico:"maximize", kind:"action", cat:"window", outs:["out"], fields:[{k:"width",lbl:"Width",t:"num",d:1280},{k:"height",lbl:"Height",t:"num",d:720}], sum:p=>`${p.width||1280}×${p.height||720}`},
+  // client: W×H is the game area (captures/templates), frame added on top.
+  // center: centre on the monitor's work area. Both off on nodes saved before
+  // they existed (outer size, top-left kept); new nodes default both on.
+  win_resize:   {label:"Resize window", ico:"maximize", kind:"action", cat:"window", outs:["out"], fields:[
+    {k:"width",lbl:"Width",t:"num",d:1280},{k:"height",lbl:"Height",t:"num",d:720},
+    {k:"client",lbl:"Size = game area (client, without borders)",t:"bool",d:true},
+    {k:"center",lbl:"Center on screen",t:"bool",d:true},
+  ], sum:p=>`${p.width||1280}×${p.height||720}${p.client?" client":""}${p.center?" · center":""}`},
   win_move:     {label:"Move window", ico:"move", kind:"action", cat:"window", outs:["out"], fields:[{k:"x",lbl:"Screen X",t:"num",d:0},{k:"y",lbl:"Screen Y",t:"num",d:0}], sum:p=>`(${p.x||0}, ${p.y||0})`},
   win_minimize: {label:"Minimize window", ico:"minimize", kind:"action", cat:"window", outs:["out"], fields:[], sum:()=>"minimize"},
   win_maximize: {label:"Maximize window", ico:"maximize", kind:"action", cat:"window", outs:["out"], fields:[], sum:()=>"maximize"},
@@ -447,14 +500,16 @@ const WF_NODES = {
   // Win32 conditions — the target window's own state (crash detection etc.), not
   // the foreground window's. Previously Win32 projects had no condition at all.
   win_if_window:{label:"If window …", ico:"help", kind:"condition", cat:"window", outs:["true","false"], fields:[
-    {k:"state",lbl:"State",t:"select",opts:[{v:"exists",t:"Exists (still running)"},{v:"foreground",t:"Is the active window"},{v:"minimized",t:"Is minimized"}],d:"exists"},
+    {k:"state",lbl:"State",t:"select",opts:WF_WIN_STATES,d:"exists"},
+    ...WF_WIN_SIZE_FIELDS,
     {k:"negate",t:"bool",d:false}
-  ], sum:p=>`🪟 ${p.negate?"not ":""}${p.state||"exists"}`},
+  ], sum:p=>`🪟 ${p.negate?"not ":""}${wfWinStateLabel(p)}`},
   win_wait_window:{label:"Wait for window …", ico:"timer", kind:"condition", cat:"window", outs:["true","false"], fields:[
-    {k:"state",lbl:"State",t:"select",opts:[{v:"exists",t:"Exists (still running)"},{v:"foreground",t:"Is the active window"},{v:"minimized",t:"Is minimized"}],d:"exists"},
+    {k:"state",lbl:"State",t:"select",opts:WF_WIN_STATES,d:"exists"},
+    ...WF_WIN_SIZE_FIELDS,
     {k:"timeout",lbl:"Timeout (s)",t:"num",d:30},
     {k:"negate",lbl:"Negate — wait for the opposite",t:"bool",d:false}
-  ], sum:p=>`🪟 ${p.negate?"not ":""}${p.state||"exists"} ≤${p.timeout??30}s`},
+  ], sum:p=>`🪟 ${p.negate?"not ":""}${wfWinStateLabel(p)} ≤${p.timeout??30}s`},
   // Win32's answer to Device info → variable.
   win_info:     {label:"Window info → variable", ico:"monitor", kind:"action", cat:"window", outs:["out"], fields:[
     {k:"name",lbl:"Target variable",t:"text",d:"info",var:true},
@@ -498,6 +553,9 @@ function wfNodeAllowed(type, ctrl){
   const need=wfNodeCtrl(type);
   return !need || need===(ctrl||"adb");
 }
+// PC-side emulator nodes that carry an install-folder path. They share the
+// project-level emulator setting (WF.emulator) unless a node picks "Custom".
+const WF_EMU_NODE_TYPES=["launch_emulator","resize_emulator","kill_emulator","restart_emulator","emulator_resolution"];
 // Palette pairs: related nodes rendered as one framed unit so the relationship
 // is obvious (e.g. Try in order + Next branch). Order of `types` = display order.
 // Search: if any member matches, the whole pair still shows (all members).
@@ -558,6 +616,12 @@ const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities
   // Which backend drives the flow: "adb" (device/emulator) or "win32" (PC window).
   controller:"adb",
   win32:{window:"", matchBy:"title", inputMode:"background"},
+  // Shared emulator choice for ADB projects: the family + install folder that
+  // Launch emulator (and the other emulator nodes) use by default. Edited in
+  // Project settings here and in the Runner's Settings tab; nodes can opt out
+  // per-node via their own "Emulator" source = Custom. Saved into the flow JSON
+  // (key "emulator").
+  emulator:{kind:"ldplayer", path:""},
   // OCR engine for text-reading blocks (wait_text/if_text/read_var/parse_var…).
   // "" = auto (the engine picks the first available backend). Saved into the
   // flow JSON (key "ocr") so the Runner + test runs use the chosen engine.
@@ -589,6 +653,7 @@ let wfFreshVar=null;       // name of the most-recently-changed var (brief highl
 // Corner-panel collapse states persist locally so the canvas reopens as left.
 let wfVarsCollapsed=false, wfActCollapsed=false;
 let wfSideCollapsed=false, wfInspCollapsed=false;
+let wfActH=0;              // manual ceiling for the Activities list; 0 = CSS default
 try{ wfVarsCollapsed=localStorage.getItem("wfVarsCollapsed")==="1";
      wfActCollapsed =localStorage.getItem("wfActCollapsed")==="1"; }catch{}
 function wfPersistPanelState(){
@@ -600,7 +665,7 @@ function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$(
   const logH = lc && !lc.classList.contains("collapsed") ? lc.offsetHeight : (lc && lc.dataset.openH ? parseInt(lc.dataset.openH,10) : undefined);
   const sideW=sd?(wfSideCollapsed?(parseInt(sd.dataset.openW,10)||272):sd.offsetWidth):undefined;
   const inspW=insp?(wfInspCollapsed?(parseInt(insp.dataset.openW,10)||304):insp.offsetWidth):undefined;
-  api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), logH: logH||undefined, sideW, inspW, sideCollapsed:wfSideCollapsed, inspCollapsed:wfInspCollapsed}); }catch{} }
+  api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), logH: logH||undefined, sideW, inspW, actH: wfActH||null, sideCollapsed:wfSideCollapsed, inspCollapsed:wfInspCollapsed}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
   const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off")+" — Smart align overrides the grid only on matched axes (hold Alt for free placement)"; s.classList.toggle("on",wfSnapOn); }
@@ -754,7 +819,7 @@ function wfPopulateOcrBackends(backs){
 // ── Project controller (ADB vs Win32) ────────────────────────────────────────
 const WF_WIN_MATCH_MODES=new Set(["title","class","pid","exe"]);
 const WF_WIN_INPUT_MODES=new Set(["background","background_sync","background_cursor",
-  "background_window","anchored_touch","foreground"]);
+  "background_window","anchored_touch","unity_bridge","foreground"]);
 function wfNormWinMatchBy(value){
   const mode=String(value||"").trim().toLowerCase();
   return WF_WIN_MATCH_MODES.has(mode)?mode:"title";
@@ -777,6 +842,7 @@ function wfSyncBackendChrome(){
   const matchEl=$("wf-bar-win32-matchby"); if(matchEl && document.activeElement!==matchEl) matchEl.value=matchBy;
   const mode=wfNormWinInputMode(cfg.inputMode);
   const modeEl=$("wf-bar-win32-mode"); if(modeEl && document.activeElement!==modeEl) modeEl.value=mode;
+  const bridgeRow=$("wf-unity-bridge-row"); if(bridgeRow) bridgeRow.style.display=mode==="unity_bridge"?"":"none";
   const footerDeviceDot=$("footer-dot"); if(footerDeviceDot) footerDeviceDot.style.display=isWin32?"none":"";
   // Preview action testers: mouse button / wheel are Win32-only; the Android
   // keycode strip only makes sense for ADB (Win32 takes VK numbers).
@@ -802,8 +868,12 @@ function wfSyncControllerUI(){
   const adbSec=$("wf-proj-adb-sec"); if(adbSec) adbSec.style.display=win32?"none":"";
   const winSec=$("wf-proj-win32-sec"); if(winSec) winSec.style.display=win32?"":"none";
   const win=$("wf-win32-window"); if(win && document.activeElement!==win) win.value=w.window||"";
+  const gp=$("wf-win32-path"); if(gp && document.activeElement!==gp) gp.value=w.path||"";
   const mb=$("wf-win32-matchby"); if(mb) mb.value=wfNormWinMatchBy(w.matchBy);
   const md=$("wf-win32-mode"); if(md) md.value=wfNormWinInputMode(w.inputMode);
+  // A project created by the Hub can already be on the bridge without ever
+  // passing through a change handler — offer the deploy here too.
+  wfWinInputModeSwitched(null, wfNormWinInputMode(w.inputMode));
   const inSel=$("wf-input-select");
   if(inSel && document.activeElement!==inSel) inSel.value=(WF.inputBackend==="scrcpy")?"scrcpy":"adb";
   wfSyncPackageUI();
@@ -883,12 +953,24 @@ async function wfPickWindow(ev, source){
 function wfWin32FromUI(){
   const w=WF.win32||(WF.win32={});
   const win=$("wf-win32-window"), mb=$("wf-win32-matchby"), md=$("wf-win32-mode");
+  const prevMode=wfNormWinInputMode(w.inputMode);
   if(win) w.window=(win.value||"").trim();
   if(mb) w.matchBy=wfNormWinMatchBy(mb.value);
   if(md) w.inputMode=wfNormWinInputMode(md.value);
   wfSyncBackendChrome();
   wfPushCaptureSource();
   if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
+  wfWinInputModeSwitched(prevMode, w.inputMode);
+}
+// Project game path (win32.path). Launch program summaries follow it live; the
+// undo snapshot + status line only on commit (change / picker).
+function wfWin32PathSet(value, commit){
+  const w=WF.win32||(WF.win32={});
+  const next=String(value||"").trim();
+  if(commit && next!==(w.path||"") && typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
+  w.path=next;
+  if(typeof wfRenderCanvas==="function") wfRenderCanvas();
+  if(commit) setStatus(next?("Game path: "+next):"Game path cleared");
 }
 function wfBarWinMatchChanged(value){
   const w=WF.win32||(WF.win32={});
@@ -899,10 +981,85 @@ function wfBarWinMatchChanged(value){
 }
 function wfBarWinInputChanged(value){
   const w=WF.win32||(WF.win32={});
+  const prevMode=wfNormWinInputMode(w.inputMode);
   w.inputMode=wfNormWinInputMode(value);
   const modalMode=$("wf-win32-mode"); if(modalMode) modalMode.value=w.inputMode;
   wfSyncBackendChrome(); wfPushCaptureSource();
   if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
+  wfWinInputModeSwitched(prevMode, w.inputMode);
+}
+// ── Unity Bridge: offer to deploy the in-game plugin when the mode is chosen ──
+// The last mode this document was on, so a re-sync (which passes prev=null) can
+// still tell a real switch — into the bridge, or already sitting on it — from a
+// no-op. Kept here rather than at the call sites so every path stays in step.
+let wfLastWinMode=null;
+function wfWinInputModeSwitched(prev, next){
+  const before=prev||wfLastWinMode;
+  wfLastWinMode=next;
+  if(next==="unity_bridge" && before!=="unity_bridge") wfOfferUnityBridgeDeploy();
+}
+let wfUnityBridgeBusy=false;
+// opts.force: skip the "already running / already installed" shortcuts and
+// always show the deploy dialog (the Project settings button).
+async function wfOfferUnityBridgeDeploy(opts){
+  opts=opts||{};
+  if(wfUnityBridgeBusy) return;
+  wfUnityBridgeBusy=true;
+  try{
+    const cfg=WF.win32||{};
+    let st=null;
+    try{ st=await api().unity_bridge_status(cfg, ""); }catch{}
+    if(!opts.force && st && st.bridgeRunning){
+      uiToast("Unity Bridge đang chạy trong game ("+st.bridge+")","success"); return;
+    }
+    if(!opts.force && st && st.pluginInstalled && st.pluginCurrent){
+      uiToast("Unity Bridge đã cài — khởi động lại game để nạp plugin","info",{dur:5000}); return;
+    }
+    if(!st || !st.exe){
+      const pick=await uiConfirm({title:"Unity Bridge",
+        message:"Chưa xác định được game từ cửa sổ mục tiêu (chưa chọn cửa sổ hoặc game chưa mở). Chọn file .exe của game Unity để triển khai plugin?",
+        ok:"Chọn file exe…", cancel:"Để sau"});
+      if(!pick) return;
+      let exe="";
+      try{ exe=await api().pick_file("")||""; }catch{}
+      if(!exe) return;
+      try{ st=await api().unity_bridge_status(cfg, exe); }catch{ st=null; }
+      if(!st){ uiToast("Không kiểm tra được game","error"); return; }
+    }
+    const list=items=>`<ul style="margin:8px 0 8px 18px">${items.map(s=>`<li>${escHtml(s)}</li>`).join("")}</ul>`;
+    if(st.problems && st.problems.length){
+      await uiModal({title:"Không thể triển khai Unity Bridge",
+        body:`<div class="ui-modal-msg">${escHtml(st.exe||"")}</div>`+list(st.problems),
+        buttons:[{label:"OK", value:true, kind:"accent"}]});
+      return;
+    }
+    const steps=[
+      st.bepinex
+        ? ("Giữ nguyên BepInEx có sẵn ("+(st.bepinexVersion||"5.x")+")"+
+           (st.bepinexOutdated ? " — đã có bản "+st.vendorBepinexVersion+", không tự nâng cấp" : ""))
+        : ("Cài BepInEx "+(st.vendorBepinexVersion||"5.x")+" x64 vào thư mục game"),
+      st.pluginInstalled ? (st.pluginCurrent ? "Plugin Macro2kBridge.dll đã là bản mới nhất (copy lại)" : "Cập nhật plugin Macro2kBridge.dll")
+                         : "Copy plugin Macro2kBridge.dll vào BepInEx/plugins",
+    ];
+    if(st.bridgeRunning) steps.push("Bridge đang chạy: "+st.bridge);
+    const ok=await uiModal({title:"Triển khai Unity Bridge?",
+      body:`<div class="ui-modal-msg">Game: <b>${escHtml(st.gameDir||"")}</b><br>Unity ${escHtml(st.backend||"")} · ${escHtml(st.arch||"?")}</div>`+
+        list(steps)+
+        `<div class="ui-modal-msg" style="opacity:.75">Plugin chạy trong game và nhận lệnh tap/swipe qua 127.0.0.1:${escHtml(String(st.port||17820))}. `+
+        `Game online có anti-cheat có thể phát hiện mod — tự cân nhắc rủi ro.</div>`,
+      buttons:[{label:"Để sau", value:false}, {label:"Triển khai", value:true, kind:"accent"}]});
+    if(!ok) return;
+    let res=null;
+    try{ res=await api().unity_bridge_deploy(st.exe); }catch(e){ res={ok:false, error:String(e)}; }
+    if(res && res.ok){
+      uiToast("Đã triển khai Unity Bridge — khởi động lại game để nạp plugin","success",{dur:6000});
+      setStatus("Unity Bridge: "+(res.actions||[]).join(" · ")+" → "+(res.gameDir||""));
+    }else{
+      uiToast("Triển khai thất bại: "+((res&&res.error)||"unknown"),"error",{dur:8000});
+    }
+  }finally{
+    wfUnityBridgeBusy=false;
+  }
 }
 
 // Open the project settings dialog (gear left of the title).
@@ -946,12 +1103,45 @@ function wfOpenProjectSettings(){
         `</select>`+
         `<div class="hint">scrcpy control injects input over the existing mirror socket (much lower latency); falls back to ADB shell automatically.</div>`;
       secAdb.appendChild(rowInput);
+      // Shared emulator choice — the ADB equivalent of the Win32 game path.
+      // Launch / Resize / Kill / Restart emulator blocks use this by default;
+      // a block can opt out with its own Emulator = Custom.
+      const rowEmuKind=document.createElement("div"); rowEmuKind.className="wf-proj-row";
+      rowEmuKind.innerHTML=
+        `<label for="wf-emulator-kind">Emulator</label>`+
+        `<select id="wf-emulator-kind" title="Emulator family used by emulator blocks set to “Project emulator setting”">`+
+          `<option value="ldplayer">LDPlayer</option>`+
+          `<option value="mumu">MuMu</option>`+
+          `<option value="nox">Nox</option>`+
+          `<option value="memu">MEmu</option>`+
+          `<option value="bluestacks">BlueStacks</option>`+
+        `</select>`+
+        `<div class="hint">Shared by Launch / Resize / Kill / Restart emulator blocks unless a block chooses “Custom”.</div>`;
+      secAdb.appendChild(rowEmuKind);
+      const rowEmuPath=document.createElement("div"); rowEmuPath.className="wf-proj-row";
+      rowEmuPath.innerHTML=
+        `<label for="wf-emulator-path">Install folder</label>`+
+        `<div class="wf-proj-inline">`+
+          `<input id="wf-emulator-path" class="mono" type="text" placeholder="C:\\LDPlayer\\LDPlayer9" spellcheck="false" autocomplete="off">`+
+          `<button type="button" class="btn sm ico" id="wf-emulator-path-pick" title="Choose the emulator install folder" aria-label="Choose the emulator install folder">${wfIco("folder")}</button>`+
+        `</div>`+
+        `<div class="hint">Used by emulator blocks set to “Project emulator setting”. Players can re-point it in the Runner's Settings tab.</div>`;
+      secAdb.appendChild(rowEmuPath);
       form.appendChild(secAdb);
 
       // ── Win32 target ──────────────────────────────────────────────────────
       const secWin=document.createElement("div"); secWin.className="wf-proj-sec"; secWin.id="wf-proj-win32-sec";
       secWin.style.display="none";
-      secWin.innerHTML=`<div class="wf-proj-sec-lbl">Win32 window</div>`;
+      secWin.innerHTML=`<div class="wf-proj-sec-lbl">Win32 game</div>`;
+      const rowPath=document.createElement("div"); rowPath.className="wf-proj-row";
+      rowPath.innerHTML=
+        `<label for="wf-win32-path">Game path (.exe)</label>`+
+        `<div class="wf-proj-inline">`+
+          `<input id="wf-win32-path" class="mono" type="text" placeholder="C:\\Games\\MyGame\\Game.exe" spellcheck="false" autocomplete="off">`+
+          `<button type="button" class="btn sm ico" id="wf-win32-path-pick" title="Choose the game .exe" aria-label="Choose the game .exe">${wfIco("folder")}</button>`+
+        `</div>`+
+        `<div class="hint">Used by Launch program blocks set to “Project game path”. Players can re-point it in the Runner's Settings tab.</div>`;
+      secWin.appendChild(rowPath);
       const rowWin=document.createElement("div"); rowWin.className="wf-proj-row";
       rowWin.innerHTML=
         `<label for="wf-win32-window">Target window</label>`+
@@ -976,8 +1166,13 @@ function wfOpenProjectSettings(){
             `<option value="background_cursor">Background + cursor — Unity / Unreal</option>`+
             `<option value="background_window">Window-pos — no cursor move</option>`+
             `<option value="anchored_touch">Anchored touch — WM_POINTER</option>`+
+            `<option value="unity_bridge">Unity bridge — in-game plugin</option>`+
             `<option value="foreground">Foreground — real mouse</option>`+
           `</select>`+
+        `</div>`+
+        `<div class="wf-proj-row" id="wf-unity-bridge-row" style="display:none">`+
+          `<label for="wf-unity-bridge-deploy">Unity Bridge</label>`+
+          `<button type="button" class="btn" id="wf-unity-bridge-deploy" title="Check the in-game plugin and deploy BepInEx + Macro2kBridge into the game folder">Kiểm tra / triển khai…</button>`+
         `</div>`;
       secWin.appendChild(rowWinOpts);
       form.appendChild(secWin);
@@ -1028,14 +1223,37 @@ function wfOpenProjectSettings(){
       const ocr=q("wf-ocr-select"); if(ocr){ wfFillOcrSelect(ocr); ocr.onchange=()=>wfOcrChanged(); }
       const inSel=q("wf-input-select");
       if(inSel) inSel.onchange=()=>{ if(typeof onInputBackendChange==="function") onInputBackendChange(inSel.value); };
+      const emuKind=q("wf-emulator-kind"), emuPath=q("wf-emulator-path");
+      const emuSet=(patch)=>{ WF.emulator=Object.assign({kind:"ldplayer",path:""},WF.emulator,patch); };
+      if(emuKind) emuKind.onchange=()=>{ emuSet({kind:emuKind.value}); if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced(); setStatus("Emulator: "+(emuKind.options[emuKind.selectedIndex]||{}).text); };
+      if(emuPath){
+        emuPath.addEventListener("input",()=>emuSet({path:(emuPath.value||"").trim()}));
+        emuPath.addEventListener("change",()=>{ if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced(); });
+      }
+      const emuPick=q("wf-emulator-path-pick");
+      if(emuPick) emuPick.onclick=async()=>{
+        let p=""; try{ p=await api().pick_folder(emuPath?emuPath.value:""); }catch{}
+        if(p){ if(emuPath) emuPath.value=p; emuSet({path:p}); if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced(); }
+      };
       const winEl=q("wf-win32-window");
       if(winEl){
         winEl.addEventListener("input",()=>{ const w=WF.win32||(WF.win32={}); w.window=(winEl.value||"").trim(); });
         winEl.addEventListener("change",()=>wfWin32FromUI());
       }
+      const pathEl=q("wf-win32-path");
+      if(pathEl){
+        pathEl.addEventListener("input",()=>wfWin32PathSet(pathEl.value,false));
+        pathEl.addEventListener("change",()=>wfWin32PathSet(pathEl.value,true));
+      }
+      const pathPick=q("wf-win32-path-pick");
+      if(pathPick) pathPick.onclick=async()=>{
+        let p=""; try{ p=await api().pick_file(pathEl?pathEl.value:""); }catch{}
+        if(p){ if(pathEl) pathEl.value=p; wfWin32PathSet(p,true); }
+      };
       const mb=q("wf-win32-matchby"); if(mb) mb.onchange=()=>wfWin32FromUI();
       const md=q("wf-win32-mode"); if(md) md.onchange=()=>wfWin32FromUI();
       const pick=q("wf-win32-pick"); if(pick) pick.onclick=(e)=>wfPickWindow(e);
+      const bridgeBtn=q("wf-unity-bridge-deploy"); if(bridgeBtn) bridgeBtn.onclick=()=>wfOfferUnityBridgeDeploy({force:true});
 
       // Appearance — applies immediately and persists via shared/theme.js.
       const thSel=q("wf-theme"), dSel=q("wf-density");
@@ -1048,9 +1266,13 @@ function wfOpenProjectSettings(){
       if(pkg) pkg.value=WF.package||"";
       const w=WF.win32||{};
       if(winEl) winEl.value=w.window||"";
+      if(pathEl) pathEl.value=w.path||"";
       if(mb) mb.value=wfNormWinMatchBy(w.matchBy);
       if(md) md.value=wfNormWinInputMode(w.inputMode);
       if(inSel) inSel.value=(WF.inputBackend==="scrcpy")?"scrcpy":"adb";
+      const emuSeed=(WF.emulator||{});
+      if(emuKind) emuKind.value=emuSeed.kind||"ldplayer";
+      if(emuPath) emuPath.value=emuSeed.path||"";
       const win32=(WF.controller==="win32");
       const adbSec=q("wf-proj-adb-sec"); if(adbSec) adbSec.style.display=win32?"none":"";
       const winSec=q("wf-proj-win32-sec"); if(winSec) winSec.style.display=win32?"":"none";
@@ -1288,6 +1510,55 @@ function wfInitLogResizer(){
     document.body.style.cursor="";
     if(!card.classList.contains("collapsed")) card.dataset.openH=String(card.offsetHeight);
     wfSaveSettings();
+  });
+}
+// Drag-to-resize the floating Activities list; height persists in settings.
+// The card is pinned to the canvas' bottom-right corner, so the handle on its
+// top edge grows the list upwards. A drag pins an exact height (--act-h, 1:1
+// with the pointer even when the list is shorter than the card); double-click
+// clears it and the card goes back to hugging its rows up to seven.
+function wfInitActResizer(){
+  const panel=$("wf-act-panel"), body=$("wf-act-panel-body"), rez=$("wf-act-resizer");
+  if(!panel||!body||!rez||rez.__wired) return;
+  rez.__wired=true; let drag=null;
+  // Room left in the canvas once the card's own chrome (header, tabs, borders)
+  // and its 14px bottom inset plus the same gap above are accounted for.
+  const maxH=()=>{
+    const host=panel.offsetParent||$("wf-canvas");
+    const avail=(host?host.clientHeight:window.innerHeight)-28-(panel.offsetHeight-body.offsetHeight);
+    return Math.max(72, Math.min(600, avail));
+  };
+  const setH=h=>{
+    h=Math.max(72, Math.min(maxH(), Math.round(h)));
+    wfActH=h; panel.style.setProperty("--act-h", h+"px");
+    rez.setAttribute("aria-valuenow",String(h));
+    rez.setAttribute("aria-valuemax",String(Math.round(maxH())));
+  };
+  if(wfActH) setH(wfActH); else rez.setAttribute("aria-valuenow",String(body.offsetHeight));
+  rez.addEventListener("mousedown",e=>{
+    if(panel.classList.contains("collapsed")||panel.classList.contains("is-max")) return;
+    e.preventDefault(); e.stopPropagation();
+    // Seed from the rendered height so the first drag continues from what the
+    // user sees, even before any height has been pinned.
+    drag={y:e.clientY, h:body.offsetHeight};
+    panel.classList.add("resizing"); rez.classList.add("drag");
+    document.body.style.cursor="row-resize";
+  });
+  rez.addEventListener("keydown",e=>{
+    if(!["ArrowUp","ArrowDown"].includes(e.key)) return;
+    if(panel.classList.contains("collapsed")||panel.classList.contains("is-max")) return;
+    e.preventDefault(); setH(body.offsetHeight+(e.key==="ArrowUp"?16:-16)); wfSaveSettings();
+  });
+  // Double-click clears the pinned height: back to hugging the rows, capped at seven.
+  rez.addEventListener("dblclick",e=>{
+    e.preventDefault(); wfActH=0; panel.style.removeProperty("--act-h");
+    rez.setAttribute("aria-valuenow",String(body.offsetHeight)); wfSaveSettings();
+  });
+  window.addEventListener("mousemove",e=>{ if(!drag) return; setH(drag.h-(e.clientY-drag.y)); });
+  window.addEventListener("mouseup",()=>{
+    if(!drag) return;
+    drag=null; panel.classList.remove("resizing"); rez.classList.remove("drag");
+    document.body.style.cursor=""; wfSaveSettings();
   });
 }
 // Fit & center all blocks of the current graph into the canvas. Uses the live DOM

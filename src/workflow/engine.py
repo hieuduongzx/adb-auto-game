@@ -489,6 +489,10 @@ class WorkflowEngine:
         self.flow: Dict[str, Any] = {}
         self.flow_path: Optional[str] = None
         self.templates_base: str = ""
+        # Shared emulator choice for ADB projects (flow["emulator"] = {kind,path}).
+        # Emulator nodes set to "Project emulator setting" read kind + install
+        # folder here instead of carrying their own copy.
+        self._emu_cfg: Dict[str, Any] = {}
         # Global workflow variables — declared once at the flow top level
         # (``globals``) and seeded into EVERY activity/thread before its own
         # activity-local vars. Lets a counter or flag set in one place be seen
@@ -534,6 +538,10 @@ class WorkflowEngine:
         self.report_matches = False
 
         self.running = False
+        # Last block an activity died on, shared across branch threads — see
+        # _note_crash. Reset at the start of every activity.
+        self._crash: Optional[Dict[str, Any]] = None
+        self._crash_lock = threading.Lock()
         self._stop = threading.Event()
         self._pause = threading.Event()
         self._pause.set()  # not paused
@@ -567,6 +575,12 @@ class WorkflowEngine:
             # [{x,y,w,h,conf,ok,label}, …], threshold, template name, optional
             # search region. Designer paints these on the Preview canvas.
             "on_match": [],
+            # fired once when an activity ends in failure: (activity, crash).
+            # ``crash`` is the _crash dict below — the block the run actually
+            # died on — or None when the activity failed with no identifiable
+            # block (e.g. an empty graph). Lets the designer keep a "last crash
+            # point" marker you can jump straight back to.
+            "on_activity_crash": [],
         }
 
         # Dispatch table for action nodes: type -> handler(node, params) -> bool.
@@ -606,7 +620,7 @@ class WorkflowEngine:
             "restart_emulator": self._a_restart_emulator,
             "emulator_resolution": self._a_emulator_resolution,
             "win_send_text":self._a_send_text,
-            "win_key":      self._a_key,
+            "win_key":      self._a_win_key,
             "win_hotkey":   self._a_win_hotkey,
             "win_escape":   self._a_back,
             "win_click":    self._a_win_click,
@@ -706,6 +720,36 @@ class WorkflowEngine:
     def _try_chain_mode(self, value: bool) -> None:
         self._ctx.try_chain_mode = value
 
+    # ── Crash point ──────────────────────────────────────────────────────────
+    # "Where did this activity actually die?" — the single most-asked question
+    # after a long unattended run. Unlike _branch_failed / _reached_end this is
+    # NOT thread-local: a parallel branch running on its own thread is exactly
+    # the case you most need the answer for, so the record is shared and the
+    # lock keeps two branches failing at once from interleaving.
+    def _note_crash(self, node: Optional[Dict], reason: str,
+                    message: str = "", weak: bool = False) -> None:
+        """Remember the block a run died on.
+
+        ``weak`` records only when nothing better is known yet: a dead end is
+        the *symptom* of the action failure that came just before it (the failed
+        block's "fail" port was left unwired), so the action keeps priority.
+        """
+        if not isinstance(node, dict):
+            return
+        with self._crash_lock:
+            if weak and self._crash is not None:
+                return
+            ntype = node.get("type") or ""
+            self._crash = {
+                "node": node.get("id"),
+                "type": ntype,
+                "label": (NODE_TYPES.get(ntype, {}).get("label") or ntype or "block"),
+                "name": str(node.get("name") or "").strip(),
+                "reason": reason,
+                "message": str(message or "")[:400],
+                "ts": time.time(),
+            }
+
     # ── Callbacks ────────────────────────────────────────────────────────────
 
     def on(self, event: str, fn: Callable) -> None:
@@ -730,6 +774,7 @@ class WorkflowEngine:
         # project settings and honoured by _ensure_ready().
         self._controller = str(self.flow.get("controller") or "adb").strip().lower()
         self._win32_cfg = dict(self.flow.get("win32") or {})
+        self._emu_cfg = dict(self.flow.get("emulator") or {})
         self.speedhack_cfg = dict(self.flow.get("speedhack") or {})
         # Workflow package: prefer top-level key; migrate legacy speedhack.package.
         pkg = str(self.flow.get("package") or "").strip()
@@ -994,6 +1039,49 @@ class WorkflowEngine:
         self._seq_thread.start()
         return True
 
+    def start_activity(self, activity_id: str, with_speedhack: bool = True) -> bool:
+        """Run one activity on its own, whatever its ``enabled`` flag says.
+
+        A sequence activity runs once (with its retries) and the engine stops;
+        a background activity starts its polling loop and runs until
+        :meth:`stop`. Used by the Runner's per-activity Run button.
+        """
+        act = next((a for a in self.activities() if str(a.get("id")) == str(activity_id)), None)
+        if act is None:
+            log_warning(f"[workflow] Activity not found: {activity_id}")
+            return False
+        if self.running:
+            log_warning("[workflow] Already running")
+            return False
+        if not self._ensure_ready():
+            return False
+        self._stop.clear()
+        self.auto._stop_event.clear()
+        self._pause.set()
+        self.running = True
+        self._emit("on_start")
+
+        if with_speedhack:
+            self._start_speedhack()
+
+        if act.get("type") == "background":
+            self.start_background(act)
+            return True
+
+        self._seq_thread = threading.Thread(target=self._run_single_activity, args=(act,), daemon=True)
+        self._seq_thread.start()
+        return True
+
+    def _run_single_activity(self, act: Dict[str, Any]) -> None:
+        try:
+            self._run_activity(act)
+        except Exception as e:
+            log_error(f"[workflow] Activity error: {e}")
+        finally:
+            if not self._bg_threads:
+                self.running = False
+                self._emit("on_stop")
+
     def start_graph(self, graph: Dict[str, Any], start_id: str, seed_act: Optional[Dict[str, Any]] = None, step: bool = False) -> bool:
         """Run one graph from an arbitrary node, used by designer debug tools."""
         if self.running:
@@ -1026,6 +1114,7 @@ class WorkflowEngine:
             self._break_loop = False
             self._branch_failed = False
             self._try_chain_mode = False
+            self._fatal = ""
             for k, v in self._vars.items():
                 self._emit("on_var", k, v)
             self._run_graph(graph, start_id=start_id)
@@ -1067,6 +1156,9 @@ class WorkflowEngine:
         self._break_loop = False
         self._branch_failed = False
         self._try_chain_mode = False
+        with self._crash_lock:
+            self._crash = None
+        self._fatal = ""
         self._emit("on_activity_start", act)
         for k, v in self._vars.items():
             self._emit("on_var", k, v)
@@ -1093,6 +1185,15 @@ class WorkflowEngine:
         else:
             log_warning(f"[workflow] ✖ {name} ({elapsed:.1f}s)")
         self._emit("on_node", None)  # clear highlight between activities
+        # A user Stop is not a crash — only report where a genuine failure died.
+        # A run aborted by _fail_run is one, even though it stopped the engine.
+        if not ok and (not self._stop.is_set() or getattr(self, "_fatal", "")):
+            with self._crash_lock:
+                crash = dict(self._crash) if self._crash else None
+            if crash:
+                where = crash.get("name") or crash.get("label")
+                log_warning(f"[workflow]   ↳ dừng tại: {where} — {crash.get('message')}")
+            self._emit("on_activity_crash", act, crash)
         self._emit("on_activity_complete", act, ok)
         return ok
 
@@ -1136,6 +1237,7 @@ class WorkflowEngine:
         ``counters`` is this walk's loop state (parallel branches get their own).
         """
         steps = 0
+        last_nid = None          # last block actually entered — see dead-end below
         while cur and not self._stop.is_set():
             self._pause.wait()
             if self._debug_step:
@@ -1148,6 +1250,7 @@ class WorkflowEngine:
             node = nodes.get(cur)
             if node is None:
                 break
+            last_nid = cur
             self._emit("on_node", cur)  # let the designer highlight the active node
             nid = cur                    # stable id for the post-run result event
             ntype = node.get("type")
@@ -1472,6 +1575,15 @@ class WorkflowEngine:
                 self._emit("on_node_delay", nid, "after", da)
                 self._sleep(da)
                 self._emit("on_node_delay", nid, None, 0)
+        # Falling out with no ``cur`` means the last block's chosen port had no
+        # wire — the walk ran out of graph instead of reaching an End. Every
+        # `break` above leaves ``cur`` set, so this only catches real dead ends.
+        # Weak: if an action already failed here, its own record is the useful
+        # one (the dead end is just its unwired "fail" port).
+        if not cur and last_nid and not self._stop.is_set():
+            self._note_crash(nodes.get(last_nid), "dead_end",
+                             "nhánh đi ra từ khối này chưa nối đi đâu — không tới được khối Kết thúc",
+                             weak=True)
         return True
 
     def _run_parallel(self, nodes, adj, node_id, depth):
@@ -2492,6 +2604,13 @@ class WorkflowEngine:
         self._pause.set()
         self._debug_gate.set()
         self._stop_speedhack()
+        # A Press key → Hold down left held must not keep the character walking.
+        ctrl = getattr(self.auto, "adb", None)
+        if getattr(self, "_controller", "adb") == "win32" and hasattr(ctrl, "release_all_keys"):
+            try:
+                ctrl.release_all_keys()
+            except Exception as exc:
+                log_warning(f"[workflow] ⌨ nhả phím lỗi: {exc}")
         for aid in list(self._bg_threads.keys()):
             self.stop_background(aid)
         if (self._seq_thread and self._seq_thread.is_alive()
@@ -2824,13 +2943,24 @@ class WorkflowEngine:
                 last_error = e
             if ok_act:
                 return True
-            if attempt < attempts and not self._stop.is_set():
+            # A stopped run (user Stop, or _fail_run) must not retry the block.
+            if self._stop.is_set():
+                break
+            if attempt < attempts:
                 log_warning(f"[workflow] ✖ '{label}' fail → retry {attempt}/{attempts - 1}")
                 if delay:
                     self._sleep(delay)
         self._branch_failed = True
+        if self._stop.is_set() and getattr(self, "_fatal", ""):
+            return False    # _fail_run already logged and recorded the real reason
         if last_error is None:
             log_warning(f"[workflow] ✖ '{label}' không thực hiện được")
+        self._note_crash(
+            node,
+            "error" if last_error is not None else "failed",
+            str(last_error) if last_error is not None
+            else f"không thực hiện được sau {attempts} lần thử",
+        )
         self._save_failure_screenshot(node)
         return False
 
@@ -3573,7 +3703,10 @@ class WorkflowEngine:
         if at and not self._wait_until_clock(at, bool(p.get("nextDay", True))):
             return False  # malformed schedule time
 
-        kind = str(p.get("emulator", "ldplayer")).strip().lower()
+        kind = self._emulator_kind(p, "ldplayer")
+        # Shared project install folder (pathSrc="project") — folded into p so
+        # the argv builder and saved emulator state both see the resolved path.
+        p = {**(p or {}), "path": self._emulator_path(p)}
         try:
             index = int(float(p.get("index", 0) or 0))
         except (TypeError, ValueError):
@@ -3674,7 +3807,7 @@ class WorkflowEngine:
             except (TypeError, ValueError):
                 port = None
         saved_port: Optional[int] = None
-        path = str(self._resolve_value(p.get("path", "")) or "").strip()
+        path = self._emulator_path(p)
         if kind == "last":
             saved = self._load_emulator_state()
             if not saved:
@@ -3722,7 +3855,7 @@ class WorkflowEngine:
             index = int(float(p.get("index", 0) or 0))
         except (TypeError, ValueError):
             index = 0
-        path = str(self._resolve_value(p.get("path", "")) or "").strip()
+        path = self._emulator_path(p)
         instance = str(p.get("instance", "") or "").strip()
         if kind == "last":
             saved = self._load_emulator_state()
@@ -4277,13 +4410,104 @@ class WorkflowEngine:
             return None
         return getattr(self.auto, "adb", None)
 
+    def set_win32_path(self, path: str) -> None:
+        """Point the project game path (``win32.path``) somewhere else — the
+        Runner's Settings override. Read by Launch program nodes on ``project``."""
+        value = str(path or "").strip()
+        self._win32_cfg["path"] = value
+        if isinstance(self.flow, dict):
+            win = self.flow.get("win32")
+            if not isinstance(win, dict):
+                win = self.flow["win32"] = {}
+            win["path"] = value
+
+    def set_emulator_config(self, kind: str, path: str) -> None:
+        """Point the shared emulator setting (``emulator``) somewhere else — the
+        Runner's Settings override. Read by emulator nodes on ``project``."""
+        kind = str(kind or "").strip().lower()
+        path = str(path or "").strip()
+        self._emu_cfg["kind"] = kind
+        self._emu_cfg["path"] = path
+        if isinstance(self.flow, dict):
+            emu = self.flow.get("emulator")
+            if not isinstance(emu, dict):
+                emu = self.flow["emulator"] = {}
+            emu["kind"] = kind
+            emu["path"] = path
+
+    def _emulator_path(self, params: Dict[str, Any]) -> str:
+        """Resolve the emulator install folder for an emulator node.
+
+        ``pathSrc``:
+          - ``project`` — the shared emulator setting (Project / Runner Settings)
+          - ``custom``  — the node's own ``path`` field
+          - missing     — legacy: shared setting first, else the node's path
+        """
+        p = params or {}
+        src = str(p.get("pathSrc") or "").strip().lower()
+        project = str((self._emu_cfg or {}).get("path") or "").strip()
+        custom = str(self._resolve_value(p.get("path", "")) or "").strip()
+        if src == "custom":
+            return custom
+        # "project" and legacy (no src) both prefer the shared setting; an empty
+        # shared path falls back to the node's own path so old files still run.
+        return project or custom
+
+    def _emulator_kind(self, params: Dict[str, Any], default: str = "ldplayer") -> str:
+        """Resolve the emulator family for a launch node (see ``_emulator_path``)."""
+        p = params or {}
+        src = str(p.get("pathSrc") or "").strip().lower()
+        custom = str(p.get("emulator") or "").strip().lower()
+        project = str((self._emu_cfg or {}).get("kind") or "").strip().lower()
+        if src == "custom":
+            return custom or default
+        return project or custom or default
+
+    def _win_launch_path(self, params: Dict[str, Any]) -> str:
+        """Resolve the program for win_launch.
+
+        ``pathSrc``:
+          - ``project`` — the project game path (Project settings / Runner Settings)
+          - ``custom``  — the node's own ``path`` field (text or variable)
+          - missing     — legacy: explicit path wins; else fall back to project
+        """
+        p = params or {}
+        src = str(p.get("pathSrc") or "").strip().lower()
+        project = str((self._win32_cfg or {}).get("path") or "").strip()
+        if src == "project":
+            return project
+        custom = str(self._resolve_value(p.get("path", "")) or "").strip()
+        if src == "custom":
+            return custom
+        return custom or project
+
+    def _fail_run(self, node: Optional[Dict], message: str) -> bool:
+        """Abort the whole run on a setup error no retry can fix (a missing game
+        exe): log it, record it as the crash point, stop every activity.
+
+        Unlike a normal action failure there is no retry and no fail branch —
+        everything after a Launch program assumes the game is running, so going
+        on would only fail again further down with a less useful message."""
+        log_error(f"[workflow] ⛔ {message}")
+        self._fatal = message
+        self._note_crash(node, "fatal", message)
+        self._branch_failed = True
+        self.stop()
+        return False
+
     def _a_win_launch(self, node, p) -> bool:
         """Start a program (exe path + optional args) or focus its window; then
         optionally wait until a matching window title appears and attach to it."""
         ctrl = self._win32_ctrl()
         if ctrl is None:
             return False
-        path = str(self._resolve_value(p.get("path", ""))).strip()
+        path = self._win_launch_path(p)
+        if not path:
+            return self._fail_run(node, "Launch program: chưa có đường dẫn game — chọn ở "
+                                        "Runner Settings → Game (Designer: Project settings / Custom)")
+        if not os.path.isfile(path):
+            return self._fail_run(node, f"Launch program: không tìm thấy game tại '{path}' — "
+                                        "chọn lại đường dẫn game rồi chạy lại")
         args = str(self._resolve_value(p.get("args", ""))).strip()
         cmd = f'"{path}" {args}'.strip() if args else path
         if not ctrl.launch_app(cmd):
@@ -4335,8 +4559,13 @@ class WorkflowEngine:
             return False
         w = int(p.get("width", 1280))
         h = int(p.get("height", 720))
-        ok = bool(ctrl.resize_window(w, h))
-        log_info(f"[workflow] 🪟 resize → {w}×{h}")
+        # Missing on nodes saved before these options existed → legacy behaviour
+        # (outer window size, top-left kept). New nodes default both on.
+        center = self._truthy(p.get("center", False))
+        client = self._truthy(p.get("client", False))
+        ok = bool(ctrl.resize_window(w, h, center=center, client=client))
+        log_info(f"[workflow] 🪟 resize → {w}×{h}{' (client)' if client else ''}"
+                 f"{' · căn giữa' if center else ''}")
         return ok
 
     def _a_win_move(self, node, p) -> bool:
@@ -4471,6 +4700,28 @@ class WorkflowEngine:
             log_info(f"[workflow] ⌨ {combo}")
         return ok
 
+    def _a_win_key(self, node, p) -> bool:
+        """Press / hold down / release a Windows virtual key on the target.
+
+        ``mode``: ``press`` (down → ``hold`` ms → up) · ``down`` (stays held
+        across later blocks until a ``up`` — walking) · ``up``. Keys still held
+        when the run stops are released by :meth:`stop`."""
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        try:
+            vk = int(p.get("keycode", 13))
+        except (TypeError, ValueError):
+            log_warning(f"[workflow] ⌨ win_key: mã phím không hợp lệ ({p.get('keycode')!r})")
+            return False
+        mode = str(p.get("mode", "press") or "press").strip().lower()
+        hold = self._resolve_count(p.get("hold", 80), default=80)
+        ok = bool(ctrl.press_key(vk, hold_ms=hold, action=mode))
+        if ok:
+            what = {"down": "giữ", "up": "nhả"}.get(mode, f"nhấn {hold}ms")
+            log_info(f"[workflow] ⌨ VK{vk} {what}")
+        return ok
+
     def _a_win_info(self, node, p) -> bool:
         """Read a target-window property into a variable (Win32's device_info)."""
         ctrl = self._win32_ctrl()
@@ -4493,14 +4744,20 @@ class WorkflowEngine:
         """win_if_window / win_wait_window: state of the TARGET window.
 
         ``state``: ``exists`` (still alive — crash detection) · ``foreground``
-        (is the active window) · ``minimized``. ``win_wait_window`` polls until
-        the state holds or ``timeout`` runs out.
+        (is the active window) · ``minimized`` · ``size`` (client area is
+        ``width``×``height`` within ``tolerance`` px — the space captures and
+        templates use). ``win_wait_window`` polls until the state holds or
+        ``timeout`` runs out.
         """
         ctrl = self._win32_ctrl()
         if ctrl is None:
             return False
         state = str(params.get("state", "exists")).strip().lower()
         negate = self._truthy(params.get("negate", False))
+        want_w = self._resolve_count(params.get("width", 0))
+        want_h = self._resolve_count(params.get("height", 0))
+        tol = self._resolve_count(params.get("tolerance", 0))
+        seen = {"w": 0, "h": 0}
 
         def probe() -> bool:
             try:
@@ -4508,23 +4765,30 @@ class WorkflowEngine:
                     return bool(ctrl.window_exists()) and bool(ctrl.is_foreground())
                 if state == "minimized":
                     return bool(ctrl.window_exists()) and bool(ctrl.is_minimized())
+                if state == "size":
+                    if not ctrl.window_exists():
+                        return False
+                    seen["w"], seen["h"] = ctrl.get_screen_size()
+                    return abs(seen["w"] - want_w) <= tol and abs(seen["h"] - want_h) <= tol
                 return bool(ctrl.window_exists())
             except Exception as exc:
                 log_warning(f"[workflow] 🪟 kiểm tra cửa sổ lỗi: {exc}")
                 return False
 
+        what = (f"client {want_w}×{want_h}" + (f"±{tol}" if tol else "")) if state == "size" else state
+        now = lambda: f" (hiện {seen['w']}×{seen['h']})" if state == "size" else ""  # noqa: E731
         if ntype == "win_if_window":
             ok = probe()
-            log_info(f"[workflow] 🪟 cửa sổ {state} → {'có' if ok else 'không'}")
+            log_info(f"[workflow] 🪟 cửa sổ {what} → {'có' if ok else 'không'}{now()}")
             return ok != negate
         end = time.time() + max(0.0, float(params.get("timeout", 30) or 0))
         while not self._stop.is_set():
             self._pause.wait()
             if probe() != negate:
-                log_info(f"[workflow] 🪟 cửa sổ {state}{' (đảo)' if negate else ''} — sẵn sàng")
+                log_info(f"[workflow] 🪟 cửa sổ {what}{' (đảo)' if negate else ''} — sẵn sàng{now()}")
                 return True
             if time.time() >= end:
-                log_warning(f"[workflow] 🪟 hết thời gian chờ cửa sổ {state}")
+                log_warning(f"[workflow] 🪟 hết thời gian chờ cửa sổ {what}{now()}")
                 return False
             time.sleep(0.25)
         return False

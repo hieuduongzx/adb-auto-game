@@ -1,4 +1,4 @@
-/* Macro2k Hub — list / run / edit / create workflows. */
+/* Macro2k Hub — game library: every workflow project as a cover card. */
 
 // ── Tiny helpers ─────────────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
@@ -11,11 +11,14 @@ function escHtml(s) {
 }
 
 // ── Toast ────────────────────────────────────────────────────────────────────
+// Level -> the shared icon of the same name. The four glyphs used to be drawn
+// here by hand (a fat polyline check, a 9px info circle) and disagreed with the
+// Designer's own hand-drawn copies; both now read the shared set.
 const TOAST_ICO = {
-  success: '<polyline points="4 12.5 9.5 18 20 6"/>',
-  error:   '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
-  warning: '<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
-  info:    '<circle cx="12" cy="12" r="9"/><line x1="12" y1="10.5" x2="12" y2="16"/><circle cx="12" cy="7.6" r="0.7"/>',
+  success: "check",
+  error:   "x",
+  warning: "triangle-alert",
+  info:    "info",
 };
 function toast(msg, level) {
   level = TOAST_ICO[level] ? level : "info";
@@ -30,7 +33,7 @@ function toast(msg, level) {
   const t = document.createElement("div");
   t.className = "ui-toast ui-" + level;
   t.innerHTML =
-    `<svg class="uico" viewBox="0 0 24 24">${TOAST_ICO[level]}</svg>` +
+    uiIco(TOAST_ICO[level], "uico-2") +
     `<span class="ui-toast-msg">${escHtml(msg)}</span>`;
   t.title = "Click to dismiss";
   host.appendChild(t);
@@ -110,9 +113,17 @@ function modal(spec) {
   });
 }
 
+// ── New game dialog ──────────────────────────────────────────────────────────
+/** Every Win32 input transport the engine accepts (src/core/win32/automation.py
+    `_INPUT_MODES`) — keep in step with the Designer's Project settings. */
+const WIN_INPUT_MODES = [
+  "background", "background_sync", "background_cursor", "background_window",
+  "anchored_touch", "unity_bridge", "foreground",
+];
+
 /** Collect create-dialog fields. Returns project backend settings or null. */
 function readNewWorkflowForm(box) {
-  const name = (box.querySelector("#hub-name-input").value || "").trim() || "My Workflow";
+  const name = (box.querySelector("#hub-name-input").value || "").trim() || "My Game";
   const ctrlBtn = box.querySelector('.choice-seg[data-field="controller"] .choice.on');
   const capBtn = box.querySelector('.choice-seg[data-field="capture"] .choice.on');
   const inputBtn = box.querySelector('.choice-seg[data-field="inputMode"] .choice.on');
@@ -120,7 +131,7 @@ function readNewWorkflowForm(box) {
   // Capture only applies to ADB; input mode only applies to Win32.
   const capture = (controller === "adb" && capBtn && capBtn.dataset.value === "adb")
     ? "adb" : "scrcpy";
-  const allowedModes = new Set(["background", "background_sync", "background_cursor", "foreground"]);
+  const allowedModes = new Set(WIN_INPUT_MODES);
   const inputMode = inputBtn && allowedModes.has(inputBtn.dataset.value)
     ? inputBtn.dataset.value : "background";
   return { name, controller, capture, inputMode };
@@ -150,7 +161,7 @@ function syncBackendFields(box) {
   if (inputField) inputField.style.display = win32 ? "" : "none";
 }
 
-/** New-workflow dialog → backend settings or null if cancelled. */
+/** New-game dialog → backend settings or null if cancelled. */
 function promptNewWorkflow() {
   return new Promise((resolve) => {
     if (_modal) modalClose(undefined);
@@ -161,11 +172,11 @@ function promptNewWorkflow() {
     box.setAttribute("role", "dialog");
     box.setAttribute("aria-modal", "true");
     box.innerHTML =
-      `<div class="ui-modal-hd">New workflow</div>` +
+      `<div class="ui-modal-hd">New game</div>` +
       `<div class="ui-modal-bd">` +
         `<div class="form-field">` +
-          `<label for="hub-name-input">Workflow name</label>` +
-          `<input id="hub-name-input" type="text" spellcheck="false" autocomplete="off" value="My Workflow">` +
+          `<label for="hub-name-input">Game name</label>` +
+          `<input id="hub-name-input" type="text" spellcheck="false" autocomplete="off" value="My Game">` +
         `</div>` +
         `<div class="form-field">` +
           `<span class="form-lbl">Controller</span>` +
@@ -209,6 +220,18 @@ function promptNewWorkflow() {
               `<span class="choice-title">Cursor</span>` +
               `<span class="choice-sub">Unity / Unreal</span>` +
             `</button>` +
+            `<button type="button" class="choice" data-value="background_window">` +
+              `<span class="choice-title">Window</span>` +
+              `<span class="choice-sub">No cursor move</span>` +
+            `</button>` +
+            `<button type="button" class="choice" data-value="anchored_touch">` +
+              `<span class="choice-title">Anchored</span>` +
+              `<span class="choice-sub">WM_POINTER</span>` +
+            `</button>` +
+            `<button type="button" class="choice" data-value="unity_bridge">` +
+              `<span class="choice-title">Bridge</span>` +
+              `<span class="choice-sub">In-game plugin</span>` +
+            `</button>` +
             `<button type="button" class="choice" data-value="foreground">` +
               `<span class="choice-title">Foreground</span>` +
               `<span class="choice-sub">Real mouse</span>` +
@@ -216,7 +239,9 @@ function promptNewWorkflow() {
           `</div>` +
           `<p class="ui-modal-hint">How clicks and swipes are delivered to the PC window.</p>` +
         `</div>` +
-        `<p class="ui-modal-hint">Creates workflows/&lt;Name&gt;/workflow.json and opens the Designer.</p>` +
+        `<p class="ui-modal-hint">Creates <span class="mono">workflows/&lt;Name&gt;/workflow.json</span> and opens the Designer. ` +
+          `Put the cover art at <span class="mono">workflows/&lt;Name&gt;/assets/cover.png</span> (3:4) ` +
+          `and the icon at <span class="mono">assets/icon.png</span> (square).</p>` +
       `</div>` +
       `<div class="ui-modal-ft">` +
         `<button type="button" class="btn" data-v="cancel">Cancel</button>` +
@@ -252,105 +277,152 @@ function promptNewWorkflow() {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let WORKFLOWS = [];
+let GAMES = [];
 let FILTER = "";
-let WORKFLOWS_LOADED = false;
-let AC_STATE = { running:false, count:0, cycles:0, activePointId:"", startedAt:0, elapsed:0, status:"Ready", error:"", hotkeys:false };
-let AC_CONFIG = { profileName:"Untitled sequence", selectedPointId:"point-1", points:[], intervalMs:250, startDelaySec:0, infinite:true, count:100 };
-let AC_CURRENT_FILE = "";
-let AC_PROFILES = [];
-let AC_DIR = "autoclicks";
-let AC_DIRTY = false;
-let _acConfigureTimer = null;
-let _acElapsedTimer = null;
+let BUILD = null;   // {path, name, version, state: running|cancelling|done|failed|cancelled, progress, stage, …}
+const COLS = 5;   // matches grid-template-columns in hub.css
+
+// ── Cover art ────────────────────────────────────────────────────────────────
+// The Hub used to keep its own paths here, including a hand-drawn box for Build.
+// Every icon now comes from the shared set (shared/icons.js) — one geometry, one
+// weight, so the Hub reads the same as the Designer.
+const svg = (name, cls) => uiIco(name, cls);
+
+// Hues for cover slots without art: the accent family plus a few calm
+// neighbours, picked per game so the same game always gets the same tint.
+const TONES = [214, 158, 256, 32, 346, 190];
+function toneFor(key) {
+  let h = 0;
+  for (const ch of String(key || "")) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  return TONES[h % TONES.length];
+}
+/** "BrownDust2" → "BD", "Cherry_Tale" → "CT", "Nikke" → "NI". */
+function initialsFor(name) {
+  const words = String(name || "")
+    .replace(/([a-z])([A-Z0-9])/g, "$1 $2")
+    .split(/[\s_\-.]+/)
+    .filter(Boolean);
+  if (!words.length) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+/** The game's small icon: assets/icon.*, else the cover, else its initials. */
+function iconHtmlFor(g, cls) {
+  const src = g.icon || g.cover;
+  if (src) return `<img class="${cls}" src="${escHtml(src)}" alt="" decoding="async" draggable="false">`;
+  return `<span class="${cls} icon-mono" aria-hidden="true">${escHtml(initialsFor(g.name))}</span>`;
+}
+function emptyArtHtml(name) {
+  return `<span class="game-art-empty" aria-hidden="true">` +
+    `<span class="art-initials">${escHtml(initialsFor(name))}</span>` +
+    `<span class="art-hint">assets/cover.png</span></span>`;
+}
 
 // ── Render ───────────────────────────────────────────────────────────────────
 function filtered() {
   const q = FILTER.trim().toLowerCase();
-  if (!q) return WORKFLOWS.slice();
-  return WORKFLOWS.filter((w) => {
-    const hay = [w.name, w.folder, w.file, w.controller, w.capture].join(" ").toLowerCase();
-    return hay.includes(q);
-  });
+  if (!q) return GAMES.slice();
+  return GAMES.filter((g) => [g.name, g.folder, g.controller].join(" ").toLowerCase().includes(q));
 }
 
-function render() {
-  const rows = filtered();
-  const body = $("wf-body");
+function cardHtml(g, i) {
+  const name = escHtml(g.name);
+  const ctrl = g.controller === "win32" ? "win32" : "adb";
+  const acts = Number(g.activityCount) || 0;
+  const art = g.cover
+    ? `<img class="game-img" src="${escHtml(g.cover)}" alt="" decoding="async" draggable="false">`
+    : emptyArtHtml(g.name);
+  const building = !!(BUILD && BUILD.state === "running" && BUILD.path === g.path);
+  return `<article class="game${building ? " is-building" : ""}" role="listitem" data-path="${escHtml(g.path)}" style="--i:${i};--tone:${toneFor(g.folder || g.name)}">` +
+    `<button class="game-cover" type="button" data-act="run" title="Run ${name}" aria-label="Run ${name}">` +
+      art +
+      `<span class="game-building" title="Show build progress"><span class="build-dot"></span>Building <span class="chip-pct">${building ? (BUILD.progress || 0) : 0}%</span></span>` +
+      `<span class="game-run" aria-hidden="true">${svg("play", "uico-0 uico-fill")}Run</span>` +
+    `</button>` +
+    `<div class="game-tools">` +
+      `<button class="game-tool" type="button" data-act="edit" title="Edit in Designer (E)" aria-label="Edit ${name}">${svg("pencil", "uico-2")}</button>` +
+      `<button class="game-tool" type="button" data-act="build" title="Build a standalone Runner .exe (B)" aria-label="Build Runner exe for ${name}">${svg("package", "uico-2")}</button>` +
+      `<button class="game-tool danger" type="button" data-act="delete" title="Delete (Del)" aria-label="Delete ${name}">${svg("trash-2", "uico-2")}</button>` +
+    `</div>` +
+    `<div class="game-info">` +
+      iconHtmlFor(g, "game-icon") +
+      `<span class="game-name" title="${name}">${name}</span>` +
+      `<span class="game-meta">` +
+        `<span class="ctrl-tag ${ctrl}">${ctrl === "win32" ? "Win32" : "ADB"}</span>` +
+        `<span class="game-acts">${acts} ${acts === 1 ? "activity" : "activities"}</span>` +
+      `</span>` +
+    `</div>` +
+  `</article>`;
+}
+
+function renderSkeleton() {
+  const grid = $("grid");
+  grid.innerHTML = Array.from({ length: COLS * 2 }, (_, i) =>
+    `<div class="game skeleton" aria-hidden="true" style="--i:${i}">` +
+      `<span class="game-cover"></span>` +
+      `<span class="game-info"><span class="sk-line"></span><span class="sk-line short"></span></span>` +
+    `</div>`).join("");
+  grid.setAttribute("aria-busy", "true");
+}
+
+function render(opts) {
+  const intro = !!(opts && opts.intro);
+  const grid = $("grid");
   const empty = $("empty");
-  const count = $("count");
+  const items = filtered();
 
-  count.textContent = WORKFLOWS.length
-    ? (rows.length === WORKFLOWS.length
-        ? `${WORKFLOWS.length} workflow${WORKFLOWS.length === 1 ? "" : "s"}`
-        : `${rows.length} of ${WORKFLOWS.length}`)
-    : "0 workflows";
+  $("count").textContent = GAMES.length
+    ? (items.length === GAMES.length
+        ? `${GAMES.length} ${GAMES.length === 1 ? "game" : "games"}`
+        : `${items.length} of ${GAMES.length}`)
+    : "0 games";
 
-  if (!WORKFLOWS.length || !rows.length) {
-    body.innerHTML = "";
+  // Keep keyboard focus on the same game across a re-render (refresh, delete).
+  const active = document.activeElement;
+  const focusedPath = active && active.closest && active.closest(".game")
+    ? active.closest(".game").dataset.path : "";
+
+  grid.setAttribute("aria-busy", "false");
+  if (!items.length) {
+    grid.innerHTML = "";
     empty.hidden = false;
-    if (WORKFLOWS.length && !rows.length) {
-      empty.querySelector(".empty-title").textContent = "No matches";
-      empty.querySelector(".empty-msg").textContent = "Try a different search term.";
-      $("btn-empty-new").hidden = true;
-    } else {
-      empty.querySelector(".empty-title").textContent = "No workflows yet";
-      empty.querySelector(".empty-msg").textContent = "Create one to start building automation flows.";
-      $("btn-empty-new").hidden = false;
-    }
+    const searching = GAMES.length > 0;
+    empty.querySelector(".empty-title").textContent = searching ? "No matches" : "No games yet";
+    empty.querySelector(".empty-msg").textContent = searching
+      ? `Nothing in the library matches “${FILTER.trim()}”.`
+      : "Create a game project to start building its workflow.";
+    $("btn-empty-new").hidden = searching;
     return;
   }
   empty.hidden = true;
 
-  body.innerHTML = rows.map((w) => {
-    const ctrl = (w.controller || "adb").toLowerCase() === "win32" ? "win32" : "adb";
-    const cap = (w.capture || "scrcpy").toLowerCase() === "adb" ? "adb" : "scrcpy";
-    const capLabel = ctrl === "win32" ? "window" : cap;
-    return `<tr data-path="${escHtml(w.path)}">
-      <td>
-        <div class="wf-name" title="${escHtml(w.name)}">${escHtml(w.name)}</div>
-        <div class="wf-file" title="${escHtml(w.relPath || w.file)}">${escHtml(w.relPath || w.file)}</div>
-      </td>
-      <td class="wf-acts">${w.activityCount ?? "—"}</td>
-      <td>
-        <span class="wf-ctrl ${ctrl}">${ctrl}</span>
-        <div class="wf-cap" title="Capture source">${escHtml(capLabel)}</div>
-      </td>
-      <td class="wf-mod" title="${escHtml(w.modifiedIso || "")}">${escHtml(w.modified || "—")}</td>
-      <td>
-        <div class="row-actions">
-          <button class="btn sm ok" data-act="run" title="Open Runner GUI">
-            <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>
-            Run
-          </button>
-          <button class="btn sm" data-act="edit" title="Open in Designer">
-            <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
-            Edit
-          </button>
-          <button class="btn sm err ico" data-act="delete" title="Delete workflow" aria-label="Delete">
-            <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          </button>
-        </div>
-      </td>
-    </tr>`;
-  }).join("");
+  grid.classList.toggle("intro", intro);
+  grid.innerHTML = items.map(cardHtml).join("");
+  if (intro) setTimeout(() => grid.classList.remove("intro"), 1000);
+
+  if (focusedPath) {
+    const card = [...grid.querySelectorAll(".game")].find((c) => c.dataset.path === focusedPath);
+    if (card) card.querySelector(".game-cover").focus({ preventScroll: true });
+  }
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
-async function loadList() {
+async function loadList(opts) {
   const a = api();
   if (!a) return;
   try {
     const res = await a.list_workflows();
-    WORKFLOWS = (res && res.workflows) || [];
+    GAMES = (res && res.workflows) || [];
     const pathEl = $("footer-path");
     if (pathEl && res && res.dir) {
       pathEl.textContent = res.dir;
       pathEl.title = res.dir;
     }
-    render();
+    render(opts);
   } catch (e) {
-    toast("Failed to list workflows", "error");
+    $("grid").innerHTML = "";
+    $("grid").setAttribute("aria-busy", "false");
+    toast("Could not read the game library", "error");
   }
 }
 
@@ -379,7 +451,7 @@ async function editWorkflow(path) {
 }
 
 function confirmDelete(name, folder) {
-  const label = name || folder || "this workflow";
+  const label = name || folder || "this game";
   return new Promise((resolve) => {
     if (_modal) modalClose(undefined);
     const wrap = document.createElement("div");
@@ -389,10 +461,10 @@ function confirmDelete(name, folder) {
     box.setAttribute("role", "dialog");
     box.setAttribute("aria-modal", "true");
     box.innerHTML =
-      `<div class="ui-modal-hd">Delete workflow?</div>` +
+      `<div class="ui-modal-hd">Delete game?</div>` +
       `<div class="ui-modal-bd">` +
         `<p class="ui-modal-msg">Permanently delete <b>${escHtml(label)}</b>?` +
-        (folder ? ` This removes the whole <span class="mono">workflows/${escHtml(folder)}/</span> folder (JSON + templates).` : "") +
+        (folder ? ` This removes the whole <span class="mono">workflows/${escHtml(folder)}/</span> folder (workflow, templates and cover).` : "") +
         `</p>` +
         `<p class="ui-modal-hint">This cannot be undone.</p>` +
       `</div>` +
@@ -401,10 +473,12 @@ function confirmDelete(name, folder) {
         `<button type="button" class="btn err" data-v="ok">Delete</button>` +
       `</div>`;
     wrap.appendChild(box);
+    const prevFocus = document.activeElement;
     const finish = (val) => {
       document.removeEventListener("keydown", onKey, true);
       wrap.remove();
       _modal = null;
+      if (!val && prevFocus && prevFocus.focus) try { prevFocus.focus(); } catch {}
       resolve(val);
     };
     const onKey = (e) => {
@@ -415,7 +489,7 @@ function confirmDelete(name, folder) {
     wrap.addEventListener("mousedown", (e) => { if (e.target === wrap) finish(false); });
     document.addEventListener("keydown", onKey, true);
     document.body.appendChild(wrap);
-    _modal = { wrap, resolve: () => {}, onKey, prevFocus: document.activeElement };
+    _modal = { wrap, resolve: () => {}, onKey, prevFocus };
     setTimeout(() => {
       try { box.querySelector('[data-v="cancel"]').focus(); } catch {}
     }, 20);
@@ -423,7 +497,7 @@ function confirmDelete(name, folder) {
 }
 
 async function deleteWorkflow(path) {
-  const meta = WORKFLOWS.find((w) => w.path === path) || {};
+  const meta = GAMES.find((g) => g.path === path) || {};
   const ok = await confirmDelete(meta.name, meta.folder);
   if (!ok) return;
   const a = api();
@@ -434,12 +508,241 @@ async function deleteWorkflow(path) {
       toast((res && res.error) || "Delete failed", "error");
       return;
     }
-    toast("Deleted «" + (meta.name || res.folder || "workflow") + "»", "success");
+    toast("Deleted «" + (meta.name || res.folder || "game") + "»", "success");
     await loadList();
   } catch {
     toast("Delete failed", "error");
   }
 }
+
+// ── Build a standalone Runner .exe ──────────────────────────────────────────
+/** Build dialog → {version, publish, repo}, or null if cancelled. */
+function promptBuild(info) {
+  let form = null;
+  const vendor = (info.vendor || []).length ? info.vendor.join(", ") : "none";
+  // workflows/<Name>/vendor/ ships beside the exe as requirements\ for the game folder.
+  const reqs = info.requirements || [];
+  const reqText = reqs.length
+    ? `${reqs.length} file${reqs.length === 1 ? "" : "s"} from vendor\\ → requirements\\ (players copy them into the game folder)`
+    : "none";
+  const published = info.published ? `v${info.published}` : "nothing yet";
+  return modal({
+    title: "Build Runner .exe",
+    body: (bd) => {
+      bd.innerHTML =
+        `<p class="ui-modal-msg">Package <b>${escHtml(info.name)}</b> as a standalone Runner with its own version and self-update.</p>` +
+        `<div class="form-field build-field">` +
+          `<label for="build-version">Version</label>` +
+          `<input id="build-version" type="text" spellcheck="false" autocomplete="off" value="${escHtml(info.version)}">` +
+        `</div>` +
+        `<label class="build-check${info.canPublish ? "" : " disabled"}">` +
+          `<input type="checkbox" id="build-publish"${info.canPublish ? "" : " disabled"}>` +
+          `<span><b>Publish as an update</b><small>${escHtml(info.canPublish
+            ? "Uploads a GitHub Release; installed Runners of this game offer it on their next launch."
+            : info.publishNote)}</small></span>` +
+        `</label>` +
+        `<div class="form-field build-field build-repo" hidden>` +
+          `<label for="build-repo">Update repository</label>` +
+          `<input id="build-repo" type="text" spellcheck="false" autocomplete="off" value="${escHtml(info.repo)}" placeholder="owner/name">` +
+        `</div>` +
+        `<dl class="build-facts">` +
+          `<dt>Icon</dt><dd class="build-icon">` +
+            (info.iconPreview ? `<img src="${info.iconPreview}" alt="">` : "") +
+            `<span>${escHtml(info.iconSource || "Macro2k icon")}</span></dd>` +
+          `<dt>Output</dt><dd class="mono" title="${escHtml(info.folder)}">${escHtml(info.folder)}\\${escHtml(info.exeName)}</dd>` +
+          `<dt>Vendor</dt><dd class="mono">${escHtml(vendor)}</dd>` +
+          `<dt>Game files</dt><dd>${escHtml(reqText)}</dd>` +
+          `<dt>Published</dt><dd class="mono">${escHtml(published)} <span class="build-tag">${escHtml(info.tagPrefix)}*</span></dd>` +
+        `</dl>` +
+        (info.exists ? `<p class="ui-modal-hint">The previous build in that folder is replaced.</p>` : "");
+      const publish = bd.querySelector("#build-publish");
+      const repoField = bd.querySelector(".build-repo");
+      publish.addEventListener("change", () => { repoField.hidden = !publish.checked; });
+      form = { version: bd.querySelector("#build-version"), publish, repo: bd.querySelector("#build-repo") };
+    },
+    buttons: [{ label: "Cancel", value: false }, { label: "Build", value: true, kind: "accent" }],
+  }).then((ok) => (ok ? {
+    version: (form.version.value || "").trim() || info.version,
+    publish: !!form.publish.checked,
+    repo: (form.repo.value || "").trim() || info.repo,
+  } : null));
+}
+
+async function buildWorkflow(path) {
+  if (BUILD && (BUILD.state === "running" || BUILD.state === "cancelling")) {
+    if (BUILD.path === path) openBuildPanel();
+    else toast(`Already building ${BUILD.name}`, "warning");
+    return;
+  }
+  const a = api();
+  if (!a) return;
+  let info = null;
+  try { info = await a.build_info(path); } catch {}
+  if (!info || !info.ok) {
+    toast((info && info.error) || "Build is not available", "error");
+    return;
+  }
+  const choice = await promptBuild(info);
+  if (choice == null) return;
+  let res = null;
+  try { res = await a.build_runner(path, choice.version, choice.publish, choice.repo); } catch {}
+  if (!res || !res.ok) {
+    toast((res && res.error) || "Build did not start", "error");
+    return;
+  }
+  applyBuild(res, { reset: true });
+  openBuildPanel();
+}
+
+// ── Build panel ──────────────────────────────────────────────────────────────
+const BP = { open: false, timer: null };
+const buildActive = () => !!(BUILD && (BUILD.state === "running" || BUILD.state === "cancelling"));
+
+function applyBuild(state, opts) {
+  const prev = BUILD;
+  if (!state || !state.path) {
+    BUILD = null;
+    renderBuildPanel();
+    return;
+  }
+  const lines = state.lines || state.log || [];
+  const fresh = (opts && opts.reset) || !prev || prev.path !== state.path || prev.startedAt !== state.startedAt;
+  BUILD = Object.assign({}, state);
+  delete BUILD.lines;
+  delete BUILD.log;
+  if (fresh) $("bp-log").innerHTML = "";
+  appendBuildLines(lines);
+
+  const wasActive = prev && (prev.state === "running" || prev.state === "cancelling") && prev.startedAt === BUILD.startedAt;
+  if (wasActive && BUILD.state === "done") toast((BUILD.releaseUrl ? `Published ${BUILD.name} v${BUILD.version}` : `Built ${BUILD.name} v${BUILD.version}`)
+    + (BUILD.requirements ? " — ships requirements\\ for the game folder" : ""), "success");
+  else if (wasActive && BUILD.state === "failed") toast(`Build failed: ${BUILD.error || BUILD.name}`, "error");
+  else if (wasActive && BUILD.state === "cancelled") toast(`Build cancelled: ${BUILD.name}`, "info");
+
+  document.querySelectorAll(".game").forEach((card) => {
+    const on = buildActive() && card.dataset.path === BUILD.path;
+    card.classList.toggle("is-building", on);
+    const pct = card.querySelector(".chip-pct");
+    if (on && pct) pct.textContent = `${BUILD.progress || 0}%`;
+  });
+  renderBuildPanel();
+}
+
+function appendBuildLines(lines) {
+  if (!lines || !lines.length) return;
+  const log = $("bp-log");
+  const follow = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  const frag = document.createDocumentFragment();
+  for (const raw of lines) {
+    const line = String(raw);
+    const div = document.createElement("div");
+    let cls = "bp-line";
+    let text = line;
+    if (line.startsWith(">> ")) { cls += " major"; text = line.slice(3); }
+    if (/\b(ERROR|Traceback|FAILED)\b|Error:/.test(line)) cls += " err";
+    else if (/\bWARNING\b/.test(line)) cls += " warn";
+    div.className = cls;
+    div.textContent = text;
+    frag.appendChild(div);
+  }
+  log.appendChild(frag);
+  while (log.childElementCount > 4000) log.removeChild(log.firstChild);
+  if (follow) log.scrollTop = log.scrollHeight;
+}
+
+function fmtDuration(seconds) {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function renderBuildPanel() {
+  const panel = $("build-panel");
+  if (!BUILD) {
+    if (BP.open) hideBuildPanel();
+    return;
+  }
+  const s = BUILD.state;
+  const labels = { running: "Building", cancelling: "Cancelling", done: BUILD.releaseUrl ? "Published" : "Built", failed: "Failed", cancelled: "Cancelled" };
+  panel.dataset.state = s;
+  $("bp-title").textContent = `Build ${BUILD.name}`;
+  $("bp-sub").textContent = `v${BUILD.version}` + (BUILD.publish ? ` · publish to ${BUILD.repo}` : "") + ` · ${BUILD.folder || ""}`;
+  $("bp-sub").title = BUILD.folder || "";
+  const badge = $("bp-badge");
+  badge.className = "bp-badge " + s;
+  badge.textContent = labels[s] || s;
+  const pct = s === "done" ? 100 : Math.max(0, Math.min(100, BUILD.progress || 0));
+  $("bp-fill").style.transform = `scaleX(${pct / 100})`;
+  $("bp-track").setAttribute("aria-valuenow", String(pct));
+  $("bp-pct").textContent = `${pct}%`;
+  $("bp-stage").textContent = s === "failed" ? (BUILD.error || "Failed")
+    : (s === "done" && BUILD.requirements) ? `${BUILD.stage || labels[s]} · players must copy requirements\\ into the game folder (REQUIREMENTS.txt)`
+    : (BUILD.stage || labels[s] || "");
+  tickBuildTime();
+
+  const foot = $("bp-foot");
+  let html = "";
+  if (s === "running") html += `<button class="btn err" type="button" data-bp="cancel">Cancel build</button>`;
+  if (s === "cancelling") html += `<button class="btn err" type="button" disabled>Cancelling…</button>`;
+  html += `<span class="bp-sp"></span>`;
+  if (s === "done") {
+    html += `<button class="btn" type="button" data-bp="folder">Open folder</button>`;
+    if (BUILD.requirements) html += `<button class="btn" type="button" data-bp="req">Open requirements</button>`;
+    if (BUILD.releaseUrl) html += `<button class="btn" type="button" data-bp="release">View release</button>`;
+  }
+  html += buildActive()
+    ? `<button class="btn" type="button" data-bp="hide">Hide</button>`
+    : `<button class="btn accent" type="button" data-bp="close">Close</button>`;
+  foot.innerHTML = html;
+
+  clearInterval(BP.timer);
+  BP.timer = buildActive() ? setInterval(tickBuildTime, 500) : null;
+}
+
+function tickBuildTime() {
+  if (!BUILD || !BUILD.startedAt) return;
+  const end = BUILD.endedAt || Date.now() / 1000;
+  $("bp-time").textContent = fmtDuration(end - BUILD.startedAt);
+}
+
+function openBuildPanel() {
+  if (!BUILD) return;
+  const panel = $("build-panel");
+  renderBuildPanel();
+  panel.hidden = false;
+  BP.open = true;
+  document.body.classList.add("bp-open");
+  requestAnimationFrame(() => panel.classList.add("in"));
+  const log = $("bp-log");
+  log.scrollTop = log.scrollHeight;
+}
+
+function hideBuildPanel() {
+  const panel = $("build-panel");
+  BP.open = false;
+  document.body.classList.remove("bp-open");
+  panel.classList.remove("in");
+  setTimeout(() => { if (!BP.open) panel.hidden = true; }, 220);
+}
+
+async function onBuildPanelAction(action) {
+  const a = api();
+  if (!BUILD || !a) return;
+  if (action === "hide") hideBuildPanel();
+  else if (action === "close") { hideBuildPanel(); if (!buildActive()) BUILD = null; }
+  else if (action === "cancel") {
+    const ok = await modal({
+      title: "Cancel this build?",
+      body: `<p class="ui-modal-msg">Stop building <b>${escHtml(BUILD.name)}</b>. Nothing is published and the previous build folder may be left incomplete.</p>`,
+      buttons: [{ label: "Keep building", value: false }, { label: "Cancel build", value: true, kind: "err" }],
+    });
+    if (ok) { try { await a.cancel_build(); } catch {} }
+  }
+  else if (action === "folder") { const ok = await a.open_folder(BUILD.folder); if (!ok) toast("Build folder not found", "error"); }
+  else if (action === "req") { const ok = await a.open_folder(BUILD.requirements); if (!ok) toast("Requirements folder not found", "error"); }
+  else if (action === "release") a.open_url(BUILD.releaseUrl);
+}
+
+window.__buildEvent = (state) => applyBuild(state);
 
 async function createWorkflow() {
   const opts = await promptNewWorkflow();
@@ -460,320 +763,107 @@ async function createWorkflow() {
   }
 }
 
-// ── Tool navigation ─────────────────────────────────────────────────────────
-async function openTool(name) {
-  document.querySelectorAll(".tool-view").forEach((view) => view.classList.toggle("active", view.id === (name === "workflow" ? "workflow-app" : name === "autoclick" ? "autoclick-app" : "tool-home")));
-  // The top tabs are the only "you are here" marker, so they have to stay honest
-  // whichever route got us here — a tab click, a tool card, or a deep link.
-  document.querySelectorAll("[data-nav]").forEach((b) => {
-    const on = b.dataset.nav === name;
-    b.classList.toggle("on", on);
-    on ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current");
-  });
-  try { await api().autoclick_set_view_active(name === "autoclick"); } catch {}
-  if (name === "workflow" && !WORKFLOWS_LOADED) {
-    await loadList();
-    WORKFLOWS_LOADED = true;
-  }
-  if (name === "autoclick") {
-    renderAutoClick();
-    setTimeout(() => { const run=$("ac-run"); if(run) run.focus(); }, 20);
-  }
-}
+// ── Keyboard — the shelf is a grid, so arrows move like one ─────────────────
+function onGridKey(e) {
+  const card = e.target.closest(".game");
+  if (!card || card.classList.contains("skeleton")) return;
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const path = card.dataset.path;
+  if (e.key === "e" || e.key === "E") { e.preventDefault(); editWorkflow(path); return; }
+  if (e.key === "b" || e.key === "B") { e.preventDefault(); buildWorkflow(path); return; }
+  if (e.key === "Delete") { e.preventDefault(); deleteWorkflow(path); return; }
 
-function segValue(field) {
-  const on = document.querySelector(`.seg-control[data-ac-field="${field}"] .seg.on`);
-  return on ? on.dataset.value : "";
+  const covers = [...$("grid").querySelectorAll(".game-cover")];
+  const index = covers.indexOf(card.querySelector(".game-cover"));
+  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -COLS, ArrowDown: COLS }[e.key];
+  let next;
+  if (step !== undefined) next = index + step;
+  else if (e.key === "Home") next = 0;
+  else if (e.key === "End") next = covers.length - 1;
+  else return;
+  e.preventDefault();
+  if (e.key === "ArrowUp" && index < COLS) { $("search").focus(); return; }
+  next = Math.max(0, Math.min(covers.length - 1, next));
+  covers[next].focus({ preventScroll: true });
+  covers[next].scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
-function setSegValue(field, value) {
-  const box = document.querySelector(`.seg-control[data-ac-field="${field}"]`);
-  if (!box) return;
-  box.querySelectorAll(".seg").forEach((button) => {
-    const selected = button.dataset.value === String(value);
-    button.classList.toggle("on", selected);
-    button.setAttribute("aria-checked", String(selected));
-    button.tabIndex = selected ? 0 : -1;
-  });
-}
-function newPoint(index) {
-  return { id:`point-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`, label:`Point ${index + 1}`,
-    enabled:true, targetMode:"fixed", x:0, y:0, button:"left", clickType:"single" };
-}
-function selectedPoint() {
-  const pts = AC_CONFIG.points || [];
-  return pts.find((p) => p.id === AC_CONFIG.selectedPointId) || null;
-}
-function pointSummary(point) {
-  const pos = point.targetMode === "cursor" ? "Cursor" : `${point.x}, ${point.y}`;
-  const btn = point.button === "right" ? "R" : point.button === "middle" ? "M" : "L";
-  return { pos, click: `${btn} · ${point.clickType === "double" ? "2×" : "1×"}` };
-}
-// AC_CONFIG.points is the source of truth (edited via the list + detail panel);
-// only the always-present name / schedule fields are read from the DOM here.
-function readAutoClickConfig() {
-  const points = (AC_CONFIG.points || []).map((point, index) => ({
-    id:point.id, label:(point.label || `Point ${index + 1}`).trim() || `Point ${index + 1}`,
-    enabled:!!point.enabled,
-    targetMode:point.targetMode === "cursor" ? "cursor" : "fixed",
-    x:parseInt(point.x, 10) || 0, y:parseInt(point.y, 10) || 0,
-    button:["left", "right", "middle"].includes(point.button) ? point.button : "left",
-    clickType:point.clickType === "double" ? "double" : "single",
-  }));
-  return { profileName:($("ac-profile-name").value||"Untitled sequence").trim(), selectedPointId:AC_CONFIG.selectedPointId,
-    points, intervalMs:Math.max(10,parseInt($("ac-interval").value,10)||250),
-    startDelaySec:Math.max(0,parseInt($("ac-delay").value,10)||0),
-    infinite:segValue("countMode")!=="finite", count:Math.max(1,parseInt($("ac-limit").value,10)||100) };
-}
-function renderPoints() {
-  const host=$("ac-points"); host.innerHTML="";
-  const points=AC_CONFIG.points||[];
-  points.forEach((point,index) => {
-    const row=document.createElement("div");
-    row.className="point-row"+(point.id===AC_CONFIG.selectedPointId?" selected":"")+(point.id===AC_STATE.activePointId?" active":"")+(point.enabled?"":" off");
-    row.dataset.id=point.id;
-    const s=pointSummary(point);
-    row.innerHTML=`<span class="point-order"><b>${index+1}</b><span class="point-move"><button type="button" data-point-act="up" ${index===0?"disabled":""} title="Move up" aria-label="Move point up">⌃</button><button type="button" data-point-act="down" ${index===points.length-1?"disabled":""} title="Move down" aria-label="Move point down">⌄</button></span></span>
-      <label class="point-enable" title="${point.enabled?"Enabled — click to disable":"Disabled — click to enable"}"><input type="checkbox" data-point-act="toggle" ${point.enabled?"checked":""} aria-label="Enable point"><span></span></label>
-      <span class="point-title">${escHtml(point.label)}</span>
-      <span class="point-sum"><span class="point-pos">${escHtml(s.pos)}</span><span class="point-click">${s.click}</span></span>
-      <button class="point-delete" type="button" data-point-act="delete" title="Delete point" aria-label="Delete point"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>`;
-    host.appendChild(row);
-  });
-  $("ac-points-empty").hidden=!!points.length;
-  const enabled=points.filter(p=>p.enabled).length;
-  $("ac-point-summary").textContent=`${points.length} point${points.length===1?"":"s"} · ${enabled} enabled`;
-  renderPointEditor();
-}
-function renderPointEditor() {
-  const host=$("ac-point-editor"); if(!host)return;
-  const points=AC_CONFIG.points||[];
-  const point=points.find(p=>p.id===AC_CONFIG.selectedPointId)||points[0];
-  if(!point){ host.hidden=true; host.innerHTML=""; return; }
-  host.hidden=false;
-  const index=points.indexOf(point), cursor=point.targetMode==="cursor";
-  host.innerHTML=`<div class="pe-head"><span class="pe-badge">${index+1}</span><span class="pe-title">Point settings</span></div>
-    <label class="pe-name"><span>Name</span><input data-pe="label" maxlength="80" value="${escHtml(point.label)}" spellcheck="false"></label>
-    <div class="pe-mode"><span class="pe-lbl">Position</span>
-      <div class="seg-control pe-seg" data-pe-seg="targetMode" role="radiogroup" aria-label="Position mode">
-        <button type="button" class="seg${cursor?"":" on"}" data-value="fixed" role="radio" aria-checked="${!cursor}">Fixed point</button><button type="button" class="seg${cursor?" on":""}" data-value="cursor" role="radio" aria-checked="${cursor}">At cursor</button>
-      </div>
-    </div>
-    ${cursor
-      ? `<p class="pe-hint">Clicks wherever the cursor is when this point runs.</p>`
-      : `<div class="pe-row pe-xy">
-          <label><span>X</span><input type="number" data-pe="x" value="${point.x}"></label>
-          <label><span>Y</span><input type="number" data-pe="y" value="${point.y}"></label>
-          <button class="pe-capture" type="button" data-pe-act="capture" title="Capture cursor position"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/></svg>Capture<kbd>F7</kbd></button>
-        </div>`}
-    <div class="pe-row pe-click">
-      <label><span>Mouse button</span><select data-pe="button"><option value="left" ${point.button==="left"?"selected":""}>Left</option><option value="right" ${point.button==="right"?"selected":""}>Right</option><option value="middle" ${point.button==="middle"?"selected":""}>Middle</option></select></label>
-      <label><span>Action</span><select data-pe="clickType"><option value="single" ${point.clickType!=="double"?"selected":""}>Single click</option><option value="double" ${point.clickType==="double"?"selected":""}>Double click</option></select></label>
-    </div>`;
-}
-function updatePointRow(point) {
-  const row=document.querySelector(`.point-row[data-id="${CSS.escape(point.id)}"]`);
-  if(!row)return;
-  const s=pointSummary(point);
-  const title=row.querySelector(".point-title"); if(title)title.textContent=point.label||`Point`;
-  const pos=row.querySelector(".point-pos"); if(pos)pos.textContent=s.pos;
-  const click=row.querySelector(".point-click"); if(click)click.textContent=s.click;
-}
-function applyAutoClickConfig(config, clean=false) {
-  if(!config)return;
-  AC_CONFIG={...AC_CONFIG,...config,points:Array.isArray(config.points)?config.points:[]};
-  $("ac-profile-name").value=AC_CONFIG.profileName||"Untitled sequence";
-  $("ac-interval").value=AC_CONFIG.intervalMs; $("ac-delay").value=AC_CONFIG.startDelaySec; $("ac-limit").value=AC_CONFIG.count;
-  setSegValue("countMode",AC_CONFIG.infinite?"infinite":"finite");
-  renderPoints(); syncAutoClickFields();
-  if(clean)setAutoClickDirty(false);
-}
-function setAutoClickDirty(dirty=true){ AC_DIRTY=dirty; const el=$("ac-dirty"); el.hidden=!dirty; }
-function syncAutoClickFields(){ $("ac-limit").disabled=AC_STATE.running||segValue("countMode")!=="finite"; }
-function queueAutoClickConfigure(){
-  if(AC_STATE.running)return;
-  AC_CONFIG=readAutoClickConfig(); setAutoClickDirty(true);
-  clearTimeout(_acConfigureTimer);
-  _acConfigureTimer=setTimeout(async()=>{ try{await api().autoclick_configure(AC_CONFIG);}catch{} },180);
-}
-function formatElapsed(seconds){ seconds=Math.max(0,Math.floor(seconds||0)); const h=Math.floor(seconds/3600),m=Math.floor((seconds%3600)/60),s=seconds%60; return h?`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`:`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`; }
-function renderAutoClick(){
-  const running=!!AC_STATE.running, status=AC_STATE.error?"Error":(AC_STATE.status||(running?"Clicking":"Ready"));
-  $("ac-count").textContent=String(AC_STATE.count||0); $("ac-cycles").textContent=String(AC_STATE.cycles||0);
-  const enabled=(AC_CONFIG.points||[]).filter(p=>p.enabled).length;
-  $("ac-status-detail").textContent=AC_STATE.error?AC_STATE.error:running?`Running ${enabled} point${enabled===1?"":"s"} in sequence.`:status==="Completed"?`Completed ${AC_STATE.cycles||0} cycles.`:`${enabled} enabled point${enabled===1?"":"s"} ready.`;
-  // The pill is the only place the run state is spelled out; the Start/Stop pair
-  // says the same thing by which of the two is live.
-  const header=$("ac-header-state"); header.className="run-state "+(AC_STATE.error?"error":running?"running":"ready");
-  header.querySelector("span:last-child").textContent=running?"Running":AC_STATE.error?"Error":status;
-  $("ac-run").disabled=running; $("ac-stop").disabled=!running;
-  $("ac-form").querySelectorAll("input,select,.seg,button").forEach(el=>{el.disabled=running;});
-  $("ac-profile-name").disabled=running; $("ac-profile-select").disabled=running; $("ac-new").disabled=running; $("ac-save").disabled=running;
-  if(!running){const rows=[...document.querySelectorAll(".point-row")];if(rows.length){const up=rows[0].querySelector('[data-point-act="up"]'),down=rows[rows.length-1].querySelector('[data-point-act="down"]');if(up)up.disabled=true;if(down)down.disabled=true;}}
-  syncAutoClickFields();
-  document.querySelectorAll(".point-row").forEach(row=>row.classList.toggle("active",running&&row.dataset.id===AC_STATE.activePointId));
-  const home=$("home-clicker-state"); home.textContent=running?`Running · ${AC_STATE.count||0} actions`:`${enabled} points · F6 run · F8 add`; home.classList.toggle("running",running);
-  if(!_acElapsedTimer)_acElapsedTimer=setInterval(()=>{const elapsed=AC_STATE.running&&AC_STATE.startedAt?Date.now()/1000-AC_STATE.startedAt:(AC_STATE.elapsed||0); const out=$("ac-elapsed");if(out)out.textContent=formatElapsed(elapsed);},250);
-}
-async function refreshAutoClickProfiles(selectFile=""){
-  try{const res=await api().autoclick_list_profiles(); if(!res||!res.ok)return; AC_PROFILES=res.profiles||[]; AC_DIR=res.dir||"autoclicks";
-    const folder=$("ac-folder"); if(folder) folder.title="Open sequence folder — "+AC_DIR;
-    const select=$("ac-profile-select"); select.innerHTML='<option value="">Open a saved sequence…</option>'+AC_PROFILES.map(p=>`<option value="${escHtml(p.filename)}" ${p.filename===(selectFile||AC_CURRENT_FILE)?"selected":""}>${escHtml(p.name)}${p.invalid?" · invalid":` · ${p.points} points`}</option>`).join("");
-  }catch{}
-}
-async function confirmDiscard(){ if(!AC_DIRTY)return true; return await modal({title:"Discard unsaved changes?",body:"Your current sequence has changes that have not been saved.",buttons:[{label:"Keep editing",value:false},{label:"Discard",value:true,kind:"err"}]}); }
-async function newAutoClickSequence(){
-  if(!await confirmDiscard())return;
-  AC_CURRENT_FILE=""; AC_STATE={...AC_STATE,count:0,cycles:0,status:"Ready",error:"",elapsed:0,startedAt:0};
-  const point=newPoint(0); applyAutoClickConfig({profileName:"Untitled sequence",selectedPointId:point.id,points:[point],intervalMs:250,startDelaySec:0,infinite:true,count:100},true);
-  $("ac-profile-select").value=""; renderAutoClick(); $("ac-profile-name").select();
-}
-async function saveAutoClickSequence(){
-  AC_CONFIG=readAutoClickConfig(); const name=AC_CONFIG.profileName; if(!name){toast("Enter a sequence name.","error");$("ac-profile-name").focus();return;}
-  let res=await api().autoclick_save_profile(name,AC_CONFIG,AC_CURRENT_FILE,!!AC_CURRENT_FILE);
-  if(res&&res.exists){const overwrite=await modal({title:"Replace saved sequence?",body:`<b>${escHtml(res.filename)}</b> already exists in autoclicks/.`,buttons:[{label:"Cancel",value:false},{label:"Replace",value:true,kind:"err"}]}); if(overwrite)res=await api().autoclick_save_profile(name,AC_CONFIG,res.filename,true);}
-  if(!res||!res.ok){toast((res&&res.error)||"Could not save sequence.","error");return;}
-  AC_CURRENT_FILE=res.filename; applyAutoClickConfig(res.config,true); await refreshAutoClickProfiles(AC_CURRENT_FILE); toast(`Saved ${res.filename}`,"success");
-}
-async function loadAutoClickSequence(filename){
-  if(!filename)return; if(!await confirmDiscard()){ $("ac-profile-select").value=AC_CURRENT_FILE; return; }
-  const res=await api().autoclick_load_profile(filename); if(!res||!res.ok){toast((res&&res.error)||"Could not load sequence.","error");return;}
-  AC_CURRENT_FILE=res.filename; AC_STATE={...AC_STATE,count:0,cycles:0,status:"Ready",error:"",elapsed:0,startedAt:0}; applyAutoClickConfig(res.config,true); renderAutoClick(); toast(`Opened ${res.filename}`,"success");
-}
-async function toggleAutoClick(){
-  const a=api();if(!a)return;$("ac-run").disabled=true;$("ac-stop").disabled=true;
-  try{let res;if(AC_STATE.running)res=await a.autoclick_stop();else{if(!$("ac-form").reportValidity())return;AC_CONFIG=readAutoClickConfig();if(!AC_CONFIG.points.some(p=>p.enabled)){toast("Add or enable at least one click point.","error");return;}res=await a.autoclick_start(AC_CONFIG);} if(!res||res.ok===false)toast((res&&res.error)||"Auto Click could not start.","error");else{AC_STATE={...AC_STATE,...res};if(res.config)applyAutoClickConfig(res.config);renderAutoClick();}}
-  catch(error){toast("Auto Click could not update. "+String(error&&error.message||error),"error");}finally{renderAutoClick();}
-}
-async function captureAutoClickPosition(pointId=AC_CONFIG.selectedPointId){
-  try{clearTimeout(_acConfigureTimer);AC_CONFIG=readAutoClickConfig();await api().autoclick_configure(AC_CONFIG);const res=await api().autoclick_capture_position(pointId);if(!res||!res.ok){toast((res&&res.error)||"Could not read cursor position.","error");return;}const point=AC_CONFIG.points.find(p=>p.id===res.pointId);if(point){point.x=res.x;point.y=res.y;}renderPoints();setAutoClickDirty(true);toast(`Captured (${res.x}, ${res.y})`,"success");}catch{toast("Could not read cursor position.","error");}
-}
-async function addAutoClickPointAtCursor(){
-  try{clearTimeout(_acConfigureTimer);AC_CONFIG=readAutoClickConfig();await api().autoclick_configure(AC_CONFIG);const res=await api().autoclick_add_point_at_cursor();if(!res||!res.ok)toast((res&&res.error)||"Could not add cursor position.","error");}
-  catch{toast("Could not add cursor position.","error");}
-}
-function acceptAddedPoint(point){
-  if(!point||AC_CONFIG.points.some(p=>p.id===point.id))return;
-  AC_CONFIG.points.push(point);AC_CONFIG.selectedPointId=point.id;renderPoints();setAutoClickDirty(true);queueAutoClickConfigure();renderAutoClick();
-  const row=document.querySelector(`.point-row[data-id="${point.id}"]`);if(row)row.scrollIntoView({block:"nearest",behavior:"smooth"});
-  toast(`Added ${point.label} at (${point.x}, ${point.y})`,"success");
-}
-function updateHotkeyState(ok){AC_STATE.hotkeys=!!ok;const note=$("ac-hotkey-note");if(!note)return;note.className="hotkey-note "+(ok?"ok":"bad");note.innerHTML=`<span class="hotkey-dot"></span>${ok?"F6 Start/Stop · F7 Update selected point · F8 Add point":"Global hotkeys unavailable — use the on-screen controls"}`;}
-window.__autoClickEvent=(event,data)=>{data=data||{};if(event==="position"){const point=AC_CONFIG.points.find(p=>p.id===data.pointId);if(point){point.x=data.x;point.y=data.y;renderPoints();setAutoClickDirty(true);}}else if(event==="point-added"){acceptAddedPoint(data.point);}else if(event==="tick"){AC_STATE={...AC_STATE,count:data.count||0,cycles:data.cycles||0,activePointId:data.pointId||""};}else if(event==="hotkeys")updateHotkeyState(!!data.ok);else if(event==="state"){AC_STATE={...AC_STATE,...data};if(data.config)applyAutoClickConfig(data.config);}if($("ac-status-detail"))renderAutoClick();};
 
 // ── Events ───────────────────────────────────────────────────────────────────
 function wire() {
-  // Theme toggle — one button per view header, all driving the shared controller
-  // in web/shared/theme.js, which persists through the backend so the Designer
-  // and Runner open in the same theme.
+  // Theme toggle — drives the shared controller in web/shared/theme.js, which
+  // persists through the backend so the Designer and Runner match.
   document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
     button.onclick = () => { if (window.uiTheme) window.uiTheme.toggle(); };
   });
-  document.querySelectorAll("[data-open-tool]").forEach((button) => { button.onclick = () => openTool(button.dataset.openTool); });
-  document.querySelectorAll("[data-back-home]").forEach((button) => { button.onclick = () => openTool("home"); });
   $("btn-refresh").onclick = () => loadList();
   $("btn-new").onclick = () => createWorkflow();
   $("btn-empty-new").onclick = () => createWorkflow();
-  $("search").addEventListener("input", (e) => {
+
+  const search = $("search");
+  search.addEventListener("input", (e) => {
     FILTER = e.target.value || "";
     render();
   });
-  $("ac-form").addEventListener("submit", (e) => e.preventDefault());
-  $("ac-run").onclick = toggleAutoClick;
-  $("ac-stop").onclick = toggleAutoClick;
-  $("ac-new").onclick = newAutoClickSequence;
-  $("ac-save").onclick = saveAutoClickSequence;
-  $("ac-folder").onclick = () => api().autoclick_open_folder();
-  $("ac-profile-select").onchange = (e) => loadAutoClickSequence(e.target.value);
-  $("ac-profile-name").addEventListener("input", queueAutoClickConfigure);
-  $("ac-form").addEventListener("input", queueAutoClickConfigure);
-  $("ac-form").addEventListener("change", queueAutoClickConfigure);
-  $("ac-add-point").onclick = addAutoClickPointAtCursor;
-  // Point list — select a row, reorder, or delete (enable toggle handled on change).
-  $("ac-points").addEventListener("click", (e) => {
-    const row=e.target.closest(".point-row");if(!row||AC_STATE.running)return;
-    if(e.target.closest(".point-enable"))return; // checkbox → handled by 'change'
-    const id=row.dataset.id, index=AC_CONFIG.points.findIndex(p=>p.id===id);
-    if(index<0)return;
-    const act=(e.target.closest("[data-point-act]")||{}).dataset?.pointAct;
-    if(act==="delete"){
-      AC_CONFIG.points.splice(index,1);
-      AC_CONFIG.selectedPointId=AC_CONFIG.points[Math.min(index,AC_CONFIG.points.length-1)]?.id||"";
-    } else if(act==="up"&&index>0){
-      [AC_CONFIG.points[index-1],AC_CONFIG.points[index]]=[AC_CONFIG.points[index],AC_CONFIG.points[index-1]];AC_CONFIG.selectedPointId=id;
-    } else if(act==="down"&&index<AC_CONFIG.points.length-1){
-      [AC_CONFIG.points[index+1],AC_CONFIG.points[index]]=[AC_CONFIG.points[index],AC_CONFIG.points[index+1]];AC_CONFIG.selectedPointId=id;
-    } else {
-      AC_CONFIG.selectedPointId=id; // plain select
+  search.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && search.value) { e.preventDefault(); search.value = ""; FILTER = ""; render(); }
+    else if (e.key === "ArrowDown" || e.key === "Enter") {
+      const first = $("grid").querySelector(".game-cover");
+      if (first) { e.preventDefault(); first.focus(); }
     }
-    renderPoints();setAutoClickDirty(true);queueAutoClickConfigure();
   });
-  $("ac-points").addEventListener("change", (e) => {
-    if(e.target.dataset.pointAct!=="toggle"||AC_STATE.running)return;
-    const row=e.target.closest(".point-row");if(!row)return;
-    const point=AC_CONFIG.points.find(p=>p.id===row.dataset.id);if(!point)return;
-    point.enabled=e.target.checked;renderPoints();setAutoClickDirty(true);queueAutoClickConfigure();renderAutoClick();
+  document.addEventListener("keydown", (e) => {
+    if (_modal || e.defaultPrevented) return;
+    const typing = e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");
+    if ((e.ctrlKey && e.key.toLowerCase() === "f") || (e.key === "/" && !typing)) {
+      e.preventDefault();
+      search.focus();
+      search.select();
+    }
   });
-  // Point detail editor — edits the selected point in place.
-  $("ac-point-editor").addEventListener("input", (e) => {
-    const point=selectedPoint();if(!point||AC_STATE.running)return;
-    const key=e.target.dataset.pe;if(!key)return;
-    if(key==="label")point.label=e.target.value;
-    else if(key==="x")point.x=parseInt(e.target.value,10)||0;
-    else if(key==="y")point.y=parseInt(e.target.value,10)||0;
-    updatePointRow(point);setAutoClickDirty(true);queueAutoClickConfigure();
-  });
-  $("ac-point-editor").addEventListener("change", (e) => {
-    const point=selectedPoint();if(!point||AC_STATE.running)return;
-    const key=e.target.dataset.pe;
-    if(key==="button")point.button=e.target.value;
-    else if(key==="clickType")point.clickType=e.target.value;
-    else return;
-    updatePointRow(point);setAutoClickDirty(true);queueAutoClickConfigure();
-  });
-  $("ac-point-editor").addEventListener("click", async (e) => {
-    if(AC_STATE.running)return;
-    const point=selectedPoint();if(!point)return;
-    const seg=e.target.closest(".pe-seg .seg");
-    if(seg){point.targetMode=seg.dataset.value==="cursor"?"cursor":"fixed";renderPointEditor();updatePointRow(point);setAutoClickDirty(true);queueAutoClickConfigure();return;}
-    if(e.target.closest('[data-pe-act="capture"]'))await captureAutoClickPosition(point.id);
-  });
-  document.addEventListener("keydown", (e) => {if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="s"&&$("autoclick-app").classList.contains("active")){e.preventDefault();saveAutoClickSequence();}});
-  document.querySelectorAll(".seg-control").forEach((box) => {
-    box.addEventListener("click", (e) => {
-      const button=e.target.closest(".seg"); if(!button||button.disabled) return;
-      setSegValue(box.dataset.acField,button.dataset.value); syncAutoClickFields(); queueAutoClickConfigure();
-    });
-    box.addEventListener("keydown", (e) => {
-      if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) return;
-      const buttons=[...box.querySelectorAll(".seg:not(:disabled)")]; if(!buttons.length) return;
-      const current=Math.max(0,buttons.findIndex(b=>b.classList.contains("on")));
-      const delta=(e.key==="ArrowLeft"||e.key==="ArrowUp")?-1:1;
-      const next=buttons[(current+delta+buttons.length)%buttons.length];
-      e.preventDefault(); next.click(); next.focus();
-    });
-  });
-  $("wf-body").addEventListener("click", (e) => {
+
+  const grid = $("grid");
+  grid.addEventListener("click", (e) => {
+    // The "Building n%" chip sits on the cover but reopens the build panel.
+    const chipCard = e.target.closest(".game-building") && e.target.closest(".game.is-building");
+    if (chipCard) { openBuildPanel(); return; }
     const btn = e.target.closest("button[data-act]");
-    if (!btn) return;
-    const tr = btn.closest("tr[data-path]");
-    if (!tr) return;
-    const path = tr.getAttribute("data-path");
-    if (!path) return;
+    const card = btn && btn.closest(".game");
+    if (!card || card.classList.contains("skeleton")) return;
+    const path = card.dataset.path;
     if (btn.dataset.act === "run") runWorkflow(path);
     else if (btn.dataset.act === "edit") editWorkflow(path);
+    else if (btn.dataset.act === "build") buildWorkflow(path);
     else if (btn.dataset.act === "delete") deleteWorkflow(path);
   });
-  // Double-click a row → Edit (operator muscle memory).
-  $("wf-body").addEventListener("dblclick", (e) => {
-    if (e.target.closest("button")) return;
-    const tr = e.target.closest("tr[data-path]");
-    if (!tr) return;
-    editWorkflow(tr.getAttribute("data-path"));
+  $("build-panel").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-bp]");
+    if (btn && !btn.disabled) onBuildPanelAction(btn.dataset.bp);
   });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && BP.open && !_modal) { e.preventDefault(); hideBuildPanel(); }
+  });
+  grid.addEventListener("keydown", onGridKey);
+  // A cover that fails to decode falls back to the blank slot. Image errors do
+  // not bubble, hence the capture phase.
+  grid.addEventListener("error", (e) => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement)) return;
+    const card = img.closest(".game");
+    const meta = GAMES.find((g) => card && g.path === card.dataset.path);
+    const name = meta ? meta.name : "";
+    if (img.classList.contains("game-icon")) {
+      img.insertAdjacentHTML("afterend", `<span class="game-icon icon-mono" aria-hidden="true">${escHtml(initialsFor(name))}</span>`);
+    } else if (img.classList.contains("game-img")) {
+      img.insertAdjacentHTML("afterend", emptyArtHtml(name));
+    } else {
+      return;
+    }
+    img.remove();
+  }, true);
 }
 
 // ── Auto-update (Velopack) ────────────────────────────────────────────────────
-// Background check on boot + a click-to-install pill in the footer. `manual`
+// Background check on boot + a click-to-install pill in the header. `manual`
 // true surfaces "up to date" / error toasts; false stays silent unless there's
 // actually an update to offer.
 async function checkForUpdates(manual) {
@@ -862,6 +952,7 @@ async function applyUpdate(version) {
 // ── Boot ─────────────────────────────────────────────────────────────────────
 async function init() {
   wire();
+  renderSkeleton();
   let tries = 0;
   while (!(window.pywebview && window.pywebview.api) && tries < 50) {
     await new Promise((r) => setTimeout(r, 100));
@@ -877,12 +968,11 @@ async function init() {
     if (vEl && ver) vEl.textContent = "v" + ver;
   } catch {}
   checkForUpdates(false);   // background check on boot (never blocks the UI)
-  try {
-    const state=await api().autoclick_state();
-    if(state){ AC_STATE={...AC_STATE,...state}; AC_DIR=state.profilesDir||AC_DIR; applyAutoClickConfig(state.config,true); updateHotkeyState(!!state.hotkeys); renderAutoClick(); }
-    await refreshAutoClickProfiles();
-  } catch { updateHotkeyState(false); }
-  await openTool("home");
+  let restored = null;
+  try { restored = await api().build_state(); } catch {}
+  if (restored && restored.path) applyBuild(restored, { reset: true });
+  await loadList({ intro: true });
+  if (buildActive()) openBuildPanel();
 }
 
 if (document.readyState === "loading") {

@@ -97,7 +97,39 @@ function wfToggleDebugOverlay(){
 function wfWantMatchOverlay(){
   return !!wfDebugOverlayOn || !!(typeof wfNodeTesting!=="undefined" && wfNodeTesting);
 }
+// ── Node usage memory ────────────────────────────────────────────────────────
+// Remembers which block types the user actually creates so the quick menu can
+// rank a "Recent" + "Frequently used" shortcut above the full catalog. Persisted
+// in localStorage; capped and pruned by recency so it cannot grow unbounded.
+const WF_USE_KEY="wfNodeUse", WF_USE_MAX=100;
+let wfNodeUse={};
+try{ wfNodeUse=JSON.parse(localStorage.getItem(WF_USE_KEY)||"{}")||{}; }catch{}
+function wfRecordNodeUse(type){
+  if(!type||typeof WF_NODES==="undefined"||!WF_NODES[type]||WF_NODES[type].hidden) return;
+  const e=wfNodeUse[type]||{n:0,t:0};
+  e.n=(e.n||0)+1; e.t=Date.now(); wfNodeUse[type]=e;
+  const keys=Object.keys(wfNodeUse);
+  if(keys.length>WF_USE_MAX){
+    keys.sort((a,b)=>(wfNodeUse[a].t||0)-(wfNodeUse[b].t||0));
+    keys.slice(0,keys.length-WF_USE_MAX).forEach(k=>{ delete wfNodeUse[k]; });
+  }
+  try{ localStorage.setItem(WF_USE_KEY, JSON.stringify(wfNodeUse)); }catch{}
+}
+// Ranked picks for the quick menu: most recently created first, then the
+// overall most-created — the frequent list drops anything already in recent so
+// the same block never shows twice.
+function wfNodeUsePicks(recentMax,freqMax){
+  if(typeof WF_NODES==="undefined") return {recent:[],freq:[]};
+  const rows=Object.keys(wfNodeUse).map(type=>({type,n:wfNodeUse[type].n||0,t:wfNodeUse[type].t||0}))
+    .filter(r=>WF_NODES[r.type]&&!WF_NODES[r.type].hidden);
+  const recent=rows.slice().sort((a,b)=>b.t-a.t).slice(0,recentMax||6);
+  const seen=new Set(recent.map(r=>r.type));
+  const freq=rows.slice().sort((a,b)=>b.n-a.n||b.t-a.t)
+    .filter(r=>!seen.has(r.type)).slice(0,freqMax||6);
+  return {recent:recent.map(r=>r.type),freq:freq.map(r=>r.type)};
+}
 function wfNewNode(type,x,y){
+  wfRecordNodeUse(type);
   // Seed the universal per-node fields (timing + failure handling) from the
   // project defaults where set — see WF.nodeDefaults and the Inspector's
   // Timing ▸ (gear) dialog. Existing nodes are unaffected; this is a stamp.

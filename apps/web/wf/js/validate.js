@@ -38,7 +38,14 @@ function wfValidationIssues(){
         if(f.t==="points" && Array.isArray(v)&&v.length>10) add("warn",`${def.label}: only the first 10 touch points will run`,ctx,n.id);
         if(f.var && String(v||"").trim() && !varNames.has(String(v).trim())) add("warn",`Variable not declared yet: ${v}`,ctx,n.id);
       });
-      if(n.type==="win_launch" && !String((n.params||{}).path||"").trim()) add("err","Launch program: choose an executable or path variable",ctx,n.id);
+      if(n.type==="win_launch"){
+        const lp=n.params||{};
+        if(lp.pathSrc==="custom"){
+          if(!String(lp.path||"").trim()) add("err","Launch program: choose an executable or path variable",ctx,n.id);
+        }else if(!String((WF.win32||{}).path||"").trim()){
+          add("warn","Launch program: no game path in Project settings — set it there, or in the Runner's Settings tab",ctx,n.id);
+        }
+      }
       if(n.type==="parallel"){
         const count=Math.max(1,parseInt((n.params||{}).count)||3);
         for(let i=1;i<=count;i++) if(!edges.some(e=>e.from===n.id && e.fromPort===String(i))) add("warn",`Parallel branch #${i} is not wired`,ctx,n.id);

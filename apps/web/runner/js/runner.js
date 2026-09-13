@@ -10,17 +10,61 @@ const S = {
   captureBackend:  "scrcpy",
   controller:      "adb",
   win32:           {},
+  emulator:        {},   // shared ADB emulator setting {kind, path}
+  emulatorDefault: {},   // as shipped by the workflow (what "clear" falls back to)
   logCount:        0,
   speedhack: { enabled:false, speed:2.0, package:"", active:false },
+  runScope:        null,   // activity ids of a single-activity run; null = full Start
 };
+
+// This Runner's own version + self-update state (standalone builds only).
+const U = { supported:false, version:"", repo:"", update:null, checking:false, applying:false };
 
 const $ = id => document.getElementById(id);
 const ACT_DOT_TITLE = { pending:"Pending", running:"Running", completed:"Completed", failed:"Failed", skipped:"Skipped" };
 const LOG_TAG = { info:"INF", success:"OK ", warning:"WRN", error:"ERR" };
-const CHECK = `<svg class="icon uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>`;
-const GRIP = `<svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>`;
+// Icons come from the shared set (shared/icons.js) — see its header for why
+// nothing inlines its own paths.
+const CHECK = uiIco("check", "uico-0");
+const PLAY  = uiIco("play", "uico-fill");
+const PLAY_SM = uiIco("play", "uico-0 uico-fill");   // per-row Run, one ladder step down
+const STOP_SM = uiIco("square", "uico-0 uico-fill"); // per-row Stop while its activity runs solo
+const GRIP  = uiIco("grip-vertical", "uico-0");
 
 function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// Small modal on the shared .ui-modal styles (shared/base.css). Resolves with the
+// clicked button's value; Escape or a backdrop click resolves undefined.
+function uiDialog(spec){
+  return new Promise(resolve=>{
+    const wrap = document.createElement("div"); wrap.className = "ui-modal-wrap";
+    const box = document.createElement("div"); box.className = "ui-modal";
+    box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true");
+    if(spec.title){
+      const hd = document.createElement("div"); hd.className = "ui-modal-hd"; hd.textContent = spec.title;
+      box.appendChild(hd); box.setAttribute("aria-label", spec.title);
+    }
+    const bd = document.createElement("div"); bd.className = "ui-modal-bd";
+    const msg = document.createElement("p"); msg.className = "ui-modal-msg"; msg.textContent = spec.message || "";
+    bd.appendChild(msg); box.appendChild(bd);
+    const ft = document.createElement("div"); ft.className = "ui-modal-ft";
+    let primary = null;
+    const onKey = e=>{ if(e.key === "Escape"){ e.preventDefault(); close(undefined); } };
+    const close = v=>{ document.removeEventListener("keydown", onKey, true); wrap.remove(); resolve(v); };
+    (spec.buttons || [{ label:"OK", value:true, kind:"ok" }]).forEach(b=>{
+      const btn = document.createElement("button"); btn.type = "button";
+      btn.className = "btn" + (b.kind ? " " + b.kind : ""); btn.textContent = b.label;
+      btn.onclick = ()=>close(b.value);
+      if(b.kind) primary = btn;
+      ft.appendChild(btn);
+    });
+    box.appendChild(ft); wrap.appendChild(box);
+    wrap.addEventListener("mousedown", e=>{ if(e.target === wrap) close(undefined); });
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(wrap);
+    (primary || ft.lastChild).focus();
+  });
+}
 
 // ── Elapsed timer ──────────────────────────────────────────────────────────
 let _elapsedTimer = null, _elapsedStart = 0;
@@ -39,7 +83,9 @@ function stopElapsedTimer(){
   if(_elapsedTimer){ clearInterval(_elapsedTimer); _elapsedTimer=null; }
 }
 function updateProgress(){
-  const seq = S.activities.filter(a=>a.type!=="background");
+  const seq = S.runScope
+    ? S.activities.filter(a=>S.runScope.includes(a.id))
+    : S.activities.filter(a=>a.type!=="background");
   const done = seq.filter(a=>["completed","failed","skipped"].includes(a.status)).length;
   const total = seq.length;
   $('prog-count').textContent = `${done}/${total}`;
@@ -55,15 +101,33 @@ function setStatusPill(key){
   else { pill.classList.add("status-ready"); $("status-text").textContent="READY"; }
 }
 
+// ── Primary button — Start while idle, Stop while running ────────────────────
+// One button rather than two, so there is exactly one obvious way to stop. The
+// label and icon are rebuilt only on an actual state change: rewriting innerHTML
+// every refresh would drop focus from the button mid-run.
+let _primaryRunning = null;
+function setPrimary(running){
+  if(_primaryRunning === running) return;
+  _primaryRunning = running;
+  const b = $("btn-primary");
+  b.classList.toggle("is-stop", running);
+  b.innerHTML = uiIco(running ? "square" : "play", "uico-fill") + (running ? "Stop" : "Start");
+}
+// The swapping handler the button's onclick points at.
+async function onPrimary(){ if(S.running) await onStop(); else await onStart(); }
+
 // ── Button states ────────────────────────────────────────────────────────────
 function refreshButtons(){
   const running = S.running, paused = S.paused;
-  $("btn-start").disabled = running || !S.loaded;
+  setPrimary(running);
+  $("btn-primary").disabled = !S.loaded;
   $("btn-pause").disabled = !running;
-  $("btn-stop").disabled  = !running;
-  $("btn-load").disabled  = running;   // loading mid-run would stop the engine
   $("btn-pause").textContent = paused ? "Resume" : "Pause";
   document.querySelectorAll(".runtime-setting-control").forEach(el=>el.disabled=running);
+  const reqCopy = $("btn-req-copy");
+  if(reqCopy) reqCopy.disabled = running || !(S.requirements && S.requirements.gameDir);
+  updateRowRunButtons();
+  renderUpdate();
   setStatusPill(running ? (paused ? "paused" : "running") : "ready");
 }
 
@@ -71,6 +135,11 @@ function refreshButtons(){
 function switchTab(tab){
   document.querySelectorAll(".tab-btn").forEach(b=>{ const on=b.dataset.tab===tab; b.classList.toggle("active",on); b.setAttribute("aria-selected",String(on)); });
   document.querySelectorAll(".tab-pane").forEach(p=>p.classList.toggle("active", p.id==="tab-"+tab));
+}
+// Right column: Activity settings | Log | Settings.
+function switchRTab(tab){
+  document.querySelectorAll("#r-tabs .rtab").forEach(b=>{ const on=b.dataset.rtab===tab; b.classList.toggle("active",on); b.setAttribute("aria-selected",String(on)); });
+  document.querySelectorAll("#r-content .rpane").forEach(p=>p.classList.toggle("active", p.id==="r-"+tab));
 }
 
 // ── Build activity rows ──────────────────────────────────────────────────────
@@ -122,14 +191,27 @@ function buildRow(a){
 
   const btns = document.createElement("div");
   btns.className = "task-btns";
-  const hasSettings = (a.vars && a.vars.length) || (a.runtimeSettings && a.runtimeSettings.length) || isBg;
+  // Settings first, Run last — the calm action, then the loud one.
+  const hasSettings = activityHasSettings(a);
   if(hasSettings){
     const gear = gearButton(a.id);
     gear.onclick = ()=>toggleSettings(a.id);
     btns.appendChild(gear);
   }
+  // Run just this activity — ignores its checkbox; a background one loops until
+  // Stop. While THIS activity is the one running solo, it becomes Stop.
+  const runOne = document.createElement("button");
+  runOne.type = "button"; runOne.className = "btn-icon btn-run-one"; runOne.dataset.runOne = a.id;
+  runOne.onclick = ()=>onRunToggle(a.id);
+  btns.appendChild(runOne);
 
   row.appendChild(handle); row.appendChild(cb); row.appendChild(dot); row.appendChild(block); row.appendChild(btns);
+  // Clicking the row (not one of its controls) opens the activity's settings —
+  // the gear remains as the affordance, and the row is the shortcut.
+  row.addEventListener("click", e=>{
+    if(e.target.closest("button, input, select, .cb, .drag-handle")) return;
+    openActivitySettings(a.id);
+  });
   return row;
 }
 
@@ -203,19 +285,29 @@ function gearButton(id){
   const g = document.createElement("button");
   g.type = "button"; g.className = "btn-icon btn-gear"; g.title = "Activity settings"; g.dataset.gear = id;
   g.setAttribute("aria-label", "Activity settings");
-  g.innerHTML = `<svg class="icon uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>`;
+  g.innerHTML = uiIco("settings", "uico-1");
   return g;
 }
 
 // ── Inline settings panel ────────────────────────────────────────────────────
+// Grouped into labelled sections (Timing / Files & folders / Variables) so the
+// panel reads as a small form instead of a flat list. Path fields get their own
+// full-width line — long folders never fight the label for space.
 function buildSettingsPanel(a){
   const panel = document.createElement("div");
   panel.className = "task-settings"; panel.dataset.settingsFor = a.id;
 
+  const group = title=>{
+    const g = document.createElement("div"); g.className = "setting-group";
+    if(title){ const h = document.createElement("div"); h.className = "setting-group-title"; h.textContent = title; g.appendChild(h); }
+    return g;
+  };
+
+  // Background activities run on a timer — that's their only runtime setting.
   if(a.type==="background"){
-    const row = document.createElement("div");
-    row.className = "setting-row"; row.style.paddingTop = "10px";
-    const lbl = document.createElement("span"); lbl.className = "setting-label"; lbl.textContent = "Interval";
+    const g = group("Timing");
+    const row = document.createElement("div"); row.className = "setting-row";
+    const lbl = document.createElement("span"); lbl.className = "setting-label"; lbl.textContent = "Repeat every";
     const inp = document.createElement("input");
     inp.type = "number"; inp.className = "setting-input";
     inp.setAttribute("aria-label", "Background interval in seconds");
@@ -228,65 +320,104 @@ function buildSettingsPanel(a){
     };
     const unit = document.createElement("span"); unit.className = "setting-unit"; unit.textContent = "seconds";
     row.appendChild(lbl); row.appendChild(inp); row.appendChild(unit);
-    panel.appendChild(row);
+    g.appendChild(row); panel.appendChild(g);
   }
 
-  (a.runtimeSettings||[]).forEach(setting=>{
-    const row=document.createElement("div");
-    row.className="setting-row"; row.style.paddingTop="8px";
-    const lbl=document.createElement("span"); lbl.className="setting-label";
-    lbl.innerHTML=escHtml(setting.label||"Path")+`<span class="sub">${escHtml(setting.nodeLabel||"")}</span>`;
-    const control=document.createElement("div"); control.className="setting-path-control";
-    const inp=document.createElement("input"); inp.type="text";
-    inp.className="setting-path-input runtime-setting-control";
-    inp.value=setting.value||""; inp.placeholder=setting.kind==="folder"?"Choose a folder…":"Choose a program…";
-    inp.setAttribute("aria-label", setting.label||"Runtime path");
-    inp.title=inp.value; inp.disabled=!!S.running;
-    inp.onchange=async()=>{
-      const old=setting.value||"", value=inp.value.trim();
-      let ok=false; try{ ok=await api().set_node_runtime_param(setting.nodeId,setting.param,value); }catch(_){ }
-      if(ok){ syncRuntimeSetting(setting.nodeId,setting.param,value); inp.title=value; }
-      else inp.value=old;
-    };
-    const pick=document.createElement("button"); pick.type="button";
-    pick.className="btn-path-pick runtime-setting-control"; pick.textContent="Choose…";
-    pick.title=setting.kind==="folder"?"Choose folder":"Choose program file"; pick.disabled=!!S.running;
-    pick.onclick=async()=>{
-      let value="";
-      try{ value=await api().pick_node_runtime_path(setting.nodeId,setting.param,setting.kind,inp.value); }catch(_){ }
-      if(value){ inp.value=value; inp.title=value; syncRuntimeSetting(setting.nodeId,setting.param,value); }
-    };
-    control.appendChild(inp); control.appendChild(pick);
-    row.appendChild(lbl); row.appendChild(control); panel.appendChild(row);
-  });
+  // Machine-specific file/folder paths the run needs (emulator folder, APK…).
+  const paths = a.runtimeSettings || [];
+  if(paths.length){
+    const g = group("Files & folders");
+    paths.forEach(setting=>{
+      const field = document.createElement("div"); field.className = "setting-field";
+      const lbl = document.createElement("span"); lbl.className = "setting-label";
+      lbl.innerHTML = escHtml(setting.label||"Path")
+        + (setting.nodeLabel ? `<span class="sub">${escHtml(setting.nodeLabel)}</span>` : "");
+      const control = document.createElement("div"); control.className = "setting-path-control";
+      const inp = document.createElement("input"); inp.type = "text";
+      inp.className = "setting-path-input runtime-setting-control";
+      inp.value = setting.value||""; inp.placeholder = setting.kind==="folder"?"Choose a folder…":"Choose a program…";
+      inp.setAttribute("aria-label", setting.label||"Runtime path");
+      inp.title = inp.value; inp.disabled = !!S.running;
+      inp.onchange = async()=>{
+        const old = setting.value||"", value = inp.value.trim();
+        let ok = false; try{ ok = await api().set_node_runtime_param(setting.nodeId,setting.param,value); }catch(_){ }
+        if(ok){ syncRuntimeSetting(setting.nodeId,setting.param,value); inp.title = value; }
+        else inp.value = old;
+      };
+      const pick = document.createElement("button"); pick.type = "button";
+      pick.className = "btn-path-pick runtime-setting-control"; pick.textContent = "Choose…";
+      pick.title = setting.kind==="folder"?"Choose folder":"Choose program file"; pick.disabled = !!S.running;
+      pick.onclick = async()=>{
+        let value = "";
+        try{ value = await api().pick_node_runtime_path(setting.nodeId,setting.param,setting.kind,inp.value); }catch(_){ }
+        if(value){ inp.value = value; inp.title = value; syncRuntimeSetting(setting.nodeId,setting.param,value); }
+      };
+      control.appendChild(inp); control.appendChild(pick);
+      field.appendChild(lbl); field.appendChild(control);
+      g.appendChild(field);
+    });
+    panel.appendChild(g);
+  }
 
-  (a.vars||[]).forEach(v=>{
-    const row = document.createElement("div");
-    row.className = "setting-row"; row.style.paddingTop = "8px";
-    const lbl = document.createElement("span"); lbl.className = "setting-label";
-    lbl.innerHTML = escHtml(v.label||v.name) + (v.label?`<span class="sub">${escHtml(v.name)}</span>`:"");
-    row.appendChild(lbl);
+  // Per-activity variable values (toggles, numbers, text) — the human label
+  // only; the variable's code name is noise for the player.
+  const vars = a.vars || [];
+  if(vars.length){
+    const g = group();
+    vars.forEach(v=>{
+      const row = document.createElement("div"); row.className = "setting-row";
+      const lbl = document.createElement("span"); lbl.className = "setting-label";
+      lbl.textContent = v.label || v.name;
+      row.appendChild(lbl);
 
-    const type = v.type || "bool";
-    if(type==="bool"){
-      const cb = document.createElement("button"); cb.type="button"; cb.className = "cb"+(v.value?" checked":""); cb.innerHTML = CHECK;
-      cb.setAttribute("aria-label", v.label||v.name); cb.setAttribute("aria-pressed",String(!!v.value));
-      cb.onclick = ()=>{ v.value=!v.value; cb.classList.toggle("checked",v.value); cb.setAttribute("aria-pressed",String(!!v.value)); api().set_activity_var(a.id,v.name,v.value); };
-      row.appendChild(cb);
-    } else if(type==="select"){
-      const sel = document.createElement("select");
-      (v.options||[]).forEach(o=>{ const op=document.createElement("option"); op.value=op.textContent=o; if(String(v.value)===String(o))op.selected=true; sel.appendChild(op); });
-      sel.onchange = ()=>{ v.value=sel.value; api().set_activity_var(a.id,v.name,sel.value); };
-      row.appendChild(sel);
-    } else {
-      const inp = document.createElement("input");
-      inp.type = type==="number" ? "number" : "text"; inp.className = "setting-input";
-      inp.value = (v.value!=null ? v.value : "");
-      inp.onchange = ()=>{ const val = type==="number" ? (parseFloat(inp.value)||0) : inp.value; v.value=val; api().set_activity_var(a.id,v.name,val); };
-      row.appendChild(inp);
-    }
-    panel.appendChild(row);
-  });
+      const type = v.type || "bool";
+      if(type==="bool"){
+        const cb = document.createElement("button"); cb.type = "button"; cb.className = "cb"+(v.value?" checked":""); cb.innerHTML = CHECK;
+        cb.setAttribute("aria-label", v.label||v.name); cb.setAttribute("aria-pressed",String(!!v.value));
+        cb.onclick = ()=>{ v.value=!v.value; cb.classList.toggle("checked",v.value); cb.setAttribute("aria-pressed",String(!!v.value)); api().set_activity_var(a.id,v.name,v.value); };
+        row.appendChild(cb);
+      } else if(type==="select"){
+        const sel = document.createElement("select");
+        (v.options||[]).forEach(o=>{ const op=document.createElement("option"); op.value=op.textContent=o; if(String(v.value)===String(o))op.selected=true; sel.appendChild(op); });
+        sel.onchange = ()=>{ v.value=sel.value; api().set_activity_var(a.id,v.name,sel.value); };
+        row.appendChild(sel);
+      } else {
+        const inp = document.createElement("input");
+        inp.type = type==="number" ? "number" : "text"; inp.className = "setting-input";
+        inp.value = (v.value!=null ? v.value : "");
+        inp.onchange = ()=>{ const val = type==="number" ? (parseFloat(inp.value)||0) : inp.value; v.value=val; api().set_activity_var(a.id,v.name,val); };
+        row.appendChild(inp);
+      }
+      g.appendChild(row);
+    });
+    panel.appendChild(g);
+  }
+
+  // Retry count — a RUNNER setting (saved to this Runner's config, never to the
+  // workflow). Default 1; an activity is tried this many times before failing.
+  // Always last, after the activity's own config.
+  {
+    const g = group();
+    const row = document.createElement("div"); row.className = "setting-row";
+    const lbl = document.createElement("span"); lbl.className = "setting-label"; lbl.textContent = "Attempts";
+    const inp = document.createElement("input");
+    inp.type = "number"; inp.className = "setting-input runtime-setting-control";
+    inp.min = 1; inp.step = 1; inp.value = a.maxRetries || 1;
+    inp.setAttribute("aria-label", "Number of attempts");
+    inp.title = "How many times this activity is tried before it fails (Runner setting)";
+    inp.disabled = !!S.running;
+    inp.onchange = async()=>{
+      let v = Math.max(1, parseInt(inp.value, 10) || 1);
+      inp.value = v;
+      let res = null; try{ res = await api().set_activity_retries(a.id, v); }catch(_){ }
+      if(res && res.ok) v = res.retries; else v = a.maxRetries || 1;
+      a.maxRetries = v; inp.value = v;
+      const meta = document.querySelector(`.task-row[data-id="${a.id}"] [data-meta]`);
+      if(meta) meta.textContent = actMeta(a);
+    };
+    row.appendChild(lbl); row.appendChild(inp);
+    g.appendChild(row); panel.appendChild(g);
+  }
 
   return panel;
 }
@@ -297,20 +428,51 @@ function syncRuntimeSetting(nodeId,param,value){
   }));
 }
 
+// The right column's Activity settings tab shows the settings of the activity
+// whose gear was pressed. Clicking the same gear again (or the ×) closes it.
+function showSettingsEmpty(){
+  const host = $("act-set-body"); if(!host) return;
+  host.innerHTML = '<div class="act-set-empty">Select the <b>⚙</b> on an activity to edit its settings here.</div>';
+}
+function closeActivitySettings(){
+  S.expandedId = null;
+  document.querySelectorAll(".btn-gear.active").forEach(g=>g.classList.remove("active"));
+  const title = $("act-set-title"); if(title) title.textContent = "Activity settings";
+  showSettingsEmpty();
+}
 function toggleSettings(id){
   const a = S.activities.find(x=>x.id===id); if(!a) return;
-  const list = a.type==="background" ? $("bg-list") : $("seq-list");
-  const existing = list.querySelector(`[data-settings-for="${id}"]`);
-  const row = list.querySelector(`[data-id="${id}"]`);
-  const gear = row && row.querySelector("[data-gear]");
-  if(existing){ existing.remove(); if(gear) gear.classList.remove("active"); S.expandedId=null; return; }
-  list.querySelectorAll("[data-settings-for]").forEach(p=>p.remove());
-  list.querySelectorAll(".btn-gear.active").forEach(g=>g.classList.remove("active"));
+  const host = $("act-set-body");
+  if(!host) return;
+  if(S.expandedId === id){ closeActivitySettings(); return; }
+  document.querySelectorAll(".btn-gear.active").forEach(g=>g.classList.remove("active"));
+  const gear = document.querySelector(`.task-row[data-id="${id}"] [data-gear]`);
   if(gear) gear.classList.add("active");
   S.expandedId = id;
-  const panel = buildSettingsPanel(a);
-  if(row && row.nextSibling) list.insertBefore(panel, row.nextSibling);
-  else if(row) list.appendChild(panel);
+  host.innerHTML = "";
+  host.appendChild(buildSettingsPanel(a));
+  const title = $("act-set-title"); if(title) title.textContent = a.name || "Activity settings";
+  switchRTab("act");
+}
+// Every activity has settings now (at least a Runner-only retry count), so the
+// gear shows on all rows and clicking any row opens its config.
+function activityHasSettings(a){
+  return !!a;
+}
+// Open the Activity settings tab for this activity (row click shortcut).
+function openActivitySettings(id){
+  const a = S.activities.find(x=>x.id===id);
+  if(!activityHasSettings(a)) return;
+  if(S.expandedId === id){ switchRTab("act"); return; }
+  toggleSettings(id);
+}
+// Keep the right column in sync after rows are rebuilt (populateLists).
+function syncActivitySettings(){
+  if(!S.expandedId) return;
+  const a = S.activities.find(x=>x.id===S.expandedId);
+  if(!a){ closeActivitySettings(); return; }
+  const gear = document.querySelector(`.task-row[data-id="${S.expandedId}"] [data-gear]`);
+  if(gear) gear.classList.add("active"); else closeActivitySettings();
 }
 
 // ── Populate lists ───────────────────────────────────────────────────────────
@@ -324,6 +486,8 @@ function populateLists(){
   if(bg.length) bg.forEach(a=>bgList.appendChild(buildRow(a)));
   else bgList.innerHTML = '<div class="empty-note">No background activities.</div>';
   $("bg-hint").style.display = bg.length ? "" : "none";
+  syncActivitySettings();
+  updateRowRunButtons();
 }
 
 function setActStatus(id, status){
@@ -364,13 +528,9 @@ function setConnected(on, name, serial){
 
 // ── Log ──────────────────────────────────────────────────────────────────────
 function updateLogCount(){
-  const el = $("log-count");
-  if(el) el.textContent = S.logCount ? String(S.logCount) : "";
-}
-function toggleLog(){
-  const card=$("log-card");
-  card.classList.toggle("collapsed");
-  $("log-toggle").setAttribute("aria-expanded",String(!card.classList.contains("collapsed")));
+  const n = S.logCount ? String(S.logCount) : "";
+  const el = $("log-count"); if(el) el.textContent = n;
+  const tab = $("rtab-log-count"); if(tab) tab.textContent = n;
 }
 function appendLog(e){
   const body = $("log-body");
@@ -386,9 +546,7 @@ function appendLog(e){
   while(body.children.length>500) body.removeChild(body.firstChild);
   S.logCount = body.children.length;
   updateLogCount();
-  const card = $("log-card");
-  if(card && !card.classList.contains("collapsed"))
-    body.scrollTop = body.scrollHeight;
+  body.scrollTop = body.scrollHeight;
 }
 function filterLog(query){
   const q = query.trim().toLowerCase();
@@ -431,12 +589,18 @@ function applyController(ctrl, win32){
   if(adbRow) adbRow.style.display = isWin ? "none" : "";
   if(winRow) winRow.style.display = isWin ? "" : "none";
 
-  // Speed hack is ADB-only; Appearance is not, so the tab itself always stays.
-  const speedCard = document.querySelector("#tab-settings .settings-card");
+  // Speed hack and the shared Emulator setting are ADB-only; the Game card
+  // (project game path) is Win32-only.
+  const speedCard = $("speed-card");
   if(speedCard) speedCard.style.display = isWin ? "none" : "";
+  const emuCard = $("emu-card");
+  if(emuCard) emuCard.style.display = isWin ? "none" : "";
+  const gameCard = $("game-card");
+  if(gameCard) gameCard.style.display = isWin ? "" : "none";
 
-  if(!isWin) return;
+  if(!isWin){ renderEmulator(S.emulator || {}); return; }
   const cfg = S.win32 || {};
+  renderGamePath(cfg.path || "");
   const target = (cfg.window || "").trim();
   const el = $("win32-target");
   if(el){
@@ -458,13 +622,193 @@ function applyController(ctrl, win32){
   }
 }
 
+// ── Project game path (Win32 Settings → Game) ─────────────────────────────────
+// Used by Launch program blocks set to "Project game path"; blocks on "Custom"
+// keep their own path control in the activity's inline settings.
+function renderGamePath(path){
+  S.win32 = Object.assign({}, S.win32, { path: path || "" });
+  const inp = $("game-path");
+  if(inp && document.activeElement !== inp){ inp.value = path || ""; inp.title = path || ""; }
+  const note = $("game-path-note");
+  if(note){
+    const def = S.gamePathDefault || "";
+    const st = S.gamePathStatus;
+    note.textContent = !path
+      ? "No game path yet — choose the game's .exe so Launch program blocks can start it."
+      : (st && st.path === path && !st.exists)
+        ? "Nothing at this path — choose the game's .exe again. Runs stay blocked until it exists."
+      : (def && path !== def)
+        ? `Overrides the workflow's default (${def}). Clear it to go back.`
+        : "Launch program blocks set to “Project game path” start this program.";
+  }
+}
+async function onGamePathChange(value){
+  const old = (S.win32 || {}).path || "";
+  let res = null;
+  try{ res = await api().set_game_path(value); }catch(_){ }
+  const inp = $("game-path");
+  if(inp) inp.blur();
+  if(res && res.ok) S.gamePathStatus = res.gamePath || S.gamePathStatus;
+  renderGamePath(res && res.ok ? res.path : old);
+  if(res && res.ok) renderRequirements(res.requirements);
+}
+async function onGamePathPick(){
+  let res = null;
+  try{ res = await api().pick_game_path(($("game-path")||{}).value || ""); }catch(_){ }
+  if(res && res.ok){
+    S.gamePathStatus = res.gamePath || S.gamePathStatus;
+    renderGamePath(res.path); renderRequirements(res.requirements);
+  }
+  return !!(res && res.ok);
+}
+
+// ── Shared emulator setting (ADB Settings → Emulator) ────────────────────────
+// Used by Launch / Resize / Kill / Restart emulator blocks set to "Project
+// emulator setting"; a node on "Custom" keeps its own path control.
+function renderEmulator(emu){
+  S.emulator = Object.assign({kind:"ldplayer", path:""}, emu || {});
+  const sel = $("emu-kind");
+  if(sel && document.activeElement !== sel) sel.value = S.emulator.kind || "ldplayer";
+  const inp = $("emu-path");
+  if(inp && document.activeElement !== inp){ inp.value = S.emulator.path || ""; inp.title = S.emulator.path || ""; }
+  const note = $("emu-note");
+  if(note){
+    const def = S.emulatorDefault || {};
+    note.textContent = !S.emulator.path
+      ? "No install folder set — emulator blocks auto-detect it. Choose a folder to pin it."
+      : (def.path && S.emulator.path !== def.path)
+        ? `Overrides the workflow's default (${def.path}).`
+        : "Launch / Resize / Kill / Restart emulator blocks set to “Project emulator setting” use this family and folder.";
+  }
+}
+async function onEmulatorKindChange(value){
+  const old = S.emulator || {};
+  let res = null;
+  try{ res = await api().set_emulator(value, old.path || ""); }catch(_){ }
+  renderEmulator(res && res.ok ? res.emulator : old);
+}
+async function onEmulatorPathChange(value){
+  const old = S.emulator || {};
+  let res = null;
+  try{ res = await api().set_emulator(old.kind || "ldplayer", value); }catch(_){ }
+  renderEmulator(res && res.ok ? res.emulator : old);
+}
+async function onEmulatorPathPick(){
+  const old = S.emulator || {};
+  let res = null;
+  try{ res = await api().pick_emulator_path(old.path || ""); }catch(_){ }
+  if(res && res.ok) renderEmulator(res.emulator);
+  return !!(res && res.ok);
+}
+
+// Ask for the game .exe up front — once per loaded game — instead of letting a
+// run start and die at its Launch program block.
+let _gamePromptFor = null;
+async function promptGamePath(message){
+  const choose = await uiDialog({
+    title: "Choose the game path",
+    message,
+    buttons: [{ label:"Later", value:false }, { label:"Choose game .exe…", value:true, kind:"ok" }],
+  });
+  if(!choose) return false;
+  await onGamePathPick();
+  return !!(S.gamePathStatus && S.gamePathStatus.exists);
+}
+function maybePromptGamePath(key){
+  const st = S.gamePathStatus;
+  if(S.controller !== "win32" || !st || !st.needed || st.exists) return;
+  if(_gamePromptFor === key) return;
+  _gamePromptFor = key;
+  promptGamePath(st.path
+    ? `The game is not at the saved path any more:\n${st.path}\n\nChoose the game's .exe so the Runner can start it.`
+    : "This game is started from its .exe. Choose the game's .exe once before the first run — the Runner remembers it.");
+}
+async function onLaunchBlocked(data){
+  stopElapsedTimer(); S.runScope = null; updateProgress();
+  if(data.gamePath){ S.gamePathStatus = data.gamePath; renderGamePath(data.gamePath.path || ""); }
+  const text = "The run was not started:\n\n• " + (data.problems || []).join("\n• ");
+  if(data.needsGamePath){ await promptGamePath(text); return; }
+  await uiDialog({ title:"Program path missing", message: text, buttons:[{ label:"OK", value:true, kind:"ok" }] });
+}
+
+// ── Game files (requirements\ → the game's install folder) ───────────────────
+function renderRequirements(req){
+  S.requirements = (req && req.folder) ? req : null;
+  const card = $("req-card");
+  if(!card) return;
+  card.style.display = S.requirements ? "" : "none";
+  if(!S.requirements){ refreshButtons(); return; }
+  const r = S.requirements, isWin = S.controller === "win32";
+  $("req-list").innerHTML = (r.items || []).map(n => `<li title="${escHtml(n)}">${escHtml(n)}</li>`).join("");
+  const copy = $("btn-req-copy");
+  if(copy) copy.style.display = isWin ? "" : "none";
+  const st = $("req-status");
+  const files = `${r.fileCount} file${r.fileCount === 1 ? "" : "s"}`;
+  st.className = "req-status " + (r.installed ? "ok" : "warn");
+  if(r.installed) st.textContent = `Installed — all ${files} found in ${r.gameDir}.`;
+  else if(!isWin) st.textContent = `Copy these ${files} into the game's install folder.`;
+  else if(!r.gameDir) st.textContent = `Not installed — set the Game path above, then copy these ${files} into the game folder.`;
+  else st.textContent = `${r.missing} of ${files} missing in ${r.gameDir} — copy them into the game folder.`;
+  refreshButtons();
+}
+async function onReqOpen(){
+  let ok = false;
+  try{ ok = await api().open_requirements(); }catch(_){ }
+  if(!ok) $("req-status").textContent = "Couldn't open the requirements folder.";
+}
+async function onReqCopy(){
+  const r = S.requirements;
+  if(!r || !r.gameDir || S.running) return;
+  const msg = `Copy ${r.fileCount} file(s) into\n${r.gameDir}?\n\nExisting files with the same name are overwritten. Close the game first.`;
+  const go = await uiDialog({ title:"Copy game files", message:msg,
+    buttons:[{ label:"Cancel", value:false }, { label:"Copy", value:true, kind:"ok" }] });
+  if(!go) return;
+  const btn = $("btn-req-copy");
+  if(btn) btn.disabled = true;
+  let res = null;
+  try{ res = await api().copy_requirements_to_game(); }catch(e){ res = { ok:false, error:String(e) }; }
+  if(res && res.requirements) renderRequirements(res.requirements);
+  else refreshButtons();
+  if(res && !res.ok){ const st = $("req-status"); st.className = "req-status warn"; st.textContent = res.error || "Copy failed."; }
+}
+
+// ── Game icon ─────────────────────────────────────────────────────────────────
+// Same initials + hue as the Hub (hub.js toneFor / initialsFor) when there is no
+// icon image, so a game looks the same in every window.
+const TONES = [214, 158, 256, 32, 346, 190];
+function toneFor(key){ let h = 0; for(const ch of String(key||"")) h = (h*31 + ch.codePointAt(0)) >>> 0; return TONES[h % TONES.length]; }
+function initialsFor(name){
+  const words = String(name||"").replace(/([a-z])([A-Z0-9])/g, "$1 $2").split(/[\s_\-.]+/).filter(Boolean);
+  if(!words.length) return "?";
+  return words.length === 1 ? words[0].slice(0,2).toUpperCase() : (words[0][0] + words[1][0]).toUpperCase();
+}
+function renderAppIcon(data){
+  const el = $("app-icon");
+  if(!el) return;
+  el.style.setProperty("--tone", toneFor(data.iconKey || data.name));
+  const initials = () => { el.innerHTML = ""; el.classList.add("mono"); el.textContent = initialsFor(data.name); };
+  if(data.icon){
+    el.classList.remove("mono");
+    el.innerHTML = "";
+    const img = document.createElement("img");
+    img.alt = ""; img.src = data.icon; img.onerror = initials;
+    el.appendChild(img);
+  } else {
+    initials();
+  }
+  el.hidden = false;
+}
+
 // ── Flow ──────────────────────────────────────────────────────────────────────
 function applyFlow(data){
   S.activities = data.activities || [];
   S.loaded = true;
+  closeActivitySettings();
   const nm = $("flow-name");
   nm.textContent = data.name || "(unnamed)"; nm.classList.remove("empty");
-  $("flow-sub").textContent = (data.controller === "win32") ? "Win32 · PC window" : "ADB · Device / emulator";
+  renderAppIcon(data);
+  $("flow-sub").textContent = ((data.controller === "win32") ? "Win32 · PC window" : "ADB · Device / emulator")
+    + (U.version ? ` · v${U.version}` : "");
   populateLists();
   updateProgress();
   const seq = S.activities.filter(a=>a.type!=="background").length;
@@ -476,8 +820,14 @@ function applyFlow(data){
     S.captureBackend=data.captureBackend;
     const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
   }
+  S.gamePathDefault = data.gamePathDefault || "";
+  S.gamePathStatus = data.gamePath || null;
+  S.emulator = data.emulator || {};
+  S.emulatorDefault = data.emulatorDefault || {};
   applyController(data.controller, data.win32);
+  renderRequirements(data.requirements);
   refreshButtons();
+  maybePromptGamePath(data.name || "");
 }
 
 // ── Python events ────────────────────────────────────────────────────────────
@@ -501,6 +851,7 @@ window.__recv = function(raw){
     return;
   }
   if(type==="flow_loaded"){ applyFlow(data); return; }
+  if(type==="launch_blocked"){ onLaunchBlocked(data); return; }
   if(type==="running_state"){
     S.running=!!data.running; S.paused=!!data.paused;
     if(S.running){ $('header-progress').style.display='flex'; if(!_elapsedTimer) startElapsedTimer(); }
@@ -512,16 +863,123 @@ window.__recv = function(raw){
     setActStatus(data.id, data.status); return;
   }
   if(type==="speedhack_update"){ applySpeedhack(data); return; }
+  if(type==="update_available"){ U.update=data; renderUpdate(); return; }
+  if(type==="update_progress"){ showUpdateProgress(data.pct, data.stage); return; }
 };
+
+// ── Version + self-update ────────────────────────────────────────────────────
+function applyRunnerInfo(r){
+  r = r || {};
+  U.supported = !!r.supported; U.version = r.version || ""; U.repo = r.repo || "";
+  if(r.update && Object.keys(r.update).length) U.update = r.update;
+  $("upd-version").textContent = U.version ? `v${U.version}` : "Not a standalone build";
+  $("upd-repo").textContent = U.repo || "—";
+  $("upd-repo").title = U.repo ? `https://github.com/${U.repo}` : "";
+  renderUpdate();
+}
+function renderUpdate(){
+  const pill = $("update-pill"), check = $("btn-upd-check"), apply = $("btn-upd-apply"), status = $("upd-status");
+  if(!pill) return;
+  const up = U.update;
+  const available = !!(up && up.available);
+  pill.hidden = !available || U.applying;
+  if(available) pill.textContent = `Update v${up.version}`;
+  check.disabled = !U.supported || U.checking || U.applying;
+  apply.hidden = !available;
+  apply.disabled = U.applying || S.running;
+  if(available) apply.textContent = `Update to v${up.version} & restart`;
+  if(U.applying) return;   // progress text owns the status line
+  if(!U.supported) status.textContent = "Updates are available in a Runner built from the Macro2k Hub.";
+  else if(U.checking) status.textContent = "Checking GitHub for a newer version…";
+  else if(up && up.error) status.textContent = `Couldn't check for updates: ${up.error}`;
+  else if(available) status.textContent = S.running ? `v${up.version} is ready. Stop the run to update.` : `v${up.version} is ready to install.`;
+  else if(up && up.supported) status.textContent = "You're on the latest version.";
+  else status.textContent = "Checks for a newer version when the Runner opens.";
+}
+function showUpdates(){
+  switchRTab("settings");
+  const card = $("updates-card");
+  if(card) card.scrollIntoView({ block:"nearest", behavior:"smooth" });
+  const apply = $("btn-upd-apply");
+  if(apply && !apply.hidden && !apply.disabled) apply.focus();
+}
+async function onUpdateCheck(){
+  if(!U.supported || U.checking) return;
+  U.checking = true; renderUpdate();
+  try{ U.update = await api().update_check(); }catch(e){ U.update = { error: String(e) }; }
+  U.checking = false; renderUpdate();
+}
+function showUpdateProgress(pct, stage){
+  const bar = $("upd-bar"), fill = $("upd-bar-fill");
+  bar.hidden = false;
+  bar.classList.toggle("indet", pct < 0);
+  if(pct >= 0) fill.style.transform = `scaleX(${Math.min(100, pct)/100})`;
+  $("upd-status").textContent = stage === "Downloading" && pct >= 0 ? `Downloading… ${pct}%` : `${stage}…`;
+}
+async function onUpdateApply(){
+  if(U.applying || S.running || !(U.update && U.update.available)) return;
+  U.applying = true; renderUpdate();
+  showUpdateProgress(0, "Downloading");
+  let res = null;
+  try{ res = await api().update_apply(); }catch(e){ res = { error: String(e) }; }
+  // Only returns when nothing was installed (success restarts the Runner).
+  U.applying = false;
+  $("upd-bar").hidden = true;
+  if(res && res.upToDate) U.update = Object.assign({}, U.update, { available:false });
+  renderUpdate();
+  if(res && res.error) $("upd-status").textContent = `Update failed: ${res.error}`;
+}
 
 // ── Handlers ───────────────────────────────────────────────────────────────
 const api = () => window.pywebview.api;
-async function onLoadJson(){ const r=await api().load_json(); if(r&&r.ok) applyFlow(r); }
 async function onStart(){
   if(!S.loaded) return;
+  S.runScope = null;
   S.activities.filter(a=>a.type!=="background").forEach(a=>setActStatus(a.id,"pending"));
   $('header-progress').style.display='flex'; startElapsedTimer(); updateProgress();
-  await api().start();
+  let ok = false;
+  try{ ok = await api().start(); }catch(_){ }
+  if(!ok){ stopElapsedTimer(); updateProgress(); }   // e.g. blocked by a missing game path
+}
+// Which single activity is running on its own, if any.
+function soloRunningId(){
+  return (S.running && S.runScope && S.runScope.length === 1) ? S.runScope[0] : null;
+}
+// The row button mirrors state: Run normally; Stop while this activity is the
+// one running solo, so it stops the run right where it started.
+function updateRowRunButtons(){
+  const solo = soloRunningId();
+  document.querySelectorAll(".btn-run-one").forEach(btn=>{
+    const id = btn.dataset.runOne;
+    const a = S.activities.find(x=>x.id===id);
+    const isThisRunning = !!id && id === solo;
+    const blocked = S.running && !isThisRunning;
+    btn.classList.toggle("is-stop", isThisRunning);
+    btn.disabled = !S.loaded || blocked;
+    if(isThisRunning){
+      btn.innerHTML = STOP_SM;
+      btn.title = "Stop this activity";
+      btn.setAttribute("aria-label", `Stop ${a ? a.name : ""}`.trim());
+    } else {
+      btn.innerHTML = PLAY_SM;
+      btn.title = (a && a.type==="background") ? "Run only this activity (loops until Stop)" : "Run only this activity";
+      btn.setAttribute("aria-label", `Run only ${a ? a.name : ""}`.trim());
+    }
+  });
+}
+async function onRunToggle(id){
+  if(soloRunningId() === id){ await onStop(); return; }
+  await onRunActivity(id);
+}
+async function onRunActivity(id){
+  if(!S.loaded || S.running) return;
+  if(!S.activities.some(a=>a.id===id)) return;
+  S.runScope = [id];
+  setActStatus(id, "pending");
+  $('header-progress').style.display='flex'; startElapsedTimer(); updateProgress();
+  let ok = false;
+  try{ ok = await api().run_activity(id); }catch(_){ }
+  if(!ok){ stopElapsedTimer(); S.runScope = null; updateProgress(); }
 }
 async function onStop(){ await api().stop(); }
 async function onPause(){ const r=await api().pause(); S.paused=!!(r&&r.paused); refreshButtons(); }
@@ -542,6 +1000,33 @@ function selectAll(type, enabled){
     api().toggle_activity(a.id, enabled);
   });
 }
+
+// ── Live preview ─────────────────────────────────────────────────────────────
+// Python pushes JPEG frames to window.__recvFrame while the panel is open; the
+// frame source is the same capture backend a run uses, so the preview is what
+// the macro sees. Hide stops the capture loop; maximize lets it fill the pane.
+let pvActive = true;    // body shown (not collapsed)
+let pvMaxed  = false;   // expanded over the right pane
+
+function pvApply(){
+  const card=$("preview-card");
+  if(card) card.classList.toggle("is-max", pvMaxed);
+  const body=$("pv-body");
+  if(body) body.style.display = pvActive ? "" : "none";
+  const hid=$("pv-hide"); if(hid){ hid.title = pvActive ? "Hide preview" : "Show preview"; hid.classList.toggle("off", !pvActive); }
+  const max=$("pv-max"); if(max) max.title = pvMaxed ? "Restore preview" : "Maximize preview";
+  try{ api().set_refresh_hz(pvMaxed ? 10 : 6); api().set_auto_refresh(pvActive); }catch(_){ }
+  if(pvActive){ try{ api().capture(); }catch(_){ } }
+}
+function togglePreviewMax(){ pvMaxed=!pvMaxed; if(pvMaxed) pvActive=true; pvApply(); }
+function togglePreviewHide(){ pvActive=!pvActive; if(pvActive) pvMaxed=false; pvApply(); }
+window.__recvFrame = function(dataUrl,w,h){
+  const img=$("pv-img"), empty=$("pv-empty");
+  if(!img) return;
+  img.src = dataUrl;
+  if(empty) empty.style.display="none";
+  const st=$("pv-state"); if(st && w && h) st.textContent = w+"×"+h;
+};
 
 // ── Appearance ────────────────────────────────────────────────────────────────
 // Theme and density are suite-wide: web/shared/theme.js applies them to <html>
@@ -583,6 +1068,7 @@ async function init(){
   while(!(window.pywebview&&window.pywebview.api)&&tries<40){ await new Promise(r=>setTimeout(r,100)); tries++; }
   if(!window.pywebview||!window.pywebview.api){ $("dev-label").textContent="PyWebView unavailable"; return; }
   const st = await api().get_state();
+  applyRunnerInfo(st.runner);
   S.connectedSerial = st.connectedSerial||null;
   S.captureBackend = st.captureBackend||"scrcpy";
   const capSel=$("capture-backend");
@@ -592,10 +1078,14 @@ async function init(){
     capSel.value=S.captureBackend;
   }
   if(st.loaded) applyFlow({name:st.name, activities:st.activities, speedhack:st.speedhack,
-                           captureBackend:st.captureBackend, controller:st.controller, win32:st.win32});
+                           captureBackend:st.captureBackend, controller:st.controller, win32:st.win32,
+                           gamePathDefault:st.gamePathDefault, requirements:st.requirements, gamePath:st.gamePath,
+                           emulator:st.emulator, emulatorDefault:st.emulatorDefault,
+                           icon:st.icon, iconKey:st.iconKey});
   else applyController(st.controller, st.win32);
   S.running=!!st.running; S.paused=!!st.paused;
   refreshButtons();
   (st.log||[]).forEach(appendLog);
+  pvApply();
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();

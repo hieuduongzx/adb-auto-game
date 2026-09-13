@@ -1,0 +1,75 @@
+{
+  "name": "ADB",
+  "version": 2,
+  "templatesDir": "templates",
+  "buildVersion": "1.0.0",
+  "package": "",
+  "controller": "adb",
+  "ocr": "",
+  "capture": "scrcpy",
+  "input": "adb",
+  "win32": {
+    "window": "",
+    "matchBy": "title",
+    "inputMode": "background",
+    "path": ""
+  },
+  "speedhack": {
+    "enabled": false,
+    "speed": 2,
+    "native": false
+  },
+  "globals": [],
+  "nodeDefaults": {
+    "delayBefore": 0,
+    "delayAfter": 0,
+    "retryCount": 0,
+    "retryDelay": 0,
+    "screenshotOnFail": false
+  },
+  "functions": [],
+  "activities": [
+    {
+      "id": "sequence_1",
+      "name": "Activity 1",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nstart",
+            "type": "start",
+            "x": 60,
+            "y": 70,
+            "params": {}
+          },
+          {
+            "id": "nvyqjl10",
+            "type": "resize_emulator",
+            "x": 140,
+            "y": 55,
+            "params": {
+              "emulator": "last",
+              "index": 0,
+              "path": "",
+              "width": 1920,
+              "height": 1080,
+              "x": 0,
+              "y": 0
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nstart",
+            "fromPort": "out",
+            "to": "nvyqjl10"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    }
+  ]
+}

@@ -171,8 +171,16 @@ window.__recv = function(raw){
   // The marks persist after the run and only clear on the next run start
   // (wfResetActStatus in wfResetRunViz). The !wfRunning guard drops late
   // results after a manual Stop so a half-run activity isn't painted.
-  if(type==="activity_active"){ if(!wfRunning) return; if(data.id) wfSetActStatus(data.id, "running"); return; }
+  if(type==="activity_active"){ if(!wfRunning) return;
+    // A fresh attempt is underway — drop the previous run's crash marker for
+    // this activity so the one you end up looking at is always the latest.
+    if(data.id){ wfClearActCrash(data.id); wfSetActStatus(data.id, "running"); wfRenderActivities(); }
+    return; }
   if(type==="activity_result"){ if(!wfRunning) return; if(data.id) wfSetActStatus(data.id, data.status==="ok" ? "done" : "errored"); return; }
+  // Where a failed activity actually died. Arrives just before activity_result.
+  if(type==="activity_crash"){ if(!wfRunning) return;
+    if(data.id && data.crash){ wfSetActCrash(data.id, data.crash); wfRenderActivities(); }
+    return; }
   if(type==="speedhack_state"){
     wfSpeedRunning=!!data.running; wfSyncSpeedUI();
     if(data.running && data.active) setStatus("Speed hack is running");
@@ -309,7 +317,7 @@ async function wfNew(){
   WF.package="";
   WF.speedhack={enabled:false, speed:2.0, native:false};
   WF.controller=controller;
-  WF.win32={window:"", matchBy:"title", inputMode};
+  WF.win32={window:"", matchBy:"title", inputMode, path:""};
   WF.ocrBackend=""; if(typeof wfSyncOcrUI==="function") wfSyncOcrUI();
   WF.captureBackend=capture;
   if(typeof wfApplyCaptureBackend==="function") wfApplyCaptureBackend(capture);
@@ -318,6 +326,7 @@ async function wfNew(){
   WF.activities=[]; WF.functions=[]; WF.edit={kind:"activity",id:null};
   WF.sel=[]; WF.selectedNode=null; wfPan={x:0,y:0}; wfZoom=1; wfRunNode=null;
   if(typeof wfResetRunViz==="function") wfResetRunViz();   // blank doc — no stale run trail
+  if(typeof wfClearAllActCrash==="function") wfClearAllActCrash();
   const nm=$("wf-name"); if(nm) nm.value=WF.name;
   if(typeof wfSyncPackageUI==="function") wfSyncPackageUI();
   wfSyncSpeedUI();
@@ -327,6 +336,9 @@ async function wfNew(){
   await wfSave();              // auto-create workflow.json inside the named folder
   const tag = controller==="win32" ? ("Win32 · "+inputMode) : ("ADB · "+capture);
   setStatus("New workflow: " + WF.name + " ("+tag+")");
+  if(controller==="win32" && inputMode==="unity_bridge" && typeof wfOfferUnityBridgeDeploy==="function"){
+    wfOfferUnityBridgeDeploy();
+  }
 }
 
 /** Dialog: name + backend settings → options | null. */
@@ -402,6 +414,10 @@ function wfPromptNewWorkflow(){
               `<button type="button" class="choice" data-value="anchored_touch">`+
                 `<span class="choice-title">Anchored</span>`+
                 `<span class="choice-sub">WM_POINTER</span>`+
+              `</button>`+
+              `<button type="button" class="choice" data-value="unity_bridge">`+
+                `<span class="choice-title">Bridge</span>`+
+                `<span class="choice-sub">In-game plugin</span>`+
               `</button>`+
               `<button type="button" class="choice" data-value="foreground">`+
                 `<span class="choice-title">Foreground</span>`+

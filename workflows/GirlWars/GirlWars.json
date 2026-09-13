@@ -11,14 +11,27 @@
   "win32": {
     "window": "",
     "matchBy": "title",
-    "inputMode": "background"
+    "inputMode": "background",
+    "path": ""
+  },
+  "emulator": {
+    "kind": "mumu",
+    "path": "D:\\Programs\\MuMuPlayerGlobal\\nx_main"
   },
   "speedhack": {
     "enabled": true,
     "speed": 2,
     "native": false
   },
-  "globals": [],
+  "globals": [
+    {
+      "name": "hello_ki",
+      "label": "Hello ki",
+      "type": "bool",
+      "value": false,
+      "options": []
+    }
+  ],
   "nodeDefaults": {
     "delayBefore": 0.5,
     "delayAfter": 0.5,
@@ -257,17 +270,18 @@
             "id": "nlibvh6v",
             "type": "launch_emulator",
             "x": 320,
-            "y": 256,
+            "y": 258,
             "params": {
               "emulator": "mumu",
-              "index": 2,
+              "index": 1,
               "instance": "",
               "path": "D:\\Programs\\MuMuPlayerGlobal\\nx_main",
               "command": "",
               "at": "",
               "nextDay": true,
               "wait": 60,
-              "port": 0
+              "port": 0,
+              "pathSrc": "project"
             }
           },
           {
@@ -280,7 +294,8 @@
               "index": 2,
               "path": "",
               "width": 1920,
-              "height": 1080
+              "height": 1080,
+              "pathSrc": "project"
             },
             "note": "MuMu #2 — template & tọa độ tap được ghi ở 1920×1080"
           },
@@ -782,7 +797,8 @@
               "at": "",
               "nextDay": true,
               "wait": 60,
-              "port": 0
+              "port": 0,
+              "pathSrc": "project"
             }
           },
           {
@@ -795,7 +811,8 @@
               "index": 2,
               "path": "",
               "width": 1920,
-              "height": 1080
+              "height": 1080,
+              "pathSrc": "project"
             },
             "note": "MuMu #2 — template & tọa độ tap được ghi ở 1920×1080"
           },
@@ -925,7 +942,7 @@
             "id": "nsfwqmvn",
             "type": "start",
             "x": 40,
-            "y": 52,
+            "y": 55,
             "params": {}
           },
           {
@@ -3356,7 +3373,7 @@
       "id": "sequence_xn71",
       "name": "Guild",
       "type": "sequence",
-      "enabled": false,
+      "enabled": true,
       "vars": [
         {
           "name": "terrioty",
@@ -3369,14 +3386,14 @@
           "name": "claim_reward",
           "label": "Claim Reward",
           "type": "bool",
-          "value": false,
+          "value": true,
           "options": []
         },
         {
           "name": "warrush",
           "label": "Warrush",
           "type": "bool",
-          "value": false,
+          "value": true,
           "options": []
         }
       ],

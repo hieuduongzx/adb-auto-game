@@ -1,12 +1,17 @@
 """Generate the Macro2k application icon.
 
-Draws the same brand mark the Hub header shows (three rounded tiles + an accent
-plus) on a dark rounded-square app tile, and writes:
+Draws the Hub's brand mark — the shared ``grid-2x2-plus`` glyph — on a dark
+rounded-square app tile, and writes:
 
     packaging/app.ico   multi-resolution icon (16 … 256) — used by
                         ``apps_build.spec`` / ``runner_build.spec`` for the
                         ``.exe`` and by ``installer.iss`` for ``Setup.exe``
     packaging/app.png   256 px preview / source for any web or docs use
+
+The geometry is the Hub's, but the *paint* deliberately is not: the in-app mark
+is a one-colour outline from the icon set, while this one fills the tiles and
+stains the plus --accent, because a 16 px .ico has to survive on a dark taskbar
+where a hairline outline disappears. Same mark, two treatments, on purpose.
 
 Every size is rendered independently at 8x and downsampled, so the 16 px frame
 stays legible instead of being a blurry shrink of the 256 px art. Small frames
@@ -71,7 +76,9 @@ def _frame(size: int) -> Image.Image:
         outline=TILE_EDGE + (110,), width=max(1, round(px * 0.006)),
     )
 
-    # The mark lives on a 24x24 grid (identical to the inline SVG in the Hub).
+    # The mark lives on the same 24x24 grid as shared/icons.js `grid-2x2-plus`,
+    # drawn as three solid tiles rather than that glyph's single open outline —
+    # the fill is what carries at 16 px. See the module docstring.
     inset = px * (0.085 if small else 0.155)
     unit = (px - inset * 2) / 24.0
 

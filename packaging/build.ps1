@@ -90,12 +90,17 @@ if ($iconStale) {
     if ($LASTEXITCODE -ne 0) { throw "make_icon.py failed (is Pillow installed?)" }
 }
 
-# 2. Build Macro2k into the staging dir.
+# 2. Icon set guard — shared/icons.js must stay the only copy of icon geometry.
+Write-Host "==> Checking icon set..." -ForegroundColor Cyan
+python (Join-Path $PSScriptRoot "check_icons.py")
+if ($LASTEXITCODE -ne 0) { throw "check_icons.py failed — see the report above" }
+
+# 3. Build Macro2k into the staging dir.
 Write-Host "==> Running PyInstaller..." -ForegroundColor Cyan
 python -m PyInstaller --noconfirm --clean --distpath $Stage --workpath $Work $Spec
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 
-# 3. Promote staging/Macro2k -> dist/Macro2k.
+# 4. Promote staging/Macro2k -> dist/Macro2k.
 Write-Host "==> Assembling output folder: $OutDir" -ForegroundColor Cyan
 $keepVendor = (Test-Path (Join-Path $OutDir "vendor")) -and $SkipVendor
 if (Test-Path $OutDir) {
@@ -111,7 +116,7 @@ if (-not (Test-Path $src)) { throw "PyInstaller did not produce $src" }
 robocopy $src $OutDir /E /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy Macro2k -> dist failed (code $LASTEXITCODE)" }
 
-# 4. Copy vendor/.
+# 5. Copy vendor/.
 if (-not $SkipVendor) {
     $vendorSrc = Join-Path $Root "vendor"
     $vendorDst = Join-Path $OutDir "vendor"
@@ -121,7 +126,7 @@ if (-not $SkipVendor) {
 }
 $global:LASTEXITCODE = 0   # reset robocopy's non-zero "success" codes
 
-# 5. Clean up staging.
+# 6. Clean up staging.
 Remove-Item -Recurse -Force $Stage -ErrorAction SilentlyContinue
 
 Write-Host ""

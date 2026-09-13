@@ -66,6 +66,7 @@
         <option value="background_cursor">Background + cursor</option>
         <option value="background_window">Window-pos — no cursor move</option>
         <option value="anchored_touch">Anchored touch — WM_POINTER</option>
+        <option value="unity_bridge">Unity bridge — in-game plugin</option>
         <option value="foreground">Foreground — real mouse</option>
       </select>
     </div>
@@ -300,8 +301,10 @@
       <div id="wf-minimap" class="wf-minimap" title="Minimap — click or drag to move the view">
         <canvas id="wf-minimap-cv"></canvas>
       </div>
-      <!-- Activities — compact graph switcher; the list shows seven rows before scrolling. -->
+      <!-- Activities — compact graph switcher; the list shows seven rows before
+           scrolling, and the top edge drags to any height (double-click to reset). -->
       <div class="wf-side-sec pnl" id="wf-act-panel" data-pnl="wf-activities" data-pnl-title="Activities" data-pnl-tools="max">
+        <div id="wf-act-resizer" title="Drag the top edge (or use arrow keys) to resize the activity list — double-click to reset" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize activity list" aria-valuemin="72" aria-valuemax="600"></div>
         <div class="wf-side-hdr pnl-hd">
           <button type="button" class="wf-side-hdr-button" id="wf-act-collapse" aria-controls="wf-act-panel-body" aria-expanded="true">
             <span class="wf-side-chev">
