@@ -135,7 +135,7 @@ function wfNewNode(type,x,y){
   // Timing ▸ (gear) dialog. Existing nodes are unaffected; this is a stamp.
   const nd=(typeof WF!=="undefined"&&WF.nodeDefaults)||{};
   const num=(k,fallback)=>{ const v=parseFloat(nd[k]); return Number.isFinite(v)?v:fallback; };
-  return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",
+  return {id:wfUid(),type,x,y,params:wfDefaults(type),note:"",log:"",outputLog:"",
     delayBefore:num("delayBefore",0), delayAfter:num("delayAfter",0),
     retryCount:num("retryCount",0), retryDelay:num("retryDelay",0),
     screenshotOnFail:!!nd.screenshotOnFail,

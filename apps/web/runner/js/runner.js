@@ -1116,7 +1116,9 @@ function selectAll(type, enabled){
 // Python pushes JPEG frames to window.__recvFrame while the panel is open; the
 // frame source is the same capture backend a run uses, so the preview is what
 // the macro sees. Hide stops the capture loop; maximize lets it fill the pane.
-let pvActive = true;    // body shown (not collapsed)
+// Preview is opt-in: keeping it off avoids a capture thread and frame buffers
+// consuming memory while the Runner is used only as an activity monitor.
+let pvActive = false;   // body shown (not collapsed)
 let pvMaxed  = false;   // expanded over the right pane
 
 function pvApply(){

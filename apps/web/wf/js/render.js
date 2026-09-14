@@ -927,7 +927,10 @@ function wfNodeEl(n){
     <button class="wf-act-copy" title="Copy">${copySvg}</button>
   </div>`;
   const noteHtml = n.note ? `<div class="wf-node-note">${wfIco("edit")}<span>${escHtml(n.note)}</span></div>` : "";
-  const logHtml = n.log ? `<div class="wf-node-log">${escHtml(n.log)}</div>` : "";
+  const logs=[];
+  if(n.log) logs.push(`<div class="wf-node-log wf-node-log-in"><b>IN</b>${escHtml(n.log)}</div>`);
+  if(n.outputLog) logs.push(`<div class="wf-node-log wf-node-log-out"><b>OUT</b>${escHtml(n.outputLog)}</div>`);
+  const logHtml=logs.join("");
   const delayHtml = wfDelayChipsHtml(n);
   const rp=[];
   if(n.retryCount) rp.push(`${wfIco("loop")}<span>Retry ${n.retryCount}×</span>`);

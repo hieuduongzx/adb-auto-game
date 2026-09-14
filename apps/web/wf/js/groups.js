@@ -752,6 +752,7 @@ async function wfRunSingleNode(node){
   const clean={ id:node.id, type:node.type, params:Object.assign({}, node.params||{}) };
   if(node.note) clean.note=node.note;
   if(node.log)  clean.log=node.log;
+  if(node.outputLog) clean.outputLog=node.outputLog;
   // Per-node timing/retry used by the engine for real runs — include so test
   // matches production behaviour (except wait timeout which is capped).
   if(node.delayBefore) clean.delayBefore=node.delayBefore;

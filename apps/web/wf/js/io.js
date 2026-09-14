@@ -17,7 +17,7 @@ function wfHydNodeDefaults(d){
 }
 function wfCleanGraph(g){
   return {
-    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.delayBefore) o.delayBefore=n.delayBefore; if(n.delayAfter) o.delayAfter=n.delayAfter; if(n.retryCount) o.retryCount=n.retryCount; if(n.retryDelay) o.retryDelay=n.retryDelay; if(n.screenshotOnFail) o.screenshotOnFail=true; if(n.showPreview) o.showPreview=true; if(n.stack) o.stack=n.stack; return o; }),
+    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.outputLog) o.outputLog=n.outputLog; if(n.delayBefore) o.delayBefore=n.delayBefore; if(n.delayAfter) o.delayAfter=n.delayAfter; if(n.retryCount) o.retryCount=n.retryCount; if(n.retryDelay) o.retryDelay=n.retryDelay; if(n.screenshotOnFail) o.screenshotOnFail=true; if(n.showPreview) o.showPreview=true; if(n.stack) o.stack=n.stack; return o; }),
     edges:(g.edges||[]).map(e=>{ const o={from:e.from,fromPort:e.fromPort,to:e.to}; if(e.toPort&&e.toPort!=="in") o.toPort=e.toPort; return o; }),
     groups:(g.groups||[]).map(gr=>({id:gr.id,name:gr.name,x:Math.round(gr.x),y:Math.round(gr.y),w:Math.round(gr.w),h:Math.round(gr.h),color:gr.color||0})),
   };
@@ -89,6 +89,7 @@ function wfApplyNodeJson(node, raw){
   if(o.params!==undefined) node.params=o.params||{};
   if(o.note!==undefined) node.note=o.note||"";
   if(o.log!==undefined) node.log=o.log||"";
+  if(o.outputLog!==undefined) node.outputLog=o.outputLog||"";
   if(o.delayBefore!==undefined) node.delayBefore=parseFloat(o.delayBefore)||0;
   if(o.delayAfter!==undefined) node.delayAfter=parseFloat(o.delayAfter)||0;
   if(o.retryCount!==undefined) node.retryCount=parseInt(o.retryCount,10)||0;
@@ -184,7 +185,7 @@ function wfHydrateGraph(g){
       params.y2=y+(params.h===undefined?100:Math.max(0,Number(params.h)||0));
       delete params.x; delete params.y; delete params.w; delete params.h;
     }
-    return {id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params,note:n.note||"",log:n.log||"",
+    return {id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params,note:n.note||"",log:n.log||"",outputLog:n.outputLog||"",
       delayBefore:parseFloat(delayBefore)||0, delayAfter:parseFloat(n.delayAfter)||0,
       retryCount:parseInt(n.retryCount,10)||0, retryDelay:parseFloat(n.retryDelay)||0, screenshotOnFail:!!n.screenshotOnFail,
       showPreview:!!n.showPreview,stack:n.stack||null};

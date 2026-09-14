@@ -1462,9 +1462,11 @@ def create_workflow_runner_window(title: Optional[str] = None,
         title=title,
         url=url,
         js_api=api,
-        width=800,
-        height=1000,
-        resizable=True,
+        # Fixed desktop canvas: the right control pane gets more room than the
+        # activity list, so the Runner stays compact without breaking the split.
+        width=720,
+        height=800,
+        resizable=False,
         min_size=(420, 620),
         background_color=theme_background(),
     )

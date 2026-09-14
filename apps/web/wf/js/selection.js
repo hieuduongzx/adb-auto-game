@@ -47,7 +47,7 @@ function wfCopy(){
   if(!ids.length) return false;
   const idset=new Set(ids);
   const nodes=ids.map(id=>{ const n=g.nodes.find(x=>x.id===id);
-    return { type:n.type, x:n.x, y:n.y, note:n.note||"", log:n.log||"", showPreview:!!n.showPreview,
+    return { type:n.type, x:n.x, y:n.y, note:n.note||"", log:n.log||"", outputLog:n.outputLog||"", showPreview:!!n.showPreview,
       delayBefore:n.delayBefore||0, delayAfter:n.delayAfter||0,
       retryCount:n.retryCount||0, retryDelay:n.retryDelay||0, screenshotOnFail:!!n.screenshotOnFail,
       stack:n.stack||null, params:JSON.parse(JSON.stringify(n.params||{})) }; });
@@ -78,7 +78,7 @@ function wfPaste(opts){
     const node=wfNewNode(n.type, n.x+dx, n.y+dy);
     node.id=newIds[i];
     node.params=JSON.parse(JSON.stringify(n.params||{}));
-    node.note=n.note||""; node.log=n.log||""; node.showPreview=!!n.showPreview;
+    node.note=n.note||""; node.log=n.log||""; node.outputLog=n.outputLog||""; node.showPreview=!!n.showPreview;
     // A duplicate is an exact copy, not a fresh node — carry the original's
     // timing/failure handling across instead of re-stamping the project defaults.
     if(n.delayBefore!==undefined) node.delayBefore=n.delayBefore;

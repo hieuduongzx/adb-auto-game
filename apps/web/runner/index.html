@@ -130,7 +130,13 @@
         <div class="rpane" id="r-settings" role="tabpanel">
           <div class="rpane-scroll">
             <div class="settings-card" id="game-card" style="display:none">
-              <div class="settings-section-title">Game</div>
+              <div class="settings-card-head">
+                <div>
+                  <h2 class="settings-section-title">Game</h2>
+                  <p class="settings-card-desc">Choose the Windows game executable used by this workflow.</p>
+                </div>
+                <span class="settings-card-kicker">Win32</span>
+              </div>
               <div class="setting-block">
                 <label class="form-lbl" for="game-path">Game path (.exe)</label>
                 <div class="setting-path-control">
@@ -143,7 +149,13 @@
             </div>
 
             <div class="settings-card" id="req-card" style="display:none">
-              <div class="settings-section-title">Game files</div>
+              <div class="settings-card-head">
+                <div>
+                  <h2 class="settings-section-title">Game files</h2>
+                  <p class="settings-card-desc">Files bundled with this Runner that may need to be installed beside the game.</p>
+                </div>
+                <span class="settings-card-kicker">Files</span>
+              </div>
               <p class="req-status" id="req-status" role="status" aria-live="polite"></p>
               <ul class="req-list mono" id="req-list" aria-label="Required game files"></ul>
               <div class="req-actions">
@@ -154,7 +166,13 @@
             </div>
 
             <div class="settings-card" id="emu-card" style="display:none">
-              <div class="settings-section-title">Emulator</div>
+              <div class="settings-card-head">
+                <div>
+                  <h2 class="settings-section-title">Emulator</h2>
+                  <p class="settings-card-desc">Set the emulator family and install folder used by emulator actions.</p>
+                </div>
+                <span class="settings-card-kicker">ADB</span>
+              </div>
               <div class="setting-block">
                 <label class="form-lbl" for="emu-kind">Family</label>
                 <select id="emu-kind" class="runtime-setting-control" onchange="onEmulatorKindChange(this.value)">
@@ -177,7 +195,13 @@
             </div>
 
             <div class="settings-card" id="speed-card">
-              <div class="settings-section-title">Speed hack</div>
+              <div class="settings-card-head">
+                <div>
+                  <h2 class="settings-section-title">Speed hack</h2>
+                  <p class="settings-card-desc">Adjust runtime speed for supported Android games.</p>
+                </div>
+                <span class="settings-card-kicker">Optional</span>
+              </div>
               <div class="toggle-row">
                 <button type="button" class="toggle" id="speed-toggle" onclick="onSpeedToggle()" role="switch" aria-label="Enable speed hack" aria-checked="false"></button>
                 <div class="toggle-text">
@@ -194,7 +218,13 @@
             </div>
 
             <div class="settings-card" id="updates-card">
-              <div class="settings-section-title">Updates</div>
+              <div class="settings-card-head">
+                <div>
+                  <h2 class="settings-section-title">Updates</h2>
+                  <p class="settings-card-desc">Keep this standalone Runner on the latest published build.</p>
+                </div>
+                <span class="settings-card-kicker">Runner</span>
+              </div>
               <dl class="upd-facts">
                 <dt>Version</dt><dd class="mono" id="upd-version">—</dd>
                 <dt>Source</dt><dd class="mono" id="upd-repo">—</dd>
@@ -208,7 +238,13 @@
             </div>
 
             <div class="settings-card" id="appearance-card">
-              <div class="settings-section-title">Appearance</div>
+              <div class="settings-card-head">
+                <div>
+                  <h2 class="settings-section-title">Appearance</h2>
+                  <p class="settings-card-desc">Tune the shared look and information density of Macro2k windows.</p>
+                </div>
+                <span class="settings-card-kicker">Shared</span>
+              </div>
               <div class="setting-block">
                 <span class="form-lbl">Theme</span>
                 <div class="choice-seg" id="theme-seg" role="radiogroup" aria-label="Theme">

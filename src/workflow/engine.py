@@ -1275,6 +1275,14 @@ class WorkflowEngine:
         targets = adj.get((node_id, port))
         return targets[0] if targets else None
 
+    def _node_done(self, node: Dict[str, Any], nid: str, status: str,
+                   port: Optional[str]) -> None:
+        """Emit a node result, writing its exit log with post-run variables."""
+        output_log = node.get("outputLog")
+        if output_log:
+            log_info(self._format_msg(output_log), kind=LOG_KIND_USER)
+        self._emit("on_node_done", nid, status, port)
+
     def _run_graph(self, graph: Dict[str, Any], depth: int = 0, start_id: Optional[str] = None) -> bool:
         nodes = {n.get("id"): n for n in graph.get("nodes", []) or []}
         adj = self._build_adjacency(graph.get("edges", []) or [])
@@ -1315,15 +1323,15 @@ class WorkflowEngine:
             self._emit("on_node", cur)  # let the designer highlight the active node
             nid = cur                    # stable id for the post-run result event
             ntype = node.get("type")
-            if ntype == "end":
-                self._reached_end = True
-                self._emit("on_node_done", nid, "ok", None)
-                break
-            # Per-node log line (designer's "Log khi chạy" field): auto-emit it
-            # every time the block runs, filling {var} placeholders from vars.
+            # Input log: emit as soon as execution enters the block. `log` keeps
+            # its legacy key so existing workflow files retain this behavior.
             custom_log = node.get("log")
             if custom_log:
                 log_info(self._format_msg(custom_log), kind=LOG_KIND_USER)
+            if ntype == "end":
+                self._reached_end = True
+                self._node_done(node, nid, "ok", None)
+                break
             spec = NODE_TYPES.get(ntype)
             kind = spec.get("kind") if spec else None
             params = node.get("params", {}) or {}
@@ -1339,7 +1347,7 @@ class WorkflowEngine:
 
             if kind == "stop":
                 log_info("■ Stop block reached — stopping the run", kind=LOG_KIND_ACTIVITY)
-                self._emit("on_node_done", nid, "ok", None)
+                self._node_done(node, nid, "ok", None)
                 self.stop()
                 break
             elif kind == "try_next":
@@ -1350,7 +1358,7 @@ class WorkflowEngine:
                     self._branch_failed = True
                 else:
                     log_warning("'Thử nhánh kế' ngoài Try in order — không có hiệu lực")
-                self._emit("on_node_done", nid, "ok", None)
+                self._node_done(node, nid, "ok", None)
                 break
             elif kind == "condition":
                 try:
@@ -1360,7 +1368,7 @@ class WorkflowEngine:
                     res = False
                     log_error(f"Node '{ntype}' error: {e}")
                 port = "true" if res else "false"
-                self._emit("on_node_done", nid, "ok", port)  # branch taken
+                self._node_done(node, nid, "ok", port)  # branch taken
                 nxt = self._next(adj, cur, port)
                 if nxt is None:
                     nxt = self._next(adj, cur, "out")
@@ -1387,7 +1395,7 @@ class WorkflowEngine:
                         log_info(f"↺ vòng lặp xong {done} lần")
                         counters[cur] = 0
                         loop_port = "done"
-                self._emit("on_node_done", nid, "ok", loop_port)
+                self._node_done(node, nid, "ok", loop_port)
                 cur = self._next(adj, cur, loop_port)
             elif kind == "loop_until":
                 # Lặp đến khi <điều kiện>: mỗi lần (re-)enter node, kiểm tra một
@@ -1418,7 +1426,7 @@ class WorkflowEngine:
                             counters[cur] = done + 1
                             steps = 0  # vòng lặp chủ ý — đừng để step cap cắt ngang
                             lu_port = "body"
-                self._emit("on_node_done", nid, "ok" if lu_port != "fail" else "fail", lu_port)
+                self._node_done(node, nid, "ok" if lu_port != "fail" else "fail", lu_port)
                 nxt = self._next(adj, cur, lu_port)
                 if lu_port == "fail" and nxt is None:
                     # fail không đi dây → nhánh này coi như thất bại (đỏ), giống
@@ -1443,41 +1451,41 @@ class WorkflowEngine:
                         is_last = ctx["remaining"] == 0
                     if not is_last:
                         # Not the last branch — stop this thread here.
-                        self._emit("on_node_done", nid, "ok", None)
+                        self._node_done(node, nid, "ok", None)
                         break
                     # Last branch: fall through and continue from "out".
-                self._emit("on_node_done", nid, "ok", "out")
+                self._node_done(node, nid, "ok", "out")
                 cur = self._next(adj, cur, "out")
             elif kind == "and":
                 expected = max(1, int(params.get("count", 2) or 2))
                 ctx = getattr(self._ctx, "join_ctx", None)
                 if ctx is None:
                     if expected <= 1:
-                        self._emit("on_node_done", nid, "ok", "out")
+                        self._node_done(node, nid, "ok", "out")
                         cur = self._next(adj, cur, "out")
                     else:
                         log_warning(f"And cần {expected} nhánh song song")
                         self._branch_failed = True
-                        self._emit("on_node_done", nid, "fail", "out")
+                        self._node_done(node, nid, "fail", "out")
                         break
                 else:
                     is_last, ok = self._and_arrive(ctx, cur, expected, self._branch_failed)
                     if not is_last:
-                        self._emit("on_node_done", nid, "ok", None)
+                        self._node_done(node, nid, "ok", None)
                         break
                     if not ok:
                         log_warning(f"And fail: có nhánh lỗi trước khi gộp {expected} nhánh")
                         self._branch_failed = True
-                        self._emit("on_node_done", nid, "fail", "out")
+                        self._node_done(node, nid, "fail", "out")
                         break
-                    self._emit("on_node_done", nid, "ok", "out")
+                    self._node_done(node, nid, "ok", "out")
                     cur = self._next(adj, cur, "out")
             elif kind == "random":
                 # Pick one of count numbered ports at random (uniform distribution).
                 count = max(1, int(params.get("count", 2)))
                 chosen = str(random.randint(1, count))
                 log_info(f"🎲 ngẫu nhiên → nhánh {chosen}/{count}")
-                self._emit("on_node_done", nid, "ok", chosen)
+                self._node_done(node, nid, "ok", chosen)
                 cur = self._next(adj, cur, chosen)
             elif kind == "try_chain":
                 count = max(1, int(params.get("count", 3)))
@@ -1498,7 +1506,7 @@ class WorkflowEngine:
                         continue
                     attempted += 1
                     log_info(f"thử nhánh {port}/{count}")
-                    self._emit("on_node_done", nid, "ok", port)
+                    self._node_done(node, nid, "ok", port)
                     self._vars = dict(vars0)
                     self._last_pos = pos0
                     self._break_loop = False
@@ -1520,7 +1528,7 @@ class WorkflowEngine:
                 self._vars = dict(vars0)
                 self._last_pos = pos0
                 self._branch_failed = failed0
-                self._emit("on_node_done", nid, "fail", "fail")
+                self._node_done(node, nid, "fail", "fail")
                 if attempted:
                     log_warning("tất cả nhánh thử lần lượt đều fail")
                 cur = self._next(adj, cur, "fail")
@@ -1545,7 +1553,7 @@ class WorkflowEngine:
                         continue
                     ran += 1
                     log_info(f"▶ chạy lần lượt nhánh {port}/{count}")
-                    self._emit("on_node_done", nid, "ok", port)
+                    self._node_done(node, nid, "ok", port)
                     self._branch_failed = False
                     self._break_loop = False
                     # Nhánh tuần tự không phải nhánh try_chain: một action fail
@@ -1576,7 +1584,7 @@ class WorkflowEngine:
                             break
                     except Exception as e:
                         log_warning(f"switch case {i} ({ctype}) lỗi: {e}")
-                self._emit("on_node_done", nid, "ok", taken)
+                self._node_done(node, nid, "ok", taken)
                 nxt = self._next(adj, cur, taken)
                 cur = nxt if nxt is not None else self._next(adj, cur, "default")
             elif kind == "call":
@@ -1599,7 +1607,7 @@ class WorkflowEngine:
                         log_warning(f"ƒ {fn.get('name', fid)} → false (dead-end, không tới node End)")
                 # Result port: "true" khi function tới node End, "false" khi dead-end.
                 port = "true" if ok_call else "false"
-                self._emit("on_node_done", nid, "ok" if ok_call else "fail", port)
+                self._node_done(node, nid, "ok" if ok_call else "fail", port)
                 nxt = self._next(adj, cur, port)
                 if nxt is None:
                     # Legacy flows wired the call's single "out" port — follow it
@@ -1623,7 +1631,7 @@ class WorkflowEngine:
                     log_warning(f"Unknown node: {ntype}", kind=LOG_KIND_ACTIVITY)
                     ok_act = False
                     self._branch_failed = True
-                self._emit("on_node_done", nid, "ok" if ok_act else "fail", "out")
+                self._node_done(node, nid, "ok" if ok_act else "fail", "out")
                 if self._try_chain_mode and not ok_act:
                     break
                 cur = self._next(adj, cur, "out")
@@ -2733,6 +2741,9 @@ class WorkflowEngine:
         spec = NODE_TYPES.get(ntype)
         kind = spec.get("kind") if spec else None
         self._emit("on_node", nid)
+        input_log = work.get("log")
+        if input_log:
+            log_info(self._format_msg(input_log), kind=LOG_KIND_USER)
         port: Optional[str] = None
         status = "ok"
         try:
@@ -2761,7 +2772,7 @@ class WorkflowEngine:
             log_error(f"Node '{ntype}' error: {e}")
             status = "fail"
             port = "out"
-        self._emit("on_node_done", nid, status, port)
+        self._node_done(work, nid, status, port)
         self._emit("on_node", None)  # clear the amber highlight
         return {"status": status, "port": port}
 

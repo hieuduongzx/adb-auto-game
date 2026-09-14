@@ -881,29 +881,38 @@ function wfUpdNodeNote(node){
 }
 
 function wfLogField(node){
-  const b=wfInspBlock("Run log");
-  const row=document.createElement("div"); row.className="wf-field full";
-  const inpRow=document.createElement("div"); inpRow.style.cssText="display:flex;gap:5px;align-items:center;";
-  const inp=document.createElement("input"); inp.type="text"; inp.className="wf-insp-input";
-  inp.placeholder="write a log each time this node runs…"; inp.value=node.log||"";
-  inp.oninput=()=>{ wfPushUndoDebounced(); node.log=inp.value; wfUpdNodeLog(node); };
-  inpRow.appendChild(inp); inpRow.appendChild(wfInsertVarBtn(inp));
-  row.appendChild(inpRow); b.appendChild(row);
+  const b=wfInspBlock("Run logs");
+  const add=(key,label,placeholder)=>{
+    const row=document.createElement("div"); row.className="wf-field full wf-run-log-field";
+    const lab=document.createElement("label"); lab.textContent=label; row.appendChild(lab);
+    const inpRow=document.createElement("div"); inpRow.className="wf-run-log-input";
+    const inp=document.createElement("input"); inp.type="text"; inp.className="wf-insp-input";
+    inp.placeholder=placeholder; inp.value=node[key]||"";
+    inp.oninput=()=>{ wfPushUndoDebounced(); node[key]=inp.value; wfUpdNodeLog(node); };
+    inpRow.appendChild(inp); inpRow.appendChild(wfInsertVarBtn(inp));
+    row.appendChild(inpRow); b.appendChild(row);
+  };
+  // Existing `log` values remain input logs, preserving old workflow behavior.
+  add("log","Input log","written before this block runs…");
+  add("outputLog","Output log","written when this block reaches an output…");
   const hint=document.createElement("div"); hint.className="wf-insp-tip";
-  hint.innerHTML='Insert variables with <code>{variable_name}</code>.';
+  hint.innerHTML='Input runs when entering the block; Output runs when leaving it. Insert variables with <code>{variable_name}</code>.';
   b.appendChild(hint);
   return b;
 }
 function wfUpdNodeLog(node){
   const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
-  let n=el.querySelector(".wf-node-log");
-  if(node.log){
-    if(!n){ n=document.createElement("div"); n.className="wf-node-log";
-      const note=el.querySelector(".wf-node-note"), thumb=el.querySelector(".wf-node-thumb");
-      if(thumb) el.insertBefore(n, thumb); else el.appendChild(n);
-      el.classList.remove("collapsed"); }
-    n.textContent=node.log;
-  } else if(n){ n.remove(); }
+  el.querySelectorAll(".wf-node-log").forEach(n=>n.remove());
+  const thumb=el.querySelector(".wf-node-thumb");
+  [["log","IN"],["outputLog","OUT"]].forEach(([key,label])=>{
+    if(!node[key]) return;
+    const n=document.createElement("div");
+    n.className=`wf-node-log wf-node-log-${key==="log"?"in":"out"}`;
+    const tag=document.createElement("b"); tag.textContent=label; n.appendChild(tag);
+    n.appendChild(document.createTextNode(node[key]));
+    if(thumb) el.insertBefore(n,thumb); else el.appendChild(n);
+    el.classList.remove("collapsed");
+  });
 }
 
 function wfActField(label,t,val,onset){

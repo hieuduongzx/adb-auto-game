@@ -2,24 +2,24 @@
    Loaded after ../shared/base.css; only app-specific rules live here. */
 
 /* ── App frame ─────────────────────────────────────────────────────────── */
-#app { padding: 10px 10px 5px; gap: 6px; }
+#app { padding: 7px 7px 4px; gap: 5px; }
 
 /* Split body: left = activities (tabs + lists), right = activity settings + log. */
-#main-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
-#main-split { flex: 1; min-height: 0; display: flex; gap: 8px; }
-#pane-left  { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-#pane-right { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+#main-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
+#main-split { flex: 1; min-height: 0; display: flex; gap: 6px; }
+#pane-left  { flex: 0 1 39%; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+#pane-right { flex: 0 1 61%; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 
 /* ── Header card ───────────────────────────────────────────────────────── */
 /* One flex column: the progress row sits between title and controls only while
    a run is live, and a column gap gives the right spacing in both states —
    margins on the rows above it left a dead 11px gap whenever it was hidden. */
 #header-card {
-  padding: 12px 13px;
+  padding: 9px 10px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 8px;
 }
 .header-top {
   display: flex;
@@ -29,7 +29,7 @@
 .header-title-block { flex: 1; min-width: 0; }
 /* The game's icon — the same art as its .exe and its Hub card. */
 .app-icon {
-  width: 34px; height: 34px; flex-shrink: 0; border-radius: 8px; overflow: hidden;
+  width: 30px; height: 30px; flex-shrink: 0; border-radius: 7px; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
 }
@@ -91,7 +91,7 @@
 .prog-elapsed { font-family: var(--mono); font-size: var(--t-ui); font-weight: 500; color: var(--dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
 /* Control buttons */
-.header-btns { display: flex; align-items: center; gap: 7px; }
+.header-btns { display: flex; align-items: center; gap: 6px; }
 /* One primary button, green while it means Start and red once it means Stop —
    see setPrimary() in runner.js. */
 .btn-start { flex: 2; background: var(--ok); color: var(--on-ok); border-color: var(--ok); font-size: var(--t-body); font-weight: 700; border-radius: var(--r-sm); }
@@ -110,7 +110,7 @@
   overflow: hidden;
 }
 .tab-btn {
-  flex: 1; justify-content: center; padding: 9px 8px; border-radius: 0;
+  flex: 1; justify-content: center; padding: 7px 6px; border-radius: 0;
   border-right: 1px solid var(--line); color: var(--dim);
   display: inline-flex; align-items: center; gap: 5px;
   transition: background .12s, color .12s;
@@ -142,7 +142,7 @@
 /* Activity row — name on top, a status / settings line under it. A 3px bar on
    the left edge carries the live state (amber running, red failed), so a
    glance down the list finds where the run is and what broke. */
-.task-row { position: relative; display: flex; align-items: center; gap: 9px; padding: 8px 10px 8px 9px; min-height: 50px; border-bottom: 1px solid var(--line); transition: background .1s; }
+.task-row { position: relative; display: flex; align-items: center; gap: 6px; padding: 5px 7px 5px 7px; min-height: 38px; border-bottom: 1px solid var(--line); transition: background .1s; }
 .task-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; transition: background .15s; }
 .task-row:last-child { border-bottom: none; }
 .task-row:hover { background: var(--surface); }
@@ -151,7 +151,7 @@
 .task-row.task-failed::before { background: var(--err); }
 
 /* Drag-to-reorder */
-.drag-handle { width: 16px; align-self: stretch; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: -8px 0 -8px -4px; color: var(--dot-off); cursor: grab; touch-action: none; transition: color .12s; }
+.drag-handle { width: 14px; align-self: stretch; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: -5px 0 -5px -3px; color: var(--dot-off); cursor: grab; touch-action: none; transition: color .12s; }
 .drag-handle:hover { color: var(--dim); }
 .drag-handle:active { cursor: grabbing; }
 .task-row.dragging { opacity: .55; background: var(--accent-bg); }
@@ -164,9 +164,9 @@
 
 /* Name block */
 .task-name-block { flex: 1; min-width: 0; cursor: pointer; }
-.task-name { font-size: var(--t-title); font-weight: 600; line-height: 1.3; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
+.task-name { font-size: var(--t-body); font-weight: 600; line-height: 1.25; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
 .task-row.task-off .task-name { color: var(--muted); font-weight: 500; }
-.task-meta { display: flex; align-items: center; gap: 5px; margin-top: 2px; font-size: var(--t-caption); line-height: 1.35; color: var(--dim); white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
+.task-meta { display: flex; align-items: center; gap: 5px; margin-top: 1px; font-size: var(--t-caption); line-height: 1.2; color: var(--dim); white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
 .task-meta:empty { display: none; }
 .task-meta .sep { color: var(--dot-off); }
 .act-st { font-weight: 600; }
@@ -190,7 +190,7 @@
 /* Sizes come from the shared ladder (icons.css) — see the markup's uico class.
    The rules below cover layout and colour only. */
 .task-btns { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-.btn-icon { width: 26px; height: 26px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; transition: background .12s, color .12s; }
+.btn-icon { width: 24px; height: 24px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; transition: background .12s, color .12s; }
 .btn-gear { color: var(--muted); }
 .btn-gear.active { color: var(--accent); }
 .btn-gear:hover { background: var(--alt); color: var(--dim); }
@@ -210,7 +210,7 @@
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
 }
 .rtab {
-  flex: 1; justify-content: center; min-width: 0; padding: 9px 8px;
+  flex: 1; justify-content: center; min-width: 0; padding: 7px 5px;
   border-right: 1px solid var(--line); border-radius: 0;
   display: inline-flex; align-items: center; gap: 5px;
   font-size: var(--t-ui); font-weight: 600; color: var(--dim);
@@ -229,7 +229,7 @@
 .rpane-hd { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 13px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
 .rpane-title { font-size: var(--t-body); font-weight: 600; color: var(--ink); }
 .rpane-sp { flex: 1; }
-.rpane-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.rpane-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 9px; display: flex; flex-direction: column; gap: 9px; }
 
 /* Activity settings pane */
 .act-set-hd { display: flex; align-items: center; gap: 6px; padding: 10px 8px 10px 13px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
@@ -286,10 +286,10 @@
 .empty-note b { color: var(--ink); }
 
 /* ── Updates card ──────────────────────────────────────────────────────── */
-.upd-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 12px; }
+.upd-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 12px; margin: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); }
 .upd-facts dt { font-size: var(--t-caption); color: var(--muted); }
 .upd-facts dd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
-.upd-status { font-size: var(--t-caption); color: var(--dim); line-height: 1.45; }
+.upd-status { margin: 0; font-size: var(--t-caption); color: var(--dim); line-height: 1.45; }
 .upd-bar { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .upd-bar[hidden] { display: none; }
 .upd-bar-fill { height: 100%; width: 100%; transform: scaleX(0); transform-origin: left; background: var(--ok); transition: transform .2s ease; }
@@ -300,19 +300,23 @@
 
 /* ── Settings tab ───────────────────────────────────────────────────────── */
 #tab-settings .pane-inner { overflow-y: auto; }
-.settings-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); padding: 13px 14px; display: flex; flex-direction: column; gap: 12px; }
-.settings-section-title { font-size: var(--t-body); font-weight: 600; letter-spacing: 0; color: var(--ink); text-transform: none; }
+.settings-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px; display: flex; flex-direction: column; gap: 9px; }
+.settings-card-head { display: flex; align-items: flex-start; gap: 12px; justify-content: space-between; }
+.settings-card-head > div { min-width: 0; }
+.settings-section-title { margin: 0; font-size: var(--t-title); font-weight: 700; letter-spacing: -.01em; color: var(--ink); text-transform: none; }
+.settings-card-desc { margin: 2px 0 0; max-width: 44ch; font-size: var(--t-caption); line-height: 1.35; color: var(--muted); }
+.settings-card-kicker { flex-shrink: 0; padding: 2px 6px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); font-size: var(--t-micro); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .toggle-row { display: flex; align-items: center; gap: 10px; }
 .toggle-text { flex: 1; }
 .toggle-name { font-size: var(--t-body); font-weight: 500; color: var(--ink); }
 .toggle-hint { font-size: var(--t-caption); color: var(--muted); margin-top: 1px; }
 
 /* Appearance card — a labelled block per preference. */
-.setting-block { display: flex; flex-direction: column; gap: 6px; }
+.setting-block { display: flex; flex-direction: column; gap: 6px; padding-top: 1px; }
 .setting-block .form-lbl { margin-bottom: 0; }
-.settings-note { font-size: var(--t-micro); color: var(--muted); line-height: 1.5; }
+.settings-note { margin: 0; font-size: var(--t-caption); color: var(--muted); line-height: 1.5; }
 /* Game files (requirements/) — what the player copies into the game folder. */
-.req-status { font-size: var(--t-ui); color: var(--dim); line-height: 1.45; overflow-wrap: anywhere; }
+.req-status { margin: 0; padding: 8px 10px; border-radius: var(--r-sm); background: var(--surface); font-size: var(--t-ui); color: var(--dim); line-height: 1.45; overflow-wrap: anywhere; }
 .req-status.ok { color: var(--ok); }
 .req-status.warn { color: var(--warn); }
 .req-list { margin: 0; padding: 7px 10px; list-style: none; max-height: 132px; overflow-y: auto;
@@ -321,11 +325,19 @@
 .req-list li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .req-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
+/* Treat the path and its picker as one composed control. */
+.setting-path-control { padding: 3px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
+.setting-path-control:focus-within { border-color: var(--accent-bd); box-shadow: 0 0 0 2px var(--accent-bg); }
+.setting-path-input { border-color: transparent; background: transparent; }
+.setting-path-input:focus { outline: none; border-color: transparent; box-shadow: none; }
+.btn-path-pick { height: 30px; }
+
 /* Toggle switch (square operator-console variant) */
 .toggle { width: 38px; height: 22px; border-radius: 5px; background: var(--dot-off); flex-shrink: 0; position: relative; transition: background .2s; cursor: pointer; }
 .toggle.on { background: var(--accent); }
 .toggle::after { content: ''; position: absolute; width: 18px; height: 18px; border-radius: 3px; background: var(--on-accent); top: 2px; left: 2px; transition: transform .2s var(--ease-out); }
 .toggle.on::after { transform: translateX(16px); }
+.toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Speed slider row */
 .speed-row { display: flex; align-items: center; gap: 10px; }
@@ -366,9 +378,12 @@
 /* ── Narrow window (down to the 420px minimum) ──────────────────────────── */
 @media (max-width: 448px) {
   .list-header { flex-wrap: wrap; }
+  .settings-card-kicker { display: none; }
+  .settings-card { padding: 12px; }
+  .rpane-scroll { padding: 10px; gap: 10px; }
 }
 /* Too narrow for two columns — stack activities on top, panels + preview below. */
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   #main-split { flex-direction: column; }
   #pane-right { flex: 0 1 auto; max-height: 72%; }
   #preview-card:not(.is-max) .pv-body { height: 180px; }
