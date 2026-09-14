@@ -111,11 +111,15 @@
 }
 .tab-btn {
   flex: 1; justify-content: center; padding: 9px 8px; border-radius: 0;
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--line); color: var(--dim);
   display: inline-flex; align-items: center; gap: 5px;
+  transition: background .12s, color .12s;
 }
 .tab-btn:last-child { border-right: 0; }
 .tab-btn::after { left: 12px; right: 12px; }
+/* Same filled active state as the right column's tabs (.rtab). */
+.tab-btn.active { background: var(--accent-bg); }
+.tab-btn:hover:not(.active) { color: var(--ink2); }
 
 /* ── Tab content ───────────────────────────────────────────────────────── */
 .tab-pane { display: none; flex-direction: column; min-height: 0; overflow: hidden; padding: 0; }
@@ -123,9 +127,10 @@
 #tab-wrapper { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .pane-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 6px 0 2px; gap: 6px; overflow: hidden; }
 
-.list-header { display: flex; align-items: center; gap: 4px; padding: 0 2px; flex-shrink: 0; }
-.list-label { font-size: var(--t-body); font-weight: 600; letter-spacing: 0; color: var(--ink); text-transform: none; flex: 1; }
-.btn-sel { font-size: var(--t-caption); font-weight: 600; padding: 2px 7px; border-radius: 4px; color: var(--accent); transition: background .1s; }
+/* The tab already names the list, so the header carries "3 of 5 enabled". */
+.list-header { display: flex; align-items: center; gap: 4px; padding: 0 2px; min-height: 26px; flex-shrink: 0; }
+.list-label { font-size: var(--t-caption); font-weight: 600; letter-spacing: 0; color: var(--dim); text-transform: none; flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
+.btn-sel { font-size: var(--t-ui); font-weight: 600; padding: 3px 8px; border-radius: var(--r-sm); color: var(--accent); transition: background .1s; }
 .btn-sel:hover { background: var(--accent-bg); }
 .btn-sel.none { color: var(--muted); }
 .btn-sel.none:hover { background: var(--line); color: var(--dim); }
@@ -134,35 +139,52 @@
 /* scrollable task list */
 .task-list { flex: 1; min-height: 0; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); }
 
-/* Activity row */
-.task-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; min-height: 44px; border-bottom: 1px solid var(--line); transition: background .1s; }
+/* Activity row — name on top, a status / settings line under it. A 3px bar on
+   the left edge carries the live state (amber running, red failed), so a
+   glance down the list finds where the run is and what broke. */
+.task-row { position: relative; display: flex; align-items: center; gap: 9px; padding: 8px 10px 8px 9px; min-height: 50px; border-bottom: 1px solid var(--line); transition: background .1s; }
+.task-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; transition: background .15s; }
 .task-row:last-child { border-bottom: none; }
 .task-row:hover { background: var(--surface); }
-.task-row.task-running { background: var(--warn-bg) !important; box-shadow: none; }
+.task-row.task-running, .task-row.task-running:hover { background: var(--warn-bg); }
+.task-row.task-running::before { background: var(--warn); }
+.task-row.task-failed::before { background: var(--err); }
 
 /* Drag-to-reorder */
 .drag-handle { width: 16px; align-self: stretch; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: -8px 0 -8px -4px; color: var(--dot-off); cursor: grab; touch-action: none; transition: color .12s; }
 .drag-handle:hover { color: var(--dim); }
 .drag-handle:active { cursor: grabbing; }
 .task-row.dragging { opacity: .55; background: var(--accent-bg); }
+/* Reordering is locked during a run — say so instead of offering a dead grip. */
+#app.is-running .drag-handle { opacity: .35; cursor: default; }
+#app.is-running .drag-handle:hover { color: var(--dot-off); }
 
 /* The checkbox itself is shared/base.css — the list rows only make it clickable. */
 .task-row .cb { cursor: pointer; }
 
 /* Name block */
 .task-name-block { flex: 1; min-width: 0; cursor: pointer; }
-.task-name { font-size: var(--t-body); font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
-.task-name.dim { color: var(--muted); }
-.task-meta { font-size: var(--t-micro); color: var(--muted); font-family: var(--mono); margin-top: 1px; }
+.task-name { font-size: var(--t-title); font-weight: 600; line-height: 1.3; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
+.task-row.task-off .task-name { color: var(--muted); font-weight: 500; }
+.task-meta { display: flex; align-items: center; gap: 5px; margin-top: 2px; font-size: var(--t-caption); line-height: 1.35; color: var(--dim); white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
 .task-meta:empty { display: none; }
+.task-meta .sep { color: var(--dot-off); }
+.act-st { font-weight: 600; }
+.act-st.st-running { color: var(--warn); }
+.act-st.st-completed, .act-st.st-active { color: var(--ok-ink); }
+.act-st.st-failed { color: var(--err); }
+.act-st.st-skipped, .act-st.st-waiting { color: var(--muted); }
 
 /* Status dot (per-activity) */
-.act-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--dot-off); transition: background .2s; }
+.act-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--dot-off); transition: background .2s; }
 .act-dot-pending   { background: var(--dot-off); }
-.act-dot-running   { background: var(--warn); }
+.act-dot-running   { background: var(--warn); animation: actPulse 1.2s ease-in-out infinite; }
 .act-dot-completed { background: var(--ok); }
 .act-dot-failed    { background: var(--err); }
 .act-dot-skipped   { background: var(--muted); }
+.act-dot-active    { background: var(--ok); }
+@keyframes actPulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .act-dot-running { animation: none; } }
 
 /* Task action buttons */
 /* Sizes come from the shared ladder (icons.css) — see the markup's uico class.
@@ -231,12 +253,14 @@
 .pv-state { font-size: var(--t-micro); color: var(--muted); }
 .pv-sp { flex: 1; }
 .pv-btn { width: 26px; height: 26px; border-radius: var(--r-sm); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .12s, color .12s; }
-.pv-btn svg { width: 15px; height: 15px; }
 .pv-btn:hover { background: var(--alt); color: var(--dim); }
 .pv-btn.off { color: var(--accent); background: var(--accent-bg); }
 .pv-body { position: relative; flex: 1; min-height: 0; background: var(--log-bg); display: flex; align-items: center; justify-content: center; overflow: hidden; }
 #preview-card:not(.is-max) .pv-body { height: 240px; flex: none; }
 #pv-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+/* Before the first frame the <img> has no src — hide it, or its alt text is
+   drawn on top of "No preview". */
+#pv-img:not([src]) { display: none; }
 .pv-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--t-caption); color: var(--log-muted); }
 .setting-group { display: flex; flex-direction: column; }
 .setting-group-title { font-size: var(--t-micro); font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 3px; }
@@ -314,17 +338,26 @@
 .log-count { font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); background: var(--alt); border-radius: 4px; padding: 1px 6px; min-width: 17px; text-align: center; }
 .log-count:empty { display: none; }
 .log-search-wrap { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
-#log-search { width: 80px; font-family: var(--sans); font-size: var(--t-caption); background: transparent; border: none; color: var(--dim); padding: 0; }
+.log-search-wrap:focus-within { border-color: var(--accent-bd); }
+#log-search { width: 110px; font-family: var(--sans); font-size: var(--t-caption); background: transparent; border: none; color: var(--ink2); padding: 0; }
 #log-search::placeholder { color: var(--muted); }
 #log-search:focus { outline: none; }
-.btn-log-clear { font-size: var(--t-micro); font-weight: 600; color: var(--muted); padding: 2px 4px; border-radius: 4px; transition: color .1s; }
-.btn-log-clear:hover { color: var(--dim); }
-.log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px; background: var(--log-bg); }
-.log-line { display: flex; gap: 7px; font-family: var(--mono); font-size: var(--t-micro); line-height: 1.75; white-space: nowrap; }
+.btn-log-clear { font-size: var(--t-caption); font-weight: 600; color: var(--muted); padding: 3px 7px; border-radius: var(--r-sm); transition: color .1s, background .1s; }
+.btn-log-clear:hover { color: var(--dim); background: var(--alt); }
+/* The Runner log is the operator's feed (milestones, the workflow's own notes,
+   errors — see WorkflowRunnerAPI._on_log), so it reads a step larger than the
+   Designer's step-by-step log. */
+.log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 10px 8px; background: var(--log-bg); user-select: text; }
+.log-line { display: flex; gap: 8px; padding: 1px 0; font-family: var(--mono); font-size: var(--t-ui); line-height: 1.6; white-space: nowrap; }
 .log-line.hidden { display: none; }
-.log-ts  { color: var(--log-muted); flex-shrink: 0; }
+.log-ts  { color: var(--log-muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .log-tag { font-weight: 700; flex-shrink: 0; }
-.log-msg { color: var(--log-ink); white-space: normal; word-break: break-word; }
+.log-msg { min-width: 0; color: var(--log-ink); white-space: normal; overflow-wrap: anywhere; }
+/* "[Activity]" prefix; lines that belong to no activity say [Runner], quietly. */
+.log-scope { font-weight: 600; color: var(--accent); }
+.log-scope.is-app { color: var(--muted); }
+.log-line.k-run .log-msg, .log-line.k-activity .log-msg { font-weight: 600; color: var(--ink); }
+.log-line.lv-error .log-msg { color: var(--err); }
 .log-info    { color: var(--accent); }
 .log-success { color: var(--ok); }
 .log-warning { color: var(--warn); }

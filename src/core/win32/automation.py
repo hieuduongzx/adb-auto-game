@@ -756,6 +756,27 @@ class Win32Controller:
                                  ((ch or h) << 16) | ((cw or w) & 0xFFFF))
             log_info(f"[win32] resize_window → ({l},{t}) window {w}×{h}, client {cw}×{ch}"
                      f"{' · centered' if center else ''}  (borderless={borderless})")
+            # Some engines take the resize and then put their own resolution back
+            # a few hundred ms later. Unity does it for a client size it won't
+            # render at — Brown Dust II reverts a 1920×1080 *outer* window (client
+            # 1904×1041, not 16:9) to its previous size within 0.5s. Check once it
+            # has had the chance, so the block fails with the reason instead of
+            # reporting a resize that didn't stick.
+            time.sleep(0.5)
+            want = (int(width), int(height))
+            if client:
+                got = self.get_screen_size()
+            else:
+                after = self._get_window_rect() or (0, 0, 0, 0)
+                got = (after[2] - after[0], after[3] - after[1])
+            if abs(got[0] - want[0]) > 2 or abs(got[1] - want[1]) > 2:
+                hint = ("→ Bật 'Size = game area (client)' để vùng game đúng tỉ lệ game hỗ trợ (vd 16:9)."
+                        if not client else
+                        "→ Game không chấp nhận kích thước này (tỉ lệ / độ phân giải không hỗ trợ, hoặc lớn hơn màn hình).")
+                log_warning(f"[win32] ⚠ Game đã tự đổi lại kích thước: muốn "
+                            f"{want[0]}×{want[1]} {'client' if client else '(cả khung)'}, "
+                            f"hiện {got[0]}×{got[1]}. {hint}")
+                return False
             return True
         except Exception as exc:
             log_warning(f"[win32] resize_window lỗi: {exc}")

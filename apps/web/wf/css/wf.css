@@ -1506,6 +1506,19 @@
 .wf-var-badge .v { font-family:var(--mono); font-size:10px; color:var(--accent); max-width:76px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wf-var-badge .v.live { color:var(--run-ok); font-weight:600; }
+/* Typed quick pick for a variable block's Value (bool true | false, short
+   select options) — see wfVarRefField. */
+.wf-val-seg { flex:1; min-width:0; display:flex; gap:2px; padding:2px; background:var(--alt);
+  border:1px solid var(--border2); border-radius:var(--r-sm); }
+.wf-val-opt { flex:1; min-width:0; height:20px; padding:0 6px; border-radius:4px; font-family:var(--mono);
+  font-size:10.5px; font-weight:600; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  transition:background .1s, color .1s, box-shadow .1s; }
+.wf-val-opt:hover:not(.on) { color:var(--ink); background:color-mix(in srgb, var(--panel) 55%, transparent); }
+.wf-val-opt.on { background:var(--panel); color:var(--accent); box-shadow:var(--sh-sm); }
+.wf-val-opt.on.is-true { color:var(--run-ok); }
+.wf-val-opt.on.is-false { color:var(--run-fail); }
+.wf-val-opt:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.wf-var-field > .wf-val-select { flex:1; min-width:0; font-size:11px; padding:4px 7px; border-radius:var(--r-sm); }
 /* Floating variable menu */
 .wf-varmenu { position:fixed; z-index:var(--z-dropdown); background:var(--panel); border:1px solid var(--border2);
   border-radius:9px; box-shadow:var(--sh-lg); display:flex; flex-direction:column;
@@ -1516,7 +1529,7 @@
 .wf-varmenu-list { flex:1; overflow-y:auto; padding:2px 4px; }
 .wf-varmenu-empty { font-size:10.5px; color:var(--muted); padding:8px 6px; }
 .wf-varmenu-sep { font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
-  color:var(--muted); padding:6px 6px 2px; }
+  color:var(--muted); padding:6px 6px 2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .wf-varmenu-item { display:flex; align-items:baseline; gap:7px; width:100%; text-align:left;
   border:none; background:none; cursor:pointer; padding:4px 7px; border-radius:6px; color:var(--ink); }
 .wf-varmenu-item:hover { background:var(--accent-bg); }

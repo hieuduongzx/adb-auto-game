@@ -353,6 +353,12 @@
 .log-ts  { color: var(--log-muted); flex-shrink: 0; }
 .log-tag { font-weight: 700; flex-shrink: 0; }
 .log-msg { color: var(--log-ink); white-space: normal; }
+/* "[Activity]" prefix — which activity logged the line; app lines stay quiet.
+   Run / activity milestones read as bold anchors between the step detail. */
+.log-scope { font-weight: 600; color: var(--accent); }
+.log-scope.is-app { color: var(--muted); }
+.log-line.k-run .log-msg, .log-line.k-activity .log-msg { font-weight: 600; color: var(--ink); }
+.log-line.lv-error .log-msg { color: var(--run-fail); }
 .log-info    { color: var(--accent); } .log-success { color: var(--run-ok); }
 .log-warning { color: var(--warn);  } .log-error   { color: var(--run-fail); }
 

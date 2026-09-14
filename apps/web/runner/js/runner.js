@@ -21,8 +21,11 @@ const S = {
 const U = { supported:false, version:"", repo:"", update:null, checking:false, applying:false };
 
 const $ = id => document.getElementById(id);
-const ACT_DOT_TITLE = { pending:"Pending", running:"Running", completed:"Completed", failed:"Failed", skipped:"Skipped" };
+const ACT_DOT_TITLE = { pending:"Pending", running:"Running", completed:"Completed", failed:"Failed", skipped:"Skipped", active:"Active" };
+// Status word on an activity's second line (pending shows "Waiting" only mid-run).
+const ACT_ST_LABEL = { running:"Running", completed:"Done", failed:"Failed", skipped:"Skipped" };
 const LOG_TAG = { info:"INF", success:"OK ", warning:"WRN", error:"ERR" };
+const APP_SCOPE = "Runner";   // log prefix for lines that belong to no activity
 // Icons come from the shared set (shared/icons.js) — see its header for why
 // nothing inlines its own paths.
 const CHECK = uiIco("check", "uico-0");
@@ -83,9 +86,11 @@ function stopElapsedTimer(){
   if(_elapsedTimer){ clearInterval(_elapsedTimer); _elapsedTimer=null; }
 }
 function updateProgress(){
+  // A full Start only runs the enabled sequence activities — counting disabled
+  // ones too left the bar stuck short of 100% on every run.
   const seq = S.runScope
     ? S.activities.filter(a=>S.runScope.includes(a.id))
-    : S.activities.filter(a=>a.type!=="background");
+    : S.activities.filter(a=>a.type!=="background" && a.enabled);
   const done = seq.filter(a=>["completed","failed","skipped"].includes(a.status)).length;
   const total = seq.length;
   $('prog-count').textContent = `${done}/${total}`;
@@ -127,6 +132,8 @@ function refreshButtons(){
   const reqCopy = $("btn-req-copy");
   if(reqCopy) reqCopy.disabled = running || !(S.requirements && S.requirements.gameDir);
   updateRowRunButtons();
+  $("app").classList.toggle("is-running", running);
+  S.activities.forEach(a=>paintRow(a));   // "Waiting" / "Active" follow the run state
   renderUpdate();
   setStatusPill(running ? (paused ? "paused" : "running") : "ready");
 }
@@ -140,13 +147,15 @@ function switchTab(tab){
 function switchRTab(tab){
   document.querySelectorAll("#r-tabs .rtab").forEach(b=>{ const on=b.dataset.rtab===tab; b.classList.toggle("active",on); b.setAttribute("aria-selected",String(on)); });
   document.querySelectorAll("#r-content .rpane").forEach(p=>p.classList.toggle("active", p.id==="r-"+tab));
+  // Lines that arrived while the pane was hidden couldn't scroll it — jump to the newest.
+  if(tab==="log"){ const body = $("log-body"); body.scrollTop = body.scrollHeight; }
 }
 
 // ── Build activity rows ──────────────────────────────────────────────────────
 function buildRow(a){
   const isBg = a.type==="background";
   const row = document.createElement("div");
-  row.className = "task-row" + (a.status==="running" ? " task-running" : "");
+  row.className = "task-row";
   row.dataset.id = a.id;
 
   const handle = document.createElement("div");
@@ -166,27 +175,24 @@ function buildRow(a){
     a.enabled = !a.enabled;
     cb.classList.toggle("checked", a.enabled);
     cb.setAttribute("aria-pressed", String(!!a.enabled));
-    row.querySelector(".task-name").classList.toggle("dim", !a.enabled);
+    paintRow(a, row); updateListSummary(); updateProgress();
     api().toggle_activity(a.id, a.enabled);
   };
 
-  const st = a.status || "pending";
   const dot = document.createElement("span");
-  dot.className = "act-dot act-dot-" + st;
-  dot.title = ACT_DOT_TITLE[st] || ACT_DOT_TITLE.pending;
+  dot.className = "act-dot";
   dot.setAttribute("role", "status");
-  dot.setAttribute("aria-label", `Status: ${dot.title}`);
   dot.dataset.dot = "1";
 
   const block = document.createElement("div");
   block.className = "task-name-block";
   const name = document.createElement("div");
-  name.className = "task-name" + (a.enabled ? "" : " dim");
+  name.className = "task-name";
   name.textContent = a.name;
+  name.title = a.name;   // long names are ellipsised
   block.appendChild(name);
   const meta = document.createElement("div");
   meta.className = "task-meta"; meta.dataset.meta = "1";
-  meta.textContent = actMeta(a);
   block.appendChild(meta);
 
   const btns = document.createElement("div");
@@ -206,6 +212,7 @@ function buildRow(a){
   btns.appendChild(runOne);
 
   row.appendChild(handle); row.appendChild(cb); row.appendChild(dot); row.appendChild(block); row.appendChild(btns);
+  paintRow(a, row);
   // Clicking the row (not one of its controls) opens the activity's settings —
   // the gear remains as the affordance, and the row is the shortcut.
   row.addEventListener("click", e=>{
@@ -275,10 +282,49 @@ function commitOrder(){
   try{ api().reorder_activities(ids); }catch(_){}
 }
 
-// Second line under the activity name.
-function actMeta(a){
-  if(a.type==="background") return `every ${a.pollInterval}s`;
-  return a.maxRetries > 1 ? `${a.maxRetries} attempts` : "";
+// Dot, status line and row tint from an activity's state. Background activities
+// loop every few seconds, so they show a steady Active / idle state instead of
+// flashing running → done on every tick.
+function paintRow(a, row){
+  row = row || document.querySelector(`.task-row[data-id="${a.id}"]`);
+  if(!row) return;
+  const isBg = a.type==="background";
+  const inRun = S.running && (S.runScope ? S.runScope.includes(a.id) : !!a.enabled);
+  const st = isBg ? (inRun ? "active" : "pending") : (a.status || "pending");
+  const dot = row.querySelector("[data-dot]");
+  if(dot){
+    dot.className = "act-dot act-dot-" + st;
+    dot.title = ACT_DOT_TITLE[st] || ACT_DOT_TITLE.pending;
+    dot.setAttribute("aria-label", `Status: ${dot.title}`);
+  }
+  row.classList.toggle("task-running", st==="running");
+  row.classList.toggle("task-failed", st==="failed");
+  row.classList.toggle("task-off", !a.enabled);
+  const meta = row.querySelector("[data-meta]");
+  if(meta) renderMeta(meta, a, st, inRun);
+}
+
+// Second line under the activity name: status word, then its settings summary.
+function renderMeta(el, a, st, inRun){
+  const parts = [];
+  if(a.type==="background"){
+    if(st==="active") parts.push('<span class="act-st st-active">Active</span>');
+    parts.push(`Every ${Number(a.pollInterval)||1}s`);
+  } else {
+    if(st==="pending"){ if(inRun) parts.push('<span class="act-st st-waiting">Waiting</span>'); }
+    else if(ACT_ST_LABEL[st]) parts.push(`<span class="act-st st-${st}">${ACT_ST_LABEL[st]}</span>`);
+    if(a.maxRetries > 1) parts.push(`${a.maxRetries} attempts`);
+  }
+  el.innerHTML = parts.join('<span class="sep" aria-hidden="true">·</span>');
+}
+
+// "3 of 5 enabled" above each list.
+function updateListSummary(){
+  [["seq-sum", a=>a.type!=="background"], ["bg-sum", a=>a.type==="background"]].forEach(([id, pick])=>{
+    const el = $(id); if(!el) return;
+    const list = S.activities.filter(pick);
+    el.textContent = list.length ? `${list.filter(a=>a.enabled).length} of ${list.length} enabled` : "";
+  });
 }
 
 function gearButton(id){
@@ -315,8 +361,7 @@ function buildSettingsPanel(a){
     inp.onchange = ()=>{
       const v = Math.max(0.05, parseFloat(inp.value)||a.pollInterval);
       inp.value = v; a.pollInterval = v; api().set_interval(a.id, v);
-      const meta = document.querySelector(`[data-id="${a.id}"] [data-meta]`);
-      if(meta) meta.textContent = actMeta(a);
+      paintRow(a);
     };
     const unit = document.createElement("span"); unit.className = "setting-unit"; unit.textContent = "seconds";
     row.appendChild(lbl); row.appendChild(inp); row.appendChild(unit);
@@ -412,8 +457,7 @@ function buildSettingsPanel(a){
       let res = null; try{ res = await api().set_activity_retries(a.id, v); }catch(_){ }
       if(res && res.ok) v = res.retries; else v = a.maxRetries || 1;
       a.maxRetries = v; inp.value = v;
-      const meta = document.querySelector(`.task-row[data-id="${a.id}"] [data-meta]`);
-      if(meta) meta.textContent = actMeta(a);
+      paintRow(a);
     };
     row.appendChild(lbl); row.appendChild(inp);
     g.appendChild(row); panel.appendChild(g);
@@ -486,24 +530,14 @@ function populateLists(){
   if(bg.length) bg.forEach(a=>bgList.appendChild(buildRow(a)));
   else bgList.innerHTML = '<div class="empty-note">No background activities.</div>';
   $("bg-hint").style.display = bg.length ? "" : "none";
+  updateListSummary();
   syncActivitySettings();
   updateRowRunButtons();
 }
 
 function setActStatus(id, status){
   const a = S.activities.find(x=>x.id===id);
-  if(a) a.status = status;
-  const st = status || "pending";
-  const row = document.querySelector(`.task-row[data-id="${id}"]`);
-  if(row){
-    const dot = row.querySelector("[data-dot]");
-    if(dot){
-      dot.className = "act-dot act-dot-" + st;
-      dot.title = ACT_DOT_TITLE[st] || ACT_DOT_TITLE.pending;
-      dot.setAttribute("aria-label", `Status: ${dot.title}`);
-    }
-    row.classList.toggle("task-running", st==="running");
-  }
+  if(a){ a.status = status; paintRow(a); }
   updateProgress();
 }
 
@@ -535,18 +569,26 @@ function updateLogCount(){
 function appendLog(e){
   const body = $("log-body");
   const query = $("log-search").value.trim().toLowerCase();
+  // Follow new lines only when already at the bottom — scrolling up to read an
+  // earlier error must not be yanked away by the next line.
+  const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
   const line = document.createElement("div");
-  line.className = "log-line fade-in";
-  if(query && !String(e.msg).toLowerCase().includes(query)) line.classList.add("hidden");
+  line.className = `log-line fade-in lv-${e.level||"info"} k-${e.kind||"app"}`;
+  // Every line starts with "[Activity]" (or "[Runner]"); older entries only carry msg.
+  const text = e.text != null ? e.text : e.msg;
+  const scope = e.scope
+    ? `<span class="log-scope${e.scope===APP_SCOPE ? " is-app" : ""}">[${escHtml(e.scope)}]</span> `
+    : "";
   line.innerHTML =
-    `<span class="log-ts">[${e.ts}]</span>`+
+    `<span class="log-ts">${escHtml(e.ts)}</span>`+
     `<span class="log-tag log-${e.level}">${LOG_TAG[e.level]||"INF"}</span>`+
-    `<span class="log-msg">${escHtml(e.msg)}</span>`;
+    `<span class="log-msg">${scope}${escHtml(text)}</span>`;
+  if(query && !line.querySelector(".log-msg").textContent.toLowerCase().includes(query)) line.classList.add("hidden");
   body.appendChild(line);
   while(body.children.length>500) body.removeChild(body.firstChild);
   S.logCount = body.children.length;
   updateLogCount();
-  body.scrollTop = body.scrollHeight;
+  if(atBottom) body.scrollTop = body.scrollHeight;
 }
 function filterLog(query){
   const q = query.trim().toLowerCase();
@@ -714,14 +756,31 @@ async function promptGamePath(message){
   await onGamePathPick();
   return !!(S.gamePathStatus && S.gamePathStatus.exists);
 }
-function maybePromptGamePath(key){
+async function maybePromptGamePath(key){
   const st = S.gamePathStatus;
   if(S.controller !== "win32" || !st || !st.needed || st.exists) return;
   if(_gamePromptFor === key) return;
   _gamePromptFor = key;
-  promptGamePath(st.path
+  await promptGamePath(st.path
     ? `The game is not at the saved path any more:\n${st.path}\n\nChoose the game's .exe so the Runner can start it.`
     : "This game is started from its .exe. Choose the game's .exe once before the first run — the Runner remembers it.");
+}
+// Game files: when a game ships required files and they aren't in the game
+// folder yet, offer to copy them — one prompt per loaded game, same idea as the
+// game-path prompt. The copy raises a UAC prompt when the folder needs rights.
+let _reqPromptFor = null;
+async function maybePromptRequirements(key){
+  const r = S.requirements;
+  if(!r || !r.fileCount || r.installed || !r.gameDir || S.running) return;
+  if(_reqPromptFor === key) return;
+  _reqPromptFor = key;
+  const go = await uiDialog({
+    title: "Game files needed",
+    message: `This game needs ${r.fileCount} file(s) inside its folder:\n${r.gameDir}\n\n`
+           + `${r.missing} still missing. Copy them into the game folder now?`,
+    buttons: [{ label:"Later", value:false }, { label:"Copy files…", value:true, kind:"ok" }],
+  });
+  if(go) await doReqCopy();
 }
 async function onLaunchBlocked(data){
   stopElapsedTimer(); S.runScope = null; updateProgress();
@@ -759,17 +818,28 @@ async function onReqOpen(){
 async function onReqCopy(){
   const r = S.requirements;
   if(!r || !r.gameDir || S.running) return;
-  const msg = `Copy ${r.fileCount} file(s) into\n${r.gameDir}?\n\nExisting files with the same name are overwritten. Close the game first.`;
+  const msg = `Copy ${r.fileCount} file(s) into\n${r.gameDir}?\n\n`
+            + `Existing files with the same name are overwritten. Close the game first.\n\n`
+            + `If the folder needs it, Windows will ask for administrator rights.`;
   const go = await uiDialog({ title:"Copy game files", message:msg,
     buttons:[{ label:"Cancel", value:false }, { label:"Copy", value:true, kind:"ok" }] });
   if(!go) return;
+  await doReqCopy();
+}
+// Perform the copy (no confirm) — shared by the button and the auto-prompt. The
+// backend falls back to an elevated robocopy when the folder refuses the write.
+async function doReqCopy(){
+  const r = S.requirements;
+  if(!r || !r.gameDir || S.running) return;
   const btn = $("btn-req-copy");
+  const st = $("req-status");
   if(btn) btn.disabled = true;
+  if(st){ st.className = "req-status warn"; st.textContent = "Copying game files…"; }
   let res = null;
   try{ res = await api().copy_requirements_to_game(); }catch(e){ res = { ok:false, error:String(e) }; }
   if(res && res.requirements) renderRequirements(res.requirements);
   else refreshButtons();
-  if(res && !res.ok){ const st = $("req-status"); st.className = "req-status warn"; st.textContent = res.error || "Copy failed."; }
+  if(res && !res.ok){ if(st){ st.className = "req-status warn"; st.textContent = res.error || "Copy failed."; } }
 }
 
 // ── Game icon ─────────────────────────────────────────────────────────────────
@@ -827,7 +897,10 @@ function applyFlow(data){
   applyController(data.controller, data.win32);
   renderRequirements(data.requirements);
   refreshButtons();
-  maybePromptGamePath(data.name || "");
+  // Ask for the game path first (requirements need it), then offer to copy the
+  // game's required files if some are still missing.
+  const promptKey = data.name || "";
+  maybePromptGamePath(promptKey).then(()=>maybePromptRequirements(promptKey));
 }
 
 // ── Python events ────────────────────────────────────────────────────────────
@@ -863,7 +936,11 @@ window.__recv = function(raw){
     setActStatus(data.id, data.status); return;
   }
   if(type==="speedhack_update"){ applySpeedhack(data); return; }
-  if(type==="update_available"){ U.update=data; renderUpdate(); return; }
+  if(type==="update_available"){
+    U.update=data; renderUpdate();
+    maybePromptUpdate();
+    return;
+  }
   if(type==="update_progress"){ showUpdateProgress(data.pct, data.stage); return; }
 };
 
@@ -903,11 +980,39 @@ function showUpdates(){
   const apply = $("btn-upd-apply");
   if(apply && !apply.hidden && !apply.disabled) apply.focus();
 }
+function focusUpdateProgress(){
+  // Move the user to the live progress card before the blocking API call starts.
+  switchRTab("settings");
+  const card = $("updates-card");
+  if(card) card.scrollIntoView({ block:"nearest", behavior:"smooth" });
+  const bar = $("upd-bar");
+  if(bar) bar.hidden = false;
+  const status = $("upd-status");
+  if(status) status.textContent = "Preparing update…";
+}
+let _updatePromptFor = null;
+async function maybePromptUpdate(){
+  const up = U.update;
+  if(!up || !up.available || U.applying || S.running) return;
+  const key = String(up.version || "");
+  if(!key || _updatePromptFor === key) return;
+  _updatePromptFor = key;
+  const install = await uiDialog({
+    title: "Runner update available",
+    message: `Version v${key} is available. You are using v${U.version || "?"}.\n\nUpdate replaces the files in this Runner folder, keeps your data and settings, then restarts the Runner.`,
+    buttons: [
+      { label:"Later", value:false },
+      { label:"Update & restart", value:true, kind:"ok" },
+    ],
+  });
+  if(install) await onUpdateApply();
+}
 async function onUpdateCheck(){
   if(!U.supported || U.checking) return;
   U.checking = true; renderUpdate();
   try{ U.update = await api().update_check(); }catch(e){ U.update = { error: String(e) }; }
   U.checking = false; renderUpdate();
+  await maybePromptUpdate();
 }
 function showUpdateProgress(pct, stage){
   const bar = $("upd-bar"), fill = $("upd-bar-fill");
@@ -918,6 +1023,7 @@ function showUpdateProgress(pct, stage){
 }
 async function onUpdateApply(){
   if(U.applying || S.running || !(U.update && U.update.available)) return;
+  focusUpdateProgress();
   U.applying = true; renderUpdate();
   showUpdateProgress(0, "Downloading");
   let res = null;
@@ -996,9 +1102,14 @@ function selectAll(type, enabled){
   S.activities.filter(a=> type==="sequence" ? a.type!=="background" : a.type==="background").forEach(a=>{
     a.enabled = enabled;
     const row = document.querySelector(`.task-row[data-id="${a.id}"]`);
-    if(row){ row.querySelector(".cb").classList.toggle("checked", enabled); row.querySelector(".task-name").classList.toggle("dim", !enabled); }
+    if(row){
+      const cb = row.querySelector(".cb");
+      cb.classList.toggle("checked", enabled); cb.setAttribute("aria-pressed", String(enabled));
+      paintRow(a, row);
+    }
     api().toggle_activity(a.id, enabled);
   });
+  updateListSummary(); updateProgress();
 }
 
 // ── Live preview ─────────────────────────────────────────────────────────────
@@ -1014,7 +1125,12 @@ function pvApply(){
   const body=$("pv-body");
   if(body) body.style.display = pvActive ? "" : "none";
   const hid=$("pv-hide"); if(hid){ hid.title = pvActive ? "Hide preview" : "Show preview"; hid.classList.toggle("off", !pvActive); }
-  const max=$("pv-max"); if(max) max.title = pvMaxed ? "Restore preview" : "Maximize preview";
+  const max=$("pv-max");
+  if(max){
+    max.title = pvMaxed ? "Restore preview" : "Maximize preview";
+    max.setAttribute("aria-label", max.title);
+    max.innerHTML = uiIco(pvMaxed ? "minimize" : "maximize", "uico-2");
+  }
   try{ api().set_refresh_hz(pvMaxed ? 10 : 6); api().set_auto_refresh(pvActive); }catch(_){ }
   if(pvActive){ try{ api().capture(); }catch(_){ } }
 }
@@ -1069,6 +1185,7 @@ async function init(){
   if(!window.pywebview||!window.pywebview.api){ $("dev-label").textContent="PyWebView unavailable"; return; }
   const st = await api().get_state();
   applyRunnerInfo(st.runner);
+  await maybePromptUpdate();
   S.connectedSerial = st.connectedSerial||null;
   S.captureBackend = st.captureBackend||"scrcpy";
   const capSel=$("capture-backend");

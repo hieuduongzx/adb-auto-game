@@ -183,18 +183,24 @@ class WorkflowDesignerAPI:
 
     def _attach(self, window: webview.Window) -> None:
         self._window = window
-        add_log_subscriber(self._on_log)
+        add_log_subscriber(self._on_log, with_meta=True)
         threading.Thread(target=self._device_worker, daemon=True).start()
         threading.Thread(target=self._device_poll, daemon=True).start()
         threading.Thread(target=self._auto_refresh_loop, daemon=True).start()
 
     # ── Log + push ───────────────────────────────────────────────────────────
 
-    def _on_log(self, level: str, message: str) -> None:
+    def _on_log(self, level: str, message: str, meta: Optional[dict] = None) -> None:
         bucket = {"info": "info", "success": "success",
                   "warning": "warning", "error": "error"}.get(level, "info")
         ts = datetime.datetime.now().strftime("%H:%M:%S")
-        entry = {"ts": ts, "level": bucket, "msg": message}
+        # The Designer keeps every line, engine detail included (the Runner
+        # shows only milestones). Each starts with the activity that logged it,
+        # or [Designer] for the app's own messages.
+        meta = meta or {}
+        scope = meta.get("activity") or "Designer"
+        entry = {"ts": ts, "level": bucket, "scope": scope, "text": message,
+                 "kind": meta.get("kind") or "app", "msg": f"[{scope}] {message}"}
         self._log_buffer.append(entry)
         if len(self._log_buffer) > 2000:
             self._log_buffer = self._log_buffer[-2000:]
@@ -1717,6 +1723,8 @@ class WorkflowDesignerAPI:
         if edit_kind == "function":
             fn = next((f for f in flow.get("functions", []) or [] if f.get("id") == edit_id), None)
             graph = (fn or {}).get("graph")
+            # Names the log prefix for this debug run.
+            seed_act = {"vars": [], "name": (fn or {}).get("name") or "Function"}
         else:
             act = next((a for a in flow.get("activities", []) or [] if a.get("id") == edit_id), None)
             graph = (act or {}).get("graph")

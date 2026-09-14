@@ -8,7 +8,7 @@ Runner folder attached, so any number of games share one repo without touching
 each other's — or the Hub installer's — releases.
 
 Applying an update downloads the zip, extracts it to a temp folder and hands
-over to a small ``.cmd`` that waits for this process to exit, mirrors the new
+over to a small ``.cmd`` that gives this process time to exit, copies the new
 files over the install folder (keeping ``data/``, ``out/`` and ``logs/``) and
 relaunches the exe. A token for a private repo may be supplied via
 ``$MACRO2K_UPDATE_TOKEN`` or ``$GITHUB_TOKEN``.
@@ -164,26 +164,63 @@ def _safe_extract(zip_path: str, dest: str) -> None:
 
 
 def write_update_script(src_dir: str, install_dir: str, exe: str, pid: int,
-                        script_path: str, relaunch: bool = True) -> str:
-    """The hand-over ``.cmd``: wait for ``pid`` to exit, mirror ``src_dir`` over
-    ``install_dir`` (keeping :data:`KEEP_DIRS`), relaunch ``exe``, clean up."""
+                        script_path: str, relaunch: bool = True,
+                        version: str = "") -> str:
+    """The hand-over ``.cmd``: let ``pid`` exit, copy ``src_dir`` over
+    ``install_dir`` (keeping :data:`KEEP_DIRS`), relaunch ``exe``, clean up.
+
+    Copy uses ``/E /IS /IT`` and deliberately **not** ``/MIR``: ``/MIR`` adds
+    ``/PURGE``, which deletes files from the install before they're replaced, so
+    a copy that fails part-way (locked file, denied rights) can leave a broken
+    install — the app then exits and never comes back. ``/IS /IT`` force each
+    source file over (otherwise robocopy skips a file whose destination looks
+    newer, leaving the version file stale). Every step is appended to a log so a
+    silent failure can be diagnosed."""
     keep = " ".join(f'"{os.path.join(install_dir, d)}"' for d in KEEP_DIRS)
-    # System tools by full path: a PATH with Git's usr/bin first would pick up
-    # the Unix `find`. `ping` is the sleep because `timeout` refuses to run in a
-    # detached process (no console to read from).
+    # System tools by full path: a PATH with Git's usr/bin first can pick up
+    # unrelated Unix tools. `ping` is a bounded sleep because `timeout` refuses
+    # to run in a process without a console. Do not poll tasklist through a pipe:
+    # on some Windows builds find.exe inherits the pipe's write handle and waits
+    # forever for EOF even though the Runner process has already exited.
     sys32 = r"%SystemRoot%\System32"
+    log_file = os.path.join(tempfile.gettempdir(), "macro2k-runner-update.log")
     lines = [
         "@echo off",
-        ":wait",
-        f'"{sys32}\\tasklist.exe" /FI "PID eq {pid}" /NH 2>nul | "{sys32}\\find.exe" " {pid} " >nul && '
-        f'("{sys32}\\PING.EXE" -n 2 127.0.0.1 >nul & goto wait)',
-        f'"{sys32}\\Robocopy.exe" "{src_dir}" "{install_dir}" /MIR /XD {keep} /R:10 /W:1 '
-        f"/NFL /NDL /NJH /NJS /NP >nul",
+        f'set "LOG={log_file}"',
+        f'>>"%LOG%" echo [%date% %time%] update v{version or "?"}: src="{src_dir}" dst="{install_dir}" exe="{exe}" pid={pid}',
+        # The parent calls os._exit immediately after starting this script. Give
+        # Windows a moment to release the exe and its _internal DLLs; robocopy's
+        # own /R retry handles any slower file release without an infinite loop.
+        f'"{sys32}\\PING.EXE" -n 4 127.0.0.1 >nul',
+        f'>>"%LOG%" echo [%date% %time%] copying after shutdown grace period',
+        # /E copies (no purge); /IS /IT force every source file over the target.
+        f'"{sys32}\\Robocopy.exe" "{src_dir}" "{install_dir}" /E /IS /IT /XD {keep} '
+        f'/R:3 /W:1 /NFL /NDL /NJH /NJS /NP >>"%LOG%" 2>&1',
+        "set RC=%ERRORLEVEL%",
+        '>>"%LOG%" echo [%date% %time%] robocopy rc=%RC%',
     ]
     if relaunch:
-        lines.append(f'start "" "{exe}"')
-    # "(goto) & del" deletes the running script without cmd complaining after.
-    lines += [f'rmdir /s /q "{src_dir}"', '(goto) 2>nul & del "%~f0"']
+        lines += [
+            'if %RC% GEQ 8 (',
+            f'  >>"%LOG%" echo [%date% %time%] COPY FAILED; keeping extracted update at "{src_dir}"',
+            f'  if exist "{exe}" start "" /D "{install_dir}" "{exe}"',
+            '  goto finish',
+            ')',
+            f'if exist "{exe}" (',
+            f'  "{sys32}\\PING.EXE" -n 2 127.0.0.1 >nul',
+            f'  start "" /D "{install_dir}" "{exe}"',
+            f'  >>"%LOG%" echo [%date% %time%] updated to v{version or "?"} and relaunched',
+            ") else (",
+            f'  >>"%LOG%" echo [%date% %time%] EXE MISSING: {exe}',
+            ")",
+        ]
+    # Only clean up the extracted files when the copy actually succeeded, so a
+    # failed update can still be inspected / copied by hand.
+    lines += [
+        f'if %RC% LSS 8 rmdir /s /q "{src_dir}"',
+        ':finish',
+        '(goto) 2>nul & del "%~f0"',
+    ]
     with open(script_path, "w", encoding="utf-8") as fh:
         fh.write("\r\n".join(lines) + "\r\n")
     return script_path
@@ -230,14 +267,16 @@ def apply(info: Optional[dict] = None,
             raise RuntimeError(f"The update package has no {os.path.basename(exe)}")
 
         script = write_update_script(new_dir, app_dir(), exe, os.getpid(),
-                                     os.path.join(tmp, "apply-update.cmd"))
+                                     os.path.join(tmp, "apply-update.cmd"), version=version)
         stage(100, "Restarting")
         log_info(f"[update] installing {version} and restarting…")
         if before_exit:
             before_exit()
-        # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
-        subprocess.Popen(["cmd", "/c", script], creationflags=0x00000008 | 0x00000200 | 0x08000000,
-                         close_fds=True)
+        # CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW. DETACHED_PROCESS conflicts
+        # with CREATE_NO_WINDOW on some Windows versions and caused a visible
+        # black console to flash during updates.
+        subprocess.Popen([os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", script],
+                         creationflags=0x00000200 | 0x08000000, close_fds=True)
         os._exit(0)
     except Exception as exc:
         log_error(f"[update] apply failed: {exc}")

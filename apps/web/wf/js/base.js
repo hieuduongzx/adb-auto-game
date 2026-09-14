@@ -572,10 +572,13 @@ function wfEndNodeDelay(id){
 
 function appendLog(entry){
   const body=$("log-body"); if(!body) return;
-  const line=document.createElement("div"); line.className=`log-line fade-in lv-${entry.level||"info"}`;
+  const line=document.createElement("div"); line.className=`log-line fade-in lv-${entry.level||"info"} k-${entry.kind||"app"}`;
+  // "[Activity]" prefix styled apart from the text; older entries only carry msg.
+  const text=entry.text!=null ? entry.text : entry.msg;
+  const scope=entry.scope ? `<span class="log-scope${entry.scope==="Designer"?" is-app":""}">[${escHtml(entry.scope)}]</span> ` : "";
   line.innerHTML=`<span class="log-ts">${entry.ts}</span>`+
     `<span class="log-tag log-${entry.level}">${LOG_TAG[entry.level]||"INF"}</span>`+
-    `<span class="log-msg">${escHtml(entry.msg)}</span>`;
+    `<span class="log-msg">${scope}${escHtml(text)}</span>`;
   body.appendChild(line);
   // Cap matches the backend buffer (2000) — long unattended runs keep more
   // history in view; the Save button exports the full buffer to a file anyway.

@@ -64,7 +64,7 @@
         <div class="tab-pane active" id="tab-seq" role="tabpanel">
           <div class="pane-inner">
             <div class="list-header">
-              <span class="list-label">Sequence activities</span>
+              <span class="list-label" id="seq-sum">Sequence activities</span>
               <button class="btn-sel"      onclick="selectAll('sequence',true)">Select all</button>
               <button class="btn-sel none" onclick="selectAll('sequence',false)">Clear</button>
             </div>
@@ -78,7 +78,7 @@
         <div class="tab-pane" id="tab-bg" role="tabpanel">
           <div class="pane-inner">
             <div class="list-header">
-              <span class="list-label">Background activities</span>
+              <span class="list-label" id="bg-sum">Background activities</span>
               <button class="btn-sel"      onclick="selectAll('background',true)">Select all</button>
               <button class="btn-sel none" onclick="selectAll('background',false)">Clear</button>
             </div>
@@ -244,10 +244,10 @@
           <span class="pv-state" id="pv-state"></span>
           <div class="pv-sp"></div>
           <button type="button" class="pv-btn" id="pv-max" onclick="togglePreviewMax()" title="Maximize preview" aria-label="Maximize preview">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+            <i data-ico="maximize" data-ico-size="uico-2" aria-hidden="true"></i>
           </button>
           <button type="button" class="pv-btn" id="pv-hide" onclick="togglePreviewHide()" title="Hide preview" aria-label="Hide preview">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            <i data-ico="chevron-down" data-ico-size="uico-2" aria-hidden="true"></i>
           </button>
         </div>
         <div class="pv-body" id="pv-body">

@@ -44,6 +44,10 @@ from src.core.adb.auto.scrcpy_capture import (
 )
 from src.workflow import WorkflowEngine
 from src.utils import (
+    LOG_KIND_ACTIVITY,
+    LOG_KIND_DETAIL,
+    LOG_KIND_RUN,
+    LOG_KIND_USER,
     add_log_subscriber,
     app_dir,
     bundle_dir,
@@ -95,6 +99,70 @@ EMULATOR_KINDS = ("ldplayer", "mumu", "nox", "memu", "bluestacks")
 REQUIREMENTS_DIR = "requirements"
 REQUIREMENTS_SRC = "vendor"
 REQUIREMENTS_SKIP = (".gitkeep", "Thumbs.db", "desktop.ini", ".DS_Store")
+
+
+def _copy_tree_elevated(src: str, dst: str) -> bool:
+    """Copy ``src``'s contents into ``dst`` through an elevated robocopy.
+
+    Game folders often live under Program Files, where a normal copy is refused.
+    This launches robocopy with the ``runas`` verb (one UAC prompt) and waits for
+    it, so the files land with admin rights. Returns True when the copy finished
+    with robocopy's success exit codes (0–7). No-op off Windows."""
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except Exception:
+        return False
+
+    skip = " ".join(f'"{name}"' for name in REQUIREMENTS_SKIP)
+    params = (f'"{os.path.abspath(src)}" "{os.path.abspath(dst)}" '
+              f'/E /COPY:DAT /R:1 /W:1 /NFL /NDL /NJH /NJS /NP /XF {skip}')
+
+    class _SHELLEXECUTEINFOW(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wintypes.DWORD),
+            ("fMask", ctypes.c_ulong),
+            ("hwnd", wintypes.HWND),
+            ("lpVerb", wintypes.LPCWSTR),
+            ("lpFile", wintypes.LPCWSTR),
+            ("lpParameters", wintypes.LPCWSTR),
+            ("lpDirectory", wintypes.LPCWSTR),
+            ("nShow", ctypes.c_int),
+            ("hInstApp", wintypes.HINSTANCE),
+            ("lpIDList", ctypes.c_void_p),
+            ("lpClass", wintypes.LPCWSTR),
+            ("hkeyClass", wintypes.HKEY),
+            ("dwHotKey", wintypes.DWORD),
+            ("hIcon", wintypes.HANDLE),
+            ("hProcess", wintypes.HANDLE),
+        ]
+
+    SEE_MASK_NOCLOSEPROCESS = 0x00000040
+    SW_HIDE = 0
+    info = _SHELLEXECUTEINFOW()
+    info.cbSize = ctypes.sizeof(info)
+    info.fMask = SEE_MASK_NOCLOSEPROCESS
+    info.lpVerb = "runas"
+    info.lpFile = "robocopy.exe"
+    info.lpParameters = params
+    info.nShow = SW_HIDE
+    try:
+        if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(info)):
+            return False
+    except Exception as exc:
+        log_warning(f"Elevation failed: {exc}")
+        return False
+    if not info.hProcess:
+        return False
+    try:
+        ctypes.windll.kernel32.WaitForSingleObject(info.hProcess, 0xFFFFFFFF)
+        code = wintypes.DWORD()
+        ctypes.windll.kernel32.GetExitCodeProcess(info.hProcess, ctypes.byref(code))
+        return int(code.value) < 8
+    finally:
+        ctypes.windll.kernel32.CloseHandle(info.hProcess)
 
 
 class WorkflowRunnerAPI:
@@ -154,7 +222,7 @@ class WorkflowRunnerAPI:
 
     def _attach(self, window: webview.Window) -> None:
         self._window = window
-        add_log_subscriber(self._on_log)
+        add_log_subscriber(self._on_log, with_meta=True)
         if self._pending_load:
             try:
                 self._load_path(self._pending_load)
@@ -176,11 +244,29 @@ class WorkflowRunnerAPI:
 
     # ── Log subscriber ───────────────────────────────────────────────────────
 
-    def _on_log(self, level: str, message: str) -> None:
+    # The Runner log is what an operator needs to follow an unattended run: run
+    # and activity milestones, the workflow author's own log lines, and errors.
+    # The engine's step-by-step detail (taps, matches, branches taken) is the
+    # Designer's log, not this one.
+    _RUNNER_LOG_KINDS = frozenset({LOG_KIND_RUN, LOG_KIND_ACTIVITY, LOG_KIND_USER})
+
+    def _on_log(self, level: str, message: str, meta: Optional[dict] = None) -> None:
+        meta = meta or {}
+        kind = meta.get("kind")
+        activity = meta.get("activity")
+        if level != "error" and kind not in self._RUNNER_LOG_KINDS:
+            if kind == LOG_KIND_DETAIL:
+                return
+            # Untagged lines from src/core while an activity runs are that
+            # step's internals; outside a run they are app / device news.
+            if activity:
+                return
         bucket = {"info": "info", "success": "success",
                   "warning": "warning", "error": "error"}.get(level, "info")
         ts = datetime.datetime.now().strftime("%H:%M:%S")
-        entry = {"ts": ts, "level": bucket, "msg": message}
+        scope = activity or "Runner"
+        entry = {"ts": ts, "level": bucket, "scope": scope, "text": message,
+                 "kind": kind or "app", "msg": f"[{scope}] {message}"}
         self._log_buffer.append(entry)
         if len(self._log_buffer) > 2000:
             self._log_buffer = self._log_buffer[-2000:]
@@ -970,7 +1056,11 @@ class WorkflowRunnerAPI:
             return False
 
     def copy_requirements_to_game(self) -> dict:
-        """Copy the requirements into the game folder (merging, overwriting)."""
+        """Copy the requirements into the game folder (merging, overwriting).
+
+        Tries a normal copy first; if the folder refuses the write (Program
+        Files and other protected locations), retries through an elevated
+        robocopy, which raises one UAC prompt."""
         if self.engine.is_running():
             return {"ok": False, "error": "Stop the run first"}
         folder = self._requirements_dir()
@@ -979,17 +1069,30 @@ class WorkflowRunnerAPI:
         game_dir = self._game_dir()
         if not game_dir:
             return {"ok": False, "error": "Choose the game's .exe in Settings → Game first"}
+
+        elevated = False
         try:
             shutil.copytree(folder, game_dir, dirs_exist_ok=True,
                             ignore=shutil.ignore_patterns(*REQUIREMENTS_SKIP))
         except (shutil.Error, OSError) as exc:
             detail = exc.args[0][0][2] if isinstance(exc, shutil.Error) and exc.args and exc.args[0] else exc
-            log_error(f"Couldn't copy game files into {game_dir}: {detail}")
-            return {"ok": False, "requirements": self._requirements_payload(),
-                    "error": f"Couldn't copy into {game_dir} — close the game, or copy "
-                             f"the files by hand if the folder needs admin rights ({detail})"}
-        log_success(f"Copied game files into {game_dir} — restart the game to load them")
-        return {"ok": True, "requirements": self._requirements_payload()}
+            log_warning(f"Normal copy blocked ({detail}) — retrying with admin rights")
+
+        payload = self._requirements_payload()
+        if not payload.get("installed"):
+            # Nothing (or not everything) landed — do it as admin.
+            log_info("Copying game files with administrator rights — confirm the UAC prompt…")
+            if _copy_tree_elevated(folder, game_dir):
+                elevated = True
+            payload = self._requirements_payload()
+
+        if payload.get("installed"):
+            log_success(f"Copied game files into {game_dir} — restart the game to load them")
+            return {"ok": True, "requirements": payload, "elevated": elevated}
+        log_error(f"Couldn't copy game files into {game_dir}")
+        return {"ok": False, "requirements": payload,
+                "error": f"Couldn't copy into {game_dir} — close the game, or run the "
+                         f"Runner as administrator and try again."}
 
     def pick_game_path(self, start: str = "") -> dict:
         """Choose the game .exe with the native picker, then save it."""

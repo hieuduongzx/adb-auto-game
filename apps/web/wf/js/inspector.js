@@ -327,7 +327,7 @@ function wfFieldLabel(f){
 // dropdown on text fields (log, message, format string…).
 function wfVarInfoMap(){
   const map={};
-  const walk=(vars,prefix,scope)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; if(!map[full]) map[full]={type:v.type||"bool", scope, value:v.value}; walk(v.children,full,scope); }); };
+  const walk=(vars,prefix,scope)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; if(!map[full]) map[full]={type:v.type||"bool", scope, value:v.value, options:v.options}; walk(v.children,full,scope); }); };
   walk(WF.globals,"","global");
   const act=wfCurAct(); if(act) walk(act.vars,"","activity");
   const g=wfGraph(); wfGraphVarNames(g).forEach(n=>{ if(!map[n]) map[n]={type:"text", scope:"node", value:undefined}; });
@@ -343,6 +343,8 @@ function wfVarBadgeInfo(name){
   return {type:info.type, scope:info.scope, value:val, live:live!==undefined};
 }
 const WF_VAR_SCOPE_LBL={global:"Global", activity:"Activity", node:"Node", live:"Live"};
+// Group order in the variable menu — same as the Variables panel.
+const WF_VAR_SCOPE_ORDER=["global","activity","node","live"];
 // Floating dropdown listing every known variable (grouped by scope, filterable).
 // `onPick(name)` fires with the chosen variable name. A "+ New global" row lets
 // the user declare one on the spot without leaving the field.
@@ -359,7 +361,12 @@ function wfShowVarMenu(anchor,onPick,opts){
   const list=document.createElement("div"); list.className="wf-varmenu-list"; menu.appendChild(list);
   const map=wfVarInfoMap();
   const allowed=Array.isArray(opts.types)&&opts.types.length?new Set(opts.types):null;
-  const names=Object.keys(map).filter(n=>!allowed||allowed.has(map[n].type)).sort();
+  // Grouped by scope in the Variables panel's order, A→Z inside each group — a
+  // plain A→Z sort interleaved the groups (Activity, Global, Activity again…).
+  const scopeRank=s=>{ const i=WF_VAR_SCOPE_ORDER.indexOf(s); return i<0?WF_VAR_SCOPE_ORDER.length:i; };
+  const names=Object.keys(map).filter(n=>!allowed||allowed.has(map[n].type))
+    .sort((a,b)=>scopeRank(map[a].scope)-scopeRank(map[b].scope) || a.localeCompare(b));
+  const curAct=typeof wfCurAct==="function"?wfCurAct():null;
   function render(filter){
     list.innerHTML="";
     const f=(filter||"").trim().toLowerCase();
@@ -368,7 +375,12 @@ function wfShowVarMenu(anchor,onPick,opts){
     let lastScope=null;
     shown.forEach(n=>{
       const info=map[n];
-      if(info.scope!==lastScope){ lastScope=info.scope; const s=document.createElement("div"); s.className="wf-varmenu-sep"; s.textContent=WF_VAR_SCOPE_LBL[info.scope]||info.scope; list.appendChild(s); }
+      if(info.scope!==lastScope){
+        lastScope=info.scope;
+        const s=document.createElement("div"); s.className="wf-varmenu-sep";
+        s.textContent=(WF_VAR_SCOPE_LBL[info.scope]||info.scope)+(info.scope==="activity"&&curAct&&curAct.name?" · "+curAct.name:"");
+        list.appendChild(s);
+      }
       const row=document.createElement("button"); row.type="button"; row.className="wf-varmenu-item";
       const badge=wfVarBadgeInfo(n);
       const val=badge&&badge.value!==undefined&&badge.value!==null&&badge.value!==""?String(badge.value):"";
@@ -453,35 +465,146 @@ function wfVarNameField(node,f){
   inp.placeholder=f.ph||"variable name";
   const badge=wfVarBadge();
   const sync=()=>badge.refresh(inp.value);
-  inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]=inp.value; wfUpdNodeSum(node); wfRenderVarsPanel(); sync(); };
-  const pick=wfVarPickBtn(name=>{ inp.value=name; node.params[f.k]=name; wfPushUndoDebounced(); wfUpdNodeSum(node); wfRenderVarsPanel(); sync(); }, "Choose an existing variable");
+  // The sibling Value control follows this variable's type live; the value
+  // itself is only corrected once the name is committed (blur / pick), so
+  // typing past a bool variable's name on the way to another doesn't rewrite it.
+  inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]=inp.value; wfUpdNodeSum(node); wfRenderVarsPanel(); sync(); wfRefreshVarValues(row.parentElement); };
+  inp.onchange=()=>{ wfNormalizeVarValue(node); wfRefreshVarValues(row.parentElement); };
+  const pick=wfVarPickBtn(name=>{ inp.value=name; node.params[f.k]=name; wfPushUndoDebounced(); wfUpdNodeSum(node); wfRenderVarsPanel(); sync();
+    wfNormalizeVarValue(node); wfRefreshVarValues(row.parentElement); }, "Choose an existing variable");
   row.appendChild(inp); row.appendChild(pick); row.appendChild(badge);
   sync();
   return row;
 }
 
+// ── Typed variable values ────────────────────────────────────────────────────
+// Blocks whose `value` is assigned to / compared with the variable in `name`.
+// Their Value control follows that variable's declared type instead of always
+// being free text: a bool gets true | false, a select its options.
+const WF_VAR_VALUE_NODES = new Set(["set_var","if_var","loop_until_var"]);
+// Text operators compare as strings — a true/false or option pick would mislead.
+const WF_TEXT_CMP_OPS = new Set(["contains","!contains","starts","ends","regex"]);
+
+// What the `value` field should offer, from the declared type of the named
+// variable: {type:"bool"|"select", opts:[…]} for a quick pick, {type:"number"}
+// for a numeric hint, or null for plain text.
+function wfVarValueKind(node,f){
+  if(!f || f.k!=="value" || !WF_VAR_VALUE_NODES.has(node.type)) return null;
+  const info=wfVarInfoMap()[String(node.params.name||"").trim()];
+  if(!info) return null;
+  const op=String(node.params.op||"==");
+  const equality=node.type==="set_var" || op==="==" || op==="!=";
+  if(info.type==="bool") return equality ? {type:"bool", opts:["true","false"]} : null;
+  if(info.type==="select"){
+    const opts=(info.options||[]).map(String).filter(Boolean);
+    return equality && opts.length ? {type:"select", opts} : null;
+  }
+  if(info.type==="number" && !WF_TEXT_CMP_OPS.has(op)) return {type:"number"};
+  return null;
+}
+// The option a stored value stands for ("True" → "true"), or null when it is
+// something else (another variable's name, a {placeholder}, a stray literal).
+function wfVarValueOpt(kind,raw){
+  if(!kind || !kind.opts) return null;
+  const s=String(raw===undefined||raw===null?"":raw).trim();
+  if(kind.type==="bool"){ const l=s.toLowerCase(); return kind.opts.includes(l)?l:null; }
+  return kind.opts.includes(s)?s:null;
+}
+// After the variable or operator changes, move a value that no longer fits the
+// new type onto it — "0" becomes "true" for a bool, an unknown option the first
+// option. A value that names another variable is left alone.
+function wfNormalizeVarValue(node){
+  const kind=wfVarValueKind(node,{k:"value"});
+  if(!kind || !kind.opts) return;
+  const raw=node.params.value;
+  const cur=String(raw===undefined||raw===null?"":raw).trim();
+  if(wfVarBadgeInfo(cur)) return;
+  const opt=wfVarValueOpt(kind,cur);
+  if(opt!==null && opt===raw) return;
+  wfPushUndoDebounced();
+  node.params.value = opt!==null ? opt : kind.opts[0];
+  wfUpdNodeSum(node);
+}
+// Rebuild the typed Value controls beside a Name / Operator field that changed.
+function wfRefreshVarValues(container){
+  if(!container) return;
+  container.querySelectorAll(".wf-var-field").forEach(r=>{ if(r._varRefresh) r._varRefresh(); });
+}
+
 // A VALUE field that may be a literal OR a reference to another variable
 // (loop count, set_var value, if_var value, calc_var value). Picking a variable
 // replaces the whole value with its name — the engine resolves a bare name to
-// that variable's live value at run time.
+// that variable's live value at run time. For a typed variable (see
+// wfVarValueKind) the literal is a one-click pick instead of free text.
 function wfVarRefField(node,f){
   const row=document.createElement("div"); row.className="wf-field wf-var-field";
-  const lab=document.createElement("label"); lab.textContent=wfFieldLabel(f); lab.title=f.k; row.appendChild(lab);
-  const inp=document.createElement("input"); inp.type=f.t==="num"?"text":"text";  // text so a var name is typeable even on numeric fields
-  inp.className="wf-var-input"; inp.inputMode=f.t==="num"?"numeric":"text";
-  inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
-  inp.placeholder=f.ph||(f.t==="num"?"number or variable":"value or variable");
-  const badge=wfVarBadge();
-  const sync=()=>{ const s=String(inp.value||"").trim(); badge.refresh(wfVarBadgeInfo(s)?s:""); };
-  const commit=refresh=>{ wfPushUndoDebounced();
-    // Keep numeric literals as numbers; leave variable names / expressions as text.
-    const s=inp.value;
-    node.params[f.k]= (f.t==="num" && s!=="" && !isNaN(s) && wfVarBadgeInfo(String(s).trim())===null) ? parseFloat(s) : s;
-    wfUpdNodeSum(node); if(refresh) wfRenderCanvas(); sync(); };
-  inp.oninput=()=>commit(!!f.refresh);
-  const pick=wfVarPickBtn(name=>{ inp.value=name; commit(!!f.refresh); }, "Use a variable as this value");
-  row.appendChild(inp); row.appendChild(pick); row.appendChild(badge);
-  sync();
+  const set=v=>{
+    const hadFocus=row.contains(document.activeElement);
+    wfPushUndoDebounced(); node.params[f.k]=v; wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas();
+    build();
+    if(hadFocus){ const el=row.querySelector(".wf-val-opt.on, .wf-val-select, .wf-var-input"); if(el) el.focus(); }
+  };
+  function build(){
+    row.innerHTML="";
+    const lab=document.createElement("label"); lab.textContent=wfFieldLabel(f); lab.title=f.k; row.appendChild(lab);
+    const kind=wfVarValueKind(node,f);
+    const cur=node.params[f.k]!==undefined?node.params[f.k]:"";
+    const opt=wfVarValueOpt(kind,cur);
+    const pick=wfVarPickBtn(name=>set(name), "Use a variable as this value");
+
+    if(opt!==null){
+      // Short option sets read best as a segmented pick; long ones as a dropdown.
+      const fits=kind.type==="bool" || (kind.opts.length<=3 && kind.opts.join("").length<=18);
+      if(fits){
+        const seg=document.createElement("div"); seg.className="wf-val-seg";
+        seg.setAttribute("role","radiogroup"); seg.setAttribute("aria-label",wfFieldLabel(f));
+        kind.opts.forEach(o=>{
+          const b=document.createElement("button"); b.type="button";
+          b.className="wf-val-opt"+(o===opt?" on":"")+(kind.type==="bool"?" is-"+o:"");
+          b.textContent=o; b.title=o;
+          b.setAttribute("role","radio"); b.setAttribute("aria-checked",String(o===opt));
+          b.onclick=()=>{ if(o!==opt) set(o); };
+          seg.appendChild(b);
+        });
+        row.appendChild(seg);
+      } else {
+        const sel=document.createElement("select"); sel.className="wf-val-select";
+        kind.opts.forEach(o=>{ const op=document.createElement("option"); op.value=op.textContent=o; if(o===opt) op.selected=true; sel.appendChild(op); });
+        sel.onchange=()=>set(sel.value);
+        row.appendChild(sel);
+      }
+      row.appendChild(pick);
+      return;
+    }
+
+    const numeric=f.t==="num" || (kind && kind.type==="number");
+    const inp=document.createElement("input"); inp.type="text";  // text so a var name is typeable even on numeric fields
+    inp.className="wf-var-input"; inp.inputMode=numeric?"decimal":"text";
+    inp.value=cur;
+    inp.placeholder=f.ph||(numeric?"number or variable":"value or variable");
+    const badge=wfVarBadge();
+    const sync=()=>{ const s=String(inp.value||"").trim(); badge.refresh(wfVarBadgeInfo(s)?s:""); };
+    inp.oninput=()=>{ wfPushUndoDebounced();
+      // Keep numeric literals as numbers; leave variable names / expressions as text.
+      const s=inp.value;
+      node.params[f.k]= (f.t==="num" && s!=="" && !isNaN(s) && wfVarBadgeInfo(String(s).trim())===null) ? parseFloat(s) : s;
+      wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); sync(); };
+    // Typing a valid option by hand ("false") switches back to the quick pick.
+    inp.onchange=()=>{ if(wfVarValueOpt(kind,inp.value)!==null) set(wfVarValueOpt(kind,inp.value)); };
+    row.appendChild(inp); row.appendChild(pick);
+    if(kind && kind.opts){
+      const quick=document.createElement("button"); quick.type="button"; quick.className="btn sm ico wf-var-pick wf-val-quick";
+      quick.title=kind.type==="bool" ? "Pick true / false" : "Pick one of the options";
+      quick.setAttribute("aria-label",quick.title);
+      quick.innerHTML=uiIco("toggle-left","uico-1");
+      quick.onclick=e=>{ e.stopPropagation(); set(kind.opts[0]); };
+      row.appendChild(quick);
+    }
+    row.appendChild(badge);
+    sync();
+  }
+  row._varRefresh=build;
+  build();
   return row;
 }
 
@@ -1018,7 +1141,10 @@ function wfFieldEl(node,f){
     // If any sibling field gates on this one (showWhen), re-render the inspector
     // so gated fields appear/disappear as the selection changes.
     const gates=(WF_NODES[node.type]&&WF_NODES[node.type].fields||[]).some(ff=>ff.showWhen&&ff.showWhen[f.k]!==undefined);
-    sel.onchange=()=>{ wfPushUndoDebounced(); node.params[f.k]=sel.value; wfUpdNodeSum(node); if(gates) wfRenderInspector(); };
+    sel.onchange=()=>{ wfPushUndoDebounced(); node.params[f.k]=sel.value; wfUpdNodeSum(node); if(gates) wfRenderInspector();
+      // A variable block's Value control depends on the operator (true/false
+      // only makes sense for = and ≠).
+      if(f.k==="op" && WF_VAR_VALUE_NODES.has(node.type)){ wfNormalizeVarValue(node); wfRefreshVarValues(row.parentElement); } };
     row.appendChild(sel); return row;
   }
   if(f.t==="tpls") return wfTplsField(node,f);

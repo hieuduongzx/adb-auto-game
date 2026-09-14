@@ -14,8 +14,9 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Callable, List, Optional, Sequence
+from typing import Callable, Iterator, List, Optional, Sequence
 
 from colorama import init as _colorama_init, Fore, Style
 
@@ -50,33 +51,87 @@ _current_state: Optional[str] = None
 # Subscribers receive every log message ``(level, message)`` where ``level``
 # is one of: ``info``, ``success``, ``warning``, ``error``, ``state``,
 # ``quest``, ``normal``. Used by the GUI to mirror logs in its log panel.
-_subscribers: List[Callable[[str, str], None]] = []
+_subscribers: List[Callable[..., None]] = []
+# Subscribers that also want the log context as a third ``meta`` argument.
+_meta_subscribers: List[Callable[..., None]] = []
 _subscribers_lock = threading.Lock()
 
+# ── Log context ─────────────────────────────────────────────────────────────
+# Which activity the *current thread* is running. The workflow engine sets it
+# for the sequence thread, each parallel branch and each background worker, so
+# every line logged on that thread — including ones from src/core helpers —
+# can be prefixed with ``[<activity>]``.
+#
+# ``kind`` classifies a line so each app can pick its own verbosity:
+#   run      — whole-run events (started, paused, stopped, finished)
+#   activity — an activity started / finished / failed / retried
+#   user     — text the workflow author wrote (a block's log line, Log block)
+#   detail   — engine step-by-step output (taps, matches, branches taken)
+#   None     — not from the engine (app, device, speed hack…)
+LOG_KIND_RUN = "run"
+LOG_KIND_ACTIVITY = "activity"
+LOG_KIND_USER = "user"
+LOG_KIND_DETAIL = "detail"
 
-def add_log_subscriber(callback: Callable[[str, str], None]) -> None:
-    """Register ``callback(level, message)`` to receive every log message."""
+_log_ctx = threading.local()
+
+
+def set_log_activity(name: Optional[str]) -> None:
+    """Set (or clear with ``None``) the activity name for this thread's logs."""
+    _log_ctx.activity = str(name) if name else None
+
+
+def get_log_activity() -> Optional[str]:
+    """The activity this thread is running, or ``None``."""
+    return getattr(_log_ctx, "activity", None)
+
+
+@contextmanager
+def log_activity(name: Optional[str]) -> Iterator[None]:
+    """Scope this thread's logs to ``name``, restoring the previous one after."""
+    prev = get_log_activity()
+    set_log_activity(name)
+    try:
+        yield
+    finally:
+        set_log_activity(prev)
+
+
+def add_log_subscriber(callback: Callable[..., None], with_meta: bool = False) -> None:
+    """Register ``callback(level, message)`` to receive every log message.
+
+    With ``with_meta=True`` it is called as ``callback(level, message, meta)``
+    where ``meta`` is ``{"activity": str | None, "kind": str | None}``."""
     with _subscribers_lock:
         if callback not in _subscribers:
             _subscribers.append(callback)
+        if with_meta and callback not in _meta_subscribers:
+            _meta_subscribers.append(callback)
 
 
-def remove_log_subscriber(callback: Callable[[str, str], None]) -> None:
+def remove_log_subscriber(callback: Callable[..., None]) -> None:
     """Unregister a previously added subscriber."""
     with _subscribers_lock:
         if callback in _subscribers:
             _subscribers.remove(callback)
+        if callback in _meta_subscribers:
+            _meta_subscribers.remove(callback)
 
 
-def _notify_subscribers(level: str, message: str) -> None:
+def _notify_subscribers(level: str, message: str, kind: Optional[str] = None) -> None:
     """Fan out a message to every subscriber. Failures are swallowed so a
     misbehaving GUI sink can never break console logging.
     """
     with _subscribers_lock:
         subs = list(_subscribers)
+        with_meta = set(_meta_subscribers)
+    meta = {"activity": get_log_activity(), "kind": kind}
     for cb in subs:
         try:
-            cb(level, message)
+            if cb in with_meta:
+                cb(level, message, meta)
+            else:
+                cb(level, message)
         except Exception:
             pass
 
@@ -129,6 +184,9 @@ def set_current_state(state: Optional[str]) -> None:
 def _format(message: str, color: str) -> str:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
     state = f"[{_current_state}]" if _current_state else ""
+    activity = get_log_activity()
+    if activity:
+        state += f"[{activity}]"
     return (
         f"{Fore.CYAN}[{timestamp}]{state}{Style.RESET_ALL} "
         f"{color}{message}{Style.RESET_ALL}"
@@ -140,16 +198,16 @@ def log_with_time(message: str, color: str = Fore.WHITE) -> None:
     print(_format(message, color))
 
 
-def log_error(message: str, exc_info: bool = False) -> None:
+def log_error(message: str, exc_info: bool = False, kind: Optional[str] = None) -> None:
     """Log an error to stderr/console and the root logger.
 
     ``exc_info=True`` will append the active exception traceback (only valid
-    inside an ``except`` block).
+    inside an ``except`` block). ``kind`` — see the log context notes above.
     """
     print(_format(message, Fore.RED))
     if exc_info:
         _root_logger.error(message, exc_info=True)
-    _notify_subscribers("error", message)
+    _notify_subscribers("error", message, kind)
 
 
 def log_debug(message: str) -> None:
@@ -164,19 +222,19 @@ def log_debug(message: str) -> None:
     _root_logger.debug(message)
 
 
-def log_warning(message: str) -> None:
+def log_warning(message: str, kind: Optional[str] = None) -> None:
     log_with_time(message, Fore.YELLOW)
-    _notify_subscribers("warning", message)
+    _notify_subscribers("warning", message, kind)
 
 
-def log_success(message: str) -> None:
+def log_success(message: str, kind: Optional[str] = None) -> None:
     log_with_time(message, Fore.GREEN)
-    _notify_subscribers("success", message)
+    _notify_subscribers("success", message, kind)
 
 
-def log_info(message: str) -> None:
+def log_info(message: str, kind: Optional[str] = None) -> None:
     log_with_time(message, Fore.CYAN)
-    _notify_subscribers("info", message)
+    _notify_subscribers("info", message, kind)
 
 
 def log_state(message: str) -> None:
@@ -536,4 +594,11 @@ __all__ = [
     "log_normal",
     "add_log_subscriber",
     "remove_log_subscriber",
+    "LOG_KIND_RUN",
+    "LOG_KIND_ACTIVITY",
+    "LOG_KIND_USER",
+    "LOG_KIND_DETAIL",
+    "set_log_activity",
+    "get_log_activity",
+    "log_activity",
 ]

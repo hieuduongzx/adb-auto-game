@@ -318,6 +318,53 @@ def _read_meta(path: str, folder_name: str) -> Dict[str, Any]:
     }
 
 
+# ── Recent interaction ───────────────────────────────────────────────────────
+# A per-game "last touched from the Hub" timestamp, bumped when a game is run,
+# edited, or built. Kept under data/ so it survives restarts; the library orders
+# by the newest of this and the workflow file's own mtime (which the Designer
+# and the build both move).
+_RECENT_PATH = os.path.join(data_root(), "data", "recent_games.json")
+_RECENT_LOCK = threading.Lock()
+
+
+def _norm_game_path(path: str) -> str:
+    try:
+        return os.path.normcase(os.path.abspath(str(path or "")))
+    except Exception:
+        return str(path or "")
+
+
+def _load_recent() -> Dict[str, float]:
+    try:
+        with open(_RECENT_PATH, "r", encoding="utf-8") as fh:
+            data = json.load(fh) or {}
+        if isinstance(data, dict):
+            return {str(k): float(v) for k, v in data.items() if v is not None}
+    except Exception:
+        pass
+    return {}
+
+
+def _touch_recent(path: str) -> None:
+    """Record that *path* was just interacted with (run / edit / build)."""
+    key = _norm_game_path(path)
+    if not key:
+        return
+    with _RECENT_LOCK:
+        data = _load_recent()
+        data[key] = time.time()
+        cutoff = time.time() - 180 * 86400        # forget games untouched for ~6 months
+        data = {k: v for k, v in data.items() if v >= cutoff}
+        try:
+            os.makedirs(os.path.dirname(_RECENT_PATH), exist_ok=True)
+            tmp = _RECENT_PATH + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, ensure_ascii=False, indent=2)
+            os.replace(tmp, _RECENT_PATH)
+        except Exception:
+            pass
+
+
 class WorkflowHubAPI:
     """Methods exposed to JavaScript as ``window.pywebview.api.*``."""
 
@@ -377,11 +424,14 @@ class WorkflowHubAPI:
 
     # ── Game library ─────────────────────────────────────────────────────────
     def list_workflows(self) -> dict:
-        """Return every game project under ``workflows/``, sorted by name.
+        """Return every game project under ``workflows/``, newest interaction first.
 
-        Alphabetical rather than most-recently-edited: a library grid whose
-        cards jump around after every save is hard to find things in."""
+        A game's place is its last interaction — run, edit, or build — so the
+        ones you touched most recently sit at the top. Falls back to the
+        workflow file's own mtime (Designer saves and builds move it), then the
+        display name for stability."""
         items: List[Dict[str, Any]] = []
+        recent = _load_recent()
         root = _WORKFLOWS_DIR
         if os.path.isdir(root):
             try:
@@ -397,8 +447,14 @@ class WorkflowHubAPI:
                 path = _find_workflow_json(folder)
                 if not path:
                     continue
-                items.append(_read_meta(path, name))
-        items.sort(key=lambda w: ((w.get("name") or "").lower(), w.get("folder") or ""))
+                meta = _read_meta(path, name)
+                used = recent.get(_norm_game_path(path), 0.0)
+                meta["lastUsed"] = used
+                meta["recency"] = max(used, float(meta.get("mtime") or 0.0))
+                items.append(meta)
+        items.sort(key=lambda w: (-(w.get("recency") or 0.0),
+                                  (w.get("name") or "").lower(),
+                                  w.get("folder") or ""))
         return {"dir": root, "workflows": items}
 
     def run_workflow(self, path: str) -> bool:
@@ -408,6 +464,7 @@ class WorkflowHubAPI:
             return False
         try:
             launch_tool("runner", [path])
+            _touch_recent(path)
             return True
         except Exception:
             return False
@@ -419,6 +476,7 @@ class WorkflowHubAPI:
             return False
         try:
             launch_tool("designer", [path])
+            _touch_recent(path)
             return True
         except Exception:
             return False
@@ -645,6 +703,7 @@ class WorkflowHubAPI:
         if cancelled:
             self._update_build(force=True, state="cancelled", stage="Cancelled", endedAt=ended)
         elif code == 0 and exe_path:
+            _touch_recent(info.get("path") or "")
             self._update_build(force=True, state="done", progress=100,
                                stage="Published" if release_url else "Built",
                                exe=exe_path, folder=os.path.dirname(exe_path),
@@ -756,6 +815,7 @@ class WorkflowHubAPI:
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(flow, fh, ensure_ascii=False, indent=2)
                 fh.write("\n")
+            _touch_recent(path)
             return {
                 "ok": True,
                 "path": path,
