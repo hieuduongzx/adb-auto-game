@@ -239,6 +239,13 @@
    collapsed state is untouched and comes back with Edit mode. */
 #workflow-view.wf-preview-on #wf-side,
 #workflow-view.wf-preview-on #wf-side-resizer { display:none; }
+/* Library mode hides the same editing chrome, plus the whole right column: a
+   269-thumbnail grid is what the tab is for, and squeezing it between a node
+   library and an inspector would defeat it. Kept in CSS (rather than set inline
+   in wfSwitchView) so the restore path is the single class removal below. */
+#workflow-view.wf-library-on #wf-side,
+#workflow-view.wf-library-on #wf-side-resizer,
+#workflow-view.wf-library-on #wf-inspector { display:none; }
 
 #wf-side { width:280px; flex-shrink:0; display:flex; flex-direction:column;
   overflow:hidden; background:var(--panel); border-right:1px solid var(--border2); }
@@ -331,7 +338,8 @@
   width:310px; max-width:calc(100% - 28px); display:flex; flex-direction:column;
   min-height:0; overflow:hidden; background:var(--panel); border:1px solid var(--border);
   border-radius:var(--r-md); box-shadow:var(--sh-md); }
-#workflow-view.wf-preview-on #wf-act-panel { display:none; }
+#workflow-view.wf-preview-on #wf-act-panel,
+#workflow-view.wf-library-on #wf-act-panel { display:none; }
 #wf-act-panel.collapsed .wf-act-tab-row,
 #wf-act-panel.collapsed .wf-act-panel-body { display:none; }
 #wf-act-panel.collapsed .wf-side-hdr { border-bottom:none; }
@@ -1725,6 +1733,77 @@
 .wf-fail-shot-path { flex:1; min-width:0; font-family:var(--mono); font-size:10px;
   color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+/* ── Template library pane (Library tab) ────────────────────────────────────── */
+/* Same overlay shell as the preview pane, so both tabs own the whole canvas
+   area; grid on the left, the selected template's usages on the right. */
+#wf-library-pane { position:absolute; inset:0; z-index:6; display:flex; flex-direction:column;
+  background:var(--bg); overflow:hidden; }
+.wf-lib-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:7px 14px;
+  background:var(--panel); border-bottom:1px solid var(--border2); flex-shrink:0; }
+.wf-lib-bar .btn.sm { height:28px; }
+.wf-lib-heading { font-size:var(--t-body); font-weight:700; color:var(--ink); }
+.wf-lib-counts { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted); }
+.wf-lib-counts.has-warn { color:var(--warn); }
+.wf-lib-path { font-family:var(--mono); font-size:var(--t-micro); color:var(--dim);
+  padding:5px 14px; border-bottom:1px solid var(--line); flex-shrink:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-lib-body { flex:1; display:flex; min-height:0; }
+.wf-lib-grid { flex:1; min-width:0; overflow-y:auto; padding:12px 14px;
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr));
+  gap:9px; align-content:start; }
+/* Card: a <button>, so the app's .asset-card look needs its native chrome
+   cleared before it applies. */
+.wf-lib-card { font:inherit; color:inherit; background:var(--panel); padding:0; }
+.wf-lib-card .asset-name { text-align:left; }
+/* Orphans are the reason the tab exists — a hairline on the left edge marks
+   them without shouting, and Used cards stay plain so the orphan scan works
+   the same way at a glance as it does through the filter chips. */
+.wf-lib-card.is-orphan { border-left:3px solid var(--warn); }
+.wf-lib-card.is-orphan .wf-lib-meta { color:var(--warn); }
+.wf-lib-meta { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted);
+  padding:0 5px 5px; text-align:left; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; }
+/* Full-width messages that stand in for a grid (empty folder, dupes header). */
+.wf-lib-empty { grid-column:1/-1; padding:10px 2px; font-size:var(--t-ui);
+  color:var(--muted); }
+/* Missing references and duplicate groups are row lists, not a card grid. */
+.wf-lib-miss, .wf-lib-dupgroup { grid-column:1/-1; display:flex; flex-direction:column; gap:4px; }
+.wf-lib-miss { align-items:flex-start; text-align:left; padding:7px 9px; border-radius:var(--r-sm);
+  border:1px solid var(--err-bd); background:var(--err-bg); cursor:pointer; }
+.wf-lib-miss:hover { filter:brightness(1.06); }
+.wf-lib-miss-name { font-family:var(--mono); font-size:var(--t-ui); color:var(--err); }
+.wf-lib-miss-where { font-size:var(--t-micro); color:var(--muted); }
+.wf-lib-dupgroup { border:1px solid var(--border); border-radius:var(--r-md);
+  background:var(--panel); padding:8px 10px; margin-bottom:2px; }
+.wf-lib-dup-hd { font-family:var(--mono); font-size:var(--t-micro); font-weight:700;
+  color:var(--muted); padding-bottom:4px; }
+.wf-lib-dup-row { display:flex; align-items:center; gap:9px; padding:3px 0; }
+.wf-lib-dup-thumb { width:52px; height:34px; object-fit:contain; flex-shrink:0;
+  border-radius:4px; }
+.wf-lib-dup-name { flex:1; min-width:0; font-family:var(--mono); font-size:var(--t-micro);
+  color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-lib-dup-size { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted); }
+/* Detail panel */
+.wf-lib-side { width:290px; flex-shrink:0; overflow-y:auto; padding:12px 14px;
+  border-left:1px solid var(--border2); background:var(--panel); }
+.wf-lib-side-hd { padding-bottom:8px; border-bottom:1px solid var(--line); margin-bottom:9px; }
+.wf-lib-side-name { font-family:var(--mono); font-size:var(--t-ui); color:var(--ink);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-lib-side-sub { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted); }
+.wf-lib-side-lbl { font-size:var(--t-micro); font-weight:700; text-transform:uppercase;
+  letter-spacing:.04em; color:var(--muted); margin-bottom:5px; }
+.wf-lib-uses { display:flex; flex-direction:column; gap:2px; }
+.wf-lib-use { display:flex; flex-direction:column; align-items:flex-start; gap:1px;
+  width:100%; text-align:left; padding:5px 7px; border-radius:var(--r-sm);
+  transition:background .1s; }
+.wf-lib-use:hover { background:var(--alt); }
+.wf-lib-use-act { font-size:var(--t-micro); color:var(--muted); }
+.wf-lib-use-node { font-size:var(--t-ui); color:var(--ink); }
+.wf-lib-note { font-size:var(--t-ui); color:var(--warn); padding:2px 0 6px; }
+.wf-lib-acts { display:flex; gap:6px; margin-top:12px; padding-top:10px;
+  border-top:1px solid var(--line); }
+.wf-lib-side .wf-lib-empty { padding:6px 0; }
+
 /* ── Live preview pane (Preview tab) ────────────────────────────────────────── */
 #wf-preview-pane { position:absolute; inset:0; z-index:6; display:flex; flex-direction:column;
   background:var(--bg); overflow:hidden; }
@@ -1773,6 +1852,15 @@
 #pv-tab-device .info-grid .k:hover + .v,
 #pv-tab-device .info-grid .v:hover { background:var(--accent-bg); }
 #wf-scope-panel .tab-pane.active { overflow-y:auto; }
+
+/* Swipe capture readout — mini device diagram + copy/clear actions. Sits under
+   the Swipe fields so "draw on the mirror → read → copy" reads top to bottom. */
+.wf-swipe-preview { display:flex; flex-direction:column; gap:4px; }
+.wf-swipe-preview canvas { width:100%; height:72px; display:block; background:var(--surface);
+  border:1px solid var(--border); border-radius:6px; }
+.wf-swipe-meta { display:flex; align-items:center; gap:6px; }
+.wf-swipe-meta > span { flex:1; min-width:0; font-family:var(--mono); font-size:10.5px;
+  color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* ── Project settings modal — stacked labeled rows ─────────────────────────── */
 .wf-proj-form { display:flex; flex-direction:column; gap:12px; padding-bottom:4px; }

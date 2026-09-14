@@ -13,6 +13,7 @@ from .constants import (
 )
 from .cache import get_cache
 from .scanner import DeviceScanner
+from src.core.keynames import android_key_name
 from src.utils import log_error, log_success, log_warning, log_normal, log_debug
 
 
@@ -428,9 +429,9 @@ class ADBController:
             self.device.shell(f"input keyevent {keycode}")
             return True
         except Exception as e:
-            log_error(f"Error pressing key {keycode}: {e}")
+            log_error(f"⌨ gửi phím '{android_key_name(keycode)}' lỗi: {e}")
             return False
-    
+
     def go_back(self) -> bool:
         """Press back button"""
         return self.press_key(KEYCODE_BACK)

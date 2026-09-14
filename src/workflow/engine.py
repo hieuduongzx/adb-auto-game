@@ -58,6 +58,13 @@ from typing import Any, Callable, Dict, List, Optional
 
 from src.core import ADBGameAutomation
 from src.core.frida_speedhack import FridaSpeedhackManager
+from src.core.keynames import (
+    android_key_is_known,
+    android_key_name,
+    vk_combo,
+    vk_is_known,
+    vk_name,
+)
 from src.utils import (
     LOG_KIND_ACTIVITY,
     LOG_KIND_DETAIL,
@@ -66,6 +73,7 @@ from src.utils import (
     get_log_activity,
     log_activity,
     set_log_activity,
+    set_log_node,
 )
 from src import utils as _utils
 
@@ -1082,7 +1090,11 @@ class WorkflowEngine:
         """
         act = next((a for a in self.activities() if str(a.get("id")) == str(activity_id)), None)
         if act is None:
-            log_warning(f"Activity not found: {activity_id}", kind=LOG_KIND_RUN)
+            # The id came from a GUI list, so echoing it back tells the user
+            # nothing — naming what IS here is what makes the mismatch visible.
+            known = ", ".join(self._label(a) for a in self.activities())
+            log_warning(f"Activity '{activity_id}' not found — workflow has: "
+                        + (known or "(no activities)"), kind=LOG_KIND_RUN)
             return False
         if self.running:
             log_warning("Already running", kind=LOG_KIND_RUN)
@@ -1200,7 +1212,13 @@ class WorkflowEngine:
         # Every line logged on this thread while the activity runs — the engine,
         # functions it calls, src/core helpers — is prefixed with its name.
         with log_activity(act.get("name") or act.get("id") or "activity"):
-            return self._run_activity_attempts(act)
+            # A pooled worker thread would otherwise still carry the last block
+            # of whichever activity ran on it before.
+            set_log_node(None)
+            try:
+                return self._run_activity_attempts(act)
+            finally:
+                set_log_node(None)
 
     def _run_activity_attempts(self, act: Dict[str, Any]) -> bool:
         retries = max(1, int(act.get("maxRetries", 1) or 1))
@@ -1289,7 +1307,8 @@ class WorkflowEngine:
         if start_id:
             cur = start_id if start_id in nodes else None
             if cur is None:
-                log_warning(f"Start node id not found: {start_id}", kind=LOG_KIND_ACTIVITY)
+                log_warning(f"Không tìm thấy block bắt đầu '{start_id}' — "
+                            "block có thể đã bị xoá khỏi graph", kind=LOG_KIND_ACTIVITY)
                 return False
         else:
             start = next((n for n in nodes.values() if n.get("type") == "start"), None)
@@ -1320,6 +1339,11 @@ class WorkflowEngine:
             if node is None:
                 break
             last_nid = cur
+            # Every line logged from here on — the block's own output, the ADB
+            # helpers it calls — is attributed to this node, so the designer can
+            # point a log line back at the block on the canvas. The walk is
+            # per-thread, so this never bleeds across parallel branches.
+            set_log_node(cur)
             self._emit("on_node", cur)  # let the designer highlight the active node
             nid = cur                    # stable id for the post-run result event
             ntype = node.get("type")
@@ -1334,6 +1358,9 @@ class WorkflowEngine:
                 break
             spec = NODE_TYPES.get(ntype)
             kind = spec.get("kind") if spec else None
+            # The block's Vietnamese label ("Chạm ảnh"), for log lines that would
+            # otherwise name the type ("tap_image") or the node's raw id.
+            label = (spec or {}).get("label") or ntype
             params = node.get("params", {}) or {}
 
             # Universal pre-block pause ("Chờ trước"): wait, THEN run the block
@@ -1366,7 +1393,7 @@ class WorkflowEngine:
                 except Exception as e:
                     # A crash inside a condition counts as "false".
                     res = False
-                    log_error(f"Node '{ntype}' error: {e}")
+                    log_error(f"Block '{label}' lỗi: {e}")
                 port = "true" if res else "false"
                 self._node_done(node, nid, "ok", port)  # branch taken
                 nxt = self._next(adj, cur, port)
@@ -1536,7 +1563,7 @@ class WorkflowEngine:
                 # Chạy các nhánh 1..N LẦN LƯỢT: dù nhánh trước fail hay thành
                 # công vẫn sang nhánh kế. Mỗi nhánh là một đường độc lập (walk
                 # tới dead-end). Khác try_chain: không dừng ở nhánh thành công
-                # đầu tiên, và không có cổng "fail"/"out" chung.
+                # đầu tiên, và chỉ có một cổng tiếp tục chung là "end".
                 count = max(1, int(params.get("count", 3)))
                 ports = [str(i + 1) for i in range(count)]
                 break0 = self._break_loop
@@ -1570,6 +1597,21 @@ class WorkflowEngine:
                 self._branch_failed = bool(failed0 or any_failed)
                 if ran:
                     log_info(f"⇉ chạy xong {ran} nhánh lần lượt")
+                # Cổng "end": đường tiếp tục chính, chạy SAU khi tất cả nhánh
+                # 1..N đã xong (dù nhánh nào fail). Có dây "end" thì lỗi của các
+                # nhánh chỉ mang tính best-effort (vẫn ghi log) — kết quả thật do
+                # đường "end" quyết định, giống nhánh thành công của try_chain.
+                # Không có dây "end" thì giữ nguyên hành vi cũ: lỗi nhánh lan ra
+                # ngoài và node kết thúc ngay tại đây.
+                end_tgt = self._next(adj, cur, "end")
+                if end_tgt and not self._stop.is_set():
+                    if any_failed:
+                        log_warning("↳ nhánh lần lượt có lỗi — tiếp tục qua cổng 'end'")
+                    self._branch_failed = failed0
+                    self._node_done(node, nid, "ok", "end")
+                    self._break_loop = False
+                    self._walk(nodes, adj, end_tgt, {}, depth)
+                    self._break_loop = break0
                 break
             elif kind == "switch":
                 # Evaluate each case top-to-bottom; first true wins its port "c{i}".
@@ -1593,7 +1635,11 @@ class WorkflowEngine:
                 fn = self._functions.get(fid)
                 ok_call = False
                 if fn is None:
-                    log_warning(f"call -> unknown function '{fid}'", kind=LOG_KIND_ACTIVITY)
+                    names = ", ".join(self._label(f) for f in self._functions.values())
+                    log_warning(f"call → không tìm thấy hàm '{fid}'"
+                                + (f" — workflow có: {names}" if names
+                                   else " — workflow chưa có hàm nào"),
+                                kind=LOG_KIND_ACTIVITY)
                 elif depth >= MAX_CALL_DEPTH:
                     log_warning("Max function call depth reached (recursion?)", kind=LOG_KIND_ACTIVITY)
                 else:
@@ -1628,7 +1674,12 @@ class WorkflowEngine:
                 elif handler is not None:
                     ok_act = self._run_action_with_retry(node, params, handler)
                 else:
-                    log_warning(f"Unknown node: {ntype}", kind=LOG_KIND_ACTIVITY)
+                    # The type name is all there is to report — no spec means no
+                    # label — so say what its absence implies instead of echoing
+                    # a bare identifier the user has never seen.
+                    log_warning(f"Block '{ntype}' không có trong bản engine này — "
+                                "workflow có thể được lưu bởi bản mới hơn",
+                                kind=LOG_KIND_ACTIVITY)
                     ok_act = False
                     self._branch_failed = True
                 self._node_done(node, nid, "ok" if ok_act else "fail", "out")
@@ -1789,6 +1840,15 @@ class WorkflowEngine:
         return re.sub(r"\{([^{}]+)\}",
                       lambda m: str(self._vars.get(m.group(1).strip(), m.group(0))),
                       s)
+
+    @staticmethod
+    def _label(obj: Dict[str, Any]) -> str:
+        """The human name of an activity / function / node, falling back to id.
+
+        Log lines used to print the raw id, which is a UUID-shaped string the
+        user never chose and cannot match to anything on screen.
+        """
+        return str(obj.get("name") or obj.get("id") or "?")
 
     def _seed_vars(self, act: Dict) -> Dict[str, Any]:
         """Initial variable values for a thread: globals first, then the
@@ -2740,6 +2800,7 @@ class WorkflowEngine:
         work["params"] = params
         spec = NODE_TYPES.get(ntype)
         kind = spec.get("kind") if spec else None
+        label = (spec or {}).get("label") or ntype
         self._emit("on_node", nid)
         input_log = work.get("log")
         if input_log:
@@ -2756,7 +2817,7 @@ class WorkflowEngine:
             elif kind in ("loop", "loop_until", "parallel", "sequence", "and", "join",
                           "random", "switch", "try_chain", "call"):
                 # Structural nodes don't make sense standalone; report no-op.
-                log_info(f"Block '{ntype}' là cấu trúc — chạy trong luồng")
+                log_info(f"Block '{label}' là cấu trúc — chạy trong luồng")
                 port = None
             else:
                 handler = self._actions.get(ntype)
@@ -2765,11 +2826,12 @@ class WorkflowEngine:
                     status = "ok" if ok_act else "fail"
                     port = "out"
                 else:
-                    log_warning(f"Unknown node: {ntype}")
+                    log_warning(f"Block '{ntype}' không có trong bản engine này — "
+                                "workflow có thể được lưu bởi bản mới hơn")
                     status = "fail"
                     port = "out"
         except Exception as e:
-            log_error(f"Node '{ntype}' error: {e}")
+            log_error(f"Block '{label}' lỗi: {e}")
             status = "fail"
             port = "out"
         self._node_done(work, nid, status, port)
@@ -3019,7 +3081,7 @@ class WorkflowEngine:
                 ok_act = handler(node, params) is not False
                 last_error = None
             except Exception as e:
-                log_error(f"Node '{node.get('type')}' error: {e}")
+                log_error(f"Block '{label}' lỗi: {e}")
                 ok_act = False
                 last_error = e
             if ok_act:
@@ -3356,15 +3418,29 @@ class WorkflowEngine:
         return self.auto.send_text(self._format_msg(str(p.get("text", ""))))
 
     def _a_key(self, node, p) -> bool:
+        """Gửi một phím Android — nhận cả keycode số (4) lẫn tên ("BACK").
+
+        Trước đây block này chạy im lặng: một keycode sai chỉ trả về False mà
+        không nói gì, nên log không phân biệt được "đã gửi phím" với "block chết".
+        """
         code = p.get("keycode", "")
+        name = android_key_name(code)
+        if not android_key_is_known(code):
+            # `input keyevent` nhận mọi chuỗi, nên lỗi typo chỉ lộ ra ở thiết bị
+            # dưới dạng lỗi mờ nghĩa — gọi tên giá trị đáng ngờ ngay tại đây.
+            log_warning(f"⌨ '{code}' không phải keycode Android đã biết — vẫn gửi thử")
         try:
-            return self.auto.press_key(int(code))
+            ok = self.auto.press_key(int(code))
         except (TypeError, ValueError):
             try:
                 self.auto.adb.device.shell(f"input keyevent {code}")
-                return True
-            except Exception:
+                ok = True
+            except Exception as exc:
+                log_warning(f"⌨ gửi phím '{name}' lỗi: {exc}")
                 return False
+        if ok:
+            log_info(f"⌨ {name}")
+        return ok
 
     def _a_back(self, node, p) -> bool:
         return self.auto.go_back()
@@ -4772,13 +4848,14 @@ class WorkflowEngine:
         try:
             vk = int(p.get("keycode", 13))
         except (TypeError, ValueError):
-            log_warning(f"⌨ win_hotkey: mã phím không hợp lệ ({p.get('keycode')!r})")
+            log_warning(f"⌨ win_hotkey: mã phím không hợp lệ '{p.get('keycode')}' — "
+                        "chọn một phím trong danh sách của block")
             return False
         mods = {k: self._truthy(p.get(k, False)) for k in ("ctrl", "shift", "alt", "win")}
         ok = bool(ctrl.press_hotkey(vk, **mods))
         if ok:
-            combo = "+".join([k.capitalize() for k, on in mods.items() if on] + [f"VK{vk}"])
-            log_info(f"⌨ {combo}")
+            # Name the key, not its code: "Ctrl+Shift+A", never "Ctrl+Shift+VK65".
+            log_info(f"⌨ {vk_combo(vk, **mods)}")
         return ok
 
     def _a_win_key(self, node, p) -> bool:
@@ -4793,14 +4870,18 @@ class WorkflowEngine:
         try:
             vk = int(p.get("keycode", 13))
         except (TypeError, ValueError):
-            log_warning(f"⌨ win_key: mã phím không hợp lệ ({p.get('keycode')!r})")
+            log_warning(f"⌨ win_key: mã phím không hợp lệ '{p.get('keycode')}' — "
+                        "chọn một phím trong danh sách của block")
             return False
         mode = str(p.get("mode", "press") or "press").strip().lower()
         hold = self._resolve_count(p.get("hold", 80), default=80)
         ok = bool(ctrl.press_key(vk, hold_ms=hold, action=mode))
         if ok:
             what = {"down": "giữ", "up": "nhả"}.get(mode, f"nhấn {hold}ms")
-            log_info(f"⌨ VK{vk} {what}")
+            # vk_name() falls back to "VK{n}" for codes the table doesn't cover —
+            # still a code, but at least a recognisable one, and the user has no
+            # other clue which key fired.
+            log_info(f"⌨ {vk_name(vk)} {what}")
         return ok
 
     def _a_win_info(self, node, p) -> bool:

@@ -8,8 +8,10 @@ glue (logging + ``window.__recv`` pushes).
 from __future__ import annotations
 
 import base64
+import itertools
 import os
 import re
+import shutil
 from typing import Any, Callable, Dict, List, Optional
 
 import cv2
@@ -221,12 +223,30 @@ def ensure_region_in_filename(path: str, x: int, y: int, w: int, h: int) -> str:
 
 # ── Asset library ─────────────────────────────────────────────────────────────
 
-def list_image_assets(out_dir: str, limit: int = 200) -> List[Dict[str, Any]]:
-    """List image assets under *out_dir* (recursively), newest first."""
+# Sub-folder an asset is moved to instead of being unlinked. It holds files the
+# user asked to remove but may want back, so it must never be listed or counted
+# as part of the library.
+TRASH_DIR = "_trash"
+
+
+def list_image_assets(out_dir: str, limit: Optional[int] = None,
+                      with_dims: bool = False) -> List[Dict[str, Any]]:
+    """List image assets under *out_dir* (recursively), newest first.
+
+    *limit* is off by default: it used to be a silent 200, which on a real
+    project (269 templates) hid the 69 oldest files with nothing on screen
+    saying so — and those are exactly the orphans worth finding. Callers that
+    genuinely want a page pass a number.
+
+    *with_dims* adds ``w``/``h``, so a grid can label each tile without a
+    second round-trip per card.
+    """
     if not os.path.isdir(out_dir):
         return []
     items: List[Dict[str, Any]] = []
-    for root, _dirs, files in os.walk(out_dir):
+    for root, dirs, files in os.walk(out_dir):
+        # Pruning in place keeps the walk from descending at all.
+        dirs[:] = [d for d in dirs if d != TRASH_DIR]
         for fname in files:
             if not fname.lower().endswith(_IMAGE_EXTS):
                 continue
@@ -236,18 +256,53 @@ def list_image_assets(out_dir: str, limit: int = 200) -> List[Dict[str, Any]]:
             except OSError:
                 continue
             rel = os.path.relpath(path, out_dir).replace("\\", "/")
-            items.append({"name": rel, "path": path.replace("\\", "/"),
-                          "size": st.st_size, "mtime": st.st_mtime})
+            item = {"name": rel, "path": path.replace("\\", "/"),
+                    "size": st.st_size, "mtime": st.st_mtime}
+            if with_dims:
+                item["w"], item["h"] = _image_size(path)
+            items.append(item)
     items.sort(key=lambda it: it["mtime"], reverse=True)
     for it in items:
         it.pop("mtime", None)
-    return items[:limit]
+    return items[:limit] if limit is not None else items
+
+
+def _image_size(path: str) -> tuple:
+    """``(width, height)`` of an image, or ``(0, 0)`` if it cannot be read.
+
+    Only the header is read (Pillow), so this stays cheap across hundreds of
+    files — decoding the pixels to learn the dimensions would not.
+    """
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            return int(im.width), int(im.height)
+    except Exception:
+        return 0, 0
+
+
+def asset_path(out_dir: str, path: str) -> Optional[str]:
+    """Resolve a listing entry — an absolute path, a relative one, or a bare
+    file name — to a real file inside *out_dir*, or ``None``.
+
+    :func:`confined_path` resolves relative candidates against the *process*
+    working directory, so a bare ``"crop_1.png"`` would be looked for next to
+    the app instead of in the templates folder and fail as "not found". Every
+    caller here is a file action on a Library row, where a bare name is the
+    natural thing to pass (it is what the rename field holds), so the name is
+    joined to *out_dir* first.
+    """
+    raw = str(path or "").strip()
+    if not raw:
+        return None
+    candidate = raw if os.path.isabs(raw) else os.path.join(out_dir, raw)
+    return confined_path(out_dir, candidate, _IMAGE_EXTS)
 
 
 def asset_thumbnail(out_dir: str, path: str, width: int = 96) -> str:
     """JPEG data-URL thumbnail for an image confined to *out_dir* (or "")."""
     try:
-        safe_path = confined_path(out_dir, path, _IMAGE_EXTS)
+        safe_path = asset_path(out_dir, path)
         if not safe_path:
             return ""
         img = cv2.imread(safe_path)
@@ -267,15 +322,60 @@ def asset_thumbnail(out_dir: str, path: str, width: int = 96) -> str:
 
 
 def delete_asset(out_dir: str, path: str) -> bool:
-    """Delete an image strictly inside *out_dir*."""
+    """Remove an image strictly inside *out_dir*.
+
+    "Remove" means moving it to ``_trash/`` rather than unlinking it. These are
+    hand-cropped templates: a mistaken delete used to be unrecoverable, and the
+    file is worth more on disk than the few KB it frees. The trashed file is
+    excluded from :func:`list_image_assets`, so it does disappear from the UI.
+    """
     try:
-        safe_path = confined_path(out_dir, path, _IMAGE_EXTS)
-        if safe_path and os.path.isfile(safe_path):
-            os.unlink(safe_path)
-            return True
+        safe_path = asset_path(out_dir, path)
+        if not (safe_path and os.path.isfile(safe_path)):
+            return False
+        trash = os.path.join(out_dir, TRASH_DIR)
+        os.makedirs(trash, exist_ok=True)
+        dest = os.path.join(trash, os.path.basename(safe_path))
+        # Two files cropped from the same region can share a name across
+        # subfolders; keep both rather than let the second overwrite the first.
+        if os.path.exists(dest):
+            stem, ext = os.path.splitext(os.path.basename(safe_path))
+            for n in itertools.count(1):
+                cand = os.path.join(trash, f"{stem}_{n}{ext}")
+                if not os.path.exists(cand):
+                    dest = cand
+                    break
+        shutil.move(safe_path, dest)
+        return True
     except Exception:
-        pass
-    return False
+        return False
+
+
+def restore_asset(out_dir: str, path: str) -> bool:
+    """Move an asset back out of ``_trash/``, keeping its original name.
+
+    The counterpart to :func:`delete_asset`; the Library's undo path uses it
+    when a delete turns out to have been a mistake.
+    """
+    try:
+        trash = os.path.join(out_dir, TRASH_DIR)
+        # Resolved against _trash/, not out_dir — this is the one file action
+        # whose target lives in the subfolder rather than in the library.
+        safe_path = asset_path(trash, path)
+        if not (safe_path and os.path.isfile(safe_path)):
+            return False
+        dest = os.path.join(out_dir, os.path.basename(safe_path))
+        if os.path.exists(dest):
+            stem, ext = os.path.splitext(os.path.basename(safe_path))
+            for n in itertools.count(1):
+                cand = os.path.join(out_dir, f"{stem}_{n}{ext}")
+                if not os.path.exists(cand):
+                    dest = cand
+                    break
+        shutil.move(safe_path, dest)
+        return True
+    except Exception:
+        return False
 
 
 # ── Template matching core ────────────────────────────────────────────────────

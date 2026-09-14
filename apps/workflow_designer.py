@@ -25,7 +25,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -54,7 +54,7 @@ from src.core.adb.input import (
 from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.core.frida_speedhack import FridaSpeedhackManager
-from src.workflow import WorkflowEngine
+from src.workflow import NODE_TYPES, WorkflowEngine
 from src.utils import (
     add_log_subscriber,
     bundle_dir,
@@ -108,6 +108,167 @@ def _sanitize_name(raw: str) -> str:
     return sanitize_name(raw)
 
 
+# ── Template references ───────────────────────────────────────────────────────
+#
+# One definition of "this node uses this template", shared by the bundler that
+# copies the files on save and the Library that audits them. Two walks that
+# drifted apart would mean the Library could call a file unused that the save
+# then bundles — so the bundler writes through _iter_template_refs too.
+
+def iter_owners(flow: dict):
+    """Yield ``(kind, owner, graph)`` for every graph in a flow.
+
+    ``kind`` is ``"activity"`` or ``"function"`` and ``owner`` is the dict
+    itself, so a caller that needs to say *where* a node lives does not have to
+    re-walk the flow to find out.
+    """
+    if not isinstance(flow, dict):
+        return
+    for act in flow.get("activities") or []:
+        g = act.get("graph") if isinstance(act, dict) else None
+        if isinstance(g, dict):
+            yield "activity", act, g
+    for fn in flow.get("functions") or []:
+        g = fn.get("graph") if isinstance(fn, dict) else None
+        if isinstance(g, dict):
+            yield "function", fn, g
+
+
+def iter_template_refs(flow: dict):
+    """Yield ``(node, kind, owner, param_key, index, raw)`` per reference.
+
+    ``index`` is the position inside a list param (the "…_any" OR nodes), or
+    ``None`` for the scalar ``template`` field.
+    """
+    for kind, owner, graph in iter_owners(flow):
+        for node in graph.get("nodes") or []:
+            params = node.get("params") if isinstance(node, dict) else None
+            if not isinstance(params, dict):
+                continue
+            for pk in _TEMPLATE_PARAM_KEYS:
+                if params.get(pk):
+                    yield node, kind, owner, pk, None, params[pk]
+            for pk in _TEMPLATE_LIST_PARAM_KEYS:
+                vals = params.get(pk)
+                if isinstance(vals, list):
+                    for i, v in enumerate(vals):
+                        if v:
+                            yield node, kind, owner, pk, i, v
+
+
+def _norm_tpl(raw: Any) -> str:
+    """Normalised key for matching a stored template path to a file on disk.
+
+    A stored value is ``templates/<file>`` once bundled, but is whatever the user
+    picked before that (an absolute path, ``out/<file>``…). Both sides collapse
+    to the bare basename, which is what the bundler guarantees is unique inside
+    one workflow's folder.
+    """
+    return os.path.basename(str(raw or "").replace("\\", "/")).strip().lower()
+
+
+def build_template_index(flow: dict, items: List[dict]) -> dict:
+    """Pair the files found on disk with the nodes that reference them.
+
+    *items* is what ``list_image_assets`` returned. Pure — no I/O — so the
+    Library's counts can be tested against a fixture instead of a device.
+    """
+    used: Dict[str, List[dict]] = {}
+    refs = 0
+    for node, kind, owner, _pk, _idx, raw in iter_template_refs(flow):
+        refs += 1
+        ntype = node.get("type") or ""
+        used.setdefault(_norm_tpl(raw), []).append({
+            "activity": owner.get("name") or owner.get("id") or "?",
+            "ownerId": owner.get("id") or "",
+            "ownerKind": kind,          # "activity" | "function"
+            "nodeId": node.get("id") or "",
+            "nodeType": ntype,
+            "nodeLabel": NODE_TYPES.get(ntype, {}).get("label") or ntype or "?",
+            "raw": str(raw),
+        })
+
+    on_disk: Dict[str, dict] = {}
+    templates = []
+    orphan = 0
+    for it in items:
+        key = os.path.basename(it["name"]).lower()
+        on_disk[key] = it
+        usages = used.get(key, [])
+        if not usages:
+            orphan += 1
+        templates.append({**it, "used": usages, "usedCount": len(usages)})
+
+    # A reference whose file is not in the folder: those nodes will fail at run
+    # time, and nothing else in the tool says so before you press Run.
+    missing = [{**e, "name": os.path.basename(e["raw"]) or e["raw"]}
+               for key, entries in used.items() if key and key not in on_disk
+               for e in entries]
+
+    return {
+        "templates": templates,
+        "missing": missing,
+        "counts": {
+            "total": len(templates),
+            "used": len(templates) - orphan,
+            "orphan": orphan,
+            "missing": len(missing),
+            "refs": refs,
+        },
+    }
+
+
+def group_duplicate_items(out_dir: str, items: List[dict],
+                          threshold: int = 4) -> dict:
+    """Group near-identical images by perceptual hash.
+
+    *threshold* is the maximum Hamming distance for two files to count as the
+    same crop — 4 keeps different buttons apart while catching a re-crop that
+    shifted by a pixel or two. Files are bucketed by dimensions first, because
+    two crops of the same button are rarely taken at the same size by accident,
+    which turns an O(n²) comparison into a handful of plausible pairs.
+    """
+    from src.core.imghash import dhash, hamming
+
+    hashed = []
+    for it in items:
+        h = dhash(os.path.join(out_dir, it["name"].replace("/", os.sep)))
+        if h is not None:
+            hashed.append((it, h))
+
+    by_size: Dict[tuple, List[tuple]] = {}
+    for it, h in hashed:
+        by_size.setdefault((it.get("w"), it.get("h")), []).append((it, h))
+
+    seen: set = set()
+    groups: List[dict] = []
+    for bucket in by_size.values():
+        if len(bucket) < 2:
+            continue
+        for i, (a, ha) in enumerate(bucket):
+            if a["name"] in seen:
+                continue
+            group = [a]
+            for b, hb in bucket[i + 1:]:
+                if b["name"] in seen:
+                    continue
+                if hamming(ha, hb) <= threshold:
+                    group.append(b)
+                    seen.add(b["name"])
+            if len(group) > 1:
+                seen.add(a["name"])
+                # Largest first: the biggest file is the one most likely to be
+                # the original crop rather than one of its shrunken copies.
+                group.sort(key=lambda x: x.get("size") or 0, reverse=True)
+                groups.append({
+                    "w": a.get("w"), "h": a.get("h"),
+                    "files": [{"name": f["name"], "path": f["path"],
+                               "size": f["size"]} for f in group],
+                })
+    groups.sort(key=lambda g: len(g["files"]), reverse=True)
+    return {"groups": groups, "scanned": len(hashed)}
+
+
 def _ts() -> str:
     return ts_stamp()
 
@@ -125,6 +286,10 @@ class WorkflowDesignerAPI:
         self._engine: Optional[WorkflowEngine] = None
         self._wf_path: Optional[str] = None
         self._last_dir: Optional[str] = None
+        # Folder the Library tab last listed. Held so the file actions that
+        # follow a listing (thumbnail, delete, rename) act on the folder that
+        # listing came from, not on whatever the app happens to be scoped to now.
+        self._library_out_dir: str = ""
         # When launched from the Hub with a path, prefer this over lastWorkflow.
         self._pending_load: Optional[str] = None
 
@@ -201,6 +366,11 @@ class WorkflowDesignerAPI:
         scope = meta.get("activity") or "Designer"
         entry = {"ts": ts, "level": bucket, "scope": scope, "text": message,
                  "kind": meta.get("kind") or "app", "msg": f"[{scope}] {message}"}
+        # The graph block that logged this, when the engine knows it — the log
+        # panel uses it to offer "jump to this block" on the line itself.
+        node = meta.get("node")
+        if node:
+            entry["node"] = node
         self._log_buffer.append(entry)
         if len(self._log_buffer) > 2000:
             self._log_buffer = self._log_buffer[-2000:]
@@ -973,6 +1143,151 @@ class WorkflowDesignerAPI:
     def delete_asset(self, path: str) -> bool:
         return device_info.delete_asset(self._scope_out(), path)
 
+    # ── Library tab (templates of the open workflow) ───────────────────────────
+    #
+    # The Library is an audit surface: which template files does this workflow
+    # actually use, which are dead weight, and which nodes point at a file that
+    # is not there. It takes the flow from the page rather than from disk so an
+    # unsaved reference shows up immediately — an orphan you just created by
+    # deleting a node should not need a save to become visible.
+
+    def _library_dir(self, flow_json: str = "") -> str:
+        """Folder the Library browses: the open workflow's ``templates/``.
+
+        Cached per call to :meth:`list_templates` so the file actions that
+        follow (thumbnail, delete, rename) act on the same folder the listing
+        described, even if the user opens another workflow in between.
+        """
+        dest = self._workflow_templates_dir(flow_json)
+        if not dest:
+            # No workflow context at all — fall back to the preview crop folder
+            # so the tab still shows something rather than an empty error.
+            dest = self._scope_out()
+        self._library_out_dir = dest
+        return dest
+
+    def list_templates(self, flow_json: str = "") -> dict:
+        """Every template in the open workflow's folder, with its node usages.
+
+        One round-trip returns the whole grid: file size and dimensions are read
+        here rather than per-card, because 269 thumbnails is already 269 calls.
+        """
+        out_dir = self._library_dir(flow_json)
+        try:
+            flow = json.loads(flow_json) if flow_json else {}
+        except Exception:
+            flow = {}
+        items = device_info.list_image_assets(out_dir, with_dims=True)
+        return {"dir": out_dir.replace("\\", "/"),
+                **build_template_index(flow, items)}
+
+    def template_thumbnail(self, path: str) -> str:
+        out_dir = getattr(self, "_library_out_dir", "") or self._scope_out()
+        return device_info.asset_thumbnail(out_dir, path)
+
+    def template_delete(self, path: str) -> dict:
+        """Soft-delete one template file (moves it to ``_trash/``)."""
+        out_dir = getattr(self, "_library_out_dir", "") or self._scope_out()
+        name = os.path.basename((path or "").replace("\\", "/"))
+        if not device_info.delete_asset(out_dir, path):
+            return {"ok": False, "error": f"Không xoá được '{name}'"}
+        log_info(f"🗑 Đã chuyển '{name}' vào {device_info.TRASH_DIR}/")
+        return {"ok": True, "name": name}
+
+    def template_restore(self, path: str) -> dict:
+        """Undo a soft delete: move the file back out of ``_trash/``."""
+        out_dir = getattr(self, "_library_out_dir", "") or self._scope_out()
+        name = os.path.basename((path or "").replace("\\", "/"))
+        if not device_info.restore_asset(out_dir, path):
+            return {"ok": False, "error": f"Không khôi phục được '{name}'"}
+        log_info(f"↩ Đã khôi phục '{name}'")
+        return {"ok": True, "name": name}
+
+    def list_trash(self) -> list:
+        """Files sitting in ``_trash/``, newest first."""
+        out_dir = getattr(self, "_library_out_dir", "") or self._scope_out()
+        trash = os.path.join(out_dir, device_info.TRASH_DIR)
+        return device_info.list_image_assets(trash, with_dims=True)
+
+    # ── Template rename (with reference rewrite) ───────────────────────────────
+
+    def rename_template(self, flow_json: str, path: str, new_name: str) -> dict:
+        """Rename a template file and every node reference to it.
+
+        Returns ``{"ok", "flow", "old", "new", "nodes"}`` — ``flow`` is the
+        rewritten flow JSON for the page to adopt, so one Ctrl+Z on the canvas
+        undoes both the rename and the rewrite (the page pushes its undo
+        snapshot before applying it).
+        """
+        out_dir = self._library_dir(flow_json)
+        # asset_path, not confined_path: the page may pass the absolute listing
+        # path or just the file name the rename field holds.
+        src = device_info.asset_path(out_dir, path)
+        if not src:
+            return {"ok": False, "error": "Không tìm thấy file gốc"}
+        clean = _sanitize_name(os.path.splitext(str(new_name or ""))[0])
+        if not clean:
+            return {"ok": False, "error": "Tên mới không hợp lệ"}
+        ext = os.path.splitext(src)[1]
+        old_base = os.path.basename(src)
+        new_base = clean + ext
+        if new_base == old_base:
+            return {"ok": True, "flow": flow_json, "old": old_base, "new": new_base,
+                    "nodes": 0}
+
+        dest = os.path.join(out_dir, new_base)
+        if os.path.exists(dest):
+            return {"ok": False, "error": f"Đã có file '{new_base}' trong thư mục"}
+
+        try:
+            flow = json.loads(flow_json) if flow_json else {}
+        except Exception:
+            return {"ok": False, "error": "Workflow JSON không đọc được"}
+        if not isinstance(flow, dict):
+            return {"ok": False, "error": "Workflow JSON không hợp lệ"}
+
+        # Rewrite first, then move: if the JSON turns out to be unwritable the
+        # file is still where every existing reference expects it.
+        tdir = (flow.get("templatesDir") or _TEMPLATES_DIRNAME).strip().strip("/\\") \
+            or _TEMPLATES_DIRNAME
+        touched = 0
+        old_key = old_base.lower()
+        rel = f"{tdir}/{new_base}"
+        for node, _kind, _owner, pk, idx, raw in iter_template_refs(flow):
+            if _norm_tpl(raw) != old_key:
+                continue
+            if idx is None:
+                node["params"][pk] = rel
+            else:
+                node["params"][pk][idx] = rel
+            touched += 1
+
+        try:
+            os.replace(src, dest)
+        except OSError as exc:
+            return {"ok": False, "error": f"Không đổi tên được: {exc}"}
+
+        log_info(f"✎ Đổi tên '{old_base}' → '{new_base}' ({touched} block)")
+        return {"ok": True, "flow": json.dumps(flow, ensure_ascii=False),
+                "old": old_base, "new": new_base, "nodes": touched}
+
+    # ── Duplicate detection ────────────────────────────────────────────────────
+
+    def find_duplicate_templates(self, threshold: int = 4) -> dict:
+        """Group templates that are near-identical crops of the same button.
+
+        Everything happens Python-side in one call — the browser would have to
+        fetch every image to compare them, which at 269 templates is 269
+        round-trips to answer a question the backend can answer from the files.
+
+        ``threshold`` is passed straight to :func:`group_duplicate_items`.
+        """
+        out_dir = getattr(self, "_library_out_dir", "") or self._scope_out()
+        items = device_info.list_image_assets(out_dir, with_dims=True)
+        if len(items) < 2:
+            return {"groups": [], "scanned": len(items)}
+        return group_duplicate_items(out_dir, items, threshold)
+
     # ── Device info (mirrors DevScope) ────────────────────────────────────────
 
     def refresh_info(self) -> None:
@@ -1310,14 +1625,8 @@ class WorkflowDesignerAPI:
     @staticmethod
     def _iter_graphs(flow: dict):
         """Yield every node-graph in a flow (each activity + each function)."""
-        for act in flow.get("activities") or []:
-            g = act.get("graph")
-            if isinstance(g, dict):
-                yield g
-        for fn in flow.get("functions") or []:
-            g = fn.get("graph")
-            if isinstance(g, dict):
-                yield g
+        for _kind, _owner, g in iter_owners(flow):
+            yield g
 
     def _resolve_existing(self, raw: str, save_dir: str) -> Optional[str]:
         """Absolute path of an existing template, or ``None`` if not found.
@@ -1377,18 +1686,11 @@ class WorkflowDesignerAPI:
             copied[key] = rel
             return rel
 
-        for graph in self._iter_graphs(flow):
-            for node in graph.get("nodes") or []:
-                params = node.get("params")
-                if not isinstance(params, dict):
-                    continue
-                for pk in _TEMPLATE_PARAM_KEYS:
-                    if params.get(pk):
-                        params[pk] = relocate(params[pk])
-                for pk in _TEMPLATE_LIST_PARAM_KEYS:
-                    vals = params.get(pk)
-                    if isinstance(vals, list):
-                        params[pk] = [relocate(v) if v else v for v in vals]
+        for node, _kind, _owner, pk, idx, raw in iter_template_refs(flow):
+            if idx is None:
+                node["params"][pk] = relocate(raw)
+            else:
+                node["params"][pk][idx] = relocate(raw)
         return len(copied)
 
     # Top-level keys other tools write into the workflow JSON and the Designer

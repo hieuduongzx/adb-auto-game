@@ -165,6 +165,7 @@
     <div id="wf-view-tabs" class="wf-view-tabs" role="tablist" aria-label="View">
       <button class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Edit mode — design the workflow graph (Tab)">Edit</button>
       <button class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview mode — live device mirror + scope tools (Tab)">Preview</button>
+      <button class="wf-view-tab" data-view="library" onclick="wfSwitchView('library')" title="Template library — every image this workflow uses, and what is no longer used (Ctrl+K → Go to Library)">Library</button>
     </div>
   </div>
 </div>
@@ -244,11 +245,39 @@
           <button type="button" id="wf-pv-node-chip" class="wf-pv-node-chip" hidden onclick="wfPvClearNodePreview()" title="Clear node preview"></button>
           <span class="spacer"></span>
           <span id="wf-pv-res" class="wf-pv-res"></span>
-          <span id="wf-pv-hint" class="wf-pv-hint" title="Left click = pick point (read color) · Left drag = select region (crop) · Right click = tap device · Right drag = swipe device · Middle drag = pan · Wheel = zoom">left = point · drag = region · right = tap · right-drag = swipe</span>
+          <span id="wf-pv-hint" class="wf-pv-hint" title="Left click = pick point (read color) · Left drag = select region (crop) · Right click = tap device · Right drag = swipe device (coords captured to the Actions panel for copy) · Middle drag = pan · Wheel = zoom">left = point · drag = region · right = tap · right-drag = swipe (→ panel)</span>
         </div>
         <div id="wf-pv-wrap">
           <canvas id="wf-pv-canvas"></canvas>
           <div id="wf-pv-tpl-strip" class="wf-pv-tpl-strip" hidden aria-label="Templates in node preview"></div>
+        </div>
+      </div>
+      <!-- Template library — every image in the open workflow's templates/ folder
+           and whether any block still uses it. Full width on purpose: the whole
+           point is seeing a 269-file folder at once. -->
+      <div id="wf-library-pane" class="wf-library-pane" style="display:none">
+        <div class="wf-lib-bar">
+          <span class="wf-lib-heading">Templates</span>
+          <span class="wf-lib-counts" id="wf-lib-counts"></span>
+          <span class="spacer"></span>
+          <span class="log-filters" id="wf-lib-filters" role="group" aria-label="Filter templates">
+            <button class="log-f on" data-lf="all"    onclick="wfLibFilter('all',event)"    title="Every file in the folder">All</button>
+            <button class="log-f"    data-lf="used"   onclick="wfLibFilter('used',event)"   title="Referenced by at least one block">Used</button>
+            <button class="log-f"    data-lf="orphan" onclick="wfLibFilter('orphan',event)" title="No block references it — dead weight">Orphan</button>
+            <button class="log-f"    data-lf="missing" onclick="wfLibFilter('missing',event)" title="A block references it but the file is not in the folder">Missing</button>
+          </span>
+          <span class="log-search-wrap">
+            <svg class="uico uico-1 log-search-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+            <input id="wf-lib-search" class="log-search" type="search" placeholder="Search name" aria-label="Search template names" oninput="wfLibSearch(this.value)">
+          </span>
+          <button class="btn sm" onclick="wfLibShowDupes()" title="Group crops that show the same thing">Duplicates</button>
+          <button class="btn sm" onclick="wfLibShowTrash()" title="Files removed from the library, still on disk">Trash</button>
+          <button class="btn sm" onclick="wfLibRefresh()">Refresh</button>
+        </div>
+        <div class="wf-lib-path" id="wf-lib-path" title=""></div>
+        <div class="wf-lib-body">
+          <div class="wf-lib-grid" id="wf-lib-grid"></div>
+          <aside class="wf-lib-side" id="wf-lib-side"></aside>
         </div>
       </div>
       <!-- Canvas tool rail — graph edit toggles + zoom, floating on the left edge.
@@ -371,7 +400,6 @@
         <button class="tab-btn active" data-tab="inspect"  onclick="pvSwitchTab('inspect')" role="tab" aria-selected="true" aria-controls="pv-tab-inspect">Inspect</button>
         <button class="tab-btn"        data-tab="template" onclick="pvSwitchTab('template')" role="tab" aria-selected="false" aria-controls="pv-tab-template" title="Template match">Template</button>
         <button class="tab-btn"        data-tab="device"   onclick="pvSwitchTab('device')" role="tab" aria-selected="false" aria-controls="pv-tab-device">Device</button>
-        <button class="tab-btn"        data-tab="library"  onclick="pvSwitchTab('library')" role="tab" aria-selected="false" aria-controls="pv-tab-library">Library</button>
       </div>
 
       <!-- Inspect -->
@@ -517,17 +545,32 @@
             </div>
             <div class="row" style="gap:5px;">
               <span class="lbl n" style="font-weight:600;">Swipe</span>
-              <input id="pv-sw-x1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe start X">
-              <input id="pv-sw-y1" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe start Y">
+              <input id="pv-sw-x1" type="number" min="0" value="0" oninput="pvUpdateSwipePreview()" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe start X">
+              <input id="pv-sw-y1" type="number" min="0" value="0" oninput="pvUpdateSwipePreview()" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe start Y">
               <span style="font-size:13px;color:var(--muted);">→</span>
-              <input id="pv-sw-x2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe end X">
-              <input id="pv-sw-y2" type="number" min="0" value="0" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe end Y">
+              <input id="pv-sw-x2" type="number" min="0" value="0" oninput="pvUpdateSwipePreview()" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe end X">
+              <input id="pv-sw-y2" type="number" min="0" value="0" oninput="pvUpdateSwipePreview()" style="flex:1;min-width:0;text-align:center;padding:5px 2px;font-size:11px;" aria-label="Swipe end Y">
               <button class="btn sm" onclick="pvSendSwipe()">Send</button>
             </div>
             <div class="row" style="gap:5px;">
               <span class="lbl n" style="font-weight:600;">Duration</span>
-              <input id="pv-sw-dur" type="number" min="50" max="100000" step="50" value="300" style="width:72px;flex:none;text-align:right;" aria-label="Swipe duration in milliseconds">
+              <input id="pv-sw-dur" type="number" min="50" max="100000" step="50" value="300" oninput="pvUpdateSwipePreview()" style="width:72px;flex:none;text-align:right;" aria-label="Swipe duration in milliseconds">
               <span class="hz-unit">ms</span>
+            </div>
+            <!-- Captured swipe readout: right-drag on the mirror fills the fields
+                 above and draws this diagram. Copy → paste (Ctrl+V) into a Swipe
+                 block's X1/Y1/X2/Y2 field on the Canvas. -->
+            <div class="wf-swipe-preview">
+              <canvas id="pv-sw-preview" height="72" aria-label="Swipe preview"></canvas>
+              <div class="wf-swipe-meta">
+                <span id="pv-sw-summary">0, 0 → 0, 0 · 300 ms</span>
+                <button class="icon-btn" onclick="pvCopySwipe(this)" title="Copy swipe (x1, y1, x2, y2, duration)" aria-label="Copy swipe">
+                  <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                </button>
+                <button class="icon-btn" onclick="pvClearSwipePreview()" title="Clear the swipe overlay on the mirror" aria-label="Clear swipe overlay">
+                  <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              </div>
             </div>
             <!-- Win32-only mouse tests: right/middle button + wheel (ADB has no analogue). -->
             <div class="row" id="pv-win-click-row" style="gap:5px;display:none;">
@@ -653,17 +696,6 @@
       </div>
 
       <!-- Library -->
-      <div class="tab-pane" id="pv-tab-library" role="tabpanel">
-        <div style="display:flex;align-items:center;gap:7px;padding:0 1px 2px;">
-          <span id="pv-lib-out-label" style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;" title="">./out/</span>
-          <span class="spacer"></span>
-          <button class="btn sm" onclick="pvRefreshAssets()">Refresh</button>
-          <button class="btn sm err" id="pv-btn-del-asset" style="display:none;" onclick="pvDeleteAsset()">Delete</button>
-        </div>
-        <div class="asset-grid" id="pv-asset-grid">
-          <div style="font-size:11.5px;color:var(--muted);padding:4px 0;">No images.</div>
-        </div>
-      </div>
     </div><!-- /wf-scope-panel -->
     </div><!-- /wf-insp-panel -->
   </div>
@@ -682,6 +714,10 @@
       <span class="log-count" id="log-count"></span>
     </button>
     <span class="spacer"></span>
+    <select id="log-scope" class="log-scope-sel" onchange="wfLogScopeSel(this.value)" aria-label="Filter log by source" title="Show only the lines from one source (activity or the app itself)">
+      <option value="all">All sources</option>
+      <option value="Designer">Designer</option>
+    </select>
     <span class="log-filters" id="log-filters" role="group" aria-label="Filter log">
       <button class="log-f on" data-f="all" onclick="wfLogFilter('all',event)" title="All levels">All</button>
       <button class="log-f" data-f="info" onclick="wfLogFilter('info',event)" title="Info">INF</button>
@@ -689,13 +725,17 @@
       <button class="log-f" data-f="warning" onclick="wfLogFilter('warning',event)" title="Warning">WRN</button>
       <button class="log-f" data-f="error" onclick="wfLogFilter('error',event)" title="Error">ERR</button>
     </span>
+    <span class="log-search-wrap">
+      <svg class="uico uico-1 log-search-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <input id="log-search" class="log-search" type="search" placeholder="Search log" aria-label="Search log" oninput="wfLogSearch(this.value)">
+    </span>
     <span class="pnl-tools">
-      <button class="btn-log-clear" onclick="wfCopyLog(event)" title="Copy the whole log" type="button">Copy</button>
+      <button class="btn-log-clear" onclick="wfCopyLog(event)" title="Copy the visible lines (Save exports the whole buffer)" type="button">Copy</button>
       <button class="btn-log-clear" onclick="wfSaveLog(event)" title="Save the whole log to a .txt file" type="button">Save</button>
       <button class="btn-log-clear" onclick="onClearLog(event)" title="Clear the whole log" type="button">Clear</button>
     </span>
   </div>
-  <div class="log-body" id="log-body" role="log" aria-live="polite"></div>
+  <div class="log-body" id="log-body" role="log" aria-live="polite" onclick="wfLogBodyClick(event)"></div>
 </div>
 
 <!-- ── Status strip ──────────────────────────────────────────────────────── -->
@@ -727,6 +767,7 @@
 <script src="js/cmdpalette.js"></script>
 <script src="js/inspector.js"></script>
 <script src="js/preview.js"></script>
+<script src="js/library.js"></script>
 <script src="js/scope-tools.js"></script>
 <script src="js/validate.js"></script>
 <script src="js/io.js"></script>

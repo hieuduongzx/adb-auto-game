@@ -21,7 +21,7 @@ window.__recv = function(raw){
   let ev; try{ev=JSON.parse(raw);}catch{return;}
   const {type,data}=ev;
   if(type==="log"){ appendLog(data); return; }
-  if(type==="log_cleared"){ const b=$("log-body"); if(b)b.innerHTML=""; updateLogCount(); return; }
+  if(type==="log_cleared"){ const b=$("log-body"); if(b)b.innerHTML=""; wfLogResetScopes(); updateLogCount(); return; }
   if(type==="devices_update"){ S.devices=data.devices||[]; rebuildDeviceSelect(S.devices,S.connectedSerial); return; }
   if(type==="device_status"){ S.connectedSerial=data.serial||null; setConnected(!!data.connected); rebuildDeviceSelect(S.devices,data.serial); return; }
   if(type==="capture_backend"){
@@ -193,12 +193,75 @@ window.__recv = function(raw){
 };
 
 // ── Log drawer ────────────────────────────────────────────────────────────────
+//
+// Three filters narrow the same list and must compose: the level chips, the
+// scope picker (which activity logged it) and the free-text search. Each one
+// only records its own state; wfLogLineOK() is the single place that decides
+// whether a line survives, so adding a fourth filter later means one predicate
+// clause rather than a new interaction to reason about.
+let wfLogLevel="all", wfLogScope="all", wfLogQuery="";
+// Distinct scopes seen in the buffer. Kept as a set so the picker is rebuilt
+// when a new activity appears and not on every one of the 2000 lines.
+let wfLogScopes=Object.create(null);
+
+function wfLogLineOK(line){
+  if(wfLogLevel!=="all" && line.dataset.level!==wfLogLevel) return false;
+  if(wfLogScope!=="all" && line.dataset.scope!==wfLogScope) return false;
+  if(wfLogQuery){
+    const msg=line.querySelector(".log-msg");
+    if(!msg || !msg.textContent.toLowerCase().includes(wfLogQuery)) return false;
+  }
+  return true;
+}
+// Re-run the predicate over the buffer. Only ever called on a filter change —
+// appendLog checks just the line it added.
+function wfApplyLogFilters(){
+  const body=$("log-body"); if(!body) return;
+  for(const line of body.children) line.classList.toggle("hidden", !wfLogLineOK(line));
+  updateLogCount();
+}
+function wfLogAtBottom(body){
+  // Follow new lines only when already at the bottom — scrolling up to read an
+  // earlier error must not be yanked away by the next line.
+  return body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+}
+function wfLogVisible(){
+  const body=$("log-body"); if(!body) return [];
+  const out=[];
+  for(const l of body.children) if(!l.classList.contains("hidden")) out.push(l);
+  return out;
+}
+// Register a scope the first time it appears so the picker can offer it. The
+// Designer's own lines are excluded — they are the "Designer" option already.
+function wfLogNoteScope(scope){
+  if(!scope || scope==="Designer" || wfLogScopes[scope]) return;
+  wfLogScopes[scope]=true;
+  const sel=$("log-scope"); if(!sel) return;
+  const opt=document.createElement("option");
+  opt.value=scope; opt.textContent=scope;
+  sel.appendChild(opt);
+}
+function wfLogResetScopes(){
+  wfLogScopes=Object.create(null);
+  const sel=$("log-scope"); if(!sel) return;
+  sel.value="all"; wfLogScope="all";
+  [...sel.options].forEach(o=>{ if(o.value!=="all") o.remove(); });
+}
 function updateLogCount(){
   const c=$("log-count"), b=$("log-body"); if(!c||!b) return;
-  const n=b.children.length;
-  c.textContent = n ? String(n) : "";
-  // Highlight the count when there are errors so the collapsed log still warns.
-  const hasErr = !!b.querySelector(".lv-error");
+  let total=0, shown=0, hasErr=false;
+  for(const l of b.children){
+    total++;
+    if(l.classList.contains("hidden")) continue;
+    shown++;
+    if(l.classList.contains("lv-error")) hasErr=true;
+  }
+  const filtered = wfLogLevel!=="all" || wfLogScope!=="all" || wfLogQuery;
+  // With a filter on, the count answers "how many matched", which is the only
+  // reading that is useful while looking at a narrowed list.
+  c.textContent = !total ? "" : (filtered && shown!==total ? `${shown}/${total}` : String(total));
+  // Highlight the count when there are errors so the collapsed log still warns
+  // — counting only visible lines, so an active filter cannot hide the alarm.
   c.classList.toggle("has-err", hasErr);
 }
 function wfToggleVarsPanel(){
@@ -225,21 +288,53 @@ function wfToggleLog(ev){
   wfSaveSettings();
 }
 
-// Filter the log by level (INF/OK/WRN/ERR) — sets data-filter on #log-card, CSS
-// hides the other levels; "All" removes the filter.
+// Filter the log by level (INF/OK/WRN/ERR). The chips only record the choice —
+// wfApplyLogFilters() is what hides the lines, so the level, the scope picker
+// and the search box all narrow the same list instead of fighting over it.
 function wfLogFilter(f, ev){
   if(ev) ev.stopPropagation();
-  const card=$("log-card"); if(!card) return;
-  if(f==="all") card.removeAttribute("data-filter"); else card.setAttribute("data-filter",f);
-  document.querySelectorAll("#log-filters .log-f").forEach(b=>b.classList.toggle("on", b.dataset.f===f));
-  if(card.classList.contains("collapsed")) wfToggleLog();   // filtering means reading — open the log
+  wfLogLevel = f||"all";
+  document.querySelectorAll("#log-filters .log-f").forEach(b=>b.classList.toggle("on", b.dataset.f===wfLogLevel));
+  wfApplyLogFilters();
+  wfLogFocusIfCollapsed();
+}
+function wfLogScopeSel(v){
+  wfLogScope = v||"all";
+  wfApplyLogFilters();
+  wfLogFocusIfCollapsed();
+}
+function wfLogSearch(q){
+  wfLogQuery = (q||"").trim().toLowerCase();
+  wfApplyLogFilters();
+}
+// A filter is a request to read, so open the drawer if it was collapsed.
+function wfLogFocusIfCollapsed(){
+  const card=$("log-card");
+  if(card && card.classList.contains("collapsed")) wfToggleLog();
+}
+// Clicking a line that the engine attributed to a block jumps to that block.
+// The log drawer is docked outside every view pane, so this works from the
+// Library and Preview tabs too — the jump itself switches back to the canvas.
+function wfLogBodyClick(ev){
+  const line=ev.target.closest(".log-line"); if(!line) return;
+  const id=line.dataset.node; if(!id) return;
+  if(typeof wfJumpToNode!=="function" || !wfJumpToNode(id)){
+    // The block is gone (workflow edited since the run) — say so rather than
+    // looking broken.
+    uiToast("Không tìm thấy block này trong workflow","warning");
+  }
 }
 function wfCopyLog(ev){
   if(ev) ev.stopPropagation();
   const body=$("log-body"); if(!body) return;
-  const txt=[...body.querySelectorAll(".log-line")].map(l=>l.textContent.replace(/\s+/g," ").trim()).join("\n");
+  const filtered = wfLogLevel!=="all" || wfLogScope!=="all" || wfLogQuery;
+  // Copy what is on screen: with a filter active that is the narrowed list the
+  // user is actually reading. Save still exports the whole backend buffer.
+  const lines = filtered ? wfLogVisible() : [...body.children];
+  const txt=lines.map(l=>l.textContent.replace(/\s+/g," ").trim()).join("\n");
   if(!txt){ setStatus("Log is empty"); return; }
-  navigator.clipboard.writeText(txt).then(()=>uiToast("Copied "+body.children.length+" log lines","success"))
+  navigator.clipboard.writeText(txt)
+    .then(()=>uiToast("Copied "+lines.length+" log lines"+(filtered?" (filtered)":""),"success"))
     .catch(()=>uiToast("Couldn't copy the log","error"));
 }
 // Save the full log (the backend buffer, not just the visible tail) to a .txt

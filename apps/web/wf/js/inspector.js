@@ -1065,24 +1065,51 @@ function wfVarValue(v){
 
 // ── Smart paste on coordinate fields ─────────────────────────────────────────
 const WF_COORD_KEYS = ["x","y","w","h"];
+// Swipe geometry: start → end plus the gesture duration. A copied swipe from
+// the Preview panel ("x1, y1, x2, y2, duration") pastes into any of these.
+const WF_SWIPE_KEYS = ["x1","y1","x2","y2","duration"];
+// Parse "x, y", "x, y, w, h" or a swipe "x1, y1, x2, y2, duration" — commas,
+// spaces and → / -> all work, and wrapping parentheses are tolerated.
+function wfParseCoordPaste(txt){
+  const s=String(txt||"").trim().replace(/^\(+|\)+$/g,"").trim();
+  if(!s) return null;
+  const parts=s.split(/\s*(?:,|→|->|\s)\s*/).filter(Boolean);
+  if(parts.length<2 || parts.length>WF_SWIPE_KEYS.length) return null;
+  const nums=parts.map(v=>Number(v));
+  return nums.every(n=>Number.isFinite(n)) ? nums : null;
+}
+// Which numeric fields the paste fills: a Swipe-style block (x1…y2, duration)
+// keeps its own set so a pasted region can't land in the wrong slots, and a
+// plain coordinate block uses x/y/w/h. Returns null when this field isn't part
+// of the block's coordinate set (e.g. Long press's duration).
+function wfCoordKeysFor(node, f){
+  if(f.t!=="num") return null;
+  const def=WF_NODES[node.type];
+  const nums=new Set((def&&def.fields||[]).filter(ff=>ff.t==="num").map(ff=>ff.k));
+  const keys=(nums.has("x1")?WF_SWIPE_KEYS:WF_COORD_KEYS).filter(k=>nums.has(k));
+  return keys.includes(f.k) ? keys : null;
+}
 function wfAttachCoordPaste(node, f, inp){
-  if(f.t!=="num" || !WF_COORD_KEYS.includes(f.k)) return;
+  const keys=wfCoordKeysFor(node,f);
+  if(!keys) return;
   inp.addEventListener("paste", e=>{
-    const txt=(e.clipboardData||{}).getData("text") || "";
-    const m=txt.match(/^\s*\(?\s*(-?\d+(?:\.\d+)?)\s*[, ]+\s*(-?\d+(?:\.\d+)?)\s*(?:[, ]+\s*(-?\d+(?:\.\d+)?)\s*(?:[, ]+\s*(-?\d+(?:\.\d+)?)\s*)?)?\)?\s*$/);
-    if(!m) return;
+    const nums=wfParseCoordPaste((e.clipboardData||{}).getData("text") || "");
+    if(!nums) return;
+    // More values than this node's fields hold (e.g. a swipe pasted into an
+    // image region) — leave the native paste alone, but say why it didn't take.
+    if(nums.length>keys.length){
+      e.preventDefault();
+      if(typeof uiToast==="function") uiToast("Clipboard has more values than this block holds — paste it into the matching block.","warning");
+      return;
+    }
     e.preventDefault();
     wfPushUndoDebounced();
-    const nums=[m[1],m[2],m[3],m[4]].filter(v=>v!==undefined).map(parseFloat);
-    const def=WF_NODES[node.type];
-    const have=new Set((def&&def.fields||[]).filter(ff=>ff.t==="num"&&WF_COORD_KEYS.includes(ff.k)).map(ff=>ff.k));
-    nums.forEach((val,i)=>{ const key=WF_COORD_KEYS[i]; if(have.has(key)) node.params[key]=val; });
+    nums.forEach((val,i)=>{ if(i<keys.length) node.params[keys[i]]=val; });
     wfUpdNodeSum(node);
     if(f.refresh) wfRenderCanvas();
     const body=$("wf-insp-body");
     if(body){
-      WF_COORD_KEYS.forEach(key=>{
-        if(!have.has(key)) return;
+      keys.forEach(key=>{
         const labEl=body.querySelector(`.wf-field > label[title="${key}"]`);
         const inpEl=labEl&&labEl.parentNode.querySelector("input");
         if(inpEl) inpEl.value=node.params[key];
@@ -1383,7 +1410,7 @@ function wfCountBranchesEditor(node){
     hint.textContent=isAnd
       ? "Wait until this many incoming parallel branches reach this node; continue only if all arrived branches had no errors."
       : isSeq
-      ? "Run branch #1 → #2 → … #n in order, one step at a time. Every wired branch ALWAYS runs, even when an earlier one fails. No shared output port — each branch carries its own continuation."
+      ? "Run branch #1 → #2 → … #n in order, one step at a time. Every wired branch ALWAYS runs, even when an earlier one fails. When all of them are done the flow continues from the 'end' port (wire it to carry on; leave it empty to stop here)."
       : "Run branch #1 first; if it fails (or hits Next branch), try #2…#n. If all fail, use the 'fail' port.";
     wrap.appendChild(hint);
   };

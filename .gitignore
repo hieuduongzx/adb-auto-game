@@ -82,3 +82,7 @@ data/
 
 # Designer → runner temp handoff (not user content)
 workflows/_run/
+
+# Soft-deleted templates (Designer Library tab). Kept on disk so a mistaken
+# delete is recoverable, but they are not part of any workflow.
+workflows/*/templates/_trash/

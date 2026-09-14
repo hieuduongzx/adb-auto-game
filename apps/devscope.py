@@ -917,8 +917,13 @@ class DevScopeAPI:
         """List image assets under the output folder, including per-package
         subfolders (e.g. QuickCrop's ``out/<package>/``). Names are shown
         relative to the output root so ``pkg/file.png`` stays distinguishable.
+
+        Bounded on purpose: ``out/`` accumulates every screenshot and crop ever
+        taken, and each grid tile costs a thumbnail round-trip, so this is a
+        capture inbox rather than an audit surface. The Designer's Library tab
+        is the one that lists a folder in full.
         """
-        return device_info.list_image_assets(self._out_dir)
+        return device_info.list_image_assets(self._out_dir, limit=500)
 
     def get_asset_thumbnail(self, path: str) -> str:
         return device_info.asset_thumbnail(self._out_dir, path)

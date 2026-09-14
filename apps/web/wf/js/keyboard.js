@@ -25,8 +25,8 @@ window.addEventListener("keydown", e => {
   if(((e.key==="z"||e.key==="Z") && (e.ctrlKey||e.metaKey) && e.shiftKey) || ((e.key==="y"||e.key==="Y") && (e.ctrlKey||e.metaKey))){ e.preventDefault(); wfRedo(); return; }
 
   if(typing) return;   // below here: canvas shortcuts only (let inputs keep native Ctrl+C/V)
-  // Tab — toggle Canvas ↔ Preview view (skipped while typing in an input).
-  if(e.key==="Tab"){ e.preventDefault(); wfSwitchView(wfPvActive?"canvas":"preview"); return; }
+  // Tab — toggle Canvas ↔ Preview (skipped while typing in an input).
+  if(e.key==="Tab"){ e.preventDefault(); wfSwitchView(wfToggleView()); return; }
   // Ctrl+= / Ctrl+- / Ctrl+0 — zoom whichever view is active (graph or mirror).
   if((e.ctrlKey||e.metaKey) && (e.key==="="||e.key==="+")){ e.preventDefault();
     if(wfPvActive) wfPvZoomBy(1.2); else wfZoomBy(1.2); return; }

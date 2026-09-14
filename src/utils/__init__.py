@@ -73,6 +73,11 @@ LOG_KIND_ACTIVITY = "activity"
 LOG_KIND_USER = "user"
 LOG_KIND_DETAIL = "detail"
 
+# Which *block* the current thread is executing, as the graph node's id. Set by
+# the engine's walk loop, it rides along in ``meta`` so the GUI can attach a log
+# line to the node that produced it and offer "jump to this block". The id is
+# what the designer keys its canvas elements by; the human name is not needed
+# here, since only the app that knows the workflow can resolve it.
 _log_ctx = threading.local()
 
 
@@ -86,6 +91,16 @@ def get_log_activity() -> Optional[str]:
     return getattr(_log_ctx, "activity", None)
 
 
+def set_log_node(node_id: Optional[str]) -> None:
+    """Set (or clear with ``None``) the graph node id for this thread's logs."""
+    _log_ctx.node = str(node_id) if node_id else None
+
+
+def get_log_node() -> Optional[str]:
+    """The graph node this thread is inside, or ``None``."""
+    return getattr(_log_ctx, "node", None)
+
+
 @contextmanager
 def log_activity(name: Optional[str]) -> Iterator[None]:
     """Scope this thread's logs to ``name``, restoring the previous one after."""
@@ -97,11 +112,23 @@ def log_activity(name: Optional[str]) -> Iterator[None]:
         set_log_activity(prev)
 
 
+@contextmanager
+def log_node(node_id: Optional[str]) -> Iterator[None]:
+    """Scope this thread's logs to one graph node, restoring the previous one."""
+    prev = get_log_node()
+    set_log_node(node_id)
+    try:
+        yield
+    finally:
+        set_log_node(prev)
+
+
 def add_log_subscriber(callback: Callable[..., None], with_meta: bool = False) -> None:
     """Register ``callback(level, message)`` to receive every log message.
 
     With ``with_meta=True`` it is called as ``callback(level, message, meta)``
-    where ``meta`` is ``{"activity": str | None, "kind": str | None}``."""
+    where ``meta`` is ``{"activity": str | None, "kind": str | None,
+    "node": str | None}``."""
     with _subscribers_lock:
         if callback not in _subscribers:
             _subscribers.append(callback)
@@ -125,7 +152,7 @@ def _notify_subscribers(level: str, message: str, kind: Optional[str] = None) ->
     with _subscribers_lock:
         subs = list(_subscribers)
         with_meta = set(_meta_subscribers)
-    meta = {"activity": get_log_activity(), "kind": kind}
+    meta = {"activity": get_log_activity(), "kind": kind, "node": get_log_node()}
     for cb in subs:
         try:
             if cb in with_meta:

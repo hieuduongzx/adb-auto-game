@@ -38,10 +38,26 @@ function wfPvColors(){
 }
 
 // ── View tab switching ──────────────────────────────────────────────────────
+// Which top-level view is showing: "canvas" (the graph), "preview" (device
+// mirror) or "library" (template library). Kept in a variable, not read back
+// from the DOM, because other modules need to ask before switching away —
+// jumping to a block from the log panel, for one.
+let wfView = "canvas";
+function wfCurView(){ return wfView; }
+// Tab and the palette's "Cycle view" both come through here, so the two can
+// never drift apart. The ring is canvas ↔ preview only: Library is reached by
+// its own tab (or the palette entry), never by cycling, so a Tab press cannot
+// land you somewhere you did not ask for. From Library, Tab goes to Preview.
+function wfToggleView(){
+  return wfView==="preview" ? "canvas" : "preview";
+}
+
 function wfSwitchView(view){
+  wfView = view;
   document.querySelectorAll(".wf-view-tab").forEach(t=>t.classList.toggle("sel", t.dataset.view===view));
   const canvas = document.getElementById("wf-canvas");
   const preview = document.getElementById("wf-preview-pane");
+  const library = document.getElementById("wf-library-pane");
   const world = document.getElementById("wf-world");
   const empty = document.getElementById("wf-canvas-empty");
   // Graph-only chrome: hide the rail's edit toggles + empty hint while previewing
@@ -51,9 +67,11 @@ function wfSwitchView(view){
     document.getElementById("wf-layout-bar"),
     document.getElementById("wf-cur-act")];
 
-  const wfView = document.getElementById("workflow-view");
+  // Named `root`, not `wfView` — the module's wfView holds the *current view*
+  // and a same-named local here would shadow it (and throw on the line above).
+  const root = document.getElementById("workflow-view");
   if(view==="preview"){
-    if(wfView) wfView.classList.add("wf-preview-on");   // hide the node library — editing chrome is dead weight here
+    if(root) root.classList.add("wf-preview-on");   // hide the node library — editing chrome is dead weight here
     if(canvas) canvas.style.overflow = "hidden";
     graphOnly.forEach(el=>{ if(el) el.style.display="none"; });
     if(typeof wfCloseLayoutMenu==="function") wfCloseLayoutMenu();
@@ -78,11 +96,28 @@ function wfSwitchView(view){
     if(wfPvAuto) wfPvStartAuto();
     wfPvCapture();              // grab one frame immediately
     wfZoomApplyMode("preview"); // repurpose the shared zoom cluster for the mirror
+  } else if(view==="library"){
+    if(root) root.classList.add("wf-library-on");   // hide the graph editing chrome
+    // Arriving from Preview must stop the mirror's auto-capture: the pane is
+    // hidden now, and the loop would keep pulling frames off the device.
+    wfPvActive = false;
+    wfPvStopAuto();
+    if(canvas) canvas.style.overflow = "hidden";
+    graphOnly.forEach(el=>{ if(el) el.style.display="none"; });
+    if(typeof wfCloseLayoutMenu==="function") wfCloseLayoutMenu();
+    if(preview) preview.style.display = "none";
+    if(library) library.style.display = "flex";
+    // The right column is hidden by the wf-library-on rules rather than here:
+    // a 269-tile grid squeezed into a canvas-plus-inspector would defeat the
+    // point of the tab, and doing it in CSS keeps the restore path in one place.
+    wfLibOpen();
   } else {
-    if(wfView) wfView.classList.remove("wf-preview-on");   // restore the node library
+    if(root) root.classList.remove("wf-preview-on");   // restore the node library
+    if(root) root.classList.remove("wf-library-on");
     wfPvActive = false;
     wfPvStopAuto();
     if(preview) preview.style.display = "none";
+    if(library) library.style.display = "none";
     graphOnly.forEach(el=>{ if(el && el!==empty) el.style.display=""; });
     if(empty) empty.style.display = wfGraph() ? "none" : "flex";  // re-evaluate the empty hint
     if(canvas) canvas.style.overflow = "";
@@ -158,6 +193,7 @@ function wfPvInit(){
     if(wfPvAuto && wfPvActive){ wfPvStopAuto(); wfPvStartAuto(); }
   };
   if(typeof pvInitDeviceInfoCopy==="function") pvInitDeviceInfoCopy();
+  if(typeof pvUpdateSwipePreview==="function") pvUpdateSwipePreview();
 
   // Tap on the mirror → send a tap to the device at the image-space point.
   // (Replaced by the full DevScope interaction set in wfPvAttachCanvas —
@@ -174,7 +210,8 @@ function wfPvInit(){
     pane.addEventListener("contextmenu", e=>e.preventDefault());
   }
 
-  window.addEventListener("resize", ()=>{ if(wfPvActive) wfPvResize(); });
+  window.addEventListener("resize", ()=>{ if(wfPvActive){ wfPvResize();
+    if(typeof pvUpdateSwipePreview==="function") pvUpdateSwipePreview(); } });
 }
 
 function wfPvResize(){
@@ -215,6 +252,10 @@ let wfPvPixCanvas=null, wfPvPixCtx=null, wfPvPixDirty=true;
 // Tap-feedback ripples ({x,y,t0} in image coords) + right-drag swipe gesture.
 let wfPvRipples=[];
 let wfPvRDrag=null;            // {s:[cx,cy], c:[cx,cy]} canvas coords while right-dragging
+// Last captured swipe {x1,y1,x2,y2,duration} in image coords. It stays drawn on
+// the mirror (dashed) after the gesture so the path can be compared with the
+// panel readout, and is what the panel's Copy button hands to the Canvas.
+let wfPvSwipe=null;
 let wfPvAnimReq=null;
 
 function wfPvPixelAt(ix,iy){
@@ -539,6 +580,26 @@ function wfPvDraw(){
     const [bx,by]=wfPvImgToCanvas(x,y+h);
     chip(`${w}×${h}`, bx, by+4);
   }
+  // Persistent swipe captured by the last right-drag — dashed so it reads as a
+  // reference drawing rather than a live gesture. Clear it from the panel.
+  if(wfPvSwipe){
+    const [sx,sy]=wfPvImgToCanvas(wfPvSwipe.x1,wfPvSwipe.y1);
+    const [tx,ty]=wfPvImgToCanvas(wfPvSwipe.x2,wfPvSwipe.y2);
+    ctx.save();
+    ctx.strokeStyle="#4f8df0"; ctx.fillStyle="#4f8df0"; ctx.lineWidth=2;
+    ctx.setLineDash([7,5]);
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(tx,ty); ctx.stroke();
+    ctx.setLineDash([]);
+    const a=Math.atan2(ty-sy,tx-sx);
+    ctx.beginPath(); ctx.moveTo(tx,ty);
+    ctx.lineTo(tx-10*Math.cos(a-.42), ty-10*Math.sin(a-.42));
+    ctx.lineTo(tx-10*Math.cos(a+.42), ty-10*Math.sin(a+.42));
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx,sy,4,0,Math.PI*2); ctx.stroke();   // start ring
+    ctx.beginPath(); ctx.arc(tx,ty,3,0,Math.PI*2); ctx.fill();     // end dot
+    ctx.restore();
+    if(ef) chip(`swipe · ${Math.round(wfPvSwipe.duration)}ms`, tx+10, ty+10);
+  }
   // Live drag rectangle while selecting a region — with a live w×h readout.
   if(wfPvDragging && wfPvDragStart && wfPvDragEnd){
     const r=wfPvNormRect(wfPvDragStart, wfPvDragEnd);
@@ -708,6 +769,10 @@ function wfPvAttachCanvas(){
         const len=Math.hypot(b[0]-a[0], b[1]-a[1]);
         const dur=Math.max(120, Math.min(800, Math.round(len*0.35)));
         await api().swipe(a[0],a[1],b[0],b[1],dur);
+        // Keep the drawn path as the persistent swipe reference and mirror it
+        // into the panel's Swipe fields so the values are copy-ready.
+        wfPvSwipe={x1:a[0],y1:a[1],x2:b[0],y2:b[1],duration:dur};
+        if(typeof pvFillSwipe==="function") pvFillSwipe(a[0],a[1],b[0],b[1],dur);
         wfPvRipples.push({x:b[0],y:b[1],t0:performance.now()}); wfPvAnimLoop();
         setStatus(`Swipe (${a[0]},${a[1]}) → (${b[0]},${b[1]}) · ${dur}ms`);
       }

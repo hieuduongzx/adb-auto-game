@@ -21,6 +21,7 @@ function wfLayPortRank(port){
   port=String(port||"out");
   if(port==="out"||port==="true") return 0;
   if(port==="false") return 100;
+  if(port==="end") return 95;              // sequence continuation — lay out after its branches
   if(port==="default") return 90;
   const m=/^c(\d+)$/.exec(port); return m?10+parseInt(m[1],10):50;
 }

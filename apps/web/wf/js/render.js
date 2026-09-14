@@ -864,6 +864,7 @@ function wfWireTone(fromPort, toPort, fromNode){
   if(fromPort==="done") return "done";
   if(fromPort==="found") return "found";
   if(fromPort==="fail") return "fail";
+  if(fromPort==="end") return "end";
   if(fromPort==="default") return "sw";
   if(/^c\d+$/.test(fromPort||"")) return "lane"+((parseInt(fromPort.slice(1),10)%6)+1);
   if(/^\d+$/.test(fromPort||"")) return "lane"+((parseInt(fromPort,10)-1)%6+1);
@@ -896,7 +897,7 @@ function wfNodeEl(n){
   if(n.type==="switch") dynOutCount=((n.params&&n.params.cases)||[]).length+1;
   else if(n.type==="try_chain") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3)+1;
   else if(n.type==="parallel") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3);
-  else if(n.type==="sequence") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3);
+  else if(n.type==="sequence") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3)+1;   // + "end"
   else if(n.type==="random_branch") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||2);
   else if(def.kind==="loop_until") dynOutCount=3;   // body/found/fail — grow the card
   if(dynOutCount>2)
@@ -982,7 +983,7 @@ function wfNodeEl(n){
   else if(n.type==="switch") outs=((n.params&&n.params.cases)||[]).map((_,i)=>"c"+i).concat(["default"]);
   else if(n.type==="try_chain") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1)).concat(["fail"]);
   else if(n.type==="parallel"||n.type==="random_branch") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||(n.type==="parallel"?3:2))},(_,i)=>String(i+1));
-  else if(n.type==="sequence") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1));
+  else if(n.type==="sequence") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1)).concat(["end"]);
   else outs=(def.outs||[]);
   // Primary port row — single in + first out share this y so chains stay level.
   // Extra ports (true/false, loop-back…) stack one WF_PORT_GAP row below the

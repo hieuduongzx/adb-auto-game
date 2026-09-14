@@ -38,6 +38,34 @@ function wfFindJump(it){
   wfCenterOnNode(it.node);
   wfFindClose();
 }
+// Which activity/function owns a node id. The log panel only ever has the id
+// (the engine cannot know the graph layout), so this is the bridge back to a
+// block on the canvas.
+function wfOwnerOfNode(id){
+  if(!id) return null;
+  let hit=null;
+  const scan=(kind,owner)=>{
+    if(hit) return;
+    const n=((owner.graph&&owner.graph.nodes)||[]).find(x=>x.id===id);
+    if(n) hit={kind, owner, node:n};
+  };
+  (WF.activities||[]).forEach(a=>scan("activity",a));
+  if(!hit) (WF.functions||[]).forEach(f=>scan("function",f));
+  return hit;
+}
+// Jump the canvas to a block by id, switching activity/function and view as
+// needed. Returns false when the block no longer exists (workflow edited since
+// the run was captured).
+function wfJumpToNode(id){
+  const it=wfOwnerOfNode(id);
+  if(!it) return false;
+  if(typeof wfSwitchView==="function" && typeof wfCurView==="function" && wfCurView()!=="canvas"){
+    wfSwitchView("canvas");   // the graph is hidden behind Library/Preview
+  }
+  wfFindJump(it);
+  return true;
+}
+
 function wfFindRender(listEl, q){
   const all=wfFindIndex();
   const terms=(q||"").trim().toLowerCase().split(/\s+/).filter(Boolean);

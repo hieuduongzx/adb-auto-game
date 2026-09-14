@@ -2,7 +2,7 @@
   "name": "BrownDust2",
   "version": 2,
   "templatesDir": "templates",
-  "buildVersion": "1.0.18",
+  "buildVersion": "1.0.19",
   "package": "",
   "controller": "win32",
   "ocr": "",
@@ -3599,7 +3599,7 @@
     }
   ],
   "runnerUpdate": {
-    "lastVersion": "1.0.18",
+    "lastVersion": "1.0.19",
     "repo": "hieuduongzx/adb-auto-game"
   }
 }

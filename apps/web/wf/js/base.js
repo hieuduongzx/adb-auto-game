@@ -573,17 +573,27 @@ function wfEndNodeDelay(id){
 function appendLog(entry){
   const body=$("log-body"); if(!body) return;
   const line=document.createElement("div"); line.className=`log-line fade-in lv-${entry.level||"info"} k-${entry.kind||"app"}`;
+  // Filter state lives on data-* rather than being re-derived from rendered
+  // text: the level chips, the scope picker and the search box then compose
+  // without any of them having to know about the others. `node` is the engine's
+  // block id, which is what makes "click the line, land on the block" possible.
+  line.dataset.level=entry.level||"info";
+  line.dataset.kind=entry.kind||"app";
+  line.dataset.scope=entry.scope||"Designer";
+  if(entry.node){ line.dataset.node=entry.node; line.classList.add("has-node"); }
   // "[Activity]" prefix styled apart from the text; older entries only carry msg.
   const text=entry.text!=null ? entry.text : entry.msg;
   const scope=entry.scope ? `<span class="log-scope${entry.scope==="Designer"?" is-app":""}">[${escHtml(entry.scope)}]</span> ` : "";
-  line.innerHTML=`<span class="log-ts">${entry.ts}</span>`+
+  line.innerHTML=`<span class="log-ts">${escHtml(entry.ts||"")}</span>`+
     `<span class="log-tag log-${entry.level}">${LOG_TAG[entry.level]||"INF"}</span>`+
     `<span class="log-msg">${scope}${escHtml(text)}</span>`;
   body.appendChild(line);
+  wfLogNoteScope(line.dataset.scope);   // keeps the scope picker's options current
+  line.classList.toggle("hidden", !wfLogLineOK(line));
   // Cap matches the backend buffer (2000) — long unattended runs keep more
   // history in view; the Save button exports the full buffer to a file anyway.
   while(body.children.length>2000) body.removeChild(body.firstChild);
-  body.scrollTop=body.scrollHeight;
+  if(wfLogAtBottom(body)) body.scrollTop=body.scrollHeight;
   updateLogCount();
 }
 function rebuildDeviceSelect(devices, connected){
