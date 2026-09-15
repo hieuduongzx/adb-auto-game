@@ -1609,10 +1609,15 @@ class WorkflowEngine:
                         log_warning("↳ nhánh lần lượt có lỗi — tiếp tục qua cổng 'end'")
                     self._branch_failed = failed0
                     self._node_done(node, nid, "ok", "end")
-                    self._break_loop = False
-                    self._walk(nodes, adj, end_tgt, {}, depth)
                     self._break_loop = break0
-                break
+                    # Tiếp tục trên cổng "end" NGAY TRONG walk này (không mở walk
+                    # con): loop bọc quanh sequence vẫn đếm được số vòng vì bộ đếm
+                    # vòng lặp nằm trong `counters` của walk hiện tại.
+                    cur = end_tgt
+                else:
+                    self._branch_failed = bool(failed0 or any_failed)
+                    self._break_loop = break0
+                    break
             elif kind == "switch":
                 # Evaluate each case top-to-bottom; first true wins its port "c{i}".
                 taken = "default"

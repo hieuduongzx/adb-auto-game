@@ -324,40 +324,49 @@
       <div class="pnl" id="wf-act-panel" data-dtab="act" data-pnl="wf-activities" data-pnl-title="Activities" data-pnl-tools="max">
         <div id="wf-act-resizer" title="Drag the top edge (or use arrow keys) to resize the list — double-click to reset" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize list" aria-valuemin="72" aria-valuemax="600"></div>
         <div class="wf-dock-tabs pnl-hd" role="tablist" aria-label="Activities, functions and variables">
-          <button type="button" class="tab-btn active" data-dtab="act" role="tab" aria-selected="true" aria-controls="wf-dock-act" id="wf-dtab-act" onclick="wfSwitchDockTab('act')">Activities <span class="tab-count" id="wf-act-total"></span></button>
-          <button type="button" class="tab-btn" data-dtab="fn" role="tab" aria-selected="false" aria-controls="wf-dock-fn" id="wf-dtab-fn" onclick="wfSwitchDockTab('fn')">Functions <span class="tab-count" id="wf-fn-count"></span></button>
-          <button type="button" class="tab-btn" data-dtab="vars" role="tab" aria-selected="false" aria-controls="wf-dock-vars" id="wf-dtab-vars" onclick="wfSwitchDockTab('vars')">Variables <span class="tab-count" id="wf-vars-count"></span><span class="wf-vars-live" id="wf-vars-live" title="● Live — engine is running">●</span></button>
+          <!-- The label is its own span so the strip can ellipsize rather than
+               overflow: with min-width:0 the tabs are the only part that can
+               give, and without it they pushed the tools off the card edge. -->
+          <button type="button" class="tab-btn active" data-dtab="act" role="tab" aria-selected="true" aria-controls="wf-dock-act" id="wf-dtab-act" onclick="wfSwitchDockTab('act')"><span class="tab-lbl">Activities</span> <span class="tab-count" id="wf-act-total"></span></button>
+          <button type="button" class="tab-btn" data-dtab="fn" role="tab" aria-selected="false" aria-controls="wf-dock-fn" id="wf-dtab-fn" onclick="wfSwitchDockTab('fn')"><span class="tab-lbl">Functions</span> <span class="tab-count" id="wf-fn-count"></span></button>
+          <button type="button" class="tab-btn" data-dtab="vars" role="tab" aria-selected="false" aria-controls="wf-dock-vars" id="wf-dtab-vars" onclick="wfSwitchDockTab('vars')"><span class="tab-lbl">Variables</span> <span class="tab-count" id="wf-vars-count"></span><span class="wf-vars-live" id="wf-vars-live" title="● Live — engine is running">●</span></button>
           <span class="pnl-tools">
-            <!-- One tool group per tab; the card's data-dtab decides which is
-                 visible. panel.js appends Maximize after these. -->
-            <span class="wf-dock-tools" data-for="act">
-              <button class="wf-side-mini" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)" aria-pressed="false">
-                <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/></svg>
-              </button>
-              <button class="wf-side-mini" id="wf-act-dbg" title="Debug overlay: Off — when on, every image/color/OCR match draws its box + confidence on Preview" aria-pressed="false">
-                <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="1"/><path d="M18.944 12.33a1 1 0 0 0 0-.66 7.5 7.5 0 0 0-13.888 0 1 1 0 0 0 0 .66 7.5 7.5 0 0 0 13.888 0"/></svg>
-              </button>
-              <button class="wf-side-mini wf-side-add" id="wf-act-add" title="Add activity">+</button>
-            </span>
-            <span class="wf-dock-tools" data-for="fn">
-              <button class="wf-side-mini wf-side-add" id="wf-fn-add" title="Create new function">+</button>
-            </span>
-            <span class="wf-dock-tools" data-for="vars">
-              <button id="wf-vars-add" class="wf-vars-add" title="Add variable (global or local)">
-                <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-              </button>
-              <button id="wf-vars-mgr" class="wf-vars-add" title="Manage global variables"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></button>
-            </span>
+            <!-- Card chrome only. The per-tab buttons moved down to
+                 .wf-dock-bar: three tab labels plus five buttons in one row
+                 overflowed the card and clipped them off its right edge.
+                 panel.js appends Maximize after this. -->
             <button class="wf-side-mini" id="wf-act-collapse" aria-controls="wf-act-panel-body" aria-expanded="true" title="Collapse — fold the list away, keep the tabs">
               <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
             </button>
           </span>
         </div>
-        <!-- Sequence/Background stays above the scrolling body so it holds still
-             while the list scrolls — same reason it sat outside it before. -->
-        <div class="wf-act-tab-row">
-          <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequence <span class="side-count" id="wf-act-count"></span></button>
-          <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
+        <!-- Action bar — whatever the open tab needs to act on its own list,
+             plus the Sequence/Background switch that belongs to Activities
+             alone. Sits above the scrolling body so both hold still while the
+             list scrolls; the card's data-dtab picks which group is shown. -->
+        <div class="wf-dock-bar">
+          <div class="wf-act-tab-row">
+            <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequence <span class="side-count" id="wf-act-count"></span></button>
+            <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
+          </div>
+          <span class="wf-dock-tools" data-for="act">
+            <button class="wf-side-mini" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)" aria-pressed="false">
+              <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/></svg>
+            </button>
+            <button class="wf-side-mini" id="wf-act-dbg" title="Debug overlay: Off — when on, every image/color/OCR match draws its box + confidence on Preview" aria-pressed="false">
+              <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="1"/><path d="M18.944 12.33a1 1 0 0 0 0-.66 7.5 7.5 0 0 0-13.888 0 1 1 0 0 0 0 .66 7.5 7.5 0 0 0 13.888 0"/></svg>
+            </button>
+            <button class="wf-side-mini wf-side-add" id="wf-act-add" title="Add activity">+</button>
+          </span>
+          <span class="wf-dock-tools" data-for="fn">
+            <button class="wf-side-mini wf-side-add" id="wf-fn-add" title="Create new function">+</button>
+          </span>
+          <span class="wf-dock-tools" data-for="vars">
+            <button id="wf-vars-add" class="wf-vars-add" title="Add variable (global or local)">
+              <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
+            <button id="wf-vars-mgr" class="wf-vars-add" title="Manage global variables"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></button>
+          </span>
         </div>
         <div id="wf-act-panel-body" class="wf-act-panel-body">
           <div class="wf-dock-pane active" id="wf-dock-act" role="tabpanel" aria-labelledby="wf-dtab-act">

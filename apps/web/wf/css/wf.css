@@ -332,7 +332,7 @@
 
 /* ── Bottom-right dock: Activities · Functions · Variables in one card ───── */
 #wf-act-panel { position:absolute; right:14px; bottom:14px; z-index:7;
-  width:340px; max-width:calc(100% - 28px); display:flex; flex-direction:column;
+  width:400px; max-width:calc(100% - 28px); display:flex; flex-direction:column;
   min-height:0; overflow:hidden; background:var(--panel); border:1px solid var(--border);
   border-radius:var(--r-md); box-shadow:var(--sh-md); }
 #workflow-view.wf-preview-on #wf-act-panel,
@@ -340,7 +340,7 @@
 /* Collapsed folds the body away but keeps the tab strip: it is the card's only
    remaining affordance, and clicking a tab is how you get the list back. */
 #wf-act-panel.collapsed .wf-act-panel-body,
-#wf-act-panel.collapsed .wf-act-tab-row { display:none; }
+#wf-act-panel.collapsed .wf-dock-bar { display:none; }
 #wf-act-panel.collapsed .pnl-hd { border-bottom:none; }
 /* The Sequence/Background switcher belongs to the Activities tab alone. */
 #wf-act-panel:not([data-dtab="act"]) .wf-act-tab-row { display:none; }
@@ -359,13 +359,28 @@
 #wf-act-panel.collapsed #wf-act-resizer, #wf-act-panel.is-max #wf-act-resizer { display:none; }
 #wf-act-panel.resizing .wf-act-panel-body { scroll-behavior:auto; }
 /* The tab strip doubles as the panel header (.pnl-hd), so shared/panel.js finds
-   it and mounts Maximize; the underline the tabs draw sits on that hairline. */
-.wf-dock-tabs { gap:var(--s1); padding:0 var(--s2) 0 var(--s3); }
-.wf-dock-tabs .tab-btn { padding:0 9px; height:100%; display:inline-flex; align-items:center; gap:5px;
-  background:none; border:none; }
+   it and mounts Maximize; the underline the tabs draw sits on that hairline.
+   It carries the three tab names and nothing else — the per-tab buttons live in
+   .wf-dock-bar below, because labels + five buttons in one 340px row overflowed
+   and the card's overflow:hidden clipped them off its right edge. */
+.wf-dock-tabs { gap:var(--s1); padding:0 var(--s2) 0 var(--s3); min-width:0; }
+.wf-dock-tabs .tab-btn { padding:0 8px; height:100%; display:inline-flex; align-items:center; gap:4px;
+  background:none; border:none; min-width:0; }
 .wf-dock-tabs .tab-btn:focus-visible { outline:2px solid var(--accent); outline-offset:-3px; }
+/* The label is the only part allowed to give: it ellipsizes while the badge and
+   the live dot stay whole, so a long tab name shortens its own tab instead of
+   pushing the tools past the card edge. */
+.wf-dock-tabs .tab-lbl { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-dock-tabs .tab-count, .wf-dock-tabs .wf-vars-live { flex-shrink:0; }
+/* Action bar — one row under the strip holding whatever the open tab needs to
+   act on its own list. Hidden on the collapsed card, like the body it acts on. */
+.wf-dock-bar { display:flex; align-items:center; gap:var(--s2);
+  padding:7px 11px; flex-shrink:0; }
+/* The switch takes the slack, so the buttons sit on the right edge whether or
+   not it is there (on Functions/Variables its group is display:none). */
+.wf-dock-bar .wf-act-tab-row { flex:1 1 auto; min-width:0; margin:0; }
 /* One tool group per tab — the card's data-dtab picks which one is on. */
-.wf-dock-tools { display:none; align-items:center; gap:1px; }
+.wf-dock-tools { display:none; align-items:center; gap:1px; margin-left:auto; flex-shrink:0; }
 #wf-act-panel[data-dtab="act"]  .wf-dock-tools[data-for="act"],
 #wf-act-panel[data-dtab="fn"]   .wf-dock-tools[data-for="fn"],
 #wf-act-panel[data-dtab="vars"] .wf-dock-tools[data-for="vars"] { display:inline-flex; }

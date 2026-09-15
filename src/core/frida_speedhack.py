@@ -705,6 +705,10 @@ class FridaSpeedhackManager:
         # Once the property channel round-trips we trust it and skip the
         # read-back verification on subsequent live updates (snappier slider).
         self._live_verified = False
+        # How to obtain root on this device: None = undecided, "direct" (adbd
+        # already runs as root, e.g. after ``adb root`` on MuMu/LDPlayer),
+        # "su" (a classic ``su`` binary exists), "none" (not rooted).
+        self._root_mode: Optional[str] = None
 
     @property
     def available(self) -> bool:
@@ -819,6 +823,70 @@ class FridaSpeedhackManager:
             log_warning(f"[speedhack] adb command failed: {e}")
             return ""
 
+    def _is_root_shell(self) -> bool:
+        """Whether ``adb shell`` itself already runs as uid 0."""
+        out = self._run_adb("id -u").strip()
+        return out.split()[:1] == ["0"]
+
+    def _try_adb_root(self) -> bool:
+        """Restart adbd as root (MuMu/LDPlayer expose root this way, no ``su``)."""
+        try:
+            result = subprocess.run(
+                self._adb_prefix() + ["root"],
+                capture_output=True, text=True, timeout=20,
+                creationflags=CREATE_NO_WINDOW,
+            )
+            msg = ((result.stdout or "") + (result.stderr or "")).lower()
+            if "cannot run as root" in msg or "not allowed" in msg:
+                return False
+            # ``adb root`` restarts adbd -> wait for the device to come back.
+            subprocess.run(
+                self._adb_prefix() + ["wait-for-device"],
+                capture_output=True, text=True, timeout=20,
+                creationflags=CREATE_NO_WINDOW,
+            )
+            for _ in range(10):
+                if self._is_root_shell():
+                    return True
+                time.sleep(0.5)
+            return False
+        except Exception as e:
+            log_warning(f"[speedhack] adb root failed: {e}")
+            return False
+
+    def _ensure_root_mode(self) -> str:
+        """Resolve how to run a root command on this device (cached).
+
+        Order matters: if adbd already runs as root (uid 0) run commands
+        directly; otherwise try ``adb root`` (the only mechanism on emulators
+        like MuMu 15, which ship no ``su``); only then fall back to ``su -c``.
+        """
+        if self._root_mode is not None:
+            return self._root_mode
+        if self._is_root_shell():
+            self._root_mode = "direct"
+        elif self._try_adb_root():
+            self._root_mode = "direct"
+        else:
+            out = self._run_adb("command -v su || which su").strip()
+            if out:
+                self._root_mode = "su"
+            else:
+                self._root_mode = "none"
+                log_warning("[speedhack] device is not rooted "
+                            "(no su and `adb root` failed)")
+        return self._root_mode
+
+    def _shell_root(self, cmd: str) -> str:
+        """Wrap ``cmd`` to run as root with whatever mechanism the device has."""
+        if self._ensure_root_mode() == "su":
+            return f"su -c {shlex.quote(cmd)}"
+        return cmd
+
+    def _run_adb_root(self, cmd: str) -> str:
+        """Run a root shell command, adapting to the device's root mechanism."""
+        return self._run_adb(self._shell_root(cmd))
+
     def _device_abi(self) -> str:
         """Return the device's primary ABI (e.g. ``arm64-v8a``)."""
         out = self._run_adb("getprop ro.product.cpu.abi").strip()
@@ -854,7 +922,7 @@ class FridaSpeedhackManager:
     def _process_arch(self, pid: int) -> Optional[str]:
         """Frida arch suffix read from the target's own ELF header (None if unreadable)."""
         inner = f"dd if=/proc/{pid}/exe bs=1 count=20 2>/dev/null"
-        out = self._run_adb(f"su -c {shlex.quote(inner)} | od -An -tx1")
+        out = self._run_adb_root(f"{inner} | od -An -tx1")
         octets = re.findall(r"\b[0-9a-f]{2}\b", out or "")
         if len(octets) < 20:
             return None
@@ -871,7 +939,7 @@ class FridaSpeedhackManager:
 
     def _is_32bit_process(self, pid: int) -> bool:
         """Whether ``pid`` is a 32-bit process (zygote32 -> app_process32)."""
-        out = self._run_adb(f"su -c {shlex.quote(f'readlink /proc/{pid}/exe')}")
+        out = self._run_adb_root(f"readlink /proc/{pid}/exe")
         return "app_process32" in (out or "")
 
     def _push_inject_if_needed(self, arch: Optional[str]) -> bool:
@@ -984,7 +1052,7 @@ class FridaSpeedhackManager:
     def _set_device_scale_prop(self, scale: float) -> None:
         """Set the live-scale system property on the device."""
         cmd = f"setprop {self._scale_prop} {scale:.6f}"
-        self._run_adb(f"su -c {shlex.quote(cmd)}")
+        self._run_adb_root(cmd)
 
     def _set_live_scale(self, scale: float) -> bool:
         """Update the running injection's scale via the system property.
@@ -1071,7 +1139,7 @@ class FridaSpeedhackManager:
             return
         log_info(f"[speedhack] clearing {len(doomed)} stale frida-inject process(es)")
         kill = "kill -9 " + " ".join(str(p) for p in doomed)
-        self._run_adb(f"su -c {shlex.quote(kill)}")
+        self._run_adb_root(kill)
 
     def _inject_scale_locked(self, scale: float, pid: Optional[int] = None,
                              keep_alive: bool = True) -> bool:
@@ -1106,7 +1174,9 @@ class FridaSpeedhackManager:
                 self._adb_prefix()
                 + [
                     "shell",
-                    f"su -c {shlex.quote(f'{self._frida_inject_path} -p {pid} -s {self._device_script_path}')}",
+                    self._shell_root(
+                        f"{self._frida_inject_path} -p {pid} -s {self._device_script_path}"
+                    ),
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
