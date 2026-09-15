@@ -42,7 +42,6 @@ from src.core.adb.auto.scrcpy_capture import (
     set_capture_backend,
     stop_scrcpy_sources,
 )
-from src.workflow import WorkflowEngine
 from src.utils import (
     LOG_KIND_ACTIVITY,
     LOG_KIND_DETAIL,
@@ -56,16 +55,20 @@ from src.utils import (
     is_frozen,
     load_ui_settings,
     log_error,
+    log_info,
     log_success,
     log_warning,
     push_webview_event,
     remove_log_subscriber,
+    sanitize_name,
     save_ui_settings,
     slugify_workflow_name,
     theme_background,
     titled,
     webview_storage_path,
 )
+from src.version import APP_VERSION
+from src.workflow import WorkflowEngine
 
 # In a frozen build, writable resources (data/) live under data_root() — next to
 # the app when writable, else %LOCALAPPDATA% (read-only Program Files install).
@@ -191,6 +194,19 @@ class WorkflowRunnerAPI:
         self._log_buffer: List[Dict] = []
         self._pending_load: Optional[str] = None  # flow path to auto-load on attach
 
+        # Terminal run outcomes (see "Run outcome" below): the engine reports a
+        # user Stop exactly like a failure, so the intent behind a Stop is
+        # tracked here, per run, and reset by every run entry point.
+        self._run_id = 0
+        self._run_active = False
+        self._stop_intent = False
+        self._run_failed = False
+        self._run_counts: Dict[str, int] = {"completed": 0, "failed": 0, "stopped": 0}
+        self._outcome: Optional[Dict[str, Any]] = None
+        # Last status pushed per activity id — used to settle rows that a Stop
+        # cancelled before they could report back (background activities).
+        self._act_status: Dict[str, str] = {}
+
         self._device_lock = threading.Lock()
         self._selected_serial: Optional[str] = None
         self._connected_serial: Optional[str] = None
@@ -207,16 +223,13 @@ class WorkflowRunnerAPI:
         self._runner_info: Dict[str, Any] = runner_update.build_info()
         self._update: Dict[str, Any] = {}
 
-        # Mirror engine running/paused into the UI.
+        # Mirror engine running/paused into the UI, and classify how the run
+        # ended (completed / stopped / failed) on the way out.
         self.engine.on("on_start", self._on_engine_start)
         self.engine.on("on_stop", self._on_engine_stop)
-        self.engine.on("on_activity_start",
-                       lambda act: self._push("activity_update",
-                                              {"id": act.get("id"), "status": "running"}))
-        self.engine.on("on_activity_complete",
-                       lambda act, ok: self._push("activity_update",
-                                                  {"id": act.get("id"),
-                                                   "status": "completed" if ok else "failed"}))
+        self.engine.on("on_activity_start", self._on_activity_start)
+        self.engine.on("on_activity_complete", self._on_activity_complete)
+        self.engine.on("on_activity_crash", self._on_activity_crash)
 
     # ── Setup ────────────────────────────────────────────────────────────────
 
@@ -236,11 +249,191 @@ class WorkflowRunnerAPI:
         if runner_update.updates_supported(self._runner_info):
             threading.Thread(target=self._auto_check_update, daemon=True).start()
 
+    # ── Run outcome (completed / stopped / failed) ───────────────────────────
+    # The engine only announces "a run started" and "a run stopped": a finished
+    # pass, a user Stop and a fatal abort all end in on_stop, and an activity
+    # cancelled mid-flight reports ok=False exactly like a failed one. So the
+    # Stop *intent* is recorded here (stop()) and combined with the engine's own
+    # failure signals — on_activity_crash, a failed activity, and the ``_fatal``
+    # abort — to say truthfully how a run ended. No engine logic is changed.
+
+    _OUTCOME_LABELS = {"completed": "Completed", "stopped": "Stopped", "failed": "Failed"}
+
+    def _engine_stop_flags(self) -> tuple:
+        """``(stopping, fatal)`` peeked read-only out of the engine.
+
+        ``_stop`` is set by a user Stop, a workflow Stop block and by
+        ``_fail_run``'s abort alike; ``_fatal`` is set *only* by ``_fail_run``
+        (a Launch program with no program to start) — the one "stopped" that is
+        genuinely a failure. Both are missing on a fresh engine, hence getattr.
+        """
+        event = getattr(self.engine, "_stop", None)
+        try:
+            stopping = bool(event is not None and event.is_set())
+        except Exception:
+            stopping = False
+        return stopping, bool(str(getattr(self.engine, "_fatal", "") or ""))
+
+    def _reset_run_tracking(self) -> None:
+        self._stop_intent = False
+        self._run_failed = False
+        self._run_counts = {"completed": 0, "failed": 0, "stopped": 0}
+
+    def _run_live(self) -> bool:
+        """True between a run's on_start and its on_stop.
+
+        Deliberately wider than ``engine.is_running()``: the engine flips
+        ``running`` to False *just before* it emits on_stop, so a run that is
+        still being wound down must not look idle to _begin_run()/stop().
+        """
+        return bool(self._run_active or self.engine.is_running())
+
+    def _begin_run(self) -> None:
+        """Start fresh outcome bookkeeping for a run that is about to be asked
+        to start.
+
+        Every entry point (Start, per-activity Run) calls this *before* it can
+        bail out, so a blocked Start (a Launch program with no path) or a
+        refused run_activity can never hand the previous run's Stop intent /
+        failure flag to the next one. A run still winding down is left alone.
+        """
+        if not self._run_live():
+            self._reset_run_tracking()
+
+    def _outcome_fields(self) -> dict:
+        """The last terminal outcome as flat keys, shared by ``running_state``
+        and :meth:`get_state` so the page reads the same shape from either.
+
+        ``outcome`` is None while a run is live and before the first run ever
+        ended; the rest describe the run it belongs to (``runId``).
+        """
+        info = self._outcome or {}
+        return {
+            "outcome": info.get("kind"),
+            "outcomeLabel": str(info.get("label") or ""),
+            "outcomeReason": str(info.get("reason") or ""),
+            "outcomeAt": str(info.get("at") or ""),
+            "runId": int(info.get("runId") or self._run_id),
+            "runCounts": dict(info.get("counts") or self._run_counts),
+        }
+
+    def _running_payload(self) -> dict:
+        payload = {"running": self.engine.is_running(), "paused": self.engine.is_paused()}
+        payload.update(self._outcome_fields())
+        return payload
+
     def _on_engine_start(self) -> None:
-        self._push("running_state", {"running": True, "paused": False})
+        self._run_id += 1
+        self._run_active = True
+        self._act_status = {}
+        self._reset_run_tracking()
+        self._outcome = None
+        self._push("running_state", self._running_payload())
 
     def _on_engine_stop(self) -> None:
-        self._push("running_state", {"running": False, "paused": False})
+        """Every terminal path lands here — classify the run once."""
+        if self._run_active:
+            self._run_active = False
+            self._outcome = self._classify_outcome()
+            if self._outcome["kind"] == "stopped":
+                # A background activity cancelled by the Stop never reports
+                # back (the engine just ends its loop), so settle its row.
+                self._settle_stopped_activities()
+            self._log_outcome(self._outcome)
+        self._push("running_state", self._running_payload())
+
+    def _classify_outcome(self) -> dict:
+        """Decide how the run that just ended actually ended.
+
+        Priority: a fatal abort is a failure even though it stopped the engine;
+        a Stop (mine or the workflow's) is "stopped" and never a failure — which
+        is the whole point of tracking intent, since a cancelled activity comes
+        back as ok=False; otherwise a run that had any failed activity failed,
+        and a clean pass completed.
+        """
+        stopping, fatal = self._engine_stop_flags()
+        counts = dict(self._run_counts)
+        intent = bool(self._stop_intent)
+        if fatal:
+            kind, reason = "failed", fatal
+        elif intent or stopping:
+            kind = "stopped"
+            reason = "Stopped by you" if intent else "Stopped by the workflow"
+        elif self._run_failed:
+            kind = "failed"
+            failed = counts.get("failed", 0)
+            reason = (f"{failed} of {sum(counts.values())} activities failed"
+                      if failed else "An activity failed")
+        else:
+            kind = "completed"
+            done = counts.get("completed", 0)
+            reason = (f"{done} activit{'y' if done == 1 else 'ies'} completed"
+                      if done else "Run finished")
+        return {"kind": kind, "label": self._OUTCOME_LABELS[kind], "reason": reason,
+                "at": datetime.datetime.now().strftime("%H:%M:%S"),
+                "epoch": time.time(), "runId": self._run_id, "counts": counts}
+
+    def _log_outcome(self, info: dict) -> None:
+        """One line in the Runner log per terminal outcome.
+
+        The log is what an operator reads (and exports) after an unattended
+        run, so how the run ended belongs in it rather than being inferred from
+        the lines above it.
+        """
+        text = f"■ Run {info['label'].lower()}"
+        if info.get("reason"):
+            text += f" ({info['reason']})"
+        if info["kind"] == "failed":
+            log_error(text, kind=LOG_KIND_RUN)
+        elif info["kind"] == "stopped":
+            log_info(text, kind=LOG_KIND_RUN)
+        else:
+            log_success(text, kind=LOG_KIND_RUN)
+
+    def _settle_stopped_activities(self) -> None:
+        for act_id, status in list(self._act_status.items()):
+            if status != "running":
+                continue
+            self._act_status[act_id] = "stopped"
+            self._push("activity_update", {"id": act_id, "status": "stopped"})
+
+    def _on_activity_start(self, act: dict) -> None:
+        act_id = (act or {}).get("id")
+        if act_id is not None:
+            self._act_status[str(act_id)] = "running"
+        self._push("activity_update", {"id": act_id, "status": "running"})
+
+    def _on_activity_complete(self, act: dict, ok: bool) -> None:
+        """Paint one activity's terminal state and count it for the outcome."""
+        status = self._activity_status(ok)
+        act_id = (act or {}).get("id")
+        if act_id is not None:
+            self._act_status[str(act_id)] = status
+        self._run_counts[status] = self._run_counts.get(status, 0) + 1
+        if status == "failed":
+            self._run_failed = True
+        self._push("activity_update", {"id": act_id, "status": status})
+
+    def _on_activity_crash(self, act: dict, crash: Optional[dict]) -> None:
+        """The engine emits this only for a genuine failure — a user Stop and a
+        Stop block are excluded there — so it is the dependable "this run did
+        not simply finish" signal."""
+        self._run_failed = True
+
+    def _activity_status(self, ok: bool) -> str:
+        """A stopped activity is reported as stopped, not failed.
+
+        The engine reports a cancelled activity as ok=False (indistinguishable
+        from a failure at that level) and, for a stop landing inside a wait,
+        even as ok=True — so an in-effect Stop outranks ``ok``. ``_fatal`` still
+        wins: an aborted run did fail.
+        """
+        stopping, fatal = self._engine_stop_flags()
+        if fatal:
+            return "failed"
+        if stopping or self._stop_intent:
+            return "stopped"
+        return "completed" if ok else "failed"
 
     # ── Log subscriber ───────────────────────────────────────────────────────
 
@@ -354,6 +547,18 @@ class WorkflowRunnerAPI:
             for var in act.get("vars", []) or []:
                 if var.get("name") in saved_vars:
                     var["value"] = saved_vars[var.get("name")]
+        for act in acts:
+            for var in act.get("vars", []) or []:
+                if var.get("type") == "select":
+                    options = var.get("options") or []
+                    if var.get("display") == "toggle-group" and var.get("multiple"):
+                        values = var.get("value")
+                        values = values if isinstance(values, list) else [values]
+                        var["value"] = [o for o in options if o in values]
+                    elif isinstance(var.get("value"), list):
+                        var["value"] = next((o for o in var["value"] if o in options), options[0] if options else "")
+                    elif var.get("value") not in options:
+                        var["value"] = options[0] if options else ""
         # Retry count: the workflow's own ``maxRetries`` is the default the Runner
         # shows, and a Runner override (saved in this Runner's config) beats it.
         # Only the override is written to flow, in memory — the workflow file is
@@ -549,10 +754,21 @@ class WorkflowRunnerAPI:
             return False
         for problem in problems:
             log_error(f"Can't start: {problem['message']}")
+        # A refused Start is still an ending the operator has to see — the page
+        # would otherwise sit on the previous run's outcome.
+        self._stop_intent = False
+        self._run_failed = True
+        self._outcome = {"kind": "failed", "label": self._OUTCOME_LABELS["failed"],
+                         "reason": "Start blocked — " + "; ".join(p["message"] for p in problems),
+                         "at": datetime.datetime.now().strftime("%H:%M:%S"),
+                         "epoch": time.time(), "runId": self._run_id,
+                         "counts": dict(self._run_counts)}
+        self._push("running_state", self._running_payload())
         self._push("launch_blocked", {
             "problems": [p["message"] for p in problems],
             "needsGamePath": any(p["gamePath"] for p in problems),
             "gamePath": self._game_path_status(),
+            "outcome": self._outcome_fields(),
         })
         return True
 
@@ -567,15 +783,73 @@ class WorkflowRunnerAPI:
             acts[str(activity_id)] = saved
         return saved
 
+    def get_diagnostics(self) -> dict:
+        """Return safe, read-only environment facts useful for support."""
+        workflow_path = os.path.abspath(self.flow_path) if self.flow_path else ""
+        req = self._requirements_payload()
+        config = self._runner_config_path or ""
+        return {
+            "ok": True,
+            "version": {"app": APP_VERSION, "appName": "Macro2k", "runner": self._runner_payload(),
+                        "builtAt": self._runner_info.get("builtAt", ""),
+                        "repo": self._runner_info.get("repo", ""), "frozen": is_frozen()},
+            "mode": "packaged" if is_frozen() else "source",
+            "controller": self._controller(),
+            "capture": {"backend": get_capture_backend(), "backends": list(CAPTURE_BACKENDS)},
+            "config": {"path": config, "exists": bool(config and os.path.isfile(config))},
+            "workflow": {"path": workflow_path, "name": self.flow.get("name", ""),
+                         "loaded": bool(self.flow), "exists": bool(workflow_path and os.path.isfile(workflow_path))},
+            "data": {"root": data_root(), "folder": os.path.dirname(config) if config else data_root(),
+                     "exists": os.path.isdir(os.path.dirname(config) if config else data_root())},
+            "requirements": {"folder": req.get("folder", ""), "exists": bool(req.get("exists")),
+                             "fileCount": len(req.get("files", []) or []),
+                             "gameDir": req.get("gameDir", ""), "missing": req.get("missing", []),
+                             "installed": req.get("installed", False)},
+            "paths": {"app": app_dir(), "data": data_root(), "bundle": bundle_dir(),
+                      "web": os.path.join(bundle_dir(), "web"), "config": config,
+                      "workflow": workflow_path, "requirements": req.get("folder", "")},
+            "log": {"entries": len(self._log_buffer), "max": 2000},
+            "running": self._run_live(),
+        }
+
+    def export_log(self, path: str = "") -> dict:
+        """Save retained Runner log as UTF-8, using the native dialog by default."""
+        if not path:
+            try:
+                chosen = self._window.create_file_dialog(webview.SAVE_DIALOG, save_filename="macro2k-run.log", file_types=("Log files (*.log)", "Text files (*.txt)", "All files (*.*)")) if self._window else None
+                path = chosen[0] if chosen else ""
+            except Exception as exc:
+                return {"ok": False, "path": "", "error": str(exc), "cancelled": False}
+        if not path:
+            return {"ok": False, "path": "", "error": "", "cancelled": True}
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                for entry in self._log_buffer:
+                    fh.write(str(entry.get("text", entry.get("message", ""))) + "\n")
+            return {"ok": True, "path": os.path.abspath(path), "error": "", "cancelled": False}
+        except Exception as exc:
+            return {"ok": False, "path": path, "error": str(exc), "cancelled": False}
+
+    def open_data_folder(self) -> dict:
+        """Open the fixed per-runner data folder without accepting arbitrary paths."""
+        folder = os.path.dirname(self._runner_config_path) if self._runner_config_path else data_root()
+        try:
+            os.makedirs(folder, exist_ok=True)
+            os.startfile(folder)
+            return {"ok": True, "path": folder, "error": ""}
+        except Exception as exc:
+            return {"ok": False, "path": folder, "error": str(exc)}
+
     def get_state(self) -> dict:
+        # "running"/"paused" plus the terminal-outcome keys, so the page reads
+        # one shape whether it just opened or a run_activity event arrived.
         return {
             "title": "Macro2k Runner",
             "name": self.flow.get("name", ""),
             "loaded": bool(self.flow),
             "activities": self._activities_payload(),
             "log": self._log_buffer[-300:],
-            "running": self.engine.is_running(),
-            "paused": self.engine.is_paused(),
+            **self._running_payload(),
             "speedhack": self.engine.speedhack_info(),
             "connectedSerial": self._connected_serial,
             "selectedSerial": self._selected_serial,
@@ -596,7 +870,7 @@ class WorkflowRunnerAPI:
 
     def _icon_url(self) -> str:
         """The game icon for the header: a built Runner's own icon, else the
-        workflow's assets/icon.* or assets/cover.* ("" → the page draws initials)."""
+        workflow's assets/icon.* or assets/cover.* (\"\" → the page draws initials)."""
         bundled = os.path.join(bundle_dir(), "runner_icon.png")
         if is_frozen() and os.path.isfile(bundled):
             return file_url(bundled)
@@ -745,7 +1019,9 @@ class WorkflowRunnerAPI:
                 "nodeCount": len(graph.get("nodes", []) or []),
                 "vars": [{"name": v.get("name"), "label": v.get("label", ""),
                           "type": v.get("type", "bool"), "value": v.get("value"),
-                          "options": v.get("options") or []}
+                          "options": v.get("options") or [],
+                          "display": v.get("display", "dropdown"),
+                          "multiple": v.get("display") == "toggle-group" and bool(v.get("multiple"))}
                          for v in (a.get("vars") or [])],
                 "runtimeSettings": self._runtime_settings_for_activity(a),
             })
@@ -809,6 +1085,9 @@ class WorkflowRunnerAPI:
                 log_warning(f"Couldn't select device: {exc}")
 
     def start(self) -> bool:
+        # Cleared even when this Start is refused below, so a blocked run can't
+        # leave the previous run's outcome flags behind (see _begin_run).
+        self._begin_run()
         if not self.flow:
             log_warning("No workflow loaded — open this Runner from the Macro2k Hub")
             return False
@@ -824,6 +1103,7 @@ class WorkflowRunnerAPI:
         """Run a single activity on its own, whether or not it is enabled.
 
         A sequence activity runs once; a background activity loops until Stop."""
+        self._begin_run()
         if not self.flow:
             log_warning("No workflow loaded — open this Runner from the Macro2k Hub")
             return False
@@ -837,6 +1117,13 @@ class WorkflowRunnerAPI:
         return self.engine.start_activity(str(activity_id or ""))
 
     def stop(self) -> bool:
+        """Stop the run — recorded as a Stop, not a failure.
+
+        The intent is set *before* the engine is asked to stop, because a
+        cancelled activity comes back from the engine as ok=False exactly like
+        a failed one; the flag is what lets the run end as "stopped"."""
+        if self._run_live():
+            self._stop_intent = True
         self.engine.stop()
         return True
 
@@ -904,6 +1191,14 @@ class WorkflowRunnerAPI:
             if a.get("id") == activity_id:
                 for v in a.get("vars", []) or []:
                     if v.get("name") == name:
+                        if v.get("type") == "select":
+                            options = v.get("options") or []
+                            if v.get("display") == "toggle-group" and v.get("multiple"):
+                                if not isinstance(value, list) or any(o not in options for o in value):
+                                    return False
+                                value = [o for o in options if o in value]
+                            elif isinstance(value, list) or value not in options:
+                                return False
                         v["value"] = value
                         with self._runner_config_lock:
                             act_cfg = self._activity_runner_config(activity_id)
@@ -1466,7 +1761,7 @@ def create_workflow_runner_window(title: Optional[str] = None,
         # activity list, so the Runner stays compact without breaking the split.
         width=720,
         height=800,
-        resizable=False,
+        resizable=True,
         min_size=(420, 620),
         background_color=theme_background(),
     )

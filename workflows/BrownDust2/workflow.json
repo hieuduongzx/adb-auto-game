@@ -29,18 +29,20 @@
       "label": "Global 1",
       "type": "bool",
       "value": false,
-      "options": []
+      "options": [],
+      "multiple": false
     },
     {
       "name": "isFirstGoHome",
       "label": "IsFirstGoHome",
       "type": "bool",
       "value": false,
-      "options": []
+      "options": [],
+      "multiple": false
     }
   ],
   "nodeDefaults": {
-    "delayBefore": 0,
+    "delayBefore": 1,
     "delayAfter": 0,
     "retryCount": 0,
     "retryDelay": 0,
@@ -62,8 +64,8 @@
           {
             "id": "nfadsqjp",
             "type": "tap_image_any",
-            "x": 340,
-            "y": 75,
+            "x": 60,
+            "y": 58,
             "params": {
               "templates": [
                 "templates/crop_20260715_152009_155_28_43_45.png",
@@ -141,7 +143,7 @@
           {
             "id": "n7tcsbej",
             "type": "win_key",
-            "x": 540,
+            "x": 300,
             "y": 58,
             "params": {
               "keycode": "72",
@@ -152,10 +154,10 @@
           {
             "id": "nn8iiw3i",
             "type": "wait_image",
-            "x": -20,
-            "y": 160,
+            "x": 60,
+            "y": 140,
             "params": {
-              "template": "templates/crop_20260914_100758_667_965_32_36.png",
+              "template": "templates/crop_20260715_063825_139_1036_55_17.png",
               "threshold": 0.85,
               "timeout": 5,
               "negate": false
@@ -167,7 +169,7 @@
             "x": -160,
             "y": 40,
             "params": {
-              "template": "templates/crop_20260914_100758_667_965_32_36.png",
+              "template": "templates/crop_20260715_063825_139_1036_55_17.png",
               "threshold": 0.85,
               "negate": false
             }
@@ -269,8 +271,8 @@
           {
             "id": "nxeeg0sp",
             "type": "end",
-            "x": 986,
-            "y": 440,
+            "x": 1360,
+            "y": 195,
             "params": {}
           },
           {
@@ -316,15 +318,15 @@
           {
             "id": "n74cfcst",
             "type": "tap_random",
-            "x": 920,
-            "y": 262,
+            "x": 1120,
+            "y": 180,
             "params": {
               "x1": 0,
               "y1": 0,
               "x2": 100,
               "y2": 100
             },
-            "delayBefore": 15
+            "delayBefore": 20
           },
           {
             "id": "n5ysn9zz",
@@ -765,27 +767,61 @@
       "name": "Quick Hunt",
       "type": "sequence",
       "enabled": true,
-      "vars": [],
+      "vars": [
+        {
+          "name": "type",
+          "label": "Type",
+          "type": "select",
+          "value": "Last",
+          "options": [
+            "Fire",
+            "Water",
+            "Wind",
+            "Light",
+            "Darrkness",
+            "Last"
+          ],
+          "multiple": false,
+          "display": "toggle-group"
+        },
+        {
+          "name": "hunt_type",
+          "label": "Hunt Type",
+          "type": "select",
+          "value": [
+            "Hunting Grounds",
+            "Crystal"
+          ],
+          "options": [
+            "Hunting Grounds",
+            "Gold",
+            "Slime",
+            "Crystal"
+          ],
+          "multiple": true,
+          "display": "toggle-group"
+        }
+      ],
       "graph": {
         "nodes": [
           {
             "id": "n49idrfx",
             "type": "start",
-            "x": 40,
+            "x": -280,
             "y": 275,
             "params": {}
           },
           {
             "id": "n063uwx6",
             "type": "end",
-            "x": 1320,
-            "y": 355,
+            "x": 2100,
+            "y": 276,
             "params": {}
           },
           {
             "id": "n0j94dxb",
             "type": "call",
-            "x": 120,
+            "x": -200,
             "y": 260,
             "params": {
               "fn": "fn_pmuop"
@@ -794,7 +830,7 @@
           {
             "id": "n2q7q16d",
             "type": "tap_image",
-            "x": 320,
+            "x": 40,
             "y": 260,
             "params": {
               "template": "templates/crop_20260716_155945_1741_244_33_35.png",
@@ -809,8 +845,8 @@
           {
             "id": "nm2c8lgt",
             "type": "tap_image",
-            "x": 520,
-            "y": 260,
+            "x": 460,
+            "y": 60,
             "params": {
               "template": "templates/crop_20260716_160030_1594_978_139_28.png",
               "taps": "1",
@@ -824,8 +860,8 @@
           {
             "id": "n7x1mqmv",
             "type": "tap_image",
-            "x": 716,
-            "y": 260,
+            "x": 656,
+            "y": 60,
             "params": {
               "template": "templates/crop_20260716_160123_1139_515_63_23.png",
               "taps": "1",
@@ -839,8 +875,8 @@
           {
             "id": "neudu56a",
             "type": "tap_image",
-            "x": 920,
-            "y": 260,
+            "x": 860,
+            "y": 60,
             "params": {
               "template": "templates/crop_20260716_160137_987_788_57_22.png",
               "taps": "1",
@@ -854,8 +890,8 @@
           {
             "id": "ncadc977",
             "type": "tap_random",
-            "x": 1120,
-            "y": 260,
+            "x": 1060,
+            "y": 60,
             "params": {
               "x1": 0,
               "y1": 0,
@@ -867,8 +903,8 @@
           {
             "id": "n19pe5oy",
             "type": "tap_image",
-            "x": 120,
-            "y": 340,
+            "x": 466,
+            "y": 260,
             "params": {
               "template": "templates/crop_20260716_160254_158_424_28_33.png",
               "taps": "1",
@@ -882,8 +918,8 @@
           {
             "id": "ngnnf8oq",
             "type": "tap_image",
-            "x": 320,
-            "y": 340,
+            "x": 1100,
+            "y": 260,
             "params": {
               "template": "templates/crop_20260716_160030_1594_978_139_28.png",
               "taps": "1",
@@ -892,13 +928,13 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delayBefore": 2
           },
           {
             "id": "n4s9pjrk",
             "type": "tap_image",
-            "x": 516,
-            "y": 340,
+            "x": 1296,
+            "y": 261,
             "params": {
               "template": "templates/crop_20260716_160123_1139_515_63_23.png",
               "taps": "1",
@@ -912,8 +948,8 @@
           {
             "id": "n8ifr98c",
             "type": "tap_image",
-            "x": 720,
-            "y": 340,
+            "x": 1500,
+            "y": 261,
             "params": {
               "template": "templates/crop_20260716_160137_987_788_57_22.png",
               "taps": "1",
@@ -927,8 +963,8 @@
           {
             "id": "ni838uvh",
             "type": "tap_random",
-            "x": 920,
-            "y": 340,
+            "x": 1700,
+            "y": 261,
             "params": {
               "x1": 0,
               "y1": 0,
@@ -940,19 +976,162 @@
           {
             "id": "nagifrsx",
             "type": "call",
-            "x": 1120,
-            "y": 340,
+            "x": 1900,
+            "y": 261,
             "params": {
               "fn": "fn_pmuop"
+            }
+          },
+          {
+            "id": "nfu2vxvt",
+            "type": "if_var",
+            "x": 680,
+            "y": 344,
+            "params": {
+              "name": "type",
+              "op": "==",
+              "value": "Fire"
+            }
+          },
+          {
+            "id": "njrr0rl7",
+            "type": "if_var",
+            "x": 680,
+            "y": 424,
+            "params": {
+              "name": "type",
+              "op": "==",
+              "value": "Water"
+            }
+          },
+          {
+            "id": "nbpy0zg4",
+            "type": "if_var",
+            "x": 680,
+            "y": 504,
+            "params": {
+              "name": "type",
+              "op": "==",
+              "value": "Wind"
+            }
+          },
+          {
+            "id": "nk989rfz",
+            "type": "if_var",
+            "x": 680,
+            "y": 584,
+            "params": {
+              "name": "type",
+              "op": "==",
+              "value": "Light"
+            }
+          },
+          {
+            "id": "nctwghz0",
+            "type": "if_var",
+            "x": 680,
+            "y": 664,
+            "params": {
+              "name": "type",
+              "op": "==",
+              "value": "Darrkness"
+            }
+          },
+          {
+            "id": "nt9l01ng",
+            "type": "tap",
+            "x": 880,
+            "y": 344,
+            "params": {
+              "target": "pos",
+              "x": 352,
+              "y": 153,
+              "taps": "1"
+            }
+          },
+          {
+            "id": "nlweslos",
+            "type": "tap",
+            "x": 880,
+            "y": 424,
+            "params": {
+              "target": "pos",
+              "x": 313,
+              "y": 219,
+              "taps": "1"
+            }
+          },
+          {
+            "id": "nkbu0s89",
+            "type": "tap",
+            "x": 880,
+            "y": 504,
+            "params": {
+              "target": "pos",
+              "x": 309,
+              "y": 289,
+              "taps": "1"
+            }
+          },
+          {
+            "id": "na66uc3u",
+            "type": "tap",
+            "x": 880,
+            "y": 584,
+            "params": {
+              "target": "pos",
+              "x": 321,
+              "y": 362,
+              "taps": "1"
+            }
+          },
+          {
+            "id": "nriwzhrf",
+            "type": "tap",
+            "x": 880,
+            "y": 664,
+            "params": {
+              "target": "pos",
+              "x": 323,
+              "y": 427,
+              "taps": "1"
+            }
+          },
+          {
+            "id": "n76rvs0e",
+            "type": "if_var",
+            "x": 680,
+            "y": 260,
+            "params": {
+              "name": "type",
+              "op": "==",
+              "value": "Last"
+            }
+          },
+          {
+            "id": "nfgrc3a5",
+            "type": "if_var",
+            "x": 254,
+            "y": 60,
+            "params": {
+              "name": "hunt_type",
+              "op": "contains",
+              "value": "Hunting Grounds"
+            }
+          },
+          {
+            "id": "n5kfajiz",
+            "type": "if_var",
+            "x": 260,
+            "y": 260,
+            "params": {
+              "name": "hunt_type",
+              "op": "contains",
+              "value": "Crystal"
             }
           }
         ],
         "edges": [
-          {
-            "from": "n2q7q16d",
-            "fromPort": "true",
-            "to": "nm2c8lgt"
-          },
           {
             "from": "nm2c8lgt",
             "fromPort": "true",
@@ -969,19 +1148,9 @@
             "to": "ncadc977"
           },
           {
-            "from": "ngnnf8oq",
-            "fromPort": "true",
-            "to": "n4s9pjrk"
-          },
-          {
             "from": "n4s9pjrk",
             "fromPort": "true",
             "to": "n8ifr98c"
-          },
-          {
-            "from": "n19pe5oy",
-            "fromPort": "true",
-            "to": "ngnnf8oq"
           },
           {
             "from": "n8ifr98c",
@@ -992,11 +1161,6 @@
             "from": "n0j94dxb",
             "fromPort": "true",
             "to": "n2q7q16d"
-          },
-          {
-            "from": "ncadc977",
-            "fromPort": "out",
-            "to": "n19pe5oy"
           },
           {
             "from": "n49idrfx",
@@ -1012,6 +1176,121 @@
             "from": "nagifrsx",
             "fromPort": "true",
             "to": "n063uwx6"
+          },
+          {
+            "from": "nfu2vxvt",
+            "fromPort": "false",
+            "to": "njrr0rl7"
+          },
+          {
+            "from": "njrr0rl7",
+            "fromPort": "false",
+            "to": "nbpy0zg4"
+          },
+          {
+            "from": "nbpy0zg4",
+            "fromPort": "false",
+            "to": "nk989rfz"
+          },
+          {
+            "from": "nk989rfz",
+            "fromPort": "false",
+            "to": "nctwghz0"
+          },
+          {
+            "from": "nfu2vxvt",
+            "fromPort": "true",
+            "to": "nt9l01ng"
+          },
+          {
+            "from": "njrr0rl7",
+            "fromPort": "true",
+            "to": "nlweslos"
+          },
+          {
+            "from": "nbpy0zg4",
+            "fromPort": "true",
+            "to": "nkbu0s89"
+          },
+          {
+            "from": "nk989rfz",
+            "fromPort": "true",
+            "to": "na66uc3u"
+          },
+          {
+            "from": "nctwghz0",
+            "fromPort": "true",
+            "to": "nriwzhrf"
+          },
+          {
+            "from": "nt9l01ng",
+            "fromPort": "out",
+            "to": "ngnnf8oq"
+          },
+          {
+            "from": "nlweslos",
+            "fromPort": "out",
+            "to": "ngnnf8oq"
+          },
+          {
+            "from": "nkbu0s89",
+            "fromPort": "out",
+            "to": "ngnnf8oq"
+          },
+          {
+            "from": "na66uc3u",
+            "fromPort": "out",
+            "to": "ngnnf8oq"
+          },
+          {
+            "from": "nriwzhrf",
+            "fromPort": "out",
+            "to": "ngnnf8oq"
+          },
+          {
+            "from": "ngnnf8oq",
+            "fromPort": "true",
+            "to": "n4s9pjrk"
+          },
+          {
+            "from": "n19pe5oy",
+            "fromPort": "true",
+            "to": "n76rvs0e"
+          },
+          {
+            "from": "n76rvs0e",
+            "fromPort": "true",
+            "to": "ngnnf8oq"
+          },
+          {
+            "from": "n76rvs0e",
+            "fromPort": "false",
+            "to": "nfu2vxvt"
+          },
+          {
+            "from": "nfgrc3a5",
+            "fromPort": "true",
+            "to": "nm2c8lgt"
+          },
+          {
+            "from": "n2q7q16d",
+            "fromPort": "true",
+            "to": "nfgrc3a5"
+          },
+          {
+            "from": "ncadc977",
+            "fromPort": "out",
+            "to": "n5kfajiz"
+          },
+          {
+            "from": "nfgrc3a5",
+            "fromPort": "false",
+            "to": "n5kfajiz"
+          },
+          {
+            "from": "n5kfajiz",
+            "fromPort": "true",
+            "to": "n19pe5oy"
           }
         ],
         "groups": []
@@ -1629,6 +1908,582 @@
       "maxRetries": 1
     },
     {
+      "id": "sequence_1gpb",
+      "name": "Wish At Goddes",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nzadxdom",
+            "type": "start",
+            "x": 20,
+            "y": -85,
+            "params": {}
+          },
+          {
+            "id": "nylnmi2r",
+            "type": "end",
+            "x": 1520,
+            "y": 13,
+            "params": {}
+          },
+          {
+            "id": "nxhx9m6n",
+            "type": "call",
+            "x": 100,
+            "y": -100,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "negr10zf",
+            "type": "tap",
+            "x": 300,
+            "y": -100,
+            "params": {
+              "target": "pos",
+              "x": 1712,
+              "y": 972,
+              "taps": "1"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "ndqrxtu2",
+            "type": "tap_image",
+            "x": 500,
+            "y": -100,
+            "params": {
+              "template": "templates/crop_20260914_085743_488_526_123_33.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nk8a5yzp",
+            "type": "tap_image",
+            "x": 700,
+            "y": -100,
+            "params": {
+              "template": "templates/crop_20260914_085824_1384_869_53_35.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 15,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nifnbbfx",
+            "type": "end",
+            "x": 920,
+            "y": -85,
+            "params": {},
+            "delayBefore": 1
+          },
+          {
+            "id": "nto4c266",
+            "type": "log",
+            "x": 820,
+            "y": 40,
+            "params": {
+              "message": "Bạn cần phải ở vị trí của tượng1 lần"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nzadxdom",
+            "fromPort": "out",
+            "to": "nxhx9m6n"
+          },
+          {
+            "from": "nxhx9m6n",
+            "fromPort": "true",
+            "to": "negr10zf"
+          },
+          {
+            "from": "negr10zf",
+            "fromPort": "out",
+            "to": "ndqrxtu2"
+          },
+          {
+            "from": "ndqrxtu2",
+            "fromPort": "true",
+            "to": "nk8a5yzp"
+          },
+          {
+            "from": "nk8a5yzp",
+            "fromPort": "true",
+            "to": "nifnbbfx"
+          },
+          {
+            "from": "nk8a5yzp",
+            "fromPort": "false",
+            "to": "nto4c266"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_m8k3",
+      "name": "PvP",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nsnuysf0",
+            "type": "start",
+            "x": 48,
+            "y": 72,
+            "params": {}
+          },
+          {
+            "id": "nley008w",
+            "type": "call",
+            "x": 120,
+            "y": 57,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nt09wo02",
+            "type": "tap_random",
+            "x": 1700,
+            "y": 1040,
+            "params": {
+              "x1": 0,
+              "y1": 0,
+              "x2": 100,
+              "y2": 100
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nmabn4ky",
+            "type": "tap",
+            "x": 320,
+            "y": 57,
+            "params": {
+              "target": "pos",
+              "x": 1692,
+              "y": 964,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "ng1t5mh6",
+            "type": "tap_image",
+            "x": 520,
+            "y": 57,
+            "params": {
+              "template": "templates/crop_20260912_192923_212_255_126_41.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nbu1nf5x",
+            "type": "if_image",
+            "x": 720,
+            "y": -20,
+            "params": {
+              "template": "templates/crop_20260912_192951_915_996_92_17.png",
+              "threshold": 0.85,
+              "negate": false
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nqsej3ht",
+            "type": "tap_image",
+            "x": 920,
+            "y": -20,
+            "params": {
+              "template": "templates/crop_20260912_192951_915_996_92_17.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "na80q7s4",
+            "type": "win_key",
+            "x": 920,
+            "y": 80,
+            "params": {
+              "keycode": "37",
+              "mode": "press",
+              "hold": 400
+            },
+            "delayBefore": 6,
+            "delayAfter": 1
+          },
+          {
+            "id": "ne6kvbjy",
+            "type": "win_key",
+            "x": 920,
+            "y": 160,
+            "params": {
+              "keycode": "40",
+              "mode": "press",
+              "hold": 400
+            },
+            "delayBefore": 3,
+            "delayAfter": 1
+          },
+          {
+            "id": "npx7h2zd",
+            "type": "tap_image",
+            "x": 1120,
+            "y": 160,
+            "params": {
+              "template": "templates/crop_20260913_214100_1713_963_103_45.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 3
+          },
+          {
+            "id": "n9xk68fw",
+            "type": "tap",
+            "x": 1554,
+            "y": 160,
+            "params": {
+              "target": "pos",
+              "x": 1491,
+              "y": 52,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nj8ys5nw",
+            "type": "if_image",
+            "x": 1320,
+            "y": 160,
+            "params": {
+              "template": "templates/crop_20260913_214159_1701_997_58_26.png",
+              "threshold": 0.85,
+              "negate": true
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "naw969hn",
+            "type": "tap_image",
+            "x": 1554,
+            "y": 240,
+            "params": {
+              "template": "templates/crop_20260913_214159_1701_997_58_26.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "n231q4cq",
+            "type": "end",
+            "x": 2112,
+            "y": 340,
+            "params": {},
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "niw1oz97",
+            "type": "if_image",
+            "x": 1760,
+            "y": 200,
+            "params": {
+              "template": "templates/crop_20260912_192951_915_996_92_17.png",
+              "threshold": 0.85,
+              "negate": false
+            },
+            "delayBefore": 3
+          },
+          {
+            "id": "nei5jsk9",
+            "type": "tap_image",
+            "x": 1960,
+            "y": 200,
+            "params": {
+              "template": "templates/crop_20260912_192951_915_996_92_17.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          }
+        ],
+        "edges": [
+          {
+            "from": "nsnuysf0",
+            "fromPort": "out",
+            "to": "nley008w"
+          },
+          {
+            "from": "nley008w",
+            "fromPort": "true",
+            "to": "nmabn4ky"
+          },
+          {
+            "from": "nmabn4ky",
+            "fromPort": "out",
+            "to": "ng1t5mh6"
+          },
+          {
+            "from": "ng1t5mh6",
+            "fromPort": "true",
+            "to": "nbu1nf5x"
+          },
+          {
+            "from": "nbu1nf5x",
+            "fromPort": "true",
+            "to": "nqsej3ht"
+          },
+          {
+            "from": "na80q7s4",
+            "fromPort": "out",
+            "to": "ne6kvbjy"
+          },
+          {
+            "from": "nbu1nf5x",
+            "fromPort": "false",
+            "to": "na80q7s4"
+          },
+          {
+            "from": "nqsej3ht",
+            "fromPort": "true",
+            "to": "na80q7s4"
+          },
+          {
+            "from": "ne6kvbjy",
+            "fromPort": "out",
+            "to": "npx7h2zd"
+          },
+          {
+            "from": "npx7h2zd",
+            "fromPort": "true",
+            "to": "nj8ys5nw"
+          },
+          {
+            "from": "nj8ys5nw",
+            "fromPort": "true",
+            "to": "n9xk68fw"
+          },
+          {
+            "from": "n9xk68fw",
+            "fromPort": "out",
+            "to": "nj8ys5nw"
+          },
+          {
+            "from": "nj8ys5nw",
+            "fromPort": "false",
+            "to": "naw969hn"
+          },
+          {
+            "from": "niw1oz97",
+            "fromPort": "true",
+            "to": "nei5jsk9"
+          },
+          {
+            "from": "naw969hn",
+            "fromPort": "true",
+            "to": "niw1oz97"
+          },
+          {
+            "from": "niw1oz97",
+            "fromPort": "false",
+            "to": "n231q4cq"
+          },
+          {
+            "from": "nei5jsk9",
+            "fromPort": "true",
+            "to": "n231q4cq"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_3whp",
+      "name": "Claim Gluppy",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "n0kjvi2x",
+            "type": "start",
+            "x": -320,
+            "y": 120,
+            "params": {}
+          },
+          {
+            "id": "nxzi0ikl",
+            "type": "tap",
+            "x": 540,
+            "y": 105,
+            "params": {
+              "target": "pos",
+              "x": 1413,
+              "y": 886,
+              "taps": "1"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nwhex63x",
+            "type": "if_image",
+            "x": 340,
+            "y": 105,
+            "params": {
+              "template": "templates/crop_20260911_103126_1393_873_40_26.png",
+              "threshold": 0.85,
+              "negate": false,
+              "regionX": 0,
+              "regionY": 0,
+              "regionW": 0,
+              "regionH": 0
+            },
+            "delayBefore": 10,
+            "delayAfter": 1
+          },
+          {
+            "id": "nslp72tj",
+            "type": "call",
+            "x": -260,
+            "y": 105,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nsyzja63",
+            "type": "tap",
+            "x": -60,
+            "y": 105,
+            "params": {
+              "target": "pos",
+              "x": 1707,
+              "y": 978,
+              "taps": "1"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nx2aejhp",
+            "type": "end",
+            "x": 760,
+            "y": 120,
+            "params": {},
+            "delayBefore": 1
+          },
+          {
+            "id": "nuzrs922",
+            "type": "tap_image",
+            "x": 140,
+            "y": 105,
+            "params": {
+              "template": "templates/crop_20260912_192923_212_255_126_41.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          }
+        ],
+        "edges": [
+          {
+            "from": "nwhex63x",
+            "fromPort": "true",
+            "to": "nxzi0ikl"
+          },
+          {
+            "from": "n0kjvi2x",
+            "fromPort": "out",
+            "to": "nslp72tj"
+          },
+          {
+            "from": "nslp72tj",
+            "fromPort": "true",
+            "to": "nsyzja63"
+          },
+          {
+            "from": "nxzi0ikl",
+            "fromPort": "out",
+            "to": "nx2aejhp"
+          },
+          {
+            "from": "nwhex63x",
+            "fromPort": "false",
+            "to": "nx2aejhp"
+          },
+          {
+            "from": "nsyzja63",
+            "fromPort": "out",
+            "to": "nuzrs922"
+          },
+          {
+            "from": "nuzrs922",
+            "fromPort": "true",
+            "to": "nwhex63x"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
       "id": "sequence_pwks",
       "name": "Nhận Thư",
       "type": "sequence",
@@ -1771,8 +2626,8 @@
           {
             "id": "nz4uoe64",
             "type": "end",
-            "x": 1500,
-            "y": 13,
+            "x": 1700,
+            "y": 35,
             "params": {}
           },
           {
@@ -1803,22 +2658,22 @@
           {
             "id": "nu7rhzzr",
             "type": "swipe",
-            "x": 500,
-            "y": -100,
+            "x": 700,
+            "y": -98,
             "params": {
-              "x1": 442,
-              "y1": 732,
-              "x2": 442,
-              "y2": 318,
-              "duration": 300
+              "x1": 426,
+              "y1": 360,
+              "x2": 428,
+              "y2": 305,
+              "duration": 120
             },
-            "delayBefore": 5
+            "delayBefore": 1
           },
           {
             "id": "nssgtef4",
             "type": "tap_image",
-            "x": 700,
-            "y": -100,
+            "x": 900,
+            "y": -82,
             "params": {
               "template": "templates/crop_20260913_224207_327_370_89_18.png",
               "taps": "1",
@@ -1832,8 +2687,8 @@
           {
             "id": "nxekbssc",
             "type": "tap_image",
-            "x": 900,
-            "y": -20,
+            "x": 1100,
+            "y": -2,
             "params": {
               "template": "templates/crop_20260914_085242_1434_771_84_30.png",
               "taps": "1",
@@ -1847,8 +2702,8 @@
           {
             "id": "nh3ht3db",
             "type": "tap",
-            "x": 900,
-            "y": 57,
+            "x": 1100,
+            "y": 80,
             "params": {
               "target": "pos",
               "x": 1773,
@@ -1860,8 +2715,8 @@
           {
             "id": "njhgnryu",
             "type": "loop",
-            "x": 900,
-            "y": -100,
+            "x": 1100,
+            "y": -82,
             "params": {
               "infinite": false,
               "count": 2
@@ -1871,8 +2726,8 @@
           {
             "id": "ns3gq6f6",
             "type": "tap_image",
-            "x": 1100,
-            "y": -82,
+            "x": 1300,
+            "y": -64,
             "params": {
               "template": "templates/crop_20260913_224454_1207_745_127_21.png",
               "taps": "1",
@@ -1886,8 +2741,8 @@
           {
             "id": "nxrt2esd",
             "type": "tap",
-            "x": 1100,
-            "y": -2,
+            "x": 1300,
+            "y": 20,
             "params": {
               "target": "pos",
               "x": 1773,
@@ -1899,26 +2754,85 @@
           {
             "id": "ndrup0tb",
             "type": "call",
-            "x": 1300,
-            "y": -2,
+            "x": 1500,
+            "y": 20,
             "params": {
               "fn": "fn_pmuop"
             },
             "delayBefore": 1
           },
           {
-            "id": "nlizj8dg",
-            "type": "swipe",
-            "x": 700,
-            "y": -20,
+            "id": "ngan8yxr",
+            "type": "tap_image",
+            "x": 264,
+            "y": -372,
             "params": {
-              "x1": 442,
-              "y1": 318,
-              "x2": 442,
-              "y2": 500,
-              "duration": 300
+              "template": "templates/crop_20260715_063913_1625_47_38_25.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "n8bnp7dc",
+            "type": "tap_image",
+            "x": 664,
+            "y": -356,
+            "params": {
+              "template": "templates/crop_20260716_152607_1631_997_108_18.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nf801zfa",
+            "type": "call",
+            "x": 864,
+            "y": -356,
+            "params": {
+              "fn": "fn_ursje"
             },
-            "delayBefore": 5
+            "delayBefore": 1
+          },
+          {
+            "id": "n4wr54se",
+            "type": "if_image",
+            "x": 464,
+            "y": -372,
+            "params": {
+              "template": "templates/crop_20260903_142311_278_38_275_34.png",
+              "threshold": 0.85,
+              "negate": true
+            },
+            "delayBefore": 1,
+            "delayAfter": 1
+          },
+          {
+            "id": "nhev9yck",
+            "type": "call",
+            "x": 1072,
+            "y": -356,
+            "params": {
+              "fn": "fn_pmuop"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "n2tingqj",
+            "type": "loop_until_image",
+            "x": 496,
+            "y": -98,
+            "params": {
+              "template": "templates/crop_20260913_224207_327_370_89_18.png",
+              "threshold": 0.85,
+              "maxLoops": 0
+            },
+            "delayBefore": 1
           }
         ],
         "edges": [
@@ -1926,16 +2840,6 @@
             "from": "nltchzy6",
             "fromPort": "out",
             "to": "n73ra5w8"
-          },
-          {
-            "from": "n73ra5w8",
-            "fromPort": "true",
-            "to": "nk1el0l5"
-          },
-          {
-            "from": "nk1el0l5",
-            "fromPort": "true",
-            "to": "nu7rhzzr"
           },
           {
             "from": "nxekbssc",
@@ -1946,11 +2850,6 @@
             "from": "njhgnryu",
             "fromPort": "body",
             "to": "nxekbssc"
-          },
-          {
-            "from": "nu7rhzzr",
-            "fromPort": "out",
-            "to": "nssgtef4"
           },
           {
             "from": "nssgtef4",
@@ -1984,17 +2883,83 @@
             "to": "nz4uoe64"
           },
           {
-            "from": "nssgtef4",
-            "fromPort": "false",
-            "to": "nlizj8dg"
+            "from": "n8bnp7dc",
+            "fromPort": "true",
+            "to": "nf801zfa"
           },
           {
-            "from": "nlizj8dg",
+            "from": "ngan8yxr",
+            "fromPort": "true",
+            "to": "n4wr54se"
+          },
+          {
+            "from": "n4wr54se",
+            "fromPort": "true",
+            "to": "ngan8yxr"
+          },
+          {
+            "from": "n4wr54se",
+            "fromPort": "false",
+            "to": "n8bnp7dc"
+          },
+          {
+            "from": "n73ra5w8",
+            "fromPort": "true",
+            "to": "ngan8yxr"
+          },
+          {
+            "from": "nf801zfa",
+            "fromPort": "true",
+            "to": "nhev9yck"
+          },
+          {
+            "from": "nf801zfa",
+            "fromPort": "false",
+            "to": "nhev9yck"
+          },
+          {
+            "from": "n8bnp7dc",
+            "fromPort": "false",
+            "to": "nhev9yck"
+          },
+          {
+            "from": "nhev9yck",
+            "fromPort": "true",
+            "to": "nk1el0l5"
+          },
+          {
+            "from": "nk1el0l5",
+            "fromPort": "true",
+            "to": "n2tingqj"
+          },
+          {
+            "from": "n2tingqj",
+            "fromPort": "body",
+            "to": "nu7rhzzr"
+          },
+          {
+            "from": "nu7rhzzr",
             "fromPort": "out",
+            "to": "n2tingqj",
+            "toPort": "loop"
+          },
+          {
+            "from": "n2tingqj",
+            "fromPort": "found",
             "to": "nssgtef4"
           }
         ],
-        "groups": []
+        "groups": [
+          {
+            "id": "gm4gs9fk",
+            "name": "Nhận Thư",
+            "x": 240,
+            "y": -420,
+            "w": 1060,
+            "h": 160,
+            "color": 0
+          }
+        ]
       },
       "maxRetries": 1
     },
@@ -2005,18 +2970,15 @@
       "enabled": true,
       "vars": [
         {
-          "name": "normal",
-          "label": "Normal",
-          "type": "bool",
-          "value": false,
-          "options": []
-        },
-        {
-          "name": "challenge",
-          "label": "Challenge",
-          "type": "bool",
-          "value": true,
-          "options": []
+          "name": "type",
+          "label": "Type",
+          "type": "select",
+          "value": "Challenge",
+          "options": [
+            "Normal",
+            "Challenge"
+          ],
+          "multiple": false
         }
       ],
       "graph": {
@@ -2031,8 +2993,8 @@
           {
             "id": "nj0k3fg2",
             "type": "end",
-            "x": 206,
-            "y": -300,
+            "x": 1980,
+            "y": 163,
             "params": {}
           },
           {
@@ -2073,24 +3035,12 @@
             "delayBefore": 1
           },
           {
-            "id": "nox1hgam",
-            "type": "if_image",
-            "x": 744,
-            "y": -132,
-            "params": {
-              "template": "templates/crop_20260913_223356_1649_953_114_84.png",
-              "threshold": 0.85,
-              "negate": false
-            },
-            "delayBefore": 1
-          },
-          {
             "id": "n6ynqp48",
             "type": "tap_image",
             "x": 944,
             "y": -132,
             "params": {
-              "template": "templates/crop_20260913_223356_1649_953_114_84.png",
+              "template": "templates/crop_20260915_100326_1658_962_93_42.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
@@ -2171,24 +3121,12 @@
             "delayBefore": 1
           },
           {
-            "id": "niok96hy",
-            "type": "if_image",
-            "x": 744,
-            "y": 148,
-            "params": {
-              "template": "templates/crop_20260913_223356_1649_953_114_84.png",
-              "threshold": 0.85,
-              "negate": false
-            },
-            "delayBefore": 1
-          },
-          {
             "id": "nxi5zyqa",
             "type": "tap_image",
             "x": 944,
             "y": 148,
             "params": {
-              "template": "templates/crop_20260913_223356_1649_953_114_84.png",
+              "template": "templates/crop_20260915_100326_1658_962_93_42.png",
               "taps": "1",
               "threshold": 0.85,
               "timeout": 10,
@@ -2319,9 +3257,9 @@
             "x": 120,
             "y": 220,
             "params": {
-              "name": "normal",
-              "op": "==",
-              "value": "true"
+              "name": "type",
+              "op": "contains",
+              "value": "Normal"
             },
             "delayBefore": 1
           },
@@ -2331,9 +3269,9 @@
             "x": 120,
             "y": 300,
             "params": {
-              "name": "challenge",
-              "op": "==",
-              "value": "true"
+              "name": "type",
+              "op": "contains",
+              "value": "Challenge"
             },
             "delayBefore": 1
           },
@@ -2394,6 +3332,30 @@
               "taps": "1"
             },
             "delayBefore": 3
+          },
+          {
+            "id": "nssid9rx",
+            "type": "wait_image",
+            "x": 744,
+            "y": 148,
+            "params": {
+              "template": "templates/crop_20260915_100326_1658_962_93_42.png",
+              "threshold": 0.85,
+              "timeout": 10,
+              "negate": false
+            }
+          },
+          {
+            "id": "na8xhw8d",
+            "type": "wait_image",
+            "x": 744,
+            "y": -132,
+            "params": {
+              "template": "templates/crop_20260915_100326_1658_962_93_42.png",
+              "threshold": 0.85,
+              "timeout": 10,
+              "negate": false
+            }
           }
         ],
         "edges": [
@@ -2406,16 +3368,6 @@
             "from": "nm9h0i5l",
             "fromPort": "true",
             "to": "nnacflgw"
-          },
-          {
-            "from": "n6omcv7m",
-            "fromPort": "out",
-            "to": "nox1hgam"
-          },
-          {
-            "from": "nox1hgam",
-            "fromPort": "true",
-            "to": "n6ynqp48"
           },
           {
             "from": "n6ynqp48",
@@ -2438,16 +3390,6 @@
             "to": "ns3k8f5s"
           },
           {
-            "from": "n1j8so0z",
-            "fromPort": "out",
-            "to": "niok96hy"
-          },
-          {
-            "from": "niok96hy",
-            "fromPort": "true",
-            "to": "nxi5zyqa"
-          },
-          {
             "from": "nxi5zyqa",
             "fromPort": "true",
             "to": "n1lgyz1d"
@@ -2466,11 +3408,6 @@
             "from": "nnm8uotf",
             "fromPort": "true",
             "to": "n1y0i576"
-          },
-          {
-            "from": "nox1hgam",
-            "fromPort": "false",
-            "to": "np0kfj9u"
           },
           {
             "from": "np0kfj9u",
@@ -2508,11 +3445,6 @@
             "to": "nuaacsgs"
           },
           {
-            "from": "niok96hy",
-            "fromPort": "false",
-            "to": "nvko9bm3"
-          },
-          {
             "from": "n7jeatem",
             "fromPort": "true",
             "to": "n6omcv7m"
@@ -2526,6 +3458,56 @@
             "from": "nukz6sxe",
             "fromPort": "true",
             "to": "n1j8so0z"
+          },
+          {
+            "from": "n1j8so0z",
+            "fromPort": "out",
+            "to": "nssid9rx"
+          },
+          {
+            "from": "nssid9rx",
+            "fromPort": "true",
+            "to": "nxi5zyqa"
+          },
+          {
+            "from": "nssid9rx",
+            "fromPort": "false",
+            "to": "nvko9bm3"
+          },
+          {
+            "from": "n6omcv7m",
+            "fromPort": "out",
+            "to": "na8xhw8d"
+          },
+          {
+            "from": "na8xhw8d",
+            "fromPort": "true",
+            "to": "n6ynqp48"
+          },
+          {
+            "from": "na8xhw8d",
+            "fromPort": "false",
+            "to": "np0kfj9u"
+          },
+          {
+            "from": "n1y0i576",
+            "fromPort": "true",
+            "to": "nj0k3fg2"
+          },
+          {
+            "from": "nuaacsgs",
+            "fromPort": "out",
+            "to": "nj0k3fg2"
+          },
+          {
+            "from": "nwa4nvki",
+            "fromPort": "out",
+            "to": "nj0k3fg2"
+          },
+          {
+            "from": "ns3k8f5s",
+            "fromPort": "true",
+            "to": "nj0k3fg2"
           }
         ],
         "groups": [
@@ -2552,531 +3534,10 @@
       "maxRetries": 1
     },
     {
-      "id": "sequence_3whp",
-      "name": "Claim Gluppy",
-      "type": "sequence",
-      "enabled": true,
-      "vars": [],
-      "graph": {
-        "nodes": [
-          {
-            "id": "n0kjvi2x",
-            "type": "start",
-            "x": -320,
-            "y": 120,
-            "params": {}
-          },
-          {
-            "id": "nxzi0ikl",
-            "type": "tap",
-            "x": 540,
-            "y": 105,
-            "params": {
-              "target": "pos",
-              "x": 1413,
-              "y": 886,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "nwhex63x",
-            "type": "if_image",
-            "x": 340,
-            "y": 105,
-            "params": {
-              "template": "templates/crop_20260911_103126_1393_873_40_26.png",
-              "threshold": 0.85,
-              "negate": false,
-              "regionX": 0,
-              "regionY": 0,
-              "regionW": 0,
-              "regionH": 0
-            },
-            "delayBefore": 10,
-            "delayAfter": 1
-          },
-          {
-            "id": "nslp72tj",
-            "type": "call",
-            "x": -260,
-            "y": 105,
-            "params": {
-              "fn": "fn_pmuop"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "nsyzja63",
-            "type": "tap",
-            "x": -60,
-            "y": 105,
-            "params": {
-              "target": "pos",
-              "x": 1707,
-              "y": 978,
-              "taps": "1"
-            },
-            "delayBefore": 1
-          },
-          {
-            "id": "nx2aejhp",
-            "type": "end",
-            "x": 760,
-            "y": 120,
-            "params": {},
-            "delayBefore": 1
-          },
-          {
-            "id": "nuzrs922",
-            "type": "tap_image",
-            "x": 140,
-            "y": 105,
-            "params": {
-              "template": "templates/crop_20260912_192923_212_255_126_41.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 10,
-              "offsetX": 0,
-              "offsetY": 0
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          }
-        ],
-        "edges": [
-          {
-            "from": "nwhex63x",
-            "fromPort": "true",
-            "to": "nxzi0ikl"
-          },
-          {
-            "from": "n0kjvi2x",
-            "fromPort": "out",
-            "to": "nslp72tj"
-          },
-          {
-            "from": "nslp72tj",
-            "fromPort": "true",
-            "to": "nsyzja63"
-          },
-          {
-            "from": "nxzi0ikl",
-            "fromPort": "out",
-            "to": "nx2aejhp"
-          },
-          {
-            "from": "nwhex63x",
-            "fromPort": "false",
-            "to": "nx2aejhp"
-          },
-          {
-            "from": "nsyzja63",
-            "fromPort": "out",
-            "to": "nuzrs922"
-          },
-          {
-            "from": "nuzrs922",
-            "fromPort": "true",
-            "to": "nwhex63x"
-          }
-        ],
-        "groups": []
-      },
-      "maxRetries": 1
-    },
-    {
-      "id": "sequence_m8k3",
-      "name": "PvP",
-      "type": "sequence",
-      "enabled": true,
-      "vars": [],
-      "graph": {
-        "nodes": [
-          {
-            "id": "nsnuysf0",
-            "type": "start",
-            "x": 48,
-            "y": 72,
-            "params": {}
-          },
-          {
-            "id": "nley008w",
-            "type": "call",
-            "x": 120,
-            "y": 57,
-            "params": {
-              "fn": "fn_pmuop"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "nt09wo02",
-            "type": "tap_random",
-            "x": 1700,
-            "y": 1040,
-            "params": {
-              "x1": 0,
-              "y1": 0,
-              "x2": 100,
-              "y2": 100
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "nmabn4ky",
-            "type": "tap",
-            "x": 320,
-            "y": 57,
-            "params": {
-              "target": "pos",
-              "x": 1692,
-              "y": 964,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "ng1t5mh6",
-            "type": "tap_image",
-            "x": 520,
-            "y": 57,
-            "params": {
-              "template": "templates/crop_20260912_192923_212_255_126_41.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 10,
-              "offsetX": 0,
-              "offsetY": 0
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "nbu1nf5x",
-            "type": "if_image",
-            "x": 720,
-            "y": -20,
-            "params": {
-              "template": "templates/crop_20260912_192951_915_996_92_17.png",
-              "threshold": 0.85,
-              "negate": false
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "nqsej3ht",
-            "type": "tap_image",
-            "x": 920,
-            "y": -20,
-            "params": {
-              "template": "templates/crop_20260912_192951_915_996_92_17.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 10,
-              "offsetX": 0,
-              "offsetY": 0
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "na80q7s4",
-            "type": "win_key",
-            "x": 920,
-            "y": 80,
-            "params": {
-              "keycode": "37",
-              "mode": "press",
-              "hold": 400
-            },
-            "delayBefore": 5,
-            "delayAfter": 1
-          },
-          {
-            "id": "ne6kvbjy",
-            "type": "win_key",
-            "x": 920,
-            "y": 160,
-            "params": {
-              "keycode": "40",
-              "mode": "press",
-              "hold": 400
-            },
-            "delayBefore": 3,
-            "delayAfter": 1
-          },
-          {
-            "id": "npx7h2zd",
-            "type": "tap_image",
-            "x": 1120,
-            "y": 160,
-            "params": {
-              "template": "templates/crop_20260913_214100_1713_963_103_45.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 10,
-              "offsetX": 0,
-              "offsetY": 0
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "n9xk68fw",
-            "type": "tap",
-            "x": 1554,
-            "y": 160,
-            "params": {
-              "target": "pos",
-              "x": 1491,
-              "y": 52,
-              "taps": "1"
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "nj8ys5nw",
-            "type": "if_image",
-            "x": 1320,
-            "y": 160,
-            "params": {
-              "template": "templates/crop_20260913_214159_1701_997_58_26.png",
-              "threshold": 0.85,
-              "negate": true
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "naw969hn",
-            "type": "tap_image",
-            "x": 1554,
-            "y": 240,
-            "params": {
-              "template": "templates/crop_20260913_214159_1701_997_58_26.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 10,
-              "offsetX": 0,
-              "offsetY": 0
-            },
-            "delayBefore": 1,
-            "delayAfter": 1
-          },
-          {
-            "id": "n231q4cq",
-            "type": "end",
-            "x": 1746,
-            "y": 255,
-            "params": {},
-            "delayBefore": 1,
-            "delayAfter": 1
-          }
-        ],
-        "edges": [
-          {
-            "from": "nsnuysf0",
-            "fromPort": "out",
-            "to": "nley008w"
-          },
-          {
-            "from": "nley008w",
-            "fromPort": "true",
-            "to": "nmabn4ky"
-          },
-          {
-            "from": "nmabn4ky",
-            "fromPort": "out",
-            "to": "ng1t5mh6"
-          },
-          {
-            "from": "ng1t5mh6",
-            "fromPort": "true",
-            "to": "nbu1nf5x"
-          },
-          {
-            "from": "nbu1nf5x",
-            "fromPort": "true",
-            "to": "nqsej3ht"
-          },
-          {
-            "from": "na80q7s4",
-            "fromPort": "out",
-            "to": "ne6kvbjy"
-          },
-          {
-            "from": "nbu1nf5x",
-            "fromPort": "false",
-            "to": "na80q7s4"
-          },
-          {
-            "from": "nqsej3ht",
-            "fromPort": "true",
-            "to": "na80q7s4"
-          },
-          {
-            "from": "ne6kvbjy",
-            "fromPort": "out",
-            "to": "npx7h2zd"
-          },
-          {
-            "from": "npx7h2zd",
-            "fromPort": "true",
-            "to": "nj8ys5nw"
-          },
-          {
-            "from": "nj8ys5nw",
-            "fromPort": "true",
-            "to": "n9xk68fw"
-          },
-          {
-            "from": "n9xk68fw",
-            "fromPort": "out",
-            "to": "nj8ys5nw"
-          },
-          {
-            "from": "nj8ys5nw",
-            "fromPort": "false",
-            "to": "naw969hn"
-          },
-          {
-            "from": "naw969hn",
-            "fromPort": "true",
-            "to": "n231q4cq"
-          }
-        ],
-        "groups": []
-      },
-      "maxRetries": 1
-    },
-    {
-      "id": "sequence_1gpb",
-      "name": "Wish At Goddes",
-      "type": "sequence",
-      "enabled": true,
-      "vars": [],
-      "graph": {
-        "nodes": [
-          {
-            "id": "nzadxdom",
-            "type": "start",
-            "x": 20,
-            "y": -85,
-            "params": {}
-          },
-          {
-            "id": "nylnmi2r",
-            "type": "end",
-            "x": 1520,
-            "y": 13,
-            "params": {}
-          },
-          {
-            "id": "nxhx9m6n",
-            "type": "call",
-            "x": 100,
-            "y": -100,
-            "params": {
-              "fn": "fn_pmuop"
-            },
-            "delayBefore": 1
-          },
-          {
-            "id": "negr10zf",
-            "type": "tap",
-            "x": 300,
-            "y": -100,
-            "params": {
-              "target": "pos",
-              "x": 1712,
-              "y": 972,
-              "taps": "1"
-            },
-            "delayBefore": 1
-          },
-          {
-            "id": "ndqrxtu2",
-            "type": "tap_image",
-            "x": 500,
-            "y": -100,
-            "params": {
-              "template": "templates/crop_20260914_085743_488_526_123_33.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 10,
-              "offsetX": 0,
-              "offsetY": 0
-            },
-            "delayBefore": 1
-          },
-          {
-            "id": "nk8a5yzp",
-            "type": "tap_image",
-            "x": 700,
-            "y": -100,
-            "params": {
-              "template": "templates/crop_20260914_085824_1384_869_53_35.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 300,
-              "offsetX": 0,
-              "offsetY": 0
-            },
-            "delayBefore": 1
-          },
-          {
-            "id": "nifnbbfx",
-            "type": "end",
-            "x": 920,
-            "y": -85,
-            "params": {},
-            "delayBefore": 1
-          }
-        ],
-        "edges": [
-          {
-            "from": "nzadxdom",
-            "fromPort": "out",
-            "to": "nxhx9m6n"
-          },
-          {
-            "from": "nxhx9m6n",
-            "fromPort": "true",
-            "to": "negr10zf"
-          },
-          {
-            "from": "negr10zf",
-            "fromPort": "out",
-            "to": "ndqrxtu2"
-          },
-          {
-            "from": "ndqrxtu2",
-            "fromPort": "true",
-            "to": "nk8a5yzp"
-          },
-          {
-            "from": "nk8a5yzp",
-            "fromPort": "true",
-            "to": "nifnbbfx"
-          }
-        ],
-        "groups": []
-      },
-      "maxRetries": 1
-    },
-    {
       "id": "sequence_7qou",
       "name": "Guild",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -3158,8 +3619,8 @@
           {
             "id": "nzdjms39",
             "type": "end",
-            "x": 1006,
-            "y": 315,
+            "x": 1160,
+            "y": 375,
             "params": {}
           },
           {
@@ -3336,7 +3797,7 @@
             "id": "n0fph5ol",
             "type": "tap",
             "x": 740,
-            "y": 300,
+            "y": 360,
             "params": {
               "target": "pos",
               "x": 170,
@@ -3345,6 +3806,15 @@
             },
             "delayBefore": 1,
             "delayAfter": 1
+          },
+          {
+            "id": "n6fswe0b",
+            "type": "call",
+            "x": 940,
+            "y": 360,
+            "params": {
+              "fn": "fn_pmuop"
+            }
           }
         ],
         "edges": [
@@ -3419,14 +3889,19 @@
             "to": "nu6h932s"
           },
           {
-            "from": "n0fph5ol",
-            "fromPort": "out",
-            "to": "nzdjms39"
+            "from": "nfqykdw1",
+            "fromPort": "end",
+            "to": "n0fph5ol"
           },
           {
-            "from": "nfqykdw1",
-            "fromPort": "5",
-            "to": "n0fph5ol"
+            "from": "n0fph5ol",
+            "fromPort": "out",
+            "to": "n6fswe0b"
+          },
+          {
+            "from": "n6fswe0b",
+            "fromPort": "true",
+            "to": "nzdjms39"
           }
         ],
         "groups": []
@@ -3451,7 +3926,7 @@
           {
             "id": "nmuw42ke",
             "type": "end",
-            "x": 940,
+            "x": 1120,
             "y": 175,
             "params": {}
           },
@@ -3549,6 +4024,15 @@
             },
             "delayBefore": 1,
             "delayAfter": 1
+          },
+          {
+            "id": "nkhvsiag",
+            "type": "call",
+            "x": 920,
+            "y": 160,
+            "params": {
+              "fn": "fn_pmuop"
+            }
           }
         ],
         "edges": [
@@ -3590,6 +4074,11 @@
           {
             "from": "nfup8gdi",
             "fromPort": "out",
+            "to": "nkhvsiag"
+          },
+          {
+            "from": "nkhvsiag",
+            "fromPort": "true",
             "to": "nmuw42ke"
           }
         ],

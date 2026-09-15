@@ -436,7 +436,6 @@ function wfRenderCanvas(){
   empty.style.display="none";
   wfRenderGroups();   // frames behind the nodes
   g.nodes.forEach(n=>world.appendChild(wfNodeEl(n)));
-  wfReflowStacks();   // snap merged blocks flush (needs nodes in the DOM)
   wfDrawWires();
   wfMarkDefaultEntry();  // pill above the block that start.out points to
   wfReapplyRunViz();   // keep the run-trail across redraws (maps are empty before any run — always safe)
@@ -481,7 +480,90 @@ function wfAllVarNames(){
   (WF.functions||[]).forEach(fn=>{ wfGraphVarNames(fn.graph).forEach(n=>s.add(n)); });
   return [...s].sort();
 }
+let wfVarsScope="local";
+const wfVarsExpanded=new WeakSet();
+function wfVarsDockSetup(){
+  const panel=$("wf-vars-panel"), act=$("wf-act-panel");
+  if(!panel||!act||$("wf-variable-dock")) return;
+  const dock=document.createElement("div"); dock.id="wf-variable-dock";
+  act.before(dock); dock.append(act);
+  const resize=document.createElement("div"); resize.id="wf-vars-resizer";
+  resize.tabIndex=0; resize.setAttribute("role","separator"); resize.setAttribute("aria-orientation","vertical");
+  resize.setAttribute("aria-label","Resize variables panel");
+  dock.append(resize,panel);
+  panel.classList.remove("pnl-flush");
+  const setWidth=w=>{ w=Math.max(250,Math.min(520,w)); dock.style.setProperty("--vars-width",w+"px"); resize.setAttribute("aria-valuenow",String(w)); try{localStorage.setItem("wfVarsWidth",w);}catch{} };
+  let width=330; try{ width=Number(localStorage.getItem("wfVarsWidth"))||330; localStorage.removeItem("wfVarsHidden"); }catch{}
+  setWidth(width);
+  resize.onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); resize.setPointerCapture(e.pointerId); const x=e.clientX,w=panel.getBoundingClientRect().width;
+    resize.onpointermove=ev=>setWidth(w+x-ev.clientX);
+    resize.onpointerup=()=>{ resize.onpointermove=null; }; };
+  resize.onkeydown=e=>{if(e.key==="ArrowLeft"||e.key==="ArrowRight"){e.preventDefault();setWidth(panel.getBoundingClientRect().width+(e.key==="ArrowLeft"?20:-20));}};
+  dock.addEventListener("mousedown",e=>e.stopPropagation());
+  dock.addEventListener("wheel",e=>e.stopPropagation());
+}
+function wfVarsDockToggle(show){
+  if(show===undefined) show=wfVarsCollapsed;
+  wfVarsCollapsed=!show;
+  const panel=$("wf-vars-panel"), toggle=$("wf-vars-collapse");
+  if(panel) panel.classList.toggle("collapsed",wfVarsCollapsed);
+  if(toggle) toggle.setAttribute("aria-expanded",String(show));
+  wfPersistPanelState();
+}
 function wfRenderVarsPanel(){
+  wfVarsDockSetup();
+  const body=$("wf-vars-body"); if(!body) return;
+  // Preserve an active editor while typing or receiving live-value updates.
+  if(body.contains(document.activeElement)&&document.activeElement.matches("input,select")) return;
+  const expandedScroll=body.scrollTop;
+  body.replaceChildren();
+  const panel=$("wf-vars-panel"); panel.classList.toggle("collapsed",wfVarsCollapsed);
+  $("wf-vars-collapse").setAttribute("aria-expanded",String(!wfVarsCollapsed));
+  panel.classList.toggle("live",Object.keys(wfLiveVars).length>0);
+  const act=wfCurAct();
+  const tabs=document.createElement("div"); tabs.className="wf-vars-tabs";
+  ["local","global"].forEach(scope=>{const b=document.createElement("button");b.type="button";b.textContent=scope==="local"?"Local":"Global";
+    b.className="btn sm"+(wfVarsScope===scope?" active":"");b.setAttribute("aria-pressed",String(wfVarsScope===scope));
+    b.onclick=()=>{wfVarsScope=scope;wfRenderVarsPanel();};tabs.append(b);});
+  body.append(tabs);
+  const context=document.createElement("div");context.className="wf-vars-context";
+  context.textContent=wfVarsScope==="global"?"Shared across all activities":act?(act.name||"Activity"):"Select an activity to edit local variables";body.append(context);
+  const vars=wfVarsScope==="global"?(WF.globals||[]):(act&&act.vars||[]);
+  $("wf-vars-count").textContent=String(vars.length);
+  function rows(list,depth=0,prefix=""){
+    list.forEach((v,index)=>{
+      const details=document.createElement("details");details.className="wf-variable-item";details.open=wfVarsExpanded.has(v);
+      details.style.marginLeft=(depth*12)+"px";
+      const summary=document.createElement("summary");
+      const name=document.createElement("span");name.className="wf-variable-name";name.textContent=v.label||v.name;
+      const type=document.createElement("span");type.className="wf-variable-type";type.textContent=v.type||"bool";
+      const value=document.createElement("span");value.className="wf-variable-value";
+      const full=prefix?prefix+"."+v.name:v.name;
+      const current=Object.hasOwn(wfLiveVars,full)?wfLiveVars[full]:v.value;
+      value.textContent=Array.isArray(current)?current.join(", ")||"None":String(current??"");value.title=value.textContent;
+      summary.append(name,type,value);details.append(summary);
+      const render=()=>{document.activeElement?.blur();wfRenderVarsPanel();};
+      function edit(){
+        if(details.children.length>1) return;
+        const card=wfVarsScope==="global"?wfGlobRow(v,index,render):wfLocalRow(act,v,index,render);
+        const del=card.querySelector(".wf-glob-del");del.onclick=()=>{wfPushUndoDebounced();list.splice(index,1);render();};
+        details.append(card);
+      }
+      details.ontoggle=()=>{if(details.open){wfVarsExpanded.add(v);edit();}else wfVarsExpanded.delete(v);};
+      if(details.open) edit();body.append(details);
+      if(v.children&&v.children.length) rows(v.children,depth+1,full);
+    });
+  }
+  rows(vars);
+  if(!vars.length){const empty=document.createElement("div");empty.className="wf-vars-empty";empty.textContent="No variables yet. Add one to configure this workflow.";body.append(empty);}
+  const add=document.createElement("button");add.type="button";add.className="btn sm";add.textContent="+ Add variable";
+  add.disabled=wfVarsScope==="local"&&!act;add.onclick=()=>wfVarsScope==="global"?wfAddQuickGlobal():wfAddQuickLocal();body.append(add);
+  const extra=Object.entries(wfLiveVars).filter(([name])=>!vars.some(v=>v.name===name));
+  if(extra.length){const title=document.createElement("div");title.className="wf-vars-context";title.textContent="Runtime variables";body.append(title);
+    extra.forEach(([name,value])=>{const row=document.createElement("div");row.className="wf-var-row-live";row.textContent=name+" = "+String(value);body.append(row);});}
+  body.scrollTop=expandedScroll;
+}
+function wfRenderVarsPanelLegacy(){
   const panel=$("wf-vars-panel"); if(!panel) return;
   const body=$("wf-vars-body"); if(!body) return;
   panel.classList.toggle("collapsed", wfVarsCollapsed);
@@ -592,6 +674,10 @@ function wfAddQuickLocal(){
 // Activity-local variables editor (mirrors the global editor, scoped to the
 // current activity). Click a Local row or add via "+" → Local.
 function wfShowLocalsEditor(){
+  wfVarsScope="local"; const act=wfCurAct(); if(act&&act.vars?.length) wfVarsExpanded.add(act.vars[act.vars.length-1]);
+  wfVarsDockToggle(true); wfRenderVarsPanel();
+}
+function wfShowLocalsEditorLegacy(){
   wfHideGlobsEditor();
   const act=typeof wfCurAct==="function"?wfCurAct():null;
   if(!act){ if(typeof uiToast==="function") uiToast("Select an activity first.","warning"); return; }
@@ -666,13 +752,9 @@ function wfLocalRow(act,v,idx,render){
   };
   r2.appendChild(ty);
   card.appendChild(r2);
-  card.appendChild(wfVarValue(v));
+  if(v.type!=="select") card.appendChild(wfVarValue(v));
   if(v.type==="select"){
-    const r3=document.createElement("div"); r3.className="wf-var-row";
-    const l=document.createElement("label"); l.textContent="options"; l.style.fontSize="10px"; r3.appendChild(l);
-    const opt=document.createElement("input"); opt.type="text"; opt.value=(v.options||[]).join(", "); opt.placeholder="A, B, C"; opt.style.flex="1"; opt.style.minWidth="0"; opt.style.fontSize="10px";
-    opt.onchange=()=>{ wfPushUndoDebounced(); v.options=opt.value.split(",").map(s=>s.trim()).filter(Boolean); if(!v.options.includes(v.value)) v.value=v.options[0]||""; render(); wfRenderVarsPanel(); };
-    r3.appendChild(opt); card.appendChild(r3);
+    card.appendChild(wfVarOptionsEditor(v));
   }
   return card;
 }
@@ -701,6 +783,10 @@ function wfToggleGlobsEditor(){
 }
 function wfHideGlobsEditor(){ const p=document.getElementById("wf-globs-pop"); if(p) p.remove(); wfGlobsOpen=false; }
 function wfShowGlobsEditor(){
+  wfVarsScope="global"; if(WF.globals?.length) wfVarsExpanded.add(WF.globals[WF.globals.length-1]);
+  wfVarsDockToggle(true); wfRenderVarsPanel();
+}
+function wfShowGlobsEditorLegacy(){
   wfHideGlobsEditor();
   if(!Array.isArray(WF.globals)) WF.globals=[];
   const pop=document.createElement("div"); pop.id="wf-globs-pop"; pop.className="wf-globs-pop";
@@ -902,12 +988,6 @@ function wfNodeEl(n){
   else if(def.kind==="loop_until") dynOutCount=3;   // body/found/fail — grow the card
   if(dynOutCount>2)
     el.style.minHeight=Math.max(WF_CARD_H, WF_ROW_TOP + (dynOutCount-1)*WF_PORT_GAP + WF_PORT_SZ + 12)+"px";
-  // Merged-block membership: hide the join port at the joined edge and flatten
-  // that corner so the stack reads as one block.
-  const intIn = n.stack ? wfHasInternalIn(n) : false;
-  const intOut = n.stack ? wfHasInternalOut(n) : false;
-  if(n.stack){ el.classList.add("wf-stacked");
-    if(intIn) el.classList.add("wf-stk-jtop"); if(intOut) el.classList.add("wf-stk-jbot"); }
   // A call node shows the referenced function's name as its title.
   let title=def.label, sum="";
   if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?fn.name:"(no function selected)";
@@ -979,8 +1059,7 @@ function wfNodeEl(n){
   // from the case list: c0..c{n-1} (one per case, including "else") + the
   // shared "default" fallback port.
   let outs;
-  if(intOut) outs=[];
-  else if(n.type==="switch") outs=((n.params&&n.params.cases)||[]).map((_,i)=>"c"+i).concat(["default"]);
+  if(n.type==="switch") outs=((n.params&&n.params.cases)||[]).map((_,i)=>"c"+i).concat(["default"]);
   else if(n.type==="try_chain") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1)).concat(["fail"]);
   else if(n.type==="parallel"||n.type==="random_branch") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||(n.type==="parallel"?3:2))},(_,i)=>String(i+1));
   else if(n.type==="sequence") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1)).concat(["end"]);
@@ -1013,7 +1092,7 @@ function wfNodeEl(n){
   // input ports (start has none; note floats).
   // Most nodes have a single 'in'; the loop also exposes a 'loop' (loop-back)
   // input below it so the wire that re-enters the loop lands on its own port.
-  if(def.kind!=="start" && def.kind!=="note" && !intIn){
+  if(def.kind!=="start" && def.kind!=="note"){
     const ins=wfIns(n.type);
     ins.forEach((port,i)=>{
       const top = inTop(i);

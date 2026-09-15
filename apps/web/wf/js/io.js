@@ -1,6 +1,6 @@
 // ── Export / import / run ────────────────────────────────────────────────────
-function wfSerialVars(vars){ return vars.map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[], children:v.children&&v.children.length?wfSerialVars(v.children):undefined})); }
-function wfHydVars(vars){ return (vars||[]).map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[], children:v.children?wfHydVars(v.children):[]})); }
+function wfSerialVars(vars){ return vars.map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[], multiple:v.type==="select"&&v.display==="toggle-group"&&!!v.multiple, display:v.type==="select"&&v.display==="toggle-group"?"toggle-group":undefined, children:v.children&&v.children.length?wfSerialVars(v.children):undefined})); }
+function wfHydVars(vars){ return (vars||[]).map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[], multiple:v.type==="select"&&v.display==="toggle-group"&&!!v.multiple, display:v.display==="toggle-group"?"toggle-group":"dropdown", children:v.children?wfHydVars(v.children):[]})); }
 // Project-wide node defaults — kept to the fields wfNewNode stamps, so an older
 // file just yields zeros (no defaults) instead of a broken object.
 function wfSerialNodeDefaults(d){
@@ -17,7 +17,7 @@ function wfHydNodeDefaults(d){
 }
 function wfCleanGraph(g){
   return {
-    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.outputLog) o.outputLog=n.outputLog; if(n.delayBefore) o.delayBefore=n.delayBefore; if(n.delayAfter) o.delayAfter=n.delayAfter; if(n.retryCount) o.retryCount=n.retryCount; if(n.retryDelay) o.retryDelay=n.retryDelay; if(n.screenshotOnFail) o.screenshotOnFail=true; if(n.showPreview) o.showPreview=true; if(n.stack) o.stack=n.stack; return o; }),
+    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.outputLog) o.outputLog=n.outputLog; if(n.delayBefore) o.delayBefore=n.delayBefore; if(n.delayAfter) o.delayAfter=n.delayAfter; if(n.retryCount) o.retryCount=n.retryCount; if(n.retryDelay) o.retryDelay=n.retryDelay; if(n.screenshotOnFail) o.screenshotOnFail=true; if(n.showPreview) o.showPreview=true; return o; }),
     edges:(g.edges||[]).map(e=>{ const o={from:e.from,fromPort:e.fromPort,to:e.to}; if(e.toPort&&e.toPort!=="in") o.toPort=e.toPort; return o; }),
     groups:(g.groups||[]).map(gr=>({id:gr.id,name:gr.name,x:Math.round(gr.x),y:Math.round(gr.y),w:Math.round(gr.w),h:Math.round(gr.h),color:gr.color||0})),
   };
@@ -96,7 +96,6 @@ function wfApplyNodeJson(node, raw){
   if(o.retryDelay!==undefined) node.retryDelay=parseFloat(o.retryDelay)||0;
   if(o.screenshotOnFail!==undefined) node.screenshotOnFail=!!o.screenshotOnFail;
   if(o.showPreview!==undefined) node.showPreview=!!o.showPreview;
-  if(o.stack!==undefined) node.stack=o.stack||null;
   // Keep node.id / x / y unless the paste explicitly provides coords.
   if(o.x!==undefined) node.x=Math.round(o.x)||node.x;
   if(o.y!==undefined) node.y=Math.round(o.y)||node.y;
@@ -188,7 +187,7 @@ function wfHydrateGraph(g){
     return {id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params,note:n.note||"",log:n.log||"",outputLog:n.outputLog||"",
       delayBefore:parseFloat(delayBefore)||0, delayAfter:parseFloat(n.delayAfter)||0,
       retryCount:parseInt(n.retryCount,10)||0, retryDelay:parseFloat(n.retryDelay)||0, screenshotOnFail:!!n.screenshotOnFail,
-      showPreview:!!n.showPreview,stack:n.stack||null};
+      showPreview:!!n.showPreview};
   });
   if(!nodes.some(n=>n.type==="start")) nodes.unshift({id:wfUid(),type:"start",x:40,y:40,params:{}});
   const groups=(g.groups||[]).map(gr=>({id:gr.id||("g"+wfUid().slice(1)),name:gr.name||"Group",x:gr.x||0,y:gr.y||0,w:gr.w||200,h:gr.h||140,color:gr.color||0}));

@@ -14,6 +14,16 @@ Usage (from the project root, with the dev Python that has PyInstaller)::
 The Hub's **Build** button and the Designer's **Build EXE** button shell out to
 exactly this script.
 
+Preflight
+---------
+Everything a build needs is checked *before* PyInstaller starts (:func:`preflight`)
+— the workflow JSON, the spec, PyInstaller itself, the ``vendor/`` tools the
+workflow's graph actually requires, the workflow's own icon, the shared icon set
+(:mod:`packaging.check_icons`), and — when publishing — ``gh``, its login and a
+free release tag. The same report feeds the CLI, the Hub's build dialog and the
+Designer's, so all three refuse the same builds for the same reason, in a second
+instead of after minutes of PyInstaller.
+
 Versions and self-update
 ------------------------
 Every Runner carries its own version and update feed in a bundled
@@ -59,9 +69,12 @@ game folder*. No ``vendor/`` (or an empty one) → neither is produced.
 
 Output protocol
 ---------------
-Lines a caller (Hub / Designer) can parse, all prefixed ``>>``:
+Lines a caller (Hub / Designer / the Designer's own build panel) can parse, all
+prefixed ``>>``:
 
 * ``>> PROGRESS <0-100> <stage>`` — overall progress and the current stage
+* ``>> CHECK <ok|warn|fail> <code>: <message>`` — one preflight result
+* ``>> PREFLIGHT OK`` / ``>> PREFLIGHT FAILED: <summary>``
 * ``>> DONE: <exe path>`` / ``>> RELEASE: <url>`` / ``>> BUILD FAILED: <why>``
 * ``>> REQUIREMENTS: <folder>`` — the build ships game requirements to copy
 * any other ``>> …`` line is a milestone for the log
@@ -121,6 +134,31 @@ def progress(pct: int, stage: str) -> None:
     print(f">> PROGRESS {int(pct)} {stage}", flush=True)
 
 
+def _issue(code: str, level: str, message: str, hint: str = "") -> dict:
+    """One preflight result: ``level`` is ``fail`` (blocks) or ``warn``."""
+    return {"code": code, "level": level, "message": " ".join(str(message).split()),
+            "hint": hint}
+
+
+class PreflightError(RuntimeError):
+    """Raised by :func:`build` when the preflight found a blocking problem.
+
+    Carries the full :func:`preflight` report so a caller that started the build
+    itself (the Hub, the Designer) can show every problem, not just the first.
+    """
+
+    def __init__(self, report: dict) -> None:
+        self.report = report
+        problems = list(report.get("blocking") or []) or ["build preflight failed"]
+        summary = problems[0] if len(problems) == 1 else f"{len(problems)} problems — " + "; ".join(problems)
+        super().__init__(summary)
+        self.summary = summary
+
+
+# Preflight commands (gh, the icon guard) must never hang the caller's UI.
+PREFLIGHT_TIMEOUT = 20.0
+
+
 def _sanitize(raw: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9_\-]+", "_", (raw or "").strip())
     return cleaned.strip("._-") or "Workflow"
@@ -156,6 +194,21 @@ def find_workflow_json(folder: str) -> str | None:
         return os.path.join(folder, lower[f"{base}.json".lower()])
     names.sort(key=str.lower)
     return os.path.join(folder, names[0])
+
+
+def resolve_flow_path(workflow_dir: str, flow_path: str = "") -> str:
+    """The workflow JSON this build bundles and version-stamps.
+
+    An explicit *flow_path* — the file the Hub or the Designer has open — always
+    wins. Without it the folder is guessed at (:func:`find_workflow_json`), which
+    is right for the CLI but wrong for an editor: a folder holding more than one
+    JSON would bundle one workflow and write ``--save-version`` into another.
+    Returns "" when nothing was found, so the caller can explain why.
+    """
+    if flow_path:
+        path = os.path.abspath(flow_path)
+        return path if os.path.isfile(path) else ""
+    return find_workflow_json(workflow_dir) or ""
 
 
 def compute_vendor_needs(flow: dict) -> set[str]:
@@ -396,6 +449,155 @@ def describe_requirements(workflow_dir: str) -> str:
     return f"{len(files)} file(s) from vendor/ → {REQUIREMENTS_DIR}/"
 
 
+# ── Build preflight ───────────────────────────────────────────────────────────
+# What a build needs, checked *before* the slow part. The CLI, the Hub
+# (build_info → build_runner) and the Designer (build_runner_preflight →
+# build_runner_exe) all run this one function, so the three surfaces agree about
+# what may be built and why not.
+
+def preflight(workflow_dir: str, *, flow: dict | None = None, app_name: str = "",
+              version: str = "", repo: str = "", publish: bool = False,
+              dry_run: bool = False, allow_missing_vendor: bool = False,
+              emit: bool = False) -> dict:
+    """Check everything a build needs and report what is missing.
+
+    *flow* may be handed in (the Hub / Designer already have it parsed and the
+    page may hold edits the file doesn't have yet); otherwise the workflow JSON
+    in *workflow_dir* is read. *version* / *repo* follow the same fallbacks a
+    build uses — the argument, then the workflow's own record, then
+    :func:`default_repo` — and are echoed back resolved.
+
+    Returns a JSON-friendly report::
+
+        {"ok": bool, "issues": [{"code", "level", "message", "hint"}],
+         "blocking": [str], "warnings": [str],
+         "appName": str, "version": str, "repo": str, "tag": str,
+         "vendor": [str], "missingVendor": [str],
+         "iconSource": str, "requirements": [str]}
+
+    *emit* prints one ``>> CHECK <level> <code>: <message>`` line per check plus
+    a ``>> PREFLIGHT OK`` / ``>> PREFLIGHT FAILED: …`` summary, so a subprocess
+    caller (the Hub's build worker, the Designer's log) shows the same reasoning
+    the in-process callers put in their dialogs.
+    """
+    issues: list[dict] = []
+    workflow_dir = os.path.abspath(workflow_dir or ".")
+
+    if not isinstance(flow, dict):
+        path = find_workflow_json(workflow_dir)
+        flow = {}
+        if not path:
+            issues.append(_issue("workflow", "fail",
+                                 f"No workflow JSON in {workflow_dir}",
+                                 "Save the workflow first."))
+        else:
+            try:
+                with open(path, "r", encoding="utf-8") as fh:
+                    flow = json.load(fh) or {}
+            except Exception as exc:
+                issues.append(_issue("workflow", "fail",
+                                     f"Couldn't read {os.path.basename(path)}: {exc}"))
+    if not flow:
+        issues.append(_issue("workflow", "fail", "The workflow is empty",
+                             "Add an activity, then build again."))
+
+    display_name = str(flow.get("name") or os.path.basename(workflow_dir) or "workflow")
+    app = _sanitize(app_name or display_name)
+    ver = str(version or flow.get("buildVersion") or "1.0.0").strip() or "1.0.0"
+    update = flow.get("runnerUpdate") if isinstance(flow.get("runnerUpdate"), dict) else {}
+    slug = (str(repo or "").strip() or str(update.get("repo") or "").strip()
+            or default_repo()).strip()
+    tag = f"{tag_prefix(app)}{ver}"
+
+    # ── The build inputs themselves ──────────────────────────────────────────
+    for code, filename, why in (
+        ("spec", os.path.join("packaging", "runner_build.spec"),
+         "The PyInstaller spec that describes the Runner."),
+        ("entry", os.path.join("packaging", "entry_runner_single.py"),
+         "The Runner entry script the spec analyses."),
+    ):
+        if not os.path.isfile(os.path.join(ROOT, filename)):
+            issues.append(_issue(code, "fail", f"{filename} is missing",
+                                 f"{why} Building needs a source checkout."))
+
+    pyi = pyinstaller_version()
+    if pyi:
+        issues.append(_issue("pyinstaller", "ok", f"PyInstaller {pyi}"))
+    else:
+        issues.append(_issue("pyinstaller", "fail",
+                             f"PyInstaller is not installed for {sys.executable}",
+                             "python -m pip install pyinstaller"))
+
+    # ── The vendor tools this workflow's graph actually uses ─────────────────
+    needs = compute_vendor_needs(flow)
+    missing = [t for t in sorted(needs) if not os.path.isdir(os.path.join(VENDOR_SRC, t))]
+    if missing:
+        listed = ", ".join(f"vendor/{t}" for t in missing)
+        issues.append(_issue(
+            "vendor", "warn" if allow_missing_vendor else "fail",
+            f"this workflow needs {listed}, which {'is' if len(missing) == 1 else 'are'} not in this checkout",
+            "Fetch the tool into vendor/ (see packaging/build.md) — the build would "
+            "copy it into the Runner, and without it the Runner fails at runtime."))
+    elif needs:
+        issues.append(_issue("vendor", "ok", "vendors: " + ", ".join(sorted(needs))))
+
+    # ── Icons: the shared set (fatal) and this game's own (a fallback) ───────
+    guard_ok, guard_out = icon_guard()
+    if not guard_ok:
+        first = _first_problem(guard_out)
+        issues.append(_issue(
+            "icons", "fail",
+            "the shared icon set has a problem — an unknown name ships as a blank glyph"
+            + (f": {first}" if first else ""),
+            "Run: python packaging/check_icons.py"))
+    kind, icon_path = find_icon_source(workflow_dir)
+    icon_source = describe_icon_source(workflow_dir)
+    icon_why = icon_asset_problem(kind, icon_path)
+    if icon_why:
+        issues.append(_issue("icon", "warn",
+                             f"{icon_source} can't be used ({icon_why}) — drawn initials "
+                             "will be used instead"))
+    else:
+        issues.append(_issue("icon", "ok", f"icon: {icon_source}"))
+
+    # ── Publishing (only when this build will actually publish) ──────────────
+    if publish or dry_run:
+        pub_issues = publish_checks(slug, app, ver, dry_run=dry_run)
+        issues.extend(pub_issues)
+        if not pub_issues:
+            issues.append(_issue("publish", "ok",
+                                 f"publish: {tag} → {slug}" if publish
+                                 else f"publish (dry run): {tag} → {slug}"))
+
+    # ── Report ───────────────────────────────────────────────────────────────
+    fails = [i for i in issues if i["level"] == "fail"]
+    warns = [i for i in issues if i["level"] == "warn"]
+    report = {
+        "ok": not fails,
+        "issues": issues,
+        "blocking": [i["message"] for i in fails],
+        "warnings": [i["message"] for i in warns],
+        "appName": app,
+        "name": display_name,
+        "version": ver,
+        "repo": slug,
+        "tag": tag,
+        "vendor": sorted(needs),
+        "missingVendor": missing,
+        "iconSource": icon_source,
+        "requirements": find_requirements(workflow_dir),
+    }
+    if emit:
+        for issue in issues:
+            if issue["level"] != "ok":
+                log(f"CHECK {issue['level']} {issue['code']}: {issue['message']}")
+        if report["ok"]:
+            log(f"PREFLIGHT OK — {display_name}, {', '.join(sorted(needs)) or 'no vendor'}")
+        else:
+            log(f"PREFLIGHT FAILED: {PreflightError(report).summary}")
+    return report
+
+
 def _requirements_note(display_name: str, entries: list[str]) -> str:
     listing = "\n".join(f"  {e}" for e in entries)
     title = f"{display_name} — required game files"
@@ -446,16 +648,125 @@ def _zip_runner(folder: str, zip_path: str) -> None:
                 zf.write(path, os.path.relpath(path, folder))
 
 
-def _gh(args: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(["gh", *args], capture_output=True, text=True,
-                          encoding="utf-8", errors="replace")
+def _gh(args: list[str], timeout: float = PREFLIGHT_TIMEOUT) -> subprocess.CompletedProcess:
+    """Run ``gh`` and never raise: a missing CLI, a timeout or a crash all come
+    back as a non-zero result, so callers only look at ``returncode``."""
+    try:
+        return subprocess.run(["gh", *args], capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=timeout)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return subprocess.CompletedProcess(["gh", *args], 127, "", str(exc))
+
+
+def gh_available() -> bool:
+    """Is the GitHub CLI on PATH? (Publishing is impossible without it.)"""
+    return shutil.which("gh") is not None
+
+
+def pyinstaller_version() -> str:
+    """Version of the PyInstaller this interpreter can import, or ""."""
+    try:
+        import PyInstaller
+    except Exception:
+        return ""
+    return str(getattr(PyInstaller, "__version__", "") or "installed")
+
+
+def icon_guard() -> tuple[bool, str]:
+    """``(ok, output)`` from :mod:`packaging.check_icons` — the shared icon set.
+
+    A name the set doesn't define renders as *nothing* at runtime, which is
+    exactly the kind of failure a build must refuse to ship, so this runs before
+    PyInstaller rather than after it.
+    """
+    script = os.path.join(ROOT, "packaging", "check_icons.py")
+    if not os.path.isfile(script):
+        return True, ""        # trimmed checkout — nothing to guard
+    try:
+        proc = subprocess.run(
+            [sys.executable, script], cwd=ROOT, capture_output=True,
+            text=True, encoding="utf-8", errors="replace", timeout=120,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return True, f"(the icon guard couldn't run: {exc})"
+    return proc.returncode == 0, (proc.stdout or proc.stderr or "").strip()
+
+
+def _first_problem(output: str) -> str:
+    """A one-line gist of the icon guard's output: the first failing check plus
+    the first detail under it (which names the file and the line)."""
+    lines = [ln.rstrip() for ln in (output or "").splitlines()]
+    header = ""
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("icon set:", "note:")):
+            continue
+        if line.startswith("  ") and header:
+            return f"{header} — {stripped}"
+        if not line.startswith("  "):
+            header = stripped
+            continue
+    return header
+
+
+def icon_asset_problem(kind: str, path: str) -> str:
+    """Why this workflow's own icon can't be used, or "" when it can.
+
+    Only inspects the file the build would actually use, so the answer matches
+    what :func:`render_icon_frames` will do a minute later (it falls back to
+    drawn initials, which is why this is a warning and not a refusal).
+    """
+    if kind == "generated" or not path:
+        return ""
+    try:
+        from PIL import Image  # noqa: F401
+    except Exception:
+        return "Pillow isn't installed"
+    try:
+        _square_art(path, from_cover=(kind == "cover"))
+    except Exception as exc:
+        return str(exc)
+    return ""
+
+
+def publish_checks(repo: str, app_name: str, version: str,
+                   dry_run: bool = False) -> list[dict]:
+    """Everything that stops a publish, as preflight issues.
+
+    Shared by :func:`preflight` (before the build) and :func:`publish` (right
+    before the upload) so there is exactly one set of rules about what may be
+    published — and so the user hears about a taken tag before PyInstaller runs,
+    not three minutes later.
+    """
+    if not re.fullmatch(r"[\w.-]+/[\w.-]+", repo or ""):
+        return [_issue("repo", "fail",
+                       f"Invalid update repo '{repo}' (expected owner/name)",
+                       "Set the repo in the workflow's runnerUpdate, or with --repo.")]
+    if dry_run:
+        return []
+    if not gh_available():
+        return [_issue("gh", "fail", "GitHub CLI (gh) is not installed — https://cli.github.com",
+                       "Install gh, or build without publishing.")]
+    if _gh(["auth", "status"]).returncode != 0:
+        return [_issue("gh-auth", "fail", "gh is not signed in — run 'gh auth login' once")]
+    tag = f"{tag_prefix(app_name)}{version}"
+    if _gh(["release", "view", tag, "--repo", repo]).returncode == 0:
+        return [_issue("tag", "fail",
+                       f"{tag} is already published in {repo} — build a newer version")]
+    return []
 
 
 def publish(final: str, app_name: str, display_name: str, version: str,
             repo: str, dry_run: bool = False) -> str:
-    """Zip ``final`` and publish it as a GitHub Release. Returns the release URL."""
-    if not re.fullmatch(r"[\w.-]+/[\w.-]+", repo or ""):
-        raise RuntimeError(f"Invalid update repo '{repo}' (expected owner/name)")
+    """Zip ``final`` and publish it as a GitHub Release. Returns the release URL.
+
+    The rules about what may be published live in :func:`publish_checks` and are
+    re-run here, right before the upload: the preflight checked them minutes ago,
+    and a release published in between must not be silently overwritten.
+    """
+    problems = publish_checks(repo, app_name, version, dry_run=dry_run)
+    if problems:
+        raise RuntimeError("; ".join(p["message"] for p in problems))
     tag = f"{tag_prefix(app_name)}{version}"
     zip_path = os.path.join(os.path.dirname(final), f"{app_name}-Runner-{version}.zip")
 
@@ -468,13 +779,6 @@ def publish(final: str, app_name: str, display_name: str, version: str,
     if dry_run:
         log(f"(dry run) would publish {tag} to {repo}")
         return url
-
-    if shutil.which("gh") is None:
-        raise RuntimeError("GitHub CLI (gh) is not installed — https://cli.github.com")
-    if _gh(["auth", "status"]).returncode != 0:
-        raise RuntimeError("gh is not signed in — run 'gh auth login' once")
-    if _gh(["release", "view", tag, "--repo", repo]).returncode == 0:
-        raise RuntimeError(f"{tag} is already published in {repo} — build a newer version")
 
     progress(95, "Uploading to GitHub")
     log(f"Publishing {tag} to {repo} …")
@@ -511,31 +815,49 @@ def _save_version(flow_path: str, version: str, repo: str) -> None:
 def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
           out_dir: str = "", repo: str = "", do_publish: bool = False,
           publish_dry_run: bool = False, verbose: bool = False,
-          save_version: bool = False) -> str:
+          save_version: bool = False, flow_path: str = "",
+          allow_missing_vendor: bool = False) -> str:
     """Build the runner exe. Returns the output folder path.
 
-    Raises on failure (missing workflow, PyInstaller error, publish error).
+    *flow_path* pins the exact workflow JSON to bundle and version-stamp (the
+    file the Hub / Designer has open); without it the folder is guessed at.
+
+    Raises :class:`PreflightError` when the preflight refuses the build, and
+    RuntimeError/FileNotFoundError/OSError for anything that fails later.
     """
     progress(2, "Reading workflow")
     workflow_dir = os.path.abspath(workflow_dir)
-    flow_path = find_workflow_json(workflow_dir)
-    if not flow_path:
-        raise FileNotFoundError(f"No workflow JSON found in {workflow_dir}")
+    pinned = os.path.abspath(flow_path) if flow_path else ""
+    resolved = resolve_flow_path(workflow_dir, flow_path)
+    if not resolved:
+        raise FileNotFoundError(f"Workflow file not found: {pinned}" if pinned
+                                else f"No workflow JSON found in {workflow_dir}")
 
-    with open(flow_path, "r", encoding="utf-8") as fh:
+    with open(resolved, "r", encoding="utf-8") as fh:
         flow = json.load(fh) or {}
 
     display_name = str(flow.get("name") or os.path.basename(workflow_dir))
-    app_name = _sanitize(name or display_name)
-    version = str(version or flow.get("buildVersion") or "1.0.0").strip() or "1.0.0"
-    update = flow.get("runnerUpdate") if isinstance(flow.get("runnerUpdate"), dict) else {}
-    repo = (repo or str(update.get("repo") or "") or default_repo()).strip()
-    needs = compute_vendor_needs(flow)
+
+    # Everything the build needs — spec, PyInstaller, required vendor/, the icon
+    # sets, and (when publishing) gh + its login + a free tag — before the slow
+    # part. Raises PreflightError, which carries every finding.
+    progress(3, "Checking the build environment")
+    report = preflight(workflow_dir, flow=flow, app_name=name or display_name,
+                       version=version, repo=repo, publish=do_publish,
+                       dry_run=publish_dry_run,
+                       allow_missing_vendor=allow_missing_vendor, emit=True)
+    if not report["ok"]:
+        raise PreflightError(report)
+
+    app_name = report["appName"]
+    version = report["version"]
+    repo = report["repo"]
+    needs = set(report["vendor"])
 
     log(f"Workflow : {display_name}")
     log(f"Exe name : {app_name}.exe   (version {version})")
     log(f"Vendor   : {', '.join(sorted(needs)) or '(none)'}")
-    log(f"Icon     : {describe_icon_source(workflow_dir)}")
+    log(f"Icon     : {report['iconSource']}")
     log(f"Game req : {describe_requirements(workflow_dir)}")
     log(f"Updates  : {repo + ' · tag ' + tag_prefix(app_name) + version if repo else '(no update repo)'}")
 
@@ -559,6 +881,7 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
         }, fh, ensure_ascii=False, indent=2)
 
     # The game's own icon: .ico for the exe, 256 px .png for the Runner header.
+    # Already checked by the preflight; a failure here still only costs branding.
     icon_ico = os.path.join(tmp_dir, "icon.ico")
     icon_png = os.path.join(tmp_dir, "runner_icon.png")
     try:
@@ -589,25 +912,8 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
         json.dump(cfg, fh)
 
     try:
-        # Icon set guard — the Runner ships shared/icons.js, so a name that does
-        # not exist or a stray inline <svg> would ship as a missing glyph. Both
-        # are silent at runtime, which is exactly why they are checked here.
-        check = subprocess.run(
-            [sys.executable, os.path.join(ROOT, "packaging", "check_icons.py")],
-            cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
-        )
-        if check.returncode != 0:
-            raise RuntimeError("check_icons.py failed:\n" + (check.stdout or check.stderr).strip())
-
-        # Ensure PyInstaller is importable in this interpreter.
-        try:
-            import PyInstaller  # noqa: F401
-        except Exception:
-            raise RuntimeError(
-                "PyInstaller is not installed in this Python. "
-                "Run: python -m pip install pyinstaller"
-            )
-
+        # The icon guard + PyInstaller were checked by the preflight above, so
+        # nothing between here and PyInstaller can refuse the build.
         env = dict(os.environ)
         env["MACRO2K_RUNNER_BUILD_CFG"] = cfg_path
         env["PYTHONIOENCODING"] = "utf-8"
@@ -701,6 +1007,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Build a single-workflow Runner exe.")
     ap.add_argument("--workflow", required=True,
                     help="Path to the workflow folder (contains workflow.json).")
+    ap.add_argument("--flow-path", default="",
+                    help="Exact workflow JSON to bundle and version-stamp "
+                         "(default: the folder's workflow.json).")
     ap.add_argument("--name", default="", help="Override the exe base name.")
     ap.add_argument("--version", default="", help="Build version (e.g. 1.0.0).")
     ap.add_argument("--out", default="", help="Output root (default: dist/).")
@@ -713,13 +1022,30 @@ def main() -> int:
                     help="Zip the build and print what --publish would do, without uploading.")
     ap.add_argument("--save-version", action="store_true",
                     help="Record the built version in the workflow JSON.")
+    ap.add_argument("--preflight", action="store_true",
+                    help="Only check what a build needs (and print the report as JSON), "
+                         "then exit — nothing is built.")
+    ap.add_argument("--allow-missing-vendor", action="store_true",
+                    help="Downgrade a missing vendor/<tool> to a warning and build anyway.")
     ap.add_argument("--verbose", action="store_true",
                     help="Echo every PyInstaller line (prefixed '..').")
     args = ap.parse_args()
     try:
+        if args.preflight:
+            report = preflight(args.workflow, app_name=args.name, version=args.version,
+                               repo=args.repo, publish=args.publish,
+                               dry_run=args.publish_dry_run,
+                               allow_missing_vendor=args.allow_missing_vendor, emit=True)
+            print(json.dumps(report, ensure_ascii=False, indent=2), flush=True)
+            return 0 if report["ok"] else 1
         build(args.workflow, name=args.name, version=args.version, out_dir=args.out,
               repo=args.repo, do_publish=args.publish, publish_dry_run=args.publish_dry_run,
-              verbose=args.verbose, save_version=args.save_version)
+              verbose=args.verbose, save_version=args.save_version,
+              flow_path=args.flow_path, allow_missing_vendor=args.allow_missing_vendor)
+    except PreflightError:
+        # preflight(emit=True) already printed every finding, including the
+        # summary line the callers parse — don't bury it under a second one.
+        return 1
     except Exception as exc:
         log(f"BUILD FAILED: {exc}")
         return 1

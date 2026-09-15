@@ -1873,6 +1873,9 @@ class WorkflowEngine:
         elif t == "number":
             c = self._coerce(val)
             out[full] = c if isinstance(c, (int, float)) and not isinstance(c, bool) else 0
+        elif t == "select" and v.get("display") == "toggle-group" and v.get("multiple"):
+            values = val if isinstance(val, list) else [val]
+            out[full] = [o for o in (v.get("options") or []) if o in values]
         else:
             out[full] = "" if val is None else str(val)
         for child in (v.get("children") or []):
@@ -2623,6 +2626,9 @@ class WorkflowEngine:
         return int(m.group(1)) * 60 + int(m.group(2))
 
     def _compare(self, cur: Any, op: str, rhs: Any) -> bool:
+        if isinstance(cur, list) and op in ("contains", "!contains"):
+            found = rhs in cur
+            return found if op == "contains" else not found
         # String-shaped operators first — OCR results almost always need soft
         # matching ("Stage 3/5" contains "3/5") rather than numeric equality.
         if op in ("contains", "!contains", "starts", "ends", "regex"):
@@ -3265,6 +3271,8 @@ class WorkflowEngine:
         best-effort number-coerced. Lets value fields (Set variable, If variable,
         loop count…) point at another variable instead of a fixed literal.
         """
+        if isinstance(raw, list):
+            return list(raw)
         if isinstance(raw, (int, float, bool)):
             return raw
         s = str(raw)

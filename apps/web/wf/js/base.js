@@ -221,7 +221,7 @@ function wfFmtDur(ms){
 }
 function wfApplyNodeTime(id){
   const d=wfNodeDur[id]; const el=wfNodeElById(id);
-  if(!d||!el||el.classList.contains("wf-stk-jbot")) return;   // flush stack member: no room below
+  if(!d||!el) return;
   let chip=el.querySelector(".wf-node-time");
   if(!chip){ chip=document.createElement("span"); chip.className="wf-node-time"; el.appendChild(chip); }
   chip.textContent=wfFmtDur(d.last)+(d.n>1?" ×"+d.n:"");

@@ -212,15 +212,13 @@ function wfStartMove(e,n){
   let ids;
   if(WF.sel.length>1 && WF.sel.includes(n.id)){
     ids=WF.sel.slice();              // move the whole multi-selection together
-  } else if(n.stack){
-    ids=wfStackMembers(n.stack).map(m=>m.id); wfSelectOne(n.id);  // drag a merged block as one
   } else {
     ids=[n.id]; wfSelectOne(n.id);   // single node
   }
   wfMarkSel(); wfRenderInspector();
   const g=wfGraph(); if(!g) return;
   const items=ids.map(id=>{ const nn=g.nodes.find(x=>x.id===id); return nn?{id,ox:nn.x,oy:nn.y}:null; }).filter(Boolean);
-  wfGesture={mode:"move",items,sx:e.clientX,sy:e.clientY,dragId:n.id,mergeOk:e.ctrlKey};
+  wfGesture={mode:"move",items,sx:e.clientX,sy:e.clientY,dragId:n.id};
 }
 function wfStartConnect(e,nodeId,port){
   if(e.button!==0) return; e.stopPropagation(); e.preventDefault();
@@ -250,10 +248,6 @@ function wfNearestInPort(nodeId, clientX, clientY){
 function wfConnectTo(toNodeId, clientX, clientY){
   const g=wfGraph();
   if(g && wfGesture && wfGesture.from!==toNodeId){
-    // Dropping onto any block of a merged stack wires into the stack's head.
-    const tn=wfNode(toNodeId);
-    if(tn && tn.stack){ const chain=wfStackChain(tn.stack); if(chain.length) toNodeId=chain[0].id; }
-    if(wfGesture.from===toNodeId) return false;
     const toPort=wfNearestInPort(toNodeId, clientX, clientY);
     g.edges=g.edges.filter(ed=>!(ed.from===wfGesture.from && ed.fromPort===wfGesture.port)); // one wire per output port
     g.edges.push({from:wfGesture.from,fromPort:wfGesture.port,to:toNodeId,toPort});
@@ -630,7 +624,7 @@ function wfWireInsertHover(x,y){
 function wfWireInsertClear(){
   if(wfInsWireGrp){ wfInsWireGrp.classList.remove("wire-insert"); wfInsWireGrp=null; }
 }
-// Primary sequential-out port for a spliced-in node (mirrors wfMergeOutPort).
+// Primary sequential-out port for a spliced-in node.
 function wfSpliceOutPort(node){
   const def=WF_NODES[node.type]||{};
   if(def.kind==="condition"||def.kind==="call") return "true";
@@ -656,7 +650,7 @@ function wfCanvasMouseDown(e){
   // empty-state card) sit above the canvas — a press there must not clear the
   // selection or start a rubber-band box (the re-render it triggers would also
   // swallow the click).
-  if(e.target.closest("#wf-rail,.wf-layout-bar,.wf-minimap,.wf-empty-card,#wf-act-panel")) return;
+  if(e.target.closest("#wf-rail,.wf-layout-bar,.wf-minimap,.wf-empty-card,#wf-act-panel,#wf-variable-dock")) return;
   // Middle mouse, or Space+left → pan.
   if(e.button===1 || (e.button===0 && wfSpace)){
     e.preventDefault();
@@ -803,7 +797,6 @@ function wfShowMenu(clientX, clientY){
   // every item reads like a mystery badge, so suppress it when nothing is plural.
   const cnt=n=>n>1?` (${n})`:"";
   const copyable=WF.sel.filter(id=>{ const n=wfNode(id); return n && n.type!=="start"; }).length;
-  const stackSids=[...new Set(WF.sel.map(id=>{ const n=wfNode(id); return n&&n.stack; }).filter(Boolean))];
   if(WF.sel.length===1){
     const _n=wfNode(WF.sel[0]);
     if(_n&&_n.type!=="start") items.push({ico:"play",label:"Set as default", fn:()=>wfSetAsDefault(WF.sel[0])});
@@ -825,7 +818,6 @@ function wfShowMenu(clientX, clientY){
     const previewable=WF.sel.map(wfNode).filter(wfPvCanPreviewNode);
     if(previewable.length) items.push({ico:"eye",label:`Show ${previewable.length} on Preview`,fn:()=>wfPvPreviewNodes(previewable)});
   }
-  if(stackSids.length) items.push({ico:"link_off",label:"Unmerge", fn:()=>stackSids.forEach(wfUnmerge)});
   if(WF.sel.length>=1) items.push({ico:"box",label:"Create group around"+cnt(WF.sel.length), fn:wfGroupSelection});
   if(copyable){ items.push({ico:"copy",label:"Copy"+cnt(copyable), fn:wfCopy});
     items.push({ico:"scissors",label:"Cut"+cnt(copyable), fn:wfCut});
@@ -1114,7 +1106,8 @@ function wfInitCanvas(){
     let node;
     if(wfPaletteDrag.startsWith("call:")){ node=wfNewNode("call",x,y); node.params={fn:wfPaletteDrag.slice(5)}; }
     else if(wfPaletteDrag.startsWith("var:")){ const p=wfPaletteDrag.split(":"); const vtype=p[1], vname=p.slice(2).join(":");
-      node=wfNewNode("if_var",x,y); node.params={name:vname, op:"==", value: vtype==="bool"?"true":""}; }
+      const info=wfVarInfoMap()[vname];
+      node=wfNewNode("if_var",x,y); node.params={name:vname, op:info&&info.multiple?"contains":"==", value: vtype==="bool"?"true":((info&&info.options||[])[0]||"")}; }
     else node=wfNewNode(wfPaletteDrag,x,y);
     g.nodes.push(node);
     wfWireInsertSplice(g, insEdge, node);
@@ -1166,9 +1159,6 @@ function wfInitCanvas(){
       if(wfGesture.items.length===1 && !e.altKey && wfAlignOn) wfShowAlignGuides(wfGesture.dragId, alignHit, portSnapped);
       else wfHideAlignGuides();
       wfDrawWires();
-      wfGesture.mergeOk=e.ctrlKey;  // live-track Ctrl so user can press it mid-drag
-      if(wfGesture.items.length===1 && wfGesture.mergeOk) wfShowMergeHint(wfGesture.dragId);
-      else wfClearMergeHint();
     } else if(wfGesture.mode==="groupmove"){
       // Move the frame + every node that was inside it when the drag began.
       // Snap the group frame first, then apply the same snapped delta to members
@@ -1236,16 +1226,13 @@ function wfInitCanvas(){
       WF.selectedNode = WF.sel.length===1 ? WF.sel[0] : null;
       wfRenderInspector();
     } else if(wfGesture.mode==="move"){
-      // Dropping a single lone block flush above/below another merges them.
-      wfClearMergeHint();
       wfHideAlignGuides();
       document.querySelectorAll(".wf-node.wf-dragging").forEach(el=>el.classList.remove("wf-dragging"));
       const moved=Math.abs(e.clientX-wfGesture.sx)+Math.abs(e.clientY-wfGesture.sy)>3;
       // Only a real drag suppresses the action bar (wf-dragdone). A plain click
       // must leave the bar visible on the freshly selected block.
       if(moved) wfGesture.items.forEach(it=>{ const el=document.querySelector(`.wf-node[data-node="${it.id}"]`); if(el) el.classList.add("wf-dragdone"); });
-      if(moved && wfGesture.items.length===1 && wfGesture.mergeOk){ wfPushUndo(); wfTryMerge(wfGesture.dragId); }
-      else if(moved) wfPushUndo();  // plain move — push before the final render
+      if(moved) wfPushUndo();  // plain move — push before the final render
     } else if(wfGesture.mode==="pan"){
       $("wf-canvas").classList.remove("panning");
     }

@@ -29,7 +29,8 @@
       "label": "Hello ki",
       "type": "bool",
       "value": false,
-      "options": []
+      "options": [],
+      "multiple": false
     }
   ],
   "nodeDefaults": {
@@ -49,7 +50,7 @@
             "id": "n3opahqa",
             "type": "start",
             "x": 60,
-            "y": 57,
+            "y": 60,
             "params": {}
           },
           {
@@ -98,15 +99,15 @@
           {
             "id": "ney4361a",
             "type": "start",
-            "x": -60,
-            "y": 71,
+            "x": -140,
+            "y": -125,
             "params": {}
           },
           {
             "id": "nm9by447",
             "type": "loop",
-            "x": 440,
-            "y": 56,
+            "x": 448,
+            "y": -122,
             "params": {
               "count": 3,
               "infinite": true
@@ -115,8 +116,8 @@
           {
             "id": "n2up63d5",
             "type": "if_image",
-            "x": 860,
-            "y": 56,
+            "x": 660,
+            "y": -122,
             "params": {
               "template": "templates/crop_20260701_012118_1308_377_79_63.png",
               "threshold": 0.85,
@@ -126,29 +127,21 @@
               "regionX": 0,
               "regionY": 0
             },
+            "delayBefore": 2,
             "showPreview": true
           },
           {
             "id": "n2asen74",
             "type": "end",
-            "x": 460,
-            "y": -20,
-            "params": {}
-          },
-          {
-            "id": "ngnhfuaf",
-            "type": "wait",
             "x": 660,
-            "y": 56,
-            "params": {
-              "seconds": 2
-            }
+            "y": -260,
+            "params": {}
           },
           {
             "id": "n2bgyf1d",
             "type": "if_image",
-            "x": 220,
-            "y": 56,
+            "x": 160,
+            "y": -142,
             "params": {
               "template": "templates/crop_20260701_012118_1308_377_79_63.png",
               "threshold": 0.85,
@@ -163,12 +156,13 @@
           {
             "id": "ndiijaf6",
             "type": "tap_image_any",
-            "x": 1060,
-            "y": 72,
+            "x": 1260,
+            "y": -122,
             "params": {
               "templates": [
                 "templates/crop_20260628_223610_67x42.png",
-                "templates/crop_20260628_232825_249x36.png"
+                "templates/crop_20260628_232825_249x36.png",
+                "templates/crop_20260915_001523_1578_78_42_44.png"
               ],
               "taps": "1",
               "threshold": 0.85,
@@ -181,10 +175,65 @@
           {
             "id": "nojm2six",
             "type": "call",
-            "x": 20,
-            "y": 56,
+            "x": -60,
+            "y": -140,
             "params": {
               "fn": "fn_tuls6"
+            }
+          },
+          {
+            "id": "nza4ybsr",
+            "type": "if_image",
+            "x": 840,
+            "y": 20,
+            "params": {
+              "template": "templates/crop_20260915_000909_848_940_229_74.png",
+              "threshold": 0.85,
+              "negate": false,
+              "regionW": 0,
+              "regionH": 0,
+              "regionX": 0,
+              "regionY": 0
+            },
+            "showPreview": true
+          },
+          {
+            "id": "nkwdchvv",
+            "type": "tap_image",
+            "x": 1060,
+            "y": 20,
+            "params": {
+              "template": "templates/crop_20260915_000909_848_940_229_74.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nbv1wxox",
+            "type": "if_image",
+            "x": 840,
+            "y": 100,
+            "params": {
+              "template": "templates/crop_20260915_001435_892_929_201_63.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "n9yia6f7",
+            "type": "tap_image",
+            "x": 1060,
+            "y": 100,
+            "params": {
+              "template": "templates/crop_20260915_001435_892_929_201_63.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
             }
           }
         ],
@@ -195,26 +244,11 @@
             "to": "n2asen74"
           },
           {
-            "from": "nm9by447",
-            "fromPort": "body",
-            "to": "ngnhfuaf"
-          },
-          {
-            "from": "ngnhfuaf",
-            "fromPort": "out",
-            "to": "n2up63d5"
-          },
-          {
             "from": "n2bgyf1d",
             "fromPort": "true",
             "to": "n2asen74"
           },
           {
-            "from": "n2up63d5",
-            "fromPort": "false",
-            "to": "ndiijaf6"
-          },
-          {
             "from": "ndiijaf6",
             "fromPort": "true",
             "to": "nm9by447",
@@ -225,11 +259,6 @@
             "fromPort": "false",
             "to": "nm9by447",
             "toPort": "loop"
-          },
-          {
-            "from": "nojm2six",
-            "fromPort": "true",
-            "to": "n2bgyf1d"
           },
           {
             "from": "ney4361a",
@@ -237,7 +266,62 @@
             "to": "nojm2six"
           },
           {
+            "from": "nojm2six",
+            "fromPort": "true",
+            "to": "n2bgyf1d"
+          },
+          {
+            "from": "nza4ybsr",
+            "fromPort": "true",
+            "to": "nkwdchvv"
+          },
+          {
             "from": "n2bgyf1d",
+            "fromPort": "false",
+            "to": "nm9by447"
+          },
+          {
+            "from": "nm9by447",
+            "fromPort": "body",
+            "to": "n2up63d5"
+          },
+          {
+            "from": "n2up63d5",
+            "fromPort": "false",
+            "to": "nza4ybsr"
+          },
+          {
+            "from": "nkwdchvv",
+            "fromPort": "true",
+            "to": "ndiijaf6"
+          },
+          {
+            "from": "nkwdchvv",
+            "fromPort": "false",
+            "to": "ndiijaf6"
+          },
+          {
+            "from": "nza4ybsr",
+            "fromPort": "false",
+            "to": "nbv1wxox"
+          },
+          {
+            "from": "nbv1wxox",
+            "fromPort": "true",
+            "to": "n9yia6f7"
+          },
+          {
+            "from": "n9yia6f7",
+            "fromPort": "true",
+            "to": "ndiijaf6"
+          },
+          {
+            "from": "n9yia6f7",
+            "fromPort": "false",
+            "to": "ndiijaf6"
+          },
+          {
+            "from": "nbv1wxox",
             "fromPort": "false",
             "to": "ndiijaf6"
           }
@@ -332,27 +416,29 @@
             }
           },
           {
-            "id": "n9jzve68",
-            "type": "call",
-            "x": 1120,
-            "y": 160,
-            "params": {
-              "fn": "fn_hh4kj"
-            },
-            "delayBefore": 60
-          },
-          {
             "id": "ncq3rl6e",
             "type": "tap",
-            "x": 1320,
-            "y": 256,
+            "x": 1340,
+            "y": 160,
             "params": {
               "target": "pos",
-              "x": 984,
-              "y": 840,
+              "x": 955,
+              "y": 846,
               "taps": "1"
             },
             "delayBefore": 3
+          },
+          {
+            "id": "nndpqedp",
+            "type": "wait_image",
+            "x": 1148,
+            "y": 160,
+            "params": {
+              "template": "templates/crop_20260914_235421_302_95_58_56.png",
+              "threshold": 0.85,
+              "timeout": 600,
+              "negate": false
+            }
           }
         ],
         "edges": [
@@ -370,16 +456,6 @@
             "from": "n2qh1u6r",
             "fromPort": "out",
             "to": "njdapqgg"
-          },
-          {
-            "from": "nmmcl4iz",
-            "fromPort": "out",
-            "to": "n9jzve68"
-          },
-          {
-            "from": "n9jzve68",
-            "fromPort": "true",
-            "to": "ncq3rl6e"
           },
           {
             "from": "njdapqgg",
@@ -405,6 +481,16 @@
             "from": "n2fsw7ai",
             "fromPort": "true",
             "to": "njdapqgg"
+          },
+          {
+            "from": "nmmcl4iz",
+            "fromPort": "out",
+            "to": "nndpqedp"
+          },
+          {
+            "from": "nndpqedp",
+            "fromPort": "true",
+            "to": "ncq3rl6e"
           }
         ],
         "groups": []
@@ -760,175 +846,6 @@
   ],
   "activities": [
     {
-      "id": "sequence_eu1z",
-      "name": "Run Game",
-      "type": "sequence",
-      "enabled": true,
-      "vars": [],
-      "graph": {
-        "nodes": [
-          {
-            "id": "n6pi9wel",
-            "type": "start",
-            "x": 40,
-            "y": 60,
-            "params": {}
-          },
-          {
-            "id": "ndi8pf0t",
-            "type": "end",
-            "x": 1420,
-            "y": 63,
-            "params": {}
-          },
-          {
-            "id": "nj3zqhb2",
-            "type": "launch_emulator",
-            "x": 120,
-            "y": 140,
-            "params": {
-              "emulator": "mumu",
-              "index": 2,
-              "instance": "",
-              "path": "D:\\Programs\\MuMuPlayerGlobal\\nx_main",
-              "command": "",
-              "at": "",
-              "nextDay": true,
-              "wait": 60,
-              "port": 0,
-              "pathSrc": "project"
-            }
-          },
-          {
-            "id": "ntrszemu",
-            "type": "resize_emulator",
-            "x": 340,
-            "y": 48,
-            "params": {
-              "emulator": "last",
-              "index": 2,
-              "path": "",
-              "width": 1920,
-              "height": 1080,
-              "pathSrc": "project"
-            },
-            "note": "MuMu #2 — template & tọa độ tap được ghi ở 1920×1080"
-          },
-          {
-            "id": "nj5xjfpu",
-            "type": "launch_app",
-            "x": 740,
-            "y": 48,
-            "params": {
-              "package": "",
-              "wait": 0,
-              "pkgSrc": "project"
-            }
-          },
-          {
-            "id": "nbra4ijc",
-            "type": "if_emulator",
-            "x": 120,
-            "y": 48,
-            "params": {
-              "emulator": "last",
-              "index": 0,
-              "port": 0,
-              "attach": true
-            }
-          },
-          {
-            "id": "ni8wav38",
-            "type": "if_app",
-            "x": 540,
-            "y": 48,
-            "params": {
-              "package": "com.neversoft.rpg.erolabs",
-              "negate": true,
-              "pkgSrc": "project"
-            }
-          },
-          {
-            "id": "nnz4qlmo",
-            "type": "call",
-            "x": 940,
-            "y": 48,
-            "params": {
-              "fn": "fn_hh4kj"
-            },
-            "delayBefore": 60
-          },
-          {
-            "id": "nlf8yrpv",
-            "type": "tap",
-            "x": 1140,
-            "y": 48,
-            "params": {
-              "target": "pos",
-              "x": 984,
-              "y": 840,
-              "taps": "1"
-            },
-            "delayBefore": 3
-          }
-        ],
-        "edges": [
-          {
-            "from": "n6pi9wel",
-            "fromPort": "out",
-            "to": "nbra4ijc"
-          },
-          {
-            "from": "nbra4ijc",
-            "fromPort": "false",
-            "to": "nj3zqhb2"
-          },
-          {
-            "from": "nj3zqhb2",
-            "fromPort": "out",
-            "to": "ntrszemu"
-          },
-          {
-            "from": "nbra4ijc",
-            "fromPort": "true",
-            "to": "ntrszemu"
-          },
-          {
-            "from": "ntrszemu",
-            "fromPort": "out",
-            "to": "ni8wav38"
-          },
-          {
-            "from": "nj5xjfpu",
-            "fromPort": "out",
-            "to": "nnz4qlmo"
-          },
-          {
-            "from": "nnz4qlmo",
-            "fromPort": "true",
-            "to": "nlf8yrpv"
-          },
-          {
-            "from": "nlf8yrpv",
-            "fromPort": "out",
-            "to": "ndi8pf0t"
-          },
-          {
-            "from": "ni8wav38",
-            "fromPort": "false",
-            "to": "ndi8pf0t"
-          },
-          {
-            "from": "ni8wav38",
-            "fromPort": "true",
-            "to": "nj5xjfpu"
-          }
-        ],
-        "groups": []
-      },
-      "maxRetries": 1
-    },
-    {
       "id": "sequence_sw9b",
       "name": "Nhận Thư",
       "type": "sequence",
@@ -955,7 +872,7 @@
           {
             "id": "nau3vmjd",
             "type": "tap_image",
-            "x": 320,
+            "x": 340,
             "y": 40,
             "params": {
               "template": "templates/crop_20260710_160936_364_143_36_17.png",
@@ -1476,7 +1393,8 @@
           "label": "Raid 5X",
           "type": "bool",
           "value": true,
-          "options": []
+          "options": [],
+          "multiple": false
         }
       ],
       "graph": {
@@ -1737,14 +1655,16 @@
           "label": "Đánh lại star bị thiếu",
           "type": "bool",
           "value": true,
-          "options": []
+          "options": [],
+          "multiple": false
         },
         {
           "name": "leoTang",
           "label": "Leo Tầng",
           "type": "bool",
           "value": false,
-          "options": []
+          "options": [],
+          "multiple": false
         }
       ],
       "graph": {
@@ -2091,8 +2011,7 @@
               "target": "found",
               "x": 0,
               "y": 0
-            },
-            "stack": "stncihqz"
+            }
           },
           {
             "id": "nx77gs1h",
@@ -2101,8 +2020,7 @@
             "y": -289,
             "params": {
               "seconds": 5
-            },
-            "stack": "stncihqz"
+            }
           },
           {
             "id": "nt7oj06q",
@@ -2865,13 +2783,15 @@
           "type": "bool",
           "value": true,
           "options": [],
+          "multiple": false,
           "children": [
             {
               "name": "x5",
               "label": "X5",
               "type": "bool",
               "value": true,
-              "options": []
+              "options": [],
+              "multiple": false
             }
           ]
         }
@@ -3392,21 +3312,24 @@
           "label": "Terrioty",
           "type": "bool",
           "value": true,
-          "options": []
+          "options": [],
+          "multiple": false
         },
         {
           "name": "claim_reward",
           "label": "Claim Reward",
           "type": "bool",
           "value": true,
-          "options": []
+          "options": [],
+          "multiple": false
         },
         {
           "name": "warrush",
           "label": "Warrush",
           "type": "bool",
           "value": true,
-          "options": []
+          "options": [],
+          "multiple": false
         }
       ],
       "graph": {
@@ -4312,14 +4235,16 @@
           "label": "School",
           "type": "bool",
           "value": true,
-          "options": []
+          "options": [],
+          "multiple": false
         },
         {
           "name": "claim_resouce",
           "label": "Calim Resource",
           "type": "bool",
           "value": true,
-          "options": []
+          "options": [],
+          "multiple": false
         }
       ],
       "graph": {
@@ -5016,14 +4941,16 @@
           "label": "Event Sigin",
           "type": "bool",
           "value": false,
-          "options": []
+          "options": [],
+          "multiple": false
         },
         {
           "name": "ryoma_leg_day",
           "label": "Ryoma Leg Day",
           "type": "bool",
           "value": false,
-          "options": []
+          "options": [],
+          "multiple": false
         }
       ],
       "graph": {

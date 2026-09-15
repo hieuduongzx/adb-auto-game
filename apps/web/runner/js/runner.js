@@ -13,6 +13,12 @@ const S = {
   emulator:        {},   // shared ADB emulator setting {kind, path}
   emulatorDefault: {},   // as shipped by the workflow (what "clear" falls back to)
   logCount:        0,
+  logTotal:        0,      // every line received this session (the DOM keeps the newest 500)
+  logLevel:        "all",
+  outcome:         "",     // how the last run ended: completed | stopped | failed ("" = none)
+  exporting:       false,
+  diagnostics:     null,
+  elapsedText:     "",
   speedhack: { enabled:false, speed:2.0, package:"", active:false },
   runScope:        null,   // activity ids of a single-activity run; null = full Start
 };
@@ -21,10 +27,22 @@ const S = {
 const U = { supported:false, version:"", repo:"", update:null, checking:false, applying:false };
 
 const $ = id => document.getElementById(id);
-const ACT_DOT_TITLE = { pending:"Pending", running:"Running", completed:"Completed", failed:"Failed", skipped:"Skipped", active:"Active" };
+const ACT_DOT_TITLE = { pending:"Pending", running:"Running", completed:"Completed", failed:"Failed", stopped:"Stopped", skipped:"Skipped", active:"Active" };
 // Status word on an activity's second line (pending shows "Waiting" only mid-run).
-const ACT_ST_LABEL = { running:"Running", completed:"Done", failed:"Failed", skipped:"Skipped" };
+const ACT_ST_LABEL = { running:"Running", completed:"Done", failed:"Failed", stopped:"Stopped", skipped:"Skipped" };
+// An activity is settled once it reaches one of these — it will not change again
+// until the next run, so the progress count may include it.
+const SETTLED = ["completed","failed","skipped","stopped"];
 const LOG_TAG = { info:"INF", success:"OK ", warning:"WRN", error:"ERR" };
+// Log level filter — each entry is the set of levels that stays visible, so the
+// wording in the dropdown is exactly what the operator sees.
+const LOG_LEVELS = { all:null, warning:["warning","error"], error:["error"] };
+// How the last run ended → { pill, banner class, headline }.
+const OUTCOME = {
+  completed: { pill:"done",    cls:"ok",   word:"Completed" },
+  stopped:   { pill:"stopped", cls:"warn", word:"Stopped"   },
+  failed:    { pill:"failed",  cls:"err",  word:"Failed"    },
+};
 const APP_SCOPE = "Runner";   // log prefix for lines that belong to no activity
 // Icons come from the shared set (shared/icons.js) — see its header for why
 // nothing inlines its own paths.
@@ -38,22 +56,48 @@ function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
 
 // Small modal on the shared .ui-modal styles (shared/base.css). Resolves with the
 // clicked button's value; Escape or a backdrop click resolves undefined.
+//
+// While it is open the rest of the page is inert: Tab and Shift+Tab cycle inside
+// the dialog instead of walking out into the Runner behind it, and the element
+// that had focus before it opened gets focus back when it closes — a run can be
+// interrupted at any moment, so the keyboard must never end up lost.
 function uiDialog(spec){
   return new Promise(resolve=>{
+    const prevFocus = document.activeElement;
     const wrap = document.createElement("div"); wrap.className = "ui-modal-wrap";
     const box = document.createElement("div"); box.className = "ui-modal";
     box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true");
+    const titleId = "ui-modal-title-" + (++_dialogSeq);
     if(spec.title){
-      const hd = document.createElement("div"); hd.className = "ui-modal-hd"; hd.textContent = spec.title;
-      box.appendChild(hd); box.setAttribute("aria-label", spec.title);
+      const hd = document.createElement("div"); hd.className = "ui-modal-hd";
+      hd.id = titleId; hd.textContent = spec.title;
+      box.appendChild(hd); box.setAttribute("aria-labelledby", titleId);
     }
     const bd = document.createElement("div"); bd.className = "ui-modal-bd";
     const msg = document.createElement("p"); msg.className = "ui-modal-msg"; msg.textContent = spec.message || "";
     bd.appendChild(msg); box.appendChild(bd);
     const ft = document.createElement("div"); ft.className = "ui-modal-ft";
     let primary = null;
-    const onKey = e=>{ if(e.key === "Escape"){ e.preventDefault(); close(undefined); } };
-    const close = v=>{ document.removeEventListener("keydown", onKey, true); wrap.remove(); resolve(v); };
+    const onKey = e=>{
+      if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); close(undefined); return; }
+      if(e.key !== "Tab") return;
+      // Focus trap: keep Tab inside the dialog. The dialog owns every stop, so
+      // the list is rebuilt on each Tab rather than cached (buttons can hide).
+      const stops = [...box.querySelectorAll("button, [href], input, select, textarea, [tabindex]")]
+        .filter(el=>!el.disabled && el.tabIndex !== -1 && el.offsetParent !== null);
+      if(!stops.length){ e.preventDefault(); box.focus(); return; }
+      const first = stops[0], last = stops[stops.length-1];
+      const active = document.activeElement;
+      if(e.shiftKey && (active === first || !box.contains(active))){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && (active === last || !box.contains(active))){ e.preventDefault(); first.focus(); }
+    };
+    const close = v=>{
+      document.removeEventListener("keydown", onKey, true);
+      wrap.remove();
+      // Hand focus back to whatever the user was on before the dialog opened.
+      if(prevFocus && document.contains(prevFocus) && typeof prevFocus.focus === "function") prevFocus.focus();
+      resolve(v);
+    };
     (spec.buttons || [{ label:"OK", value:true, kind:"ok" }]).forEach(b=>{
       const btn = document.createElement("button"); btn.type = "button";
       btn.className = "btn" + (b.kind ? " " + b.kind : ""); btn.textContent = b.label;
@@ -62,12 +106,14 @@ function uiDialog(spec){
       ft.appendChild(btn);
     });
     box.appendChild(ft); wrap.appendChild(box);
+    box.tabIndex = -1;   // focusable as a last resort (a dialog with no buttons)
     wrap.addEventListener("mousedown", e=>{ if(e.target === wrap) close(undefined); });
     document.addEventListener("keydown", onKey, true);
     document.body.appendChild(wrap);
     (primary || ft.lastChild).focus();
   });
 }
+let _dialogSeq = 0;
 
 // ── Elapsed timer ──────────────────────────────────────────────────────────
 let _elapsedTimer = null, _elapsedStart = 0;
@@ -83,27 +129,99 @@ function startElapsedTimer(){
   }, 1000);
 }
 function stopElapsedTimer(){
-  if(_elapsedTimer){ clearInterval(_elapsedTimer); _elapsedTimer=null; }
+  if(_elapsedTimer){
+    clearInterval(_elapsedTimer); _elapsedTimer=null;
+    const el = $('elapsed'); if(el) S.elapsedText = el.textContent;
+  }
+}
+// The activities a run is actually working through: the ones in a single-activity
+// scope, or (for a full Start) the enabled sequence activities. Background
+// activities loop and never "finish", so they are not part of this count.
+function scopedActivities(){
+  return S.runScope
+    ? S.activities.filter(a=>S.runScope.includes(a.id))
+    : S.activities.filter(a=>a.type!=="background" && a.enabled);
 }
 function updateProgress(){
   // A full Start only runs the enabled sequence activities — counting disabled
   // ones too left the bar stuck short of 100% on every run.
-  const seq = S.runScope
-    ? S.activities.filter(a=>S.runScope.includes(a.id))
-    : S.activities.filter(a=>a.type!=="background" && a.enabled);
-  const done = seq.filter(a=>["completed","failed","skipped"].includes(a.status)).length;
+  const seq = scopedActivities();
+  const done = seq.filter(a=>SETTLED.includes(a.status)).length;
   const total = seq.length;
-  $('prog-count').textContent = `${done}/${total}`;
+  $('prog-count').textContent = total ? `${done}/${total}` : "0/0";
   $('prog-bar').style.transform = `scaleX(${total ? done/total : 0})`;
+  // The bar's colour carries the result, so a full bar that ended in a failure
+  // never reads as a clean finish.
+  const bar = $('prog-bar');
+  if(bar) bar.className = "prog-bar-fill" + (S.outcome ? " outcome-" + S.outcome : "");
+}
+
+// ── Run outcome ──────────────────────────────────────────────────────────────
+// The backend reports how a run ended (completed / stopped / failed) with its
+// final running_state. Older builds send no outcome at all, so one is derived
+// from the activities' own final statuses — every scoped activity settled and
+// none failed means the run completed; anything else is an interrupted run.
+function derivedOutcome(){
+  const seq = scopedActivities();
+  if(!seq.length) return "";
+  if(seq.some(a=>a.status === "failed")) return "failed";
+  if(seq.some(a=>a.status === "stopped")) return "stopped";
+  if(seq.every(a=>SETTLED.includes(a.status))) return "completed";
+  return "stopped";   // it ran, nothing failed, but not everything finished
+}
+function outcomeMessage(outcome, data){
+  const seq = scopedActivities();
+  const total = seq.length;
+  const settled = seq.filter(a=>SETTLED.includes(a.status)).length;
+  const failed  = seq.filter(a=>a.status === "failed").length;
+  const noun = total === 1 ? "activity" : "activities";
+  const took = S.elapsedText && S.elapsedText !== "00:00:00" ? ` in ${S.elapsedText}` : "";
+  if(outcome === "completed") return `All ${total} ${noun} finished${took}.`;
+  if(outcome === "failed"){
+    const first = seq.find(a=>a.status === "failed");
+    const which = first && first.name ? ` — “${first.name}” failed` : "";
+    return `${failed} of ${total} ${noun} failed${which}.`;
+  }
+  if(outcome === "stopped") return `Stopped after ${settled} of ${total} ${noun}${took}.`;
+  return "";
+}
+// Show (or clear) the header's run result. `data` may carry the backend's own
+// wording, which wins over anything derived here.
+function setOutcome(outcome, data){
+  const spec = OUTCOME[outcome];
+  S.outcome = spec ? outcome : "";
+  const row = $("run-outcome"), text = $("outcome-text");
+  if(!row || !text) return;
+  if(!spec){ row.hidden = true; text.textContent = ""; paintStatusPill(); updateProgress(); return; }
+  const msg = (data && typeof data.message === "string" && data.message.trim()) || outcomeMessage(outcome, data);
+  row.hidden = false;
+  row.className = "run-outcome outcome-" + spec.cls;
+  text.textContent = msg ? `${spec.word} — ${msg}` : spec.word;
+  paintStatusPill(); updateProgress();
+}
+function dismissOutcome(){
+  const row = $("run-outcome");
+  if(row) row.hidden = true;
+  S.outcome = "";
+  paintStatusPill(); updateProgress();
 }
 
 // ── Status pill ──────────────────────────────────────────────────────────────
-function setStatusPill(key){
+// Idle, the pill reports the last run's outcome (COMPLETED / STOPPED / FAILED)
+// rather than a bare READY, so the header never looks happier than the run was.
+function paintStatusPill(){
+  if(S.running){ setStatusPill(S.paused ? "paused" : "running"); return; }
+  const spec = OUTCOME[S.outcome];
+  setStatusPill(spec ? spec.pill : "ready", spec ? spec.word.toUpperCase() : "");
+}
+function setStatusPill(key, label){
   const pill = $("status-pill"); pill.className = "";
-  if(key==="running"){ pill.classList.add("status-running"); $("status-text").textContent="RUNNING"; }
-  else if(key==="paused"){ pill.classList.add("status-paused"); $("status-text").textContent="PAUSED"; }
-  else if(key==="stopped"){ pill.classList.add("status-stopped"); $("status-text").textContent="STOPPED"; }
-  else { pill.classList.add("status-ready"); $("status-text").textContent="READY"; }
+  if(key==="running"){ pill.classList.add("status-running"); $("status-text").textContent = label || "RUNNING"; }
+  else if(key==="paused"){ pill.classList.add("status-paused"); $("status-text").textContent = label || "PAUSED"; }
+  else if(key==="done"){ pill.classList.add("status-done"); $("status-text").textContent = label || "COMPLETED"; }
+  else if(key==="failed"){ pill.classList.add("status-failed"); $("status-text").textContent = label || "FAILED"; }
+  else if(key==="stopped"){ pill.classList.add("status-stopped"); $("status-text").textContent = label || "STOPPED"; }
+  else { pill.classList.add("status-ready"); $("status-text").textContent = label || "READY"; }
 }
 
 // ── Primary button — Start while idle, Stop while running ────────────────────
@@ -117,6 +235,7 @@ function setPrimary(running){
   const b = $("btn-primary");
   b.classList.toggle("is-stop", running);
   b.innerHTML = uiIco(running ? "square" : "play", "uico-fill") + (running ? "Stop" : "Start");
+  b.title = running ? "Stop the run" : "Start the run (F5 or Ctrl+Enter)";
 }
 // The swapping handler the button's onclick points at.
 async function onPrimary(){ if(S.running) await onStop(); else await onStart(); }
@@ -135,20 +254,56 @@ function refreshButtons(){
   $("app").classList.toggle("is-running", running);
   S.activities.forEach(a=>paintRow(a));   // "Waiting" / "Active" follow the run state
   renderUpdate();
-  setStatusPill(running ? (paused ? "paused" : "running") : "ready");
+  paintStatusPill();
 }
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
 function switchTab(tab){
   document.querySelectorAll(".tab-btn").forEach(b=>{ const on=b.dataset.tab===tab; b.classList.toggle("active",on); b.setAttribute("aria-selected",String(on)); });
   document.querySelectorAll(".tab-pane").forEach(p=>p.classList.toggle("active", p.id==="tab-"+tab));
+  syncTabIndex($("tabs-bar"));
 }
 // Right column: Activity settings | Log | Settings.
 function switchRTab(tab){
   document.querySelectorAll("#r-tabs .rtab").forEach(b=>{ const on=b.dataset.rtab===tab; b.classList.toggle("active",on); b.setAttribute("aria-selected",String(on)); });
   document.querySelectorAll("#r-content .rpane").forEach(p=>p.classList.toggle("active", p.id==="r-"+tab));
+  syncTabIndex($("r-tabs"));
+  // Diagnostics read the disk and the running build — fetch them the first time
+  // the pane that shows them is opened, not on every launch.
+  if(tab==="settings") ensureDiagnostics();
   // Lines that arrived while the pane was hidden couldn't scroll it — jump to the newest.
-  if(tab==="log"){ const body = $("log-body"); body.scrollTop = body.scrollHeight; }
+  if(tab==="log"){
+    const body = $("log-body"); body.scrollTop = body.scrollHeight;
+    renderLogCount();
+  }
+}
+
+// Roving tabindex: the selected tab is the one Tab reaches; the arrows move
+// between tabs (WAI-ARIA tablist pattern) so the whole ring is one tab stop.
+function syncTabIndex(bar){
+  if(!bar) return;
+  bar.querySelectorAll('[role="tab"]').forEach(b=>{ b.tabIndex = b.classList.contains("active") ? 0 : -1; });
+}
+function wireTabNav(barId, attr, activate){
+  const bar = $(barId);
+  if(!bar) return;
+  const tabs = [...bar.querySelectorAll('[role="tab"]')];
+  tabs.forEach((btn, i)=>{
+    btn.addEventListener("keydown", e=>{
+      let next = -1;
+      if(e.key === "ArrowRight" || e.key === "ArrowDown") next = (i + 1) % tabs.length;
+      else if(e.key === "ArrowLeft" || e.key === "ArrowUp") next = (i - 1 + tabs.length) % tabs.length;
+      else if(e.key === "Home") next = 0;
+      else if(e.key === "End") next = tabs.length - 1;
+      else return;
+      e.preventDefault();
+      const target = tabs[next];
+      activate(target.dataset[attr]);
+      target.focus();
+      syncTabIndex(bar);
+    });
+  });
+  syncTabIndex(bar);
 }
 
 // ── Build activity rows ──────────────────────────────────────────────────────
@@ -299,6 +454,7 @@ function paintRow(a, row){
   }
   row.classList.toggle("task-running", st==="running");
   row.classList.toggle("task-failed", st==="failed");
+  row.classList.toggle("task-stopped", st==="stopped");
   row.classList.toggle("task-off", !a.enabled);
   const meta = row.querySelector("[data-meta]");
   if(meta) renderMeta(meta, a, st, inRun);
@@ -421,6 +577,48 @@ function buildSettingsPanel(a){
         cb.setAttribute("aria-label", v.label||v.name); cb.setAttribute("aria-pressed",String(!!v.value));
         cb.onclick = ()=>{ v.value=!v.value; cb.classList.toggle("checked",v.value); cb.setAttribute("aria-pressed",String(!!v.value)); api().set_activity_var(a.id,v.name,v.value); };
         row.appendChild(cb);
+      } else if(type==="select" && v.display==="toggle-group"){
+        row.classList.add("setting-row-options");
+        const choices=document.createElement("div"); choices.className="setting-toggle-group";
+        const multi=!!v.multiple;
+        const checked=option=>multi?(Array.isArray(v.value)&&v.value.includes(option)):String(v.value)===String(option);
+        choices.setAttribute("role",multi?"group":"radiogroup"); choices.setAttribute("aria-label",v.label||v.name);
+        const options=[...new Set(v.options||[])];
+        const inputs=[];
+        const error=document.createElement("span"); error.className="setting-choice-error";
+        error.setAttribute("role","alert"); error.hidden=true;
+        // Native radios provide exclusive selection and arrow-key navigation.
+        const name="var-choice-"+a.id+"-"+v.name;
+        options.forEach(option=>{
+          const label=document.createElement("label"); label.className="setting-choice";
+          const input=document.createElement("input"); input.type=multi?"checkbox":"radio"; input.name=name;
+          input.value=option; input.checked=checked(option);
+          const text=document.createElement("span"); text.textContent=option;
+          input.onchange=async()=>{
+            if(!multi&&!input.checked) return;
+            const value=multi?options.filter((o,i)=>inputs[i].checked):option;
+            error.hidden=true;
+            const hadFocus=document.activeElement===input;
+            inputs.forEach(el=>{ el.disabled=true; });
+            try{
+              const ok=await api().set_activity_var(a.id,v.name,value);
+              if(!ok) throw new Error("Setting was not saved");
+              v.value=value;
+            }catch(_){
+              error.textContent="Couldn't save this choice. Please try again."; error.hidden=false;
+            }finally{
+              inputs.forEach((el,i)=>{ el.checked=checked(options[i]); el.disabled=false; });
+              if(hadFocus) input.focus();
+            }
+          };
+          inputs.push(input); label.append(input,text); choices.appendChild(label);
+        });
+        if(!options.length){
+          const empty=document.createElement("span"); empty.className="setting-label";
+          empty.textContent="Add options in Designer"; choices.appendChild(empty);
+        }
+        row.appendChild(choices);
+        row.appendChild(error);
       } else if(type==="select"){
         const sel = document.createElement("select");
         (v.options||[]).forEach(o=>{ const op=document.createElement("option"); op.value=op.textContent=o; if(String(v.value)===String(o))op.selected=true; sel.appendChild(op); });
@@ -561,19 +759,43 @@ function setConnected(on, name, serial){
 }
 
 // ── Log ──────────────────────────────────────────────────────────────────────
-function updateLogCount(){
-  const n = S.logCount ? String(S.logCount) : "";
-  const el = $("log-count"); if(el) el.textContent = n;
-  const tab = $("rtab-log-count"); if(tab) tab.textContent = n;
+// The badge counts what the operator can actually read: while a search or a
+// level filter is hiding lines it shows "shown/total", otherwise just the total.
+// S.logTotal keeps counting past the 500 lines the DOM retains, so the number
+// never silently stops at the trim cap.
+function renderLogCount(){
+  const body = $("log-body");
+  const total = S.logTotal;
+  let shown = 0;
+  if(body){
+    body.querySelectorAll(".log-line").forEach(l=>{ if(!l.classList.contains("hidden")) shown++; });
+    // Lines trimmed off the top are gone for good; the visible count can never
+    // exceed what the DOM holds.
+    shown = Math.min(shown, body.children.length);
+  }
+  const filtered = shown !== total;
+  const txt = total ? (filtered ? `${shown}/${total}` : String(total)) : "";
+  const el = $("log-count");
+  if(el){
+    el.textContent = txt;
+    el.title = filtered ? `${shown} of ${total} lines shown` : `${total} lines`;
+  }
+  const tab = $("rtab-log-count"); if(tab) tab.textContent = txt;
+}
+let _logCountTimer = null;
+function scheduleLogCount(){
+  if(_logCountTimer) return;
+  _logCountTimer = setTimeout(()=>{ _logCountTimer = null; renderLogCount(); }, 150);
 }
 function appendLog(e){
   const body = $("log-body");
-  const query = $("log-search").value.trim().toLowerCase();
   // Follow new lines only when already at the bottom — scrolling up to read an
   // earlier error must not be yanked away by the next line.
   const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+  const level = e.level || "info";
   const line = document.createElement("div");
-  line.className = `log-line fade-in lv-${e.level||"info"} k-${e.kind||"app"}`;
+  line.className = `log-line fade-in lv-${level} k-${e.kind||"app"}`;
+  line.dataset.level = level;
   // Every line starts with "[Activity]" (or "[Runner]"); older entries only carry msg.
   const text = e.text != null ? e.text : e.msg;
   const scope = e.scope
@@ -581,21 +803,161 @@ function appendLog(e){
     : "";
   line.innerHTML =
     `<span class="log-ts">${escHtml(e.ts)}</span>`+
-    `<span class="log-tag log-${e.level}">${LOG_TAG[e.level]||"INF"}</span>`+
+    `<span class="log-tag log-${level}">${LOG_TAG[level]||"INF"}</span>`+
     `<span class="log-msg">${scope}${escHtml(text)}</span>`;
-  if(query && !line.querySelector(".log-msg").textContent.toLowerCase().includes(query)) line.classList.add("hidden");
+  line.hiddenByFilter = !logLineVisible(line);
+  line.classList.toggle("hidden", line.hiddenByFilter);
   body.appendChild(line);
+  S.logTotal++;
   while(body.children.length>500) body.removeChild(body.firstChild);
   S.logCount = body.children.length;
-  updateLogCount();
+  scheduleLogCount();
   if(atBottom) body.scrollTop = body.scrollHeight;
 }
-function filterLog(query){
-  const q = query.trim().toLowerCase();
+// Does this line pass the current search text and level filter?
+function logLineVisible(line){
+  const query = ($("log-search")?.value || "").trim().toLowerCase();
+  if(query && !line.querySelector(".log-msg").textContent.toLowerCase().includes(query)) return false;
+  const levels = LOG_LEVELS[S.logLevel];
+  if(levels && !levels.includes(line.dataset.level || "info")) return false;
+  return true;
+}
+// One pass over the lines, applying search + level together — the two filters
+// must not undo each other (each used to write .hidden on its own).
+function applyLogFilter(){
   $("log-body").querySelectorAll(".log-line").forEach(line=>{
-    const msg = line.querySelector(".log-msg").textContent;
-    line.classList.toggle("hidden", !!q && !msg.toLowerCase().includes(q));
+    line.classList.toggle("hidden", !logLineVisible(line));
   });
+  renderLogCount();
+}
+function filterLog(){ applyLogFilter(); }
+function setLogLevel(level){
+  S.logLevel = LOG_LEVELS[level] !== undefined ? level : "all";
+  applyLogFilter();
+}
+function clearLog(){
+  $("log-body").innerHTML = "";
+  S.logCount = 0; S.logTotal = 0;
+  renderLogCount();
+}
+
+// ── Log export / diagnostics notes ───────────────────────────────────────────
+// Short-lived feedback under the log header (and in the Diagnostics card), so
+// "Export" says where the file went instead of failing silently.
+let _noteTimer = null;
+function setLogNote(text, kind, autoClear){
+  const el = $("log-note");
+  if(el){
+    el.className = "log-note" + (kind ? " " + kind : "");
+    el.textContent = text || "";
+  }
+  if(_noteTimer){ clearTimeout(_noteTimer); _noteTimer = null; }
+  if(text && autoClear) _noteTimer = setTimeout(()=>{ _noteTimer = null; setLogNote("", ""); }, 6000);
+}
+function setDiagNote(text, kind){
+  const el = $("diag-status");
+  if(el){ el.className = "diag-status" + (kind ? " " + kind : ""); el.textContent = text || ""; }
+}
+// Whether this build exposes a given bridge method — older Runners don't have
+// diagnostics or log export, and a missing method must read as "not available"
+// rather than throwing.
+function hasApi(name){
+  const a = window.pywebview && window.pywebview.api;
+  return !!(a && typeof a[name] === "function");
+}
+async function onExportLog(){
+  if(S.exporting) return;
+  if(!hasApi("export_log")){
+    setLogNote("Exporting the log isn't available in this build.", "warn");
+    setDiagNote("Exporting the log isn't available in this build.", "warn");
+    return;
+  }
+  S.exporting = true;
+  const btns = ["btn-log-export","btn-diag-export"].map($).filter(Boolean);
+  btns.forEach(b=>b.disabled = true);
+  setLogNote("Saving the log…", "");
+  let res = null;
+  try{ res = await api().export_log(); }catch(e){ res = { ok:false, error:String(e) }; }
+  S.exporting = false;
+  btns.forEach(b=>b.disabled = false);
+  // The backend opens a native save dialog: ok + path, cancelled, or an error.
+  if(res && res.ok){
+    const where = res.path ? ` to ${res.path}` : "";
+    setLogNote(`Log saved${where}.`, "ok", true);
+    setDiagNote(`Log saved${where}.`, "ok");
+  } else if(res && res.cancelled){
+    setLogNote("Export cancelled — nothing was saved.", "", true);
+    setDiagNote("Export cancelled — nothing was saved.", "");
+  } else {
+    const why = (res && res.error) ? `: ${res.error}` : ".";
+    setLogNote(`Couldn't save the log${why}`, "warn");
+    setDiagNote(`Couldn't save the log${why}`, "warn");
+  }
+}
+async function onOpenDataFolder(){
+  if(!hasApi("open_data_folder")){
+    setDiagNote("Opening the data folder isn't available in this build.", "warn");
+    return;
+  }
+  let ok = false;
+  try{ ok = await api().open_data_folder(); }catch(_){ }
+  setDiagNote(ok ? "Opened the Runner's data folder." : "Couldn't open the data folder.", ok ? "ok" : "warn");
+}
+
+// ── Diagnostics ──────────────────────────────────────────────────────────────
+// A read-only summary of the build, the loaded workflow, its files and the
+// device — the questions a bug report always asks. Rendered generically, so a
+// backend that reports more (or different) keys still shows up here.
+let _diagDone = false;
+function ensureDiagnostics(force){
+  if(_diagDone && !force) return;
+  if(!$("diag-list")) return;
+  _diagDone = true;
+  onDiagnostics(!!force);
+}
+function diagLabel(key){
+  const s = String(key).replace(/[_-]+/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2").trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
+}
+function diagRows(d){
+  if(d == null) return [];
+  if(typeof d === "string") return d.trim() ? [["Report", d]] : [];
+  if(Array.isArray(d)) return d.filter(x=>x && x.label != null).map(x=>[String(x.label), String(x.value ?? "")]);
+  const src = (d.items && typeof d.items === "object" && !Array.isArray(d.items)) ? d.items : d;
+  const out = [];
+  for(const [k, v] of Object.entries(src)){
+    if(v == null || v === "") continue;
+    if(Array.isArray(v)){
+      if(!v.length || v.some(x=>x != null && typeof x === "object")) continue;
+      out.push([diagLabel(k), v.join(", ")]);
+    } else if(typeof v === "object"){
+      continue;   // nested detail belongs to the exported log, not this list
+    } else {
+      out.push([diagLabel(k), String(v)]);
+    }
+  }
+  return out;
+}
+async function onDiagnostics(force){
+  const list = $("diag-list");
+  if(!list) return;
+  if(!hasApi("get_diagnostics")){
+    list.innerHTML = "";
+    setDiagNote("Diagnostics aren't available in this build — Export log… still works.", "warn");
+    ["btn-diag-refresh","btn-diag-export","btn-diag-folder"].forEach(id=>{ const b = $(id); if(b) b.disabled = true; });
+    return;
+  }
+  setDiagNote("Reading this Runner's details…", "");
+  let d = null;
+  try{ d = await api().get_diagnostics(); }catch(e){ d = { error:String(e) }; }
+  S.diagnostics = d;
+  const rows = diagRows(d);
+  list.innerHTML = rows.map(([k,v])=>
+    `<dt>${escHtml(k)}</dt><dd class="mono" title="${escHtml(v)}">${escHtml(v)}</dd>`).join("");
+  const failed = !!(d && d.ok === false && d.error);
+  if(failed) setDiagNote(`Couldn't read diagnostics: ${d.error}`, "warn");
+  else if(!rows.length) setDiagNote("This build reported no diagnostics.", "");
+  else setDiagNote(`Read from ${rows.length} source${rows.length === 1 ? "" : "s"}.`, "ok");
 }
 
 // ── Speedhack ────────────────────────────────────────────────────────────────
@@ -908,7 +1270,7 @@ window.__recv = function(raw){
   let ev; try{ ev=JSON.parse(raw); }catch{ return; }
   const { type, data } = ev;
   if(type==="log"){ appendLog(data); return; }
-  if(type==="log_cleared"){ $("log-body").innerHTML=""; S.logCount=0; updateLogCount(); return; }
+  if(type==="log_cleared"){ clearLog(); return; }
   if(type==="devices_update"){
     S.devices=data.devices||[]; S.connectedSerial=data.serial||null;
     setConnected(data.connected, data.name, data.serial); rebuildDevices(S.devices, data.serial);
@@ -926,9 +1288,18 @@ window.__recv = function(raw){
   if(type==="flow_loaded"){ applyFlow(data); return; }
   if(type==="launch_blocked"){ onLaunchBlocked(data); return; }
   if(type==="running_state"){
+    const wasRunning = S.running;
     S.running=!!data.running; S.paused=!!data.paused;
-    if(S.running){ $('header-progress').style.display='flex'; if(!_elapsedTimer) startElapsedTimer(); }
-    else { stopElapsedTimer(); }
+    if(S.running){
+      setOutcome("");   // a new run clears the previous run's result
+      $('header-progress').style.display='flex'; if(!_elapsedTimer) startElapsedTimer();
+    } else {
+      stopElapsedTimer();
+      // New backends name the outcome; older ones send none, so fall back to
+      // what the activities' own statuses say happened.
+      if("outcome" in data) setOutcome(data.outcome, data);
+      else if(wasRunning) setOutcome(derivedOutcome(), data);
+    }
     refreshButtons(); return;
   }
   if(type==="activity_update"){
@@ -1039,8 +1410,9 @@ async function onUpdateApply(){
 // ── Handlers ───────────────────────────────────────────────────────────────
 const api = () => window.pywebview.api;
 async function onStart(){
-  if(!S.loaded) return;
+  if(!S.loaded || S.running) return;
   S.runScope = null;
+  setOutcome("");   // the previous run's result no longer applies
   S.activities.filter(a=>a.type!=="background").forEach(a=>setActStatus(a.id,"pending"));
   $('header-progress').style.display='flex'; startElapsedTimer(); updateProgress();
   let ok = false;
@@ -1078,9 +1450,10 @@ async function onRunToggle(id){
   await onRunActivity(id);
 }
 async function onRunActivity(id){
-  if(!S.loaded || S.running) return;
+  if(!S.loaded || S.running || S.exporting) return;
   if(!S.activities.some(a=>a.id===id)) return;
   S.runScope = [id];
+  setOutcome("");
   setActStatus(id, "pending");
   $('header-progress').style.display='flex'; startElapsedTimer(); updateProgress();
   let ok = false;
@@ -1089,6 +1462,38 @@ async function onRunActivity(id){
 }
 async function onStop(){ await api().stop(); }
 async function onPause(){ const r=await api().pause(); S.paused=!!(r&&r.paused); refreshButtons(); }
+
+// ── Keyboard ─────────────────────────────────────────────────────────────────
+// Deliberately no single-key shortcut: a stray keypress must never start a
+// macro. Start is F5 (or Ctrl+Enter, which the OS does not claim first) and
+// pause is F6 — both are keyed on the function keys an operator already reaches
+// for, and both are ignored while a dialog or a text field has focus.
+function isTypingTarget(el){
+  if(!el) return false;
+  if(el.isContentEditable) return true;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
+}
+function onGlobalKey(e){
+  if(document.querySelector(".ui-modal-wrap")) return;   // a dialog owns the keyboard
+  if(e.ctrlKey && e.key === "Enter" && !e.altKey && !e.shiftKey){
+    e.preventDefault();
+    if(S.running) onStop(); else onStart();
+    return;
+  }
+  if(e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+  if(isTypingTarget(document.activeElement)) return;
+  if(e.key === "F5"){
+    // Start only, never a stop: F5 is the key people jab out of habit, and a run
+    // half an hour in must not die to a reflex. Stopping stays a deliberate act
+    // (the button, or Ctrl+Enter to toggle).
+    e.preventDefault();
+    if(!S.running) onStart();
+  } else if(e.key === "F6"){
+    e.preventDefault();
+    if(S.running) onPause();
+  }
+}
 async function onClearLog(){ await api().clear_log(); }
 async function onDeviceChange(serial){ if(serial){ S.connectedSerial=serial; await api().select_device(serial); } }
 async function onCaptureBackendChange(backend){
@@ -1138,6 +1543,17 @@ function pvApply(){
 }
 function togglePreviewMax(){ pvMaxed=!pvMaxed; if(pvMaxed) pvActive=true; pvApply(); }
 function togglePreviewHide(){ pvActive=!pvActive; if(pvActive) pvMaxed=false; pvApply(); }
+// Escape leaves the maximized preview — the same gesture the shared panel
+// chrome uses, and the only way back that does not require finding the button.
+function onPreviewKey(e){
+  if(e.key !== "Escape" || !pvMaxed) return;
+  const t = e.target;
+  if(t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA")) return;
+  e.preventDefault();
+  pvMaxed = false;
+  pvApply();
+  const btn = $("pv-max"); if(btn) btn.focus();
+}
 window.__recvFrame = function(dataUrl,w,h){
   const img=$("pv-img"), empty=$("pv-empty");
   if(!img) return;
@@ -1180,6 +1596,7 @@ function wireAppearance(){
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init(){
   wireAppearance();
+  document.addEventListener("keydown", onGlobalKey, true);
   setupListDnD($("seq-list"));
   setupListDnD($("bg-list"));
   let tries=0;

@@ -15,17 +15,17 @@
   /* At least 4.69:1 on every product surface, including --bg (WCAG AA). */
   --muted:     #667383;
 
-  --accent:       #245fc7;
-  --accent-hover: #194b9f;
-  --accent-bg:    #eaf1fb;
-  --accent-bd:    #bfd1ec;
+  --accent:       #18181b;
+  --accent-hover: #09090b;
+  --accent-bg:    #f4f4f5;
+  --accent-bd:    #d4d4d8;
   /* --ok remains legible under white button text (4.96:1). */
-  --ok:           #1b8049;
-  --ok-hover:     #166d3f;
-  --ok-bg:        #e8f5ed;
-  --ok-bd:        #cfead9;
+  --ok:           #18181b;
+  --ok-hover:     #09090b;
+  --ok-bg:        #f4f4f5;
+  --ok-bd:        #d4d4d8;
   /* Foreground for success text/badges that sit on --ok-bg. */
-  --ok-ink:       #1c7a44;
+  --ok-ink:       #18181b;
   --warn:         #9c6c12;
   --warn-bg:      #fdf6e9;
   --warn-bd:      #e7d5a4;

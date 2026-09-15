@@ -267,6 +267,9 @@ function updateLogCount(){
 function wfToggleVarsPanel(){
   wfVarsCollapsed = !wfVarsCollapsed;
   if(typeof wfPersistPanelState==="function") wfPersistPanelState();
+  const panel=$("wf-vars-panel"), toggle=$("wf-vars-collapse");
+  if(panel) panel.classList.toggle("collapsed",wfVarsCollapsed);
+  if(toggle) toggle.setAttribute("aria-expanded",String(!wfVarsCollapsed));
   wfRenderVarsPanel();
 }
 

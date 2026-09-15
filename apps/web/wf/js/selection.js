@@ -22,9 +22,6 @@ function wfDeleteNodes(ids){
   wfPushUndo();
   g.nodes=g.nodes.filter(n=>!del.includes(n.id));
   g.edges=g.edges.filter(e=>!del.includes(e.from)&&!del.includes(e.to));
-  // A merge with only one block left is no longer a stack — dissolve it.
-  const stackCount={}; g.nodes.forEach(n=>{ if(n.stack) stackCount[n.stack]=(stackCount[n.stack]||0)+1; });
-  g.nodes.forEach(n=>{ if(n.stack && stackCount[n.stack]<2) n.stack=null; });
   WF.sel=WF.sel.filter(id=>!del.includes(id));
   if(del.includes(WF.selectedNode)) WF.selectedNode=null;
   wfRenderCanvas(); wfRenderInspector();
@@ -34,7 +31,7 @@ function wfDeleteNodes(ids){
 }
 
 // ── Copy / paste ──────────────────────────────────────────────────────────────
-// Clipboard holds detached clones of the copied nodes (params, note, stacking)
+// Clipboard holds detached clones of the copied nodes (params, note, timing)
 // plus the edges *internal* to the selection, referenced by array index so they
 // survive id remapping. Works across activities/functions (it's not tied to the
 // current graph). The 'start' node is never copyable.
@@ -50,7 +47,7 @@ function wfCopy(){
     return { type:n.type, x:n.x, y:n.y, note:n.note||"", log:n.log||"", outputLog:n.outputLog||"", showPreview:!!n.showPreview,
       delayBefore:n.delayBefore||0, delayAfter:n.delayAfter||0,
       retryCount:n.retryCount||0, retryDelay:n.retryDelay||0, screenshotOnFail:!!n.screenshotOnFail,
-      stack:n.stack||null, params:JSON.parse(JSON.stringify(n.params||{})) }; });
+      params:JSON.parse(JSON.stringify(n.params||{})) }; });
   const edges=g.edges.filter(e=>idset.has(e.from)&&idset.has(e.to))
     .map(e=>({fromIdx:ids.indexOf(e.from), fromPort:e.fromPort, toIdx:ids.indexOf(e.to), toPort:e.toPort||"in"}));
   const minX=Math.min(...nodes.map(n=>n.x)), minY=Math.min(...nodes.map(n=>n.y));
@@ -73,7 +70,6 @@ function wfPaste(opts){
     dy=wfSnap((opts.clientY-wr.top)/wfZoom - clip.minY - 14);
   } else { wfPasteShift+=24; dx=wfPasteShift; dy=wfPasteShift; }
   const newIds=clip.nodes.map(()=>wfUid());
-  const stackMap={};   // remap copied stack ids → fresh ids so paste stays its own merge
   clip.nodes.forEach((n,i)=>{
     const node=wfNewNode(n.type, n.x+dx, n.y+dy);
     node.id=newIds[i];
@@ -86,14 +82,9 @@ function wfPaste(opts){
     if(n.retryCount!==undefined) node.retryCount=n.retryCount;
     if(n.retryDelay!==undefined) node.retryDelay=n.retryDelay;
     if(n.screenshotOnFail!==undefined) node.screenshotOnFail=n.screenshotOnFail;
-    if(n.stack){ stackMap[n.stack]=stackMap[n.stack]||wfStackId(); node.stack=stackMap[n.stack]; }
     g.nodes.push(node);
   });
   clip.edges.forEach(e=>g.edges.push({from:newIds[e.fromIdx], fromPort:e.fromPort, to:newIds[e.toIdx], toPort:e.toPort||"in"}));
-  // A partially-copied stack (only some members) can leave a lone tagged node —
-  // drop the tag so it isn't a one-block "merge".
-  const stkCnt={}; g.nodes.forEach(n=>{ if(n.stack) stkCnt[n.stack]=(stkCnt[n.stack]||0)+1; });
-  g.nodes.forEach(n=>{ if(n.stack && stkCnt[n.stack]<2) n.stack=null; });
   WF.sel=newIds.slice(); WF.selectedNode=newIds.length===1?newIds[0]:null;
   wfRenderCanvas(); wfMarkSel(); wfRenderInspector();
   wfPopNodes(newIds);

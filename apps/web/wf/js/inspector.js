@@ -327,7 +327,7 @@ function wfFieldLabel(f){
 // dropdown on text fields (log, message, format string…).
 function wfVarInfoMap(){
   const map={};
-  const walk=(vars,prefix,scope)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; if(!map[full]) map[full]={type:v.type||"bool", scope, value:v.value, options:v.options}; walk(v.children,full,scope); }); };
+  const walk=(vars,prefix,scope)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; if(!map[full]) map[full]={type:v.type||"bool", scope, value:v.value, options:v.options, multiple:v.display==="toggle-group"&&!!v.multiple}; walk(v.children,full,scope); }); };
   walk(WF.globals,"","global");
   const act=wfCurAct(); if(act) walk(act.vars,"","activity");
   const g=wfGraph(); wfGraphVarNames(g).forEach(n=>{ if(!map[n]) map[n]={type:"text", scope:"node", value:undefined}; });
@@ -497,7 +497,12 @@ function wfVarValueKind(node,f){
   if(info.type==="bool") return equality ? {type:"bool", opts:["true","false"]} : null;
   if(info.type==="select"){
     const opts=(info.options||[]).map(String).filter(Boolean);
-    return equality && opts.length ? {type:"select", opts} : null;
+    if(info.multiple){
+      if(node.type==="set_var" || op==="==" || op==="!=") return {type:"multi",opts};
+      return (op==="contains"||op==="!contains")&&opts.length?{type:"select",opts}:null;
+    }
+    const allowedOps = equality || op==="contains" || op==="!contains";
+    return allowedOps && opts.length ? {type:"select", opts} : null;
   }
   if(info.type==="number" && !WF_TEXT_CMP_OPS.has(op)) return {type:"number"};
   return null;
@@ -506,6 +511,7 @@ function wfVarValueKind(node,f){
 // something else (another variable's name, a {placeholder}, a stray literal).
 function wfVarValueOpt(kind,raw){
   if(!kind || !kind.opts) return null;
+  if(kind.type==="multi") return Array.isArray(raw)?raw:null;
   const s=String(raw===undefined||raw===null?"":raw).trim();
   if(kind.type==="bool"){ const l=s.toLowerCase(); return kind.opts.includes(l)?l:null; }
   return kind.opts.includes(s)?s:null;
@@ -516,6 +522,11 @@ function wfVarValueOpt(kind,raw){
 function wfNormalizeVarValue(node){
   const kind=wfVarValueKind(node,{k:"value"});
   if(!kind || !kind.opts) return;
+  if(kind.type==="multi"){
+    if(Array.isArray(node.params.value)||wfVarBadgeInfo(String(node.params.value||""))) return;
+    wfPushUndoDebounced(); node.params.value=kind.opts.includes(node.params.value)?[node.params.value]:[];
+    wfUpdNodeSum(node); return;
+  }
   const raw=node.params.value;
   const cur=String(raw===undefined||raw===null?"":raw).trim();
   if(wfVarBadgeInfo(cur)) return;
@@ -552,7 +563,18 @@ function wfVarRefField(node,f){
     const opt=wfVarValueOpt(kind,cur);
     const pick=wfVarPickBtn(name=>set(name), "Use a variable as this value");
 
-    if(opt!==null){
+    if(kind&&kind.type==="multi"&&Array.isArray(cur)){
+      const choices=document.createElement("div"); choices.className="wf-option-choices";
+      kind.opts.forEach(option=>{
+        const label=document.createElement("label"); label.className="wf-option-choice";
+        const input=document.createElement("input"); input.type="checkbox"; input.checked=cur.includes(option);
+        input.onchange=()=>set(input.checked?[...cur,option]:cur.filter(o=>o!==option));
+        const text=document.createElement("span"); text.textContent=option; label.append(input,text); choices.appendChild(label);
+      });
+      row.append(choices,pick); return;
+    }
+
+    if(kind && kind.opts && kind.opts.length>0){
       // Short option sets read best as a segmented pick; long ones as a dropdown.
       const fits=kind.type==="bool" || (kind.opts.length<=3 && kind.opts.join("").length<=18);
       if(fits){
@@ -592,12 +614,12 @@ function wfVarRefField(node,f){
     // Typing a valid option by hand ("false") switches back to the quick pick.
     inp.onchange=()=>{ if(wfVarValueOpt(kind,inp.value)!==null) set(wfVarValueOpt(kind,inp.value)); };
     row.appendChild(inp); row.appendChild(pick);
-    if(kind && kind.opts){
+    if(kind && kind.opts && kind.opts.length>0){
       const quick=document.createElement("button"); quick.type="button"; quick.className="btn sm ico wf-var-pick wf-val-quick";
       quick.title=kind.type==="bool" ? "Pick true / false" : "Pick one of the options";
       quick.setAttribute("aria-label",quick.title);
       quick.innerHTML=uiIco("toggle-left","uico-1");
-      quick.onclick=e=>{ e.stopPropagation(); set(kind.opts[0]); };
+      quick.onclick=e=>{ e.stopPropagation(); set(kind.type==="multi"?[]:kind.opts[0]); };
       row.appendChild(quick);
     }
     row.appendChild(badge);
@@ -1005,15 +1027,11 @@ function wfVarRow(act,v,idx,depth){
     wfRenderInspector();
   };
   r2.appendChild(ty);
-  r2.appendChild(wfVarValue(v));
+  if(v.type!=="select") r2.appendChild(wfVarValue(v));
   card.appendChild(r1); card.appendChild(r2);
   // Line 3 (select only): options.
   if(v.type==="select"){
-    const r3=document.createElement("div"); r3.className="wf-var-row";
-    const opt=document.createElement("input"); opt.type="text"; opt.placeholder="options: A, B, C"; opt.value=(v.options||[]).join(", ");
-    opt.style.cssText="flex:1;min-width:0;font-size:10.5px;";
-    opt.onchange=()=>{ wfPushUndoDebounced(); v.options=opt.value.split(",").map(s=>s.trim()).filter(Boolean); if(!v.options.includes(v.value)) v.value=v.options[0]||""; wfRenderInspector(); };
-    r3.appendChild(opt); card.appendChild(r3);
+    card.appendChild(wfVarOptionsEditor(v));
   }
   return card;
 }
@@ -1035,6 +1053,115 @@ function findParentVarArr(arr, idx, depth){
 function findParentVarIdx(arr, idx, depth){
   const result=wfFindVarInArr(arr, idx, depth, 0);
   return result?result.i:-1;
+}
+// Edit one option per row; both radio columns write the same default/test value.
+function wfVarOptionsEditor(v){
+  const editor=document.createElement("div"); editor.className="wf-options-editor";
+  const uid=wfUid();
+  function changed(){ if(typeof wfRenderVarsPanel==="function") wfRenderVarsPanel(); }
+  function draw(){
+    editor.replaceChildren();
+    const options=v.options||[];
+    const multi=v.display==="toggle-group"&&!!v.multiple;
+    const checked=option=>multi?(Array.isArray(v.value)&&v.value.includes(option)):v.value===option;
+    const heading=document.createElement("div"); heading.className="wf-options-heading";
+    const title=document.createElement("span"); title.textContent="Options";
+    const def=document.createElement("span"); def.textContent="Default";
+    heading.append(title,def); editor.appendChild(heading);
+    const radios=[], previews=[];
+    function select(value){
+      wfPushUndoDebounced();
+      if(multi){ const values=Array.isArray(v.value)?v.value:[]; v.value=values.includes(value)?values.filter(o=>o!==value):[...values,value]; }
+      else v.value=value;
+      changed();
+      radios.forEach((r,i)=>{ r.checked=checked(options[i]); });
+      previews.forEach((r,i)=>{ r.checked=checked(options[i]); });
+    }
+    options.forEach((option,index)=>{
+      const row=document.createElement("div"); row.className="wf-option-row";
+      const input=document.createElement("input"); input.type="text"; input.value=option;
+      input.setAttribute("aria-label","Option "+(index+1));
+      input.oninput=()=>input.setCustomValidity("");
+      input.onchange=()=>{
+        const value=input.value.trim();
+        if(!value || options.some((o,i)=>i!==index&&o===value)){
+          input.setCustomValidity(value?"Each option must be unique.":"Enter an option name.");
+          input.reportValidity(); input.value=option; return;
+        }
+        if(value===option){ input.value=value; return; }
+        wfPushUndoDebounced(); options[index]=value;
+        if(v.value===option) v.value=value;
+        else if(multi) v.value=(v.value||[]).map(o=>o===option?value:o);
+        changed(); draw();
+        editor.querySelectorAll('.wf-option-row input[type="text"]')[index]?.focus();
+      };
+      const radio=document.createElement("input"); radio.type=multi?"checkbox":"radio"; radio.name=uid+"-default";
+      radio.checked=checked(option); radio.setAttribute("aria-label","Use "+option+" as default");
+      radio.onchange=()=>select(option); radios.push(radio);
+      const del=document.createElement("button"); del.type="button"; del.className="btn sm ico";
+      del.innerHTML=wfIco("x"); del.title="Remove "+option; del.setAttribute("aria-label",del.title);
+      del.disabled=options.length===1; del.onclick=()=>{
+        wfPushUndoDebounced(); options.splice(index,1);
+        if(multi) v.value=(v.value||[]).filter(o=>options.includes(o));
+        else if(!options.includes(v.value)) v.value=options[0]||"";
+        changed(); draw();
+        editor.querySelectorAll('.wf-option-row input[type="text"]')[Math.min(index,options.length-1)]?.focus();
+      };
+      row.append(input,radio,del); editor.appendChild(row);
+    });
+    const add=document.createElement("button"); add.type="button"; add.className="btn sm wf-option-add";
+    add.textContent="+ Add option"; add.onclick=()=>{
+      wfPushUndoDebounced(); let i=options.length+1;
+      while(options.includes("Option "+i)) i++;
+      const value="Option "+i; v.options=[...options,value];
+      if(!multi&&!options.includes(v.value)) v.value=value;
+      changed(); draw();
+      const inputs=editor.querySelectorAll('.wf-option-row input[type="text"]');
+      inputs[inputs.length-1]?.focus(); inputs[inputs.length-1]?.select();
+    };
+    editor.append(add,wfVarDisplay(v,()=>{ changed(); draw(); }));
+    if(v.display==="toggle-group"){
+      const label=document.createElement("label"); label.className="wf-var-row";
+      const toggle=document.createElement("input"); toggle.type="checkbox"; toggle.checked=multi;
+      toggle.onchange=()=>{
+        wfPushUndoDebounced(); v.multiple=toggle.checked;
+        v.value=toggle.checked?(options.includes(v.value)?[v.value]:[]):((v.value||[])[0]||options[0]||"");
+        changed(); draw();
+      };
+      label.append(toggle,document.createTextNode("Allow multiple choices")); editor.appendChild(label);
+    }
+    const fieldset=document.createElement("fieldset"); fieldset.className="wf-option-preview";
+    const legend=document.createElement("legend"); legend.textContent="Default / Test value"; fieldset.appendChild(legend);
+    const choices=document.createElement("div"); choices.className="wf-option-choices";
+    options.forEach(option=>{
+      const label=document.createElement("label"); label.className="wf-option-choice";
+      const radio=document.createElement("input"); radio.type=multi?"checkbox":"radio"; radio.name=uid+"-preview";
+      radio.checked=checked(option); radio.onchange=()=>select(option); previews.push(radio);
+      const text=document.createElement("span"); text.textContent=option;
+      label.append(radio,text); choices.appendChild(label);
+    });
+    fieldset.appendChild(choices);
+    const help=document.createElement("p"); help.className="wf-options-help";
+    help.textContent=options.length?"Used when testing in Designer and as the Runner default.":"Add an option to choose a default.";
+    editor.append(fieldset,help);
+  }
+  draw(); return editor;
+}
+// Local select variables can use either a dropdown or exclusive toggles in Runner.
+function wfVarDisplay(v,onchange){
+  const row=document.createElement("label"); row.className="wf-var-row";
+  const title=document.createElement("span"); title.textContent="Runner display";
+  const select=document.createElement("select");
+  [["dropdown","Dropdown"],["toggle-group","Group toggle"]].forEach(([value,text])=>{
+    const option=document.createElement("option"); option.value=value; option.textContent=text;
+    option.selected=(v.display||"dropdown")===value; select.appendChild(option);
+  });
+  select.onchange=()=>{ wfPushUndoDebounced(); v.display=select.value;
+    if(v.display!=="toggle-group"){ v.multiple=false; if(Array.isArray(v.value)) v.value=v.value[0]||(v.options||[])[0]||""; }
+    if(onchange) onchange();
+  };
+  row.append(title,select);
+  return row;
 }
 function wfVarValue(v){
   if((v.type||"bool")==="bool"){

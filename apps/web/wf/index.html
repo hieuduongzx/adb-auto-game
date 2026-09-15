@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -267,7 +267,7 @@
             <button class="log-f"    data-lf="missing" onclick="wfLibFilter('missing',event)" title="A block references it but the file is not in the folder">Missing</button>
           </span>
           <span class="log-search-wrap">
-            <svg class="uico uico-1 log-search-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+            <i class="log-search-icon" data-ico="search" data-ico-size="uico-1"></i>
             <input id="wf-lib-search" class="log-search" type="search" placeholder="Search name" aria-label="Search template names" oninput="wfLibSearch(this.value)">
           </span>
           <button class="btn sm" onclick="wfLibShowDupes()" title="Group crops that show the same thing">Duplicates</button>
@@ -565,10 +565,10 @@
               <div class="wf-swipe-meta">
                 <span id="pv-sw-summary">0, 0 → 0, 0 · 300 ms</span>
                 <button class="icon-btn" onclick="pvCopySwipe(this)" title="Copy swipe (x1, y1, x2, y2, duration)" aria-label="Copy swipe">
-                  <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                  <i data-ico="copy" data-ico-size="uico-1"></i>
                 </button>
                 <button class="icon-btn" onclick="pvClearSwipePreview()" title="Clear the swipe overlay on the mirror" aria-label="Clear swipe overlay">
-                  <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  <i data-ico="x" data-ico-size="uico-1"></i>
                 </button>
               </div>
             </div>
@@ -726,7 +726,7 @@
       <button class="log-f" data-f="error" onclick="wfLogFilter('error',event)" title="Error">ERR</button>
     </span>
     <span class="log-search-wrap">
-      <svg class="uico uico-1 log-search-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <i class="log-search-icon" data-ico="search" data-ico-size="uico-1"></i>
       <input id="log-search" class="log-search" type="search" placeholder="Search log" aria-label="Search log" oninput="wfLogSearch(this.value)">
     </span>
     <span class="pnl-tools">

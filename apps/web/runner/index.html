@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -33,18 +33,31 @@
 
     <div id="header-progress" style="display:none">
       <span class="prog-count" id="prog-count">0/0</span>
-      <div class="prog-bar-track"><div class="prog-bar-fill" id="prog-bar"></div></div>
+      <div class="prog-bar-track"><div class="prog-bar-fill" id="prog-bar" aria-hidden="true"></div></div>
       <span class="prog-elapsed" id="elapsed">00:00:00</span>
+    </div>
+
+    <!-- How the last run ended. Written from running_state's outcome, or derived
+         from the activities' own statuses when an older backend sends none. -->
+    <div id="run-outcome" class="run-outcome" role="status" aria-live="polite" hidden>
+      <span class="outcome-dot" aria-hidden="true"></span>
+      <span class="outcome-text" id="outcome-text"></span>
+      <button type="button" class="outcome-x" id="outcome-x" onclick="dismissOutcome()"
+              title="Hide this result" aria-label="Hide this run result">×</button>
     </div>
 
     <div class="header-btns">
       <!-- One primary button: Start while idle, Stop while running (see
            setPrimary in runner.js). A separate icon-only Stop would be a second
-           way to do the same thing, so there isn't one. -->
-      <button class="btn btn-start" id="btn-primary" type="button" onclick="onPrimary()" disabled>
+           way to do the same thing, so there isn't one. Start is a hotkey
+           (F5 / Ctrl+Enter) but never a bare key — a stray keypress must not
+           launch a game macro. -->
+      <button class="btn btn-start" id="btn-primary" type="button" onclick="onPrimary()" disabled
+              title="Start the run (F5 or Ctrl+Enter)">
         <i data-ico="play" data-ico-size="uico-fill" aria-hidden="true"></i>Start
       </button>
-      <button class="btn btn-pause" id="btn-pause" onclick="onPause()" disabled>Pause</button>
+      <button class="btn btn-pause" id="btn-pause" onclick="onPause()" disabled
+              title="Pause or resume the run (F6)">Pause</button>
     </div>
   </div>
 
@@ -54,14 +67,16 @@
 
     <!-- LEFT: activity lists -->
     <div id="pane-left">
-      <div id="tabs-bar" role="tablist" aria-label="Runner views">
-        <button class="tab-btn active" data-tab="seq" onclick="switchTab('seq')" role="tab" aria-selected="true" aria-controls="tab-seq">Sequence</button>
-        <button class="tab-btn"        data-tab="bg"  onclick="switchTab('bg')"  role="tab" aria-selected="false" aria-controls="tab-bg">Background</button>
+      <div id="tabs-bar" role="tablist" aria-label="Runner views" aria-orientation="horizontal">
+        <button class="tab-btn active" id="tab-btn-seq" data-tab="seq" onclick="switchTab('seq')"
+                role="tab" aria-selected="true" aria-controls="tab-seq" tabindex="0">Sequence</button>
+        <button class="tab-btn"        id="tab-btn-bg"  data-tab="bg"  onclick="switchTab('bg')"
+                role="tab" aria-selected="false" aria-controls="tab-bg" tabindex="-1">Background</button>
       </div>
 
       <div id="tab-wrapper">
         <!-- Sequential tab -->
-        <div class="tab-pane active" id="tab-seq" role="tabpanel">
+        <div class="tab-pane active" id="tab-seq" role="tabpanel" aria-labelledby="tab-btn-seq" tabindex="0">
           <div class="pane-inner">
             <div class="list-header">
               <span class="list-label" id="seq-sum">Sequence activities</span>
@@ -75,7 +90,7 @@
         </div>
 
         <!-- Background tab -->
-        <div class="tab-pane" id="tab-bg" role="tabpanel">
+        <div class="tab-pane" id="tab-bg" role="tabpanel" aria-labelledby="tab-btn-bg" tabindex="0">
           <div class="pane-inner">
             <div class="list-header">
               <span class="list-label" id="bg-sum">Background activities</span>
@@ -93,15 +108,18 @@
 
     <!-- RIGHT: Activity settings | Log | Settings, then Preview -->
     <div id="pane-right">
-      <div id="r-tabs" role="tablist" aria-label="Runner panels">
-        <button class="rtab active" data-rtab="act"      onclick="switchRTab('act')"      role="tab" aria-selected="true"  aria-controls="r-act">Activity settings</button>
-        <button class="rtab"        data-rtab="log"      onclick="switchRTab('log')"      role="tab" aria-selected="false" aria-controls="r-log">Log<span class="tab-count" id="rtab-log-count"></span></button>
-        <button class="rtab"        data-rtab="settings" onclick="switchRTab('settings')" role="tab" aria-selected="false" aria-controls="r-settings">Settings</button>
+      <div id="r-tabs" role="tablist" aria-label="Runner panels" aria-orientation="horizontal">
+        <button class="rtab active" id="rtab-btn-act" data-rtab="act"      onclick="switchRTab('act')"
+                role="tab" aria-selected="true"  aria-controls="r-act"      tabindex="0">Activity settings</button>
+        <button class="rtab"        id="rtab-btn-log" data-rtab="log"      onclick="switchRTab('log')"
+                role="tab" aria-selected="false" aria-controls="r-log"      tabindex="-1">Log<span class="tab-count" id="rtab-log-count"></span></button>
+        <button class="rtab"        id="rtab-btn-settings" data-rtab="settings" onclick="switchRTab('settings')"
+                role="tab" aria-selected="false" aria-controls="r-settings" tabindex="-1">Settings</button>
       </div>
 
       <div id="r-content">
         <!-- Activity settings -->
-        <div class="rpane active" id="r-act" role="tabpanel">
+        <div class="rpane active" id="r-act" role="tabpanel" aria-labelledby="rtab-btn-act" tabindex="0">
           <div class="act-set-hd">
             <span class="act-set-title" id="act-set-title">Activity settings</span>
             <button type="button" class="act-set-x" id="act-set-close" onclick="closeActivitySettings()" title="Close" aria-label="Close settings">×</button>
@@ -112,22 +130,33 @@
         </div>
 
         <!-- Log -->
-        <div class="rpane" id="r-log" role="tabpanel">
+        <div class="rpane" id="r-log" role="tabpanel" aria-labelledby="rtab-btn-log" tabindex="0">
           <div class="rpane-hd">
             <span class="rpane-title">Log</span>
-            <span class="log-count" id="log-count"></span>
+            <span class="log-count" id="log-count" title="Lines shown"></span>
             <div class="rpane-sp"></div>
+            <select id="log-level" class="log-level" aria-label="Filter log by level"
+                    title="Show only lines at this level or more serious" onchange="setLogLevel(this.value)">
+              <option value="all">All levels</option>
+              <option value="warning">Warnings + errors</option>
+              <option value="error">Errors only</option>
+            </select>
             <div class="log-search-wrap">
               <i data-ico="search" data-ico-size="uico-0" aria-hidden="true"></i>
               <input id="log-search" type="search" aria-label="Search log" placeholder="Search" oninput="filterLog(this.value)">
             </div>
-            <button class="btn-log-clear" onclick="onClearLog()">Clear</button>
+            <button class="btn-log-clear" id="btn-log-export" type="button" onclick="onExportLog()"
+                    title="Save the log to a file…">Export</button>
+            <button class="btn-log-clear" type="button" onclick="onClearLog()"
+                    title="Empty the Runner's log">Clear</button>
           </div>
+          <!-- Export / copy feedback; empty (and therefore hidden) at rest. -->
+          <div class="log-note" id="log-note" role="status" aria-live="polite"></div>
           <div class="log-body" id="log-body" role="log" aria-live="polite" aria-relevant="additions"></div>
         </div>
 
         <!-- Settings (project-wide) -->
-        <div class="rpane" id="r-settings" role="tabpanel">
+        <div class="rpane" id="r-settings" role="tabpanel" aria-labelledby="rtab-btn-settings" tabindex="0">
           <div class="rpane-scroll">
             <div class="settings-card" id="game-card" style="display:none">
               <div class="settings-card-head">
@@ -159,10 +188,17 @@
               <p class="req-status" id="req-status" role="status" aria-live="polite"></p>
               <ul class="req-list mono" id="req-list" aria-label="Required game files"></ul>
               <div class="req-actions">
-                <button class="btn" type="button" onclick="onReqOpen()">Open folder</button>
-                <button class="btn ok" id="btn-req-copy" type="button" onclick="onReqCopy()">Copy into game folder</button>
+                <button class="btn" type="button" onclick="onReqOpen()"
+                        title="Open the folder inside this Runner that holds these files">Open folder</button>
+                <button class="btn ok" id="btn-req-copy" type="button" onclick="onReqCopy()"
+                        title="Copy the files into the game's install folder">Copy into game folder</button>
               </div>
-              <p class="settings-note">This game needs these files inside its own install folder (next to the game's .exe). Copy them by hand, or let the Runner copy them into the folder of the Game path. Restart the game afterwards.</p>
+              <ol class="req-steps">
+                <li>Copy the files above into the game's install folder — the one holding the game's <span class="mono">.exe</span>.</li>
+                <li>If that folder is protected, Windows asks for administrator rights; allow it.</li>
+                <li>Restart the game so it picks up the new files.</li>
+              </ol>
+              <p class="settings-note">The <b>Game path</b> above sets which folder “Copy into game folder” writes to. Without it, copy the files by hand from <b>Open folder</b>.</p>
             </div>
 
             <div class="settings-card" id="emu-card" style="display:none">
@@ -232,9 +268,32 @@
               <p class="upd-status" id="upd-status" role="status" aria-live="polite">Updates are available in a Runner built from the Macro2k Hub.</p>
               <div class="upd-bar" id="upd-bar" hidden><div class="upd-bar-fill" id="upd-bar-fill"></div></div>
               <div class="upd-actions">
-                <button class="btn" id="btn-upd-check" type="button" onclick="onUpdateCheck()">Check for updates</button>
-                <button class="btn ok" id="btn-upd-apply" type="button" onclick="onUpdateApply()" hidden>Update &amp; restart</button>
+                <button class="btn" id="btn-upd-check" type="button" onclick="onUpdateCheck()"
+                        title="Ask GitHub for a newer published build">Check for updates</button>
+                <button class="btn ok" id="btn-upd-apply" type="button" onclick="onUpdateApply()" hidden
+                        title="Download, replace this Runner's files, and restart">Update &amp; restart</button>
               </div>
+              <p class="settings-note" id="upd-note">Installing replaces this Runner's own files only. Games in the Hub, workflow folders and your settings stay where they are.</p>
+            </div>
+
+            <div class="settings-card" id="diag-card">
+              <div class="settings-card-head">
+                <div>
+                  <h2 class="settings-section-title">Diagnostics</h2>
+                  <p class="settings-card-desc">This Runner's build, files and device — what to check, and what to send, when a run misbehaves.</p>
+                </div>
+                <span class="settings-card-kicker">Support</span>
+              </div>
+              <p class="diag-status" id="diag-status" role="status" aria-live="polite"></p>
+              <dl class="diag-list" id="diag-list" aria-label="Runner diagnostics"></dl>
+              <div class="diag-actions">
+                <button class="btn" id="btn-diag-refresh" type="button" onclick="onDiagnostics(true)">Refresh</button>
+                <button class="btn" id="btn-diag-export" type="button" onclick="onExportLog()"
+                        title="Save the Runner log to a file…">Export log…</button>
+                <button class="btn" id="btn-diag-folder" type="button" onclick="onOpenDataFolder()"
+                        title="Open the folder holding this Runner's settings and log">Open data folder</button>
+              </div>
+              <p class="settings-note">The data folder holds this Runner's per-game settings and its log. A failing run is easiest to explain with the log: run the workflow, then <b>Export log…</b> and share that file.</p>
             </div>
 
             <div class="settings-card" id="appearance-card">

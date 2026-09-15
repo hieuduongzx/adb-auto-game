@@ -210,7 +210,6 @@ function wfDrawWires(){
   // edge array.
   const routes=[];
   (g.edges||[]).forEach(ed=>{
-    if(wfSameStack(ed.from,ed.to)) return;
     const toPort=ed.toPort||"in";
     const a=wfPortPt(ed.from,ed.fromPort), b=wfPortPt(ed.to,toPort);
     if(!a||!b) return;
