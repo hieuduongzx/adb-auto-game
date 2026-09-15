@@ -646,11 +646,11 @@ function wfWireInsertSplice(g, edge, node){
 function wfCanvasMouseDown(e){
   if(e.target.closest(".wf-node")||e.target.closest(".wf-group")) return;
   wfCancelCamAnim();   // a press on the canvas takes the camera back by hand
-  // Floating overlays (Activities/Variables corner stack, layout menu, minimap,
-  // empty-state card) sit above the canvas — a press there must not clear the
-  // selection or start a rubber-band box (the re-render it triggers would also
-  // swallow the click).
-  if(e.target.closest("#wf-rail,.wf-layout-bar,.wf-minimap,.wf-empty-card,#wf-act-panel,#wf-variable-dock")) return;
+  // Floating overlays (the Activities/Functions/Variables dock card, layout
+  // menu, minimap, empty-state card) sit above the canvas — a press there must
+  // not clear the selection or start a rubber-band box (the re-render it
+  // triggers would also swallow the click).
+  if(e.target.closest("#wf-rail,.wf-layout-bar,.wf-minimap,.wf-empty-card,#wf-act-panel")) return;
   // Middle mouse, or Space+left → pan.
   if(e.button===1 || (e.button===0 && wfSpace)){
     e.preventDefault();
@@ -1039,6 +1039,9 @@ function wfInitCanvas(){
   document.querySelectorAll(".wf-act-tab").forEach(tab=>{
     tab.onclick=(e)=>{ e.stopPropagation(); wfActTab(tab.dataset.tab); };
   });
+  // Dock card: Activities / Functions / Variables tab strip (also restores the
+  // tab the user left the card on).
+  if(typeof wfInitDockTabs==="function") wfInitDockTabs();
   const aadd=$("wf-act-add");
   if(aadd) aadd.onclick=(e)=>{ e.stopPropagation(); wfActAddCurrent(); };
   const afocus=$("wf-act-focus");
@@ -1051,14 +1054,8 @@ function wfInitCanvas(){
   // Functions section (bottom of the left sidebar): "+" creates, header collapses.
   const fadd=$("wf-fn-add");
   if(fadd) fadd.onclick=(e)=>{ e.stopPropagation(); wfAddFunction(); };
-  const fhdr=$("wf-fns-hdr"), fsec=$("wf-side-fns-sec");
-  if(fhdr && fsec){
-    try{ if(localStorage.getItem("wfFnsCollapsed")==="1") fsec.classList.add("collapsed"); }catch{}
-    fhdr.setAttribute("aria-expanded",String(!fsec.classList.contains("collapsed")));
-    fhdr.onclick=()=>{
-      const c=fsec.classList.toggle("collapsed"); fhdr.setAttribute("aria-expanded",String(!c));
-      try{ localStorage.setItem("wfFnsCollapsed", c?"1":"0"); }catch{} };
-  }
+  // The Functions list has no header of its own any more — it is a tab on the
+  // dock card, so its collapse state is the card's.
   // Auto-layout menu (bottom-left): toggle open/closed + run a strategy on pick.
   document.querySelectorAll(".wf-layout-item").forEach(btn=>{
     btn.onclick=(e)=>{ e.stopPropagation(); wfAutoLayout(btn.dataset.layout); wfCloseLayoutMenu(); };
@@ -1070,6 +1067,9 @@ function wfInitCanvas(){
   // (Row-level contextmenu is handled on each .wf-act and stops propagation.)
   if(actBody) actBody.addEventListener("contextmenu", e=>{
     if(e.target.closest(".wf-act")) return;  // row menu owns this click
+    // The body now hosts all three panes; the select-all menu is an Activities
+    // affordance only, so leave the Functions/Variables panes their native menu.
+    if(!e.target.closest("#wf-dock-act")) return;
     e.preventDefault(); e.stopPropagation();
     wfShowActAllMenu(e.clientX, e.clientY);
   });

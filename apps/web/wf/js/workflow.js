@@ -651,14 +651,13 @@ let wfAlignOn=true;       // Figma-style edge/centre magnetism + guides (Alt = p
 let wfLiveVars={};
 let wfFreshVar=null;       // name of the most-recently-changed var (brief highlight)
 // Corner-panel collapse states persist locally so the canvas reopens as left.
-let wfVarsCollapsed=false, wfActCollapsed=false;
+// (The dock card's open tab — wfDockTab — persists alongside, in render.js.)
+let wfActCollapsed=false;
 let wfSideCollapsed=false, wfInspCollapsed=false;
 let wfActH=0;              // manual ceiling for the Activities list; 0 = CSS default
-try{ wfVarsCollapsed=localStorage.getItem("wfVarsCollapsed")==="1";
-     wfActCollapsed =localStorage.getItem("wfActCollapsed")==="1"; }catch{}
+try{ wfActCollapsed=localStorage.getItem("wfActCollapsed")==="1"; }catch{}
 function wfPersistPanelState(){
-  try{ localStorage.setItem("wfVarsCollapsed", wfVarsCollapsed?"1":"0");
-       localStorage.setItem("wfActCollapsed",  wfActCollapsed ?"1":"0"); }catch{}
+  try{ localStorage.setItem("wfActCollapsed", wfActCollapsed?"1":"0"); }catch{}
 }
 const wfSnap=v=> wfSnapOn ? Math.round(v/WF_GRID)*WF_GRID : Math.round(v);
 function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$("wf-inspector");

@@ -82,8 +82,6 @@ function wfSwitchView(view){
     const inspTitle=document.getElementById("wf-insp-title");
     if(inspBody) inspBody.style.display="none";
     if(scopePanel){ scopePanel.style.display="flex"; }
-    const varsPanel=document.getElementById("wf-vars-panel");
-    if(varsPanel) varsPanel.style.display="none";
     if(inspTitle) inspTitle.textContent="DevScope tools";
     wfPvActive = true;
     wfPvInit();                 // lazy init on first switch
@@ -127,8 +125,6 @@ function wfSwitchView(view){
     const inspTitle=document.getElementById("wf-insp-title");
     if(inspBody) inspBody.style.display="";
     if(scopePanel) scopePanel.style.display="none";
-    const varsPanel=document.getElementById("wf-vars-panel");
-    if(varsPanel) varsPanel.style.display="";
     if(inspTitle) inspTitle.textContent="Properties";
     wfZoomApplyMode("canvas");  // hand the zoom cluster back to the graph
     // If a wire draw landed while the canvas was hidden (renders during the

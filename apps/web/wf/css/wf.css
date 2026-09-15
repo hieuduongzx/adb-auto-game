@@ -292,9 +292,6 @@
 /* Properties / DevScope share one panel below Variables — it takes the rest of
    the column and scrolls internally. */
 #wf-insp-panel { flex:1; min-height:0; }
-/* .pnl-flush clears all four borders; the hairline splitting Variables from
-   Properties is the column's structure, not the panel's, so restore it. */
-#wf-vars-panel.pnl { border-bottom:1px solid var(--border2); }
 /* A maximized sidebar panel is a free-floating card again, so the column's
    hairlines and the section divider it inherited must not follow it over. */
 #wf-side .pnl.is-max, #wf-inspector .pnl.is-max, #wf-act-panel.is-max {
@@ -333,17 +330,21 @@
 /* Debug overlay on = teal tint so it reads apart from Focus (blue accent). */
 #wf-act-dbg.on { color:var(--cat-image); background:var(--cat-image-bg); }
 
-/* ── Activities: floating graph switcher in the canvas' bottom-right corner. */
+/* ── Bottom-right dock: Activities · Functions · Variables in one card ───── */
 #wf-act-panel { position:absolute; right:14px; bottom:14px; z-index:7;
-  width:310px; max-width:calc(100% - 28px); display:flex; flex-direction:column;
+  width:340px; max-width:calc(100% - 28px); display:flex; flex-direction:column;
   min-height:0; overflow:hidden; background:var(--panel); border:1px solid var(--border);
   border-radius:var(--r-md); box-shadow:var(--sh-md); }
 #workflow-view.wf-preview-on #wf-act-panel,
 #workflow-view.wf-library-on #wf-act-panel { display:none; }
-#wf-act-panel.collapsed .wf-act-tab-row,
-#wf-act-panel.collapsed .wf-act-panel-body { display:none; }
-#wf-act-panel.collapsed .wf-side-hdr { border-bottom:none; }
-#wf-act-panel.collapsed .wf-side-chev { transform:rotate(-90deg); }
+/* Collapsed folds the body away but keeps the tab strip: it is the card's only
+   remaining affordance, and clicking a tab is how you get the list back. */
+#wf-act-panel.collapsed .wf-act-panel-body,
+#wf-act-panel.collapsed .wf-act-tab-row { display:none; }
+#wf-act-panel.collapsed .pnl-hd { border-bottom:none; }
+/* The Sequence/Background switcher belongs to the Activities tab alone. */
+#wf-act-panel:not([data-dtab="act"]) .wf-act-tab-row { display:none; }
+#wf-act-panel.collapsed #wf-act-collapse svg { transform:rotate(-90deg); }
 /* Drag handle along the panel's top edge: the card is pinned to the canvas'
    bottom-right corner, so growing the list pushes the top edge up. Sits inside
    the panel (which clips to its radius) rather than 3px above it like the log
@@ -357,18 +358,20 @@
 #wf-act-resizer:focus-visible::before { background:var(--accent); }
 #wf-act-panel.collapsed #wf-act-resizer, #wf-act-panel.is-max #wf-act-resizer { display:none; }
 #wf-act-panel.resizing .wf-act-panel-body { scroll-behavior:auto; }
-/* Activities and variables share a dock; Properties keeps its full column. */
-#wf-variable-dock { position:absolute; right:14px; bottom:14px; z-index:7; display:flex; align-items:flex-end; max-width:calc(100% - 28px); max-height:calc(100% - 28px); pointer-events:none; }
-#wf-variable-dock > * { pointer-events:auto; }
-#wf-variable-dock #wf-act-panel { position:relative; right:auto; bottom:auto; width:310px; min-width:220px; flex:1 1 310px; max-width:none; box-shadow:var(--sh-sm); }
-#wf-variable-dock #wf-vars-panel { width:var(--vars-width,330px); min-width:250px; flex:0 1 var(--vars-width,330px); max-height:min(520px,65vh); background:var(--panel); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--sh-sm); display:flex; flex-direction:column; }
-#wf-variable-dock #wf-vars-body { max-height:none; min-height:0; flex:1; overflow:auto; padding:10px; }
-#wf-variable-dock #wf-vars-panel.collapsed #wf-vars-body { display:none; }
-#wf-vars-resizer { width:8px; flex-shrink:0; align-self:stretch; cursor:col-resize; touch-action:none; }
-#wf-vars-resizer:hover, #wf-vars-resizer:focus-visible { background:var(--accent-bg); outline:1px solid var(--accent); }
-#wf-variable-dock #wf-act-panel.collapsed, #wf-variable-dock #wf-vars-panel.collapsed { height:auto; min-height:0; flex-grow:0; }
-#wf-variable-dock #wf-vars-panel.collapsed .wf-vars-hdr { border-bottom:0; }
-#workflow-view.wf-preview-on #wf-variable-dock, #workflow-view.wf-library-on #wf-variable-dock { display:none; }
+/* The tab strip doubles as the panel header (.pnl-hd), so shared/panel.js finds
+   it and mounts Maximize; the underline the tabs draw sits on that hairline. */
+.wf-dock-tabs { gap:var(--s1); padding:0 var(--s2) 0 var(--s3); }
+.wf-dock-tabs .tab-btn { padding:0 9px; height:100%; display:inline-flex; align-items:center; gap:5px;
+  background:none; border:none; }
+.wf-dock-tabs .tab-btn:focus-visible { outline:2px solid var(--accent); outline-offset:-3px; }
+/* One tool group per tab — the card's data-dtab picks which one is on. */
+.wf-dock-tools { display:none; align-items:center; gap:1px; }
+#wf-act-panel[data-dtab="act"]  .wf-dock-tools[data-for="act"],
+#wf-act-panel[data-dtab="fn"]   .wf-dock-tools[data-for="fn"],
+#wf-act-panel[data-dtab="vars"] .wf-dock-tools[data-for="vars"] { display:inline-flex; }
+/* Panes share the one scrolling body, so --act-h sizes whichever tab is open. */
+.wf-dock-pane { display:none; flex-direction:column; min-height:0; }
+.wf-dock-pane.active { display:flex; }
 .wf-vars-tabs { display:flex; gap:4px; margin-bottom:8px; }
 .wf-vars-tabs .btn { flex:1; }
 .wf-vars-tabs .active { background:var(--accent-bg); color:var(--accent); }
@@ -524,19 +527,12 @@
 .wf-chip .ico svg { width:12px; height:12px; stroke-width:2.2; display:block; }
 .wf-chip:hover .ico { background:var(--accent-bd); }
 
-/* ── Functions section — pinned at the bottom of the left sidebar ─────────── */
-#wf-side-fns-sec { flex-shrink:0; display:flex; flex-direction:column; min-height:0; max-height:28%; }
-.wf-side-hdr-toggle { cursor:pointer; user-select:none; transition:background .1s; }
-.wf-side-hdr-toggle:hover { background:var(--alt); }
-#wf-side-fns-sec.collapsed .wf-side-chev { transform:rotate(-90deg); }
-#wf-side-fns-sec.collapsed .wf-side-fns { display:none; }
-#wf-side-fns-sec.collapsed .wf-side-hdr { border-bottom:none; }
-.wf-side-fns { overflow-y:auto; min-height:0; padding:8px 10px 10px; }
+/* ── Functions — the dock's second tab; reusable subgraphs ────────────────── */
 .wf-fn { cursor:pointer; }
 .wf-badge.fn { display:inline-flex; align-items:center; justify-content:center; color:var(--on-accent);
   background:var(--cat-logic-ink); border:none; font-size:9.5px; font-weight:800;
   padding:2px 5px; letter-spacing:.02em; border-radius:4px; min-width:16px; }
-/* Function sidebar rows: purple tint + subtle hover */
+/* Function rows: purple tint + subtle hover */
 .wf-act.wf-fn { border:1px solid var(--border); background:var(--cat-logic-bg); }
 .wf-act.wf-fn:hover, .wf-act.wf-fn.sel { background:var(--cat-logic-bg); border-color:var(--border2); box-shadow:none; }
 
@@ -1634,16 +1630,13 @@
 .wf-region-cell input { width:100%; min-width:0; box-sizing:border-box; text-align:center; padding:2px 1px; font-size:10px; height:20px; background:var(--panel); }
 .wf-empty-note { font-size:11.5px; color:var(--muted); padding:6px 2px; text-align:center; }
 
-/* ── Live variables panel — docked at the top of the right sidebar ────────── */
-.wf-vars-panel { flex:0 0 auto; display:flex; flex-direction:column;
-  border-bottom:1px solid var(--border2); font-size:11px; }
+/* ── Live variables — the dock's third tab ───────────────────────────────── */
+/* .wf-vars-hdr and friends outlive the old right-column panel: the Global-vars
+   popover (.wf-globs-pop) still builds its header out of the same classes. */
 .wf-vars-hdr { display:flex; align-items:center; gap:var(--s2); height:var(--pnl-hd-h);
   padding:0 var(--s2) 0 var(--s4); border-bottom:1px solid var(--line);
   user-select:none; transition:background .1s; flex-shrink:0; }
 .wf-vars-hdr:hover { background:var(--alt); }
-.wf-vars-panel.collapsed .wf-vars-hdr { border-bottom:none; }
-.wf-vars-panel.collapsed .wf-act-hdr-chevron { transform:rotate(-90deg); }
-.wf-vars-panel.collapsed .wf-vars-body { display:none; }
 .wf-panel-toggle { display:inline-flex; align-items:center; gap:7px; min-width:0; color:inherit; flex:1; }
 .wf-act-hdr-chevron { color:var(--muted); display:flex; align-items:center; flex-shrink:0;
   transition:transform .15s var(--ease); }
@@ -1653,7 +1646,7 @@
   border-radius:999px; padding:1px 6px; letter-spacing:0; }
 .wf-vars-count:empty { display:none; }
 /* The live dot only earns its pixels while the engine runs — hidden at rest. */
-.wf-vars-live { display:none; color:var(--muted); font-size:9px; margin-left:auto; flex-shrink:0; }
+.wf-vars-live { display:none; color:var(--muted); font-size:9px; flex-shrink:0; }
 .wf-vars-actions { display:flex; align-items:center; gap:4px; flex-shrink:0; }
 .wf-vars-add { width:26px; height:26px; line-height:1; padding:0; border-radius:var(--r-sm); background:transparent;
   color:var(--muted); cursor:pointer; font-size:13px;
@@ -1662,9 +1655,10 @@
 .wf-vars-add svg { width:14px; height:14px; stroke-width:2; display:block; }
 .wf-vars-add:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-vars-add:active { transform:scale(.92); }
-.wf-vars-panel.live .wf-vars-live { display:inline; color:var(--run-ok); animation:wfPulse 1.4s ease-in-out infinite; }
+#wf-dtab-vars.live .wf-vars-live { display:inline; color:var(--run-ok); animation:wfPulse 1.4s ease-in-out infinite; }
 @keyframes wfPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-.wf-vars-body { flex:1; min-height:0; max-height:200px; overflow-y:auto; padding:4px 7px 7px; }
+/* No max-height here — the dock card's --act-h is what bounds the list. */
+.wf-vars-body { flex:1; min-height:0; overflow-y:auto; padding:4px 7px 7px; }
 .wf-vars-empty { color:var(--muted); padding:10px 8px; font-size:11px; line-height:1.45;
   border:1px dashed var(--border); border-radius:7px; background:var(--surface); margin:2px 0; }
 .wf-vars-sep { font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;

@@ -260,12 +260,8 @@ function wfDuplicateFunction(id){
   const i=WF.functions.findIndex(f=>f.id===id);
   WF.functions.splice(i<0?WF.functions.length:i+1, 0, copy);
   WF.edit={kind:"function",id:copy.id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
-  // Make sure the sidebar Functions section is open so the new row is visible.
-  const fsec=$("wf-side-fns-sec");
-  if(fsec && fsec.classList.contains("collapsed")){
-    fsec.classList.remove("collapsed");
-    try{ localStorage.setItem("wfFnsCollapsed","0"); }catch{}
-  }
+  // Bring the Functions tab forward (and unfold the card) so the new row shows.
+  if(typeof wfSwitchDockTab==="function") wfSwitchDockTab("fn");
   wfRenderAll();
   setStatus("Duplicated ƒ "+src.name+" → "+copy.name);
 }
@@ -279,12 +275,8 @@ function wfAddFunction(){
     const id="fn_"+wfUid().slice(1,6);
     WF.functions.push({id,name,graph:wfNewGraph()});
     WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
-    // Make sure the sidebar Functions section is open so the new row is visible.
-    const fsec=$("wf-side-fns-sec");
-    if(fsec && fsec.classList.contains("collapsed")){
-      fsec.classList.remove("collapsed");
-      try{ localStorage.setItem("wfFnsCollapsed","0"); }catch{}
-    }
+    // Bring the Functions tab forward (and unfold the card) so the new row shows.
+    if(typeof wfSwitchDockTab==="function") wfSwitchDockTab("fn");
     wfRenderAll();
   });
 }

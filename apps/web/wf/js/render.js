@@ -70,6 +70,9 @@ function wfRenderActivities(){
   const bgActs =WF.activities.filter(a=>a.type==="background");
   if(seqCnt) seqCnt.textContent = seqActs.length? String(seqActs.length):"";
   if(bgCnt)  bgCnt.textContent = bgActs.length ? String(bgActs.length) :"";
+  // The tab carries the whole count; the sub-tabs below split it two ways.
+  const totCnt=$("wf-act-total");
+  if(totCnt) totCnt.textContent = WF.activities.length? String(WF.activities.length):"";
   const check=`<svg class="uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>`;
   function rowInto(wrap, act){
     const sel = WF.edit.kind==="activity" && act.id===WF.edit.id;
@@ -159,12 +162,13 @@ function wfRenderFunctions(){
   });
 }
 
-// ── Activities panel tabs (in-canvas corner) ─────────────────────────────────
-// Two tabs: "seq" (sequence activities) and "bg" (background activities).
-// Functions live in their own section at the bottom of the left sidebar.
+// ── Activities pane sub-tabs ────────────────────────────────────────────────
+// Two sub-tabs inside the Activities pane of the bottom-right dock: "seq"
+// (sequence activities) and "bg" (background activities). Functions and
+// Variables are their own top-level tabs on the same card — see wfSwitchDockTab.
 let wfActTabCur="seq";
 function wfActTab(which){
-  if(which==="fns") which="seq";   // legacy callers — the fns tab moved to the sidebar
+  if(which==="fns") which="seq";   // legacy callers — Functions is a top-level tab now
   wfActTabCur=which;
   // Rows change with the tab — drop the Ctrl+click highlight so stale rows
   // aren't silently part of the next "Run selected".
@@ -175,8 +179,6 @@ function wfActTab(which){
   if(bg)   bg.style.display   = which==="bg" ?"":"none";
   const add=$("wf-act-add");
   if(add) add.title = which==="bg"?"Add background task":"Add activity";
-  const title=$("wf-act-hdr-title");
-  if(title) title.textContent = which==="bg"?"Background tasks":"Activities";
 }
 function wfActAddCurrent(){
   if(wfActTabCur==="bg") wfAddActivity("background");
@@ -482,44 +484,65 @@ function wfAllVarNames(){
 }
 let wfVarsScope="local";
 const wfVarsExpanded=new WeakSet();
-function wfVarsDockSetup(){
-  const panel=$("wf-vars-panel"), act=$("wf-act-panel");
-  if(!panel||!act||$("wf-variable-dock")) return;
-  const dock=document.createElement("div"); dock.id="wf-variable-dock";
-  act.before(dock); dock.append(act);
-  const resize=document.createElement("div"); resize.id="wf-vars-resizer";
-  resize.tabIndex=0; resize.setAttribute("role","separator"); resize.setAttribute("aria-orientation","vertical");
-  resize.setAttribute("aria-label","Resize variables panel");
-  dock.append(resize,panel);
-  panel.classList.remove("pnl-flush");
-  const setWidth=w=>{ w=Math.max(250,Math.min(520,w)); dock.style.setProperty("--vars-width",w+"px"); resize.setAttribute("aria-valuenow",String(w)); try{localStorage.setItem("wfVarsWidth",w);}catch{} };
-  let width=330; try{ width=Number(localStorage.getItem("wfVarsWidth"))||330; localStorage.removeItem("wfVarsHidden"); }catch{}
-  setWidth(width);
-  resize.onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); resize.setPointerCapture(e.pointerId); const x=e.clientX,w=panel.getBoundingClientRect().width;
-    resize.onpointermove=ev=>setWidth(w+x-ev.clientX);
-    resize.onpointerup=()=>{ resize.onpointermove=null; }; };
-  resize.onkeydown=e=>{if(e.key==="ArrowLeft"||e.key==="ArrowRight"){e.preventDefault();setWidth(panel.getBoundingClientRect().width+(e.key==="ArrowLeft"?20:-20));}};
-  dock.addEventListener("mousedown",e=>e.stopPropagation());
-  dock.addEventListener("wheel",e=>e.stopPropagation());
+// ── Bottom-right dock tabs: Activities · Functions · Variables ──────────────
+// The three used to be separate cards (two of them fighting over the same
+// corner); they are now one card with a tab strip that doubles as its header.
+const WF_DOCK_TABS=["act","fn","vars"];
+let wfDockTab="act";
+try{ const t=localStorage.getItem("wfDockTab"); if(WF_DOCK_TABS.includes(t)) wfDockTab=t; }catch{}
+
+// Paint the strip + panes for `tab`. No side effects beyond the DOM: the CSS
+// reads data-dtab on the card to pick which tool group to show.
+function wfApplyDockTab(tab){
+  if(!WF_DOCK_TABS.includes(tab)) tab="act";
+  wfDockTab=tab;
+  const card=$("wf-act-panel"); if(!card) return;
+  card.dataset.dtab=tab;
+  document.querySelectorAll(".wf-dock-tabs .tab-btn").forEach(b=>{
+    const on=b.dataset.dtab===tab;
+    b.classList.toggle("active",on);
+    b.setAttribute("aria-selected",String(on));
+    b.tabIndex=on?0:-1;
+  });
+  document.querySelectorAll(".wf-dock-pane").forEach(p=>p.classList.toggle("active", p.id==="wf-dock-"+tab));
 }
-function wfVarsDockToggle(show){
-  if(show===undefined) show=wfVarsCollapsed;
-  wfVarsCollapsed=!show;
-  const panel=$("wf-vars-panel"), toggle=$("wf-vars-collapse");
-  if(panel) panel.classList.toggle("collapsed",wfVarsCollapsed);
-  if(toggle) toggle.setAttribute("aria-expanded",String(show));
-  wfPersistPanelState();
+function wfSwitchDockTab(tab,opts){
+  if(tab==="fns") tab="fn";                     // legacy spelling
+  if(!WF_DOCK_TABS.includes(tab)) return;
+  // Clicking a tab is also how you get the list back from a folded card.
+  if(wfActCollapsed){ wfActCollapsed=false; wfToggleActPanel(); wfPersistPanelState(); }
+  wfApplyDockTab(tab);
+  try{ localStorage.setItem("wfDockTab",tab); }catch{}
+  if(tab==="vars" && !(opts&&opts.silent)) wfRenderVarsPanel();
+  if(opts&&opts.focus){ const b=$("wf-dtab-"+tab); if(b) b.focus(); }
+}
+// Roving tabindex over the strip: ←/→ wrap, Home/End jump, Enter/Space are the
+// button's own click. Mirrors the runner's tab bars.
+function wfInitDockTabs(){
+  wfApplyDockTab(wfDockTab);
+  const bar=document.querySelector(".wf-dock-tabs");
+  if(!bar||bar.dataset.wired) return;
+  bar.dataset.wired="1";
+  bar.addEventListener("keydown",e=>{
+    const i=WF_DOCK_TABS.indexOf(wfDockTab); if(i<0) return;
+    let j;
+    if(e.key==="ArrowRight")      j=(i+1)%WF_DOCK_TABS.length;
+    else if(e.key==="ArrowLeft")  j=(i-1+WF_DOCK_TABS.length)%WF_DOCK_TABS.length;
+    else if(e.key==="Home")       j=0;
+    else if(e.key==="End")        j=WF_DOCK_TABS.length-1;
+    else return;
+    e.preventDefault();
+    wfSwitchDockTab(WF_DOCK_TABS[j],{focus:true});
+  });
 }
 function wfRenderVarsPanel(){
-  wfVarsDockSetup();
   const body=$("wf-vars-body"); if(!body) return;
   // Preserve an active editor while typing or receiving live-value updates.
   if(body.contains(document.activeElement)&&document.activeElement.matches("input,select")) return;
   const expandedScroll=body.scrollTop;
   body.replaceChildren();
-  const panel=$("wf-vars-panel"); panel.classList.toggle("collapsed",wfVarsCollapsed);
-  $("wf-vars-collapse").setAttribute("aria-expanded",String(!wfVarsCollapsed));
-  panel.classList.toggle("live",Object.keys(wfLiveVars).length>0);
+  // The live dot rides on the tab, not on a header — the header is the tab strip.
+  const tabBtn=$("wf-dtab-vars"); if(tabBtn) tabBtn.classList.toggle("live",Object.keys(wfLiveVars).length>0);
   const act=wfCurAct();
   const tabs=document.createElement("div"); tabs.className="wf-vars-tabs";
   ["local","global"].forEach(scope=>{const b=document.createElement("button");b.type="button";b.textContent=scope==="local"?"Local":"Global";
@@ -563,65 +586,6 @@ function wfRenderVarsPanel(){
     extra.forEach(([name,value])=>{const row=document.createElement("div");row.className="wf-var-row-live";row.textContent=name+" = "+String(value);body.append(row);});}
   body.scrollTop=expandedScroll;
 }
-function wfRenderVarsPanelLegacy(){
-  const panel=$("wf-vars-panel"); if(!panel) return;
-  const body=$("wf-vars-body"); if(!body) return;
-  panel.classList.toggle("collapsed", wfVarsCollapsed);
-  const toggle=$("wf-vars-collapse"); if(toggle) toggle.setAttribute("aria-expanded",String(!wfVarsCollapsed));
-  panel.classList.toggle("live", Object.keys(wfLiveVars).length>0);
-  const declared=wfDeclaredVars();
-  // Buckets: globals → activity-declared → node-produced → live-only extras.
-  // Walk nested vars to collect all names (dotted for children).
-  const globalNames=[];
-  const walkNames=(vars,prefix)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; globalNames.push(full); walkNames(v.children,full); }); };
-  walkNames(WF.globals,"");
-  const actDeclared={}; const act=wfCurAct(); const actNames=[];
-  const walkAct=(vars,prefix)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; if(!globalNames.includes(full)){ actDeclared[full]=v.value; actNames.push(full); } walkAct(v.children,full); }); };
-  if(act) walkAct(act.vars,"");
-  const g=wfGraph();
-  const nodeNames=[]; wfGraphVarNames(g).forEach(n=>{ if(!globalNames.includes(n)&&!actNames.includes(n)) nodeNames.push(n); });
-  const liveExtra=[]; Object.keys(wfLiveVars).forEach(n=>{ if(!globalNames.includes(n)&&!actNames.includes(n)&&!nodeNames.includes(n)) liveExtra.push(n); });
-  const allNames=[...globalNames,...actNames,...nodeNames,...liveExtra];
-  // Update count badge in header.
-  const countEl=$("wf-vars-count"); if(countEl) countEl.textContent=allNames.length?String(allNames.length):"";
-  body.innerHTML="";
-  if(!allNames.length){
-    const e=document.createElement("div"); e.className="wf-vars-empty";
-    e.textContent="No variables yet. Click + to add a global or local variable.";
-    body.appendChild(e); return;
-  }
-  function mkSep(label){ const s=document.createElement("span"); s.className="wf-vars-sep"; s.textContent=label; return s; }
-  function mkRow(n, scope){
-    const row=document.createElement("div"); row.className="wf-var-row-live";
-    // Declared rows open the matching editor (global vs activity-local).
-    if(scope==="global"){ row.classList.add("clickable");
-      row.addEventListener("click",()=>{ wfGlobsOpen=true; wfShowGlobsEditor(); }); }
-    else if(scope==="activity"){ row.classList.add("clickable");
-      row.addEventListener("click",()=>{ wfShowLocalsEditor(); }); }
-    const nm=document.createElement("span"); nm.className="vn";
-    nm.title=n+(scope==="global"?" · global · click to edit":scope==="activity"?" · local (this activity) · click to edit":"");
-    if(scope==="global"){
-      nm.style.color="var(--accent)";
-      nm.innerHTML='<svg class="uico" viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>'+n;
-    } else if(scope==="activity"){
-      nm.style.color="var(--cat-logic-ink,#6d28d9)";
-      nm.innerHTML='<svg class="uico" viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg>'+n;
-    } else { nm.textContent=n; }
-    const live=wfLiveVars[n];
-    const hasDeclared=declared.hasOwnProperty(n);
-    const val=(live!==undefined)?live:(hasDeclared?declared[n]:undefined);
-    const vv=document.createElement("span"); vv.className="vv"+(n===wfFreshVar?" fresh":"");
-    vv.textContent=(val===undefined||val===null||val==="")?(hasDeclared?"∅":"(generated)"):String(val);
-    vv.title=(live!==undefined)?"runtime value":(hasDeclared?"declared value":"created by node");
-    row.appendChild(nm); row.appendChild(vv);
-    return row;
-  }
-  if(globalNames.length){ body.appendChild(mkSep("Global")); globalNames.forEach(n=>body.appendChild(mkRow(n,"global"))); }
-  if(actNames.length){ body.appendChild(mkSep("Local · "+((act&&act.name)||"activity"))); actNames.forEach(n=>body.appendChild(mkRow(n,"activity"))); }
-  if(nodeNames.length){ body.appendChild(mkSep("Node")); nodeNames.forEach(n=>body.appendChild(mkRow(n,"node"))); }
-  if(liveExtra.length){ body.appendChild(mkSep("Live")); liveExtra.forEach(n=>body.appendChild(mkRow(n,"live"))); }
-}
-
 // ── Add variable: pick Global vs Local (activity) ─────────────────────────────
 let wfGlobsOpen=false;
 function wfHideAddVarMenu(){ const m=document.getElementById("wf-var-scope-menu"); if(m) m.remove(); }
@@ -675,7 +639,7 @@ function wfAddQuickLocal(){
 // current activity). Click a Local row or add via "+" → Local.
 function wfShowLocalsEditor(){
   wfVarsScope="local"; const act=wfCurAct(); if(act&&act.vars?.length) wfVarsExpanded.add(act.vars[act.vars.length-1]);
-  wfVarsDockToggle(true); wfRenderVarsPanel();
+  wfSwitchDockTab("vars");   // make sure the tab is on screen before filling it
 }
 function wfShowLocalsEditorLegacy(){
   wfHideGlobsEditor();
@@ -784,7 +748,7 @@ function wfToggleGlobsEditor(){
 function wfHideGlobsEditor(){ const p=document.getElementById("wf-globs-pop"); if(p) p.remove(); wfGlobsOpen=false; }
 function wfShowGlobsEditor(){
   wfVarsScope="global"; if(WF.globals?.length) wfVarsExpanded.add(WF.globals[WF.globals.length-1]);
-  wfVarsDockToggle(true); wfRenderVarsPanel();
+  wfSwitchDockTab("vars");   // make sure the tab is on screen before filling it
 }
 function wfShowGlobsEditorLegacy(){
   wfHideGlobsEditor();
