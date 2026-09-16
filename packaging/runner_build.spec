@@ -110,7 +110,7 @@ hiddenimports += [
     "clr",            # pythonnet entry module
     "bottle",         # pywebview's local http server
     "proxy_tools",    # pywebview js-api proxy
-    "pytesseract",    # OCR (calls the vendored tesseract.exe)
+    "onnxruntime",     # imported lazily when the recognition backend starts
 ]
 
 # --- bundled assets: runner web UI + the one workflow ------------------------
@@ -121,6 +121,8 @@ _web_src = os.path.join(ROOT, "apps", "web")
 extra_datas = [
     (os.path.join(_web_src, "shared"), os.path.join("web", "shared")),
     (os.path.join(_web_src, "runner"), os.path.join("web", "runner")),
+    (os.path.join(ROOT, "assets", "ocr", "ppocr_v5_mobile"),
+     os.path.join("assets", "ocr", "ppocr_v5_mobile")),
 ]
 # The workflow folder entry by entry, minus "workflow_excludes" (its vendor/
 # ships beside the exe as requirements/ instead). Empty folders are skipped —
@@ -146,12 +148,12 @@ if _icon_png and os.path.isfile(_icon_png):
 # --- exclude the world we don't ship -----------------------------------------
 # On top of the shared exclusions, drop the designer/hub-only heavy deps: the
 # runner never opens the graph editor, so OpenCV/numpy still ship (the engine
-# needs them) but the neural OCR + Qt worlds do not.
+# needs them). PP-OCRv5 Mobile uses the bundled graph and ONNX Runtime CPU.
 excludes = [
     "PySide6", "shiboken6", "PyQt5", "PyQt6", "qtawesome",
     "torch", "torchvision", "torchaudio",
-    "easyocr", "paddle", "paddleocr", "paddlepaddle",
-    "scipy", "matplotlib", "pandas", "sympy", "sklearn", "skimage",
+    "scipy", "matplotlib", "sympy", "sklearn", "skimage",
+    "paddle", "paddleocr", "paddlex", "easyocr", "pytesseract", "onnx",
     "tkinter", "IPython", "notebook", "jupyter", "pytest",
 ]
 if not INCLUDE_AV:

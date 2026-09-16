@@ -10,13 +10,9 @@ pillow>=10.0.0
 # project owns its scrcpy transport and targets the current PyAV API.
 av>=10.0.0
 
-# ── OCR (Tesseract is the default / packaged backend) ───────────────────────
-# Requires the Tesseract binary: vendor/tesseract/ or system install.
-#   Windows: https://github.com/UB-Mannheim/tesseract/wiki
-# Optional neural backends (not packaged; pip install if needed):
-#   pip install easyocr
-#   pip install paddlepaddle paddleocr
-pytesseract>=0.3.10
+# ── OCR — recognition-only PP-OCRv5 Mobile ─────────────────────────────────
+# The official recognition graph is bundled under assets/ocr; no download.
+onnxruntime==1.23.2
 
 # ── GUI (PyWebView + EdgeChromium / WebView2 on Windows) ────────────────────
 pywebview>=5.0

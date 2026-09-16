@@ -6,11 +6,11 @@ Output (after ``build.ps1`` merges staging + vendor)::
     dist/Macro2k/
         Macro2k.exe      -> Hub (default) + Designer (--designer) + Runner (--runner)
         _macro2k/        -> private runtime files
-        vendor/             -> adb / frida / tesseract (external, not bundled)
+        vendor/             -> adb / frida (external, not bundled)
 
 ``vendor/`` is NOT bundled here (kept external/updatable). Web HTML assets ARE
-bundled (``hub/`` + ``wf/`` + ``runner/`` — DevScope is not packaged). Neural OCR
-backends (easyocr / paddle / torch) are excluded; only Tesseract.
+bundled (``hub/`` + ``wf/`` + ``runner/`` — DevScope is not packaged).
+PP-OCRv5 Mobile recognition and its ONNX Runtime are collected into the app.
 
 Prefer ``build.ps1`` (handles staging + vendor). Raw build::
 
@@ -79,7 +79,7 @@ hiddenimports += [
     "clr",            # pythonnet entry module
     "bottle",         # pywebview's local http server
     "proxy_tools",    # pywebview js-api proxy
-    "pytesseract",    # OCR (calls the vendored tesseract.exe)
+    "onnxruntime",     # imported lazily when the recognition backend starts
 ]
 
 # --- bundled web assets (hub + designer + runner; no DevScope) ---------------
@@ -90,14 +90,16 @@ web_datas = [
     (os.path.join(_web_src, "hub"), os.path.join("web", "hub")),
     (os.path.join(_web_src, "wf"), os.path.join("web", "wf")),
     (os.path.join(_web_src, "runner"), os.path.join("web", "runner")),
+    (os.path.join(ROOT, "assets", "ocr", "ppocr_v5_mobile"),
+     os.path.join("assets", "ocr", "ppocr_v5_mobile")),
 ]
 
 # --- exclude the world we don't ship -----------------------------------------
 excludes = [
     "PySide6", "shiboken6", "PyQt5", "PyQt6", "qtawesome",
     "torch", "torchvision", "torchaudio",
-    "easyocr", "paddle", "paddleocr", "paddlepaddle",
-    "scipy", "matplotlib", "pandas", "sympy", "sklearn", "skimage",
+    "scipy", "matplotlib", "sympy", "sklearn", "skimage",
+    "paddle", "paddleocr", "paddlex", "easyocr", "pytesseract", "onnx",
     "tkinter", "IPython", "notebook", "jupyter", "pytest",
 ]
 

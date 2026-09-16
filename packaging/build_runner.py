@@ -48,8 +48,8 @@ The workflow JSON is scanned to decide which vendor tools ship:
 
 * ``adb``       — ADB controller, an ``adb`` capture source, or any emulator node
 * ``scrcpy``    — ADB projects using the scrcpy capture source
-* ``tesseract`` — any OCR text node (``if_text`` / ``wait_text`` / ``read_var`` /
-                  ``parse_var``)
+* PP-OCRv5 Mobile recognition is bundled by PyInstaller; OCR nodes need no
+  separate vendor tool
 * ``frida``     — an enabled ADB speed hack only (``vendor/frida`` is the Android
                   frida-inject binary; Win32 input uses Win32 messaging, not
                   frida, so Win32 workflows never need it)
@@ -103,8 +103,7 @@ SPEC = os.path.join(ROOT, "packaging", "runner_build.spec")
 VENDOR_SRC = os.path.join(ROOT, "vendor")
 
 # The vendor sub-tools we know how to trim to.
-VENDOR_TOOLS = ("adb", "scrcpy", "tesseract", "frida")
-OCR_NODES = {"if_text", "wait_text", "read_var", "parse_var"}
+VENDOR_TOOLS = ("adb", "scrcpy", "frida")
 EMULATOR_NODES = {"launch_emulator", "if_emulator", "wait_emulator"}
 # Folders a running Runner writes into; never shipped in an update zip.
 USER_DIRS = ("data", "out", "logs")
@@ -157,6 +156,18 @@ class PreflightError(RuntimeError):
 
 # Preflight commands (gh, the icon guard) must never hang the caller's UI.
 PREFLIGHT_TIMEOUT = 20.0
+
+# Uploading a release is the one build step that is *not* a quick query: a
+# Runner zip is ~65 MB, and 20 s of patience needs a ~27 Mbit/s uplink — so the
+# preflight timeout once killed every publish from a normal home connection
+# with "gh release create timed out" (leaving the zip built but unpublished).
+# Half an hour covers ~35 KB/s, slow enough for anything that isn't a dead link.
+UPLOAD_TIMEOUT = 1800.0
+
+# :func:`_gh` exit code for "gh was still running when the timeout hit", kept
+# apart from 127 ("gh isn't there") so callers can tell the two apart and say
+# something useful about each.
+_GH_TIMEOUT = 124
 
 
 def _sanitize(raw: str) -> str:
@@ -235,9 +246,6 @@ def compute_vendor_needs(flow: dict) -> set[str]:
     # scrcpy — only ADB projects using the scrcpy frame source.
     if (is_adb or has_emulator) and capture == "scrcpy":
         needs.add("scrcpy")
-    # tesseract — any OCR text node.
-    if node_types & OCR_NODES:
-        needs.add("tesseract")
     # frida — ADB speed hack ONLY. vendor/frida is the Android frida-inject
     # binary; Win32 input uses Win32 messaging (PostMessage/SendMessage), never
     # frida, so a Win32 workflow never needs this ~107 MB tree.
@@ -393,6 +401,69 @@ def _dir_size_mb(path: str) -> float:
             except OSError:
                 pass
     return total / (1024 * 1024)
+
+
+MAX_RUNNER_APP_MB = 250.0
+_OCR_ASSET_NAMES = ("rec.onnx", "dict.txt", "model.json")
+_REMOVED_OCR_RUNTIMES = (
+    "paddle", "paddlepaddle", "paddleocr", "paddlex", "easyocr", "tesseract"
+)
+
+
+def _app_size_mb(final: str) -> float:
+    """Runner size excluding game files shipped in ``requirements/``."""
+    total = 0
+    requirements = os.path.normcase(os.path.abspath(
+        os.path.join(final, REQUIREMENTS_DIR)
+    ))
+    for root, dirs, files in os.walk(final):
+        dirs[:] = [
+            name for name in dirs
+            if os.path.normcase(os.path.abspath(os.path.join(root, name)))
+            != requirements
+        ]
+        for name in files:
+            try:
+                total += os.path.getsize(os.path.join(root, name))
+            except OSError:
+                pass
+    return total / (1024 * 1024)
+
+
+def _validate_ocr_payload(final: str) -> None:
+    """Refuse a Runner missing offline ONNX OCR or carrying an old engine."""
+    contents = os.path.join(final, "_internal")
+    asset_dir = os.path.join(contents, "assets", "ocr", "ppocr_v5_mobile")
+    for name in _OCR_ASSET_NAMES:
+        path = os.path.join(asset_dir, name)
+        if not os.path.isfile(path):
+            raise RuntimeError(f"Runner OCR payload is incomplete: {path} is missing")
+    if not os.path.isdir(os.path.join(contents, "onnxruntime")):
+        raise RuntimeError("Runner OCR payload is missing the onnxruntime package")
+
+    for root, dirs, files in os.walk(final):
+        for name in dirs + files:
+            lowered = name.lower()
+            for removed in _REMOVED_OCR_RUNTIMES:
+                if (lowered == removed or lowered.startswith(removed + ".")
+                        or lowered.startswith(removed + "-")):
+                    raise RuntimeError(
+                        f"Removed OCR runtime still packaged: "
+                        f"{os.path.join(root, name)}"
+                    )
+
+
+def _make_build_scratch() -> tuple[str, str, str]:
+    """Return an isolated ``(scratch, stage, work)`` set for one build.
+
+    Hub and Designer can be open together. Fixed PyInstaller directories let
+    one build's ``--clean`` delete another build's EXE/base_library.zip while
+    it was still collecting files.
+    """
+    build_root = os.path.join(ROOT, "build")
+    os.makedirs(build_root, exist_ok=True)
+    scratch = tempfile.mkdtemp(prefix="_runner_", dir=build_root)
+    return scratch, os.path.join(scratch, "stage"), os.path.join(scratch, "work")
 
 
 def _trim_build(final: str) -> None:
@@ -650,10 +721,17 @@ def _zip_runner(folder: str, zip_path: str) -> None:
 
 def _gh(args: list[str], timeout: float = PREFLIGHT_TIMEOUT) -> subprocess.CompletedProcess:
     """Run ``gh`` and never raise: a missing CLI, a timeout or a crash all come
-    back as a non-zero result, so callers only look at ``returncode``."""
+    back as a non-zero result, so callers only look at ``returncode``. A timeout
+    comes back as :data:`_GH_TIMEOUT` rather than 127, because "gh is too slow"
+    and "gh isn't installed" need different advice.
+
+    The default is the preflight's short leash (quick queries); an upload passes
+    :data:`UPLOAD_TIMEOUT` instead."""
     try:
         return subprocess.run(["gh", *args], capture_output=True, text=True,
                               encoding="utf-8", errors="replace", timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        return subprocess.CompletedProcess(["gh", *args], _GH_TIMEOUT, "", str(exc))
     except (OSError, subprocess.SubprocessError) as exc:
         return subprocess.CompletedProcess(["gh", *args], 127, "", str(exc))
 
@@ -747,7 +825,12 @@ def publish_checks(repo: str, app_name: str, version: str,
     if not gh_available():
         return [_issue("gh", "fail", "GitHub CLI (gh) is not installed — https://cli.github.com",
                        "Install gh, or build without publishing.")]
-    if _gh(["auth", "status"]).returncode != 0:
+    auth = _gh(["auth", "status"])
+    if auth.returncode == _GH_TIMEOUT:
+        return [_issue("gh-auth", "fail",
+                       f"gh auth status timed out ({PREFLIGHT_TIMEOUT:.0f}s)",
+                       "Check your connection and retry.")]
+    if auth.returncode != 0:
         return [_issue("gh-auth", "fail", "gh is not signed in — run 'gh auth login' once")]
     tag = f"{tag_prefix(app_name)}{version}"
     if _gh(["release", "view", tag, "--repo", repo]).returncode == 0:
@@ -781,13 +864,26 @@ def publish(final: str, app_name: str, display_name: str, version: str,
         return url
 
     progress(95, "Uploading to GitHub")
-    log(f"Publishing {tag} to {repo} …")
+    log(f"Publishing {tag} to {repo} … ({os.path.getsize(zip_path) / (1024 * 1024):.0f} MB, "
+        f"this takes as long as your uplink needs)")
+    # UPLOAD_TIMEOUT, not the preflight's short leash — see the constant.
     result = _gh([
         "release", "create", tag, zip_path, "--repo", repo,
         "--title", f"{display_name} Runner {version}",
         "--notes", f"Standalone Runner for {display_name}, version {version}.",
         "--latest=false",
-    ])
+    ], timeout=UPLOAD_TIMEOUT)
+    if result.returncode == _GH_TIMEOUT:
+        # gh creates the release before it uploads the file, so a kill here can
+        # leave the tag published with no asset — which the next run refuses as
+        # "already published". Say so, and how to clear it.
+        raise RuntimeError(
+            f"Uploading to GitHub timed out after {UPLOAD_TIMEOUT / 60:.0f} min. "
+            f"The release may exist without its file — check 'gh release view {tag} "
+            f"--repo {repo}'; if it's there, remove it with 'gh release delete {tag} "
+            f"--repo {repo} --yes' before publishing again. The built folder and "
+            f"{os.path.basename(zip_path)} are ready, so only the upload has to be redone."
+        )
     if result.returncode != 0:
         raise RuntimeError(f"gh release create failed: {(result.stderr or result.stdout).strip()}")
     return url
@@ -861,8 +957,7 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
     log(f"Game req : {describe_requirements(workflow_dir)}")
     log(f"Updates  : {repo + ' · tag ' + tag_prefix(app_name) + version if repo else '(no update repo)'}")
 
-    stage = os.path.join(ROOT, "build", "_runner_stage")
-    work = os.path.join(ROOT, "build", "_runner_work")
+    scratch, stage, work = _make_build_scratch()
     out_root = out_dir or os.path.join(ROOT, "dist")
     final = os.path.join(out_root, f"{app_name}-Runner")
 
@@ -952,6 +1047,12 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
         staged = os.path.join(stage, f"{app_name}-Runner")
         if not os.path.isdir(staged):
             raise RuntimeError(f"PyInstaller did not produce {staged}")
+        staged_exe = os.path.join(staged, app_name + ".exe")
+        if not os.path.isfile(staged_exe):
+            raise RuntimeError(
+                f"PyInstaller output is incomplete: {staged_exe} is missing. "
+                "Check the build warnings or security software, then rebuild."
+            )
 
         # Promote staging -> dist/<Name>-Runner (wipe any previous build).
         # NB: don't ignore_errors on the wipe — a half-deleted folder makes
@@ -969,6 +1070,9 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
                 )
         os.makedirs(out_root, exist_ok=True)
         shutil.move(staged, final)
+        final_exe = os.path.join(final, app_name + ".exe")
+        if not os.path.isfile(final_exe):
+            raise RuntimeError(f"Runner assembly failed: {final_exe} is missing")
 
         # Drop dead weight, then copy only the vendor pieces this workflow needs.
         _trim_build(final)
@@ -981,7 +1085,15 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
             log(f"Game requirements → {requirements} (see {REQUIREMENTS_NOTE}: "
                 "players copy them into the game folder)")
 
-        log(f"Total size: {_dir_size_mb(final):.0f} MB")
+        _validate_ocr_payload(final)
+        app_size = _app_size_mb(final)
+        if app_size > MAX_RUNNER_APP_MB:
+            raise RuntimeError(
+                f"Runner application is {app_size:.1f} MB; maximum is "
+                f"{MAX_RUNNER_APP_MB:.0f} MB (game requirements excluded)"
+            )
+        log(f"Application size: {app_size:.1f} MB (game requirements excluded)")
+        log(f"Total size: {_dir_size_mb(final):.1f} MB")
 
         release_url = ""
         if do_publish or publish_dry_run:
@@ -995,12 +1107,11 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
             log(f"RELEASE: {release_url}")
         if requirements:
             log(f"REQUIREMENTS: {requirements}")
-        log(f"DONE: {os.path.join(final, app_name + '.exe')}")
+        log(f"DONE: {final_exe}")
         return final
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        shutil.rmtree(stage, ignore_errors=True)
-        shutil.rmtree(work, ignore_errors=True)
+        shutil.rmtree(scratch, ignore_errors=True)
 
 
 def main() -> int:
