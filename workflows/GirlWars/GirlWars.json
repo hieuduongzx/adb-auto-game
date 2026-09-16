@@ -947,6 +947,22 @@
               "negate": true
             },
             "delayBefore": 2
+          },
+          {
+            "id": "n4y5nsp1",
+            "type": "resize_emulator",
+            "x": 254,
+            "y": 280,
+            "params": {
+              "emulator": "last",
+              "index": 1,
+              "pathSrc": "project",
+              "path": "",
+              "width": 1920,
+              "height": 1080,
+              "x": 0,
+              "y": 0
+            }
           }
         ],
         "edges": [

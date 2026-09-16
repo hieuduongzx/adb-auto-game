@@ -1416,6 +1416,19 @@ class WorkflowDesignerAPI:
             log_error(f"Select device error: {e}")
             return False
 
+    def _sync_engine_device(self) -> None:
+        """Tell the engine which device the picker has selected.
+
+        Emulator nodes targeting ``selected`` resolve against it, so a test run
+        resizes/kills the instance the user is looking at rather than whichever
+        one the flow launched last. ``_connected_serial`` wins over
+        ``_selected_serial``: the worker clears the former when a device drops
+        off ``adb devices`` but never the latter, so the raw field can point at
+        an emulator that is already gone.
+        """
+        if self._engine is not None:
+            self._engine.set_selected_device(self._connected_serial or self._selected_serial)
+
     def scan_ports(self) -> None:
         threading.Thread(target=self._scan_ports_worker, daemon=True).start()
 
@@ -1439,6 +1452,7 @@ class WorkflowDesignerAPI:
                 "serial": s.get("device_id"),
                 "name": s.get("device_name") or serial,
             })
+            self._sync_engine_device()
             self._warm_capture_async()
         except Exception as e:
             log_error(f"Connect device error: {e}")
@@ -1518,6 +1532,9 @@ class WorkflowDesignerAPI:
                             self._push("device_status", {
                                 "connected": False, "serial": None, "name": "",
                             })
+                # After the branches, so a device that just dropped is reflected
+                # rather than the serial it had a moment ago.
+                self._sync_engine_device()
             except Exception:
                 self._push("devices_update", {"devices": []})
 
@@ -1873,6 +1890,7 @@ class WorkflowDesignerAPI:
         if self._engine is None:
             self._engine = WorkflowEngine()
         serial = self._connected_serial or self._selected_serial
+        self._engine.set_selected_device(serial)
         try:
             if serial and not is_win32:
                 self._engine.auto.adb.device_id = serial
@@ -2010,6 +2028,7 @@ class WorkflowDesignerAPI:
             log_warning("Workflow is already running")
             return False
         serial = self._connected_serial or self._selected_serial
+        self._engine.set_selected_device(serial)
         try:
             if serial and not is_win32:
                 self._engine.auto.adb.device_id = serial
@@ -2076,6 +2095,7 @@ class WorkflowDesignerAPI:
             log_warning("Workflow is already running")
             return {"ok": False, "status": "busy", "port": None}
         serial = self._connected_serial or self._selected_serial
+        self._engine.set_selected_device(serial)
         try:
             if serial and not is_win32:
                 self._engine.auto.adb.device_id = serial

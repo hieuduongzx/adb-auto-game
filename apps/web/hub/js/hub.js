@@ -280,7 +280,33 @@ function promptNewWorkflow() {
 let GAMES = [];
 let FILTER = "";
 let BUILD = null;   // {path, name, version, state: running|cancelling|done|failed|cancelled, progress, stage, …}
-const COLS = 5;   // matches grid-template-columns in hub.css
+/** The shelf's widest layout — five covers across (hub.css `--cols`). It is the
+    ceiling and the value used before the grid has been laid out; it is never
+    the arrow-key step, because the grid reflows on a narrow window. */
+const GRID_COLS = 5;
+
+// ── Grid geometry ────────────────────────────────────────────────────────────
+/** How many tracks a computed `grid-template-columns` describes. Chromium
+    reports used values ("185px 185px …"); a `repeat(3, 185px)` form is counted
+    from its repeat count instead. Unreadable values (a grid that is not laid
+    out reports "none") fall back to `fallback`. */
+function trackCount(value, fallback) {
+  const css = String(value == null ? "" : value).trim();
+  if (!css || css === "none") return fallback;
+  const rep = /^repeat\(\s*(\d+)/i.exec(css);
+  if (rep) return Number(rep[1]) || fallback;
+  const n = css.split(/\s+/).filter(Boolean).length;
+  return n > 0 ? n : fallback;
+}
+
+/** Columns the shelf is actually laying out, so arrows move by whole rows at
+    every reflow step rather than by a constant that only suits a wide window. */
+function gridColumns() {
+  const grid = $("grid");
+  let css = "";
+  try { css = grid ? getComputedStyle(grid).gridTemplateColumns : ""; } catch { css = ""; }
+  return Math.max(1, trackCount(css, GRID_COLS));
+}
 
 // ── Cover art ────────────────────────────────────────────────────────────────
 // The Hub used to keep its own paths here, including a hand-drawn box for Build.
@@ -325,6 +351,11 @@ function filtered() {
   return GAMES.filter((g) => [g.name, g.folder, g.controller].join(" ").toLowerCase().includes(q));
 }
 
+/** One card. The cover is its own button — clicking the art runs the game — and
+    the footer under it carries the same Run as a labelled control beside the
+    Edit / Build / Delete tools, so nothing on a card depends on hovering to be
+    found. Neither button nests inside the other: the delegated click handler
+    reads `data-act` from whichever one was hit. */
 function cardHtml(g, i) {
   const name = escHtml(g.name);
   const ctrl = g.controller === "win32" ? "win32" : "adb";
@@ -337,13 +368,7 @@ function cardHtml(g, i) {
     `<button class="game-cover" type="button" data-act="run" title="Run ${name}" aria-label="Run ${name}">` +
       art +
       `<span class="game-building" title="Show build progress"><span class="build-dot"></span>Building <span class="chip-pct">${building ? (BUILD.progress || 0) : 0}%</span></span>` +
-      `<span class="game-run" aria-hidden="true">${svg("play", "uico-0 uico-fill")}Run</span>` +
     `</button>` +
-    `<div class="game-tools">` +
-      `<button class="game-tool" type="button" data-act="edit" title="Edit in Designer (E)" aria-label="Edit ${name}">${svg("pencil", "uico-2")}</button>` +
-      `<button class="game-tool" type="button" data-act="build" title="Build a standalone Runner .exe (B)" aria-label="Build Runner exe for ${name}">${svg("package", "uico-2")}</button>` +
-      `<button class="game-tool danger" type="button" data-act="delete" title="Delete (Del)" aria-label="Delete ${name}">${svg("trash-2", "uico-2")}</button>` +
-    `</div>` +
     `<div class="game-info">` +
       iconHtmlFor(g, "game-icon") +
       `<span class="game-name" title="${name}">${name}</span>` +
@@ -352,15 +377,30 @@ function cardHtml(g, i) {
         `<span class="game-acts">${acts} ${acts === 1 ? "activity" : "activities"}</span>` +
       `</span>` +
     `</div>` +
+    `<div class="game-foot">` +
+      `<button class="game-run" type="button" data-act="run" title="Run ${name}" aria-label="Run ${name}">${svg("play", "uico-2 uico-fill")}Run</button>` +
+      `<span class="game-tools">` +
+        `<button class="game-tool" type="button" data-act="edit" title="Edit in Designer (E)" aria-label="Edit ${name}">${svg("pencil", "uico-2")}</button>` +
+        `<button class="game-tool" type="button" data-act="build" title="Build a standalone Runner .exe (B)" aria-label="Build Runner exe for ${name}">${svg("package", "uico-2")}</button>` +
+        `<button class="game-tool danger" type="button" data-act="delete" title="Delete (Del)" aria-label="Delete ${name}">${svg("trash-2", "uico-2")}</button>` +
+      `</span>` +
+    `</div>` +
   `</article>`;
 }
 
+/** Two rows of placeholder cards. The boxes stand in for the footer's Run and
+    tools as well as the cover and the name lines, so a row keeps its height
+    when the real cards land in it. */
 function renderSkeleton() {
   const grid = $("grid");
-  grid.innerHTML = Array.from({ length: COLS * 2 }, (_, i) =>
+  grid.innerHTML = Array.from({ length: gridColumns() * 2 }, (_, i) =>
     `<div class="game skeleton" aria-hidden="true" style="--i:${i}">` +
       `<span class="game-cover"></span>` +
       `<span class="game-info"><span class="sk-line"></span><span class="sk-line short"></span></span>` +
+      `<span class="game-foot">` +
+        `<span class="sk-line run"></span>` +
+        `<span class="sk-dots"><span class="sk-dot"></span><span class="sk-dot"></span><span class="sk-dot"></span></span>` +
+      `</span>` +
     `</div>`).join("");
   grid.setAttribute("aria-busy", "true");
 }
@@ -391,7 +431,10 @@ function render(opts) {
     empty.querySelector(".empty-msg").textContent = searching
       ? `Nothing in the library matches “${FILTER.trim()}”.`
       : "Create a game project to start building its workflow.";
+    // Empty library → the way out is a new game; no matches → the way out is
+    // dropping the search (Esc in the field does the same).
     $("btn-empty-new").hidden = searching;
+    $("btn-empty-clear").hidden = !searching;
     return;
   }
   empty.hidden = true;
@@ -773,16 +816,18 @@ function onGridKey(e) {
   if (e.key === "b" || e.key === "B") { e.preventDefault(); buildWorkflow(path); return; }
   if (e.key === "Delete") { e.preventDefault(); deleteWorkflow(path); return; }
 
+  const cols = gridColumns();
   const covers = [...$("grid").querySelectorAll(".game-cover")];
   const index = covers.indexOf(card.querySelector(".game-cover"));
-  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -COLS, ArrowDown: COLS }[e.key];
+  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols }[e.key];
   let next;
   if (step !== undefined) next = index + step;
   else if (e.key === "Home") next = 0;
   else if (e.key === "End") next = covers.length - 1;
   else return;
   e.preventDefault();
-  if (e.key === "ArrowUp" && index < COLS) { $("search").focus(); return; }
+  // Up from the first row leaves the shelf for the search box above it.
+  if (e.key === "ArrowUp" && index < cols) { $("search").focus(); return; }
   next = Math.max(0, Math.min(covers.length - 1, next));
   covers[next].focus({ preventScroll: true });
   covers[next].scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -811,6 +856,14 @@ function wire() {
       if (first) { e.preventDefault(); first.focus(); }
     }
   });
+  // "Clear search" in the no-match empty state — same as Esc in the field,
+  // then focus it so typing a new term needs no click.
+  $("btn-empty-clear").onclick = () => {
+    search.value = "";
+    FILTER = "";
+    render();
+    search.focus();
+  };
   document.addEventListener("keydown", (e) => {
     if (_modal || e.defaultPrevented) return;
     const typing = e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");

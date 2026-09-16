@@ -246,7 +246,9 @@ function wfHydrate(flow){
       const sp=seed.params||{};
       WF.emulator.path=String(sp.path||"").trim();
       const k=String(sp.emulator||"").trim().toLowerCase();
-      if(k && k!=="custom" && k!=="last") WF.emulator.kind=k;
+      // "selected" is a targeting mode, not a family — seeding it here would
+      // hand launch_emulator a bogus install folder to look up.
+      if(k && k!=="custom" && k!=="last" && k!=="selected") WF.emulator.kind=k;
     }
   }
   WF.nodeDefaults=wfHydNodeDefaults(flow.nodeDefaults);

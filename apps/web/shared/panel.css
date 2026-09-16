@@ -23,8 +23,8 @@
 
 :root {
   --rail-w:    68px;   /* left navigation rail */
-  --pnl-hd-h:  40px;   /* panel header — the suite's one header height */
-  --ctlbar-h:  52px;   /* labelled control strip */
+  --pnl-hd-h:  44px;   /* panel header — the suite's one header height */
+  --ctlbar-h:  56px;   /* labelled control strip */
   --dtab-h:    40px;   /* document tab strip */
   --frow-lbl:  148px;  /* form-row label column */
 }

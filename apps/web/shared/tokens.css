@@ -1,31 +1,31 @@
 /* Macro2k shared product tokens.
    Every WebView surface loads this file before its app-specific stylesheet. */
 :root {
-  --bg:        #e9edf2;
-  --panel:     #fbfcfe;
-  --surface:   #f4f6f9;
+  --bg:        #eef1f5;
+  --panel:     #ffffff;
+  --surface:   #f6f8fb;
   --alt:       #eef2f6;
-  --border:    #d8dee7;
-  --border2:   #cbd3de;
-  --line:      #e5e9ef;
+  --border:    #dbe2ec;
+  --border2:   #cbd7e6;
+  --line:      #dde3ea;
 
-  --ink:       #17202b;
-  --ink2:      #344150;
+  --ink:       #131922;
+  --ink2:      #2e3a49;
   --dim:       #4d5a69;
   /* At least 4.69:1 on every product surface, including --bg (WCAG AA). */
-  --muted:     #667383;
+  --muted:     #5b6675;
 
-  --accent:       #245fc7;
-  --accent-hover: #194b9f;
-  --accent-bg:    #eaf1fb;
-  --accent-bd:    #bfd1ec;
+  --accent:       #1f6feb;
+  --accent-hover: #1a5ad6;
+  --accent-bg:    #e8effe;
+  --accent-bd:    #c4d7ff;
   /* --ok remains legible under white button text (4.96:1). */
-  --ok:           #1b8049;
-  --ok-hover:     #166d3f;
-  --ok-bg:        #e8f5ed;
-  --ok-bd:        #cfead9;
+  --ok:           #1a7f4a;
+  --ok-hover:     #156a3e;
+  --ok-bg:        #e6f4ec;
+  --ok-bd:        #b8dfc7;
   /* Foreground for success text/badges that sit on --ok-bg. */
-  --ok-ink:       #1c7a44;
+  --ok-ink:       #157a40;
   --warn:         #9c6c12;
   --warn-bg:      #fdf6e9;
   --warn-bd:      #e7d5a4;
@@ -36,7 +36,7 @@
 
   /* Sub-text sitting on --accent-bg (chooser subtitles, selected rows): the
      accent stepped back far enough to read as secondary but stay in family. */
-  --accent-soft:  #4a78c9;
+  --accent-soft:  #5a8af0;
   /* Inert fill for a track a value runs along (progress bar, slider rail). */
   --track:        #e2e7ee;
   /* Transparency checkerboard behind a colour swatch. */
@@ -64,21 +64,19 @@
   --on-err: #ffffff;
 
   /* Type scale — seven steps, and the only sizes the suite is allowed to use.
-     It replaces an ad-hoc 9–19px spread of fourteen sizes that differed between
-     the three apps for no reason (app titles were 15px in the Hub and 17px in
-     the Runner; section labels drifted between 9.5, 10 and 10.5px). Reach for
-     the nearest step rather than adding a new one. */
+     Bumped one step vs the original 10.5–17 range so hierarchy reads from
+     across the desk. Reach for the nearest step rather than adding a new one. */
   --t-micro: 10.5px;   /* badges, unit suffixes, meta microcopy (AA floor) */
-  --t-caption: 11px;   /* field labels, hints, status-strip text */
-  --t-ui: 11.5px;      /* buttons, chips, dense controls */
-  --t-body: 12.5px;    /* default UI text, list-row names */
-  --t-title: 13.5px;   /* card / section titles */
-  --t-head: 15px;      /* app title in a header card */
-  --t-display: 17px;   /* hero numbers, empty-state headline */
+  --t-caption: 12px;   /* field labels, hints, status-strip text */
+  --t-ui: 12.5px;      /* buttons, chips, dense controls */
+  --t-body: 13.5px;    /* default UI text, list-row names */
+  --t-title: 15px;     /* card / section titles */
+  --t-head: 19px;      /* app title in a header card */
+  --t-display: 22px;   /* hero numbers, empty-state headline */
 
-  --r-sm: 5px;
-  --r-md: 7px;
-  --r-lg: 9px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
   --s1: 4px;
   --s2: 6px;
   --s3: 8px;
@@ -102,7 +100,7 @@
    setting data-density="compact" on <html>. Comfortable (default) is :root. */
 :root[data-density="compact"] {
   --s1: 3px; --s2: 4px; --s3: 6px; --s4: 9px; --s5: 12px; --s6: 18px;
-  --t-body: 12px; --t-caption: 10.5px;
+  --t-body: 12.5px; --t-caption: 11px;
 }
 
 /* ── Dark theme — remaps surfaces, ink and the semantic tints. Semantic
@@ -124,10 +122,10 @@
   --dim:       #9aa7b8;
   --muted:     #7d8a9d;
 
-  --accent:       #5b8def;
-  --accent-hover: #7ba4f5;
-  --accent-bg:    rgba(91, 141, 239, .16);
-  --accent-bd:    rgba(91, 141, 239, .38);
+  --accent:       #6aa1ff;
+  --accent-hover: #8ab4ff;
+  --accent-bg:    rgba(106, 161, 255, .16);
+  --accent-bd:    rgba(106, 161, 255, .38);
   --ok:           #3fae72;
   --ok-hover:     #55c88a;
   --ok-bg:        rgba(63, 174, 114, .15);

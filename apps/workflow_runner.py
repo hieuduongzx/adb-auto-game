@@ -1077,6 +1077,7 @@ class WorkflowRunnerAPI:
         if not self._adb_workflow():
             return                      # Win32 drives a window, not a device
         serial = self._connected_serial or self._selected_serial
+        self.engine.set_selected_device(serial)
         if serial:
             try:
                 self.engine.auto.adb.device_id = serial
@@ -1623,6 +1624,7 @@ class WorkflowRunnerAPI:
         try:
             self._selected_serial = serial
             self.engine.auto.adb.device_id = serial
+            self.engine.set_selected_device(serial)
             threading.Thread(target=self._connect_device, args=(serial,), daemon=True).start()
             return True
         except Exception as e:
@@ -1635,6 +1637,10 @@ class WorkflowRunnerAPI:
             self.engine.auto.adb.quick_refresh()
             s = self.engine.auto.adb.get_status_summary()
             self._connected_serial = s.get("device_id") if s.get("connected") else None
+            # The engine's "selected device" follows the live handle, not the
+            # request: emulator nodes targeting `selected` must resolve to a
+            # device that is actually connected.
+            self.engine.set_selected_device(self._connected_serial or self._selected_serial)
             self._push("device_status", {
                 "connected": bool(s.get("connected")),
                 "serial": s.get("device_id"),
@@ -1705,6 +1711,7 @@ class WorkflowRunnerAPI:
                 adb.quick_refresh()
                 s = adb.get_status_summary()
                 self._connected_serial = s.get("device_id") if s.get("connected") else None
+                self.engine.set_selected_device(self._connected_serial or self._selected_serial)
                 self._push("devices_update", {
                     "devices": devices,
                     "connected": bool(s.get("connected")),

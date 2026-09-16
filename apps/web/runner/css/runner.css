@@ -2,34 +2,34 @@
    Loaded after ../shared/base.css; only app-specific rules live here. */
 
 /* ── App frame ─────────────────────────────────────────────────────────── */
-#app { padding: 7px 7px 4px; gap: 5px; }
+#app { padding: var(--s4); gap: var(--s4); }
 
 /* Split body: left = activities (tabs + lists), right = activity settings + log. */
-#main-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
-#main-split { flex: 1; min-height: 0; display: flex; gap: 6px; }
-#pane-left  { flex: 0 1 39%; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-#pane-right { flex: 0 1 61%; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+#main-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--s4); }
+#main-split { flex: 1; min-height: 0; display: flex; gap: var(--s4); }
+#pane-left  { flex: 0 1 39%; min-width: 0; display: flex; flex-direction: column; gap: var(--s3); }
+#pane-right { flex: 0 1 61%; min-width: 0; display: flex; flex-direction: column; gap: var(--s3); }
 
 /* ── Header card ───────────────────────────────────────────────────────── */
 /* One flex column: the progress row sits between title and controls only while
    a run is live, and a column gap gives the right spacing in both states —
    margins on the rows above it left a dead 11px gap whenever it was hidden. */
 #header-card {
-  padding: 9px 10px;
+  padding: var(--s5);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s4);
 }
 .header-top {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s4);
 }
-.header-title-block { flex: 1; min-width: 0; }
+.header-title-block { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 /* The game's icon — the same art as its .exe and its Hub card. */
 .app-icon {
-  width: 30px; height: 30px; flex-shrink: 0; border-radius: 7px; overflow: hidden;
+  width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
 }
@@ -37,7 +37,7 @@
 .app-icon img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
 .app-icon.mono {
   background: hsl(var(--tone) 40% 30%); color: hsl(var(--tone) 45% 93%);
-  font-size: var(--t-body); font-weight: 600; letter-spacing: -.02em;
+  font-size: var(--t-head); font-weight: 600; letter-spacing: -.02em;
 }
 .app-title {
   font-size: var(--t-head);
@@ -63,13 +63,13 @@
 
 /* Status pill — square, semantic tint only */
 #status-pill {
-  display: flex; align-items: center; gap: 5px;
-  padding: 4px 9px; border-radius: var(--r-sm);
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 11px; border-radius: var(--r-sm);
   flex-shrink: 0; transition: background .2s, border-color .2s;
   border: 1px solid transparent;
 }
-#status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; transition: background .3s; }
-#status-text { font-size: var(--t-micro); font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
+#status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; transition: background .3s; }
+#status-text { font-size: var(--t-caption); font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
 .status-ready   { background: var(--surface); border-color: var(--border); }
 .status-running { background: var(--ok-bg); border-color: var(--border); }
 .status-paused  { background: var(--warn-bg); border-color: var(--border); }
@@ -97,48 +97,49 @@
 .outcome-stopped .outcome-dot { background:var(--warn); }
 
 /* Progress bar */
-#header-progress { display: flex; align-items: center; gap: 9px; }
+#header-progress { display: flex; align-items: center; gap: var(--s4); padding-top: var(--s2); border-top: 1px solid var(--line); }
 .prog-count { font-size: var(--t-caption); font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums; min-width: 28px; flex-shrink: 0; }
 .prog-bar-track { flex: 1; height: 6px; border-radius: 2px; background: var(--track); overflow: hidden; }
 .prog-bar-fill { height: 100%; border-radius: 2px; background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
 .prog-elapsed { font-family: var(--mono); font-size: var(--t-ui); font-weight: 500; color: var(--dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
 /* Control buttons */
-.header-btns { display: flex; align-items: center; gap: 6px; }
+.header-btns { display: flex; align-items: center; gap: var(--s3); }
+.header-btns .btn { height: 40px; font-size: var(--t-title); padding: 0 var(--s5); border-radius: var(--r-md); }
 /* One primary button, green while it means Start and red once it means Stop —
    see setPrimary() in runner.js. */
-.btn-start { flex: 2; background: var(--ok); color: var(--on-ok); border-color: var(--ok); font-size: var(--t-body); font-weight: 700; border-radius: var(--r-sm); }
-.btn-start:hover:not(:disabled) { background: var(--ok-hover); }
-.btn-start:active:not(:disabled) { background: var(--ok-hover); }
+.btn-start { flex: 2; background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-size: var(--t-title); font-weight: 700; border-radius: var(--r-md); }
+.btn-start:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-start:active:not(:disabled) { background: var(--accent-hover); }
 .btn-start.is-stop { background: var(--err); color: var(--on-ok); border-color: var(--err); }
 .btn-start.is-stop:hover:not(:disabled) { background: var(--err-hover); }
 .btn-start.is-stop:active:not(:disabled) { background: var(--err-hover); }
-.btn-pause { flex: 1; background: var(--warn-bg); color: var(--warn); border-color: var(--border); border-radius: var(--r-sm); }
-.btn-pause:hover:not(:disabled) { background: var(--warn-bd); }
+.btn-pause { flex: 1; background: var(--panel); color: var(--dim); border-color: var(--border2); border-radius: var(--r-md); }
+.btn-pause:hover:not(:disabled) { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-bd); }
 
 /* ── Tabs — segmented control (operator console) ───────────────────────── */
 #tabs-bar {
   display: flex; align-items: center; gap: 0; flex-shrink: 0;
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md);
-  overflow: hidden;
+  padding: 3px; gap: 3px; overflow: hidden;
 }
 .tab-btn {
-  flex: 1; justify-content: center; padding: 7px 6px; border-radius: 0;
-  border-right: 1px solid var(--line); color: var(--dim);
+  flex: 1; justify-content: center; padding: 9px 10px; border-radius: var(--r-sm);
+  border: none; color: var(--dim);
   display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--t-body); font-weight: 600;
   transition: background .12s, color .12s;
 }
-.tab-btn:last-child { border-right: 0; }
-.tab-btn::after { left: 12px; right: 12px; }
-/* Same filled active state as the right column's tabs (.rtab). */
-.tab-btn.active { background: var(--accent-bg); }
-.tab-btn:hover:not(.active) { color: var(--ink2); }
+.tab-btn::after { left: 10px; right: 10px; }
+.tab-btn.active { background: var(--accent); color: var(--on-accent); }
+.tab-btn.active::after { display: none; }
+.tab-btn:hover:not(.active) { background: var(--alt); color: var(--ink2); }
 
 /* ── Tab content ───────────────────────────────────────────────────────── */
 .tab-pane { display: none; flex-direction: column; min-height: 0; overflow: hidden; padding: 0; }
 .tab-pane.active { display: flex; flex: 1; }
 #tab-wrapper { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.pane-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 6px 0 2px; gap: 6px; overflow: hidden; }
+.pane-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 2px 0; gap: var(--s3); overflow: hidden; }
 
 /* The tab already names the list, so the header carries "3 of 5 enabled". */
 .list-header { display: flex; align-items: center; gap: 4px; padding: 0 2px; min-height: 26px; flex-shrink: 0; }
@@ -155,7 +156,7 @@
 /* Activity row — name on top, a status / settings line under it. A 3px bar on
    the left edge carries the live state (amber running, red failed), so a
    glance down the list finds where the run is and what broke. */
-.task-row { position: relative; display: flex; align-items: center; gap: 6px; padding: 5px 7px 5px 7px; min-height: 38px; border-bottom: 1px solid var(--line); transition: background .1s; }
+.task-row { position: relative; display: flex; align-items: center; gap: var(--s3); padding: 8px 10px; min-height: 44px; border-bottom: 1px solid var(--line); transition: background .1s; }
 .task-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; transition: background .15s; }
 .task-row:last-child { border-bottom: none; }
 .task-row:hover { background: var(--surface); }
@@ -219,27 +220,36 @@
 
 /* ── Right column: 3 tabs + preview ────────────────────────────────────── */
 #r-tabs {
-  display: flex; align-items: stretch; flex-shrink: 0; gap: 0;
+  display: flex; align-items: stretch; flex-shrink: 0;
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
+  padding: 3px; gap: 3px;
 }
 .rtab {
-  flex: 1; justify-content: center; min-width: 0; padding: 7px 5px;
-  border-right: 1px solid var(--line); border-radius: 0;
+  flex: 1; justify-content: center; min-width: 0; padding: 9px 10px;
+  border: none; border-radius: var(--r-sm);
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: var(--t-ui); font-weight: 600; color: var(--dim);
+  font-size: var(--t-body); font-weight: 600; color: var(--dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transition: background .12s, color .12s;
 }
-.rtab:last-child { border-right: 0; }
-.rtab:hover { color: var(--ink2); }
-.rtab.active { color: var(--accent); background: var(--accent-bg); }
-.rtab.active .tab-count { color: var(--accent); background: var(--accent-bg); }
+.rtab:hover { background: var(--alt); color: var(--ink2); }
+.rtab.active { color: var(--on-accent); background: var(--accent); }
+.rtab.active .tab-count { color: var(--on-accent); background: transparent; }
 
 #r-content { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .rpane { display: none; flex: 1; min-width: 0; min-height: 0; flex-direction: column;
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
 .rpane.active { display: flex; }
-.rpane-hd { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 13px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.rpane-hd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.log-level { min-width: 0; max-width: 100%; height: 28px; }
+.log-note:empty, .diag-status:empty { display: none; }
+.log-note, .diag-status { padding: var(--s3) var(--s4); font-size: var(--t-caption); line-height: 1.5; overflow-wrap: anywhere; color: var(--dim); background: var(--surface); }
+.log-note.ok, .diag-status.ok { color: var(--ok-ink); background: var(--ok-bg); }
+.log-note.warn, .diag-status.warn { color: var(--warn); background: var(--warn-bg); }
+.diag-list { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s2) var(--s4); }
+.diag-list dt { color: var(--muted); font-size: var(--t-caption); }
+.diag-list dd { min-width: 0; overflow-wrap: anywhere; user-select: text; }
+.diag-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .rpane-title { font-size: var(--t-body); font-weight: 600; color: var(--ink); }
 .rpane-sp { flex: 1; }
 .rpane-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 9px; display: flex; flex-direction: column; gap: 9px; }
@@ -269,7 +279,8 @@
 .pv-btn:hover { background: var(--alt); color: var(--dim); }
 .pv-btn.off { color: var(--accent); background: var(--accent-bg); }
 .pv-body { position: relative; flex: 1; min-height: 0; background: var(--log-bg); display: flex; align-items: center; justify-content: center; overflow: hidden; }
-#preview-card:not(.is-max) .pv-body { height: 240px; flex: none; }
+/* Keep the screen useful without starving the log on short windows. */
+#preview-card:not(.is-max) .pv-body { height: clamp(100px, 25vh, 280px); flex: none; }
 #pv-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
 /* Before the first frame the <img> has no src — hide it, or its alt text is
    drawn on top of "No preview". */
@@ -372,9 +383,9 @@
 /* ── Log ───────────────────────────────────────────────────────────────── */
 .log-count { font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); background: var(--alt); border-radius: 4px; padding: 1px 6px; min-width: 17px; text-align: center; }
 .log-count:empty { display: none; }
-.log-search-wrap { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
-.log-search-wrap:focus-within { border-color: var(--accent-bd); }
-#log-search { width: 110px; font-family: var(--sans); font-size: var(--t-caption); background: transparent; border: none; color: var(--ink2); padding: 0; }
+.log-search-wrap { display: flex; align-items: center; gap: var(--s1); padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); flex: 1 1 160px; min-width: 130px; max-width: 240px; }
+.log-search-wrap:focus-within { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px; }
+#log-search { flex: 1; min-width: 0; width: auto; font-family: var(--sans); font-size: var(--t-caption); background: transparent; border: none; color: var(--ink2); padding: 0; }
 #log-search::placeholder { color: var(--muted); }
 #log-search:focus { outline: none; }
 .btn-log-clear { font-size: var(--t-caption); font-weight: 600; color: var(--muted); padding: 3px 7px; border-radius: var(--r-sm); transition: color .1s, background .1s; }
@@ -408,13 +419,22 @@
 /* Too narrow for two columns — stack activities on top, panels + preview below. */
 @media (max-width: 640px) {
   #main-split { flex-direction: column; }
-  #pane-right { flex: 0 1 auto; max-height: 72%; }
-  #preview-card:not(.is-max) .pv-body { height: 180px; }
+  #main-split { overflow-y: auto; }
+  #pane-left { flex: 0 0 220px; }
+  #pane-right { flex: 1 0 380px; }
+  #preview-card:not(.is-max) .pv-body { height: clamp(100px, 20vh, 180px); }
 }
 
 /* ── Footer / status bar ───────────────────────────────────────────────── */
-#footer { display: flex; flex-direction: column; gap: 4px; padding: 5px 7px; flex-shrink: 0; background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); }
-.footer-row { display: flex; align-items: center; gap: 7px; }
+#footer { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s3) var(--s4); flex-shrink: 0; background: var(--panel); border-top: 1px solid var(--border); border-radius: 0; }
+.footer-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); font-size: var(--t-caption); }
+#tabs-bar .tab-btn:focus-visible, .rtab:focus-visible { outline-offset: -3px; }
+.drag-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; color: var(--accent); }
+.btn-sel, .btn-log-clear { min-height: 28px; }
+@media (pointer: coarse) {
+  .btn-icon, .pv-btn, .act-set-x { width: 32px; height: 32px; }
+  .drag-handle { width: 24px; }
+}
 #dev-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background .3s; }
 #dev-dot.connected { background: var(--ok); }
 #win-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }

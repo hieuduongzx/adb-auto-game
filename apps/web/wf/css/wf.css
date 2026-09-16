@@ -11,24 +11,35 @@
    Flex items are laid out sequentially and cannot overlap, whatever the width.
    The two side zones share the leftover space (`flex:1 1 0`) so the run cluster
    still sits optically centred; `min-width:0` lets them actually shrink. */
+/* 48px. 36px tracks with 28px controls inside, a 36px Run button, and enough
+   air that the written labels (Device, Source) still sit beside their controls.
+   The bar is a strip the canvas pays for, so it stays one row at laptop widths
+   rather than wrapping: the old 56px/40px trays could not fit a 1440px window
+   on one line and cost ~53px of canvas to a second row. */
+:root { --hdr-h:48px; }
 #toolbar { display:flex; align-items:center;
-  gap:var(--s4); height:var(--hdr-h); padding:0 var(--s4); flex-shrink:0;
+  gap:var(--s3); height:var(--hdr-h); padding:0 var(--s4); flex-shrink:0;
   background:var(--panel); border-bottom:1px solid var(--border2); }
-.tb-zone { display:flex; align-items:center; gap:var(--s3); min-width:0; }
+.tb-zone { display:flex; align-items:center; gap:var(--s2); min-width:0; }
+/* Written labels keep the caption register — the trays carry the weight, and a
+   label larger than the control it names reads as the louder element. */
+#toolbar .ctl-lbl { font-size:var(--t-caption); }
+#toolbar .ctl-sep { height:20px; margin:0 var(--s2); }
 .tb-left  { flex:1 1 0; justify-content:flex-start; }
 .tb-center{ flex:0 0 auto; }          /* the run cluster is never squeezed */
 .tb-right { flex:1 1 0; justify-content:flex-end; }
 .tb-backend-tools { display:flex; align-items:center; gap:var(--s3); min-width:0; }
 
 /* ── Tray: the one container language — tinted track, ghost buttons ──────────
-   Every button cluster in the header is a tray: 32px track, 26px buttons,
-   hairline separators between logical sub-groups. */
-.tb-tray { display:inline-flex; align-items:center; gap:2px; padding:3px; height:34px;
-  border-radius:var(--r-md); background:var(--surface); border:1px solid var(--border); flex-shrink:0; }
+   Every button cluster in the header is a tray: 36px track, 28px buttons,
+   hairline separators between logical sub-groups. The hover state is a flat
+   inversion (panel fill, no shadow) so nothing in the bar lifts off the bar. */
+.tb-tray { display:inline-flex; align-items:center; gap:2px; padding:4px; height:36px;
+  border-radius:var(--r-sm); background:var(--surface); border:1px solid var(--border); flex-shrink:0; }
 .tb-tray .btn { border-color:transparent; background:transparent; height:28px; }
 .tb-tray .btn.ico { width:28px; }
-.tb-tray .btn.ico svg { width:14px; height:14px; stroke-width:2; }
-.tb-tray .btn:hover { background:var(--panel); border-color:transparent; box-shadow:var(--sh-sm); }
+.tb-tray .btn.ico svg { width:14px; height:14px; stroke-width:1.9; }
+.tb-tray .btn:hover { background:var(--panel); border-color:transparent; box-shadow:none; }
 .tb-tray .btn.accent { background:var(--accent); border-color:transparent; color:var(--on-accent); }
 .tb-tray .btn.accent:hover { background:var(--accent-hover); box-shadow:none; }
 .tb-tray .btn.ok { background:var(--ok); border-color:transparent; color:var(--on-ok); }
@@ -36,7 +47,7 @@
 .tb-tray-sep { width:1px; height:18px; margin:0 3px; background:var(--border2); flex-shrink:0; }
 
 /* Device + Source trays: same height/padding/type so they read as a pair. */
-.tb-tray-device, .tb-tray-source { gap:3px; padding:2px 4px; }
+.tb-tray-device, .tb-tray-source { gap:2px; padding:4px; }
 /* The device tray is the widest thing in the bar and the only one carrying a
    long string ("No devices — auto-scanning…"), so it is the one that gives way
    first. A hard min-width here was what pushed the zones past the window edge. */
@@ -46,14 +57,16 @@
   flex-shrink:0; margin-left:3px; transition:background .2s, box-shadow .2s; }
 .tb-device-dot.connected { background:var(--ok) !important; box-shadow:none; }
 .tb-device-dot:not(.connected) { background:var(--dot-off); }
-.tb-tray-device select, .tb-tray-source select { font-family:var(--sans); font-size:11.5px;
-  font-weight:600; color:var(--dim); border:none; background:transparent; padding:0 2px;
-  flex:1; min-width:0; height:24px; cursor:pointer; -webkit-appearance:none; appearance:none;
+.tb-tray-device select, .tb-tray-source select { font-family:var(--sans); font-size:12px;
+  font-weight:600; color:var(--dim); border:none; background:transparent; padding:0 3px;
+  flex:1; min-width:0; height:28px; cursor:pointer; -webkit-appearance:none; appearance:none;
   background-image:none; line-height:1; }
-.tb-tray-device select:focus, .tb-tray-source select:focus { outline:none; box-shadow:none; }
+/* Keep a visible keyboard ring — tray selects previously removed the outline
+   entirely, so keyboard users lost their place in the header. */
+.tb-tray-device select:focus-visible, .tb-tray-source select:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; box-shadow:none; }
 .tb-tray-device select:disabled { opacity:.7; cursor:default; color:var(--muted); }
-.tb-tray-device .btn { height:24px; width:24px; flex-shrink:0; }
-.tb-tray-device .btn.ico svg { width:12px; height:12px; stroke-width:2.2; }
+.tb-tray-device .btn { height:28px; width:28px; flex-shrink:0; }
+.tb-tray-device .btn.ico svg { width:13px; height:13px; stroke-width:2; }
 
 /* Next step — hidden until a step-debug session actually pauses (the engine
    toggles .paused), so the header isn't spent on a control that's usually dead. */
@@ -72,23 +85,25 @@
 /* ── Run cluster — the signature control. The Run/Stop button is the one
    labelled action in the header; state (Ready/Running/Stopped) sits beside it
    with a live elapsed clock. Readable from across the desk. */
-#toolbar .tb-run-btn { width:auto; height:34px; padding:0 15px 0 13px; border-radius:var(--r-md);
-  gap:7px; font-size:12.5px; }
-#toolbar .tb-run-btn svg { width:16px; height:16px; stroke-width:1.8; }
+#toolbar .tb-run-btn { width:auto; height:36px; padding:0 15px 0 13px; border-radius:var(--r-sm);
+  gap:7px; font-size:var(--t-body); }
+#toolbar .tb-run-btn svg { width:15px; height:15px; stroke-width:1.8; }
 #toolbar .tb-run-btn::after { content:"Run"; font-weight:700; letter-spacing:.01em; }
 #toolbar .tb-run-btn.err::after { content:"Stop"; }
-#toolbar .tb-run-btn.ok  { box-shadow:0 1px 4px color-mix(in srgb, var(--ok) 35%, transparent); }
+/* Flat fills — a coloured glow under the primary button reads as a second
+   light source in a bar that has exactly one. */
+#toolbar .tb-run-btn.ok  { box-shadow:none; }
 #toolbar .tb-run-btn.err { background:var(--err); border-color:var(--err); color:var(--on-err);
-  box-shadow:0 1px 4px color-mix(in srgb, var(--err) 35%, transparent); }
+  box-shadow:none; }
 #toolbar .tb-run-btn.err:hover { background:var(--err-hover); }
 #toolbar .tb-run-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 
 /* Run status pill — grey at rest, amber pulse while executing, green when done. */
-.wf-run-status { display:flex; align-items:center; gap:7px; height:34px; padding:0 12px;
-  border-radius:var(--r-md); background:var(--surface); border:1px solid var(--border);
-  font-size:11.5px; font-weight:600; color:var(--dim); flex-shrink:0;
+.wf-run-status { display:flex; align-items:center; gap:6px; height:36px; padding:0 12px;
+  border-radius:var(--r-sm); background:var(--surface); border:1px solid var(--border);
+  font-size:12px; font-weight:600; color:var(--dim); flex-shrink:0;
   transition:background .15s, border-color .15s, color .15s; }
-.wf-run-dot { width:9px; height:9px; border-radius:50%; background:var(--muted); flex-shrink:0;
+.wf-run-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex-shrink:0;
   transition:background .15s, box-shadow .15s; }
 .wf-run-status.running { background:var(--cat-ocr-bg); border-color:var(--border); color:var(--cat-ocr-ink); }
 .wf-run-status.running .wf-run-dot { background:var(--run-live); animation:wfRunPulse 1.1s ease-in-out infinite; }
@@ -106,14 +121,14 @@
 
 /* Speed-hack chip: one compact ⚡ + value button in the header; turns amber when
    enabled. The value input + inject/stop button live in the anchored popover. */
-.wf-speed-group { position:relative; display:flex; align-items:center; height:34px; padding:3px;
-  border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface);
+.wf-speed-group { position:relative; display:flex; align-items:center; height:36px; padding:4px;
+  border:1px solid var(--border); border-radius:var(--r-sm); background:var(--surface);
   transition:background .15s, border-color .15s; flex-shrink:0; }
 .wf-speed-group.on { border-color:var(--border2); background:var(--warn-bg); }
 #wf-speed-chip-btn { border-color:transparent; background:transparent; height:28px;
-  width:auto; gap:5px; padding:0 8px 0 6px; }
+  width:auto; gap:6px; padding:0 9px 0 7px; }
 #wf-speed-chip-btn:hover { background:var(--panel); }
-#wf-speed-chip { font-family:var(--mono); font-size:10.5px; font-weight:600; color:var(--dim); }
+#wf-speed-chip { font-family:var(--mono); font-size:11.5px; font-weight:600; color:var(--dim); }
 .wf-speed-group.on #wf-speed-chip { color:var(--warn); }
 .wf-speed-group.on #wf-speed-chip-btn { color:var(--warn); }
 .wf-speed-pop { position:absolute; top:calc(100% + 6px); right:0; z-index:var(--z-dropdown);
@@ -141,93 +156,107 @@
 #wf-speed-run-btn.err { background:var(--err); color:var(--on-err); border-color:transparent; }
 
 /* Project title tray — gear + name share one pill. */
-.wf-title-tray { display:inline-flex; align-items:center; gap:3px; height:34px;
-  padding:3px 9px 3px 3px; border-radius:var(--r-md); background:var(--surface);
-  border:1px solid var(--border); flex-shrink:1; min-width:0; max-width:260px; }
+.wf-title-tray { display:inline-flex; align-items:center; gap:4px; height:36px;
+  padding:4px 9px 4px 4px; border-radius:var(--r-sm); background:var(--surface);
+  border:1px solid var(--border); flex-shrink:1; min-width:0; max-width:288px; }
 .wf-title-tray #wf-proj-settings { flex-shrink:0; width:28px; height:28px; color:var(--dim);
   border-color:transparent; background:transparent; }
-.wf-title-tray #wf-proj-settings:hover { color:var(--accent); background:var(--panel); box-shadow:var(--sh-sm); }
-.wf-title-tray #wf-proj-settings svg { width:14px; height:14px; stroke-width:2; }
-.wf-title-tray #wf-name { font-family:var(--sans); font-size:12.5px; font-weight:700;
-  flex:1; min-width:64px; width:150px; max-width:210px; height:28px;
-  border:none; background:transparent; padding:0 6px; color:var(--ink);
+.wf-title-tray #wf-proj-settings:hover { color:var(--accent); background:var(--panel); box-shadow:none; }
+.wf-title-tray #wf-proj-settings svg { width:15px; height:15px; stroke-width:1.9; }
+.wf-title-tray #wf-name { font-family:var(--sans); font-size:13.5px; font-weight:700;
+  flex:1; min-width:64px; width:168px; max-width:228px; height:28px;
+  border:none; background:transparent; padding:0 7px; color:var(--ink);
   border-radius:6px; box-shadow:none; }
 .wf-title-tray #wf-name:hover { background:var(--panel); }
 .wf-title-tray #wf-name:focus { outline:2px solid var(--accent); outline-offset:0; background:var(--panel); box-shadow:none; }
 
 /* Win32 target controls — appear beside the title when controller = Win32. */
-.wf-bar-win32 { display:inline-flex; align-items:center; gap:2px; height:32px; min-width:0;
-  padding:2px 5px; border-radius:8px; background:var(--alt); border:1px solid var(--border);
+.wf-bar-win32 { display:inline-flex; align-items:center; gap:2px; height:38px; min-width:0;
+  padding:3px 6px; border-radius:var(--r-md); background:var(--alt); border:1px solid var(--border);
   box-sizing:border-box; flex-shrink:1; }
-.wf-win-target { display:flex; align-items:center; gap:6px; height:26px; min-width:96px; max-width:200px;
-  padding:0 6px; border:0; border-radius:6px; background:transparent; color:var(--ink2);
-  font-family:var(--sans); font-size:11.5px; font-weight:600; cursor:pointer; }
+.wf-win-target { display:flex; align-items:center; gap:6px; height:30px; min-width:104px; max-width:210px;
+  padding:0 7px; border:0; border-radius:6px; background:transparent; color:var(--ink2);
+  font-family:var(--sans); font-size:12.5px; font-weight:600; cursor:pointer; }
 .wf-win-target:hover { background:var(--panel); color:var(--accent); }
 .wf-win-target:focus-visible, #wf-bar-win32-matchby:focus-visible, #wf-bar-win32-mode:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 .wf-win-target #wf-bar-win32-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wf-win-target > svg { width:12px; height:12px; flex-shrink:0; fill:none; stroke:currentColor;
   stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
 #wf-bar-win32-dot.configured { background:var(--cat-win32); box-shadow:none; }
-#wf-bar-win32-matchby, #wf-bar-win32-mode { height:26px; padding:0 20px 0 6px; border:0; border-radius:6px;
+#wf-bar-win32-matchby, #wf-bar-win32-mode { height:30px; padding:0 20px 0 7px; border:0; border-radius:6px;
   background-color:transparent; color:var(--cat-win32-ink); font-family:var(--sans);
-  font-size:10.5px; font-weight:700; cursor:pointer; box-shadow:none; }
+  font-size:11.5px; font-weight:700; cursor:pointer; box-shadow:none; }
 #wf-bar-win32-matchby { width:84px; }
 #wf-bar-win32-mode { width:172px; }
 #wf-bar-win32-matchby:hover, #wf-bar-win32-mode:hover { background-color:var(--panel); }
 
 /* View tabs (Edit / Preview) — segmented control, right end of the header. */
-.wf-view-tabs { display:flex; gap:0; height:34px; align-items:center; background:var(--surface);
-  border:1px solid var(--border); border-radius:var(--r-md); padding:3px; flex-shrink:0; }
-.wf-view-tab { height:28px; padding:0 15px; border-radius:4px; font-size:11.5px; font-weight:700;
+.wf-view-tabs { display:flex; gap:0; height:36px; align-items:center; background:var(--surface);
+  border:1px solid var(--border); border-radius:var(--r-sm); padding:4px; flex-shrink:0; }
+.wf-view-tab { height:28px; padding:0 14px; border-radius:var(--r-sm); font-size:12px; font-weight:700;
   color:var(--dim); background:none; border:none; cursor:pointer;
-  transition:background .15s, color .15s, box-shadow .15s; }
+  transition:background .15s, color .15s; }
 .wf-view-tab:hover:not(.sel) { color:var(--ink); }
-.wf-view-tab.sel { background:var(--panel); color:var(--accent); box-shadow:var(--sh-sm); }
+.wf-view-tab.sel { background:var(--panel); color:var(--accent); box-shadow:none; }
 .wf-view-tab:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+/* The utility icons at the right end of the bar sit at the bar's own scale —
+   the shared 30px default reads as a smaller species next to the 36px trays. */
+.tb-right > .btn { height:34px; }
+.tb-right > .btn.ico { width:38px; }
+.tb-right > .btn svg { width:17px; height:17px; stroke-width:1.8; }
 
-/* Laptop width: the run cluster takes a row of its own. flex-wrap does this
+/* Narrow window: the run cluster takes a row of its own. flex-wrap does this
    without grid areas, and the height is derived from the rows instead of being
-   asserted separately — the old --hdr-h:80px against two 39px rows plus 3px of
-   padding each side came to 84px, which is why the Run row was clipped. */
-@media (max-width: 1320px){
-  :root { --hdr-h:84px; }               /* 2 x 39 row + 2 x 3 padding */
-  #toolbar { flex-wrap:wrap; align-content:center; row-gap:0; padding:3px var(--s4); }
-  .tb-left, .tb-right { height:39px; flex:1 1 auto; }
-  .tb-center { order:3; flex:1 0 100%; height:39px; justify-content:center; }
-  .wf-title-tray { max-width:190px; }
-  .wf-title-tray #wf-name { width:110px; max-width:130px; }
-  .wf-win-target { max-width:140px; }
-  #wf-bar-win32-mode { width:140px; }
+   asserted separately — an --hdr-h that disagrees with the rows it holds is
+   what clipped the Run row before. 36px trays fit one line at laptop widths
+   (the trim rules below take over as it narrows), so this only fires when a
+   zone genuinely cannot sit beside another. */
+@media (max-width: 840px){
+  /* 2 x 32 row + 4 row-gap + 2 x 6 padding + 1 border — the real wrapped
+     height, because --hdr-h also offsets the toasts. A var that understates
+     the bar lets the first toast land on top of it. */
+  :root { --hdr-h:81px; }
+  /* min-height, not height: two rows are what this breakpoint is FOR, and a
+     third (only reachable when a zone still cannot fit beside another) grows
+     the bar instead of spilling over the canvas below it. */
+  #toolbar { flex-wrap:wrap; align-content:center; row-gap:4px; padding:6px var(--s4);
+    height:auto; min-height:var(--hdr-h); }
+  .tb-left, .tb-right { height:32px; flex:1 1 auto; }
+  .tb-center { order:3; flex:1 0 100%; height:32px; justify-content:center; }
+  .wf-title-tray { max-width:200px; }
+  .wf-title-tray #wf-name { width:118px; max-width:140px; }
+  .wf-win-target { max-width:150px; }
+  #wf-bar-win32-mode { width:150px; }
   .tb-tray-device { flex-basis:230px; }
 }
-@media (max-width: 1280px){
+@media (max-width: 1380px){
   /* capture source remains in Project settings */
   .tb-tray-source, #tb-lbl-source, #tb-adb-tools > .ctl-sep { display:none; }
 }
-@media (max-width: 1180px){
+@media (max-width: 1280px){
   /* Speed hack is root-only and niche; it is the first whole control to go.
      Everything it does is still reachable from Project settings. */
   #wf-speed-group { display:none; }
 }
-@media (max-width: 1100px){
-  .wf-title-tray { max-width:155px; }
-  .wf-title-tray #wf-name { width:82px; }
-  .tb-tray-device { flex-basis:170px; max-width:200px; }
+@media (max-width: 1180px){
+  .wf-title-tray { max-width:165px; }
+  .wf-title-tray #wf-name { width:90px; }
+  .tb-tray-device { flex-basis:180px; max-width:210px; }
   .tb-right > .theme-btn { display:none; }
   /* Words go before controls do, and only once nothing else is left to trim. */
   #tb-lbl-device { display:none; }
 }
-@media (max-width: 980px){
+@media (max-width: 1040px){
   /* Check and Test-block are both in the ▾ run menu already, so the tray keeps
      only the menu itself. Run stays, always — it is the point of the bar. */
   .tb-run-aux .btn:not(#wf-run-menu-btn):not(#wf-step-next-btn) { display:none; }
-  .wf-run-status .wf-run-txt { display:none; }   /* the dot still carries state */
-  .wf-run-status { padding:0 9px; }
+  .wf-run-status .wf-run-txt { display:inline; } /* State must not depend on colour alone. */
+  .wf-run-status { padding:0 11px; }
   #wf-shortcuts-btn { display:none; }            /* F1 still opens it */
 }
-@media (max-width: 860px){
-  .wf-title-tray #wf-name { width:64px; }
-  .tb-tray-device { flex-basis:130px; max-width:150px; }
+@media (max-width: 920px){
+  .wf-title-tray #wf-name { width:72px; }
+  .tb-tray-device { flex-basis:140px; max-width:160px; }
   .tb-tray-doc .btn:nth-child(n+7) { display:none; }  /* undo/redo -> Ctrl+Z/Y */
   .tb-tray-doc .tb-tray-sep:nth-of-type(2) { display:none; }
 }
@@ -247,9 +276,12 @@
 #workflow-view.wf-library-on #wf-side-resizer,
 #workflow-view.wf-library-on #wf-inspector { display:none; }
 
+/* Fixed default widths but resizable (the resizer handles live on either side).
+   16px inspector gutters + a 92px label column need the extra 8px, and the
+   palette rows now run to the panel edge instead of wrapping into two columns. */
 #wf-side { width:280px; flex-shrink:0; display:flex; flex-direction:column;
   overflow:hidden; background:var(--panel); border-right:1px solid var(--border2); }
-#wf-inspector { width:312px; flex-shrink:0; display:flex; flex-direction:column;
+#wf-inspector { width:320px; flex-shrink:0; display:flex; flex-direction:column;
   overflow:hidden; background:var(--panel); border-left:1px solid var(--border2); }
 #wf-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
 
@@ -331,10 +363,13 @@
 #wf-act-dbg.on { color:var(--cat-image); background:var(--cat-image-bg); }
 
 /* ── Bottom-right dock: Activities · Functions · Variables in one card ───── */
+/* Flat: no drop shadow. The dock sits on a canvas, not above it — a hairline
+   border and the panel fill already separate it, and the shadow only muddied
+   the plane it is pinned to. */
 #wf-act-panel { position:absolute; right:14px; bottom:14px; z-index:7;
   width:400px; max-width:calc(100% - 28px); display:flex; flex-direction:column;
   min-height:0; overflow:hidden; background:var(--panel); border:1px solid var(--border);
-  border-radius:var(--r-md); box-shadow:var(--sh-md); }
+  border-radius:var(--r-md); box-shadow:none; }
 #workflow-view.wf-preview-on #wf-act-panel,
 #workflow-view.wf-library-on #wf-act-panel { display:none; }
 /* Collapsed folds the body away but keeps the tab strip: it is the card's only
@@ -481,27 +516,27 @@
 /* ── Node palette ─────────────────────────────────────────────────────────── */
 #wf-side .wf-palette { padding:0 var(--s3) var(--s3); overflow-y:auto; }
 /* Palette search — a compact rounded field pinned under the sidebar header. */
-.wf-pal-search { position:relative; display:flex; align-items:center; margin:var(--s3) var(--s3); }
+.wf-pal-search { position:relative; display:flex; flex-shrink:0; align-items:center; margin:var(--s3) var(--s3); }
 .wf-pal-search-ico { position:absolute; left:10px; width:14px; height:14px; stroke-width:2; color:var(--muted);
   pointer-events:none; }
-#wf-pal-search-inp { flex:1; min-width:0; font-family:var(--sans); font-size:12px;
+#wf-pal-search-inp { flex:1; min-width:0; font-family:var(--sans); font-size:var(--t-ui);
   padding:7px 28px 7px 29px; border:1px solid var(--border2); border-radius:var(--r-md);
   background:var(--surface); color:var(--ink); transition:border-color .12s, box-shadow .12s, background .12s; }
 #wf-pal-search-inp::placeholder { color:var(--muted); }
-#wf-pal-search-inp:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--border2);
+#wf-pal-search-inp:focus-visible { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--border2);
   box-shadow:none; background:var(--panel); }
 .wf-pal-search-clr { position:absolute; right:5px; width:19px; height:19px; padding:0; border:none;
   border-radius:5px; background:none; color:var(--muted); cursor:pointer; display:flex;
   align-items:center; justify-content:center; transition:color .1s, background .1s; }
 .wf-pal-search-clr svg { width:12px; height:12px; stroke-width:2.2; }
 .wf-pal-search-clr:hover { color:var(--err); background:var(--err-bg); }
-.wf-pal-none { font-size:11.5px; color:var(--muted); text-align:center; padding:18px 10px;
+.wf-pal-none { font-size:var(--t-ui); color:var(--muted); text-align:center; padding:18px 10px;
   line-height:1.5; border:1px dashed var(--border); border-radius:8px; background:var(--surface);
   margin:4px 0; }
 
-.wf-palette { display:flex; flex-direction:column; gap:3px; }
+.wf-palette { display:flex; flex-direction:column; gap:2px; }
 /* Category label — small uppercase + count + chevron, with a leader rule. */
-.wf-pal-cat { display:flex; align-items:center; gap:9px; font-size:10px; font-weight:800;
+.wf-pal-cat { display:flex; align-items:center; gap:9px; font-size:10.5px; font-weight:700;
   letter-spacing:.05em; text-transform:uppercase; margin:var(--s4) 0 var(--s2); padding:5px 7px;
   border-radius:var(--r-sm); color:var(--ink); cursor:pointer; user-select:none;
   transition:background .1s; }
@@ -511,35 +546,50 @@
   align-items:center; gap:8px; white-space:nowrap; }
 .wf-pal-cat > span:first-of-type::after { content:""; flex:1; height:1px;
   background:var(--line); min-width:8px; }
-.wf-pal-cat-n { font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:0;
+.wf-pal-cat-n { font-family:var(--mono); font-size:9.5px; font-weight:600; letter-spacing:0;
   color:var(--muted); background:var(--alt); border-radius:999px; padding:1px 6px; }
 .wf-pal-chev { flex-shrink:0; color:var(--muted); transition:transform .15s var(--ease); }
 .wf-pal-cat.closed .wf-pal-chev { transform:rotate(-90deg); }
-.wf-pal-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
-/* Related nodes rendered as one unit (e.g. Try in order + Next branch). */
+/* One column, full-width rows. Two columns of 130px chips split every name and
+   paid a second row of "…" ellipses for the privilege: at this width a list row
+   shows the whole block name and reads top-to-bottom like the catalog it is. */
+.wf-pal-grid { display:grid; grid-template-columns:minmax(0, 1fr); gap:1px; }
+.wf-pal-grid .wf-chip { min-width:0; }
+@media (hover:none) {
+  .wf-sidebar-toggle { opacity:1; pointer-events:auto; }
+}
+/* Related nodes rendered as one unit (e.g. Try in order + Next branch). Panel
+   fill, not a nested tray: the hairline box groups the two rows, the rows
+   themselves stay the same flat list items as everything else in the column. */
 .wf-pal-pair { grid-column:1 / -1; display:flex; flex-direction:column; gap:4px;
-  padding:6px; border:1px solid var(--border); border-radius:var(--r-md);
-  background:var(--surface); }
+  padding:5px 6px; border:1px solid var(--border); border-radius:var(--r-md);
+  background:var(--panel); }
 .wf-pal-pair-hd { display:flex; align-items:center; padding:0 3px; min-width:0; }
-.wf-pal-pair-lbl { font-size:9px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+.wf-pal-pair-lbl { font-size:9.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
   color:var(--accent); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wf-pal-pair-row { display:grid; grid-template-columns:1fr auto 1fr; gap:3px; align-items:stretch; }
+/* The pair stacks like everything else now, so the connector points down the
+   page instead of across it. */
+.wf-pal-pair-row { display:grid; grid-template-columns:minmax(0, 1fr); gap:2px; align-items:stretch; }
 .wf-pal-pair-row .wf-chip { min-width:0; }
 .wf-pal-pair-link { display:flex; align-items:center; justify-content:center; color:var(--muted);
   opacity:.8; padding:0 1px; }
-.wf-pal-pair-link svg { display:block; }
-.wf-chip { display:flex; align-items:center; gap:7px; padding:6px 7px 6px 5px; border:1px solid var(--border2);
-  border-radius:var(--r-md); background:var(--panel); cursor:grab;
-  font-size:12.5px; font-weight:600; color:var(--ink);
-  transition:border-color .1s, background .1s, box-shadow .1s, transform .1s; user-select:none; }
-.wf-chip:hover { border-color:var(--border2); background:var(--accent-bg); }
-.wf-chip:active { cursor:grabbing; transform:scale(.98); }
-.wf-chip:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.wf-pal-pair-link svg { display:block; transform:rotate(90deg); }
+/* Palette row — a flat list item, not a chip: transparent until hover, so a
+   category reads as one list with one icon column instead of as a tray of
+   bordered tiles. */
+.wf-chip { display:flex; align-items:center; gap:10px; padding:7px 8px; border:1px solid transparent;
+  border-radius:var(--r-sm); background:transparent; cursor:grab;
+  font-size:13.5px; font-weight:600; color:var(--ink);
+  transition:background .1s, border-color .1s, color .1s; user-select:none; min-width:0; }
+.wf-chip:hover { border-color:var(--border); background:var(--alt); }
+.wf-chip:active { cursor:grabbing; }
+.wf-chip:focus-visible { outline:2px solid var(--accent); outline-offset:-1px; }
+.wf-chip > span:not(.ico) { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Icon tile — one accent hue across the whole palette (identity, not category coding). */
 .wf-chip .ico { display:flex; align-items:center; justify-content:center; flex-shrink:0;
-  width:22px; height:22px; border-radius:var(--r-sm);
+  width:24px; height:24px; border-radius:var(--r-sm);
   background:var(--accent-bg); color:var(--accent); transition:background .1s; }
-.wf-chip .ico svg { width:12px; height:12px; stroke-width:2.2; display:block; }
+.wf-chip .ico svg { width:13px; height:13px; stroke-width:2; display:block; }
 .wf-chip:hover .ico { background:var(--accent-bd); }
 
 /* ── Functions — the dock's second tab; reusable subgraphs ────────────────── */
@@ -727,7 +777,7 @@
 /* ── Canvas tool rail — edit toggles + zoom, floating on the left edge ────── */
 #wf-rail { position:absolute; left:12px; top:50%; transform:translateY(-50%); z-index:5;
   display:flex; flex-direction:column; padding:4px; background:var(--panel);
-  border:1px solid var(--border2); border-radius:var(--r-md); box-shadow:var(--sh-sm); }
+  border:1px solid var(--border2); border-radius:var(--r-md); box-shadow:none; }
 .wf-rail-sec { display:flex; flex-direction:column; gap:2px; }
 .wf-rail-sep { height:1px; margin:4px 5px; background:var(--border2); }
 #wf-rail .btn { width:30px; height:30px; border:none; background:transparent;
@@ -750,7 +800,7 @@
 .wf-layout-bar { position:absolute; left:12px; bottom:12px; z-index:5; }
 .wf-layout-toggle { width:36px; height:36px; padding:0; border:1px solid var(--border2);
   border-radius:var(--r-md); background:var(--panel); color:var(--dim); cursor:pointer;
-  display:flex; align-items:center; justify-content:center; box-shadow:var(--sh-md);
+  display:flex; align-items:center; justify-content:center; box-shadow:none;
   transition:color .1s, border-color .1s, background .1s; }
 .wf-layout-toggle:hover, .wf-layout-bar.open .wf-layout-toggle { color:var(--accent); border-color:var(--border2); background:var(--accent-bg); }
 .wf-layout-menu { position:absolute; left:0; bottom:42px; min-width:188px;
@@ -773,7 +823,7 @@
 .wf-minimap { position:absolute; left:12px; bottom:56px; z-index:5;
   width:180px; height:120px; display:none; cursor:crosshair; overflow:hidden;
   background:var(--panel); border:1px solid var(--border2);
-  border-radius:var(--r-md); box-shadow:var(--sh-md); }
+  border-radius:var(--r-md); box-shadow:none; }
 .wf-minimap.show { display:block; animation:wfPop .14s var(--ease); }
 .wf-minimap canvas { display:block; width:100%; height:100%; }
 
@@ -982,7 +1032,10 @@
 /* Structural kinds set their own accent colour. */
 .wf-node.start { --node-accent:var(--term-start); --ntitle:var(--cat-app-ink); }
 .wf-node.end { --node-accent:var(--term-end); --ntitle:var(--term-end); }
-.wf-node.stop { --node-accent:var(--term-end); --ntitle:var(--err); --nhd-bg:var(--err-bg); --nhd-bd:var(--err-bd); }
+/* Stop is not a category — it is an abort, and it says so in red. Same whisper
+   strength as the category faces, so it stays a marker rather than a shout. */
+.wf-node.stop { --node-accent:var(--term-end); --ntitle:var(--err);
+  --nhd-bg:color-mix(in srgb, var(--err) 12%, var(--panel)); --nhd-bd:var(--err-bd); }
 .wf-node.condition { --node-accent:var(--cat-logic); }
 .wf-node.loop { --node-accent:var(--cat-flow); }
 .wf-node.call { --node-accent:var(--cat-logic-ink); }
@@ -1168,9 +1221,9 @@
   stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
 .wf-node-act-spacer { flex:1; }
 /* Image preview — compact square on the right of the body. */
-.wf-node-prevrow { display:flex; align-items:center; gap:7px; padding:4px 18px; min-height:32px; }
+.wf-node-prevrow { display:flex; align-items:center; gap:6px; padding:3px 17px; min-height:28px; }
 .wf-node-prevrow .wf-node-sum { padding:0; flex:1; min-width:0; }
-.wf-node-thumb { flex-shrink:0; width:26px; height:26px; object-fit:contain;
+.wf-node-thumb { flex-shrink:0; width:22px; height:22px; object-fit:contain;
   background:var(--panel) repeating-conic-gradient(var(--checker) 0% 25%, transparent 0% 50%) 50%/5px 5px;
   border:1px solid var(--border2); border-radius:4px; padding:1px; cursor:zoom-in; }
 .wf-node:not(.showing-thumb) .wf-node-thumb,
@@ -1223,43 +1276,48 @@
   z-index:1; pointer-events:none; border-radius:2px; }
 .wf-node { cursor:grab; }
 .wf-node:active { cursor:grabbing; }
-/* Node header: a title bar in the ComfyUI/Blender sense — the block's colour
-   lives here (tinted per-category via --nhd-bg/--nhd-bd), the body stays neutral. */
-.wf-node-hd { display:flex; align-items:center; gap:7px; padding:0 11px; height:26px;
-  border-bottom:1px solid var(--nhd-bd,var(--cat-logic-bd)); background:var(--nhd-bg,var(--cat-logic-bg));
+/* Node header: a title bar in the ComfyUI/Blender sense. The face is the same
+   neutral card for every block; the category survives as a whisper of the
+   block's own accent in the header and as the icon's hue (below). */
+.wf-node-hd { display:flex; align-items:center; gap:5px; padding:0 9px; height:23px;
+  border-bottom:1px solid var(--nhd-bd,var(--line));
+  background:var(--nhd-bg,color-mix(in srgb, var(--node-accent,var(--cat-misc)) 12%, var(--panel)));
   border-radius:calc(var(--node-r) - 1px) calc(var(--node-r) - 1px) 0 0;
   transition: background .15s, border-bottom-color .15s; }
-.wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:14px; height:14px; }
-.wf-node .ico svg { width:14px; height:14px; stroke-width:2; display:block; }
+.wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:12px; height:12px; }
+.wf-node .ico svg { width:12px; height:12px; stroke-width:2; display:block; }
 .wf-node.call .ico { font-style:italic; font-weight:700; }
-.wf-node-title { font-size:11px; font-weight:700; color:var(--ntitle,var(--cat-logic-ink)); flex:1; min-width:0;
+.wf-node-title { font-size:10.5px; font-weight:700; color:var(--ntitle,var(--ink)); flex:1; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wf-node.has-tf .wf-node-title { padding-right:18px; }
-/* Per-category node header+title triads */
-.wf-node.cat-basic  { --nhd-bg:var(--cat-basic-bg);  --nhd-bd:var(--cat-basic-bd);  --ntitle:var(--cat-basic-ink); }
-.wf-node.cat-input  { --nhd-bg:var(--cat-input-bg);  --nhd-bd:var(--cat-input-bd);  --ntitle:var(--cat-input-ink); }
-.wf-node.cat-image  { --nhd-bg:var(--cat-image-bg);  --nhd-bd:var(--cat-image-bd);  --ntitle:var(--cat-image-ink); }
-.wf-node.cat-color  { --nhd-bg:var(--cat-color-bg);  --nhd-bd:var(--cat-color-bd);  --ntitle:var(--cat-color-ink); }
-.wf-node.cat-ocr    { --nhd-bg:var(--cat-ocr-bg);    --nhd-bd:var(--cat-ocr-bd);    --ntitle:var(--cat-ocr-ink); }
-.wf-node.cat-flow   { --nhd-bg:var(--cat-flow-bg);   --nhd-bd:var(--cat-flow-bd);   --ntitle:var(--cat-flow-ink); }
-.wf-node.cat-logic  { --nhd-bg:var(--cat-logic-bg);  --nhd-bd:var(--cat-logic-bd);  --ntitle:var(--cat-logic-ink); }
-.wf-node.cat-app    { --nhd-bg:var(--cat-app-bg);    --nhd-bd:var(--cat-app-bd);    --ntitle:var(--cat-app-ink); }
-.wf-node.cat-time   { --nhd-bg:var(--cat-time-bg);   --nhd-bd:var(--cat-time-bd);   --ntitle:var(--cat-time-ink); }
-.wf-node.cat-device { --nhd-bg:var(--cat-device-bg); --nhd-bd:var(--cat-device-bd); --ntitle:var(--cat-device-ink); }
-.wf-node.cat-win32  { --nhd-bg:var(--cat-win32-bg);  --nhd-bd:var(--cat-win32-bd);  --ntitle:var(--cat-win32-ink); }
-.wf-node.cat-window { --nhd-bg:var(--cat-window-bg); --nhd-bd:var(--cat-window-bd); --ntitle:var(--cat-window-ink); }
-.wf-node.cat-misc   { --nhd-bg:var(--cat-misc-bg);   --nhd-bd:var(--cat-misc-bd);   --ntitle:var(--cat-misc-ink); }
-/* Structural kinds that lack a cat class: borrow the nearest category's tint.
-   --node-accent goes with the triad — it drives the header icon and the plate
-   these blocks collapse to at low zoom, and leaving it unset dropped them all
-   to the neutral grey while their headers stayed amber/violet. */
-.wf-node.loop       { --node-accent:var(--cat-flow);  --nhd-bg:var(--cat-flow-bg);   --nhd-bd:var(--cat-flow-bd);   --ntitle:var(--cat-flow-ink); }
-.wf-node.try_chain  { --node-accent:var(--cat-flow);  --nhd-bg:var(--cat-flow-bg);   --nhd-bd:var(--cat-flow-bd);   --ntitle:var(--cat-flow-ink); }
-.wf-node.sequence   { --node-accent:var(--cat-flow);  --nhd-bg:var(--cat-flow-bg);   --nhd-bd:var(--cat-flow-bd);   --ntitle:var(--cat-flow-ink); }
-.wf-node.try_next   { --node-accent:var(--cat-flow);  --nhd-bg:var(--cat-flow-bg);   --nhd-bd:var(--cat-flow-bd);   --ntitle:var(--cat-flow-ink); }
-.wf-node.call       { --node-accent:var(--cat-logic); --nhd-bg:var(--cat-logic-bg);  --nhd-bd:var(--cat-logic-bd);  --ntitle:var(--cat-logic-ink); }
-.wf-node.switch     { --node-accent:var(--cat-logic); --nhd-bg:var(--cat-logic-bg);  --nhd-bd:var(--cat-logic-bd);  --ntitle:var(--cat-logic-ink); }
-.wf-node.parallel   { --node-accent:var(--cat-basic); --nhd-bg:var(--cat-basic-bg);  --nhd-bd:var(--cat-basic-bd);  --ntitle:var(--cat-basic-ink); }
+/* Structural kinds that lack a cat class: borrow the nearest category's accent.
+   --node-accent drives the header icon, the header tint and the plate these
+   blocks collapse to at low zoom, and leaving it unset dropped them all to the
+   neutral grey while their headers stayed amber/violet. */
+.wf-node.loop       { --node-accent:var(--cat-flow); }
+.wf-node.try_chain  { --node-accent:var(--cat-flow); }
+.wf-node.sequence   { --node-accent:var(--cat-flow); }
+.wf-node.try_next   { --node-accent:var(--cat-flow); }
+.wf-node.call       { --node-accent:var(--cat-logic); }
+.wf-node.switch     { --node-accent:var(--cat-logic); }
+.wf-node.parallel   { --node-accent:var(--cat-basic); }
+/* ── Neutral faces ────────────────────────────────────────────────────────
+   Every block face is one neutral card; the category survives only as the
+   header's whisper tint and the icon's hue. Forty saturated headers made the
+   canvas read as a colour chart and the wires — the thing you actually trace —
+   had to compete with it. Terminals (start / end / stop) and notes are NOT
+   categories and keep their own semantic colour. Run state and selection are
+   set at higher specificity further up and still repaint the header. */
+.wf-node.cat-basic,  .wf-node.cat-input,  .wf-node.cat-image, .wf-node.cat-color,
+.wf-node.cat-ocr,    .wf-node.cat-flow,   .wf-node.cat-logic, .wf-node.cat-app,
+.wf-node.cat-time,   .wf-node.cat-device, .wf-node.cat-win32, .wf-node.cat-window,
+.wf-node.cat-misc,
+.wf-node.loop, .wf-node.try_chain, .wf-node.sequence, .wf-node.try_next,
+.wf-node.call, .wf-node.switch, .wf-node.parallel {
+  --nhd-bg: color-mix(in srgb, var(--node-accent) 12%, var(--panel));
+  --nhd-bd: var(--line);
+  --ntitle: var(--ink);
+}
 /* Validation badge: a node missing a template / not wired in shows an amber "!" */
 .wf-node-warn { position:absolute; top:-8px; right:-8px; width:16px; height:16px; border-radius:50%;
   background:var(--run-warn); color:var(--shade); font-size:10px; font-weight:800; line-height:16px;
@@ -1267,14 +1325,14 @@
 .wf-node.has-warn { border-color:var(--border2); }
 /* Default per-block summary line (the auto description under the title). The
    side padding clears the inset port dots — a card's text never runs under one. */
-.wf-node-sum { font-family:var(--mono); font-size:10.5px; color:var(--dim); padding:6px 19px 7px;
-  line-height:1.4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-node-sum { font-family:var(--mono); font-size:10px; color:var(--dim); padding:4px 17px 5px;
+  line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Live colour swatch in a color node's summary line. */
 .wf-node-colordot { display:inline-block; width:8px; height:8px; border-radius:2px;
   margin-right:4px; vertical-align:-1px; border:1px solid var(--border2); }
-.wf-node-note { display:flex; align-items:flex-start; gap:5px; font-size:10px; font-style:italic;
+.wf-node-note { display:flex; align-items:flex-start; gap:5px; font-size:9.5px; font-style:italic;
   color:var(--muted); background:transparent; border-top:1px solid var(--line);
-  border-radius:0 0 var(--node-r) var(--node-r); padding:4px 8px 5px; white-space:normal;
+  border-radius:0 0 var(--node-r) var(--node-r); padding:3px 8px 4px; white-space:normal;
   word-break:break-word; line-height:1.35; }
 .wf-node-note svg { width:10px; height:10px; stroke-width:2.4; flex-shrink:0; margin-top:1.5px; opacity:.4; }
 /* Runtime log line: text auto-emitted to the log panel each time this block runs. */
@@ -1415,24 +1473,27 @@
 #wf-insp-body { flex:1; min-height:0; overflow-y:auto; padding:0; display:flex; flex-direction:column; gap:0; }
 
 /* ── Inspector — flat, sectioned layout (no nested cards) ─────────────────── */
+/* 16px gutters, body-size text. The inspector is read at a glance while the
+   eyes are on the canvas, so it gets the same measure as any other panel
+   header rather than the compressed 14px/10.5px it used to run at. */
 .wf-insp-id { position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:10px;
-  padding:10px 14px; background:var(--panel); border-bottom:1px solid var(--border);
-  box-shadow:var(--sh-sm); }
+  padding:12px 16px; background:var(--panel); border-bottom:1px solid var(--border);
+  box-shadow:none; }
 .wf-insp-id .ic { width:32px; height:32px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
   border-radius:var(--r-md); background:var(--accent-bg); border:1px solid var(--border); color:var(--accent); }
 .wf-insp-id .ic svg { width:16px; height:16px; stroke-width:1.8; }
-.wf-insp-id .meta { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
-.wf-insp-id .title { font-size:13px; font-weight:700; color:var(--ink); line-height:1.25;
+.wf-insp-id .meta { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.wf-insp-id .title { font-size:var(--t-body); font-weight:700; color:var(--ink); line-height:1.25;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.wf-insp-id .sub { font-family:var(--mono); font-size:10px; color:var(--muted);
+.wf-insp-id .sub { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.wf-insp-id .count { flex-shrink:0; font-family:var(--mono); font-size:10px; font-weight:700; color:var(--accent);
+.wf-insp-id .count { flex-shrink:0; font-family:var(--mono); font-size:var(--t-micro); font-weight:700; color:var(--accent);
   background:var(--accent-bg); border:1px solid var(--border); border-radius:4px; padding:2px 9px; }
 
-.wf-insp-block { display:flex; flex-direction:column; gap:7px; padding:10px 14px; }
+.wf-insp-block { display:flex; flex-direction:column; gap:8px; padding:12px 16px; }
 .wf-insp-block + .wf-insp-block { border-top:1px solid var(--line); }
-.wf-insp-sec { display:flex; align-items:center; gap:6px; margin:0 0 1px;
-  font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--ink); }
+.wf-insp-sec { display:flex; align-items:center; gap:6px; margin:0 0 2px;
+  font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink); }
 .wf-insp-sec-spacer { flex:1; min-width:0; }
 /* Gear that opens the project-wide node-defaults dialog (Timing / Failure handling). */
 .wf-insp-sec-gear { margin-left:auto; flex-shrink:0; width:20px; height:20px; padding:0;
@@ -1452,7 +1513,7 @@
 .wf-insp-grid .btn.sm { min-height:28px; }
 .wf-insp-sec .sec-count { letter-spacing:0; font-family:var(--mono); font-size:9.5px; font-weight:600;
   color:var(--muted); background:var(--alt); border-radius:999px; padding:1px 6px; }
-.wf-insp-tip { font-size:10.5px; color:var(--muted); line-height:1.55; }
+.wf-insp-tip { font-size:var(--t-micro); color:var(--muted); line-height:1.6; }
 .wf-insp-tip code { background:var(--alt); padding:1px 4px; border-radius:4px; font-size:10px; font-family:var(--mono); }
 .wf-insp-pair-tip { margin:6px 0 2px; padding:8px 10px; border-radius:8px;
   border:1px dashed var(--cat-flow-bd, var(--border2)); background:var(--cat-flow-bg, var(--surface));
@@ -1487,20 +1548,22 @@
 .wf-json-hint { font-size:10px; color:var(--muted); line-height:1.45; }
 
 /* Field row */
-.wf-field { display:flex; align-items:center; gap:6px; }
-.wf-field > label { font-size:10.5px; line-height:1.25; color:var(--ink2); font-weight:600;
-  width:88px; max-width:40%; flex-shrink:0; overflow-wrap:anywhere; }
+.wf-field { display:flex; align-items:center; gap:8px; }
+.wf-field > label { font-size:var(--t-caption); line-height:1.3; color:var(--ink2); font-weight:600;
+  width:92px; max-width:42%; flex-shrink:0; overflow-wrap:anywhere; }
 /* Two short numeric fields on one line (x/y, w/h…). */
 .wf-field-pair { display:flex; align-items:center; gap:10px; }
-.wf-field-pair > .wf-field { flex:1; min-width:0; gap:5px; }
+.wf-field-pair > .wf-field { flex:1; min-width:0; gap:6px; }
 .wf-field-pair > .wf-field > label { width:auto; max-width:none; min-width:0; flex-shrink:0;
-  text-transform:uppercase; letter-spacing:.02em; color:var(--muted); font-size:10px; }
+  text-transform:uppercase; letter-spacing:.02em; color:var(--muted); font-size:var(--t-micro); }
 .wf-field-pair > .wf-field > input { flex:1; min-width:0; text-align:center; }
 .wf-field > input[type=text], .wf-field > input[type=number], .wf-field > input[type=time], .wf-field > select {
-  flex:1; min-width:0; font-size:11px; padding:4px 7px; border-radius:var(--r-sm); }
+  flex:1; min-width:0; font-size:var(--t-ui); padding:5px 8px; border-radius:var(--r-sm); }
 .wf-field > input[type=time], .wf-time-pick {
   font-family:var(--mono); font-variant-numeric:tabular-nums; min-width:0;
   color-scheme:light; cursor:pointer; }
+:root[data-theme="dark"] .wf-field > input[type=time],
+:root[data-theme="dark"] .wf-time-pick { color-scheme:dark; }
 .wf-field > input[type=time]::-webkit-calendar-picker-indicator { cursor:pointer; opacity:.65; }
 .wf-field > input[type=time]:hover::-webkit-calendar-picker-indicator { opacity:1; }
 .wf-field .cb { width:17px; height:17px; border-radius:5px; border:1.5px solid var(--cb-bd); background:var(--panel);
@@ -1582,7 +1645,7 @@
 .wf-varmenu-add:hover { background:var(--accent-bg); }
 .wf-varmenu-add svg { width:12px; height:12px; stroke-width:2.2; }
 
-.wf-insp-input { width:100%; font-size:11.5px; padding:6px 8px; border-radius:var(--r-sm); }
+.wf-insp-input { width:100%; font-size:var(--t-ui); padding:6px 9px; border-radius:var(--r-sm); }
 .wf-run-log-field { align-items:stretch; }
 .wf-run-log-field > label { flex:none; }
 .wf-run-log-input { display:flex; align-items:center; gap:5px; min-width:0; flex:1; }
@@ -1782,30 +1845,51 @@
    area; grid on the left, the selected template's usages on the right. */
 #wf-library-pane { position:absolute; inset:0; z-index:6; display:flex; flex-direction:column;
   background:var(--bg); overflow:hidden; }
-.wf-lib-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:7px 14px;
-  background:var(--panel); border-bottom:1px solid var(--border2); flex-shrink:0; }
-.wf-lib-bar .btn.sm { height:28px; }
-.wf-lib-heading { font-size:var(--t-body); font-weight:700; color:var(--ink); }
-.wf-lib-counts { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted); }
+/* One row, always. Every control here is needed at once while scanning, so the
+   bar scrolls sideways rather than stacking into a two-row block that eats the
+   grid's height. The scrollbar is deliberately left visible: it only appears
+   below ~950px, and a bar that silently hides its last buttons would be worse
+   than the extra 6px. Above that width it never shows and the bar is 39px. */
+.wf-lib-bar { display:flex; align-items:center; gap:7px; flex-wrap:nowrap; padding:6px 14px;
+  background:var(--panel); border-bottom:1px solid var(--border2); flex-shrink:0;
+  overflow-x:auto; overflow-y:hidden; }
+.wf-lib-bar::-webkit-scrollbar { height:6px; }
+.wf-lib-bar .btn.sm { height:27px; padding:0 9px; }
+.wf-lib-bar .log-filters { flex-wrap:nowrap; flex-shrink:0; }
+.wf-lib-bar .log-search-wrap { flex-shrink:1; min-width:120px; }
+.wf-lib-heading { font-size:var(--t-ui); font-weight:700; color:var(--ink); flex-shrink:0; }
+.wf-lib-counts { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted); flex-shrink:0; }
 .wf-lib-counts.has-warn { color:var(--warn); }
-.wf-lib-path { font-family:var(--mono); font-size:var(--t-micro); color:var(--dim);
-  padding:5px 14px; border-bottom:1px solid var(--line); flex-shrink:0;
+.wf-lib-path { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted);
+  padding:3px 14px 4px; border-bottom:1px solid var(--line); flex-shrink:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wf-lib-body { flex:1; display:flex; min-height:0; }
+/* 148px columns: big enough that a crop is recognisable without opening it,
+   which is the whole job of this tab — the old 104px grid fit more cards per
+   row and identified none of them. */
 .wf-lib-grid { flex:1; min-width:0; overflow-y:auto; padding:12px 14px;
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr));
-  gap:9px; align-content:start; }
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
+  gap:12px; align-content:start; }
 /* Card: a <button>, so the app's .asset-card look needs its native chrome
-   cleared before it applies. */
-.wf-lib-card { font:inherit; color:inherit; background:var(--panel); padding:0; }
-.wf-lib-card .asset-name { text-align:left; }
-/* Orphans are the reason the tab exists — a hairline on the left edge marks
-   them without shouting, and Used cards stay plain so the orphan scan works
-   the same way at a glance as it does through the filter chips. */
-.wf-lib-card.is-orphan { border-left:3px solid var(--warn); }
+   cleared before it applies. Flat in the grid — elevation is for overlays, and
+   a hundred shadowed cards turned the scan into noise. */
+.wf-lib-card { font:inherit; color:inherit; background:var(--panel); padding:0;
+  box-shadow:none; border-color:var(--border); }
+.wf-lib-card:hover, .wf-lib-card.active { box-shadow:none; }
+.wf-lib-card.active { border-color:var(--accent); }
+#wf-library-pane .asset-thumb { height:76px; }
+.wf-lib-card .asset-name { text-align:left; padding:4px 6px 3px; }
+/* Orphans are the reason the tab exists, so they get a marker that survives the
+   scan — a small square on the meta line. It used to be a 3px left border,
+   which also shifted those cards' thumbnails 2px right of every other card's
+   and made the whole grid look misaligned. The meta line already reads "không
+   dùng" in warn ink; this just gives the eye something to catch. */
 .wf-lib-card.is-orphan .wf-lib-meta { color:var(--warn); }
+.wf-lib-card.is-orphan .wf-lib-meta::before {
+  content:''; display:inline-block; width:6px; height:6px; margin-right:4px;
+  border-radius:2px; background:var(--warn); vertical-align:1px; }
 .wf-lib-meta { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted);
-  padding:0 5px 5px; text-align:left; overflow:hidden; text-overflow:ellipsis;
+  padding:0 6px 6px; text-align:left; overflow:hidden; text-overflow:ellipsis;
   white-space:nowrap; }
 /* Full-width messages that stand in for a grid (empty folder, dupes header). */
 .wf-lib-empty { grid-column:1/-1; padding:10px 2px; font-size:var(--t-ui);
@@ -1886,16 +1970,25 @@
 #wf-scope-panel { display:none; flex:1; min-height:0; flex-direction:column; }
 #pv-tabs-bar { display:flex; align-items:center; gap:2px; padding:0 4px;
   border-bottom:1px solid var(--border); flex-shrink:0; }
-/* Four tabs in a 280px panel: compact padding + no wrap so labels stay on one line. */
-#pv-tabs-bar .tab-btn { padding:9px 9px 10px; font-size:11.5px; white-space:nowrap; flex:1; }
-#wf-scope-panel .tab-pane { padding:9px; }
-#wf-scope-panel .group { margin-bottom:7px; }
+/* Three tabs in a ~300px panel: compact padding + no wrap so labels stay on one line. */
+#pv-tabs-bar .tab-btn { padding:8px 8px 9px; font-size:11.5px; white-space:nowrap; flex:1; min-width:0; }
+/* The tab pane is the only gutter the groups get — their own padding is the
+   inner one. gap:0 because the groups carry their own spacing between them;
+   inheriting the shared 6px pane gap on top of that doubled every seam. */
+#wf-scope-panel .tab-pane { padding:10px 11px; }
+#wf-scope-panel .tab-pane.active { gap:0; overflow-y:auto; overflow-x:hidden; }
+#wf-scope-panel .group { margin-bottom:8px; }
+#wf-scope-panel .group:last-child { margin-bottom:0; }
+/* Wide readouts inside a group (a path, a hex dump, an OCR line) wrap instead
+   of pushing the group border outward. */
+#wf-scope-panel .grp-body .hz-unit,
+#wf-scope-panel .grp-body .wf-insp-tip { overflow-wrap:anywhere; }
+#pv-tab-device .info-grid { grid-template-columns:auto minmax(0,1fr); }
 #pv-tab-device .info-grid .k,
 #pv-tab-device .info-grid .v { cursor:copy; border-radius:4px; padding:2px 3px; margin:-2px -3px; }
 #pv-tab-device .info-grid .k:hover,
 #pv-tab-device .info-grid .k:hover + .v,
 #pv-tab-device .info-grid .v:hover { background:var(--accent-bg); }
-#wf-scope-panel .tab-pane.active { overflow-y:auto; }
 
 /* Swipe capture readout — mini device diagram + copy/clear actions. Sits under
    the Swipe fields so "draw on the mirror → read → copy" reads top to bottom. */

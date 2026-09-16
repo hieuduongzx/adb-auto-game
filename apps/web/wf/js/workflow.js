@@ -164,6 +164,42 @@ const WF_CMP_OPS = [
   {v:"regex",t:".* matches regex"},
 ];
 
+// The emulator nodes' target picker. "Selected device" resolves against the
+// toolbar's device select (the serial is handed to the engine), "Last used"
+// against the instance the last Launch emulator saved. Families are listed for
+// when neither applies — an emulator this app never launched and that isn't in
+// the device list yet. One array so the five nodes can't drift apart.
+const WF_EMU_TARGET_OPTS = [
+  {v:"selected", t:"Selected device (toolbar)"},
+  {v:"last",     t:"Last used (saved)"},
+  {v:"ldplayer", t:"LDPlayer"},
+  {v:"mumu",     t:"MuMu"},
+  {v:"nox",      t:"Nox"},
+  {v:"memu",     t:"MEmu"},
+  {v:"bluestacks", t:"BlueStacks"},
+];
+// Same picker, MuMu only — Emulator resolution drives the console's settings
+// keys, which no other family exposes.
+const WF_EMU_TARGET_OPTS_MUMU = [
+  {v:"selected", t:"Selected device (toolbar)"},
+  {v:"last",     t:"Last used (saved)"},
+  {v:"mumu",     t:"MuMu"},
+];
+// What the emulator nodes print on the canvas for the chosen target. The
+// selected serial is read live so the node says which device it means, not just
+// "selected" — the ambiguity that made this option necessary in the first place.
+function wfEmuTargetLabel(p){
+  p=p||{};
+  const k=String(p.emulator||"last").toLowerCase();
+  if(k==="selected"){
+    const s=(typeof S!=="undefined"&&S.connectedSerial)||"";
+    return s?("selected ("+s+")"):"selected device";
+  }
+  if(k==="last"||!k) return "last used";
+  const i=parseInt(p.index)||0;
+  return k+(i?(" #"+i):"");
+}
+
 // Node catalog: UI source of truth (icon, kind, output ports, param fields).
 // Mirrors src/workflow/engine.py NODE_TYPES. kind: start|end|action|condition|loop.
 const WF_NODES = {
@@ -380,46 +416,46 @@ const WF_NODES = {
   // instance saved by Launch emulator. Pure Win32, so it also works in ADB
   // flows — e.g. snap MuMu to 1920×1080 right after boot.
   resize_emulator:{label:"Resize emulator", ico:"maximize", kind:"action", cat:"device", outs:["out"], fields:[
-    {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"}],d:"last"},
-    {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
+    {k:"emulator",lbl:"Emulator",t:"select",opts:WF_EMU_TARGET_OPTS,d:"selected"},
+    {k:"index",lbl:"Instance index (ignored for Last used / Selected)",t:"num",d:0},
     {k:"pathSrc",lbl:"Install folder",t:"select",opts:[{v:"project",t:"Project emulator setting"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true,showWhen:{pathSrc:"custom"}},
     {k:"width",lbl:"Client width (Android screen)",t:"num",d:1920},
     {k:"height",lbl:"Client height (Android screen)",t:"num",d:1080},
     {k:"x",lbl:"Window X (blank = keep)",t:"num"},
     {k:"y",lbl:"Window Y (blank = keep)",t:"num"},
-  ], sum:p=>`📐 ${(!p.emulator||p.emulator==="last")?"last used":(p.emulator+((parseInt(p.index)||0)?(" #"+p.index):""))} → ${p.width||1920}×${p.height||1080}`},
+  ], sum:p=>`📐 ${wfEmuTargetLabel(p)} → ${p.width||1920}×${p.height||1080}`},
   // Kill the emulator instance — closing the app inside ≠ closing the emulator;
   // the instance keeps running and holds RAM/CPU + ADB port. Preferred path is
   // the family's console shutdown (LDPlayer/MuMu/Nox/MEmu); falls back to
   // taskkilling the player window's process tree when no console exists or it
   // can't be resolved. "last" reuses the instance saved by Launch emulator.
   kill_emulator:{label:"Kill emulator", ico:"octagon", kind:"action", cat:"device", outs:["out"], fields:[
-    {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"}],d:"last"},
-    {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
+    {k:"emulator",lbl:"Emulator",t:"select",opts:WF_EMU_TARGET_OPTS,d:"selected"},
+    {k:"index",lbl:"Instance index (ignored for Last used / Selected)",t:"num",d:0},
     {k:"pathSrc",lbl:"Install folder",t:"select",opts:[{v:"project",t:"Project emulator setting"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true,showWhen:{pathSrc:"custom"}},
-  ], sum:p=>`⏹ ${(!p.emulator||p.emulator==="last")?"last used":(p.emulator+((parseInt(p.index)||0)?(" #"+p.index):""))}`},
+  ], sum:p=>`⏹ ${wfEmuTargetLabel(p)}`},
   // Reboot a wedged instance (frozen UI, ADB gone, app stuck) — what app_stop
   // can't fix. Console reboot when the family has one (LDPlayer/MuMu/Nox/MEmu),
   // else kill the player + relaunch. Wait > 0 polls sys.boot_completed so the
   // next node runs against a booted device.
   restart_emulator:{label:"Restart emulator", ico:"loop", kind:"action", cat:"device", outs:["out"], fields:[
-    {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"}],d:"last"},
-    {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
+    {k:"emulator",lbl:"Emulator",t:"select",opts:WF_EMU_TARGET_OPTS,d:"selected"},
+    {k:"index",lbl:"Instance index (ignored for Last used / Selected)",t:"num",d:0},
     {k:"pathSrc",lbl:"Install folder",t:"select",opts:[{v:"project",t:"Project emulator setting"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true,showWhen:{pathSrc:"custom"}},
     {k:"wait",lbl:"Wait for boot (s · 0 = don't wait)",t:"num",d:120},
     {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
     {k:"attach",lbl:"Attach as active device when ready",t:"bool",d:true},
-  ], sum:p=>`♻ ${(!p.emulator||p.emulator==="last")?"last used":(p.emulator+((parseInt(p.index)||0)?(" #"+p.index):""))}${(p.wait??120)>0?(" ≤"+(p.wait??120)+"s"):""}`},
+  ], sum:p=>`♻ ${wfEmuTargetLabel(p)}${(p.wait??120)>0?(" ≤"+(p.wait??120)+"s"):""}`},
   // Set the DEVICE resolution (Android screen px + DPI) — the value templates
   // were cropped against. Resize emulator only changes the PC window, so a
   // 1920×1080 window over a 1600×900 device still letterboxes. MuMu only; the
   // instance must restart to apply, which this node does by default.
   emulator_resolution:{label:"Emulator resolution", ico:"smartphone", kind:"action", cat:"device", outs:["out"], fields:[
-    {k:"emulator",lbl:"Emulator (MuMu only)",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"mumu",t:"MuMu"}],d:"last"},
-    {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
+    {k:"emulator",lbl:"Emulator (MuMu only)",t:"select",opts:WF_EMU_TARGET_OPTS_MUMU,d:"selected"},
+    {k:"index",lbl:"Instance index (ignored for Last used / Selected)",t:"num",d:0},
     {k:"pathSrc",lbl:"Install folder",t:"select",opts:[{v:"project",t:"Project emulator setting"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"path",lbl:"Install folder (blank = auto)",t:"path",d:"",pickFolder:true,showWhen:{pathSrc:"custom"}},
     {k:"width",lbl:"Device width (px)",t:"num",d:1920},

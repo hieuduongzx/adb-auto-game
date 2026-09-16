@@ -17,11 +17,14 @@
 <!--
   THESIS: the Hub is a shelf of games, not a tool menu — the cover you recognise is the button that runs it.
   OWN-WORLD: the suite's flat operator console (tokens.css / base.css, IBM Plex, hairline panels, light + dark);
-  covers are the only imagery; ok-green is reserved for Run, red for Delete.
+  covers are the only imagery; red is reserved for Delete, and Run is the one control repeated on every card.
   STORY: open the app, spot the game by its cover, click to run; E edits, Del deletes, New game adds one.
-  FIRST VIEWPORT: 52px library bar (title, count, search, refresh, New game); below it exactly two rows of
-  five 3:4 cover cards sized to the window, extra rows scroll; 30px footer with the workflows path and keys.
-  FORM: brief-pinned 5 x 2 cover grid inside the established world (no concept roll: precise request).
+  FIRST VIEWPORT: 64px library bar (title, count, search, refresh, New game); below it five flat cover cards
+  across, each with its name and an always-visible Run + tools footer; further rows scroll; 34px footer with
+  the workflows path and keys.
+  Narrow window: the same bar in two rows, the shelf reflowed to 4 / 3 / 2 / 1 columns, footer wrapped —
+  the covers never shrink below readable, the shelf scrolls instead, and no control leaves the screen.
+  FORM: brief-pinned five-across cover shelf inside the established world (no concept roll: precise request).
 -->
 <div id="app">
 
@@ -62,8 +65,13 @@
     </div>
     <p class="empty-title">No games yet</p>
     <p class="empty-msg">Create a game project to start building its workflow.</p>
+    <!-- One of the two shows: an empty library offers a new game, a search with
+         no matches offers the way back out of it. -->
     <button class="btn accent" id="btn-empty-new" type="button">
       <i data-ico="plus" aria-hidden="true"></i>New game
+    </button>
+    <button class="btn" id="btn-empty-clear" type="button" hidden>
+      <i data-ico="x" aria-hidden="true"></i>Clear search
     </button>
   </div>
 </main>

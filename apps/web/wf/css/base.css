@@ -98,11 +98,13 @@
   /* Attention amber: unsaved-changes dot + active speed-hack tint. */
   --amber:     #f59e0b;
   --speed-on:  #f1c84b;
-  /* Canvas surface + dot grid — a touch darker than --bg so the workbench
-     reads as a distinct plane behind the node cards. */
-  --canvas-bg:         #e7ebf0;
-  --canvas-dot:        rgba(23,32,43,.12);
-  --canvas-dot-minor:  #d5dbe3;
+  /* Canvas surface + dot grid. Brighter and lower-contrast than it used to be:
+     the workbench is a plane, not a background image — a white card, a coloured
+     wire and the dot grid should not all be competing for the same attention.
+     Still a step below --panel so a node face lifts off it on its own. */
+  --canvas-bg:         #eff1f5;
+  --canvas-dot:        rgba(23,32,43,.09);
+  --canvas-dot-minor:  #dfe4ec;
   --node-r: 10px;  /* node card corner — ComfyUI/Blender-style rounded block */
   --node-w: 172px; /* canonical card width — every action/condition block */
   --node-h: 70px;  /* canonical card height: 26px header + ~44px body */
@@ -194,9 +196,9 @@
   --note-ink:  #e7c25a;
   --amber:     #fbbf24;
   --speed-on:  #f5d76b;
-  --canvas-bg:         #12161c;
-  --canvas-dot:        rgba(220,230,242,.10);
-  --canvas-dot-minor:  #2c3542;
+  --canvas-bg:         #191e26;
+  --canvas-dot:        rgba(220,230,242,.085);
+  --canvas-dot-minor:  #252d38;
 }
 
 /* ── Shared-primitive overrides ──────────────────────────────────────────── */
@@ -213,34 +215,51 @@
 .spacer { flex: 1; }
 
 /* ── Collapsible groups ──────────────────────────────────────────────────── */
-.group { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+/* These live only in the Preview tool panel, which is ~300px wide — so the
+   gutter here is the *inner* one, not a page gutter. A group is a hairline box
+   with a 34px title row; the label column and the controls share what is left.
+   Everything that can shrink is allowed to: a row that cannot shrink is a row
+   that pushes its control past the group border, which is what made the
+   sections read as overlapping each other. */
+/* flex:0 0 auto is load-bearing. The pane is a column flex box, and a flex
+   item with overflow:hidden resolves min-height:auto to 0 — so without this the
+   groups all shrink to share the pane and each one clips its own body, which
+   reads as sections running into one another. A group is always its full
+   content height; the pane scrolls instead. */
+.group { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
+  flex: 0 0 auto; }
 
-.grp-hdr { display: flex; align-items: center; gap: 8px; padding: 0 12px;
-  height: var(--pnl-hd-h); width:100%; text-align:left; cursor: pointer; user-select: none;
-  transition: background .1s; }
+.grp-hdr { display: flex; align-items: center; gap: 7px; padding: 0 11px;
+  height: 34px; width:100%; text-align:left; cursor: pointer; user-select: none;
+  transition: background .1s; min-width: 0; }
 .grp-hdr:hover { background: var(--alt); }
 
-/* Sentence case at body size — the same title register as every panel header
-   in the suite, so a collapsible group inside the inspector reads as a smaller
-   instance of the same thing rather than as a new kind of label. */
-.grp-title { font-size: var(--t-body); font-weight: 600; letter-spacing: 0;
-  color: var(--ink); text-transform: none; }
+/* Sentence case at the panel-title register, one step down in size: a group is
+   a smaller instance of a panel header, not a new kind of label. */
+.grp-title { font-size: var(--t-ui); font-weight: 600; letter-spacing: 0;
+  color: var(--ink); text-transform: none; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .grp-chevron { margin-left: auto; color: var(--muted); flex-shrink: 0;
   transition: transform .15s; }
 .group.closed .grp-chevron { transform: rotate(-90deg); }
 
-.grp-body { display: flex; flex-direction: column; gap: 8px;
-  padding: 0 12px 11px; }
+.grp-body { display: flex; flex-direction: column; gap: 7px;
+  padding: 1px 11px 11px; min-width: 0; }
 .group.closed .grp-body { display: none; }
 
 /* Row inside group */
-.row { display: flex; align-items: center; gap: 6px; }
+.row { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .lbl { font-size: var(--t-ui); color: var(--dim); font-weight: 500; min-width: 52px; flex-shrink: 0; }
 .lbl.n { min-width: 38px; }
-.row > input { flex: 1; min-width: 0; }
+/* A flex item defaults to min-width:auto, and a bare <input>'s intrinsic width
+   is its 20-character size — ~177px in the mono face. Two of those in a row
+   cannot fit a 300px panel, so the row used to spill past its group border.
+   Every control in a row shrinks now; only the label keeps a floor. */
+.row > input, .row > select, .row > .pill-wrap, .row > .hz-wrap { flex: 1; min-width: 0; }
+.row > .btn, .row > .icon-btn { flex: 0 0 auto; }
 .btns { display: flex; flex-wrap: wrap; gap: 5px; }
-.btns .btn { flex: 1; min-width: 60px; }
+.btns .btn { flex: 1; min-width: 58px; }
 
 /* Readout & swatch — the live colour preview beside a picked Point / sampled
    colour. A subtle checker underlay shows through translucent samples. */
@@ -281,8 +300,8 @@
 
 /* Device info */
 .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; }
-.info-grid .k { font-size: var(--t-ui); color: var(--muted); font-weight: 600; white-space: nowrap; }
-.info-grid .v { font-size: var(--t-ui); color: var(--ink); word-break: break-word;
+.info-grid .k { font-size: var(--t-body); color: var(--muted); font-weight: 600; white-space: nowrap; }
+.info-grid .v { font-size: var(--t-body); color: var(--ink); word-break: break-word;
   user-select: text; font-family: var(--mono); }
 
 /* Asset library */

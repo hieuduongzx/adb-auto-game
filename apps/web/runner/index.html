@@ -14,6 +14,7 @@
 <script src="../shared/panel.js"></script>
 </head>
 <body>
+<a class="skip-link" href="#main-split">Skip to activity lists</a>
 <div id="app">
 
   <!-- ── Header card ─────────────────────────────────────────────────── -->
@@ -63,7 +64,7 @@
 
   <!-- ── Main body: split (left activities / right panels) + footer ──── -->
   <div id="main-body" data-pnl-stage>
-  <div id="main-split">
+  <div id="main-split" tabindex="-1" role="region" aria-label="Activities and runner panels">
 
     <!-- LEFT: activity lists -->
     <div id="pane-left">
@@ -363,7 +364,7 @@
       <select id="device-select" onchange="onDeviceChange(this.value)" aria-label="ADB device">
         <option value="">No devices</option>
       </select>
-      <span class="footer-lbl">Capture</span>
+      <label class="footer-lbl" for="capture-backend">Source</label>
       <select id="capture-backend" onchange="onCaptureBackendChange(this.value)" title="Workflow capture source: fast headless scrcpy or slower, reliable ADB screencap">
         <option value="scrcpy">scrcpy</option>
         <option value="adb">ADB</option>

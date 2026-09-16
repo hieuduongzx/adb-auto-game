@@ -386,6 +386,77 @@ EMU_PLAYER_EXES: Dict[str, List[str]] = {
     "bluestacks": ["hd-player", "bluestacks"],
 }
 
+# Node param value meaning "whatever device the toolbar has selected" — the
+# device the user is looking at, rather than one this flow launched itself.
+EMU_SELECTED = "selected"
+
+# Instances per family, mirroring the 32-entry port ranges in
+# src/core/adb/constants.py. Guards _emulator_port_candidates against an
+# unrelated port landing on a formula by accident.
+EMU_INDEX_MAX = 32
+
+
+def _split_emulator_serial(serial: str) -> Tuple[str, Optional[int]]:
+    """``(host, adb_port)`` for a toolbar serial; ``(host, None)`` with no port.
+
+    Covers the three shapes the device list can hand us: ``host:port`` (what an
+    emulator publishes, loopback or LAN), adb's ``emulator-N`` console form —
+    whose ADB port is N+1, the classic 5554/5555 pairing LDPlayer answers on —
+    and a USB serial (``R58M…``), which no emulator node can act on.
+    """
+    s = str(serial or "").strip()
+    if not s:
+        return "", None
+    if s.lower().startswith("emulator-"):
+        try:
+            return "", int(s.split("-", 1)[1]) + 1
+        except (TypeError, ValueError):
+            return "", None
+    if ":" in s:
+        host, _, tail = s.rpartition(":")
+        try:
+            port = int(tail)
+        except (TypeError, ValueError):
+            return s, None
+        return host.strip(), (port if port > 0 else None)
+    return s, None
+
+
+def _emulator_port_candidates(port: int) -> List[Tuple[str, int]]:
+    """Every ``(family, index)`` whose ADB port is *port*.
+
+    Inverts each family's ``port0``/``step``. More than one family can answer
+    the same port — LDPlayer's ``5555 + 2n`` meets BlueStacks' ``5555 + 10n`` on
+    seven of them — so a single candidate is a certain answer, while several
+    need the running-process evidence :meth:`_resolve_selected_emulator` adds.
+    """
+    if not port or port <= 0:
+        return []
+    out: List[Tuple[str, int]] = []
+    for kind, spec in EMULATOR_CONSOLES.items():
+        port0 = int(spec.get("port0") or 0)
+        step = int(spec.get("step") or 0)
+        if port0 <= 0 or step <= 0:
+            continue
+        delta = int(port) - port0
+        if delta < 0 or delta % step:
+            continue
+        index = delta // step
+        if 0 <= index < EMU_INDEX_MAX:
+            out.append((kind, index))
+    return out
+
+
+def _emulator_family_from_exe(path: str) -> Optional[str]:
+    """Family whose *player* exe *path* names, or None (a bare ``adb.exe``)."""
+    name = os.path.basename(str(path or "")).lower()
+    if not name:
+        return None
+    for kind, prefixes in EMU_PLAYER_EXES.items():
+        if any(name.startswith(pre) for pre in prefixes):
+            return kind
+    return None
+
 
 def _process_image_path(pid: int) -> str:
     """Full exe path of *pid* ("" for elevated/protected or non-Windows)."""
@@ -441,27 +512,27 @@ def _emulator_render_child(hwnd: int) -> Optional[tuple]:
     return best
 
 
-def _find_emulator_window(kind: str, install_dir: str = "") -> Optional[int]:
-    """Locate an emulator family's visible main window; largest one wins.
+def _enum_player_windows() -> Dict[str, List[Dict[str, Any]]]:
+    """Every visible top-level emulator player window, grouped by family.
 
-    A top-level window qualifies when its process exe basename starts with one
-    of the family's :data:`EMU_PLAYER_EXES` prefixes. When ``install_dir`` is
-    known (node param / saved launch_emulator state), windows whose process
-    lives under it are preferred — several emulator versions installed side by
-    side all match the same family prefixes. Falls back to the window title
-    (which usually carries the brand) when the process path is unreadable.
+    One ``EnumWindows`` pass answers both questions the emulator nodes ask:
+    *which families are running at all* (needed to tell two families apart when
+    they share an ADB port) and *which window is this instance's* — see
+    :func:`_pick_player_window`.
+
+    A window qualifies when its process exe basename starts with one of the
+    family's :data:`EMU_PLAYER_EXES` prefixes. When the exe can't be read
+    (elevated), the window title is trusted instead — it usually carries the
+    brand — and the window is listed under every family its title matches.
     """
+    out: Dict[str, List[Dict[str, Any]]] = {}
     try:
         import win32gui
         import win32process
     except ImportError:
-        return None
-    prefixes = EMU_PLAYER_EXES.get(kind, [])
-    base = os.path.normcase(os.path.normpath(install_dir)) if install_dir else ""
-    best: Optional[tuple] = None  # (under_install_dir, area, hwnd)
+        return out
 
     def _cb(hwnd, _):
-        nonlocal best
         if not win32gui.IsWindowVisible(hwnd):
             return
         title = (win32gui.GetWindowText(hwnd) or "").strip()
@@ -469,36 +540,130 @@ def _find_emulator_window(kind: str, install_dir: str = "") -> Optional[int]:
             return  # skip invisible-named helper windows
         try:
             pid = win32process.GetWindowThreadProcessId(hwnd)[1]
-        except Exception:
-            return
-        exe_path = _process_image_path(pid)
-        name = os.path.basename(exe_path or "").lower()
-        under = False
-        if name:
-            if not any(name.startswith(pre) for pre in prefixes):
-                return
-            if base and exe_path:
-                exe_dir = os.path.normcase(os.path.normpath(os.path.dirname(exe_path)))
-                under = exe_dir.startswith(base) or exe_dir.startswith(
-                    os.path.normcase(os.path.normpath(os.path.dirname(base)))
-                )
-        else:
-            # Can't read the exe (elevated) — trust the window title instead.
-            if not any(pre in title.lower() for pre in prefixes + [kind]):
-                return
-        try:
             l, t, r, b = win32gui.GetWindowRect(hwnd)
         except Exception:
             return
-        key = (under, abs((r - l) * (b - t)), hwnd)
-        if best is None or key > best:
-            best = key
+        w, h = r - l, b - t
+        if w <= 0 or h <= 0:
+            return
+        exe_path = _process_image_path(pid)
+        name = os.path.basename(exe_path or "").lower()
+        low_title = title.lower()
+        for kind, prefixes in EMU_PLAYER_EXES.items():
+            if name:
+                if not any(name.startswith(pre) for pre in prefixes):
+                    continue
+            elif not any(pre in low_title for pre in prefixes + [kind]):
+                continue
+            out.setdefault(kind, []).append({
+                "hwnd": hwnd, "pid": int(pid), "title": title,
+                "exe_path": exe_path, "area": abs(w * h),
+            })
 
     try:
         win32gui.EnumWindows(_cb, None)
     except Exception:
-        return None
-    return best[2] if best else None
+        return out
+    return out
+
+
+def _pick_player_window(records: Dict[str, List[Dict[str, Any]]], kind: str,
+                        install_dir: str = "", *,
+                        pid_hints: Optional[List[int]] = None,
+                        strict: bool = False) -> Tuple[Optional[int], str]:
+    """Pick one instance's player window for *kind*; returns ``(hwnd, how)``.
+
+    ``how`` names the rung that decided it, because the caller has to know
+    whether the answer is certain:
+
+      ``pid``        — the window's process holds the instance's ADB port, so
+                       this IS that instance (exact)
+      ``single``     — only one window of the family is open (exact)
+      ``largest``    — several windows, nothing identified the right one: the
+                       historical rule, kept for the explicit family+index nodes
+      ``ambiguous``  — several windows and the caller asked for one specific
+                       instance (``strict``) → refuse instead of resizing a sibling
+      ``none``       — no window of the family at all
+
+    ``install_dir`` (node param / saved launch_emulator state) orders windows
+    whose process lives under it first — several emulator versions installed
+    side by side all match the same family prefixes.
+    """
+    recs = records.get(kind) or []
+    if not recs:
+        return None, "none"
+    base = os.path.normcase(os.path.normpath(install_dir)) if install_dir else ""
+
+    def _key(rec: Dict[str, Any]) -> tuple:
+        under = False
+        exe_path = rec.get("exe_path") or ""
+        if base and exe_path:
+            exe_dir = os.path.normcase(os.path.normpath(os.path.dirname(exe_path)))
+            under = exe_dir.startswith(base) or exe_dir.startswith(
+                os.path.normcase(os.path.normpath(os.path.dirname(base)))
+            )
+        return (under, rec.get("area") or 0, rec.get("hwnd") or 0)
+
+    hints = {int(p) for p in (pid_hints or [])}
+    if hints:
+        hit = [r for r in recs if int(r.get("pid") or 0) in hints]
+        if hit:
+            return max(hit, key=_key)["hwnd"], "pid"
+    if len(recs) == 1:
+        return recs[0]["hwnd"], "single"
+    if strict:
+        return None, "ambiguous"
+    return max(recs, key=_key)["hwnd"], "largest"
+
+
+def _find_emulator_window(kind: str, install_dir: str = "") -> Optional[int]:
+    """Locate an emulator family's visible main window; largest one wins.
+
+    Thin wrapper over :func:`_enum_player_windows` + :func:`_pick_player_window`
+    that keeps the original "largest window of the family" contract for callers
+    with no way to identify the instance — see ``_pick_player_window`` for the
+    ``how`` values that make the choice exact instead.
+    """
+    return _pick_player_window(_enum_player_windows(), kind, install_dir)[0]
+
+
+def _tcp_listener_pids(port: int) -> List[int]:
+    """PIDs holding a LISTENING TCP socket on *port* (``[]`` when unknown).
+
+    This is what makes "the device I selected" exact: the instance whose ADB
+    port the toolbar serial names is the one whose window must be resized, and
+    that association is the only signal that survives several instances of the
+    same family being open at once. ``netstat`` rather than a ctypes
+    ``GetExtendedTcpTable`` because the table's struct layout is a minefield
+    that can't be exercised without the emulator installed.
+    """
+    import subprocess
+    try:
+        r = subprocess.run(
+            ["netstat", "-ano", "-p", "TCP"],
+            capture_output=True, text=True, timeout=10,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+        )
+    except Exception:
+        return []
+    pids: List[int] = []
+    for line in (r.stdout or "").splitlines():
+        #   TCP    127.0.0.1:16384    0.0.0.0:0    LISTENING    1234
+        parts = line.split()
+        if len(parts) < 5 or parts[0].upper() != "TCP" or parts[3].upper() != "LISTENING":
+            continue
+        local = parts[1]
+        if ":" not in local:
+            continue
+        try:
+            if int(local.rsplit(":", 1)[1]) != int(port):
+                continue
+            pid = int(parts[4])
+        except (TypeError, ValueError):
+            continue
+        if pid > 0 and pid not in pids:
+            pids.append(pid)
+    return pids
 
 # Condition node types a switch case may use — only the *instant* ones (no
 # wait_* timeout blocking, no tap_* side-effect), so evaluating one case never
@@ -563,6 +728,10 @@ class WorkflowEngine:
         self._debug_gate = threading.Event()
         self._debug_gate.set()
         self.failure_screenshot_dir: Optional[str] = None
+        # The ADB serial the host app's device picker currently has selected —
+        # what the emulator nodes' "selected" target resolves against. Pushed in
+        # by the Designer/Runner (set_selected_device); empty in a bare engine.
+        self.selected_serial: str = ""
         # When True (the designer's test runs), a failure screenshot is captured
         # for EVERY final action failure — not just nodes that opted in via
         # screenshotOnFail — so the designer can show "what the screen looked
@@ -4011,16 +4180,79 @@ class WorkflowEngine:
                 and not self.auto.adb.device):
             self._attach_adb_after_boot(host)
 
+    def set_selected_device(self, serial: Optional[str]) -> None:
+        """Report the device the host app's picker currently has selected.
+
+        The Designer/Runner call this whenever ``select_device`` runs, so an
+        emulator node targeting ``EMU_SELECTED`` acts on what the user is
+        actually looking at instead of on whatever this flow launched last.
+        """
+        self.selected_serial = str(serial or "").strip()
+
+    def _current_selected_serial(self) -> str:
+        """The selected-device serial: what the host pushed, else the bound ADB
+        device — the same "current device" ``_a_install_apk`` and
+        ``_a_device_info`` read off the controller."""
+        return (self.selected_serial
+                or str(getattr(self.auto.adb, "device_id", "") or "").strip())
+
+    def _resolve_selected_emulator(self, p: Dict, verb: str) -> Optional[tuple]:
+        """``(kind, index, install_dir, instance)`` for the toolbar's device.
+
+        The toolbar holds an ADB serial, the PC-side nodes need family+index, so
+        this walks: serial → port → candidate families. A port one family owns
+        is a certain answer; a shared port (LDPlayer and BlueStacks both answer
+        5555) is settled by which of those families actually has a player window
+        open. When that evidence is missing too we refuse and say so, rather
+        than resizing whichever sibling happens to be largest.
+        """
+        serial = self._current_selected_serial()
+        if not serial:
+            log_warning(f"🖥 {verb}: chưa chọn thiết bị nào ở thanh công cụ — chọn thiết bị, "
+                        f"hoặc đổi 'Emulator' sang 'Last used (saved)' / hãng cụ thể")
+            return None
+        _, port = _split_emulator_serial(serial)
+        cands = _emulator_port_candidates(port) if port else []
+        if not cands:
+            log_warning(f"🖥 {verb}: thiết bị đang chọn '{serial}' không khớp cổng ADB của "
+                        f"giả lập nào — chọn hãng giả lập cụ thể trong node")
+            return None
+        running = _enum_player_windows()
+        if len(cands) == 1:
+            kind, index = cands[0]
+            note = ""
+        else:
+            live = [c for c in cands if running.get(c[0])]
+            if len(live) != 1:
+                names = " và ".join(f"'{k}'" for k, _ in cands)
+                log_warning(f"🖥 {verb}: cổng {port} dùng chung cho {names} mà không thấy "
+                            f"tiến trình nào đang chạy — chọn hãng giả lập cụ thể trong node")
+                return None
+            kind, index = live[0]
+            note = " (theo tiến trình đang chạy)"
+        # The running instance's own exe path beats the project setting: several
+        # copies of one emulator installed side by side answer the same family.
+        path = ""
+        for rec in running.get(kind) or []:
+            if rec.get("exe_path"):
+                path = os.path.dirname(rec["exe_path"])
+                break
+        log_info(f"🖥 {verb}: thiết bị đang chọn {serial} → {kind} #{index}{note}")
+        return kind, index, path or self._emulator_path(p), ""
+
     def _emulator_pc_target(self, p: Dict, verb: str) -> Optional[tuple]:
         """Resolve ``(kind, index, install_dir, instance)`` for the PC-side
         emulator nodes (resize / kill / restart / device resolution).
 
         ``emulator`` = "last" reuses the instance the last successful
         launch_emulator saved (family + index + install path + BlueStacks
-        instance name). Returns None when the family can't be determined; the
-        reason is logged here.
+        instance name); ``EMU_SELECTED`` resolves the toolbar's device instead.
+        Returns None when the family can't be determined; the reason is logged
+        here.
         """
         kind = str(p.get("emulator", "last")).strip().lower() or "last"
+        if kind == EMU_SELECTED:
+            return self._resolve_selected_emulator(p, verb)
         try:
             index = int(float(p.get("index", 0) or 0))
         except (TypeError, ValueError):
@@ -4081,13 +4313,18 @@ class WorkflowEngine:
             log_warning(f"🖥 Console '{args_key}' lỗi: {exc}")
             return None
 
-    def _taskkill_emulator_window(self, kind: str, path: str) -> Optional[bool]:
+    def _taskkill_emulator_window(self, kind: str, path: str, *,
+                                  pid_hints: Optional[List[int]] = None,
+                                  strict: bool = False) -> Optional[bool]:
         """Force-kill the process tree owning the family's player window.
 
         True = killed, None = no window found (already closed), False = error.
+        ``pid_hints``/``strict`` narrow the choice to one instance — see
+        :func:`_pick_player_window`.
         """
         import subprocess
-        hwnd = _find_emulator_window(kind, path)
+        hwnd = _pick_player_window(_enum_player_windows(), kind, path,
+                                   pid_hints=pid_hints, strict=strict)[0]
         if not hwnd:
             return None
         try:
@@ -4100,6 +4337,25 @@ class WorkflowEngine:
         except Exception as exc:
             log_warning(f"🖥 Taskkill giả lập lỗi: {exc}")
             return False
+
+    def _selected_instance_hints(self, p: Dict
+                                 ) -> Tuple[Optional[int], Optional[List[int]], bool]:
+        """``(adb_port, listener_pids, strict)`` for a node naming one instance.
+
+        A node targeting the toolbar's device means *that* instance, so the
+        caller passes ``strict`` and refuses rather than resizing a sibling when
+        the window can't be pinned down. ``listener_pids`` is the set of PIDs
+        holding the device's ADB port — the only signal that survives several
+        instances of one family being open, and ``None`` on the explicit
+        family+index paths, which keep the historical largest-window rule.
+
+        The port comes from the serial itself rather than the family formula, so
+        a drifted MuMu port or a LAN-bound LDPlayer still resolves.
+        """
+        if str(p.get("emulator", "")).strip().lower() != EMU_SELECTED:
+            return None, None, False
+        port = _split_emulator_serial(self._current_selected_serial())[1]
+        return port, (_tcp_listener_pids(port) if port else []), True
 
     def _a_resize_emulator(self, node, p) -> bool:
         """Resize the emulator's PC window so the ANDROID RENDER AREA becomes
@@ -4114,9 +4370,9 @@ class WorkflowEngine:
         ``win_resize`` — which resizes the flow's Win32 target window — this
         needs no controller, so it works in ADB flows; the player window is
         found via the family's process names ("last" = the instance the last
-        successful launch_emulator saved). Keeps the restore-if-maximized +
-        WM_SIZE nudge, because the Qt/DX player windows otherwise ignore plain
-        SetWindowPos.
+        successful launch_emulator saved, "selected" = the toolbar's device).
+        Keeps the restore-if-maximized + WM_SIZE nudge, because the Qt/DX player
+        windows otherwise ignore plain SetWindowPos.
         """
         target = self._emulator_pc_target(p, "Resize")
         if not target:
@@ -4127,10 +4383,20 @@ class WorkflowEngine:
             h = max(200, int(float(p.get("height", 1080) or 1080)))
         except (TypeError, ValueError):
             w, h = 1920, 1080
-        hwnd = _find_emulator_window(kind, install_dir)
+        _, hints, strict = self._selected_instance_hints(p)
+        hwnd, how = _pick_player_window(_enum_player_windows(), kind, install_dir,
+                                        pid_hints=hints, strict=strict)
+        if how == "ambiguous":
+            log_warning(f"🖥 Resize: '{kind}' đang mở nhiều cửa sổ mà không xác định được "
+                        f"cửa sổ của {self._current_selected_serial()} — đóng bớt instance, "
+                        f"hoặc chọn hãng + index cụ thể trong node")
+            return False
         if not hwnd:
             log_warning(f"🖥 Không thấy cửa sổ giả lập '{kind}' #{index} — giả lập chưa mở?")
             return False
+        if how == "largest":
+            log_warning(f"🖥 Resize: '{kind}' đang mở nhiều cửa sổ — nhắm vào cửa sổ lớn "
+                        f"nhất, có thể sai instance")
         try:
             import win32api
             import win32con
@@ -4174,7 +4440,12 @@ class WorkflowEngine:
             if got and got != (w, h):
                 log_warning(f"🖥 Vùng hiển thị sau resize là {got[0]}×{got[1]} "
                             f"(yêu cầu {w}×{h}) — window có thể bị kẹp kích thước tối thiểu")
-            log_success(f"🖥 Resize giả lập {kind} #{index} → hiển thị {w}×{h} tại ({l}, {t})")
+            # Name the window: with two instances of one family open, this is
+            # how the user sees which one the node actually acted on.
+            title = (win32gui.GetWindowText(hwnd) or "").strip()
+            log_success(f"🖥 Resize giả lập {kind} #{index}"
+                        f"{f' — cửa sổ {title!r}' if title else ''}"
+                        f" → hiển thị {w}×{h} tại ({l}, {t})")
             return True
         except Exception as exc:
             log_warning(f"🖥 Resize giả lập lỗi: {exc}")
@@ -4195,6 +4466,7 @@ class WorkflowEngine:
         if not target:
             return False
         kind, index, path, _ = target
+        _, hints, strict = self._selected_instance_hints(p)
 
         # 1) console shutdown — leaves no zombie VM process behind.
         if self._run_emulator_console(kind, path, "quit_args", index) is not None:
@@ -4202,7 +4474,7 @@ class WorkflowEngine:
             return True
         # 2) fallback: taskkill the player window's process tree (BlueStacks has
         #    no console verb; or the console exe couldn't be resolved).
-        killed = self._taskkill_emulator_window(kind, path)
+        killed = self._taskkill_emulator_window(kind, path, pid_hints=hints, strict=strict)
         if killed is None:
             log_info(f"🖥 Không thấy cửa sổ giả lập '{kind}' #{index} (đã tắt sẵn? — bỏ qua)")
             return True
@@ -4224,15 +4496,23 @@ class WorkflowEngine:
         if not target:
             return False
         kind, index, path, instance = target
+        sel_port, hints, strict = self._selected_instance_hints(p)
         try:
             wait = max(0.0, float(p.get("wait", 120) or 0))
         except (TypeError, ValueError):
             wait = 120.0
+        # Relaunching BlueStacks means `HD-Player --instance <name>`, and an
+        # instance name can't be read off an ADB serial — so say so instead of
+        # relaunching whatever instance the console would default to.
+        if strict and kind == "bluestacks" and not instance:
+            log_warning("🖥 Restart giả lập: BlueStacks cần tên instance — điền 'Instance "
+                        "name' trong node (không suy ra được từ thiết bị đang chọn)")
+            return False
 
         if self._run_emulator_console(kind, path, "restart_args", index) is None:
             # No console restart verb (BlueStacks) → kill, then relaunch.
             log_info(f"🖥 '{kind}' không có lệnh restart — tắt rồi mở lại")
-            killed = self._taskkill_emulator_window(kind, path)
+            killed = self._taskkill_emulator_window(kind, path, pid_hints=hints, strict=strict)
             if killed is False:
                 return False
             if killed:
@@ -4260,7 +4540,10 @@ class WorkflowEngine:
         # Use the resolved install path for console-reported ports. A restart
         # node using `emulator: "last"` often leaves `path` blank.
         port_params = {**p, "path": path}
-        port = self._emulator_adb_port(port_params, kind, index)
+        # Targeting the toolbar's device, the port is already known from its
+        # serial — and it beats the formula, which can drift across a reboot
+        # (MuMu Global) or name the other emulator on a shared port.
+        port = sel_port or self._emulator_adb_port(port_params, kind, index)
         host = f"127.0.0.1:{port}" if port else None
         if not host:
             log_warning(f"🖥 Không suy ra được cổng ADB của '{kind}' #{index} — bỏ qua bước chờ")
