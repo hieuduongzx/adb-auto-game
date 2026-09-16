@@ -270,13 +270,15 @@ def list_image_assets(out_dir: str, limit: Optional[int] = None,
 def _image_size(path: str) -> tuple:
     """``(width, height)`` of an image, or ``(0, 0)`` if it cannot be read.
 
-    Only the header is read (Pillow), so this stays cheap across hundreds of
-    files — decoding the pixels to learn the dimensions would not.
+    OpenCV is already required for template matching, so using it here avoids
+    bundling a second image stack only to inspect template dimensions.
     """
     try:
-        from PIL import Image
-        with Image.open(path) as im:
-            return int(im.width), int(im.height)
+        image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        if image is None or image.size == 0:
+            return 0, 0
+        height, width = image.shape[:2]
+        return int(width), int(height)
     except Exception:
         return 0, 0
 

@@ -154,6 +154,11 @@ excludes = [
     "torch", "torchvision", "torchaudio",
     "scipy", "matplotlib", "sympy", "sklearn", "skimage",
     "paddle", "paddleocr", "paddlex", "easyocr", "pytesseract", "onnx",
+    # Runtime image work uses cv2. Pillow is only a build-tool dependency.
+    # The local file:// webview does not use pywebview's optional SSL stack.
+    "PIL", "cryptography",
+    # No Runner source imports these optional HTTP/config helpers.
+    "requests", "charset_normalizer", "yaml",
     "tkinter", "IPython", "notebook", "jupyter", "pytest",
 ]
 if not INCLUDE_AV:

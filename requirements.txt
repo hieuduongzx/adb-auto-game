@@ -2,7 +2,9 @@
 # Install:  pip install -r requirements.txt
 
 # ── Capture / vision ────────────────────────────────────────────────────────
-opencv-python>=4.8.0
+# Pin the standard build: newer/contrib wheels add 15+ MiB to every frozen
+# Runner without providing APIs used by Macro2k.
+opencv-python==4.10.0.84
 numpy>=1.24.0
 pillow>=10.0.0
 # scrcpy H.264 decode (optional — capture falls back to ADB screencap).

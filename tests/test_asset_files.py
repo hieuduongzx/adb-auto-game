@@ -17,6 +17,7 @@ import tempfile
 import unittest
 import zlib
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -70,6 +71,12 @@ class TestListing(_Folder):
                   if i["name"] == "btn_play.png")
         self.assertEqual((it["w"], it["h"]), (40, 12))
         self.assertGreater(it["size"], 0)
+
+    def test_dimensions_do_not_require_pillow(self):
+        with patch.dict(sys.modules, {"PIL": None, "PIL.Image": None}):
+            items = device_info.list_image_assets(self.root, with_dims=True)
+        it = next(i for i in items if i["name"] == "btn_play.png")
+        self.assertEqual((it["w"], it["h"]), (40, 12))
 
     def test_trash_is_never_listed(self):
         device_info.delete_asset(self.root, self.path("btn_back.png"))

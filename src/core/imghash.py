@@ -21,23 +21,23 @@ def dhash(path: str) -> Optional[int]:
 
     Each bit is "is this pixel brighter than the one to its right", which makes
     the hash a fingerprint of the image's horizontal gradient structure rather
-    than its exact pixels. Pillow is imported lazily so this module stays
-    importable in builds that never touch an image.
+    than its exact pixels. OpenCV is already part of the matching runtime, so
+    this does not pull a second image decoder into packaged Runners.
     """
     try:
-        from PIL import Image
-        with Image.open(path) as im:
-            small = im.convert("L").resize(_RESIZE, Image.LANCZOS)
-        pixels = list(small.getdata())
+        import cv2
+
+        image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        if image is None or image.size == 0:
+            return None
+        small = cv2.resize(image, _RESIZE, interpolation=cv2.INTER_LANCZOS4)
     except Exception:
         return None
 
-    width = _RESIZE[0]
     bits = 0
     for y in range(_RESIZE[1]):
-        row = y * width
-        for x in range(width - 1):
-            bits = (bits << 1) | (1 if pixels[row + x] > pixels[row + x + 1] else 0)
+        for x in range(_RESIZE[0] - 1):
+            bits = (bits << 1) | (1 if small[y, x] > small[y, x + 1] else 0)
     return bits
 
 
