@@ -28,7 +28,8 @@ contract. Its implementation changes from `paddleocr.TextRecognition` to a
 small ONNX recognition pipeline:
 
 1. Load bundled `rec.onnx` with ONNX Runtime's CPU execution provider.
-2. Accept the existing BGR crop and convert it to RGB.
+2. Accept the existing BGR crop without swapping color channels, matching the
+   official model's `DecodeImage(img_mode="BGR")` preprocessing.
 3. Resize the crop to the model's fixed height while preserving aspect ratio;
    pad the remaining width and normalize pixels exactly as the official model
    configuration specifies.
