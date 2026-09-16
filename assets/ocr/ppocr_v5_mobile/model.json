@@ -1,0 +1,24 @@
+{
+  "model_id": "ppocr_v5_mobile",
+  "source_model": "PP-OCRv5_mobile_rec",
+  "source_repository": "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_rec_onnx",
+  "input_height": 48,
+  "base_width": 320,
+  "max_width": 3200,
+  "color_order": "BGR",
+  "normalization": {
+    "scale": 0.00392156862745098,
+    "mean": 0.5,
+    "std": 0.5
+  },
+  "blank_index": 0,
+  "use_space_char": true,
+  "character_count": 18383,
+  "output_class_count": 18385,
+  "input_name": "x",
+  "output_name": "fetch_name_0",
+  "sha256": {
+    "rec.onnx": "da72dc72ca4dc220df0dfde68c1dedc31c58d3e76a25871122e5056227d50092",
+    "dict.txt": "1ea29636956177e400af712d9782e7693f3fb25f98617bed10479d2965a836fd"
+  }
+}
