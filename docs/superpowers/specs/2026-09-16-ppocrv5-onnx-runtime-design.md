@@ -17,8 +17,9 @@ detection and should shrink from roughly 610 MiB to 195–230 MiB.
   `paddleocr`, continue migrating to `ppocr_v5_mobile`.
 - The Runner must include the recognition model and character dictionary. A
   clean machine must not need Internet access on first use.
-- The ONNX model must be converted from the official PP-OCRv5 Mobile
-  recognition inference model. LunaTranslator files may be inspected as an
+- The ONNX graph must come from PaddlePaddle's official
+  `PP-OCRv5_mobile_rec_onnx` release. Its dictionary comes from the matching
+  official Paddle inference model. LunaTranslator files may be inspected as an
   architectural reference but will not be copied into Macro2k.
 
 ## Runtime architecture
@@ -58,10 +59,10 @@ blank-token handling, and expected ONNX input/output names. This avoids hidden
 constants in the inference code and gives future registry entries the same
 asset contract.
 
-A development-only conversion script converts the official cached Paddle
-inference model and validates the ONNX graph. Paddle and Paddle2ONNX are build
-tools only during conversion; they are not runtime dependencies and are not
-collected into Runner builds.
+A development-only exporter combines PaddlePaddle's official ONNX graph with
+the dictionary embedded in the matching official Paddle model, validates the
+graph contract, and records both hashes. Paddle and Paddle2ONNX are not runtime
+or build dependencies.
 
 ## Dependencies and packaging
 

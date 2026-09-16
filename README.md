@@ -17,11 +17,11 @@ Frozen exe modes: `Macro2k.exe` (hub), `--designer [flow]`, `--runner [flow]`.
 
 ```
 apps/           Product apps + web UI (hub / wf / runner / scope)
-src/            Library: ADB core, OCR, Win32, workflow engine, utils
+src/            Library: ADB core, PP-OCRv5 Mobile, Win32, workflow engine, utils
 workflows/      Game projects: <Name>/*.json + templates/ + assets/cover.png
 data/           Runtime settings (gitignored machine-local files)
 packaging/      PyInstaller → dist/Macro2k/
-vendor/         adb / scrcpy / frida / tesseract binaries
+vendor/         adb / scrcpy / frida binaries
 ```
 
 ## Setup
@@ -32,8 +32,7 @@ python -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python -m pip check
-# Optional OCR:  pip install easyocr
-#                 pip install paddlepaddle paddleocr
+# OCR runtime:   ONNX Runtime; the official PP-OCRv5 Mobile model is bundled
 ```
 
 Use the project virtual environment instead of a shared Python installation.
@@ -41,7 +40,12 @@ The obsolete third-party `scrcpy-client` package pins `av<10` and conflicts with
 Macro2k's direct PyAV capture implementation (`av>=10`); Macro2k does not use or
 require that package.
 
-Place binaries under `vendor/` as needed (`adb`, `scrcpy`, `tesseract`; `frida` / `scrcpy` may be local-only — see `.gitignore`).
+OCR is recognition-only because workflow nodes already provide a cropped text
+region. `assets/ocr/ppocr_v5_mobile/` contains the official PaddlePaddle ONNX
+graph, dictionary, and manifest, so source runs and packaged Runners work
+offline. The selector remains registry-driven for future recognition models.
+
+Place binaries under `vendor/` as needed (`adb`, `scrcpy`, `frida`; some tools may be local-only — see `.gitignore`).
 
 ## Quality checks
 
@@ -58,6 +62,16 @@ JavaScript files can be syntax-checked with Node.js:
 ```powershell
 Get-ChildItem apps/web -Recurse -Filter *.js | ForEach-Object { node --check $_.FullName }
 ```
+
+Designer geometry and keyboard regression checks:
+
+```powershell
+node --test tests/test_designer_geometry.cjs
+```
+
+In Designer, **F** fits the graph above the floating dock; **Shift+F** focuses
+selected nodes. **Arrange** spaces nodes automatically and can be undone with
+**Ctrl+Z**. Selecting a node highlights its incoming and outgoing wires.
 
 ## Build (Macro2k only)
 

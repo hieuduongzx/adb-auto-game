@@ -23,7 +23,7 @@ All commands run from the **project root** in PowerShell.
 dist/Macro2k/                    the app folder (PyInstaller output + vendor/)
     Macro2k.exe                  Hub (default) · --designer · --runner
     _macro2k/                    private runtime files
-    vendor/                      adb / frida / tesseract
+    vendor/                      adb / frida
 dist/installer/
     Macro2k-Setup-<ver>.exe      the wizard installer (Browse-to-folder)
 ```
@@ -37,6 +37,13 @@ pwsh packaging/build.ps1 -SkipVendor   # code-only rebuild, reuse existing vendo
 
 Prerequisite: `pip install -r requirements.txt`. PyInstaller is auto-installed if
 missing.
+
+The build bundles recognition-only PP-OCRv5 Mobile from
+`assets/ocr/ppocr_v5_mobile/` plus ONNX Runtime CPU. It does not download a
+model on first launch and does not ship Paddle, PaddleOCR, PaddleX, Tesseract,
+or EasyOCR. Standalone Runner builds reject an incomplete OCR payload and an
+application payload larger than 250 MiB; game-specific `requirements/` files
+are reported separately and do not count toward that limit.
 
 ## 1b. App icon
 
@@ -183,3 +190,16 @@ force data-beside-the-app regardless.
   `$env:GITHUB_TOKEN`.
 - **File locked / "Access denied" during build** — a running `Macro2k.exe` holds
   the file; close it (`Get-Process Macro2k | Stop-Process -Force`) and re-run.
+- **A *downloaded* Runner dies with `Failed to resolve Python.Runtime.Loader.
+  Initialize`** — Windows' *Mark-of-the-Web*. Files Explorer extracts from a
+  downloaded `.zip` keep a `Zone.Identifier` stream, and the .NET Framework
+  refuses to load a marked assembly — which is what Python.NET (pywebview's
+  Windows backend) is. It hits everyone who downloads the build and nobody who
+  built it, because the builder's copies were never downloaded. Current builds
+  clear the mark at startup (`unblock_bundled_files()` in
+  [`src/utils/__init__.py`](../src/utils/__init__.py), called from the frozen
+  entry points before `webview.start()`), so nothing has to be done — a build
+  made before that fix can be rescued by right-clicking the `.zip` →
+  *Properties* → **Unblock** *before* extracting, extracting with 7-Zip
+  instead, or running `Get-ChildItem <folder> -Recurse | Unblock-File` on the
+  extracted folder.

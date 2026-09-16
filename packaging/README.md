@@ -1,13 +1,13 @@
 # Đóng gói app ra .exe
 
 Build **Macro2k** (Hub mặc định + Designer qua `--designer` + Runner qua
-`--runner`) vào một thư mục kèm **`vendor/`** (adb / frida / tesseract):
+`--runner`) vào một thư mục kèm **`vendor/`** (adb / frida):
 
 ```
 dist/Macro2k/
     Macro2k.exe      Hub (mặc định); --designer / --runner
     _macro2k/        file runtime riêng
-    vendor/             adb / frida / tesseract
+    vendor/             adb / frida
 ```
 
 Exe resolve thư mục ghi được (`vendor/`, `data/`, `out/`) về folder chứa exe.
@@ -61,7 +61,8 @@ tile tối, render riêng từng size 16 → 256 để frame nhỏ vẫn rõ.
 
 ## Lưu ý
 
-- Chỉ bundle backend OCR **Tesseract**; `easyocr/paddle/torch` bị loại khỏi build cho nhẹ.
+- Bundle **PP-OCRv5 Mobile recognition** cùng ONNX Runtime CPU và model offline;
+  không có detector, Paddle runtime hay OCR vendor riêng.
 - `vendor/` nằm trong `dist/Macro2k/vendor` — có thể tự xoá bớt tool không dùng nếu cần.
 - Đổi `console=False` → `True` trong `apps_build.spec` nếu cần xem traceback khi debug.
 - Để phân phối: nén/copy cả thư mục `dist/Macro2k/` (giữ nguyên cấu trúc bên trong).

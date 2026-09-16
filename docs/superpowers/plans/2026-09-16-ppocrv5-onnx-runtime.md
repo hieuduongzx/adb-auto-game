@@ -4,7 +4,7 @@
 
 **Goal:** Replace PaddleOCR with a bundled, recognition-only PP-OCRv5 Mobile ONNX runtime and keep each standalone Runner at or below 250 MiB excluding game requirements.
 
-**Architecture:** A focused `ppocr_onnx.py` module owns model metadata, BGR preprocessing, ONNX Runtime inference, and CTC decoding. The existing OCR registry and `OCRReader` facade remain stable while `PPOCRv5MobileBackend` delegates to that module. The official cached Paddle inference model is converted once into repository assets; Paddle remains a conversion-only tool and is absent from runtime requirements and builds.
+**Architecture:** A focused `ppocr_onnx.py` module owns model metadata, BGR preprocessing, ONNX Runtime inference, and CTC decoding. The existing OCR registry and `OCRReader` facade remain stable while `PPOCRv5MobileBackend` delegates to that module. The repository payload combines PaddlePaddle's official ONNX graph with its matching official dictionary; Paddle is absent from runtime requirements and builds.
 
 **Tech Stack:** Python 3.10, NumPy, OpenCV, ONNX Runtime CPU, PyInstaller, `unittest`
 
@@ -16,7 +16,7 @@
 - Keep model ID `ppocr_v5_mobile`, label `PP-OCRv5 Mobile`, and the registry-driven selectors.
 - Legacy values `tesseract`, `easyocr`, `paddleocr`, `auto`, and empty strings migrate to `ppocr_v5_mobile`.
 - The Runner must work offline and bundle `rec.onnx`, `dict.txt`, and `model.json`.
-- The ONNX model must be converted from the official `PP-OCRv5_mobile_rec` Paddle inference model; LunaTranslator files are reference only.
+- The graph must come from PaddlePaddle's official `PP-OCRv5_mobile_rec_onnx` release and the dictionary from the matching official Paddle model; LunaTranslator files are reference only.
 - Preserve BGR channel order, resize to height 48, preserve aspect ratio, pad on the right, normalize to `[-1, 1]`, and cap input width at 3200.
 - Runtime dependencies must not contain Paddle, PaddleOCR, PaddleX, Tesseract, or EasyOCR.
 - BrownDust2 Runner must be no larger than 250 MiB excluding `requirements/`.
@@ -58,16 +58,9 @@ Run:
 .\.venv\Scripts\python.exe -m pip install "onnxruntime==1.23.2" "onnx==1.17.0"
 ```
 
-Use an isolated conversion venv under `build/onnx-converter` with the Paddle nightly required by the official Windows conversion documentation. Do not add Paddle or Paddle2ONNX to `requirements.txt`.
-
-```powershell
-py -3.10 -m venv build\onnx-converter
-.\build\onnx-converter\Scripts\python.exe -m pip install --upgrade pip
-.\build\onnx-converter\Scripts\python.exe -m pip install --pre paddlepaddle -i https://www.paddlepaddle.org.cn/packages/nightly/cpu/
-.\build\onnx-converter\Scripts\python.exe -m pip install paddleocr paddlex
-.\build\onnx-converter\Scripts\paddlex.exe --install paddle2onnx
-.\build\onnx-converter\Scripts\paddlex.exe --paddle2onnx --paddle_model_dir "$env:USERPROFILE\.paddlex\official_models\PP-OCRv5_mobile_rec" --onnx_model_dir build\ppocrv5-mobile-onnx --opset_version 11
-```
+Download `inference.onnx` from PaddlePaddle's official
+`PP-OCRv5_mobile_rec_onnx` repository. Do not add Paddle or Paddle2ONNX to
+`requirements.txt`.
 
 - [ ] **Step 2: Write the failing asset-contract test**
 
@@ -114,12 +107,12 @@ manifest = {
 }
 ```
 
-Convert with the official PaddleX Paddle2ONNX command at opset 11, then call the exporter with the official cache and converted graph paths. The exporter must reject a source model name other than `PP-OCRv5_mobile_rec` and any dictionary count other than 18,383.
+Call the exporter with the matching official Paddle cache and official ONNX graph. The exporter must reject a source model name other than `PP-OCRv5_mobile_rec`, any dictionary count other than 18,383, and a graph whose output is not 18,385 classes.
 
 ```powershell
 .\.venv\Scripts\python.exe tools\export_ppocrv5_mobile_onnx.py `
   --source "$env:USERPROFILE\.paddlex\official_models\PP-OCRv5_mobile_rec" `
-  --model build\ppocrv5-mobile-onnx\model.onnx `
+  --model build\PP-OCRv5_mobile_rec_official.onnx `
   --output assets\ocr\ppocr_v5_mobile
 ```
 
@@ -311,7 +304,7 @@ git commit -m "build: package lightweight ONNX OCR runtime"
 
 - [ ] **Step 1: Update documentation**
 
-Document that PP-OCRv5 Mobile recognition is offline and recognition-only, ONNX Runtime is the only OCR runtime dependency, model selectors remain registry-driven, and `tools/export_ppocrv5_mobile_onnx.py` is only for regenerating assets from the official Paddle cache.
+Document that PP-OCRv5 Mobile recognition is offline and recognition-only, ONNX Runtime is the only OCR runtime dependency, model selectors remain registry-driven, and `tools/export_ppocrv5_mobile_onnx.py` regenerates the manifest/dictionary around PaddlePaddle's official ONNX graph.
 
 - [ ] **Step 2: Run the complete regression suite**
 
