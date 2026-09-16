@@ -1,5 +1,5 @@
 import sys
-import types
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -85,55 +85,42 @@ class OCRONNXIntegrationTests(unittest.TestCase):
         self.assertEqual(recognizer.read(crop), "SCORE 42")
 
 
-class _Result:
-    json = {"res": {"rec_text": "Score 42!", "rec_score": 0.98}}
-
-
-class _TextRecognition:
-    init_kwargs = None
-    last_input = None
-
-    def __init__(self, **kwargs):
-        type(self).init_kwargs = kwargs
-
-    def predict(self, *, input, batch_size=1):
-        type(self).last_input = input.copy()
-        return [_Result()]
-
-
 class OCRModelTests(unittest.TestCase):
-    def setUp(self):
-        _TextRecognition.init_kwargs = None
-        _TextRecognition.last_input = None
-        self.paddleocr = types.SimpleNamespace(TextRecognition=_TextRecognition)
-
-    def test_default_reader_uses_ppocr_v5_mobile_recognition_only(self):
-        with patch.dict(sys.modules, {"paddleocr": self.paddleocr}):
+    def test_default_reader_recognizes_without_paddleocr_installed(self):
+        crop = cv2.imread(str(ROOT / "tests" / "fixtures" / "ocr" / "score_42.png"))
+        with patch.dict(sys.modules, {"paddleocr": None}):
             reader = OCRReader()
-            screen = np.zeros((24, 48, 3), dtype=np.uint8)
-            text = reader.read_text(
-                screen, region=(7, 5, 20, 10), whitelist="Score 42"
-            )
+            text = reader.read_text(crop)
 
         self.assertEqual(KNOWN_BACKENDS, ("ppocr_v5_mobile",))
         self.assertEqual(reader.backend_name, "ppocr_v5_mobile")
-        self.assertEqual(
-            _TextRecognition.init_kwargs,
-            {
-                "model_name": "PP-OCRv5_mobile_rec",
-                "device": "cpu",
-                "enable_mkldnn": False,
-            },
-        )
-        self.assertEqual(_TextRecognition.last_input.shape, (10, 20, 3))
-        self.assertEqual(text, "Score 42")
+        self.assertEqual(text, "SCORE 42")
+
+    def test_whitelist_is_applied_after_onnx_decoding(self):
+        crop = cv2.imread(str(ROOT / "tests" / "fixtures" / "ocr" / "score_42.png"))
+        reader = OCRReader()
+        self.assertEqual(reader.read_text(crop, whitelist="0123456789"), "42")
 
     def test_legacy_backend_names_migrate_to_the_only_registered_model(self):
-        with patch.dict(sys.modules, {"paddleocr": self.paddleocr}):
-            for old_name in ("tesseract", "easyocr", "paddleocr", ""):
-                with self.subTest(old_name=old_name):
-                    reader = OCRReader(backend=old_name)
-                    self.assertEqual(reader.backend_name, "ppocr_v5_mobile")
+        for old_name in ("tesseract", "easyocr", "paddleocr", "auto", ""):
+            with self.subTest(old_name=old_name):
+                reader = OCRReader(backend=old_name)
+                self.assertEqual(reader.backend_name, "ppocr_v5_mobile")
+
+    def test_unknown_future_model_does_not_fall_back(self):
+        reader = OCRReader(backend="ppocr_v6_future")
+        self.assertFalse(reader.available)
+        self.assertEqual(reader.backend_name, "none")
+
+    def test_missing_bundled_asset_is_safe(self):
+        with tempfile.TemporaryDirectory() as empty, patch(
+            "src.core.adb.auto.ppocr_onnx.bundle_dir", return_value=empty
+        ):
+            reader = OCRReader()
+        self.assertFalse(reader.available)
+        self.assertEqual(
+            reader.read_text(np.zeros((24, 48, 3), dtype=np.uint8)), ""
+        )
 
 
 if __name__ == "__main__":
