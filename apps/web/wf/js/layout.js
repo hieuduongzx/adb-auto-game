@@ -2,7 +2,8 @@
 // Each rearranges every node in the current graph into a tidy arrangement, then
 // fits the result to view. Notes are excluded (they float free). Nodes keep their
 // x/y in world coords; stacks/groups are not touched (members follow their head).
-const WF_LAY_NODE_W=172, WF_LAY_NODE_H=70, WF_LAY_GAP_X=40, WF_LAY_GAP_Y=34;
+const WF_LAY_NODE_W=WF_GEOMETRY.width, WF_LAY_NODE_H=WF_GEOMETRY.height,
+  WF_LAY_GAP_X=36, WF_LAY_GAP_Y=28, WF_LAY_COMPACT_GAP=20;
 // Approximate node height: real DOM height when available, else the default.
 function wfNodeH(n){
   const el=wfNodeElById(n.id); return el?el.offsetHeight:WF_LAY_NODE_H;
@@ -151,9 +152,9 @@ function wfLayoutTree(g){
   }
   let left=40;
   const roots=layers.flat().filter(id=>!claimed.has(id));
-  roots.forEach(id=>{ place(id,left); left+=widthOf(id)+WF_LAY_GAP_X*2; });
+  roots.forEach(id=>{ place(id,left); left+=widthOf(id)+WF_LAY_GAP_X; });
   // Defensive fallback for malformed cyclic graphs whose forced seed was claimed.
-  layers.flat().forEach(id=>{ if(!placed.has(id)){ place(id,left); left+=widthOf(id)+WF_LAY_GAP_X*2; } });
+  layers.flat().forEach(id=>{ if(!placed.has(id)){ place(id,left); left+=widthOf(id)+WF_LAY_GAP_X; } });
 }
 // Layout: compact — vertical columns but with tight gaps and nodes packed by
 // topo order into a near-square grid (good for many small blocks).
@@ -167,8 +168,8 @@ function wfLayoutCompact(g){
       n.x=wfSnap(x); n.y=wfSnap(y);
       const h=wfNodeH(n); if(h>rowMaxH) rowMaxH=h;
       col++;
-      if(col>=cols){ col=0; x=40; y+=rowMaxH+28; rowMaxH=0; }
-      else x+=WF_LAY_NODE_W+28;
+      if(col>=cols){ col=0; x=40; y+=rowMaxH+WF_LAY_COMPACT_GAP; rowMaxH=0; }
+      else x+=wfNodeW(n)+WF_LAY_COMPACT_GAP;
     });
   });
 }
@@ -249,10 +250,12 @@ function wfToggleLayoutMenu(e){
   if(e) e.stopPropagation();
   const bar=document.getElementById("wf-layout-bar");
   if(bar) bar.classList.toggle("open");
+  document.getElementById("wf-layout-toggle")?.setAttribute("aria-expanded",String(!!bar?.classList.contains("open")));
 }
 function wfCloseLayoutMenu(){
   const bar=document.getElementById("wf-layout-bar");
   if(bar) bar.classList.remove("open");
+  document.getElementById("wf-layout-toggle")?.setAttribute("aria-expanded","false");
 }
 // Layout: zigzag — vertical columns that alternate left/right per layer, so a
 // long sequential flow reads as a boustrophedon (snake) instead of one tall tower.
@@ -268,9 +271,9 @@ function wfLayoutZigzag(g){
       const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
       n.x=wfSnap(x); n.y=wfSnap(y);
       const h=wfNodeH(n); if(h>rowMaxH) rowMaxH=h;
-      x+=wfNodeW(n)+20;
+      x+=wfNodeW(n)+WF_LAY_COMPACT_GAP;
     });
-    y+=rowMaxH+28;
+    y+=rowMaxH+WF_LAY_COMPACT_GAP;
   });
 }
 // Layout: radial — start node at the centre, each topo layer on a ring whose
@@ -278,20 +281,28 @@ function wfLayoutZigzag(g){
 function wfLayoutRadial(g){
   const layers=wfTopoLayers(g);
   const cx=400, cy=350;
-  const ringGap=210;
+  let previousRadius=0;
   layers.forEach((layer,depth)=>{
     if(!depth){ // centre
-      layer.forEach(id=>{ const n=g.nodes.find(n=>n.id===id); if(n&&n.type!=="note"){ n.x=wfSnap(cx-wfNodeW(n)/2); n.y=wfSnap(cy-20); } });
+      layer.forEach(id=>{ const n=g.nodes.find(n=>n.id===id); if(n&&n.type!=="note"){ n.x=wfSnap(cx-wfNodeW(n)/2); n.y=wfSnap(cy-wfNodeH(n)/2); } });
       return;
     }
-    const r=depth*ringGap;
     const step=layer.length;
+    const maxW=Math.max(WF_LAY_NODE_W,...layer.map(id=>wfNodeW(g.nodes.find(n=>n.id===id))));
+    // Sparse rings stay close; busy rings grow only as much as their
+    // circumference needs to keep adjacent cards from touching.
+    const busyRadius=step*(maxW+WF_LAY_COMPACT_GAP)/(Math.PI*2);
+    const r=Math.max(depth*90,busyRadius,previousRadius+90);
+    previousRadius=r;
+    // Rotate each ring by the golden angle. A deep workflow with one node per
+    // layer becomes a compact spiral instead of one very tall vertical ray.
+    const phase=-Math.PI/2+(depth-1)*2.399963229728653;
     layer.forEach((id,i)=>{
       const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
       // spread the ring evenly; offset so depth-1 starts at top.
-      const ang=(i/Math.max(1,step))*Math.PI*2 - Math.PI/2;
+      const ang=(i/Math.max(1,step))*Math.PI*2+phase;
       n.x=wfSnap(cx + Math.cos(ang)*r - wfNodeW(n)/2);
-      n.y=wfSnap(cy + Math.sin(ang)*r - 15);
+      n.y=wfSnap(cy + Math.sin(ang)*r - wfNodeH(n)/2);
     });
   });
 }
@@ -324,6 +335,8 @@ function wfDefaults(type){
     if(f.k && f.k.startsWith("_")) return;  // UI-only field (e.g. "_region" group)
     if(f.t==="tpls"){ p[f.k]= Array.isArray(f.d)?f.d.slice():[]; return; }  // fresh array per node
     if(f.t==="points"){ p[f.k]=Array.isArray(f.d)?f.d.map(pt=>({...pt})):[]; return; }
+    if(f.t==="sequence_points"){ p[f.k]=Array.isArray(f.d)?f.d.map(pt=>({...pt})):[]; return; }
+    if(f.t==="sequence_images"){ p[f.k]=Array.isArray(f.d)?f.d.map(item=>({...item})):[]; return; }
     p[f.k]= f.d!==undefined?f.d : (f.t==="num"?0 : f.t==="bool"?false : "");
   });
   if(type==="switch") p.cases=[];   // multi-branch starts with no cases

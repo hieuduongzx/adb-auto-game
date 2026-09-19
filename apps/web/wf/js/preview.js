@@ -301,7 +301,8 @@ function wfPvCanvasPos(e){ const r=wfPvCanvas.getBoundingClientRect(); return [e
 // touch the device. Shapes use image coordinates and are clipped at draw time.
 const WF_PV_IMAGE_TYPES=new Set([
   "tap_image","wait_image","if_image","scroll_find","loop_until_image",
-  "find_image_pos","tap_all_images","tap_image_any","wait_image_any","if_image_any"
+  "find_image_pos","tap_all_images","tap_image_any","wait_image_any","if_image_any",
+  "sequence_tap_image"
 ]);
 const WF_PV_POINT_TYPES=new Set([
   "tap","double_tap","long_press","wait_color","if_color","read_color",
@@ -325,7 +326,9 @@ function wfPvNodeLabel(node){ const d=WF_NODES[node.type]||{}; return d.label||n
 function wfPvCanPreviewNode(node){
   if(!node) return false;
   const p=node.params||{}, t=node.type;
-  if(WF_PV_IMAGE_TYPES.has(t)) return !!(p.template||(Array.isArray(p.templates)&&p.templates.some(Boolean))||wfPvRegionOf(p));
+  if(WF_PV_IMAGE_TYPES.has(t)) return t==="sequence_tap_image"
+    ? Array.isArray(p.images)&&p.images.some(item=>item&&item.template)
+    : !!(p.template||(Array.isArray(p.templates)&&p.templates.some(Boolean))||wfPvRegionOf(p));
   if(WF_PV_POINT_TYPES.has(t)) return p.target!=="found";
   if(WF_PV_REGION_TYPES.has(t)) return t!=="parse_var" || p.source!=="var";
   if(t==="tap_random"||t==="swipe"||t==="multi_tap"||t==="swipe_dir"||t==="tap_color"||t==="wait_stable") return true;
@@ -342,7 +345,7 @@ function wfPvShapesForNode(node){
   const arrow=(x1,y1,x2,y2,text=label)=>out.push({kind:"arrow",x1:wfPvNum(x1),y1:wfPvNum(y1),x2:wfPvNum(x2),y2:wfPvNum(y2),label:text,color:"node"});
   const search=wfPvRegionOf(p); if(search) rect(...search,"Search region","info",true);
 
-  if(WF_PV_IMAGE_TYPES.has(t)){
+  if(WF_PV_IMAGE_TYPES.has(t) && t!=="sequence_tap_image"){
     const paths=(Array.isArray(p.templates)?p.templates:[p.template]).filter(Boolean);
     paths.forEach((path,i)=>{ const r=wfPvTplRegion(path); if(r) rect(...r,paths.length>1?`Template ${i+1}`:"Template crop","ok"); });
     return out;
@@ -359,14 +362,24 @@ function wfPvShapesForNode(node){
     else rect(p.x,p.y,p.w,p.h,"Random tap area","node");
     return out;
   }
-  if(t==="swipe"){ arrow(p.x1,p.y1,p.x2,p.y2,`${label} · ${wfPvNum(p.duration,300)}ms`); return out; }
-  if(t==="swipe_dir"){
+  if(t==="swipe"&&p.mode!=="direction"){ arrow(p.x1,p.y1,p.x2,p.y2,`${label} · ${wfPvNum(p.duration,300)}ms`); return out; }
+  if(t==="swipe_dir"||(t==="swipe"&&p.mode==="direction")){
     const W=wfPvImgW||1080,H=wfPvImgH||1920,cx=W/2,cy=H/2,d=wfPvNum(p.distance,400); let x2=cx,y2=cy;
     if(p.direction==="down")y2+=d; else if(p.direction==="left")x2-=d; else if(p.direction==="right")x2+=d; else y2-=d;
     arrow(cx,cy,x2,y2,`${label} · ${p.direction||"up"}`); return out;
   }
   if(t==="multi_tap"){
     (Array.isArray(p.points)?p.points:[]).forEach((q,i)=>point(q.x,q.y,`Tap ${i+1}`,"node",8)); return out;
+  }
+  if(t==="sequence_tap"){
+    (Array.isArray(p.points)?p.points:[]).forEach((q,i)=>point(q.x,q.y,`Tap ${i+1}`,"node",8)); return out;
+  }
+  if(t==="sequence_tap_image"){
+    (Array.isArray(p.images)?p.images:[]).forEach((item,i)=>{
+      const r=wfPvTplRegion(item&&item.template);
+      if(r) rect(...r,`Image ${i+1}`,"ok");
+    });
+    return out;
   }
   if(t==="tap_color"){
     if(!search) rect(0,0,wfPvImgW,wfPvImgH,`${label} · whole screen`,"node",true); return out;

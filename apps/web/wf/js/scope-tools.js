@@ -5,6 +5,11 @@
 
 function pvCopyText(text, btn){
   navigator.clipboard.writeText(text);
+  const m=String(text||"").match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if(m && typeof wfPvPoint!="undefined"){
+    wfPvPoint=[Number(m[1]),Number(m[2])];
+    window.wfCopiedPoint=wfPvPoint.slice();
+  }
   if(btn){ btn.classList.add("flash"); setTimeout(()=>btn.classList.remove("flash"),700); }
 }
 function pvCopyEl(id, btn){ pvCopyText($(id).value, btn); }
@@ -189,7 +194,7 @@ function pvClearSwipePreview(){
 async function pvOcrBackendChange(name){
   const r=await api().set_ocr_backend(name);
   const el=$("pv-ocr-engine");
-  el.textContent=r.engine+(r.available?" · ready":" · unavailable");
+  el.textContent=(r.label||wfOcrModelLabel(r.engine))+(r.available?" · ready":" · unavailable");
   el.className=r.available?"":"unavailable";
 }
 async function pvReadText(){ $("pv-ocr-result").value=await api().read_text($("pv-ocr-wl").value); }
@@ -239,10 +244,10 @@ function pvUpdateOutDir(p){
 // ── Populate OCR backend dropdown from get_state ───────────────────────────
 async function pvInitOcrBackends(){
   const sel=$("pv-ocr-backend"); if(!sel) return;
-  let backs=[];
-  try{ const st=await api().get_state(); backs=st.ocrBackends||[]; }catch{}
-  if(!backs.length) backs=["tesseract","easyocr","paddleocr"];
+  let models=[];
+  try{ const st=await api().get_state(); models=st.ocrModels||st.ocrBackends||[]; }catch{}
+  if(!models.length) models=WF_OCR_MODELS;
   sel.innerHTML="";
-  backs.forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b; sel.appendChild(o); });
+  models.forEach(model=>{ const id=typeof model==="string"?model:model.id; const o=document.createElement("option"); o.value=id; o.textContent=(typeof model==="string"?wfOcrModelLabel(id):model.label)||id; sel.appendChild(o); });
   if(sel.options.length){ await pvOcrBackendChange(sel.value); }
 }

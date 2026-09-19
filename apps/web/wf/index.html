@@ -41,7 +41,7 @@
     </div>
     <!-- Project identity: gear + name as one tray. -->
     <div class="wf-title-tray" title="Project — click the gear for package / ADB / OCR settings">
-      <button type="button" class="btn sm ico" id="wf-proj-settings" onclick="wfOpenProjectSettings()" title="Project settings — package, ADB/Win32, OCR…" aria-label="Project settings">
+      <button type="button" class="btn sm ico" id="wf-proj-settings" onclick="wfOpenProjectSettings()" title="Project settings — package, ADB/Win32, OCR model…" aria-label="Project settings">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
       <input id="wf-name" type="text" placeholder="Workflow name" value="My Workflow" aria-label="Workflow name">
@@ -199,6 +199,7 @@
     <div id="wf-canvas">
       <!-- Soft watermark: name of the open activity/function (top-left of the graph). -->
       <div class="wf-cur-act" id="wf-cur-act" data-empty="1" title="Currently open activity / function" aria-live="polite"></div>
+      <div id="wf-graph-stats" class="wf-graph-stats" aria-live="polite"></div>
       <div id="wf-world">
         <svg id="wf-wires"></svg>
       </div>
@@ -294,13 +295,15 @@
           <button type="button" id="wf-zoom-lbl" onclick="wfZoomReset()" title="Reset zoom to 100%">100%</button>
           <button class="btn sm ico" id="wf-zoom-in" onclick="wfZoomBy(1.1)" title="Zoom in">
             <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
-          <button class="btn sm ico" id="wf-zoom-fit" onclick="wfFit()" title="Fit view — show all blocks (F)"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+          <button class="btn sm ico" id="wf-zoom-fit" onclick="wfFit()" title="Fit view — show all blocks (F)" aria-label="Fit all nodes"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+          <button class="btn sm ico" id="wf-fit-selection" onclick="wfFitSelection()" title="Fit selected nodes (Shift+F)" aria-label="Fit selected nodes" disabled><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></button>
         </div>
       </div>
       <!-- Auto-layout — one button that opens a menu of layout strategies. -->
       <div id="wf-layout-bar" class="wf-layout-bar">
-        <button class="wf-layout-toggle" id="wf-layout-toggle" onclick="wfToggleLayoutMenu(event)" title="Arrange blocks">
+        <button class="wf-layout-toggle" id="wf-layout-toggle" onclick="wfToggleLayoutMenu(event)" title="Arrange blocks — Ctrl+Z to undo" aria-expanded="false" aria-controls="wf-layout-menu">
           <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
+          <span>Arrange</span>
         </button>
         <div class="wf-layout-menu" id="wf-layout-menu">
           <button class="wf-layout-item" data-layout="vertical"><span class="ico"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></span><span class="lbl"><b>Vertical</b><i>top-down flow</i></span></button>
@@ -514,7 +517,7 @@
             <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
           <div class="grp-body">
             <div class="row"><span class="lbl">Engine</span>
-              <select id="pv-ocr-backend" onchange="pvOcrBackendChange(this.value)" style="flex:1;min-width:0;" aria-label="OCR engine"></select></div>
+              <select id="pv-ocr-backend" onchange="pvOcrBackendChange(this.value)" style="flex:1;min-width:0;" aria-label="OCR model"></select></div>
             <div class="row">
               <input id="pv-ocr-result" type="text" readonly placeholder="(not read)" style="flex:1;background:var(--surface);font-size:13px;" aria-label="OCR result">
               <button class="icon-btn" onclick="pvCopyEl('pv-ocr-result', this)" title="Copy result">

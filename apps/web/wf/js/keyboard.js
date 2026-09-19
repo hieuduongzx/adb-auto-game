@@ -1,6 +1,7 @@
 // ── Keyboard (workflow shortcuts) ─────────────────────────────────────────────
+let wfNudging=false;
 window.addEventListener("keydown", e => {
-  const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  const typing = e.target && (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable);
   // F1 (or ? outside an input) — shortcuts sheet.
   if(e.key==="F1" || (e.key==="?" && !typing)){ e.preventDefault(); if(typeof uiShowShortcuts==="function") uiShowShortcuts(); return; }
   if((e.key==="s"||e.key==="S") && (e.ctrlKey||e.metaKey)){
@@ -25,6 +26,10 @@ window.addEventListener("keydown", e => {
   if(((e.key==="z"||e.key==="Z") && (e.ctrlKey||e.metaKey) && e.shiftKey) || ((e.key==="y"||e.key==="Y") && (e.ctrlKey||e.metaKey))){ e.preventDefault(); wfRedo(); return; }
 
   if(typing) return;   // below here: canvas shortcuts only (let inputs keep native Ctrl+C/V)
+  if(e.defaultPrevented) return;
+  // Preserve native Tab/Space/arrow behavior in controls and resizers.
+  if(e.target?.closest?.('button,[role="separator"],[role="tab"],[role="button"]') &&
+    ["Tab"," ","ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) return;
   // Tab — toggle Canvas ↔ Preview (skipped while typing in an input).
   if(e.key==="Tab"){ e.preventDefault(); wfSwitchView(wfToggleView()); return; }
   // Ctrl+= / Ctrl+- / Ctrl+0 — zoom whichever view is active (graph or mirror).
@@ -41,12 +46,13 @@ window.addEventListener("keydown", e => {
   if(e.key===" "){ wfSpace=true; }
   if(e.key==="Delete"||e.key==="Backspace"){ if(WF.sel.length){ e.preventDefault(); wfDeleteSelected(); return; } }
   if((e.key==="a"||e.key==="A") && (e.ctrlKey||e.metaKey)){ const g=wfGraph(); if(g){ e.preventDefault(); WF.sel=g.nodes.map(n=>n.id); WF.selectedNode=null; wfMarkSel(); wfRenderInspector(); return; } }
-  if((e.key==="f"||e.key==="F") && !e.ctrlKey && !e.metaKey){ e.preventDefault(); wfFit(); return; }
+  if((e.key==="f"||e.key==="F") && !e.ctrlKey && !e.metaKey){ e.preventDefault(); if(e.shiftKey) wfFitSelection(); else wfFit(); return; }
   if(e.key==="Escape"){ if(typeof wfRunning!=="undefined"&&wfRunning){ e.preventDefault(); wfToggleRun(); return; }
     const vald=document.getElementById("wf-vald"); if(vald){ vald.remove(); return; }
     if(wfGroupMode) wfSetGroupMode(false); wfClearSel(); wfMarkSel(); wfRenderInspector(); }
   if(e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown"){
     if(WF.sel.length){ e.preventDefault();
+      if(!wfNudging){ wfPushUndo(); wfNudging=true; }
       const dx=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0;
       const dy=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0;
       const step=e.shiftKey?10:1;
@@ -56,6 +62,6 @@ window.addEventListener("keydown", e => {
   }
 });
 window.addEventListener("keyup", e => { if(e.key===" ") wfSpace=false;
-  // Push undo on arrow-key nudge release (batch all nudging into one undo step).
-  if(e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown"){ if(WF.sel.length && typeof wfPushUndo==="function") wfPushUndo(); }
+  if(e.key.startsWith("Arrow")) wfNudging=false;
 });
+window.addEventListener("blur",()=>{ wfNudging=false; wfSpace=false; });

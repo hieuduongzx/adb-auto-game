@@ -30,9 +30,25 @@ def _force_utf8_streams() -> None:
     non-Latin diacritics (e.g. Vietnamese ``ắ``) never raise
     ``UnicodeEncodeError`` under the Windows console/frozen-exe default codec
     (cp1252 / 'charmap'). ``errors='replace'`` guarantees a write can never
-    crash. Streams may be ``None`` in a windowed (no-console) build."""
-    for _stream in (sys.stdout, sys.stderr):
+    crash.
+
+    A windowed (no-console) frozen build starts with ``sys.stdout``/``stderr``
+    set to ``None``. PyWebView's ``webview.http`` module *fills those in* with
+    ``open(os.devnull, 'w')`` as soon as it is imported — a stream that encodes
+    with the machine's **ANSI code page** (cp1252 on most PCs, UTF-8 only where
+    the "Beta: Use Unicode UTF-8" setting is on). Every log line a workflow
+    prints in Vietnamese then dies with a 'charmap' error, which is invisible on
+    a UTF-8 developer machine and breaks on everyone else's. Installing our own
+    UTF-8 sink for the ``None`` case — before PyWebView is imported — both stops
+    that substitution and keeps ``print`` a harmless no-op."""
+    for _name in ("stdout", "stderr"):
+        _stream = getattr(sys, _name, None)
         if _stream is None:
+            try:
+                setattr(sys, _name, open(os.devnull, "w", encoding="utf-8",
+                                         errors="replace"))
+            except Exception:
+                pass
             continue
         try:
             _stream.reconfigure(encoding="utf-8", errors="replace")
@@ -286,7 +302,7 @@ def log_normal(message: str) -> None:
 # These let the same code run from source (``python apps/...``) and from a
 # PyInstaller one-dir build. In a frozen build:
 #   * ``app_dir()``    -> the folder that contains the .exe (where the shipped,
-#                         read-only ``vendor/`` lives — adb/frida/tesseract);
+#                         read-only ``vendor/`` lives — adb/frida);
 #   * ``data_root()``  -> writable user data (``workflows/``, ``data/``, ``out/``,
 #                         ``logs/``). Same as app_dir() for a
 #                         plain/portable build, but redirected OUT of the install
@@ -302,7 +318,7 @@ _SOURCE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 
 
 # Windows flag that prevents a child console process (adb.exe, frida-inject,
-# tesseract, …) from popping up its own black console window. Essential for the
+# command-line helpers from popping up their own black console window. Essential for the
 # windowed/frozen build, where the host has no console for children to attach to
 # — without it each subprocess call flashes a console window. 0 elsewhere.
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -377,6 +393,104 @@ def bundle_dir() -> str:
     if is_frozen():
         return getattr(sys, "_MEIPASS", app_dir())
     return _SOURCE_ROOT
+
+
+# ---------------------------------------------------------------------------
+# Mark-of-the-Web
+#
+# A released build is normally *downloaded* (GitHub Releases zip), and Windows
+# stamps a ``Zone.Identifier`` stream onto every file Explorer extracts from
+# it. The .NET Framework then refuses to load the assemblies inside — so
+# Python.NET, pywebview's Windows backend, dies at startup with
+#
+#     RuntimeError: Failed to resolve Python.Runtime.Loader.Initialize
+#                   from ...\_internal\pythonnet\runtime\Python.Runtime.dll
+#
+# on every machine except the one that built it (its copies were never
+# downloaded, so they carry no mark). Deleting the stream is exactly what the
+# file's *Unblock* checkbox does, and it has to happen before the first .NET
+# assembly is loaded — hence the call at the top of each frozen entry point.
+# ---------------------------------------------------------------------------
+
+# ERROR_ACCESS_DENIED — a file we were allowed to see but not to modify (an
+# all-users ``C:/Program Files`` install without elevation).
+_ERROR_ACCESS_DENIED = 5
+
+
+def _frozen_bundle_roots() -> List[str]:
+    """Folders holding a frozen build's own files: the install folder (the exe,
+    ``vendor/``, ``requirements/`` …) and — when PyInstaller extracted the
+    bundle somewhere else, as a onefile build does into ``%TEMP%`` — its
+    ``_MEIPASS`` folder too."""
+    if not is_frozen():
+        return []
+    roots: List[str] = []
+    install = app_dir()
+    if os.path.isdir(install):
+        roots.append(install)
+    meipass = getattr(sys, "_MEIPASS", "")
+    if meipass and os.path.isdir(meipass):
+        inside_install = os.path.abspath(meipass).startswith(
+            os.path.abspath(install) + os.sep)
+        if not inside_install:   # onedir: _MEIPASS *is* <install>/_internal
+            roots.append(meipass)
+    return roots
+
+
+def unblock_bundled_files(roots: Optional[Sequence[str]] = None) -> int:
+    """Clear the Mark-of-the-Web from a downloaded build's own files.
+
+    Windows tags files extracted from an internet-downloaded archive with a
+    ``Zone.Identifier`` stream, and the .NET Framework will not load the .NET
+    assemblies among them — which is how a released Runner ends up with
+    ``Failed to resolve Python.Runtime.Loader.Initialize`` on every machine but
+    the developer's. Removing the stream is what *Properties → Unblock* does,
+    and it must happen before the first assembly is loaded, so the frozen entry
+    points call this before ``webview.start()`` (:mod:`packaging.entry_designer`,
+    :mod:`packaging.entry_runner_single`, :mod:`packaging.entry_devscope`).
+
+    ``roots`` defaults to the frozen bundle's own folders; a source run, another
+    platform, or no bundles at all is a no-op. Never raises — an install we
+    can't write to just keeps its marks, and is reported. Returns the number of
+    files unblocked.
+    """
+    if roots is None:
+        roots = _frozen_bundle_roots()
+    if sys.platform != "win32" or not roots:
+        return 0
+
+    import ctypes
+
+    try:
+        delete_file = ctypes.WinDLL("kernel32", use_last_error=True).DeleteFileW
+    except Exception:
+        return 0
+    delete_file.argtypes = (ctypes.c_wchar_p,)
+    delete_file.restype = ctypes.c_int
+
+    cleared = 0
+    denied = 0
+    for root in roots:
+        for dirpath, _dirnames, filenames in os.walk(root):
+            for name in filenames:
+                # DeleteFileW takes the "file:stream" syntax and fails with
+                # ERROR_FILE_NOT_FOUND for the usual, unmarked file — so this
+                # is one cheap syscall per file, no prior existence check.
+                if delete_file(os.path.join(dirpath, name) + ":Zone.Identifier"):
+                    cleared += 1
+                elif ctypes.get_last_error() == _ERROR_ACCESS_DENIED:
+                    denied += 1
+
+    if cleared:
+        log_info(f"Unblocked {cleared} file(s) downloaded from the internet.")
+    if denied:
+        log_warning(
+            f"{denied} file(s) are still blocked by Windows (they came from a "
+            f"downloaded .zip) and the app folder is not writable. Right-click "
+            f"the app's folder → Properties → Unblock, or re-extract the .zip "
+            f"with 7-Zip."
+        )
+    return cleared
 
 
 def file_url(path: str) -> str:
@@ -560,6 +674,13 @@ _FROZEN_PREFIX = {
 }
 
 
+def source_python() -> str:
+    """Use this checkout's virtualenv when launching sibling source apps."""
+    parts = ("Scripts", "python.exe") if sys.platform == "win32" else ("bin", "python")
+    project_python = os.path.join(_SOURCE_ROOT, ".venv", *parts)
+    return project_python if os.path.isfile(project_python) else sys.executable
+
+
 def launch_tool(tool: str, extra_args: Optional[Sequence[str]] = None) -> None:
     """Launch a sibling app process, working both frozen and from source.
 
@@ -585,7 +706,7 @@ def launch_tool(tool: str, extra_args: Optional[Sequence[str]] = None) -> None:
         prefix = list(_FROZEN_PREFIX.get(tool, []))
         cmd = [target, *prefix, *args]
     else:
-        cmd = [sys.executable, os.path.join(_SOURCE_ROOT, script_rel), *args]
+        cmd = [source_python(), os.path.join(_SOURCE_ROOT, script_rel), *args]
     subprocess.Popen(cmd)
 
 
@@ -608,6 +729,7 @@ __all__ = [
     "webview_storage_path",
     "push_webview_event",
     "launch_tool",
+    "source_python",
     "setup_logger",
     "set_current_state",
     "log_with_time",

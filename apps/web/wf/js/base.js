@@ -484,6 +484,16 @@ function wfRestoreDelayChip(chip){
   if(!chip) return;
   chip.classList.remove("counting");
   chip.style.removeProperty("--pct");
+  if(chip.classList.contains("wf-node-timeout")){
+    // Corner badge: back to the static limit the block was rendered with.
+    const label=chip.querySelector(".wf-timeout-label");
+    const n=typeof wfNode==="function"?wfNode(chip.closest(".wf-node")?.dataset.node):null;
+    const secs=n?parseFloat(n.params&&n.params.timeout):parseFloat(chip.dataset.secs);
+    const shown=(typeof wfDelaySecs==="function"&&Number.isFinite(secs)&&secs>0)?wfDelaySecs(secs):(chip.dataset.secs?chip.dataset.secs+"s":"⏱");
+    if(label) label.textContent=shown;
+    chip.title="Timeout: "+(Number.isFinite(secs)&&secs>0?wfDelaySecs(secs):"set by expression / default");
+    return;
+  }
   const secs=parseFloat(chip.dataset.secs)||0;
   const phase=chip.dataset.phase;
   const label=chip.querySelector(".wf-delay-label");
@@ -496,6 +506,7 @@ function wfClearNodeDelay(){
   const prev=wfDelayState; wfDelayState=null;
   document.querySelectorAll(".wf-node.delaying").forEach(el=>el.classList.remove("delaying"));
   document.querySelectorAll(".wf-delay-chip.counting").forEach(wfRestoreDelayChip);
+  document.querySelectorAll(".wf-node-timeout.counting").forEach(wfRestoreDelayChip);
   // Floating badge (shown when the node has no static delay row, e.g. stack join).
   document.querySelectorAll(".wf-node-delay-live").forEach(el=>el.remove());
   if(prev){ const el=wfNodeElById(prev.id); if(el) el.querySelectorAll(".wf-delay-chip").forEach(wfRestoreDelayChip); }
@@ -507,6 +518,19 @@ function wfPaintNodeDelay(){
   const el=wfNodeElById(st.id);
   if(!el) return;
   el.classList.add("delaying");
+  if(st.phase==="timeout"){
+    // Countdown against the block's own timeout deadline, painted on the corner
+    // badge. Runs purely off the local clock — the engine's node_result ends it.
+    const chip=el.querySelector(".wf-node-timeout");
+    if(!chip) return;
+    chip.classList.add("counting");
+    chip.style.setProperty("--pct", pct.toFixed(1));
+    const label=chip.querySelector(".wf-timeout-label");
+    const left=wfFmtRemain(remain);
+    if(label) label.textContent=left;
+    chip.title="Timeout — "+left+" left";
+    return;
+  }
   // Prefer the existing static chip for this phase; fall back to a floating badge
   // when the chip row is hidden (stacked join-bottom) or missing.
   let chip=el.querySelector(`.wf-delay-chip[data-phase="${st.phase}"]`);
@@ -545,7 +569,7 @@ function wfPaintNodeDelay(){
 function wfStartNodeDelay(id, phase, seconds){
   wfClearNodeDelay();
   const secs=parseFloat(seconds)||0;
-  if(!id || (phase!=="before" && phase!=="after") || secs<=0) return;
+  if(!id || (phase!=="before" && phase!=="after" && phase!=="timeout") || secs<=0) return;
   wfDelayState={id, phase, endAt:performance.now()+secs*1000, total:secs};
   // Keep the amber "running" look during After wait (node_result already painted
   // green trail) so the operator still sees which block is holding the graph.
@@ -568,6 +592,20 @@ function wfEndNodeDelay(id){
   // Only clear if this end matches the active countdown (ignore stale ends).
   if(wfDelayState && id && wfDelayState.id!==id) return;
   wfClearNodeDelay();
+}
+// Start a countdown against the node's own timeout param. Called when the node
+// goes live (and again when a delayBefore ends, since the engine's timeout
+// clock only starts once the block actually runs). No engine event needed —
+// the deadline is just params.timeout seconds from now. Skipped for {var}
+// expressions, which can't be resolved on the designer side.
+function wfStartNodeTimeout(id){
+  const n=typeof wfNode==="function"?wfNode(id):null;
+  if(!n||!n.params) return;
+  const def=WF_NODES[n.type];
+  if(!def||!(def.fields||[]).some(f=>f.k==="timeout")) return;
+  const secs=parseFloat(n.params.timeout);
+  if(!Number.isFinite(secs)||secs<=0) return;
+  wfStartNodeDelay(id, "timeout", secs);
 }
 
 function appendLog(entry){

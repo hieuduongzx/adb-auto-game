@@ -51,6 +51,14 @@ def _find_bundled_workflow() -> str | None:
 
 
 def main() -> None:
+    # Unblock the bundle first: a Runner downloaded as a .zip carries Windows'
+    # Mark-of-the-Web on its DLLs, and the .NET Framework refuses to load those
+    # (Python.NET then fails with "Failed to resolve Python.Runtime.Loader.
+    # Initialize"). Must run before webview imports clr.
+    from src.utils import unblock_bundled_files
+
+    unblock_bundled_files()
+
     from workflow_runner import run as run_runner
 
     flow = _find_bundled_workflow()

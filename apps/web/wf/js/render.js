@@ -280,7 +280,7 @@ function wfPalPairByType(type){
 function wfPalTypeMatches(type, q){
   if(!q) return true;
   const def=WF_NODES[type]||{};
-  return (def.label+" "+type).toLowerCase().includes(q);
+  return (def.label+" "+type+" "+(def.search||"")).toLowerCase().includes(q);
 }
 // Build a framed pair unit (full-width) so related chips read as one tool.
 function wfPalPairEl(pair, catKey){
@@ -410,8 +410,11 @@ function wfInsertNodeAtViewportCenter(type){
   const g=wfGraph(), canvas=$("wf-canvas"), world=$("wf-world");
   if(!g||!canvas||!world){ uiToast("Open an activity or function before adding a block.","warning"); return; }
   const cr=canvas.getBoundingClientRect(), wr=world.getBoundingClientRect();
-  const x=wfSnap((cr.left+cr.width/2-wr.left)/wfZoom-84);
-  const y=wfSnap((cr.top+cr.height/2-wr.top)/wfZoom-32);
+  // Screen-centre insert: keep the card visually centred, but the half-card
+  // offsets are grid multiples (100=5 cells, 40=2 cells) so the corner still
+  // lands on the grid — 90 (4.5 cells) put it dead centre of a cell.
+  const x=wfSnap((cr.left+cr.width/2-wr.left)/wfZoom-100);
+  const y=wfSnap((cr.top+cr.height/2-wr.top)/wfZoom-40);
   wfPushUndo();
   const node=wfNewNode(type,x,y); g.nodes.push(node);
   wfSelectOne(node.id); wfRenderCanvas(); wfRenderInspector(); wfPopNodes([node.id]);
@@ -434,7 +437,7 @@ function wfRenderCanvas(){
   const world=$("wf-world"), empty=$("wf-canvas-empty"), g=wfGraph();
   [...world.querySelectorAll(".wf-node,.wf-group")].forEach(n=>n.remove());
   wfApplyTransform();
-  if(!g){ empty.style.display="flex"; $("wf-wires").innerHTML=""; return; }
+  if(!g){ empty.style.display="flex"; $("wf-wires").innerHTML=""; wfSyncWireSelection(); return; }
   empty.style.display="none";
   wfRenderGroups();   // frames behind the nodes
   g.nodes.forEach(n=>world.appendChild(wfNodeEl(n)));
@@ -874,10 +877,11 @@ function wfColorDotHtml(n,def){
   return /^#[0-9a-fA-F]{6}$/.test(v) ? `<span class="wf-node-colordot" style="background:${v}"></span>` : "";
 }
 
-// Timing ticks (delayBefore / delayAfter) — a signed duration under the card
-// so a wait never stretches the standardized block. Shared by wfNodeEl and
-// the inspector's live update. data-phase lets the runtime countdown highlight
-// the active wait. Copy is "−1.5s" / "+0.5s" — the sign is the phase.
+// Timing ticks (delayBefore / delayAfter) — ONE pill under the card's bottom
+// edge holding both waits, split by a "|" divider ("−1.5s | +0.5s"), so a wait
+// never stretches the standardized block. Shared by wfNodeEl and the
+// inspector's live update. Each half keeps its data-phase so the runtime
+// countdown can light up just the side that's actually waiting.
 function wfDelaySecs(n){
   const v=parseFloat(n); if(!v) return "0s";
   const s=Number.isInteger(v)?String(v):String(v);
@@ -887,14 +891,29 @@ function wfDelayChipsHtml(n){
   const dp=[];
   if(n.delayBefore) dp.push(`<span class="wf-delay-chip" data-phase="before" data-secs="${n.delayBefore}" title="Wait ${wfDelaySecs(n.delayBefore)} before this block"><span class="wf-delay-label">−${wfDelaySecs(n.delayBefore)}</span></span>`);
   if(n.delayAfter)  dp.push(`<span class="wf-delay-chip" data-phase="after" data-secs="${n.delayAfter}" title="Wait ${wfDelaySecs(n.delayAfter)} after this block"><span class="wf-delay-label">+${wfDelaySecs(n.delayAfter)}</span></span>`);
-  return dp.length ? `<div class="wf-node-delay">${dp.join("")}</div>` : "";
+  return dp.length ? `<div class="wf-node-delay">${dp.join(`<span class="wf-delay-sep">|</span>`)}</div>` : "";
+}
+// Timeout corner badge. A block whose def declares a timeout param gets a small
+// "⏱ Ns" pill at its top-right corner; while the block runs, the same pill
+// counts down against the engine's deadline (see wfStartNodeTimeout in base.js).
+// Numeric literal → show the value; anything else (blank → the field's default,
+// a {var} reference) still marks the block as timeout-bounded.
+function wfTimeoutChipHtml(n){
+  if(!n||!n.params) return "";
+  const def=WF_NODES[n.type];
+  if(!def||!(def.fields||[]).some(f=>f.k==="timeout")) return "";
+  const raw=n.params.timeout;
+  const num=(typeof raw==="number")?raw:parseFloat(raw);
+  const shown=Number.isFinite(num)&&num>0?wfDelaySecs(num):"⏱";
+  return `<span class="wf-node-timeout" data-secs="${Number.isFinite(num)?num:""}" title="Timeout: ${Number.isFinite(num)&&num>0?wfDelaySecs(num):"set by expression / default"}"><span class="wf-timeout-label">${shown}</span></span>`;
 }
 // Card geometry, mirroring css/base.css (--node-h, --term-size, --port-sz).
 // Port rows are computed here rather than in CSS because a block's slot count
 // is dynamic (switch cases, try arms, parallel lanes) — keep the two sides in
 // step when either moves.
-const WF_CARD_H=70, WF_TERM_H=40, WF_NEXT_H=44, WF_PORT_SZ=9, WF_PORT_GAP=18;
-const WF_PORT_INSET=6;   // mirrors --port-inset in css/base.css
+const WF_CARD_H=WF_GEOMETRY.height, WF_TERM_H=WF_GEOMETRY.terminal,
+  WF_NEXT_H=40, WF_PORT_SZ=WF_GEOMETRY.port, WF_PORT_GAP=WF_GEOMETRY.gap;
+const WF_PORT_INSET=WF_GEOMETRY.inset;
 const WF_ROW_TOP=Math.round((WF_CARD_H-WF_PORT_SZ)/2);   // primary in/out row
 // Which colour a link is — the ONE place that decides it, for the dot at each
 // end as much as for the path between them. Returns the tone class wf.css uses
@@ -906,8 +925,17 @@ const WF_ROW_TOP=Math.round((WF_CARD_H-WF_PORT_SZ)/2);   // primary in/out row
 function wfSlotGutter(text){
   return Math.ceil(WF_PORT_INSET + WF_PORT_SZ + 4 + text.length*5.9 + 3);
 }
-function wfWireTone(fromPort, toPort, fromNode){
+function wfWireTone(fromPort, toPort, fromNode, edge){
   if(toPort==="loop") return "loop";
+  // Fan-in: when several links converge on the same input of one block, each
+  // gets its own lane hue (assigned in edge-array order, so it's stable across
+  // redraws) — converging runs read as N coloured arrivals at the shared dot,
+  // not N identical lines. The input dot picks up the same lane via the edge.
+  if(edge){
+    const edges=(wfGraph()&&wfGraph().edges)||[];
+    const ins=edges.filter(e=>e.to===edge.to && (e.toPort||"in")===(edge.toPort||"in"));
+    if(ins.length>1){ const i=ins.indexOf(edge); if(i>=0) return "lane"+((i%6)+1); }
+  }
   if(fromPort==="true") return "t";
   if(fromPort==="false") return "f";
   if(fromPort==="body") return "body";
@@ -942,7 +970,7 @@ function wfNodeEl(n){
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
   // Dynamic output ports — grow the card so they all sit inside it. Multi-port
   // blocks stack ports from the primary row (≈ card centre), 16px apart.
-  // Never shorter than the standard --node-h card (64px).
+  // Never shorter than the standard --node-h card (78px).
   let dynOutCount=0;
   if(n.type==="switch") dynOutCount=((n.params&&n.params.cases)||[]).length+1;
   else if(n.type==="try_chain") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3)+1;
@@ -951,7 +979,9 @@ function wfNodeEl(n){
   else if(n.type==="random_branch") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||2);
   else if(def.kind==="loop_until") dynOutCount=3;   // body/found/fail — grow the card
   if(dynOutCount>2)
-    el.style.minHeight=Math.max(WF_CARD_H, WF_ROW_TOP + (dynOutCount-1)*WF_PORT_GAP + WF_PORT_SZ + 12)+"px";
+    // Grown cards snap to the same 20px grid the base card obeys — a switch
+    // with 5 cases is exactly 6 cells tall, not 6.1.
+    el.style.minHeight=(Math.ceil(Math.max(WF_CARD_H, WF_ROW_TOP + (dynOutCount-1)*WF_PORT_GAP + WF_PORT_SZ + 12)/20)*20)+"px";
   // A call node shows the referenced function's name as its title.
   let title=def.label, sum="";
   if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?fn.name:"(no function selected)";
@@ -972,11 +1002,10 @@ function wfNodeEl(n){
     <button class="wf-act-copy" title="Copy">${copySvg}</button>
   </div>`;
   const noteHtml = n.note ? `<div class="wf-node-note">${wfIco("edit")}<span>${escHtml(n.note)}</span></div>` : "";
-  const logs=[];
-  if(n.log) logs.push(`<div class="wf-node-log wf-node-log-in"><b>IN</b>${escHtml(n.log)}</div>`);
-  if(n.outputLog) logs.push(`<div class="wf-node-log wf-node-log-out"><b>OUT</b>${escHtml(n.outputLog)}</div>`);
-  const logHtml=logs.join("");
+  const logHtml=wfNodeLogEntries(n).map(({key,tag,text})=>
+    `<div class="wf-node-log wf-node-log-${key==="input"?"in":"out"}"><b>${escHtml(tag)}</b>${escHtml(text)}</div>`).join("");
   const delayHtml = wfDelayChipsHtml(n);
+  const timeoutHtml = wfTimeoutChipHtml(n);
   const rp=[];
   if(n.retryCount) rp.push(`${wfIco("loop")}<span>Retry ${n.retryCount}×</span>`);
   if(n.screenshotOnFail) rp.push(`${wfIco("camera")}<span>Screenshot on fail</span>`);
@@ -992,15 +1021,17 @@ function wfNodeEl(n){
   const isTerminal = def.kind==="start"||def.kind==="end";
   const isNextBranch = n.type==="try_next";
   // Color nodes get a live swatch dot in front of the summary text.
-  const sumHtml = sum?`<div class="wf-node-sum">${wfColorDotHtml(n,def)}${escHtml(sum)}</div>`:"";
+  const sumHtml = sum?`<div class="wf-node-sum" title="${escHtml(sum)}">${wfColorDotHtml(n,def)}${escHtml(sum)}</div>`:"";
   const topRow = hasTpl ? `<div class="wf-node-prevrow">${thumbHtml}${sumHtml}</div>` : sumHtml;
   el.classList.toggle("showing-thumb", hasRealThumb);
   el.classList.toggle("has-thumb", hasTpl);
   if(isTerminal){
-    // Start is a play glyph; End is a stop square — both sit in the same disc.
+    // Start / End — a light ring token: panel face, coloured ring, small glyph.
+    // Reads as the graph's entry/exit socket rather than a heavy solid disc.
     const termIco = def.kind==="end"
-      ? '<rect x="7" y="7" width="10" height="10" rx="2"/>'
-      : '<polygon points="9 6 18 12 9 18 9 6"/>';
+      ? '<rect x="8" y="8" width="8" height="8" rx="2"/>'
+      : '<polygon points="10 7.5 16.5 12 10 16.5 10 7.5"/>';
+    el.title=def.label;
     el.innerHTML =
       `<span class="wf-node-tri">`+
         `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none">${termIco}</svg>`+
@@ -1015,19 +1046,14 @@ function wfNodeEl(n){
   } else {
     el.innerHTML=
       actBar+
-      `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span><span class="wf-node-title">${escHtml(title)}</span></div>`+
-      topRow+delayHtml+retryHtml+noteHtml+logHtml;
+      `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span><span class="wf-node-title" title="${escHtml(title)}">${escHtml(title)}</span></div>`+
+      topRow+delayHtml+timeoutHtml+retryHtml+noteHtml+logHtml;
   }
   // Output ports are placed first; input ports mirror the output row of the
   // same index so a block's in/out wires start level. Switch builds its ports
   // from the case list: c0..c{n-1} (one per case, including "else") + the
   // shared "default" fallback port.
-  let outs;
-  if(n.type==="switch") outs=((n.params&&n.params.cases)||[]).map((_,i)=>"c"+i).concat(["default"]);
-  else if(n.type==="try_chain") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1)).concat(["fail"]);
-  else if(n.type==="parallel"||n.type==="random_branch") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||(n.type==="parallel"?3:2))},(_,i)=>String(i+1));
-  else if(n.type==="sequence") outs=Array.from({length:Math.max(1,parseInt(n.params&&n.params.count)||3)},(_,i)=>String(i+1)).concat(["end"]);
-  else outs=(def.outs||[]);
+  const outs=wfNodeOutputPorts(n);
   // Primary port row — single in + first out share this y so chains stay level.
   // Extra ports (true/false, loop-back…) stack one WF_PORT_GAP row below the
   // last, the way a ComfyUI block lists its slots; the card grows to fit them.
@@ -1065,9 +1091,10 @@ function wfNodeEl(n){
       const incoming = g && (g.edges||[]).find(e=>e.to===n.id && (e.toPort||"in")===port);
       const src = incoming && g.nodes.find(x=>x.id===incoming.from);
       const tone = port==="loop" ? "loop"
-                 : incoming ? wfWireTone(incoming.fromPort, port, src) : "";
+                 : incoming ? wfWireTone(incoming.fromPort, port, src, incoming) : "";
       ip.className="wf-port in"+(tone?" "+tone:"")+(incoming?" connected":"");
       ip.dataset.node=n.id; ip.dataset.port=port; ip.style.top=top+"px";
+      ip.title=port==="loop"?"Loop return — drop a wire here":"Input — drop a wire here";
       el.appendChild(ip);
       if(ins.length>1){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl in"+(port==="loop"?" loop":"");
         const txt=WF_IN_LBL[port]||port;
@@ -1082,9 +1109,10 @@ function wfNodeEl(n){
     const outgoing = g && (g.edges||[]).find(e=>e.from===n.id && e.fromPort===port);
     // Unwired branch slots still show their own hue; a wired one follows its link
     // (a back-run into a loop port turns the whole thread amber, both ends).
-    const tone = outgoing ? wfWireTone(port, outgoing.toPort||"in", n) : wfWireTone(port,"in", n);
+    const tone = outgoing ? wfWireTone(port, outgoing.toPort||"in", n, outgoing) : wfWireTone(port,"in", n);
     op.className="wf-port out"+(tone?" "+tone:"")+(outgoing?" connected":"");
     op.dataset.node=n.id; op.dataset.port=port; op.style.top=top+"px";
+    op.title=(WF_PORT_LBL[port]||port)+" — drag to connect; drop on empty canvas to add a node";
     el.appendChild(op);
     let lblTxt;
     if(n.type==="switch") lblTxt = (port==="default") ? "else" : "#"+(i+1);
@@ -1142,6 +1170,10 @@ function wfNodeEl(n){
 // ── Switch-node case edits: keep outgoing wires attached as ports c0.. shift ──
 function wfRemoveSwitchCase(node, idx){
   const g=wfGraph(); if(!g) return;
+  node.outputLogs=Object.fromEntries(Object.entries(wfOutputLogValues(node)).flatMap(([k,v])=>{
+    if(!/^c\d+$/.test(k)) return [[k,v]];
+    const i=Number(k.slice(1)); return i===idx?[]:[["c"+(i>idx?i-1:i),v]];
+  }));
   node.params.cases.splice(idx,1);
   g.edges = g.edges.filter(e=>!(e.from===node.id && e.fromPort==="c"+idx));   // drop the removed case's wire
   g.edges.forEach(e=>{ if(e.from===node.id && /^c\d+$/.test(e.fromPort)){
@@ -1154,6 +1186,8 @@ function wfReorderSwitchCase(node, from, to){
   const ord=[]; for(let i=0;i<n;i++) ord.push(i);
   const [m]=ord.splice(from,1); ord.splice(to,0,m);
   const newIndexOf={}; ord.forEach((oldIdx,newIdx)=>{ newIndexOf[oldIdx]=newIdx; });
+  node.outputLogs=Object.fromEntries(Object.entries(wfOutputLogValues(node)).map(([k,v])=>
+    [/^c\d+$/.test(k)&&newIndexOf[Number(k.slice(1))]!==undefined?"c"+newIndexOf[Number(k.slice(1))]:k,v]));
   const [moved]=cs.splice(from,1); cs.splice(to,0,moved);
   const g=wfGraph(); if(!g) return;
   g.edges.forEach(e=>{ if(e.from===node.id && /^c\d+$/.test(e.fromPort)){

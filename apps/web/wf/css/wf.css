@@ -25,9 +25,9 @@
    label larger than the control it names reads as the louder element. */
 #toolbar .ctl-lbl { font-size:var(--t-caption); }
 #toolbar .ctl-sep { height:20px; margin:0 var(--s2); }
-.tb-left  { flex:1 1 0; justify-content:flex-start; }
+.tb-left  { flex:1 1 auto; justify-content:flex-start; }
 .tb-center{ flex:0 0 auto; }          /* the run cluster is never squeezed */
-.tb-right { flex:1 1 0; justify-content:flex-end; }
+.tb-right { flex:0 1 auto; justify-content:flex-end; }
 .tb-backend-tools { display:flex; align-items:center; gap:var(--s3); min-width:0; }
 
 /* ── Tray: the one container language — tinted track, ghost buttons ──────────
@@ -229,7 +229,7 @@
   #wf-bar-win32-mode { width:150px; }
   .tb-tray-device { flex-basis:230px; }
 }
-@media (max-width: 1380px){
+@media (max-width: 1500px){
   /* capture source remains in Project settings */
   .tb-tray-source, #tb-lbl-source, #tb-adb-tools > .ctl-sep { display:none; }
 }
@@ -279,9 +279,9 @@
 /* Fixed default widths but resizable (the resizer handles live on either side).
    16px inspector gutters + a 92px label column need the extra 8px, and the
    palette rows now run to the panel edge instead of wrapping into two columns. */
-#wf-side { width:280px; flex-shrink:0; display:flex; flex-direction:column;
+#wf-side { width:248px; flex-shrink:0; display:flex; flex-direction:column;
   overflow:hidden; background:var(--panel); border-right:1px solid var(--border2); }
-#wf-inspector { width:320px; flex-shrink:0; display:flex; flex-direction:column;
+#wf-inspector { width:304px; flex-shrink:0; display:flex; flex-direction:column;
   overflow:hidden; background:var(--panel); border-left:1px solid var(--border2); }
 #wf-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
 
@@ -614,11 +614,16 @@
 
 #wf-canvas.panning { cursor:grabbing; }
 /* Soft activity/function name watermark — top-left of the graph canvas. */
-.wf-cur-act { position:absolute; left:22px; top:18px; z-index:4; pointer-events:none;
+.wf-cur-act { position:absolute; left:20px; top:16px; z-index:4; pointer-events:none;
   max-width:min(48%, 380px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   font-size:14.5px; font-weight:650; letter-spacing:0; color:var(--muted);
-  opacity:.72; user-select:none; line-height:1.2;
-  text-shadow:0 1px 0 color-mix(in srgb, var(--panel) 65%, transparent); }
+  user-select:none; line-height:1.2; }
+.wf-graph-stats { position:absolute; top:38px; left:20px; z-index:4;
+  max-width:calc(100% - 40px); font-size:var(--t-micro); color:var(--muted);
+  pointer-events:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#workflow-view.wf-preview-on .wf-graph-stats,
+#workflow-view.wf-library-on .wf-graph-stats { display:none; }
+#workflow-view.wf-preview-on #wf-fit-selection { display:none; }
 .wf-cur-act:empty, .wf-cur-act[data-empty="1"] { display:none; }
 .wf-cur-act.is-fn { opacity:.48; font-family:var(--mono); }
 /* While a FUNCTION is open, the watermark breadcrumb becomes a back button —
@@ -634,12 +639,17 @@
    click without thickening the visible line. The visible wire is click-through. */
 #wf-wires .wire-hit { fill:none; stroke:transparent; stroke-width:18; pointer-events:stroke;
   cursor:pointer; stroke-linecap:round; }
- /* Wire styles — one calm rope per link, ComfyUI-weight. Direction is carried by
-    the curve itself; a filled disc sits at the midpoint (LinkMarkerShape.Circle). */
- #wf-wires path.wire { fill:none; stroke:var(--wire); stroke-width:1.7; pointer-events:none;
+ /* Directional wires with a canvas-coloured underlay to separate crossings. */
+ #wf-wires path.wire { fill:none; stroke:var(--wire); stroke-width:2; pointer-events:none;
    stroke-linecap:round; stroke-linejoin:round;
    transition:stroke .12s, stroke-width .12s, stroke-opacity .12s; }
- /* Flow marker — ComfyUI default: a filled circle on the curve, same colour as the rope. */
+#wf-wires .wire-halo { fill:none; stroke:var(--canvas-bg); stroke-width:6;
+  stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+#wf-wires.has-selection .wire-grp:not(.related):not(:hover):not(:focus-within) { opacity:.28; }
+#wf-wires.has-selection .wire-grp:has(.took-wire),
+#wf-wires.has-selection .wire-grp:has(.nottook-wire) { opacity:1; }
+#wf-wires .wire-grp.related path.wire { stroke-width:2.6; }
+ /* Arrow follows the tangent at the link midpoint and shares its semantic hue. */
  #wf-wires .wire-flow { fill:var(--wire); stroke:none; pointer-events:none;
    transition:fill .12s; }
  /* Semantic branch wires — the source port's colour flows down its own wire. */
@@ -749,12 +759,14 @@
 #wf-canvas[data-lod="far"] .wf-port-lbl,
 #wf-canvas[data-lod="far"] .wf-node-delay,
 #wf-canvas[data-lod="far"] .wf-node-time,
+#wf-canvas[data-lod="far"] .wf-node-timeout,
 #wf-canvas[data-lod="far"] #wf-wires .wire-flow { display:none; }
 #wf-canvas[data-lod="far"] .wf-node-retry { visibility:hidden; }
 
 #wf-canvas[data-lod="tiny"] .wf-port-lbl,
 #wf-canvas[data-lod="tiny"] .wf-node-delay,
 #wf-canvas[data-lod="tiny"] .wf-node-time,
+#wf-canvas[data-lod="tiny"] .wf-node-timeout,
 #wf-canvas[data-lod="tiny"] #wf-wires .wire-flow { display:none; }
 #wf-canvas[data-lod="tiny"] .wf-node-retry,
 #wf-canvas[data-lod="tiny"] .wf-node-note,
@@ -785,6 +797,8 @@
 #wf-rail .btn svg { width:16px; height:16px; stroke-width:1.8; }
 #wf-rail .btn:hover { background:var(--alt); color:var(--ink); box-shadow:none; }
 #wf-rail .btn.on { background:var(--accent-bg); color:var(--accent); }
+#wf-rail .btn:disabled { opacity:.35; cursor:default; background:transparent; }
+#wf-rail button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 /* Link-style button — three glyphs stacked, only the live one is shown, so the
    rail says which wire shape is in force without a second label. */
 #wf-link-btn .wf-link-ico { display:none; }
@@ -798,10 +812,11 @@
 
 /* ── Auto-layout — a single toggle button (bottom-left). ──────────────────── */
 .wf-layout-bar { position:absolute; left:12px; bottom:12px; z-index:5; }
-.wf-layout-toggle { width:36px; height:36px; padding:0; border:1px solid var(--border2);
+.wf-layout-toggle { min-width:100px; height:36px; padding:0 12px; gap:8px; border:1px solid var(--border2);
   border-radius:var(--r-md); background:var(--panel); color:var(--dim); cursor:pointer;
   display:flex; align-items:center; justify-content:center; box-shadow:none;
   transition:color .1s, border-color .1s, background .1s; }
+.wf-layout-toggle span { font-family:var(--sans); font-size:var(--t-caption); font-weight:600; }
 .wf-layout-toggle:hover, .wf-layout-bar.open .wf-layout-toggle { color:var(--accent); border-color:var(--border2); background:var(--accent-bg); }
 .wf-layout-menu { position:absolute; left:0; bottom:42px; min-width:188px;
   background:var(--panel); border:1px solid var(--border2); border-radius:9px;
@@ -1141,7 +1156,7 @@
 @keyframes wfStepPulse { 0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent)}
                          50%   {box-shadow:0 0 0 5px transparent} }
 /* Next branch is a control-flow token, not a normal action card. */
-.wf-node.try_next { width:146px; min-height:44px !important; border:none;
+.wf-node.try_next { width:140px; min-height:40px !important; border:none;
   border-radius:999px; background:transparent !important; }
 .wf-node.try_next::after { border-radius:999px; }
 .wf-next-body { height:44px; display:flex; align-items:center; gap:8px; padding:0 20px;
@@ -1161,7 +1176,7 @@
 /* ── Terminals: Start and End are both solid discs — one silhouette for "the
    flow begins / the flow ends", told apart by colour and glyph, not shape. ─── */
 .wf-node.start, .wf-node.end {
-  --port-inset:3px;
+  --port-inset:2px;
   width:var(--term-size); height:var(--term-size); min-height:var(--term-size);
   border:none; background:transparent; overflow:visible;
   border-radius:50%;
@@ -1183,18 +1198,21 @@
 .wf-node.start.ran-ok::after, .wf-node.end.ran-ok::after { box-shadow:var(--sh-sm); }
 .wf-node.start.ran-fail::after, .wf-node.end.ran-fail::after { box-shadow:var(--sh-sm); }
 .wf-node.start.running::after, .wf-node.end.running::after { box-shadow:var(--sh-md); }
-/* Terminal body — the disc itself. */
+/* Terminal body — the disc itself. A light ring token: panel face, coloured
+   ring, glyph in the terminal hue; a soft wash and shadow lift it off the
+   canvas without the old solid-disc weight. */
 .wf-node-tri {
-  position:absolute; inset:0; background:var(--node-accent); border-radius:50%;
-  display:flex; align-items:center; justify-content:center; color:var(--on-accent);
-  box-shadow:var(--sh-md);
+  position:absolute; inset:0; background:var(--panel); border-radius:50%;
+  border:1.75px solid var(--node-accent);
+  display:flex; align-items:center; justify-content:center; color:var(--node-accent);
+  box-shadow:var(--sh-sm), inset 0 0 0 3px color-mix(in srgb, var(--node-accent) 12%, transparent);
 }
-.wf-node-tri svg { width:16px; height:16px; stroke-width:1.8; display:block; }
+.wf-node-tri svg { width:14px; height:14px; stroke-width:1.8; display:block; }
 .wf-node.start .wf-node-tri svg { margin-left:1px; } /* optical centre for play */
 .wf-node-tri-lbl {
   position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:4px;
-  font-size:9.5px; font-weight:700; letter-spacing:.02em; line-height:1;
-  color:var(--ntitle); white-space:nowrap; pointer-events:none;
+  font-size:8.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+  line-height:1; color:var(--dim); white-space:nowrap; pointer-events:none;
 }
 .wf-node.start.wf-entry::before, .wf-node.end.wf-entry::before { display:none; }
 /* Preview-toggle eye: hidden until hover; stays visible while preview is on. */
@@ -1206,22 +1224,22 @@
 .wf-node-eye:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-node-eye.on { color:var(--accent); }
 /* Action bar — pinned to the top-right corner of a selected node. */
-.wf-node-actions { position:absolute; top:-15px; right:0; height:14px;
-  display:none; align-items:center; gap:0; padding:0 2px;
-  border-radius:4px 4px 0 0;
-  background:color-mix(in srgb, var(--surface) 82%, transparent); }
+.wf-node-actions { position:absolute; top:-28px; right:0; height:26px;
+  display:none; align-items:center; gap:2px; padding:0 2px;
+  border-radius:var(--r-sm); border:1px solid var(--border);
+  background:var(--panel); }
 .wf-node.sel:not(.wf-dragging):not(.wf-dragdone) .wf-node-actions { display:flex; }
 .wf-node-actions button { display:inline-flex; align-items:center; justify-content:center;
-  width:14px; height:14px; padding:0; border:none; border-radius:2px; background:transparent;
+  width:24px; height:24px; padding:0; border:none; border-radius:4px; background:transparent;
   color:var(--muted); cursor:pointer; transition:background .1s, color .1s; }
 .wf-node-actions button:hover { background:var(--alt); color:var(--ink); }
 .wf-node-actions button.on { color:var(--accent); }
 .wf-node-actions .wf-act-del:hover { color:var(--err); background:var(--err-bg); }
-.wf-node-actions button svg { width:10px; height:10px; display:block; stroke:currentColor; fill:none;
+.wf-node-actions button svg { width:12px; height:12px; display:block; stroke:currentColor; fill:none;
   stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
 .wf-node-act-spacer { flex:1; }
 /* Image preview — compact square on the right of the body. */
-.wf-node-prevrow { display:flex; align-items:center; gap:6px; padding:3px 17px; min-height:28px; }
+.wf-node-prevrow { display:flex; align-items:center; gap:7px; padding:6px 12px; min-height:32px; }
 .wf-node-prevrow .wf-node-sum { padding:0; flex:1; min-width:0; }
 .wf-node-thumb { flex-shrink:0; width:22px; height:22px; object-fit:contain;
   background:var(--panel) repeating-conic-gradient(var(--checker) 0% 25%, transparent 0% 50%) 50%/5px 5px;
@@ -1279,17 +1297,17 @@
 /* Node header: a title bar in the ComfyUI/Blender sense. The face is the same
    neutral card for every block; the category survives as a whisper of the
    block's own accent in the header and as the icon's hue (below). */
-.wf-node-hd { display:flex; align-items:center; gap:5px; padding:0 9px; height:23px;
+.wf-node-hd { display:flex; align-items:center; gap:7px; padding:0 10px; height:28px;
   border-bottom:1px solid var(--nhd-bd,var(--line));
   background:var(--nhd-bg,color-mix(in srgb, var(--node-accent,var(--cat-misc)) 12%, var(--panel)));
   border-radius:calc(var(--node-r) - 1px) calc(var(--node-r) - 1px) 0 0;
   transition: background .15s, border-bottom-color .15s; }
-.wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:12px; height:12px; }
-.wf-node .ico svg { width:12px; height:12px; stroke-width:2; display:block; }
+.wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:14px; height:14px; }
+.wf-node .ico svg { width:14px; height:14px; stroke-width:1.8; display:block; }
 .wf-node.call .ico { font-style:italic; font-weight:700; }
-.wf-node-title { font-size:10.5px; font-weight:700; color:var(--ntitle,var(--ink)); flex:1; min-width:0;
+.wf-node-title { font-size:var(--t-caption); font-weight:600; color:var(--ntitle,var(--ink)); flex:1; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wf-node.has-tf .wf-node-title { padding-right:18px; }
+.wf-node.has-tf .wf-node-title { padding-right:0; }
 /* Structural kinds that lack a cat class: borrow the nearest category's accent.
    --node-accent drives the header icon, the header tint and the plate these
    blocks collapse to at low zoom, and leaving it unset dropped them all to the
@@ -1314,7 +1332,7 @@
 .wf-node.cat-misc,
 .wf-node.loop, .wf-node.try_chain, .wf-node.sequence, .wf-node.try_next,
 .wf-node.call, .wf-node.switch, .wf-node.parallel {
-  --nhd-bg: color-mix(in srgb, var(--node-accent) 12%, var(--panel));
+  --nhd-bg: color-mix(in srgb, var(--node-accent) 7%, var(--panel));
   --nhd-bd: var(--line);
   --ntitle: var(--ink);
 }
@@ -1325,8 +1343,8 @@
 .wf-node.has-warn { border-color:var(--border2); }
 /* Default per-block summary line (the auto description under the title). The
    side padding clears the inset port dots — a card's text never runs under one. */
-.wf-node-sum { font-family:var(--mono); font-size:10px; color:var(--dim); padding:4px 17px 5px;
-  line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-node-sum { font-family:var(--mono); font-size:var(--t-micro); color:var(--dim); padding:6px 12px;
+  line-height:1.5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Live colour swatch in a color node's summary line. */
 .wf-node-colordot { display:inline-block; width:8px; height:8px; border-radius:2px;
   margin-right:4px; vertical-align:-1px; border:1px solid var(--border2); }
@@ -1342,19 +1360,26 @@
 .wf-node-log b { margin-right:4px; font-size:8.5px; letter-spacing:.04em; }
 .wf-node-log-out { color:var(--ok); background:var(--ok-bg); }
 
-/* Timing ticks under the card: signed duration, no icon. −before / +after.
-   Sit in the same left column as the summary; never grow the standardized card. */
-.wf-node-delay { position:absolute; top:100%; left:var(--port-inset); margin-top:3px;
-  display:flex; align-items:center; gap:6px; pointer-events:none; z-index:1;
-  white-space:nowrap; }
+/* Timing ticks under the card: ONE pill holding both waits, halves split by a
+   "|" divider — "−1.5s | +0.5s" tucked to the block's bottom edge. The pill
+   chrome lives on the container; each .wf-delay-chip is just its half, so the
+   runtime countdown can highlight one half without doubling the border. */
+.wf-node-delay { position:absolute; top:100%; left:calc(var(--port-inset) + 2px); margin-top:2px;
+  display:inline-flex; align-items:center; gap:5px; pointer-events:none; z-index:1;
+  white-space:nowrap; border:1px solid var(--border); border-radius:999px;
+  padding:1.5px 6px; background:color-mix(in srgb, var(--panel) 80%, transparent); }
 .wf-delay-chip { display:inline-flex; align-items:center;
-  font-family:var(--mono); font-size:9px; font-weight:500; letter-spacing:.02em;
-  line-height:1; color:var(--muted); position:relative; overflow:hidden;
-  border-radius:3px; padding:1px 0; transition:color .12s, background .12s; }
+  font-family:var(--mono); font-size:8.5px; font-weight:500; letter-spacing:.02em;
+  line-height:1; color:var(--dim); position:relative; overflow:hidden;
+  border-radius:3px; transition:color .12s, background .12s; }
+.wf-delay-sep { color:var(--border2); font-size:8px; line-height:1;
+  user-select:none; }
 .wf-delay-label { font-variant-numeric:tabular-nums; }
 /* Live countdown while the engine sleeps on delayBefore / delayAfter. */
+/* Live countdown while the engine sleeps on delayBefore / delayAfter: only the
+   active half lights up (amber + fill), the pill itself doesn't change size. */
 .wf-delay-chip.counting {
-  color:var(--run-live-ink); font-weight:700; padding:2px 5px;
+  color:var(--run-live-ink); font-weight:700;
   background:var(--run-live-hd);
 }
 .wf-delay-chip.counting::before {
@@ -1387,19 +1412,39 @@
   pointer-events:none; white-space:nowrap; z-index:1; }
 .wf-node.ran-fail .wf-node-time { color:var(--run-fail); font-weight:600; }
 
+/* Timeout corner badge — the static limit a wait-style block runs under, top-right.
+   While the block is live the same pill counts down (elapsed bar fill) until the
+   engine's node_result restores it. */
+.wf-node-timeout { position:absolute; top:4px; right:5px; z-index:2;
+  display:inline-flex; align-items:center; pointer-events:none;
+  font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:.02em;
+  line-height:1; color:var(--dim); font-variant-numeric:tabular-nums;
+  background:var(--surface); border:1px solid var(--border); border-radius:3px;
+  padding:2px 4px; white-space:nowrap; overflow:hidden; }
+.wf-node-timeout::after { content:"⏱"; font-family:inherit; margin-right:2px; opacity:.7; order:-1; }
+.wf-node-timeout.counting {
+  color:var(--run-live-ink); font-weight:700;
+  background:var(--run-live-hd); border-color:var(--run-live-hd-bd);
+}
+.wf-node-timeout.counting::before {
+  content:""; position:absolute; left:0; top:0; bottom:0;
+  width:100%; transform:scaleX(calc(var(--pct, 0) / 100)); transform-origin:left;
+  background:color-mix(in srgb, var(--run-live) 22%, transparent); pointer-events:none; z-index:0;
+  transition:transform .05s linear;
+}
+.wf-node-timeout.counting > * { position:relative; z-index:1; }
+
  /* Ports — the joint between a block and its wire. ComfyUI rule: an unwired
     socket is a hollow ring; a wired socket fills with the output's type colour
     (here: source-node category, or a branch hue). wfWireTone in render.js is
     the single place that decides the tone class for both the dot and the path. */
  .wf-port { position:absolute; width:var(--port-sz); height:var(--port-sz); border-radius:50%;
-   background:var(--panel); border:1.5px solid var(--cb-bd); cursor:crosshair; z-index:2;
+   background:var(--panel); border:1.25px solid var(--cb-bd); cursor:crosshair; z-index:2;
    transition:border-color .12s, background .12s, transform .12s; box-sizing:border-box; }
-/* Generous hit-area so grab/drop still feels easy. */
-.wf-port::before { content:""; position:absolute; inset:-8px; border-radius:50%; }
-/* Dots sit INSIDE the card, inset from its edge — the ComfyUI arrangement. A
-   wire therefore does not stop at the border: it keeps going and slips BEHIND
-   the block (the wire layer paints under the cards), so the rope visually runs
-   under the node and only its dot shows. Nothing hangs off a card any more. */
+/* Generous hit-area so grab/drop still feels easy — the dot shrank visually, the
+   grabbable disc did not. */
+.wf-port::before { content:""; position:absolute; inset:-7px; border-radius:50%; }
+/* Card sockets meet the wire at the border. Terminals keep their inset sockets. */
 .wf-port.in  { left:var(--port-inset); }
 .wf-port.out { right:var(--port-inset); }
 /* Unwired: a ring. Branch slots keep a hint of their hue so a block still reads
@@ -1454,7 +1499,7 @@
 /* Slot labels sit INSIDE the card next to their dot, the way ComfyUI and
    Blender label sockets — nothing floats in the canvas gutter any more. The
    body reserves a gutter for them via .slots-out / .slots-in below. */
-.wf-port-lbl { position:absolute; margin-top:-1px; font-size:9px; font-weight:700;
+.wf-port-lbl { position:absolute; margin-top:-1px; font-size:var(--t-micro); font-weight:600;
   line-height:12px; color:var(--dim); white-space:nowrap; pointer-events:none;
   right:calc(var(--port-inset) + var(--port-sz) + 4px); }
 .wf-port-lbl.in { right:auto; text-align:left;
@@ -1650,6 +1695,9 @@
 .wf-run-log-field > label { flex:none; }
 .wf-run-log-input { display:flex; align-items:center; gap:5px; min-width:0; flex:1; }
 .wf-run-log-input .wf-insp-input { min-width:0; flex:1; }
+.wf-key-preset { display:flex; flex-direction:column; gap:6px; flex:1; min-width:0; }
+.wf-key-preset select, .wf-key-preset input { width:100%; min-width:0; }
+.wf-key-preset input[hidden] { display:none; }
 /* Template field: path + picker + compact thumbnail on one row. */
 .wf-tpl-row { display:flex; align-items:center; gap:5px; }
 .wf-tpl-row input { flex:1; min-width:0; font-size:10px; }
@@ -1666,6 +1714,7 @@
 /* Multi-point tap coordinate editor */
 .wf-points-list { display:flex; flex-direction:column; gap:4px; }
 .wf-points-head, .wf-point-row { display:grid; grid-template-columns:20px minmax(0,1fr) minmax(0,1fr) 22px; align-items:center; gap:4px; }
+.wf-sequence-points-list .wf-points-head, .wf-sequence-points-list .wf-point-row { grid-template-columns:20px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 22px; }
 .wf-points-head { color:var(--muted); font-size:9.5px; font-weight:600; text-align:center; }
 .wf-point-row .num { display:flex; align-items:center; justify-content:center; width:20px; height:20px;
   border-radius:50%; background:var(--accent-bg); color:var(--accent); font-family:var(--mono); font-size:9.5px; font-weight:700; }

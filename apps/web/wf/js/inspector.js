@@ -253,7 +253,7 @@ function wfRenderInspector(){
       body.appendChild(tip);
     }
     if(node.type!=="note") body.appendChild(wfNoteField(node));
-    if(node.type!=="note" && node.type!=="start") body.appendChild(wfLogField(node));
+    if(node.type!=="note") body.appendChild(wfLogField(node));
     body.appendChild(wfInspJsonBlock("Node", ()=>wfSerializeNode(node), o=>wfApplyNodeJson(node,o)));
     return;
   }
@@ -551,7 +551,7 @@ function wfVarRefField(node,f){
   const row=document.createElement("div"); row.className="wf-field wf-var-field";
   const set=v=>{
     const hadFocus=row.contains(document.activeElement);
-    wfPushUndoDebounced(); node.params[f.k]=v; wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas();
+    wfPushUndoDebounced(); node.params[f.k]=v; wfUpdNodeSum(node); if(f.refresh){ wfRenderCanvas(); wfRefreshNodeLogs(node); }
     build();
     if(hadFocus){ const el=row.querySelector(".wf-val-opt.on, .wf-val-select, .wf-var-input"); if(el) el.focus(); }
   };
@@ -610,7 +610,7 @@ function wfVarRefField(node,f){
       // Keep numeric literals as numbers; leave variable names / expressions as text.
       const s=inp.value;
       node.params[f.k]= (f.t==="num" && s!=="" && !isNaN(s) && wfVarBadgeInfo(String(s).trim())===null) ? parseFloat(s) : s;
-      wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); sync(); };
+      wfUpdNodeSum(node); if(f.k==="timeout") wfUpdNodeTimeoutChip(node); if(f.refresh){ wfRenderCanvas(); wfRefreshNodeLogs(node); } sync(); };
     // Typing a valid option by hand ("false") switches back to the quick pick.
     inp.onchange=()=>{ if(wfVarValueOpt(kind,inp.value)!==null) set(wfVarValueOpt(kind,inp.value)); };
     row.appendChild(inp); row.appendChild(pick);
@@ -827,6 +827,17 @@ function wfUpdNodeTiming(node){
   const html=wfDelayChipsHtml(node);
   if(html) el.insertAdjacentHTML("beforeend", html);
 }
+// Same in-place swap for the timeout corner badge, called from every oninput
+// that can change params.timeout. A badge mid-countdown is left alone — the
+// run's own deadline is what it's showing.
+function wfUpdNodeTimeoutChip(node){
+  const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
+  const old=el.querySelector(".wf-node-timeout");
+  if(old && old.classList.contains("counting")) return;
+  if(old) old.remove();
+  const html=wfTimeoutChipHtml(node);
+  if(html) el.insertAdjacentHTML("beforeend", html);
+}
 
 function wfRetryField(node){
   const b=wfInspBlock("Failure handling",undefined,wfNodeDefaultsBtn());
@@ -904,34 +915,39 @@ function wfUpdNodeNote(node){
 
 function wfLogField(node){
   const b=wfInspBlock("Run logs");
-  const add=(key,label,placeholder)=>{
+  b.classList.add("wf-run-logs");
+  node.outputLogs=wfOutputLogValues(node);
+  const add=({key,label})=>{
     const row=document.createElement("div"); row.className="wf-field full wf-run-log-field";
     const lab=document.createElement("label"); lab.textContent=label; row.appendChild(lab);
     const inpRow=document.createElement("div"); inpRow.className="wf-run-log-input";
     const inp=document.createElement("input"); inp.type="text"; inp.className="wf-insp-input";
-    inp.placeholder=placeholder; inp.value=node[key]||"";
-    inp.oninput=()=>{ wfPushUndoDebounced(); node[key]=inp.value; wfUpdNodeLog(node); };
+    inp.placeholder=key==="input"?"When entering this block…":key==="$error"?"When the action fails…":key==="$done"?"When this block finishes…":"Only when this exit is taken…";
+    inp.setAttribute("aria-label",label);
+    inp.value=key==="input"?(node.log||""):(node.outputLogs[key]||"");
+    inp.oninput=()=>{ wfPushUndoDebounced(); if(key==="input") node.log=inp.value; else node.outputLogs[key]=inp.value; wfUpdNodeLog(node); };
     inpRow.appendChild(inp); inpRow.appendChild(wfInsertVarBtn(inp));
     row.appendChild(inpRow); b.appendChild(row);
   };
-  // Existing `log` values remain input logs, preserving old workflow behavior.
-  add("log","Input log","written before this block runs…");
-  add("outputLog","Output log","written when this block reaches an output…");
+  wfNodeLogFields(node).forEach(add);
   const hint=document.createElement("div"); hint.className="wf-insp-tip";
-  hint.innerHTML='Input runs when entering the block; Output runs when leaving it. Insert variables with <code>{variable_name}</code>.';
+  hint.innerHTML='Only the log for the chosen exit runs. Leave a field blank to skip it. Input runs before execution; exit logs use updated <code>{variable_name}</code> values.';
   b.appendChild(hint);
   return b;
+}
+function wfRefreshNodeLogs(node){
+  const block=document.querySelector("#wf-insp-body .wf-run-logs");
+  if(block) block.replaceWith(wfLogField(node));
 }
 function wfUpdNodeLog(node){
   const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
   el.querySelectorAll(".wf-node-log").forEach(n=>n.remove());
   const thumb=el.querySelector(".wf-node-thumb");
-  [["log","IN"],["outputLog","OUT"]].forEach(([key,label])=>{
-    if(!node[key]) return;
+  wfNodeLogEntries(node).forEach(({key,tag,text})=>{
     const n=document.createElement("div");
-    n.className=`wf-node-log wf-node-log-${key==="log"?"in":"out"}`;
-    const tag=document.createElement("b"); tag.textContent=label; n.appendChild(tag);
-    n.appendChild(document.createTextNode(node[key]));
+    n.className=`wf-node-log wf-node-log-${key==="input"?"in":"out"}`;
+    const badge=document.createElement("b"); badge.textContent=tag; n.appendChild(badge);
+    n.appendChild(document.createTextNode(text));
     if(thumb) el.insertBefore(n,thumb); else el.appendChild(n);
     el.classList.remove("collapsed");
   });
@@ -1233,7 +1249,7 @@ function wfAttachCoordPaste(node, f, inp){
     wfPushUndoDebounced();
     nums.forEach((val,i)=>{ if(i<keys.length) node.params[keys[i]]=val; });
     wfUpdNodeSum(node);
-    if(f.refresh) wfRenderCanvas();
+    if(f.refresh){ wfRenderCanvas(); wfRefreshNodeLogs(node); }
     const body=$("wf-insp-body");
     if(body){
       keys.forEach(key=>{
@@ -1286,6 +1302,28 @@ function wfFieldEl(node,f){
   const row=document.createElement("div"); row.className="wf-field";
   const lab=document.createElement("label"); lab.textContent=wfFieldLabel(f); lab.title=f.k; row.appendChild(lab);
 
+  if(f.t==="key"){
+    const box=document.createElement("div"); box.className="wf-key-preset";
+    const sel=document.createElement("select"); sel.setAttribute("aria-label",wfFieldLabel(f));
+    const value=String(node.params[f.k]??f.d??"");
+    for(const preset of f.opts||[]){
+      const op=document.createElement("option"); op.value=preset.v; op.textContent=preset.t; sel.appendChild(op);
+    }
+    const custom=document.createElement("option"); custom.value="__custom"; custom.textContent="Custom keycode…"; sel.appendChild(custom);
+    sel.value=(f.opts||[]).some(p=>p.v===value)?value:"__custom";
+    const inp=document.createElement("input"); inp.type="text"; inp.value=value;
+    inp.setAttribute("aria-label",node.type==="key"?"Custom Android keycode":"Custom Windows virtual-key code");
+    inp.placeholder=node.type==="key"?"Android code or KEYCODE_NAME":"Windows VK number";
+    inp.hidden=sel.value!=="__custom";
+    sel.onchange=()=>{
+      inp.hidden=sel.value!=="__custom";
+      if(!inp.hidden){ inp.focus(); inp.select(); return; }
+      wfPushUndoDebounced(); node.params[f.k]=sel.value; inp.value=sel.value; wfUpdNodeSum(node);
+    };
+    inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]=inp.value; wfUpdNodeSum(node); };
+    box.append(sel,inp); row.appendChild(box); return row;
+  }
+
   if(f.t==="bool"){
     const cb=document.createElement("span"); cb.className="cb"+(node.params[f.k]?" checked":"");
     cb.setAttribute("role","checkbox"); cb.tabIndex=0; cb.setAttribute("aria-checked",String(!!node.params[f.k]));
@@ -1293,7 +1331,7 @@ function wfFieldEl(node,f){
     // A bool that another field gates on (showWhen) must re-render the inspector
     // so the dependent field appears/disappears (e.g. loop infinite ↔ count).
     const gates=(WF_NODES[node.type]&&WF_NODES[node.type].fields||[]).some(ff=>ff.showWhen&&ff.showWhen[f.k]!==undefined);
-    cb.onclick=()=>{ wfPushUndoDebounced(); node.params[f.k]=!node.params[f.k]; cb.classList.toggle("checked",node.params[f.k]); cb.setAttribute("aria-checked",String(!!node.params[f.k])); wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); if(gates) wfRenderInspector(); };
+    cb.onclick=()=>{ wfPushUndoDebounced(); node.params[f.k]=!node.params[f.k]; cb.classList.toggle("checked",node.params[f.k]); cb.setAttribute("aria-checked",String(!!node.params[f.k])); wfUpdNodeSum(node); if(f.refresh){ wfRenderCanvas(); wfRefreshNodeLogs(node); } if(gates) wfRenderInspector(); };
     cb.onkeydown=e=>{ if(e.key===" "||e.key==="Enter"){ e.preventDefault(); cb.click(); } };
     row.appendChild(cb); return row;
   }
@@ -1312,6 +1350,8 @@ function wfFieldEl(node,f){
   }
   if(f.t==="tpls") return wfTplsField(node,f);
   if(f.t==="points") return wfPointsField(node,f);
+  if(f.t==="sequence_points") return wfSequencePointsField(node,f);
+  if(f.t==="sequence_images") return wfSequenceImagesField(node,f);
 
   // Color field: native swatch picker + hex text kept in sync both ways.
   if(f.t==="color"){
@@ -1354,7 +1394,7 @@ function wfFieldEl(node,f){
   const inp=document.createElement("input");
   inp.type=f.t==="num"?"number":"text"; if(f.t==="num"&&f.step) inp.step=f.step;
   inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
-  inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]= f.t==="num"?(parseFloat(inp.value)||0):inp.value; wfUpdNodeSum(node); if(f.refresh) wfRenderCanvas(); };
+  inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]= f.t==="num"?(parseFloat(inp.value)||0):inp.value; wfUpdNodeSum(node); if(f.k==="timeout") wfUpdNodeTimeoutChip(node); if(f.refresh){ wfRenderCanvas(); wfRefreshNodeLogs(node); } };
   wfAttachCoordPaste(node, f, inp);
   row.appendChild(inp);
 
@@ -1449,6 +1489,71 @@ function wfPointsField(node,f){
   return wrap;
 }
 
+function wfSequencePointsField(node,f){
+  const wrap=document.createElement("div"); wrap.className="wf-field full";
+  const lab=document.createElement("label"); lab.textContent=wfFieldLabel(f); lab.title=f.k; wrap.appendChild(lab);
+  const arr=()=>Array.isArray(node.params[f.k])?node.params[f.k]:(node.params[f.k]=[]);
+  const list=document.createElement("div"); list.className="wf-points-list wf-sequence-points-list";
+  const head=document.createElement("div"); head.className="wf-points-head";
+  head.innerHTML="<span>Tap</span><span>X</span><span>Y</span><span>Delay (s)</span><span></span>"; list.appendChild(head);
+  const commit=()=>{ wfPushUndoDebounced(); wfUpdNodeSum(node); };
+  function renderList(){
+    while(list.children.length>1) list.removeChild(list.lastChild);
+    arr().forEach((point,idx)=>{
+      if(!point || typeof point!=="object") point=arr()[idx]={x:0,y:0,delay:0};
+      const row=document.createElement("div"); row.className="wf-point-row";
+      const num=document.createElement("span"); num.className="num"; num.textContent=String(idx+1);
+      const make=(key,placeholder)=>{ const input=document.createElement("input"); input.type="number"; input.min="0"; input.step=key==="delay"?"0.05":"1"; input.placeholder=placeholder; input.value=Number(point[key])||0; input.oninput=()=>{ point[key]=parseFloat(input.value)||0; commit(); }; return input; };
+      const del=document.createElement("button"); del.type="button"; del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Delete tap";
+      del.onclick=()=>{ wfPushUndoDebounced(); arr().splice(idx,1); wfUpdNodeSum(node); renderList(); };
+      row.append(num,make("x","X"),make("y","Y"),make("delay","s"),del); list.appendChild(row);
+    });
+  }
+  renderList();
+  const actions=document.createElement("div"); actions.className="wf-points-actions";
+  const add=document.createElement("button"); add.type="button"; add.className="btn sm"; add.textContent="+ Tap";
+  add.onclick=()=>{ wfPushUndoDebounced(); const picked=(typeof wfPvPoint!=="undefined"&&Array.isArray(wfPvPoint))?wfPvPoint:null; arr().push({x:picked?picked[0]:0,y:picked?picked[1]:0,delay:0}); wfUpdNodeSum(node); renderList(); };
+  actions.appendChild(add);
+  const hint=document.createElement("div"); hint.className="wf-insp-tip"; hint.textContent="Tap theo thứ tự; delay được chờ sau mỗi tap, kể cả tap cuối.";
+  wrap.append(list,actions,hint); return wrap;
+}
+
+function wfSequenceImagesField(node,f){
+  const wrap=document.createElement("div"); wrap.className="wf-field full";
+  const lab=document.createElement("label"); lab.textContent=wfFieldLabel(f); lab.title=f.k; wrap.appendChild(lab);
+  const arr=()=>Array.isArray(node.params[f.k])?node.params[f.k]:(node.params[f.k]=[]);
+  const list=document.createElement("div"); list.className="wf-sequence-images-list";
+  const commit=()=>{ wfPushUndoDebounced(); wfUpdNodeSum(node); wfUpdNodePreview(node); wfRenderCanvas(); };
+  function renderList(){
+    list.innerHTML="";
+    arr().forEach((item,idx)=>{
+      if(!item || typeof item!=="object") item=arr()[idx]={template:"",threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:0};
+      const block=document.createElement("div"); block.className="wf-tpls-item";
+      const title=document.createElement("div"); title.className="wf-tpls-hdr";
+      const num=document.createElement("span"); num.className="num"; num.textContent=(idx+1)+".";
+      const inp=document.createElement("input"); inp.type="text"; inp.placeholder="Template image"; inp.value=item.template||"";
+      const pick=document.createElement("button"); pick.type="button"; pick.className="btn sm"; pick.textContent="Choose…";
+      const del=document.createElement("button"); del.type="button"; del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Delete image";
+      const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img,item.template);
+      const set=(key,value)=>{ item[key]=value; commit(); };
+      inp.oninput=()=>set("template",inp.value);
+      pick.onclick=async()=>{ const path=await api().pick_template(); if(path){ inp.value=path; set("template",path); wfLoadThumb(img,path); } };
+      del.onclick=()=>{ wfPushUndoDebounced(); arr().splice(idx,1); renderList(); commit(); };
+      title.append(num,inp,pick,del,img);
+      const opts=document.createElement("div"); opts.className="wf-region-panel"; opts.style.display="grid";
+      [["threshold","Threshold",.05],["timeout","Timeout (s)",.1],["offsetX","Offset X",1],["offsetY","Offset Y",1],["delay","Delay (s)",.05]].forEach(([key,placeholder,step])=>{
+        const input=document.createElement("input"); input.type="number"; input.min="0"; input.step=step; input.placeholder=placeholder; input.title=placeholder; input.value=Number(item[key])||0; input.oninput=()=>set(key,parseFloat(input.value)||0); opts.appendChild(input);
+      });
+      block.append(title,opts); list.appendChild(block);
+    });
+    if(!arr().length){ const e=document.createElement("div"); e.className="wf-tpls-empty"; e.textContent="No images — add at least 1."; list.appendChild(e); }
+  }
+  renderList();
+  const add=document.createElement("button"); add.type="button"; add.className="btn sm"; add.textContent="+ Image tap";
+  add.onclick=async()=>{ wfPushUndoDebounced(); const path=await api().pick_template(); arr().push({template:path||"",threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:0}); renderList(); commit(); };
+  wrap.append(list,add); return wrap;
+}
+
 function wfRegionField(node,f){
   const wrap=document.createElement("div");
   wrap.style.cssText="display:flex;flex-direction:column;gap:5px;padding:5px 0;";
@@ -1521,8 +1626,10 @@ function wfSetBranchCount(node, nextCount){
   if(nextCount<prev && node.type!=="and"){
     const g=wfGraph();
     if(g) g.edges=(g.edges||[]).filter(e=>!(e.from===node.id && /^\d+$/.test(e.fromPort) && parseInt(e.fromPort,10)>nextCount));
+    node.outputLogs=Object.fromEntries(Object.entries(wfOutputLogValues(node)).filter(([k])=>!/^\d+$/.test(k)||Number(k)<=nextCount));
   }
   wfUpdNodeSum(node); wfRenderCanvas();
+  wfRefreshNodeLogs(node);
 }
 
 function wfCountBranchesEditor(node){
@@ -1558,6 +1665,7 @@ function wfSwitchCasesEditor(node){
   };
   const list=document.createElement("div"); list.style.cssText="display:flex;flex-direction:column;gap:8px;";
   function render(){
+    wfRefreshNodeLogs(node);
     const countCtl=wrap.querySelector(".wf-branch-count input");
     if(countCtl) countCtl.value=cases().length;
     list.innerHTML="";

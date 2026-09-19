@@ -51,7 +51,7 @@ from src.core.adb.input import (
     get_input_backend as get_adb_input_backend,
     set_input_backend as set_adb_input_backend,
 )
-from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
+from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCR_MODEL_LABELS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.core.frida_speedhack import FridaSpeedhackManager
 from src.workflow import NODE_TYPES, WorkflowEngine
@@ -71,6 +71,7 @@ from src.utils import (
     remove_log_subscriber,
     sanitize_name,
     save_ui_settings,
+    source_python,
     theme_background,
     titled,
     ts_stamp,
@@ -393,6 +394,10 @@ class WorkflowDesignerAPI:
             "inputBackend": get_adb_input_backend(),
             "inputBackends": list(ADB_INPUT_BACKENDS),
             "ocrBackends": list(KNOWN_BACKENDS),
+            "ocrModels": [
+                {"id": model, "label": OCR_MODEL_LABELS[model]}
+                for model in KNOWN_BACKENDS
+            ],
             "outDir": self._scope_out_dir or "",
             "log": self._log_buffer[-300:],
         }
@@ -1115,7 +1120,8 @@ class WorkflowDesignerAPI:
                 self._ocr_reader.set_backend(name)
             engine = self._ocr_reader.backend_name
             available = bool(self._ocr_reader.available)
-            return {"engine": engine if engine != "none" else "n/a", "available": available}
+            label = OCR_MODEL_LABELS.get(name, OCR_MODEL_LABELS[KNOWN_BACKENDS[0]])
+            return {"engine": engine if engine != "none" else "n/a", "label": label, "available": available}
         except Exception:
             return {"engine": "n/a", "available": False}
 
@@ -2338,7 +2344,7 @@ class WorkflowDesignerAPI:
             script = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                 "packaging", "build_runner.py")
-        cmd = [sys.executable, script, "--workflow", workflow_dir, "--version", version]
+        cmd = [source_python(), script, "--workflow", workflow_dir, "--version", version]
         log_info("Building standalone Runner .exe …")
         out_path = ""
         req_path = ""   # requirements/ beside the exe (from workflows/<Name>/vendor/)

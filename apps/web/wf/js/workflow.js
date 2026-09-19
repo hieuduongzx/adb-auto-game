@@ -1,4 +1,12 @@
 // ── Workflow designer (node-graph) ───────────────────────────────────────────
+// Read the shared canvas geometry once so render, auto-layout and CSS agree.
+const WF_GEOMETRY=(()=>{
+  const css=getComputedStyle(document.documentElement);
+  const px=(name,fallback)=>parseFloat(css.getPropertyValue(name))||fallback;
+  return Object.freeze({width:px('--node-w',184),height:px('--node-h',78),
+    terminal:px('--term-size',42),port:px('--port-sz',10),
+    inset:px('--port-inset',-5),gap:px('--port-gap',20)});
+})();
 // Icon set: a compact inline-SVG library (Lucide-style, 24×24, stroke 1.8) so the
 // node palette reads as a consistent professional tool, not a mixed emoji grab-bag.
 // Each entry is the inner markup of an SVG (paths/shapes) wrapped at render time.
@@ -152,6 +160,29 @@ function wfWinKeyLabel(value){
   return hit?hit.t:("VK "+value);
 }
 
+// Android keycodes are a separate namespace from Windows virtual keys.
+const WF_ADB_KEYS = [
+  {v:"4",t:"Back",name:"BACK"},{v:"3",t:"Home",name:"HOME"},
+  {v:"187",t:"Recent apps",name:"APP_SWITCH"},{v:"82",t:"Menu",name:"MENU"},
+  {v:"66",t:"Enter",name:"ENTER"},{v:"67",t:"Backspace",name:"DEL"},
+  {v:"61",t:"Tab",name:"TAB"},{v:"62",t:"Space",name:"SPACE"},
+  {v:"19",t:"Up",name:"DPAD_UP"},{v:"20",t:"Down",name:"DPAD_DOWN"},
+  {v:"21",t:"Left",name:"DPAD_LEFT"},{v:"22",t:"Right",name:"DPAD_RIGHT"},
+  {v:"23",t:"D-pad center",name:"DPAD_CENTER"},
+  {v:"24",t:"Volume up",name:"VOLUME_UP"},{v:"25",t:"Volume down",name:"VOLUME_DOWN"},
+  {v:"164",t:"Mute",name:"VOLUME_MUTE"},{v:"26",t:"Power",name:"POWER"},
+  {v:"85",t:"Play / Pause",name:"MEDIA_PLAY_PAUSE"},{v:"84",t:"Search",name:"SEARCH"},
+];
+function wfAdbKeyValue(value){
+  const raw=String(value??"4").trim();
+  const hit=WF_ADB_KEYS.find(k=>k.v===raw||k.name===raw.toUpperCase().replace(/^KEYCODE_/,""));
+  return hit?hit.v:raw;
+}
+function wfAdbKeyLabel(value){
+  const code=wfAdbKeyValue(value), hit=WF_ADB_KEYS.find(k=>k.v===code);
+  return hit?hit.t:("Key "+code);
+}
+
 // Comparison operators shared by If variable / Loop until variable / switch
 // cases. The string-shaped ones (contains / starts / ends / regex) matter most
 // for OCR results, which rarely equal a literal exactly.
@@ -162,6 +193,10 @@ const WF_CMP_OPS = [
   {v:"contains",t:"⊃ contains"},{v:"!contains",t:"⊅ does not contain"},
   {v:"starts",t:"^ starts with"},{v:"ends",t:"$ ends with"},
   {v:"regex",t:".* matches regex"},
+  {v:"is_integer",t:"is integer"},{v:"is_not_integer",t:"is not integer"},
+  {v:"is_number",t:"is number"},{v:"is_not_number",t:"is not number"},
+  {v:"is_text",t:"is text"},{v:"is_not_text",t:"is not text"},
+  {v:"is_empty",t:"is empty"},{v:"is_not_empty",t:"is not empty"},
 ];
 
 // The emulator nodes' target picker. "Selected device" resolves against the
@@ -207,6 +242,9 @@ const WF_NODES = {
   end:        {label:"End",  ico:"square", kind:"end",   cat:"flow",  outs:[],      fields:[]},
   tap:        {label:"Tap",      ico:"pointer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`)+(p.taps=="2"?" ×2":"")},
   multi_tap:  {label:"Multi-point tap",ico:"touches",kind:"action",cat:"basic",outs:["out"],fields:[{k:"points",lbl:"Touch points",t:"points",d:[{x:0,y:0},{x:100,y:100}]},{k:"duration",lbl:"Hold duration (ms)",t:"num",d:80}],sum:p=>{const a=Array.isArray(p.points)?p.points:[];return `${a.length} points · together · ${Math.max(20,Number(p.duration)||80)}ms`; }},
+  sequence_tap: {label:"Sequence tap",ico:"list_numbered",kind:"action",cat:"basic",outs:["out"],fields:[{k:"sequenceId",lbl:"Sequence ID",t:"text",d:"main"},{k:"points",lbl:"Tap sequence",t:"sequence_points",d:[{x:0,y:0,delay:0.1},{x:100,y:100,delay:0.1}]}],sum:p=>{const a=Array.isArray(p.points)?p.points:[];return `${a.length} taps · ${p.sequenceId||"main"}`; }},
+  sequence_tap_image: {label:"Sequence tap image",ico:"target",kind:"action",cat:"image",outs:["out"],fields:[{k:"sequenceId",lbl:"Sequence ID",t:"text",d:"main"},{k:"images",lbl:"Image sequence",t:"sequence_images",d:[{template:"",threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:.1}]}],sum:p=>{const a=Array.isArray(p.images)?p.images:[];return `${a.length} images · ${p.sequenceId||"main"}`; }},
+  stop_sequence: {label:"Stop sequence",ico:"octagon",kind:"action",cat:"flow",outs:["out"],fields:[{k:"sequenceId",lbl:"Sequence ID",t:"text",d:"main"}],sum:p=>`stop ${p.sequenceId||"main"}`},
   // Hidden from the palette — superseded by tap(taps=2); old files still open/run fine.
   double_tap: {label:"Double tap",  ico:"hand",kind:"action",cat:"basic", hidden:true, outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`)+" ×2"},
   tap_random: {label:"Random tap",ico:"dice",kind:"action",cat:"basic", outs:["out"], fields:[
@@ -214,14 +252,26 @@ const WF_NODES = {
     {k:"x2",lbl:"To X",t:"num",d:100},{k:"y2",lbl:"To Y",t:"num",d:100}
   ], sum:p=>`X ${Math.min(Number(p.x1)||0,Number(p.x2)||0)}–${Math.max(Number(p.x1)||0,Number(p.x2)||0)} · Y ${Math.min(Number(p.y1)||0,Number(p.y2)||0)}–${Math.max(Number(p.y1)||0,Number(p.y2)||0)}`},
   long_press: {label:"Long press",       ico:"timer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}},{k:"duration",lbl:"Duration (ms)",t:"num",d:800}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x},${p.y})`)+` ${p.duration}ms`},
-  swipe:      {label:"Swipe",      ico:"arrow_down",kind:"action",cat:"basic", outs:["out"], fields:[{k:"x1",t:"num"},{k:"y1",t:"num"},{k:"x2",t:"num"},{k:"y2",t:"num"},{k:"duration",t:"num",d:300}], sum:p=>`(${p.x1},${p.y1})→(${p.x2},${p.y2})`},
-  swipe_dir:  {label:"Swipe direction",ico:"arrow_down",kind:"action",cat:"basic", outs:["out"], fields:[{k:"direction",t:"select",opts:[{v:"up",t:"↑ Up"},{v:"down",t:"↓ Down"},{v:"left",t:"← Left"},{v:"right",t:"→ Right"}],d:"up"},{k:"distance",lbl:"Distance (px)",t:"num",d:400},{k:"duration",lbl:"Duration (ms)",t:"num",d:300}], sum:p=>`${({up:"↑",down:"↓",left:"←",right:"→"})[p.direction]||"↑"} ${p.distance}px`},
-  wait:       {label:"Wait",       ico:"timer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"seconds",t:"num",d:1,step:.5}], sum:p=>`${p.seconds}s`},
-  wait_random:{label:"Random wait",ico:"hourglass",kind:"action",cat:"basic", outs:["out"], fields:[{k:"min",t:"num",d:.5,step:.5},{k:"max",t:"num",d:2,step:.5}], sum:p=>`${p.min}-${p.max}s`},
+  swipe: {label:"Swipe",search:"direction coordinates",ico:"arrow_down",kind:"action",cat:"basic",outs:["out"], fields:[
+    {k:"mode",lbl:"Swipe mode",t:"select",opts:[{v:"coordinates",t:"Coordinates"},{v:"direction",t:"Direction from screen center"}],d:"coordinates"},
+    {k:"x1",t:"num",showWhen:{mode:"coordinates"}},{k:"y1",t:"num",showWhen:{mode:"coordinates"}},
+    {k:"x2",t:"num",showWhen:{mode:"coordinates"}},{k:"y2",t:"num",showWhen:{mode:"coordinates"}},
+    {k:"direction",t:"select",opts:[{v:"up",t:"Up"},{v:"down",t:"Down"},{v:"left",t:"Left"},{v:"right",t:"Right"}],d:"up",showWhen:{mode:"direction"}},
+    {k:"distance",lbl:"Distance (px)",t:"num",d:400,showWhen:{mode:"direction"}},
+    {k:"duration",lbl:"Duration (ms)",t:"num",d:300}
+  ],sum:p=>p.mode==="direction"?`${p.direction||"up"} ${p.distance??400}px`:`(${p.x1},${p.y1})→(${p.x2},${p.y2})`},
+  swipe_dir:  {label:"Swipe direction",ico:"arrow_down",kind:"action",cat:"basic", hidden:true, outs:["out"], fields:[{k:"direction",t:"select",opts:[{v:"up",t:"↑ Up"},{v:"down",t:"↓ Down"},{v:"left",t:"← Left"},{v:"right",t:"→ Right"}],d:"up"},{k:"distance",lbl:"Distance (px)",t:"num",d:400},{k:"duration",lbl:"Duration (ms)",t:"num",d:300}], sum:p=>`${({up:"↑",down:"↓",left:"←",right:"→"})[p.direction]||"↑"} ${p.distance}px`},
+  wait: {label:"Wait",search:"random duration range",ico:"timer",kind:"action",cat:"basic",outs:["out"], fields:[
+    {k:"mode",lbl:"Wait mode",t:"select",opts:[{v:"fixed",t:"Fixed duration"},{v:"random",t:"Random range"}],d:"fixed"},
+    {k:"seconds",lbl:"Duration (s)",t:"num",d:1,step:.5,showWhen:{mode:"fixed"}},
+    {k:"min",lbl:"Minimum (s)",t:"num",d:.5,step:.5,showWhen:{mode:"random"}},
+    {k:"max",lbl:"Maximum (s)",t:"num",d:2,step:.5,showWhen:{mode:"random"}}
+  ],sum:p=>p.mode==="random"?`${p.min??.5}–${p.max??2}s · random`:`${p.seconds??1}s`},
+  wait_random:{label:"Random wait",ico:"hourglass",kind:"action",cat:"basic", hidden:true, outs:["out"], fields:[{k:"min",t:"num",d:.5,step:.5},{k:"max",t:"num",d:2,step:.5}], sum:p=>`${p.min}-${p.max}s`},
   send_text:  {label:"Input text", ico:"keyboard",kind:"action",cat:"input", outs:["out"], fields:[{k:"text",t:"text",insertVar:true}], sum:p=>`"${p.text||""}"`},
-  key:        {label:"Key",      ico:"disc",kind:"action",cat:"input", outs:["out"], fields:[{k:"keycode",t:"text",d:"BACK"}], sum:p=>`${p.keycode}`},
-  back:       {label:"Back",      ico:"back",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"Back key"},
-  home:       {label:"Home",      ico:"home",kind:"action",cat:"input", outs:["out"], fields:[], sum:()=>"Home key"},
+  key: {label:"Key (ADB)",search:"back home android preset",ico:"disc",kind:"action",cat:"input",outs:["out"],fields:[{k:"keycode",lbl:"Key preset",t:"key",opts:WF_ADB_KEYS,d:"4"}],sum:p=>wfAdbKeyLabel(p.keycode??"4")},
+  back:       {label:"Back",      ico:"back",kind:"action",cat:"input", hidden:true, outs:["out"], fields:[], sum:()=>"Back key"},
+  home:       {label:"Home",      ico:"home",kind:"action",cat:"input", hidden:true, outs:["out"], fields:[], sum:()=>"Home key"},
   tap_image:  {label:"Tap image",  ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")},
   wait_image: {label:"Wait image",   ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate — wait until it DISAPPEARS",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>(p.negate?"until gone ":"")+wfBase(p.template)},
   if_image:   {label:"If image",   ico:"help",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.negate?"not ":""}found ${wfBase(p.template)}`},
@@ -473,8 +523,8 @@ const WF_NODES = {
   win_send_text:{label:"Input text", ico:"keyboard", kind:"action", cat:"win32", outs:["out"], fields:[{k:"text",t:"text",insertVar:true}], sum:p=>`"${p.text||""}"`},
   // mode: press = down → hold → up (a game only moves while the key is down, so
   // walking wants a few hundred ms); down / up keep a key held across blocks.
-  win_key:      {label:"Press key", ico:"disc", kind:"action", cat:"win32", outs:["out"], fields:[
-    {k:"keycode",lbl:"Key",t:"select",opts:WF_WIN_KEYS,d:"13"},
+  win_key:      {label:"Key (Win32)",search:"press key escape esc preset", ico:"disc", kind:"action", cat:"win32", outs:["out"], fields:[
+    {k:"keycode",lbl:"Key preset",t:"key",opts:WF_WIN_KEYS,d:"13"},
     {k:"mode",lbl:"Action",t:"select",opts:[{v:"press",t:"Press (down → hold → up)"},{v:"down",t:"Hold down (until Release)"},{v:"up",t:"Release (key up)"}],d:"press"},
     {k:"hold",lbl:"Hold (ms)",t:"num",d:80,showWhen:{mode:"press"}},
   ], sum:p=>`${({down:"⬇ hold ",up:"⬆ release "})[p.mode]||""}${wfWinKeyLabel(p.keycode??"13")}${(!p.mode||p.mode==="press")?` ${p.hold??80}ms`:""}`},
@@ -487,7 +537,7 @@ const WF_NODES = {
     {k:"win",lbl:"Win",t:"bool",d:false},
     {k:"keycode",lbl:"Key",t:"select",opts:WF_WIN_KEYS,d:"67"}
   ], sum:p=>[p.ctrl&&"Ctrl",p.shift&&"Shift",p.alt&&"Alt",p.win&&"Win",wfWinKeyLabel(p.keycode??"67")].filter(Boolean).join("+")},
-  win_escape:   {label:"Escape key", ico:"back", kind:"action", cat:"win32", outs:["out"], fields:[], sum:()=>"Esc"},
+  win_escape:   {label:"Escape key", ico:"back", kind:"action", cat:"win32", hidden:true, outs:["out"], fields:[], sum:()=>"Esc"},
   // Right / middle click (the left button is the shared Tap node).
   win_click:    {label:"Mouse click", ico:"pointer", kind:"action", cat:"win32", outs:["out"], fields:[
     {k:"button",lbl:"Button",t:"select",opts:[{v:"right",t:"Right"},{v:"middle",t:"Middle"},{v:"left",t:"Left"}],d:"right"},
@@ -602,7 +652,7 @@ const WF_PAL_PAIRS = [
 // "body" is where the loop's contents hang off; the loop-back INPUT is what is
 // labelled "loop" (WF_IN_LBL). Calling both of them "loop" made a Repeat block
 // read as if it had the same port twice.
-const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"body", done:"done", found:"found", fail:"fail", "1":"1", "2":"2", "3":"3" };
+const WF_PORT_LBL = { out:"", "true":"True", "false":"False", body:"body", done:"done", found:"found", fail:"fail", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
 const WF_IN_LBL = { in:"in", loop:"loop" };
 
@@ -636,6 +686,74 @@ function wfApplyRegionFromTplName(node, tplPath){
 
 function wfIns(type){ const def=WF_NODES[type]; return (def&&def.ins)||["in"]; }
 
+// One port model for canvas rendering and per-exit log configuration.
+function wfNodeOutputPorts(node){
+  const p=node.params||{}, type=node.type;
+  if(type==="switch") return (p.cases||[]).map((_,i)=>"c"+i).concat("default");
+  if(["parallel","random_branch","sequence","try_chain"].includes(type)){
+    const ports=Array.from({length:Math.max(1,parseInt(p.count)||(type==="random_branch"?2:3))},(_,i)=>String(i+1));
+    return ports.concat(type==="sequence"?["end"]:type==="try_chain"?["fail"]:[]);
+  }
+  return ((WF_NODES[type]||{}).outs||[]).slice();
+}
+function wfNodeLogFields(node){
+  const kind=(WF_NODES[node.type]||{}).kind;
+  if(kind==="note") return [];
+  const fields=[{key:"input",label:"Log Input",tag:"IN"}];
+  const labels={out:"Output",true:"True",false:"False",body:"Body",done:"Done",found:"Found",fail:"Fail",end:"End",default:"Default"};
+  for(const port of wfNodeOutputPorts(node)){
+    const label=labels[port]||(/^c\d+$/.test(port)?"Case "+(Number(port.slice(1))+1):"Branch "+port);
+    fields.push({key:port,label:"Log "+label,tag:label.toUpperCase()});
+  }
+  if(["end","stop","try_next"].includes(kind)) fields.push({key:"$done",label:"Log Done",tag:"DONE"});
+  if(kind==="action"||kind==="and") fields.push({key:"$error",label:"Log Error",tag:"ERROR"});
+  return fields;
+}
+function wfOutputLogValues(node){
+  const valid=new Set(wfNodeLogFields(node).filter(f=>f.key!=="input").map(f=>f.key));
+  if(node.outputLogs && typeof node.outputLogs==="object" && !Array.isArray(node.outputLogs))
+    return Object.fromEntries(Object.entries(node.outputLogs).filter(([k,v])=>valid.has(k)&&typeof v==="string"));
+  return node.outputLog ? Object.fromEntries([...valid].map(k=>[k,node.outputLog])) : {};
+}
+function wfNodeLogEntries(node){
+  const logs=wfOutputLogValues(node);
+  return wfNodeLogFields(node).map(f=>({...f,text:f.key==="input"?(node.log||""):(logs[f.key]||"")})).filter(f=>f.text);
+}
+
+// Recognition-model registry. Keep the selector plumbing even with one model
+// so future recognition models can be added without redesigning Project or
+// Preview settings.
+const WF_OCR_MODELS=[{id:"ppocr_v5_mobile",label:"PP-OCRv5 Mobile"}];
+function wfNormalizeOcrBackend(value){
+  const id=String(value||"").trim().toLowerCase();
+  return WF_OCR_MODELS.some(model=>model.id===id)?id:WF_OCR_MODELS[0].id;
+}
+function wfOcrModelLabel(value){
+  const id=wfNormalizeOcrBackend(value);
+  return (WF_OCR_MODELS.find(model=>model.id===id)||{}).label||id;
+}
+function wfNormalizeNode(node){
+  const p=node.params||(node.params={});
+  if(node.type==="back"||node.type==="home"){
+    p.keycode=node.type==="back"?"4":"3"; node.type="key";
+  }else if(node.type==="win_escape"){
+    node.type="win_key"; p.keycode="27"; p.mode="press"; p.hold=0;
+  }else if(node.type==="wait_random"){
+    node.type="wait"; p.mode="random";
+  }else if(node.type==="swipe_dir"){
+    node.type="swipe"; p.mode="direction";
+  }
+  if(["key","win_key","wait","swipe"].includes(node.type)){
+    for(const f of WF_NODES[node.type].fields){
+      if(p[f.k]===undefined) p[f.k]=f.d!==undefined?f.d:(f.t==="num"?0:"");
+    }
+  }
+  if(node.type==="key") p.keycode=wfAdbKeyValue(p.keycode);
+  node.outputLogs=wfOutputLogValues(node);
+  delete node.outputLog;
+  return node;
+}
+
 // edit = which graph the canvas is showing: an activity or a function.
 // sel = ids of all selected nodes (multi-select); selectedNode = primary (inspector).
 const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities:[], functions:[],
@@ -658,10 +776,10 @@ const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities
   // per-node via their own "Emulator" source = Custom. Saved into the flow JSON
   // (key "emulator").
   emulator:{kind:"ldplayer", path:""},
-  // OCR engine for text-reading blocks (wait_text/if_text/read_var/parse_var…).
-  // "" = auto (the engine picks the first available backend). Saved into the
-  // flow JSON (key "ocr") so the Runner + test runs use the chosen engine.
-  ocrBackend:"",
+  // Recognition model for text-reading blocks (wait_text/if_text/read_var/parse_var…).
+  // The registry currently exposes only PP-OCRv5 Mobile; the selected model is
+  // saved into the flow JSON (key "ocr") for Runner and test runs.
+  ocrBackend:WF_OCR_MODELS[0].id,
   // Screen capture source for ADB projects: "scrcpy" (fast/headless) or "adb"
   // (screencap). Saved into the flow JSON (key "capture") per game workflow.
   captureBackend:"scrcpy",
@@ -677,8 +795,8 @@ const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities
   nodeDefaults:{ delayBefore:0, delayAfter:0, retryCount:0, retryDelay:0, screenshotOnFail:false },
   edit:{kind:"activity", id:null}, sel:[], selectedNode:null };
 let wfSpace=false;  // space held → pan instead of box-select
-const WF_GRID=20;   // grid step; snapping is opt-in (default off)
-let wfSnapOn=false;
+const WF_GRID=20;   // grid step; every card dimension is a whole multiple of it
+let wfSnapOn=true;  // snap ON by default — blocks land on the grid unless you opt out
 let wfPreviewAll=false;   // global: show image thumbnail on every image block
 let wfMinimapOn=false;    // minimap is opt-in (default off)
 let wfAlignOn=true;       // Figma-style edge/centre magnetism + guides (Alt = pause)
@@ -700,7 +818,7 @@ function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$(
   const logH = lc && !lc.classList.contains("collapsed") ? lc.offsetHeight : (lc && lc.dataset.openH ? parseInt(lc.dataset.openH,10) : undefined);
   const sideW=sd?(wfSideCollapsed?(parseInt(sd.dataset.openW,10)||272):sd.offsetWidth):undefined;
   const inspW=insp?(wfInspCollapsed?(parseInt(insp.dataset.openW,10)||304):insp.offsetWidth):undefined;
-  api().save_settings({snap:wfSnapOn, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), logH: logH||undefined, sideW, inspW, actH: wfActH||null, sideCollapsed:wfSideCollapsed, inspCollapsed:wfInspCollapsed}); }catch{} }
+  api().save_settings({snap:wfSnapOn, snapMigrated:true, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), logH: logH||undefined, sideW, inspW, actH: wfActH||null, sideCollapsed:wfSideCollapsed, inspCollapsed:wfInspCollapsed}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
   const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off")+" — Smart align overrides the grid only on matched axes (hold Alt for free placement)"; s.classList.toggle("on",wfSnapOn); }
@@ -829,22 +947,22 @@ async function wfSpeedRun(){
 
 // ── Project settings popup (package · controller · OCR · advanced Win32 target) ─
 // Frequent Win32 target/input controls also stay visible beside the title.
-let wfOcrBackendsCache=["tesseract","easyocr","paddleocr"];
+let wfOcrBackendsCache=WF_OCR_MODELS.slice();
 function wfSyncOcrUI(){
-  const sel=$("wf-ocr-select"); if(sel) sel.value=WF.ocrBackend||"";
+  const sel=$("wf-ocr-select"); if(sel) sel.value=wfNormalizeOcrBackend(WF.ocrBackend);
 }
 function wfOcrChanged(){
   const sel=$("wf-ocr-select");
-  WF.ocrBackend=sel?((sel.value||"").trim()):(WF.ocrBackend||"");
+  WF.ocrBackend=wfNormalizeOcrBackend(sel?sel.value:WF.ocrBackend);
   if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
-  setStatus("OCR engine: "+(WF.ocrBackend||"auto"));
+  setStatus("OCR model: "+wfOcrModelLabel(WF.ocrBackend));
 }
 function wfFillOcrSelect(sel){
   if(!sel) return;
-  const backs=wfOcrBackendsCache&&wfOcrBackendsCache.length?wfOcrBackendsCache:["tesseract","easyocr","paddleocr"];
-  sel.innerHTML='<option value="">Auto</option>';
-  backs.forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=b; sel.appendChild(o); });
-  sel.value=WF.ocrBackend||"";
+  const models=wfOcrBackendsCache&&wfOcrBackendsCache.length?wfOcrBackendsCache:WF_OCR_MODELS;
+  sel.innerHTML="";
+  models.forEach(model=>{ const id=typeof model==="string"?model:model.id; const o=document.createElement("option"); o.value=id; o.textContent=(typeof model==="string"?wfOcrModelLabel(id):model.label)||id; sel.appendChild(o); });
+  sel.value=wfNormalizeOcrBackend(WF.ocrBackend);
 }
 // Cache backends from the host; fill the select if the settings form is open.
 function wfPopulateOcrBackends(backs){
@@ -1217,8 +1335,8 @@ function wfOpenProjectSettings(){
       secOcr.innerHTML=`<div class="wf-proj-sec-lbl">OCR</div>`;
       const rowOcr=document.createElement("div"); rowOcr.className="wf-proj-row";
       rowOcr.innerHTML=
-        `<label for="wf-ocr-select">Text engine</label>`+
-        `<select id="wf-ocr-select" title="OCR engine for Wait text / If text / Read → variable / Parse"></select>`+
+        `<label for="wf-ocr-select">Text model</label>`+
+        `<select id="wf-ocr-select" title="Recognition model for Wait text / If text / Read → variable / Parse"></select>`+
         `<div class="hint">Auto = first available backend. Saved into the workflow JSON.</div>`;
       secOcr.appendChild(rowOcr);
       form.appendChild(secOcr);
@@ -1347,16 +1465,25 @@ function wfSyncGrid(){
   const cs=getComputedStyle(c);
   const dotMajor=(cs.getPropertyValue("--grid-dot")||"rgba(20,30,45,.10)").trim();
   const dotMinor=(cs.getPropertyValue("--grid-dot-minor")||"#d9dee6").trim();
-  const layers=[`radial-gradient(circle, ${dotMajor} ${(1.4*z).toFixed(2)}px, transparent ${(1.6*z).toFixed(2)}px)`];
+  // A radial-gradient paints its dot at the CENTRE of each background tile by
+  // default, so the grid dots sat half a cell off from the world's (0,0) — a
+  // node corner snapped to x=0 floated between dots. Position each layer at
+  // its top-left corner (and off by half a dot so the ink centres exactly on
+  // the grid line), and start the tile pattern half a cell back so tile 0's
+  // corner — where world origin and node corners live — gets the dot.
+  const halfDot=1.6*z;
+  const pos=[`${wfCrispPx(px-halfDot)}px ${wfCrispPx(py-halfDot)}px`,
+             `${wfCrispPx(px-halfDot-10*z)}px ${wfCrispPx(py-halfDot-10*z)}px`];
+  const layers=[`radial-gradient(circle at 0 0, ${dotMajor} ${(1.4*z).toFixed(2)}px, transparent ${(1.6*z).toFixed(2)}px)`];
   const sizes=[`${100*z}px ${100*z}px`];
   if(z>=0.55){
     const r=Math.max(.8, z);
-    layers.push(`radial-gradient(circle, ${dotMinor} ${r.toFixed(2)}px, transparent ${(r+.2).toFixed(2)}px)`);
+    layers.push(`radial-gradient(circle at 0 0, ${dotMinor} ${r.toFixed(2)}px, transparent ${(r+.2).toFixed(2)}px)`);
     sizes.push(`${20*z}px ${20*z}px`);
   }
   c.style.backgroundImage=layers.join(",");
   c.style.backgroundSize=sizes.join(",");
-  c.style.backgroundPosition=`${px}px ${py}px`;
+  c.style.backgroundPosition=pos.join(",");
 }
 // Temporarily promote #wf-world to a compositor layer while the camera is in
 // motion (tween / wheel burst), then demote it once it settles. A promoted
@@ -1600,16 +1727,29 @@ function wfInitActResizer(){
 // node bounds (world coords), so it's exact regardless of node heights.
 // Glides there by default; pass animate=false for an instant frame (the
 // auto-layout pre-fit needs a stable camera before it animates the nodes).
-function wfFit(animate){
+function wfFit(animate, selectionOnly=false){
   const canvas=$("wf-canvas"); if(!canvas) return;
-  const els=[...document.querySelectorAll("#wf-world .wf-node")];
+  const els=[...document.querySelectorAll("#wf-world .wf-node")]
+    .filter(el=>!selectionOnly||WF.sel.includes(el.dataset.node));
+  if(selectionOnly&&!els.length) return;
   if(!els.length){ wfPan={x:0,y:0}; wfSetZoom(1); return; }
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   els.forEach(el=>{ const x=el.offsetLeft,y=el.offsetTop,w=el.offsetWidth,h=el.offsetHeight;
     if(x<minX)minX=x; if(y<minY)minY=y; if(x+w>maxX)maxX=x+w; if(y+h>maxY)maxY=y+h; });
-  const pad=70, cw=canvas.clientWidth, ch=canvas.clientHeight;
-  const z=Math.max(0.2, Math.min(cw/((maxX-minX)+pad*2), ch/((maxY-minY)+pad*2), 1.5));
-  const tx=(cw-(minX+maxX)*z)/2, ty=(ch-(minY+maxY)*z)/2;
+  // Reserve the toolbar, breadcrumb and floating dock before framing nodes.
+  const frame={left:68,top:60,right:canvas.clientWidth-24,bottom:canvas.clientHeight-64};
+  const dock=$("wf-act-panel");
+  if(dock&&dock.offsetParent!==null&&!dock.classList.contains("is-max")){
+    const cr=canvas.getBoundingClientRect(),dr=dock.getBoundingClientRect();
+    frame.bottom=Math.min(frame.bottom,dr.top-cr.top-24);
+  }
+  const cw=Math.max(80,frame.right-frame.left),ch=Math.max(80,frame.bottom-frame.top);
+  const z=Math.max(0.2,Math.min(cw/((maxX-minX)+40),ch/((maxY-minY)+40),1));
+  const tx=frame.left+(cw-(minX+maxX)*z)/2,ty=frame.top+(ch-(minY+maxY)*z)/2;
   if(animate===false){ wfCancelCamAnim(); wfZoom=z; wfPan.x=tx; wfPan.y=ty; wfApplyTransform(); }
   else wfAnimateCamera(tx,ty,z,280);
+}
+function wfFitSelection(){
+  if(typeof wfPvActive!=="undefined"&&wfPvActive) return;
+  wfFit(undefined,true);
 }

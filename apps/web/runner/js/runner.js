@@ -10,6 +10,7 @@ const S = {
   captureBackend:  "scrcpy",
   controller:      "adb",
   win32:           {},
+  bridge:          null,  // unity_bridge plugin status {port, ok, reply} | null
   emulator:        {},   // shared ADB emulator setting {kind, path}
   emulatorDefault: {},   // as shipped by the workflow (what "clear" falls back to)
   logCount:        0,
@@ -1024,6 +1025,29 @@ function applyController(ctrl, win32){
     dot.style.cssText = "width:8px;height:8px;border-radius:50%;flex-shrink:0;background:" +
       (target ? "var(--ok)" : "var(--muted)");
   }
+  renderBridge();
+}
+
+// unity_bridge: the in-game plugin not answering is why "the window is there
+// but nothing happens", so surface it in the footer instead of the log only.
+function renderBridge(){
+  const modeEl = $("win32-mode-lbl");
+  if(!modeEl) return;
+  const cfg = S.win32 || {};
+  const mode = (cfg.inputMode || "background").replace(/_/g, " ");
+  if(S.controller !== "win32" || (cfg.inputMode || "") !== "unity_bridge"){
+    modeEl.textContent = mode; modeEl.style.color = ""; return;
+  }
+  const b = S.bridge;
+  if(!b){ modeEl.textContent = mode; modeEl.style.color = ""; return; }
+  const on = !!b.ok;
+  modeEl.textContent = mode + (on ? " \u00b7 bridge OK" : " \u00b7 bridge OFF");
+  modeEl.style.color = on ? "var(--ok)" : "var(--warn)";
+  modeEl.title = on
+    ? ("Unity Bridge online (127.0.0.1:" + b.port + ") \u2014 " + (b.reply || "ok"))
+    : ("Unity Bridge kh\u00f4ng ph\u1ea3n h\u1ed3i \u1edf 127.0.0.1:" + b.port +
+       ". Game ch\u01b0a n\u1ea1p BepInEx/Macro2kBridge (kh\u1edfi \u0111\u1ed9ng l\u1ea1i game " +
+       "sau khi copy file game), ho\u1eb7c plugin l\u1ed7i \u2014 xem BepInEx\\\\LogOutput.log.");
 }
 
 // ── Project game path (Win32 Settings → Game) ─────────────────────────────────
@@ -1286,6 +1310,7 @@ window.__recv = function(raw){
     return;
   }
   if(type==="flow_loaded"){ applyFlow(data); return; }
+  if(type==="bridge_status"){ S.bridge=data; renderBridge(); return; }
   if(type==="launch_blocked"){ onLaunchBlocked(data); return; }
   if(type==="running_state"){
     const wasRunning = S.running;

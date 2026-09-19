@@ -273,7 +273,12 @@ const WF_QUICK_CONNECT = {
 };
 function wfQuickNodePosition(clientX, clientY){
   const wr=$("wf-world").getBoundingClientRect();
-  return {x:wfSnap((clientX-wr.left)/wfZoom-70), y:wfSnap((clientY-wr.top)/wfZoom-14)};
+  // Corner-at-pointer: the block's top-left lands exactly where you point, and
+  // with Snap on that corner sits on the nearest grid intersection. The old
+  // half-card offsets (−70/−90) always pushed the corner a half-cell off the
+  // grid, which is why blocks could never be dropped with their corner on a
+  // grid line.
+  return {x:wfSnap((clientX-wr.left)/wfZoom), y:wfSnap((clientY-wr.top)/wfZoom)};
 }
 function wfQuickConnectItems(port){
   const ids=WF_QUICK_CONNECT[port]||WF_QUICK_CONNECT.out;
@@ -746,7 +751,7 @@ async function wfRunSingleNode(node){
   const clean={ id:node.id, type:node.type, params:Object.assign({}, node.params||{}) };
   if(node.note) clean.note=node.note;
   if(node.log)  clean.log=node.log;
-  if(node.outputLog) clean.outputLog=node.outputLog;
+  clean.outputLogs=wfOutputLogValues(node);
   // Per-node timing/retry used by the engine for real runs — include so test
   // matches production behaviour (except wait timeout which is capped).
   if(node.delayBefore) clean.delayBefore=node.delayBefore;
@@ -1101,7 +1106,8 @@ function wfInitCanvas(){
     wfWireInsertClear();
     const g=wfGraph(); if(!g){ uiToast("Select or create an activity/function first.","warning"); wfPaletteDrag=null; return; }
     const wr=$("wf-world").getBoundingClientRect();
-    const x=wfSnap((e.clientX-wr.left)/wfZoom-70), y=wfSnap((e.clientY-wr.top)/wfZoom-14);
+    // Corner at the pointer — with Snap on, the corner lands on a grid point.
+    const x=wfSnap((e.clientX-wr.left)/wfZoom), y=wfSnap((e.clientY-wr.top)/wfZoom);
     wfPushUndo();
     let node;
     if(wfPaletteDrag.startsWith("call:")){ node=wfNewNode("call",x,y); node.params={fn:wfPaletteDrag.slice(5)}; }

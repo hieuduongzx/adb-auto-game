@@ -218,6 +218,11 @@ class WorkflowRunnerAPI:
         self._refresh_hz = 6.0
         self._refresh_thread: Optional[threading.Thread] = None
         self._capture_lock = threading.Lock()
+        # Last time the preview tried to (re)attach the Win32 window — see
+        # _grab_frame; a missing window is retried at most every 2 s.
+        self._win32_attach_at = 0.0
+        # Last time the Unity Bridge was probed for the footer indicator.
+        self._bridge_status_at = 0.0
 
         # A standalone Runner build knows its own version + update repo.
         self._runner_info: Dict[str, Any] = runner_update.build_info()
@@ -1066,6 +1071,8 @@ class WorkflowRunnerAPI:
                  "icon": self._icon_url(),
                  "iconKey": self._icon_key()}
         self._push("flow_loaded", state)
+        # unity_bridge: show from the start whether the in-game plugin answers.
+        self._push_bridge_status(force=True)
         # The controller just changed: start (or park) ADB device watching.
         self._kick_device_scan()
         return state
@@ -1098,6 +1105,9 @@ class WorkflowRunnerAPI:
         # Reset UI activity statuses.
         for a in self._activities_payload():
             self._push("activity_update", {"id": a["id"], "status": "pending"})
+        # Re-check the Unity Bridge now: the operator usually starts the game
+        # right before pressing Start, so this is when it matters.
+        self._push_bridge_status(force=True)
         return self.engine.start(background=True)
 
     def run_activity(self, activity_id: str) -> bool:
@@ -1537,14 +1547,53 @@ class WorkflowRunnerAPI:
             if self._controller() == "win32":
                 try:
                     from src.core.win32 import Win32GameAutomation
-                    if not isinstance(auto, Win32GameAutomation):
-                        self.engine._ensure_ready_win32()
+                    # Attach on the first frame, and keep retrying while no window
+                    # is attached: the game is usually started *after* the app, so
+                    # the window only becomes findable later. Throttled — a missing
+                    # window must not re-enumerate (and re-log) at frame rate.
+                    if (not isinstance(auto, Win32GameAutomation)
+                            or not getattr(auto, "hwnd", None)):
+                        now = time.time()
+                        if now - self._win32_attach_at >= 2.0:
+                            self._win32_attach_at = now
+                            self.engine._ensure_ready_win32()
                         auto = self.engine.auto
                 except Exception:
                     pass
+                self._push_bridge_status()
             return auto.capture_screen()
         except Exception:
             return None
+
+    def _push_bridge_status(self, force: bool = False) -> None:
+        """Tell the page whether the in-game Unity Bridge answers.
+
+        A ``unity_bridge`` workflow that can't reach its plugin silently falls
+        back to ``anchored_touch``, which many Unity games ignore — the operator
+        then sees "the window is there but nothing happens". Showing it in the
+        footer (and logging it on attach) is what turns that into a one-glance
+        diagnosis. Throttled; only for unity_bridge workflows."""
+        if self._controller() != "win32":
+            return
+        cfg = (self.flow.get("win32") or {}) if self.flow else {}
+        if str(cfg.get("inputMode") or "").strip().lower() != "unity_bridge":
+            return
+        now = time.time()
+        if not force and now - self._bridge_status_at < 5.0:
+            return
+        self._bridge_status_at = now
+        try:
+            port = int(cfg.get("bridgePort") or 17820)
+        except (TypeError, ValueError):
+            port = 17820
+        reply = ""
+        try:
+            from src.core.win32 import unity_bridge
+            reply = unity_bridge.ping(port) or ""
+        except Exception:
+            reply = ""
+        self._push("bridge_status", {"port": port, "ok": reply.startswith("ok"),
+                                     "reply": reply})
 
     def _encode_frame(self, bgr) -> Optional[dict]:
         try:

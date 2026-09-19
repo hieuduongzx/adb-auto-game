@@ -1,10 +1,8 @@
 // ── Wires ────────────────────────────────────────────────────────────────────
-// Links are drawn the way ComfyUI/LiteGraph (and Blender's node editor) draw
-// them: a single curve from the output dot to the input dot and nothing else.
-// There is no obstacle avoidance and no lane allocation — a link that passes a
-// block simply runs behind it, because the wire layer paints under the cards.
-// That is the whole trick those editors use: the graph reads from where the
-// blocks sit, so the wires are allowed to stay dumb, calm and predictable.
+// Wires paint below cards, with an underlay at crossings and a direction arrow.
+// Orthogonal return links clear their endpoint cards; unrelated obstacles are
+// still drawn over the wire. Selection highlights adjacent links without
+// rebuilding paths or changing execution-state colours.
 //
 // Three render modes, the same three ComfyUI ships (rail button cycles them):
 //   spline   (default) — cubic bezier, horizontal handles ¼ of the port distance
@@ -28,7 +26,7 @@ function wfWireIndexRebuild(){
       // block, so a link has to swing past that edge to be seen at all — the
       // router solves for it below rather than guessing a handle length.
       const pt={ x:x+p.offsetLeft+p.offsetWidth/2, y:y+p.offsetTop+p.offsetHeight/2,
-                 edge: side==="out" ? right : x };
+                 edge: side==="out" ? right : x, bottom:y+el.offsetHeight };
       ports.set(side+":"+p.dataset.port, pt);
       if(!ports.has(side)) ports.set(side, pt);   // first port of a side = fallback
     });
@@ -143,17 +141,31 @@ function wfLinearPath(a,b){
   return `M${a.x},${a.y} L${a.x+s},${a.y} L${b.x-s},${b.y} L${b.x},${b.y}`;
 }
 function wfStraightPath(a,b){
-  const s=wfStub(a,b), dy=b.y-a.y;
-  // Forward links turn at the halfway column; a back-run has no halfway column
-  // to use, so it turns just past its own stub and runs the vertical there.
-  const mx=(b.x-a.x > s*2+20) ? (a.x+b.x)/2 : a.x+s+10;
-  if(Math.abs(dy)<1) return `M${a.x},${a.y} L${b.x},${b.y}`;
-  const sy=dy>0?1:-1;
-  const d1=mx-a.x, d2=b.x-mx;
-  const r=Math.max(0, Math.min(9, Math.abs(dy)/2, Math.abs(d1), Math.abs(d2)));
-  const h1=d1>=0?1:-1, h2=d2>=0?1:-1;
-  return `M${a.x},${a.y} L${mx-h1*r},${a.y} Q${mx},${a.y} ${mx},${a.y+sy*r}`+
-         ` L${mx},${b.y-sy*r} Q${mx},${b.y} ${mx+h2*r},${b.y} L${b.x},${b.y}`;
+  const pts=wfOrthogonalPoints(a,b);
+  let d=`M${a.x},${a.y}`;
+  for(let i=1;i<pts.length-1;i++){
+    const p=pts[i-1],q=pts[i],r=pts[i+1];
+    const before=Math.hypot(q.x-p.x,q.y-p.y),after=Math.hypot(r.x-q.x,r.y-q.y);
+    const radius=Math.min(10,before/2,after/2);
+    if(!radius){ d+=` L${q.x},${q.y}`; continue; }
+    d+=` L${q.x-(q.x-p.x)/before*radius},${q.y-(q.y-p.y)/before*radius}`+
+       ` Q${q.x},${q.y} ${q.x+(r.x-q.x)/after*radius},${q.y+(r.y-q.y)/after*radius}`;
+  }
+  return d+` L${b.x},${b.y}`;
+}
+function wfOrthogonalPoints(a,b){
+  const s=wfStub(a,b);
+  if(b.x-a.x>s*2){
+    if(Math.abs(b.y-a.y)<1) return [a,b];
+    const mx=(a.x+b.x)/2;
+    return [a,{x:mx,y:a.y},{x:mx,y:b.y},b];
+  }
+  // A return edge must leave the source to the right, travel below both
+  // cards, then approach the destination from the left (including self-links).
+  const right=Math.max(a.x,a.edge??a.x)+s;
+  const left=Math.min(b.x,b.edge??b.x)-s;
+  const y=Math.max(a.bottom??a.y,b.bottom??b.y)+28;
+  return [a,{x:right,y:a.y},{x:right,y},{x:left,y},{x:left,y:b.y},b];
 }
 function wfWirePath(a,b){
   if(wfLinkMode==="linear")   return wfLinearPath(a,b);
@@ -161,20 +173,25 @@ function wfWirePath(a,b){
   return wfSplinePath(a,b);
 }
 
-// Flow marker — ComfyUI's default LinkMarkerShape.Circle: a filled disc at
-// the link midpoint, same colour as the rope. Direction is already in the
-// curve (left → right). Computed analytically per shape, never via
-// getPointAtLength — that would force a layout flush per wire on every drag.
+// Arrow position and tangent are computed from the route rather than reading
+// SVG path geometry on every drag frame.
 function wfLinkMid(a,b){
   if(wfLinkMode==="linear"){
     const s=wfStub(a,b), p={x:a.x+s,y:a.y}, q={x:b.x-s,y:b.y};
     return { x:(p.x+q.x)/2, y:(p.y+q.y)/2, ang:Math.atan2(q.y-p.y,q.x-p.x) };
   }
   if(wfLinkMode==="straight"){
-    const s=wfStub(a,b), dy=b.y-a.y;
-    const mx=(b.x-a.x > s*2+20) ? (a.x+b.x)/2 : a.x+s+10;
-    if(Math.abs(dy)<1) return { x:(a.x+b.x)/2, y:a.y, ang:b.x>=a.x?0:Math.PI };
-    return { x:mx, y:(a.y+b.y)/2, ang:dy>0?Math.PI/2:-Math.PI/2 };
+    const pts=wfOrthogonalPoints(a,b);
+    const lengths=pts.slice(1).map((p,i)=>Math.hypot(p.x-pts[i].x,p.y-pts[i].y));
+    let remaining=lengths.reduce((sum,n)=>sum+n,0)/2;
+    for(let i=0;i<lengths.length;i++){
+      if(remaining<=lengths[i]){
+        const p=pts[i],q=pts[i+1],t=lengths[i]?remaining/lengths[i]:0;
+        return {x:p.x+(q.x-p.x)*t,y:p.y+(q.y-p.y)*t,ang:Math.atan2(q.y-p.y,q.x-p.x)};
+      }
+      remaining-=lengths[i];
+    }
+    return {x:a.x,y:a.y,ang:0};
   }
   const off=wfSplineOffCached(a,b), lift=wfSplineLift(b.x-a.x, b.y-a.y);
   const c1={x:a.x+off,y:a.y-lift}, c2={x:b.x-off,y:b.y-lift};
@@ -191,7 +208,6 @@ function wfLinkMid(a,b){
 // canvas is visible again.
 let wfWiresStale=false;
 const WF_NS="http://www.w3.org/2000/svg";
-const WF_FLOW_R=3.2;
 
 function wfDrawWires(){
   if(typeof wfMinimapQueue==="function") wfMinimapQueue();   // node moves redraw wires → keep the map live
@@ -220,6 +236,7 @@ function wfDrawWires(){
   routes.sort((p,q)=>p.span-q.span || (p.key<q.key?-1:p.key>q.key?1:0));
 
   const frag=document.createDocumentFragment();
+  const byId=new Map((g.nodes||[]).map(n=>[n.id,n]));
   routes.forEach(({ed,a,b,toPort})=>{
     const d=wfWirePath(a,b);
     const grp=document.createElementNS(WF_NS,"g");
@@ -228,26 +245,43 @@ function wfDrawWires(){
     hit.setAttribute("class","wire-hit"); hit.setAttribute("d",d);
     hit.setAttribute("tabindex","0"); hit.setAttribute("role","button");
     const fromLabel=WF_PORT_LBL[ed.fromPort]||ed.fromPort||"out";
-    hit.setAttribute("aria-label",`Wire ${fromLabel||"out"}; press Delete to remove`);
+    const nodeLabel=id=>{ const n=byId.get(id); return n&&(WF_NODES[n.type]?.label||n.type)||id; };
+    const description=`${nodeLabel(ed.from)} → ${nodeLabel(ed.to)} (${fromLabel})`;
+    hit.setAttribute("aria-label",description+"; press Delete to remove");
     const tt=document.createElementNS(WF_NS,"title");
-    tt.textContent="Right-click or press Delete to remove wire"; hit.appendChild(tt);
-    const src=(g.nodes||[]).find(n=>n.id===ed.from);
-    const tone=typeof wfWireTone==="function" ? wfWireTone(ed.fromPort, toPort, src) : "";
+    tt.textContent=description+" · Right-click or Delete to remove"; hit.appendChild(tt);
+    const src=byId.get(ed.from);
+    const tone=typeof wfWireTone==="function" ? wfWireTone(ed.fromPort, toPort, src, ed) : "";
     const p=document.createElementNS(WF_NS,"path");
     p.setAttribute("class","wire"+(toPort==="loop"?" loopback":"")+(tone?" tone-"+tone:""));
     p.dataset.from=ed.from; p.dataset.fromport=ed.fromPort; p.dataset.to=ed.to;
     p.setAttribute("d",d);
     const m=wfLinkMid(a,b);
-    const dot=document.createElementNS(WF_NS,"circle");
+    const dot=document.createElementNS(WF_NS,"path");
     dot.setAttribute("class","wire-flow"+(toPort==="loop"?" loopback":"")+(tone?" tone-"+tone:""));
     dot.dataset.fromport=ed.fromPort;
-    dot.setAttribute("cx", m.x.toFixed(1));
-    dot.setAttribute("cy", m.y.toFixed(1));
-    dot.setAttribute("r", String(WF_FLOW_R));
-    grp.appendChild(hit); grp.appendChild(p); grp.appendChild(dot);
+    dot.setAttribute("d","M-4,-3.5 L4,0 L-4,3.5 Z");
+    dot.setAttribute("transform",`translate(${m.x},${m.y}) rotate(${m.ang*180/Math.PI})`);
+    const halo=document.createElementNS(WF_NS,"path");
+    halo.setAttribute("class","wire-halo"); halo.setAttribute("d",d);
+    grp.appendChild(halo); grp.appendChild(hit); grp.appendChild(p); grp.appendChild(dot);
     frag.appendChild(grp);
   });
   svg.appendChild(frag);
+  wfSyncWireSelection();
+}
+function wfSyncWireSelection(){
+  const svg=$("wf-wires"); if(!svg) return;
+  const selected=new Set(WF.sel||[]);
+  svg.classList.toggle("has-selection",selected.size>0);
+  svg.querySelectorAll(".wire-grp").forEach(grp=>{
+    const e=grp.__edge;
+    grp.classList.toggle("related",!!e&&(selected.has(e.from)||selected.has(e.to)));
+  });
+  const button=$("wf-fit-selection"); if(button) button.disabled=!selected.size;
+  const stats=$("wf-graph-stats"),g=wfGraph();
+  if(stats) stats.textContent=g?`${g.nodes.length} nodes · ${(g.edges||[]).length} links`+
+    (selected.size?` · ${selected.size} selected`:""):"";
 }
 // One delegated key handler for every wire hit-path — 200 wires no longer mean
 // 200 listeners rebuilt on each draw.

@@ -44,6 +44,7 @@ from src.utils import (
     load_ui_settings,
     sanitize_name as _sanitize_name,
     save_ui_settings,
+    source_python,
     theme_background,
     titled,
     webview_storage_path,
@@ -650,7 +651,7 @@ class WorkflowHubAPI:
                       repo: str, dry_run: bool) -> None:
         script = os.path.join(_SOURCE_ROOT, "packaging", "build_runner.py")
         folder = os.path.dirname(os.path.abspath(info["path"]))
-        cmd = [sys.executable, "-u", script, "--workflow", folder, "--version", version,
+        cmd = [source_python(), "-u", script, "--workflow", folder, "--version", version,
                "--repo", repo, "--verbose", "--save-version"]
         if publish:
             cmd.append("--publish")

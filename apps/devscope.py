@@ -10,7 +10,7 @@ Features:
 - Color picker (RGB / HEX at last clicked point)
 - Manual tap / swipe sender
 - Template match tester (threshold / grayscale / multi-scale)
-- OCR via OCRReader (Tesseract / EasyOCR / PaddleOCR) - switchable at runtime
+- OCR via recognition-only PP-OCRv5 Mobile - model registry remains selectable
 - Live device info panel
 - Region crop: Save crop... (dialog), QuickCrop (no dialog) + filename field
 
@@ -53,7 +53,7 @@ from src.core.adb.input import (
     get_input_backend as get_adb_input_backend,
     set_input_backend as set_adb_input_backend,
 )
-from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
+from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCR_MODEL_LABELS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.utils import (
     add_log_subscriber,
@@ -217,6 +217,10 @@ class DevScopeAPI:
         """Initial state hydration called by JS on load."""
         return {
             "ocrBackends": list(KNOWN_BACKENDS),
+            "ocrModels": [
+                {"id": model, "label": OCR_MODEL_LABELS[model]}
+                for model in KNOWN_BACKENDS
+            ],
             "autoRefresh": self._auto_refresh_enabled,
             "refreshHz": self._refresh_hz,
             "minHz": self.AUTO_REFRESH_MIN_HZ,
@@ -827,6 +831,7 @@ class DevScopeAPI:
         else:
             log_warning(f"OCR backend '{name}' not available")
         return {"engine": engine if engine != "none" else "n/a",
+                "label": OCR_MODEL_LABELS.get(name, OCR_MODEL_LABELS[KNOWN_BACKENDS[0]]),
                 "available": available}
 
     def read_text(self, whitelist: str = "") -> str:

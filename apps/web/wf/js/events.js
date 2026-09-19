@@ -118,6 +118,10 @@ window.__recv = function(raw){
     // New node → any previous delayAfter countdown is done.
     if(typeof wfClearNodeDelay==="function") wfClearNodeDelay();
     if(data.id){ wfLiveNode=data.id; wfNoteNodeStart(data.id); }   // the true running node, even if in an off-screen graph
+    // Timeout-bounded blocks count down on their corner badge. delayBefore
+    // (node_delay "before", next event) replaces this briefly; the timeout's
+    // engine clock only starts once the block runs, so we re-arm it then.
+    if(data.id && typeof wfStartNodeTimeout==="function") wfStartNodeTimeout(data.id);
     // A call block stays ringed for as long as its function runs, on whichever
     // graph is being viewed — see wfCallStackEnter.
     if(data.id) wfCallStackEnter(data.id);
@@ -133,7 +137,7 @@ window.__recv = function(raw){
     if(!wfRunning && !wfNodeTesting) return;
     // delayBefore is over once the action reports a result; delayAfter may start
     // next via node_delay — only clear a before-wait here so we don't wipe after.
-    if(typeof wfDelayState!=="undefined" && wfDelayState && wfDelayState.phase==="before")
+    if(typeof wfDelayState!=="undefined" && wfDelayState && (wfDelayState.phase==="before" || wfDelayState.phase==="timeout"))
       wfClearNodeDelay();
     wfNoteNodeDone(data.id);
     if(data.id) wfCallStackExit(data.id);   // a call reports only once its function ended
@@ -156,6 +160,9 @@ window.__recv = function(raw){
       wfStartNodeDelay(data.id, data.phase, data.seconds);
     } else {
       wfEndNodeDelay(data.id);
+      // delayBefore just ended → the block itself runs now, so its timeout
+      // deadline starts here (the engine sets it after the pre-block sleep).
+      if(data.id && typeof wfStartNodeTimeout==="function") wfStartNodeTimeout(data.id);
     }
     return;
   }
@@ -411,7 +418,7 @@ async function wfNew(){
   WF.speedhack={enabled:false, speed:2.0, native:false};
   WF.controller=controller;
   WF.win32={window:"", matchBy:"title", inputMode, path:""};
-  WF.ocrBackend=""; if(typeof wfSyncOcrUI==="function") wfSyncOcrUI();
+  WF.ocrBackend=wfNormalizeOcrBackend(""); if(typeof wfSyncOcrUI==="function") wfSyncOcrUI();
   WF.captureBackend=capture;
   if(typeof wfApplyCaptureBackend==="function") wfApplyCaptureBackend(capture);
   WF.inputBackend="adb";

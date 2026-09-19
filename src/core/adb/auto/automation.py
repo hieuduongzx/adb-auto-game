@@ -74,9 +74,9 @@ class ADBGameAutomation:
         if self.is_debug:
             self.visualizer.enable(self.is_debug_fail)
 
-        # OCR reader. Backend is chosen via ``ocr_backend``; ``None``
-        # auto-detects (tesseract first, then easyocr). If the chosen
-        # backend isn't installed, the reader stays in
+        # OCR reader. The model is chosen via ``ocr_backend``; currently the
+        # registry contains PP-OCRv5 Mobile recognition only. If the runtime
+        # isn't installed, the reader stays in
         # ``available=False`` mode and OCR helpers return safe empty
         # results. Switch at runtime via :meth:`set_ocr_backend`.
         self.ocr = OCRReader(backend=ocr_backend)
@@ -253,7 +253,7 @@ class ADBGameAutomation:
         neural models in memory) and (lazily) initialises the new one.
         Returns ``True`` if the new backend became available.
 
-        Supported backends: ``"tesseract"``, ``"easyocr"``.
+        Currently supported model: ``"ppocr_v5_mobile"``.
         """
         return self.ocr.set_backend(backend)
 

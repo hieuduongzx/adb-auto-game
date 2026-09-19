@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from src.utils import log_error, log_info, log_warning, log_debug
+from src.utils import log_error, log_info, log_warning, log_debug, LOG_KIND_ACTIVITY
 from src.core.adb.auto.automation import ADBGameAutomation
 from src.core.adb.auto.config import Config
 from src.core.adb.auto.template_matcher import TemplateMatcher
@@ -204,6 +204,10 @@ class Win32Controller:
         self._anchors: Dict[int, object] = {}  # input thread id -> AnchorWindow
         self._anchored_warned = False
         self._bridge_warned = False
+        self._bridge_miss_warned = False
+        # When attach fails we dump the open windows to help diagnose a bad
+        # target; throttled because an unattached preview retries repeatedly.
+        self._window_list_at = 0.0
 
     # ── config ────────────────────────────────────────────────────────────────
     def configure(self, cfg: dict) -> None:
@@ -215,6 +219,7 @@ class Win32Controller:
         self._wgc_stop()
         self._touch_stop()
         self._bridge_warned = False
+        self._bridge_miss_warned = False
 
     def _touch_stop(self) -> None:
         """Release the synthetic touch device + anchor window (if any)."""
@@ -262,15 +267,106 @@ class Win32Controller:
             log_error("[win32] Chưa đặt tên/lớp cửa sổ mục tiêu (Project settings)")
             return False
         hwnd = self._find_hwnd(pattern, by)
+        if not hwnd and by == "title":
+            # A game started as Administrator has an unreadable title (UIPI
+            # blocks WM_GETTEXT, so GetWindowText returns ""), and a localised
+            # client's title may simply differ — in both cases no title ever
+            # matches. Fall back to the configured program's exe name, which
+            # needs only PROCESS_QUERY_LIMITED_INFORMATION (never UIPI-blocked).
+            exe = self._exe_pattern()
+            if exe:
+                hwnd = self._find_hwnd(exe, "exe")
+                if hwnd:
+                    log_info(f"[win32] Không khớp tiêu đề '{pattern}' — "
+                             f"gắn theo chương trình '{exe}' thay thế")
         if not hwnd:
             log_warning(f"[win32] Không tìm thấy cửa sổ khớp '{pattern}' ({by})")
+            self._log_window_list()
             self.hwnd = None
             return False
         self.hwnd = hwnd
         _, win32gui = self._w[0], self._w[1]
-        log_info(f"[win32] Gắn cửa sổ 0x{hwnd:X} — '{win32gui.GetWindowText(hwnd)}'")
+        title = win32gui.GetWindowText(hwnd) or "(tiêu đề không đọc được)"
+        log_info(f"[win32] Gắn cửa sổ 0x{hwnd:X} — '{title}'")
         self._warn_if_uipi_blocked()
+        if self._bridge_mode():
+            self._check_bridge()
         return True
+
+    def _bridge_port(self) -> int:
+        try:
+            return int(self.cfg.get("bridgePort") or _BRIDGE_DEFAULT_PORT)
+        except (TypeError, ValueError):
+            return _BRIDGE_DEFAULT_PORT
+
+    def _check_bridge(self) -> None:
+        """Announce whether the in-game Unity Bridge answers, right after attach.
+
+        A ``unity_bridge`` workflow is chosen precisely because message-based
+        input is ignored by the game, yet when the plugin is missing the code
+        silently falls back to ``anchored_touch``, which many Unity games also
+        ignore — so the operator sees "the window is there but nothing happens"
+        with no clue. This probes 127.0.0.1 and says exactly what to fix."""
+        try:
+            from src.core.win32 import unity_bridge
+        except Exception:
+            return
+        port = self._bridge_port()
+        reply = unity_bridge.ping(port)
+        if reply and reply.startswith("ok"):
+            log_info(f"[win32] unity_bridge đã kết nối plugin 127.0.0.1:{port} — {reply}")
+        else:
+            log_error(
+                f"[win32] unity_bridge KHÔNG kết nối được plugin tại 127.0.0.1:{port} "
+                "(game chưa nạp BepInEx/Macro2kBridge, hoặc plugin lỗi). "
+                "Sau khi copy file game (Settings → Game files) PHẢI khởi động lại game; "
+                "kiểm tra BepInEx\\LogOutput.log trong thư mục game. "
+                "Trong lúc đó tool tạm dùng anchored_touch nên có thể không điều khiển được."
+            )
+        # Either way one message is enough — stop _bridge_call repeating it.
+        self._bridge_warned = True
+
+    def _exe_pattern(self) -> str:
+        """Basename of the configured game program (``cfg['path']``)."""
+        path = str(self.cfg.get("path", "")).strip()
+        return os.path.basename(path) if path else ""
+
+    def _log_window_list(self, limit: int = 20, min_interval: float = 30.0) -> None:
+        """Log the visible top-level windows when the target can't be matched, so
+        the user (and whoever supports them) can see what Windows actually
+        reports — a localised title, a missing window, or blank titles on an
+        elevated game. Throttled: an unattached preview retries every couple of
+        seconds and must not flood the log."""
+        now = time.time()
+        if now - self._window_list_at < min_interval:
+            return
+        self._window_list_at = now
+        win32gui, win32process = self._w[1], self._w[5]
+        rows: List[tuple] = []
+
+        def _cb(hwnd, _):
+            try:
+                if not win32gui.IsWindowVisible(hwnd):
+                    return
+                title = win32gui.GetWindowText(hwnd) or ""
+                cls = win32gui.GetClassName(hwnd) or ""
+                if not title and not cls:
+                    return
+                pid = int(win32process.GetWindowThreadProcessId(hwnd)[1])
+                rows.append((title, cls, pid))
+            except Exception:
+                return
+
+        try:
+            win32gui.EnumWindows(_cb, None)
+        except Exception:
+            return
+        if not rows:
+            return
+        log_warning(f"[win32] {len(rows)} cửa sổ đang mở (tiêu đề | lớp | exe):")
+        for title, cls, pid in rows[:limit]:
+            log_warning(f"[win32]   '{title}' | {cls} | "
+                        f"{process_exe_name(pid) or f'pid {pid}'}")
 
     # ── UIPI (integrity level) check ───────────────────────────────────────────
     # Windows blocks PostMessage/SendInput from a lower-integrity process to a
@@ -325,6 +421,12 @@ class Win32Controller:
                 log_error(f"[win32] PID không hợp lệ: '{pattern}'")
                 return None
         found: List[int] = []
+        # Windows whose exe matched but whose title is unreadable. A game started
+        # as Administrator has an unreadable title (UIPI blocks WM_GETTEXT, so
+        # GetWindowText returns ""), so it can never match a title pattern — yet
+        # it is a perfectly valid target. Kept apart from ``found`` so a titled
+        # window of the same exe always wins.
+        untitled: List[int] = []
         exe_by_pid: dict[int, str] = {}
 
         def _cb(hwnd, _):
@@ -343,10 +445,17 @@ class Win32Controller:
                     if pid not in exe_by_pid:
                         exe_by_pid[pid] = process_exe_name(pid).lower()
                     exe = exe_by_pid[pid]
-                    stem = os.path.splitext(exe)[0]
-                    ok = bool(win32gui.GetWindowText(hwnd)) and (
-                        fnmatch.fnmatch(exe, low) if use_glob else low in (exe, stem)
-                    )
+                    base = os.path.basename(exe)
+                    base_stem = os.path.splitext(base)[0]
+                    if use_glob:
+                        ok = fnmatch.fnmatch(base, low) or fnmatch.fnmatch(exe, low)
+                    else:
+                        # Match by file name ("BrownDust II.exe") as well as by the
+                        # full path it was configured with: the same game often
+                        # lives in a different folder on every PC, and the exe
+                        # name is what identifies it.
+                        ok = (low in (base, base_stem, exe, os.path.splitext(exe)[0])
+                              or low in base)
             elif by == "class":
                 name = win32gui.GetClassName(hwnd) or ""
                 ok = (name == pattern) or (use_glob and fnmatch.fnmatch(name.lower(), low))
@@ -356,10 +465,15 @@ class Win32Controller:
                     return
                 ok = fnmatch.fnmatch(title.lower(), low) if use_glob else (low in title.lower())
             if ok:
-                found.append(hwnd)
+                if by == "exe" and not win32gui.GetWindowText(hwnd):
+                    untitled.append(hwnd)
+                else:
+                    found.append(hwnd)
 
         win32gui.EnumWindows(_cb, None)
-        return found[0] if found else None
+        if found:
+            return found[0]
+        return untitled[0] if untitled else None
 
     def get_screen_size(self) -> Tuple[int, int]:
         if not self.hwnd:
@@ -972,10 +1086,7 @@ class Win32Controller:
 
         Returns None when the plugin is unreachable; the caller falls back to
         anchored_touch. One connection per command keeps this thread-safe."""
-        try:
-            port = int(self.cfg.get("bridgePort") or _BRIDGE_DEFAULT_PORT)
-        except (TypeError, ValueError):
-            port = _BRIDGE_DEFAULT_PORT
+        port = self._bridge_port()
         try:
             with socket.create_connection(("127.0.0.1", port), timeout=2.0) as sock:
                 sock.settimeout(max(0.0, float(op_ms)) / 1000.0 + 6.0)
@@ -993,7 +1104,8 @@ class Win32Controller:
             if not self._bridge_warned:
                 self._bridge_warned = True
                 log_warning(f"[win32] unity_bridge: không kết nối được plugin 127.0.0.1:{port} "
-                            f"({exc}) — game đã load BD2MOD chưa? Tạm dùng anchored_touch.")
+                            f"({exc}) — game đã load BD2MOD chưa? Tạm dùng anchored_touch.",
+                            kind=LOG_KIND_ACTIVITY)
             return None
 
     def _bridge_result(self, reply: Optional[str], what: str) -> Optional[bool]:
@@ -1003,6 +1115,12 @@ class Win32Controller:
         if reply.startswith("ok"):
             return True
         if reply == "miss":
+            if not self._bridge_miss_warned:
+                self._bridge_miss_warned = True
+                log_warning(
+                    f"[win32] unity_bridge: plugin phản hồi nhưng {what} không trúng UI "
+                    "(EventSystem) — tool chuyển sang anchored_touch. Kiểm tra toạ độ "
+                    "theo độ phân giải cửa sổ.", kind=LOG_KIND_ACTIVITY)
             log_debug(f"[win32] unity_bridge: {what} không trúng UI — thử anchored_touch")
             return None
         log_warning(f"[win32] unity_bridge {what}: {reply}")
@@ -1695,11 +1813,12 @@ class Win32Controller:
             if not self._bridge_key_warned:
                 self._bridge_key_warned = True
                 log_warning("[win32] unity_bridge: plugin trong game chưa hỗ trợ phím (lệnh key) — "
-                            "build lại plugin rồi mở lại game; tạm gửi phím qua window message")
+                            "build lại plugin rồi mở lại game; tạm gửi phím qua window message",
+                            kind=LOG_KIND_ACTIVITY)
             return None
         if reply.startswith("ok"):
             return True
-        log_warning(f"[win32] unity_bridge key: {reply}")
+        log_warning(f"[win32] unity_bridge key: {reply}", kind=LOG_KIND_ACTIVITY)
         return False
 
     def press_key(self, keycode: int, hold_ms: float = 0, action: str = "press") -> bool:

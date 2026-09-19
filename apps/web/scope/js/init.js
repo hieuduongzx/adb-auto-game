@@ -13,11 +13,12 @@ async function init(){
     S.captureBackend=capSel.value;
   }
   const sel=$("ocr-backend");
-  (state.ocrBackends||[]).forEach(b=>{const o=document.createElement("option");o.value=o.textContent=b;sel.appendChild(o);});
+  const models=state.ocrModels||[];
+  models.forEach(model=>{const o=document.createElement("option");o.value=model.id;o.textContent=model.label||model.id;sel.appendChild(o);});
   if(sel.options.length){
     const r=await api().set_ocr_backend(sel.value);
     const el=$("ocr-engine");
-    el.textContent=r.engine+(r.available?" · ready":" · unavailable");
+    el.textContent=(r.label||r.engine)+(r.available?" · ready":" · unavailable");
     el.className=r.available?"":"unavailable";
   }
   S.autoRefresh=!!state.autoRefresh;

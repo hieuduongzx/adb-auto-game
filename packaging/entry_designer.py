@@ -27,6 +27,14 @@ if not getattr(sys, "frozen", False):
 
 
 def main() -> None:
+    # Unblock the bundle first: an app downloaded as a .zip carries Windows'
+    # Mark-of-the-Web on its DLLs, and the .NET Framework refuses to load those
+    # (Python.NET then fails with "Failed to resolve Python.Runtime.Loader.
+    # Initialize"). Must run before webview imports clr.
+    from src.utils import unblock_bundled_files
+
+    unblock_bundled_files()
+
     argv = sys.argv[1:]
     if argv and argv[0] == "--runner":
         flow = argv[1] if len(argv) > 1 else None

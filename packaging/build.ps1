@@ -6,7 +6,7 @@
     dist/Macro2k/               <- the app folder (PyInstaller output + vendor)
         Macro2k.exe
         _macro2k/               private runtime files
-        vendor/                 adb / frida / tesseract
+        vendor/                 adb / frida
 
     dist/installer/             <- (with -Installer) the wizard installer
         Macro2k-Setup-<ver>.exe

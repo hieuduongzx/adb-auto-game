@@ -117,6 +117,9 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "note":       {"label": "Ghi chú",       "kind": "note",      "ins": 0, "outs": []},
     "tap":        {"label": "Chạm",          "kind": "action",    "ins": 1, "outs": ["out"]},
     "multi_tap":  {"label": "Chạm nhiều điểm", "kind": "action",    "ins": 1, "outs": ["out"]},
+    "sequence_tap": {"label": "Chạm tuần tự", "kind": "action", "ins": 1, "outs": ["out"]},
+    "sequence_tap_image": {"label": "Chạm tuần tự ảnh", "kind": "action", "ins": 1, "outs": ["out"]},
+    "stop_sequence": {"label": "Dừng sequence", "kind": "action", "ins": 1, "outs": ["out"]},
     "double_tap": {"label": "Chạm đúp",      "kind": "action",    "ins": 1, "outs": ["out"]},
     "tap_random": {"label": "Chạm ngẫu nhiên","kind": "action",   "ins": 1, "outs": ["out"]},
     "long_press": {"label": "Giữ",           "kind": "action",    "ins": 1, "outs": ["out"]},
@@ -755,6 +758,8 @@ class WorkflowEngine:
         self._seq_thread: Optional[threading.Thread] = None
         self._bg_threads: Dict[str, threading.Thread] = {}
         self._bg_stop: Dict[str, threading.Event] = {}
+        self._sequence_stops: Dict[str, threading.Event] = {}
+        self._sequence_stops_lock = threading.Lock()
 
         # GUI hooks; all optional.
         self.callbacks: Dict[str, List[Callable]] = {
@@ -793,6 +798,9 @@ class WorkflowEngine:
         self._actions: Dict[str, Callable[[Dict, Dict], bool]] = {
             "tap": self._a_tap,
             "multi_tap": self._a_multi_tap,
+            "sequence_tap": self._a_sequence_tap,
+            "sequence_tap_image": self._a_sequence_tap_image,
+            "stop_sequence": self._a_stop_sequence,
             "double_tap": self._a_double_tap,
             "tap_random": self._a_tap_random,
             "long_press": self._a_long_press,
@@ -987,8 +995,8 @@ class WorkflowEngine:
         if not pkg:
             pkg = str((self.speedhack_cfg or {}).get("package") or "").strip()
         self.package = pkg
-        # OCR engine của flow ("tesseract" / "easyocr" / "paddleocr"…; rỗng = auto):
-        # chọn trong Project settings của designer, áp dụng ở _ensure_ready().
+        # OCR model của flow. OCRReader migrates legacy engine names to the
+        # sole current model (PP-OCRv5 Mobile recognition).
         self._ocr_backend = str(self.flow.get("ocr") or "").strip().lower()
         # ADB frame source for this flow: "scrcpy" | "adb". Key "capture" (also
         # accept legacy captureBackend / capture_backend). Applied on load so
@@ -1073,7 +1081,7 @@ class WorkflowEngine:
     # ── Lifecycle ────────────────────────────────────────────────────────────
 
     def _apply_ocr_backend(self) -> None:
-        """Đổi OCR engine của automation theo cấu hình flow (rỗng = giữ mặc định).
+        """Apply the workflow's recognition model to the active automation.
 
         Gọi sau khi backend (ADB/Win32) sẵn sàng — cả hai đều có ``self.auto.ocr``
         (OCRReader). Backend không khả dụng chỉ cảnh báo, không chặn run.
@@ -1090,11 +1098,11 @@ class WorkflowEngine:
             else:
                 ok = bool(ocr.set_backend(name))
             if ok:
-                log_info(f"OCR engine: {name}")
+                log_info(f"OCR model: {getattr(ocr, 'backend_name', name)}")
             else:
-                log_warning(f"OCR '{name}' không khả dụng — dùng engine mặc định")
+                log_warning(f"OCR model '{name}' không khả dụng")
         except Exception as e:
-            log_warning(f"Không đổi được OCR engine '{name}': {e}")
+            log_warning(f"Không đổi được OCR model '{name}': {e}")
 
     def _apply_capture_backend(self) -> None:
         """Apply the flow's ADB capture source (scrcpy / adb screencap).
@@ -1464,8 +1472,19 @@ class WorkflowEngine:
 
     def _node_done(self, node: Dict[str, Any], nid: str, status: str,
                    port: Optional[str]) -> None:
-        """Emit a node result, writing its exit log with post-run variables."""
-        output_log = node.get("outputLog")
+        """Log only the exit actually selected, using post-run variables."""
+        # Nested function/sequence walks leave the child as the current log
+        # owner. Attribute the parent's exit message back to the parent.
+        set_log_node(nid)
+        logs = node.get("outputLogs")
+        if isinstance(logs, dict):
+            key = port if port is not None else "$done"
+            if status == "fail" and port == "out":
+                key = "$error"
+            output_log = logs.get(key)
+        else:
+            # Runner can still execute older files without opening Designer.
+            output_log = node.get("outputLog")
         if output_log:
             log_info(self._format_msg(output_log), kind=LOG_KIND_USER)
         self._emit("on_node_done", nid, status, port)
@@ -1484,7 +1503,7 @@ class WorkflowEngine:
             if start is None:
                 log_warning("Graph has no start node", kind=LOG_KIND_ACTIVITY)
                 return False
-            cur = self._next(adj, start.get("id"), "out")
+            cur = start.get("id")
         self._walk(nodes, adj, cur, {}, depth)
         return not self._branch_failed
 
@@ -1541,7 +1560,10 @@ class WorkflowEngine:
                 self._sleep(db)
                 self._emit("on_node_delay", nid, None, 0)
 
-            if kind == "stop":
+            if kind == "start":
+                self._node_done(node, nid, "ok", "out")
+                cur = self._next(adj, cur, "out")
+            elif kind == "stop":
                 log_info("■ Stop block reached — stopping the run", kind=LOG_KIND_ACTIVITY)
                 self._node_done(node, nid, "ok", None)
                 self.stop()
@@ -1915,6 +1937,7 @@ class WorkflowEngine:
 
         threads = []
         for _p, tgt in active:
+            self._node_done(nodes[node_id], node_id, "ok", _p)
             t = threading.Thread(
                 target=self._walk_branch,
                 args=(nodes, adj, tgt, depth, vars0, pos0, join_ctx, get_log_activity()),
@@ -2800,6 +2823,31 @@ class WorkflowEngine:
         return int(m.group(1)) * 60 + int(m.group(2))
 
     def _compare(self, cur: Any, op: str, rhs: Any) -> bool:
+        type_ops = {
+            "integer": lambda value: isinstance(value, int) and not isinstance(value, bool),
+            "number": lambda value: isinstance(value, (int, float)) and not isinstance(value, bool),
+            "text": lambda value: isinstance(value, str),
+            "empty": lambda value: value is None or (isinstance(value, str) and not value.strip()),
+        }
+        if op.startswith("is_"):
+            base = op[6:] if op.startswith("is_not_") else op[3:].lstrip("_")
+            if base == "integer" and isinstance(cur, str):
+                try:
+                    int(cur.strip())
+                    result = bool(cur.strip())
+                except ValueError:
+                    result = False
+            elif base == "number" and isinstance(cur, str):
+                try:
+                    float(cur.strip())
+                    result = bool(cur.strip())
+                except ValueError:
+                    result = False
+            elif base in type_ops:
+                result = type_ops[base](cur)
+            else:
+                result = False
+            return (not result) if op.startswith("is_not_") else result
         if isinstance(cur, list) and op in ("contains", "!contains"):
             found = rhs in cur
             return found if op == "contains" else not found
@@ -2981,6 +3029,7 @@ class WorkflowEngine:
         spec = NODE_TYPES.get(ntype)
         kind = spec.get("kind") if spec else None
         label = (spec or {}).get("label") or ntype
+        set_log_node(nid)
         self._emit("on_node", nid)
         input_log = work.get("log")
         if input_log:
@@ -3013,7 +3062,7 @@ class WorkflowEngine:
         except Exception as e:
             log_error(f"Block '{label}' lỗi: {e}")
             status = "fail"
-            port = "out"
+            port = "false" if kind == "condition" else "out"
         self._node_done(work, nid, status, port)
         self._emit("on_node", None)  # clear the amber highlight
         return {"status": status, "port": port}
@@ -3371,6 +3420,94 @@ class WorkflowEngine:
             log_info(f"👆 chạm đồng thời {len(points)} điểm: {coords} · {duration_ms}ms")
         return ok
 
+    def _a_sequence_tap(self, node, p) -> bool:
+        """Tap fixed points one by one, waiting after each tap."""
+        points = p.get("points", []) if isinstance(p.get("points"), list) else []
+        if not points:
+            log_warning("sequence tap cần ít nhất 1 điểm")
+            return False
+        sequence_id = str(p.get("sequenceId", "main") or "main")
+        stop_event = self._sequence_stop_event(sequence_id, reset=True)
+        for raw in points[:50]:
+            if stop_event.is_set():
+                log_info(f"■ dừng sequence '{sequence_id}'")
+                return True
+            try:
+                if isinstance(raw, dict):
+                    x, y = int(raw.get("x", 0)), int(raw.get("y", 0))
+                    delay = max(0.0, float(raw.get("delay", 0) or 0))
+                elif isinstance(raw, (list, tuple)) and len(raw) >= 2:
+                    x, y = int(raw[0]), int(raw[1])
+                    delay = max(0.0, float(raw[2] if len(raw) > 2 else 0) or 0)
+                else:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            if not self.auto.tap(x, y, tap_count=1):
+                return False
+            log_info(f"👆 chạm tuần tự ({x}, {y})")
+            if delay and self._sequence_delay(stop_event, delay):
+                return True
+        return True
+
+    def _a_sequence_tap_image(self, node, p) -> bool:
+        """Find and tap each template in order, waiting after each tap."""
+        images = p.get("images", []) if isinstance(p.get("images"), list) else []
+        if not images:
+            log_warning("sequence tap image cần ít nhất 1 ảnh")
+            return False
+        sequence_id = str(p.get("sequenceId", "main") or "main")
+        stop_event = self._sequence_stop_event(sequence_id, reset=True)
+        for raw in images[:50]:
+            if stop_event.is_set():
+                log_info(f"■ dừng sequence '{sequence_id}'")
+                return True
+            if not isinstance(raw, dict):
+                continue
+            tpl = self._resolve_template(raw.get("template", ""))
+            if not tpl:
+                return False
+            try:
+                threshold = float(raw.get("threshold", 0.85))
+                timeout = max(0.0, float(raw.get("timeout", 10) or 0))
+                delay = max(0.0, float(raw.get("delay", 0) or 0))
+            except (TypeError, ValueError):
+                return False
+            res = self._wait_for_template(
+                tpl, timeout=timeout, threshold=threshold,
+                region=self._search_region(raw),
+            )
+            if not res:
+                return False
+            self._last_pos = (res[0], res[1])
+            if not self._tap_at(res[0], res[1], raw, label=os.path.basename(tpl)):
+                return False
+            if delay and self._sequence_delay(stop_event, delay):
+                return True
+        return True
+
+    def _sequence_stop_event(self, sequence_id: str, reset: bool = False) -> threading.Event:
+        with self._sequence_stops_lock:
+            event = self._sequence_stops.setdefault(sequence_id, threading.Event())
+            if reset:
+                event.clear()
+            return event
+
+    def _sequence_delay(self, stop_event: threading.Event, seconds: float) -> bool:
+        """Wait between items, returning early when the paired stop node fires."""
+        end = time.time() + max(0.0, seconds)
+        while time.time() < end and not self._stop.is_set():
+            if stop_event.wait(timeout=min(0.05, max(0.0, end - time.time()))):
+                return True
+            self._pause.wait()
+        return stop_event.is_set()
+
+    def _a_stop_sequence(self, node, p) -> bool:
+        sequence_id = str(p.get("sequenceId", "main") or "main")
+        self._sequence_stop_event(sequence_id).set()
+        log_info(f"■ yêu cầu dừng sequence '{sequence_id}'")
+        return True
+
     def _a_double_tap(self, node, p) -> bool:
         x, y = self._pos(p)
         ok = self.auto.tap(x, y, tap_count=2)
@@ -3583,6 +3720,8 @@ class WorkflowEngine:
         return self.auto.adb.swipe(x, y, x, y, int(p.get("duration", 800)))
 
     def _a_swipe(self, node, p) -> bool:
+        if p.get("mode") == "direction":
+            return self._a_swipe_dir(node, p)
         return self.auto.swipe(
             int(p.get("x1", 0)), int(p.get("y1", 0)),
             int(p.get("x2", 0)), int(p.get("y2", 0)),
@@ -3590,6 +3729,8 @@ class WorkflowEngine:
         )
 
     def _a_wait(self, node, p) -> bool:
+        if p.get("mode") == "random":
+            return self._a_wait_random(node, p)
         secs = float(p.get("seconds", 1.0))
         log_info(f"⏱ Đợi {secs:g}s")
         self._sleep(secs)

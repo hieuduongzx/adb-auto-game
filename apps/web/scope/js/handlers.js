@@ -65,7 +65,7 @@ async function onClearRegion(){
 async function onOcrBackendChange(name){
   const r=await api().set_ocr_backend(name);
   const el=$("ocr-engine");
-  el.textContent=r.engine+(r.available?" · ready":" · unavailable");
+  el.textContent=(r.label||r.engine)+(r.available?" · ready":" · unavailable");
   el.className=r.available?"":"unavailable";
 }
 async function onReadText(){ $("ocr-result").value=await api().read_text($("ocr-wl").value); }

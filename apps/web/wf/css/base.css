@@ -102,19 +102,22 @@
      the workbench is a plane, not a background image — a white card, a coloured
      wire and the dot grid should not all be competing for the same attention.
      Still a step below --panel so a node face lifts off it on its own. */
-  --canvas-bg:         #eff1f5;
+  --canvas-bg:         #f3f5f8;
   --canvas-dot:        rgba(23,32,43,.09);
   --canvas-dot-minor:  #dfe4ec;
   --node-r: 10px;  /* node card corner — ComfyUI/Blender-style rounded block */
-  --node-w: 172px; /* canonical card width — every action/condition block */
-  --node-h: 70px;  /* canonical card height: 26px header + ~44px body */
-  /* Port dots. They sit INSIDE the card by --port-inset, so a wire runs on
-     behind the block instead of stopping at its edge. Row pitch for multi-slot
-     blocks lives in js/render.js (WF_PORT_GAP) because slot counts are
-     dynamic — keep the two in step. */
-  --port-sz: 9px;
-  --port-inset: 6px;
-  /* Start / End — round chips (icon only). */
+  /* Card geometry is locked to whole grid cells (WF_GRID = 20px): 9×4 cells.
+     Node x/y snapping then lands the card exactly on the minor grid — edges
+     sit on grid lines, never half a cell off. */
+  --node-w: 180px; /* Canonical geometry is also read by workflow.js. */
+  --node-h: 80px;
+  /* Border-centred sockets. Render and layout read these same geometry tokens;
+     the 20px row pitch = exactly 1 cell, so every slot's dot centre lands on a
+     grid dot when the card sits on the grid. */
+  --port-sz: 8px;
+  --port-inset: -4px; /* Socket centre sits on the border, meeting its wire. */
+  --port-gap: 20px;
+  /* Start / End — ring tokens, exactly 2×2 grid cells. */
   --term-size: 40px;
   /* Semantic z-index scale — no arbitrary 999s. */
   --z-node: 2; --z-selbox: 1; --z-node-hover: 6;

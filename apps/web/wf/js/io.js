@@ -17,7 +17,7 @@ function wfHydNodeDefaults(d){
 }
 function wfCleanGraph(g){
   return {
-    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; if(n.outputLog) o.outputLog=n.outputLog; if(n.delayBefore) o.delayBefore=n.delayBefore; if(n.delayAfter) o.delayAfter=n.delayAfter; if(n.retryCount) o.retryCount=n.retryCount; if(n.retryDelay) o.retryDelay=n.retryDelay; if(n.screenshotOnFail) o.screenshotOnFail=true; if(n.showPreview) o.showPreview=true; return o; }),
+    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; const logs=wfOutputLogValues(n); if(Object.values(logs).some(Boolean)) o.outputLogs=logs; if(n.delayBefore) o.delayBefore=n.delayBefore; if(n.delayAfter) o.delayAfter=n.delayAfter; if(n.retryCount) o.retryCount=n.retryCount; if(n.retryDelay) o.retryDelay=n.retryDelay; if(n.screenshotOnFail) o.screenshotOnFail=true; if(n.showPreview) o.showPreview=true; return o; }),
     edges:(g.edges||[]).map(e=>{ const o={from:e.from,fromPort:e.fromPort,to:e.to}; if(e.toPort&&e.toPort!=="in") o.toPort=e.toPort; return o; }),
     groups:(g.groups||[]).map(gr=>({id:gr.id,name:gr.name,x:Math.round(gr.x),y:Math.round(gr.y),w:Math.round(gr.w),h:Math.round(gr.h),color:gr.color||0})),
   };
@@ -90,6 +90,8 @@ function wfApplyNodeJson(node, raw){
   if(o.note!==undefined) node.note=o.note||"";
   if(o.log!==undefined) node.log=o.log||"";
   if(o.outputLog!==undefined) node.outputLog=o.outputLog||"";
+  if(o.outputLogs!==undefined) node.outputLogs=o.outputLogs;
+  else if(o.outputLog!==undefined) delete node.outputLogs;
   if(o.delayBefore!==undefined) node.delayBefore=parseFloat(o.delayBefore)||0;
   if(o.delayAfter!==undefined) node.delayAfter=parseFloat(o.delayAfter)||0;
   if(o.retryCount!==undefined) node.retryCount=parseInt(o.retryCount,10)||0;
@@ -99,6 +101,7 @@ function wfApplyNodeJson(node, raw){
   // Keep node.id / x / y unless the paste explicitly provides coords.
   if(o.x!==undefined) node.x=Math.round(o.x)||node.x;
   if(o.y!==undefined) node.y=Math.round(o.y)||node.y;
+  wfNormalizeNode(node);
 }
 function wfSerialize(){
   wfSpeedFromUI();
@@ -113,7 +116,7 @@ function wfSerialize(){
     // Target Android package (workflow-level; used by speed hack + as a project hint).
     package:(WF.package||"").trim(),
     controller:isWin32?"win32":"adb",
-    ocr:(WF.ocrBackend||"").trim(),
+    ocr:wfNormalizeOcrBackend(WF.ocrBackend),
     // ADB frame source for this game/workflow ("scrcpy" | "adb").
     capture:(WF.captureBackend==="adb")?"adb":"scrcpy",
     // ADB input transport for this game/workflow ("adb" | "scrcpy").
@@ -139,7 +142,8 @@ function wfSerialize(){
 }
 function wfHydrateGraph(g){
   g=g||{nodes:[],edges:[]};
-  let nodes=(g.nodes||[]).map(n=>{
+  let nodes=(g.nodes||[]).map(raw=>{
+    const n=wfNormalizeNode({...raw,params:JSON.parse(JSON.stringify(raw.params||wfDefaults(raw.type)))});
     const params=n.params||wfDefaults(n.type);
     // Migrate the legacy single `delay` (find-then-wait) → delayBefore
     // (wait-then-find), then drop it so it doesn't linger in params.
@@ -184,7 +188,7 @@ function wfHydrateGraph(g){
       params.y2=y+(params.h===undefined?100:Math.max(0,Number(params.h)||0));
       delete params.x; delete params.y; delete params.w; delete params.h;
     }
-    return {id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params,note:n.note||"",log:n.log||"",outputLog:n.outputLog||"",
+    return {id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params,note:n.note||"",log:n.log||"",outputLogs:wfOutputLogValues(n),
       delayBefore:parseFloat(delayBefore)||0, delayAfter:parseFloat(n.delayAfter)||0,
       retryCount:parseInt(n.retryCount,10)||0, retryDelay:parseFloat(n.retryDelay)||0, screenshotOnFail:!!n.screenshotOnFail,
       showPreview:!!n.showPreview};
@@ -210,7 +214,7 @@ function wfHydrate(flow){
   WF.speedhack={enabled:!!sh.enabled, speed:(parseFloat(sh.speed)||2.0), native:!!sh.native};
   WF.package=String(flow.package!=null?flow.package:(sh.package||"")).trim();
   WF.controller=(flow.controller==="win32")?"win32":"adb";
-  WF.ocrBackend=String(flow.ocr||"").trim().toLowerCase();
+  WF.ocrBackend=wfNormalizeOcrBackend(flow.ocr);
   if(typeof wfSyncOcrUI==="function") wfSyncOcrUI();
   // Capture backend: key "capture" (preferred); accept legacy aliases.
   {
@@ -571,9 +575,14 @@ async function init(){
     capSel.value=S.captureBackend;
   }
   S.inputBackend=state.inputBackend||"adb";
-  if(typeof wfPopulateOcrBackends==="function") wfPopulateOcrBackends(state.ocrBackends);
+  if(typeof wfPopulateOcrBackends==="function") wfPopulateOcrBackends(state.ocrModels||state.ocrBackends);
   (state.log||[]).forEach(appendLog);
-  try{ const st=await api().get_settings(); wfSnapOn=!!st.snap; wfPreviewAll=!!st.previewAll;
+  try{ const st=await api().get_settings();
+    // One-time migration: every pre-migration "snap:false" was just the old
+    // default, not a choice — force snap on once, then respect the user's
+    // stored value forever after (snapMigrated gate below).
+    wfSnapOn = !(st.snap===false && st.snapMigrated===true);
+    wfPreviewAll=!!st.previewAll;
     wfMinimapOn=!!st.minimap;                 // opt-in — default off
     wfAlignOn = st.alignGuides!==false;       // opt-out — default on
     if(st.previewHz){ wfPvHz=Math.max(0.2, Math.min(60, parseFloat(st.previewHz)||30)); const hz=$("wf-pv-hz"); if(hz) hz.value=wfPvHz; }
