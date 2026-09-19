@@ -1,0 +1,43 @@
+{
+  "name": "ZZZ",
+  "version": 2,
+  "templatesDir": "templates",
+  "controller": "win32",
+  "capture": "scrcpy",
+  "package": "",
+  "win32": {
+    "window": "",
+    "matchBy": "title",
+    "inputMode": "background_cursor"
+  },
+  "speedhack": {
+    "enabled": false,
+    "speed": 2,
+    "package": ""
+  },
+  "globals": [],
+  "functions": [],
+  "activities": [
+    {
+      "id": "sequence_1",
+      "name": "Activity 1",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "nstart",
+            "type": "start",
+            "x": 60,
+            "y": 70,
+            "params": {}
+          }
+        ],
+        "edges": [],
+        "groups": []
+      },
+      "maxRetries": 1
+    }
+  ]
+}
