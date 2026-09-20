@@ -1,8 +1,8 @@
 // ── Wires ────────────────────────────────────────────────────────────────────
-// Wires paint below cards, with an underlay at crossings and a direction arrow.
-// Orthogonal return links clear their endpoint cards; unrelated obstacles are
-// still drawn over the wire. Selection highlights adjacent links without
-// rebuilding paths or changing execution-state colours.
+// Wires paint below cards (they run under a block and re-emerge at its far
+// edge), with an underlay at crossings. No mid-wire markers — direction reads
+// from the port side. Selection highlights adjacent links without rebuilding
+// paths or changing execution-state colours.
 //
 // Three render modes, the same three ComfyUI ships (rail button cycles them):
 //   spline   (default) — cubic bezier, horizontal handles ¼ of the port distance
@@ -256,15 +256,11 @@ function wfDrawWires(){
     p.setAttribute("class","wire"+(toPort==="loop"?" loopback":"")+(tone?" tone-"+tone:""));
     p.dataset.from=ed.from; p.dataset.fromport=ed.fromPort; p.dataset.to=ed.to;
     p.setAttribute("d",d);
-    const m=wfLinkMid(a,b);
-    const dot=document.createElementNS(WF_NS,"path");
-    dot.setAttribute("class","wire-flow"+(toPort==="loop"?" loopback":"")+(tone?" tone-"+tone:""));
-    dot.dataset.fromport=ed.fromPort;
-    dot.setAttribute("d","M-4,-3.5 L4,0 L-4,3.5 Z");
-    dot.setAttribute("transform",`translate(${m.x},${m.y}) rotate(${m.ang*180/Math.PI})`);
+    // No mid-wire direction marker: the flow reads from the port side and the
+    // run-trail dash animation — a floating arrowhead was just visual noise.
     const halo=document.createElementNS(WF_NS,"path");
     halo.setAttribute("class","wire-halo"); halo.setAttribute("d",d);
-    grp.appendChild(halo); grp.appendChild(hit); grp.appendChild(p); grp.appendChild(dot);
+    grp.appendChild(halo); grp.appendChild(hit); grp.appendChild(p);
     frag.appendChild(grp);
   });
   svg.appendChild(frag);
@@ -293,6 +289,24 @@ document.addEventListener("keydown",e=>{
   if(!grp||!grp.__edge) return;
   e.preventDefault(); e.stopPropagation();
   wfDeleteWire(grp.__edge);
+});
+
+// Hover a wire → light up its two endpoint sockets so the eye traces the link
+// from block to block. Delegated like the Delete handler: one listener serves
+// every wire, and leaving clears whatever is lit (one hover at a time).
+document.addEventListener("mouseover",e=>{
+  const t=e.target;
+  if(!t||!t.classList||!t.classList.contains("wire-hit")) return;
+  const grp=t.parentNode, ed=grp&&grp.__edge; if(!ed) return;
+  const from=document.querySelector(`.wf-node[data-node="${ed.from}"] .wf-port[data-port="${ed.fromPort||"out"}"]`);
+  const to=document.querySelector(`.wf-node[data-node="${ed.to}"] .wf-port[data-port="${ed.toPort||"in"}"]`);
+  if(from) from.classList.add("hover-end");
+  if(to) to.classList.add("hover-end");
+});
+document.addEventListener("mouseout",e=>{
+  const t=e.target;
+  if(!t||!t.classList||!t.classList.contains("wire-hit")) return;
+  document.querySelectorAll(".wf-port.hover-end").forEach(p=>p.classList.remove("hover-end"));
 });
 
 function wfDeleteWire(ed){

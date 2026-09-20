@@ -302,8 +302,8 @@ class WorkflowDesignerAPI:
         self._device_lock = threading.Lock()
         self._selected_serial: Optional[str] = None
         self._connected_serial: Optional[str] = None
-        # When no device is listed, periodically deep-scan emulator ports so a
-        # freshly-booted instance is picked up without a manual "Scan ports".
+        # Periodically deep-scan emulator ports so additional instances are
+        # discovered even while another emulator remains connected.
         self._last_deep_scan = 0.0
         self._deep_scan_interval = 30.0
 
@@ -1419,6 +1419,10 @@ class WorkflowDesignerAPI:
     def select_device(self, serial: str) -> bool:
         try:
             self._selected_serial = serial or None
+            self.controller.device = None
+            self.controller.device_id = serial or None
+            self._connected_serial = None
+            self._sync_engine_device()
             threading.Thread(target=self._connect_device, args=(serial,), daemon=True).start()
             return True
         except Exception as e:
@@ -1445,13 +1449,21 @@ class WorkflowDesignerAPI:
         threading.Thread(target=self._restart_adb_worker, daemon=True).start()
 
     def _connect_device(self, serial: str) -> None:
+        with self._device_lock:
+            self._connect_device_locked(serial)
+
+    def _connect_device_locked(self, serial: str) -> None:
         try:
+            if serial != self._selected_serial:
+                return
             if not serial:
                 self._connected_serial = None
                 self._push("device_status", {"connected": False})
                 return
             self.controller.select_device(serial)
             self.controller.quick_refresh()
+            if serial != self._selected_serial:
+                return
             s = self.controller.get_status_summary()
             self._connected_serial = s.get("device_id") if s.get("connected") else None
             if s.get("connected"):
@@ -1485,16 +1497,16 @@ class WorkflowDesignerAPI:
         with self._device_lock:
             try:
                 self.scanner.ensure_adb_server_running()
-                devices = self.controller.client.devices()
+                devices = self.controller.online_devices()
                 items = self.scanner.unique_devices(devices)
-                if not items and deep:
+                if deep:
                     try:
                         found = self.scanner.scan_all(stop_on_first=False) or []
                         if found:
                             log_info(f"Auto-scan found {len(found)} device(s)")
                     except Exception as exc:
                         log_warning(f"Auto port scan failed: {exc}")
-                    devices = self.controller.client.devices()
+                    devices = self.controller.online_devices()
                     items = self.scanner.unique_devices(devices)
                 if items and not self._selected_serial:
                     first = items[0].get("serial")
@@ -1506,7 +1518,7 @@ class WorkflowDesignerAPI:
                             or self.controller.device_id != self._selected_serial):
                         self.controller.select_device(self._selected_serial)
                 self._push("devices_update", {"devices": items})
-                serials = {d.get("serial") for d in items if d.get("serial")}
+                serials = {d.serial for d in devices}
                 # Selected emulator closed → clear handle + stop live capture.
                 wanted = self._selected_serial or self._connected_serial
                 if wanted and wanted not in serials:
@@ -1519,7 +1531,7 @@ class WorkflowDesignerAPI:
                             "connected": False, "serial": None, "name": "",
                         })
                 elif items:
-                    s = self.controller.get_status_summary()
+                    s = self.controller.get_status_summary(include_app=False)
                     self._connected_serial = s.get("device_id") if s.get("connected") else None
                     if s.get("connected"):
                         self._device_lost_announced = False
@@ -1544,8 +1556,15 @@ class WorkflowDesignerAPI:
                 # After the branches, so a device that just dropped is reflected
                 # rather than the serial it had a moment ago.
                 self._sync_engine_device()
-            except Exception:
+            except Exception as exc:
+                log_warning(f"ADB device refresh failed: {exc}")
+                self.controller.mark_disconnected("device refresh failed")
+                self._connected_serial = None
                 self._push("devices_update", {"devices": []})
+                self._push("device_status", {
+                    "connected": False, "serial": None, "name": "",
+                })
+                self._sync_engine_device()
 
     def _device_poll(self) -> None:
         """Light refresh every 5s; when no device is connected, also deep-scan
@@ -1561,13 +1580,10 @@ class WorkflowDesignerAPI:
             if self._capture_kind == "win32":
                 continue
             deep = False
-            # Deep-scan when nothing is connected — a light adb-devices poll is
-            # enough while a device is live; offline, re-probe emulator ports.
-            if not self._connected_serial:
-                now = time.monotonic()
-                if now - self._last_deep_scan >= self._deep_scan_interval:
-                    deep = True
-                    self._last_deep_scan = now
+            now = time.monotonic()
+            if now - self._last_deep_scan >= self._deep_scan_interval:
+                deep = True
+                self._last_deep_scan = now
             self._device_worker(deep=deep)
 
     def _scan_ports_worker(self) -> None:

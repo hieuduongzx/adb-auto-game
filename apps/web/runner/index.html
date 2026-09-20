@@ -64,6 +64,11 @@
 
   <!-- ── Main body: split (left activities / right panels) + footer ──── -->
   <div id="main-body" data-pnl-stage>
+  <div id="mobile-tabs" role="tablist" aria-label="Runner views" aria-orientation="horizontal">
+    <button class="mobile-tab active" type="button" role="tab" aria-selected="true" aria-controls="pane-left" data-mobile-view="activities" onclick="switchMobileView('activities')">Activities</button>
+    <button class="mobile-tab" type="button" role="tab" aria-selected="false" aria-controls="r-log" data-mobile-view="log" onclick="switchMobileView('log')">Log</button>
+    <button class="mobile-tab" type="button" role="tab" aria-selected="false" aria-controls="r-settings" data-mobile-view="settings" onclick="switchMobileView('settings')">Settings</button>
+  </div>
   <div id="main-split" tabindex="-1" role="region" aria-label="Activities and runner panels">
 
     <!-- LEFT: activity lists -->
@@ -110,19 +115,23 @@
     <!-- RIGHT: Activity settings | Log | Settings, then Preview -->
     <div id="pane-right">
       <div id="r-tabs" role="tablist" aria-label="Runner panels" aria-orientation="horizontal">
-        <button class="rtab active" id="rtab-btn-act" data-rtab="act"      onclick="switchRTab('act')"
-                role="tab" aria-selected="true"  aria-controls="r-act"      tabindex="0">Activity settings</button>
-        <button class="rtab"        id="rtab-btn-log" data-rtab="log"      onclick="switchRTab('log')"
-                role="tab" aria-selected="false" aria-controls="r-log"      tabindex="-1">Log<span class="tab-count" id="rtab-log-count"></span></button>
+        <button class="rtab" id="rtab-btn-act" data-rtab="act" onclick="switchRTab('act')"
+                role="tab" aria-selected="false" aria-controls="r-act" tabindex="-1">Activity</button>
+        <button class="rtab active" id="rtab-btn-log" data-rtab="log" onclick="switchRTab('log')"
+                role="tab" aria-selected="true" aria-controls="r-log" tabindex="0">Log<span class="tab-count" id="rtab-log-count"></span></button>
         <button class="rtab"        id="rtab-btn-settings" data-rtab="settings" onclick="switchRTab('settings')"
                 role="tab" aria-selected="false" aria-controls="r-settings" tabindex="-1">Settings</button>
       </div>
 
       <div id="r-content">
         <!-- Activity settings -->
-        <div class="rpane active" id="r-act" role="tabpanel" aria-labelledby="rtab-btn-act" tabindex="0">
+        <div class="rpane" id="r-act" role="tabpanel" aria-labelledby="rtab-btn-act" tabindex="0">
           <div class="act-set-hd">
+            <button type="button" class="act-set-back" id="act-set-back" onclick="switchMobileView('activities')" aria-label="Back to activities">
+              <i data-ico="chevron-left" data-ico-size="uico-1" aria-hidden="true"></i><span>Activities</span>
+            </button>
             <span class="act-set-title" id="act-set-title">Activity settings</span>
+            <span class="activity-save-status" id="activity-save-status" role="status" aria-live="polite"></span>
             <button type="button" class="act-set-x" id="act-set-close" onclick="closeActivitySettings()" title="Close" aria-label="Close settings">×</button>
           </div>
           <div class="act-set-body" id="act-set-body">
@@ -131,7 +140,7 @@
         </div>
 
         <!-- Log -->
-        <div class="rpane" id="r-log" role="tabpanel" aria-labelledby="rtab-btn-log" tabindex="0">
+        <div class="rpane active" id="r-log" role="tabpanel" aria-labelledby="rtab-btn-log" tabindex="0">
           <div class="rpane-hd">
             <span class="rpane-title">Log</span>
             <span class="log-count" id="log-count" title="Lines shown"></span>
@@ -159,57 +168,43 @@
         <!-- Settings (project-wide) -->
         <div class="rpane" id="r-settings" role="tabpanel" aria-labelledby="rtab-btn-settings" tabindex="0">
           <div class="rpane-scroll">
-            <div class="settings-card" id="game-card" style="display:none">
-              <div class="settings-card-head">
-                <div>
-                  <h2 class="settings-section-title">Game</h2>
-                  <p class="settings-card-desc">Choose the Windows game executable used by this workflow.</p>
-                </div>
-                <span class="settings-card-kicker">Win32</span>
-              </div>
+            <section class="settings-section" id="game-card" style="display:none">
+              <h2 class="settings-section-title">Game</h2>
               <div class="setting-block">
-                <label class="form-lbl" for="game-path">Game path (.exe)</label>
+                <label class="form-lbl" for="game-path">Game executable</label>
                 <div class="setting-path-control">
                   <input type="text" id="game-path" class="setting-path-input runtime-setting-control" spellcheck="false" autocomplete="off"
                          placeholder="Choose the game's .exe…" onchange="onGamePathChange(this.value)">
                   <button type="button" class="btn-path-pick runtime-setting-control" id="game-path-pick" onclick="onGamePathPick()" title="Choose the game .exe">Choose…</button>
                 </div>
               </div>
-              <p class="settings-note" id="game-path-note">Launch program blocks set to “Project game path” start this program. Clear it to use the workflow's default.</p>
-            </div>
+              <p class="settings-note" id="game-path-note"></p>
+            </section>
 
-            <div class="settings-card" id="req-card" style="display:none">
-              <div class="settings-card-head">
-                <div>
-                  <h2 class="settings-section-title">Game files</h2>
-                  <p class="settings-card-desc">Files bundled with this Runner that may need to be installed beside the game.</p>
+            <details class="settings-section settings-disclosure" id="req-card" style="display:none">
+              <summary><span class="settings-section-title">Game files</span><span class="section-state" id="req-summary">Check status</span></summary>
+              <div class="settings-detail-body">
+                <p class="req-status" id="req-status" role="status" aria-live="polite"></p>
+                <ul class="req-list mono" id="req-list" aria-label="Required game files"></ul>
+                <div class="req-actions">
+                  <button class="btn" type="button" onclick="onReqOpen()"
+                          title="Open the folder inside this Runner that holds these files">Open folder</button>
+                  <button class="btn ok" id="btn-req-copy" type="button" onclick="onReqCopy()"
+                          title="Copy the files into the game's install folder">Copy into game folder</button>
                 </div>
-                <span class="settings-card-kicker">Files</span>
+                <details class="inline-help">
+                  <summary>Installation help</summary>
+                  <ol class="req-steps">
+                    <li>Copy the files above into the game's install folder — the one holding the game's <span class="mono">.exe</span>.</li>
+                    <li>If that folder is protected, Windows asks for administrator rights; allow it.</li>
+                    <li>Restart the game so it picks up the new files.</li>
+                  </ol>
+                </details>
               </div>
-              <p class="req-status" id="req-status" role="status" aria-live="polite"></p>
-              <ul class="req-list mono" id="req-list" aria-label="Required game files"></ul>
-              <div class="req-actions">
-                <button class="btn" type="button" onclick="onReqOpen()"
-                        title="Open the folder inside this Runner that holds these files">Open folder</button>
-                <button class="btn ok" id="btn-req-copy" type="button" onclick="onReqCopy()"
-                        title="Copy the files into the game's install folder">Copy into game folder</button>
-              </div>
-              <ol class="req-steps">
-                <li>Copy the files above into the game's install folder — the one holding the game's <span class="mono">.exe</span>.</li>
-                <li>If that folder is protected, Windows asks for administrator rights; allow it.</li>
-                <li>Restart the game so it picks up the new files.</li>
-              </ol>
-              <p class="settings-note">The <b>Game path</b> above sets which folder “Copy into game folder” writes to. Without it, copy the files by hand from <b>Open folder</b>.</p>
-            </div>
+            </details>
 
-            <div class="settings-card" id="emu-card" style="display:none">
-              <div class="settings-card-head">
-                <div>
-                  <h2 class="settings-section-title">Emulator</h2>
-                  <p class="settings-card-desc">Set the emulator family and install folder used by emulator actions.</p>
-                </div>
-                <span class="settings-card-kicker">ADB</span>
-              </div>
+            <section class="settings-section" id="emu-card" style="display:none">
+              <h2 class="settings-section-title">Emulator</h2>
               <div class="setting-block">
                 <label class="form-lbl" for="emu-kind">Family</label>
                 <select id="emu-kind" class="runtime-setting-control" onchange="onEmulatorKindChange(this.value)">
@@ -228,107 +223,78 @@
                   <button type="button" class="btn-path-pick runtime-setting-control" id="emu-path-pick" onclick="onEmulatorPathPick()" title="Choose the emulator install folder">Choose…</button>
                 </div>
               </div>
-              <p class="settings-note" id="emu-note">Launch / Resize / Kill / Restart emulator blocks set to “Project emulator setting” use this family and folder. Clear the folder to auto-detect.</p>
-            </div>
+              <p class="settings-note" id="emu-note"></p>
+            </section>
 
-            <div class="settings-card" id="speed-card">
-              <div class="settings-card-head">
-                <div>
-                  <h2 class="settings-section-title">Speed hack</h2>
-                  <p class="settings-card-desc">Adjust runtime speed for supported Android games.</p>
+            <details class="settings-section settings-disclosure" id="runtime-section">
+              <summary><span class="settings-section-title">Runtime</span><span class="section-state" id="runtime-summary" data-section-state="runtime">Speed hack off</span></summary>
+              <div class="settings-detail-body" id="speed-card">
+                <div class="toggle-row">
+                  <button type="button" class="toggle" id="speed-toggle" onclick="onSpeedToggle()" role="switch" aria-label="Enable speed hack" aria-checked="false"></button>
+                  <div class="toggle-text">
+                    <div class="toggle-name">Speed hack</div>
+                    <div class="toggle-hint">Requires root access.</div>
+                  </div>
                 </div>
-                <span class="settings-card-kicker">Optional</span>
-              </div>
-              <div class="toggle-row">
-                <button type="button" class="toggle" id="speed-toggle" onclick="onSpeedToggle()" role="switch" aria-label="Enable speed hack" aria-checked="false"></button>
-                <div class="toggle-text">
-                  <div class="toggle-name">Speed hack</div>
-                  <div class="toggle-hint">Frida acceleration. Root access required.</div>
+                <div class="speed-row">
+                  <input type="range" id="speed-range" min="0.5" max="5" step="0.1" value="2" disabled aria-label="Speed multiplier"
+                         oninput="onSpeedInput(this.value)" onchange="onSpeedCommit(this.value)">
+                  <span id="speed-val">2.0x</span>
                 </div>
+                <div id="speed-pkg">(load a workflow to configure)</div>
               </div>
-              <div class="speed-row">
-                <input type="range" id="speed-range" min="0.5" max="5" step="0.1" value="2" disabled aria-label="Speed multiplier"
-                       oninput="onSpeedInput(this.value)" onchange="onSpeedCommit(this.value)">
-                <span id="speed-val">2.0x</span>
-              </div>
-              <div id="speed-pkg">(load a workflow to configure)</div>
-            </div>
+            </details>
 
-            <div class="settings-card" id="updates-card">
-              <div class="settings-card-head">
-                <div>
-                  <h2 class="settings-section-title">Updates</h2>
-                  <p class="settings-card-desc">Keep this standalone Runner on the latest published build.</p>
-                </div>
-                <span class="settings-card-kicker">Runner</span>
-              </div>
-              <dl class="upd-facts">
-                <dt>Version</dt><dd class="mono" id="upd-version">—</dd>
-                <dt>Source</dt><dd class="mono" id="upd-repo">—</dd>
-              </dl>
-              <p class="upd-status" id="upd-status" role="status" aria-live="polite">Updates are available in a Runner built from the Macro2k Hub.</p>
-              <div class="upd-bar" id="upd-bar" hidden><div class="upd-bar-fill" id="upd-bar-fill"></div></div>
-              <div class="upd-actions">
-                <button class="btn" id="btn-upd-check" type="button" onclick="onUpdateCheck()"
-                        title="Ask GitHub for a newer published build">Check for updates</button>
-                <button class="btn ok" id="btn-upd-apply" type="button" onclick="onUpdateApply()" hidden
-                        title="Download, replace this Runner's files, and restart">Update &amp; restart</button>
-              </div>
-              <p class="settings-note" id="upd-note">Installing replaces this Runner's own files only. Games in the Hub, workflow folders and your settings stay where they are.</p>
-            </div>
-
-            <div class="settings-card" id="diag-card">
-              <div class="settings-card-head">
-                <div>
-                  <h2 class="settings-section-title">Diagnostics</h2>
-                  <p class="settings-card-desc">This Runner's build, files and device — what to check, and what to send, when a run misbehaves.</p>
-                </div>
-                <span class="settings-card-kicker">Support</span>
-              </div>
-              <p class="diag-status" id="diag-status" role="status" aria-live="polite"></p>
-              <dl class="diag-list" id="diag-list" aria-label="Runner diagnostics"></dl>
-              <div class="diag-actions">
-                <button class="btn" id="btn-diag-refresh" type="button" onclick="onDiagnostics(true)">Refresh</button>
-                <button class="btn" id="btn-diag-export" type="button" onclick="onExportLog()"
-                        title="Save the Runner log to a file…">Export log…</button>
-                <button class="btn" id="btn-diag-folder" type="button" onclick="onOpenDataFolder()"
-                        title="Open the folder holding this Runner's settings and log">Open data folder</button>
-              </div>
-              <p class="settings-note">The data folder holds this Runner's per-game settings and its log. A failing run is easiest to explain with the log: run the workflow, then <b>Export log…</b> and share that file.</p>
-            </div>
-
-            <div class="settings-card" id="appearance-card">
-              <div class="settings-card-head">
-                <div>
-                  <h2 class="settings-section-title">Appearance</h2>
-                  <p class="settings-card-desc">Tune the shared look and information density of Macro2k windows.</p>
-                </div>
-                <span class="settings-card-kicker">Shared</span>
-              </div>
-              <div class="setting-block">
-                <span class="form-lbl">Theme</span>
+            <section class="settings-section" id="appearance-card">
+              <div class="settings-title-row"><h2 class="settings-section-title">Appearance</h2><span class="section-state">Shared</span></div>
+              <div class="setting-row settings-choice-row">
+                <span class="setting-label">Theme</span>
                 <div class="choice-seg" id="theme-seg" role="radiogroup" aria-label="Theme">
-                  <button type="button" class="choice" data-theme-set="light" role="radio" aria-checked="true">
-                    <span class="choice-title">Light</span><span class="choice-sub">Default console</span>
-                  </button>
-                  <button type="button" class="choice" data-theme-set="dark" role="radio" aria-checked="false">
-                    <span class="choice-title">Dark</span><span class="choice-sub">Low-light rooms</span>
-                  </button>
+                  <button type="button" class="choice" data-theme-set="light" role="radio" aria-checked="true"><span class="choice-title">Light</span></button>
+                  <button type="button" class="choice" data-theme-set="dark" role="radio" aria-checked="false"><span class="choice-title">Dark</span></button>
                 </div>
               </div>
-              <div class="setting-block">
-                <span class="form-lbl">Density</span>
+              <div class="setting-row settings-choice-row">
+                <span class="setting-label">Density</span>
                 <div class="choice-seg" id="density-seg" role="radiogroup" aria-label="Density">
-                  <button type="button" class="choice" data-density-set="comfortable" role="radio" aria-checked="true">
-                    <span class="choice-title">Comfortable</span><span class="choice-sub">Roomier rows</span>
-                  </button>
-                  <button type="button" class="choice" data-density-set="compact" role="radio" aria-checked="false">
-                    <span class="choice-title">Compact</span><span class="choice-sub">More on screen</span>
-                  </button>
+                  <button type="button" class="choice" data-density-set="comfortable" role="radio" aria-checked="true"><span class="choice-title">Comfortable</span></button>
+                  <button type="button" class="choice" data-density-set="compact" role="radio" aria-checked="false"><span class="choice-title">Compact</span></button>
                 </div>
               </div>
-              <p class="settings-note">Shared with the Hub and the Designer — every Macro2k window opens with what you pick here.</p>
-            </div>
+            </section>
+
+            <details class="settings-section settings-disclosure" id="updates-section">
+              <summary><span class="settings-section-title">Updates</span><span class="section-state" id="updates-summary" data-section-state="updates">Checking</span></summary>
+              <div class="settings-detail-body" id="updates-card">
+                <dl class="upd-facts">
+                  <dt>Version</dt><dd class="mono" id="upd-version">—</dd>
+                  <dt>Source</dt><dd class="mono" id="upd-repo">—</dd>
+                </dl>
+                <p class="upd-status" id="upd-status" role="status" aria-live="polite">Updates are available in a Runner built from the Macro2k Hub.</p>
+                <div class="upd-bar" id="upd-bar" hidden><div class="upd-bar-fill" id="upd-bar-fill"></div></div>
+                <div class="upd-actions">
+                  <button class="btn" id="btn-upd-check" type="button" onclick="onUpdateCheck()"
+                          title="Ask GitHub for a newer published build">Check for updates</button>
+                  <button class="btn ok" id="btn-upd-apply" type="button" onclick="onUpdateApply()" hidden
+                          title="Download, replace this Runner's files, and restart">Update &amp; restart</button>
+                </div>
+              </div>
+            </details>
+
+            <details class="settings-section settings-disclosure" id="diagnostics-section">
+              <summary><span class="settings-section-title">Diagnostics</span><span class="section-state" data-section-state="diagnostics">Support tools</span></summary>
+              <div class="settings-detail-body" id="diag-card">
+                <p class="diag-status" id="diag-status" role="status" aria-live="polite"></p>
+                <dl class="diag-list" id="diag-list" aria-label="Runner diagnostics"></dl>
+                <div class="diag-actions">
+                  <button class="btn" id="btn-diag-refresh" type="button" onclick="onDiagnostics(true)">Refresh</button>
+                  <button class="btn" id="btn-diag-export" type="button" onclick="onExportLog()"
+                          title="Save the Runner log to a file…">Export log…</button>
+                  <button class="btn" id="btn-diag-folder" type="button" onclick="onOpenDataFolder()"
+                          title="Open the folder holding this Runner's settings and log">Open data folder</button>
+                </div>
+              </div>
+            </details>
           </div>
         </div>
       </div><!-- /r-content -->

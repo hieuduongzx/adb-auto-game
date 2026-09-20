@@ -43,6 +43,42 @@ class DeviceScanner:
         # seconds) only logs when something actually changes — no spam.
         self._last_server_ok: Optional[bool] = None
         self._last_device_count: int = -1
+
+    @staticmethod
+    def parse_device_states(output: str) -> Dict[str, str]:
+        """Parse ``adb devices -l`` into ``serial -> transport state``."""
+        states: Dict[str, str] = {}
+        for raw_line in (output or "").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("List of devices attached"):
+                continue
+            parts = line.split()
+            if len(parts) >= 2:
+                states[parts[0]] = parts[1].lower()
+        return states
+
+    def get_device_states(self, timeout: float = 3.0) -> Dict[str, str]:
+        """Return every registered ADB serial and its current transport state."""
+        try:
+            result = subprocess.run(
+                [
+                    self.adb_path,
+                    "-H", self.host,
+                    "-P", str(self.port),
+                    "devices", "-l",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                creationflags=CREATE_NO_WINDOW,
+            )
+            if result.returncode != 0:
+                log_debug(f"adb devices failed: {result.stderr.strip()}")
+                return {}
+            return self.parse_device_states(result.stdout)
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            log_debug(f"adb devices state check failed: {exc}")
+            return {}
     
     @staticmethod
     def _local_ipv4s() -> List[str]:
@@ -99,7 +135,10 @@ class DeviceScanner:
             # several rows right after a scan. Warm devices hit this once.
             for attempt in range(3):
                 try:
-                    out = d.shell("getprop ro.product.model; settings get secure android_id") or ""
+                    out = d.shell(
+                        "getprop ro.product.model; settings get secure android_id",
+                        timeout=3.0,
+                    ) or ""
                     parts = [ln.strip() for ln in out.splitlines() if ln.strip()]
                     if parts:
                         model = parts[0]
@@ -113,7 +152,7 @@ class DeviceScanner:
                     time.sleep(0.3)
             if not fp:
                 try:
-                    fp = (d.shell("getprop ro.serialno") or "").strip()
+                    fp = (d.shell("getprop ro.serialno", timeout=3.0) or "").strip()
                 except Exception:
                     fp = ""
             if not fp:
@@ -167,12 +206,17 @@ class DeviceScanner:
             stdout = result.stdout.lower()
             if "connected" not in stdout and "already connected" not in stdout:
                 return None
-            
-            # adb connect succeeded — the serial IS the host string.
-            # Do not fall back to devices[0]: under parallel scanning multiple
-            # threads may query ADB simultaneously, and the first-registered
-            # device would mask every other port's result.
-            return host
+
+            # The serial is the host string. Do not fall back to devices[0]:
+            # concurrent probes could otherwise mask every other port. Also,
+            # ``adb connect`` may report success while transport is still
+            # offline during boot, so wait briefly for command-ready state.
+            for attempt in range(3):
+                if self.get_device_states().get(host) == "device":
+                    return host
+                if attempt < 2:
+                    time.sleep(0.2)
+            return None
                 
         except subprocess.TimeoutExpired:
             return None
@@ -187,7 +231,7 @@ class DeviceScanner:
     def scan_ports(
         self,
         ports: List[str],
-        max_workers: int = 100,
+        max_workers: int = 16,
         stop_on_first: bool = False
     ) -> List[Tuple[str, str]]:
         """

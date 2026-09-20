@@ -23,7 +23,16 @@ function wfFindIndex(){
     });
   };
   (WF.activities||[]).forEach(a=>scan("activity",a));
-  (WF.functions||[]).forEach(f=>scan("function",f));
+  (WF.functions||[]).forEach(f=>{
+    // The function ITSELF is a hit too (not just its call blocks): searching
+    // "collect" must offer "go edit Collect rewards", the same way an activity
+    // name does — otherwise a function's blocks could be found but not the
+    // function you'd actually want to open.
+    const name=f.name||f.id;
+    items.push({ kind:"fn", fn:f, title:"ƒ "+name, sum:"function",
+      where:"Function", hay:("ƒ "+name+" function call "+f.id).toLowerCase() });
+    scan("function",f);
+  });
   return items;
 }
 
@@ -32,6 +41,11 @@ function wfFindClose(){
 }
 function wfFindJump(it){
   if(!it) return;
+  if(it.kind==="fn"){          // the function itself → open it for editing
+    if(typeof wfEditFunction==="function") wfEditFunction(it.fn.id);
+    wfFindClose();
+    return;
+  }
   if(it.kind==="activity"){ if(typeof wfSelectActivity==="function") wfSelectActivity(it.owner.id); }
   else { if(typeof wfEditFunction==="function") wfEditFunction(it.owner.id); }
   wfSelectOne(it.node.id); wfMarkSel(); wfRenderInspector();
@@ -103,7 +117,7 @@ function wfFindShow(){
   box.innerHTML=
     `<div class="wf-find-bar">
        <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
-       <input type="text" placeholder="Find block… (name, image, note)" spellcheck="false" autocomplete="off">
+       <input type="text" placeholder="Find block or function… (name, image, note)" spellcheck="false" autocomplete="off">
        <span class="k">Esc</span>
      </div>
      <div class="wf-find-list"></div>`;

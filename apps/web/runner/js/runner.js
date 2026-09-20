@@ -22,6 +22,7 @@ const S = {
   elapsedText:     "",
   speedhack: { enabled:false, speed:2.0, package:"", active:false },
   runScope:        null,   // activity ids of a single-activity run; null = full Start
+  mobileView:      "activities",
 };
 
 // This Runner's own version + self-update state (standalone builds only).
@@ -253,6 +254,11 @@ function refreshButtons(){
   if(reqCopy) reqCopy.disabled = running || !(S.requirements && S.requirements.gameDir);
   updateRowRunButtons();
   $("app").classList.toggle("is-running", running);
+  if(S.expandedId){
+    const save = $("activity-save-status");
+    if(running) setActivitySaveState("Stop to edit");
+    else if(save && save.textContent === "Stop to edit") setActivitySaveState("");
+  }
   S.activities.forEach(a=>paintRow(a));   // "Waiting" / "Active" follow the run state
   renderUpdate();
   paintStatusPill();
@@ -277,6 +283,28 @@ function switchRTab(tab){
     const body = $("log-body"); body.scrollTop = body.scrollHeight;
     renderLogCount();
   }
+  if(window.matchMedia && window.matchMedia("(max-width: 640px)").matches){
+    switchMobileView(tab === "settings" ? "settings" : (tab === "log" ? "log" : "activity"), false);
+  }
+}
+
+// At the Runner's minimum width, the activity list and the right panel cannot
+// both stay useful. This navigation makes them three predictable views while
+// preserving the desktop split above the breakpoint.
+function switchMobileView(view, syncPanel=true){
+  const allowed = ["activities", "activity", "log", "settings"];
+  if(!allowed.includes(view)) view = "activities";
+  S.mobileView = view;
+  const shell = $("main-split");
+  if(shell) shell.dataset.mobileView = view;
+  const publicView = view === "activity" ? "activities" : view;
+  document.querySelectorAll("#mobile-tabs [data-mobile-view]").forEach(btn=>{
+    const on = btn.dataset.mobileView === publicView;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", String(on));
+    btn.tabIndex = on ? 0 : -1;
+  });
+  if(syncPanel && (view === "log" || view === "settings")) switchRTab(view);
 }
 
 // Roving tabindex: the selected tab is the one Tab reaches; the arrows move
@@ -508,7 +536,7 @@ function buildSettingsPanel(a){
 
   // Background activities run on a timer — that's their only runtime setting.
   if(a.type==="background"){
-    const g = group("Timing");
+    const g = group("Schedule");
     const row = document.createElement("div"); row.className = "setting-row";
     const lbl = document.createElement("span"); lbl.className = "setting-label"; lbl.textContent = "Repeat every";
     const inp = document.createElement("input");
@@ -517,8 +545,11 @@ function buildSettingsPanel(a){
     inp.min = 0.05; inp.step = 0.5; inp.value = a.pollInterval;
     inp.onchange = ()=>{
       const v = Math.max(0.05, parseFloat(inp.value)||a.pollInterval);
-      inp.value = v; a.pollInterval = v; api().set_interval(a.id, v);
-      paintRow(a);
+      inp.value = v; setActivitySaveState("Saving…");
+      Promise.resolve(api().set_interval(a.id, v)).then(ok=>{
+        if(ok === false) throw new Error();
+        a.pollInterval = v; paintRow(a); setActivitySaveState("Saved", "ok");
+      }).catch(()=>{ inp.value=a.pollInterval; setActivitySaveState("Couldn't save", "error"); });
     };
     const unit = document.createElement("span"); unit.className = "setting-unit"; unit.textContent = "seconds";
     row.appendChild(lbl); row.appendChild(inp); row.appendChild(unit);
@@ -542,17 +573,20 @@ function buildSettingsPanel(a){
       inp.title = inp.value; inp.disabled = !!S.running;
       inp.onchange = async()=>{
         const old = setting.value||"", value = inp.value.trim();
+        setActivitySaveState("Saving…");
         let ok = false; try{ ok = await api().set_node_runtime_param(setting.nodeId,setting.param,value); }catch(_){ }
-        if(ok){ syncRuntimeSetting(setting.nodeId,setting.param,value); inp.title = value; }
-        else inp.value = old;
+        if(ok){ syncRuntimeSetting(setting.nodeId,setting.param,value); inp.title = value; setActivitySaveState("Saved", "ok"); }
+        else { inp.value = old; setActivitySaveState("Couldn't save", "error"); }
       };
       const pick = document.createElement("button"); pick.type = "button";
       pick.className = "btn-path-pick runtime-setting-control"; pick.textContent = "Choose…";
       pick.title = setting.kind==="folder"?"Choose folder":"Choose program file"; pick.disabled = !!S.running;
       pick.onclick = async()=>{
         let value = "";
+        setActivitySaveState("Saving…");
         try{ value = await api().pick_node_runtime_path(setting.nodeId,setting.param,setting.kind,inp.value); }catch(_){ }
-        if(value){ inp.value = value; inp.title = value; syncRuntimeSetting(setting.nodeId,setting.param,value); }
+        if(value){ inp.value = value; inp.title = value; syncRuntimeSetting(setting.nodeId,setting.param,value); setActivitySaveState("Saved", "ok"); }
+        else setActivitySaveState("");
       };
       control.appendChild(inp); control.appendChild(pick);
       field.appendChild(lbl); field.appendChild(control);
@@ -565,7 +599,7 @@ function buildSettingsPanel(a){
   // only; the variable's code name is noise for the player.
   const vars = a.vars || [];
   if(vars.length){
-    const g = group();
+    const g = group("Options");
     vars.forEach(v=>{
       const row = document.createElement("div"); row.className = "setting-row";
       const lbl = document.createElement("span"); lbl.className = "setting-label";
@@ -576,7 +610,17 @@ function buildSettingsPanel(a){
       if(type==="bool"){
         const cb = document.createElement("button"); cb.type = "button"; cb.className = "cb"+(v.value?" checked":""); cb.innerHTML = CHECK;
         cb.setAttribute("aria-label", v.label||v.name); cb.setAttribute("aria-pressed",String(!!v.value));
-        cb.onclick = ()=>{ v.value=!v.value; cb.classList.toggle("checked",v.value); cb.setAttribute("aria-pressed",String(!!v.value)); api().set_activity_var(a.id,v.name,v.value); };
+        cb.onclick = async()=>{
+          const old = v.value, next = !old;
+          cb.disabled = true; setActivitySaveState("Saving…");
+          try{
+            const ok = await api().set_activity_var(a.id,v.name,next);
+            if(!ok) throw new Error();
+            v.value=next; cb.classList.toggle("checked",next); cb.setAttribute("aria-pressed",String(next));
+            setActivitySaveState("Saved", "ok");
+          }catch(_){ setActivitySaveState("Couldn't save", "error"); }
+          finally{ cb.disabled = false; }
+        };
         row.appendChild(cb);
       } else if(type==="select" && v.display==="toggle-group"){
         row.classList.add("setting-row-options");
@@ -598,15 +642,17 @@ function buildSettingsPanel(a){
           input.onchange=async()=>{
             if(!multi&&!input.checked) return;
             const value=multi?options.filter((o,i)=>inputs[i].checked):option;
-            error.hidden=true;
+            error.hidden=true; setActivitySaveState("Saving…");
             const hadFocus=document.activeElement===input;
             inputs.forEach(el=>{ el.disabled=true; });
             try{
               const ok=await api().set_activity_var(a.id,v.name,value);
               if(!ok) throw new Error("Setting was not saved");
               v.value=value;
+              setActivitySaveState("Saved", "ok");
             }catch(_){
               error.textContent="Couldn't save this choice. Please try again."; error.hidden=false;
+              setActivitySaveState("Couldn't save", "error");
             }finally{
               inputs.forEach((el,i)=>{ el.checked=checked(options[i]); el.disabled=false; });
               if(hadFocus) input.focus();
@@ -623,13 +669,24 @@ function buildSettingsPanel(a){
       } else if(type==="select"){
         const sel = document.createElement("select");
         (v.options||[]).forEach(o=>{ const op=document.createElement("option"); op.value=op.textContent=o; if(String(v.value)===String(o))op.selected=true; sel.appendChild(op); });
-        sel.onchange = ()=>{ v.value=sel.value; api().set_activity_var(a.id,v.name,sel.value); };
+        sel.onchange = async()=>{
+          const old=v.value, value=sel.value; sel.disabled=true; setActivitySaveState("Saving…");
+          try{ if(!await api().set_activity_var(a.id,v.name,value)) throw new Error(); v.value=value; setActivitySaveState("Saved", "ok"); }
+          catch(_){ sel.value=old; setActivitySaveState("Couldn't save", "error"); }
+          finally{ sel.disabled=false; }
+        };
         row.appendChild(sel);
       } else {
         const inp = document.createElement("input");
         inp.type = type==="number" ? "number" : "text"; inp.className = "setting-input";
         inp.value = (v.value!=null ? v.value : "");
-        inp.onchange = ()=>{ const val = type==="number" ? (parseFloat(inp.value)||0) : inp.value; v.value=val; api().set_activity_var(a.id,v.name,val); };
+        inp.onchange = async()=>{
+          const old=v.value, val=type==="number" ? (parseFloat(inp.value)||0) : inp.value;
+          inp.disabled=true; setActivitySaveState("Saving…");
+          try{ if(!await api().set_activity_var(a.id,v.name,val)) throw new Error(); v.value=val; setActivitySaveState("Saved", "ok"); }
+          catch(_){ inp.value=old ?? ""; setActivitySaveState("Couldn't save", "error"); }
+          finally{ inp.disabled=false; }
+        };
         row.appendChild(inp);
       }
       g.appendChild(row);
@@ -641,7 +698,7 @@ function buildSettingsPanel(a){
   // workflow). Default 1; an activity is tried this many times before failing.
   // Always last, after the activity's own config.
   {
-    const g = group();
+    const g = group("Execution");
     const row = document.createElement("div"); row.className = "setting-row";
     const lbl = document.createElement("span"); lbl.className = "setting-label"; lbl.textContent = "Attempts";
     const inp = document.createElement("input");
@@ -653,8 +710,10 @@ function buildSettingsPanel(a){
     inp.onchange = async()=>{
       let v = Math.max(1, parseInt(inp.value, 10) || 1);
       inp.value = v;
+      setActivitySaveState("Saving…");
       let res = null; try{ res = await api().set_activity_retries(a.id, v); }catch(_){ }
-      if(res && res.ok) v = res.retries; else v = a.maxRetries || 1;
+      if(res && res.ok){ v = res.retries; setActivitySaveState("Saved", "ok"); }
+      else { v = a.maxRetries || 1; setActivitySaveState("Couldn't save", "error"); }
       a.maxRetries = v; inp.value = v;
       paintRow(a);
     };
@@ -677,11 +736,23 @@ function showSettingsEmpty(){
   const host = $("act-set-body"); if(!host) return;
   host.innerHTML = '<div class="act-set-empty">Select the <b>⚙</b> on an activity to edit its settings here.</div>';
 }
+let _activitySaveTimer = null;
+function setActivitySaveState(message, kind=""){
+  const el = $("activity-save-status"); if(!el) return;
+  if(_activitySaveTimer){ clearTimeout(_activitySaveTimer); _activitySaveTimer=null; }
+  el.textContent = message || "";
+  el.className = "activity-save-status" + (kind ? " " + kind : "");
+  if(message === "Saved") _activitySaveTimer = setTimeout(()=>{ el.textContent=""; }, 1800);
+}
 function closeActivitySettings(){
   S.expandedId = null;
   document.querySelectorAll(".btn-gear.active").forEach(g=>g.classList.remove("active"));
+  document.querySelectorAll(".task-row.is-selected").forEach(row=>row.classList.remove("is-selected"));
   const title = $("act-set-title"); if(title) title.textContent = "Activity settings";
+  setActivitySaveState("");
   showSettingsEmpty();
+  if(S.mobileView === "activity") switchMobileView("activities");
+  else switchRTab("log");
 }
 function toggleSettings(id){
   const a = S.activities.find(x=>x.id===id); if(!a) return;
@@ -691,11 +762,15 @@ function toggleSettings(id){
   document.querySelectorAll(".btn-gear.active").forEach(g=>g.classList.remove("active"));
   const gear = document.querySelector(`.task-row[data-id="${id}"] [data-gear]`);
   if(gear) gear.classList.add("active");
+  document.querySelectorAll(".task-row.is-selected").forEach(row=>row.classList.remove("is-selected"));
+  const selectedRow = document.querySelector(`.task-row[data-id="${id}"]`);
+  if(selectedRow) selectedRow.classList.add("is-selected");
   S.expandedId = id;
   host.innerHTML = "";
   host.appendChild(buildSettingsPanel(a));
   const title = $("act-set-title"); if(title) title.textContent = a.name || "Activity settings";
   switchRTab("act");
+  switchMobileView("activity", false);
 }
 // Every activity has settings now (at least a Runner-only retry count), so the
 // gear shows on all rows and clicking any row opens its config.
@@ -715,7 +790,9 @@ function syncActivitySettings(){
   const a = S.activities.find(x=>x.id===S.expandedId);
   if(!a){ closeActivitySettings(); return; }
   const gear = document.querySelector(`.task-row[data-id="${S.expandedId}"] [data-gear]`);
-  if(gear) gear.classList.add("active"); else closeActivitySettings();
+  const row = document.querySelector(`.task-row[data-id="${S.expandedId}"]`);
+  if(gear){ gear.classList.add("active"); if(row) row.classList.add("is-selected"); }
+  else closeActivitySettings();
 }
 
 // ── Populate lists ───────────────────────────────────────────────────────────
@@ -970,6 +1047,8 @@ function applySpeedhack(info){
   const rng = $("speed-range"); rng.value = S.speedhack.speed; rng.disabled = !S.speedhack.enabled;
   $("speed-val").textContent = (parseFloat(S.speedhack.speed)||1).toFixed(1)+"x";
   $("speed-pkg").textContent = S.speedhack.package ? ("→ "+S.speedhack.package) : "(workflow package / Launch app node)";
+  const summary = $("runtime-summary");
+  if(summary) summary.textContent = S.speedhack.enabled ? `${(parseFloat(S.speedhack.speed)||1).toFixed(1)}× enabled` : "Speed hack off";
 }
 async function onSpeedToggle(){
   const en = !S.speedhack.enabled;
@@ -1062,12 +1141,12 @@ function renderGamePath(path){
     const def = S.gamePathDefault || "";
     const st = S.gamePathStatus;
     note.textContent = !path
-      ? "No game path yet — choose the game's .exe so Launch program blocks can start it."
+      ? "Required before this workflow can start."
       : (st && st.path === path && !st.exists)
-        ? "Nothing at this path — choose the game's .exe again. Runs stay blocked until it exists."
+        ? "Game not found. Choose the executable again."
       : (def && path !== def)
-        ? `Overrides the workflow's default (${def}). Clear it to go back.`
-        : "Launch program blocks set to “Project game path” start this program.";
+        ? "Custom path. Clear it to restore the workflow default."
+        : "Workflow default";
   }
 }
 async function onGamePathChange(value){
@@ -1103,10 +1182,10 @@ function renderEmulator(emu){
   if(note){
     const def = S.emulatorDefault || {};
     note.textContent = !S.emulator.path
-      ? "No install folder set — emulator blocks auto-detect it. Choose a folder to pin it."
+      ? "Auto-detect"
       : (def.path && S.emulator.path !== def.path)
-        ? `Overrides the workflow's default (${def.path}).`
-        : "Launch / Resize / Kill / Restart emulator blocks set to “Project emulator setting” use this family and folder.";
+        ? "Custom folder"
+        : "Workflow default";
   }
 }
 async function onEmulatorKindChange(value){
@@ -1184,13 +1263,16 @@ function renderRequirements(req){
   card.style.display = S.requirements ? "" : "none";
   if(!S.requirements){ refreshButtons(); return; }
   const r = S.requirements, isWin = S.controller === "win32";
+  const summary = $("req-summary");
+  if(summary) summary.textContent = r.installed ? "Installed" : `${r.missing || r.fileCount} missing`;
+  if(!r.installed) card.open = true;
   $("req-list").innerHTML = (r.items || []).map(n => `<li title="${escHtml(n)}">${escHtml(n)}</li>`).join("");
   const copy = $("btn-req-copy");
   if(copy) copy.style.display = isWin ? "" : "none";
   const st = $("req-status");
   const files = `${r.fileCount} file${r.fileCount === 1 ? "" : "s"}`;
   st.className = "req-status " + (r.installed ? "ok" : "warn");
-  if(r.installed) st.textContent = `Installed — all ${files} found in ${r.gameDir}.`;
+  if(r.installed) st.textContent = "Files installed. Restart the game if it is open.";
   else if(!isWin) st.textContent = `Copy these ${files} into the game's install folder.`;
   else if(!r.gameDir) st.textContent = `Not installed — set the Game path above, then copy these ${files} into the game folder.`;
   else st.textContent = `${r.missing} of ${files} missing in ${r.gameDir} — copy them into the game folder.`;
@@ -1355,6 +1437,13 @@ function renderUpdate(){
   if(!pill) return;
   const up = U.update;
   const available = !!(up && up.available);
+  const summary = $("updates-summary");
+  if(summary) summary.textContent = available ? `v${up.version} available`
+    : U.checking ? "Checking"
+    : (up && up.supported) ? "Up to date"
+    : (U.supported ? "Automatic" : "Build only");
+  const section = $("updates-section");
+  if(section && available) section.open = true;
   pill.hidden = !available || U.applying;
   if(available) pill.textContent = `Update v${up.version}`;
   check.disabled = !U.supported || U.checking || U.applying;
@@ -1371,7 +1460,8 @@ function renderUpdate(){
 }
 function showUpdates(){
   switchRTab("settings");
-  const card = $("updates-card");
+  const section = $("updates-section"); if(section) section.open = true;
+  const card = section || $("updates-card");
   if(card) card.scrollIntoView({ block:"nearest", behavior:"smooth" });
   const apply = $("btn-upd-apply");
   if(apply && !apply.hidden && !apply.disabled) apply.focus();
@@ -1379,7 +1469,8 @@ function showUpdates(){
 function focusUpdateProgress(){
   // Move the user to the live progress card before the blocking API call starts.
   switchRTab("settings");
-  const card = $("updates-card");
+  const section = $("updates-section"); if(section) section.open = true;
+  const card = section || $("updates-card");
   if(card) card.scrollIntoView({ block:"nearest", behavior:"smooth" });
   const bar = $("upd-bar");
   if(bar) bar.hidden = false;
@@ -1621,6 +1712,8 @@ function wireAppearance(){
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init(){
   wireAppearance();
+  switchMobileView("activities", false);
+  wireTabNav("mobile-tabs", "mobileView", switchMobileView);
   document.addEventListener("keydown", onGlobalKey, true);
   setupListDnD($("seq-list"));
   setupListDnD($("bg-list"));

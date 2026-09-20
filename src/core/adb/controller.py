@@ -17,6 +17,20 @@ from src.core.keynames import android_key_name
 from src.utils import log_error, log_success, log_warning, log_normal, log_debug
 
 
+class TimedAdbClient(AdbClient):
+    """ppadb client whose host commands cannot block a polling thread forever."""
+
+    def __init__(self, host: str = "127.0.0.1", port: int = 5037,
+                 timeout: float = 3.0):
+        super().__init__(host=host, port=port)
+        self.timeout = timeout
+
+    def create_connection(self, timeout=None):
+        return super().create_connection(
+            timeout=self.timeout if timeout is None else timeout
+        )
+
+
 def _extract_package_from_focus_line(line: str) -> Optional[str]:
     """Extract a package name from a dumpsys focus/activity line like
     '... u0 com.example.app/.MainActivity ...'."""
@@ -46,7 +60,7 @@ def _detect_current_app(device) -> Optional[str]:
             "mFocusedActivity", "topResumedActivity", "ACTIVITY ")
     for cmd in queries:
         try:
-            result = device.shell(cmd) or ""
+            result = device.shell(cmd, timeout=3.0) or ""
         except Exception:
             continue
         for line in result.splitlines():
@@ -75,7 +89,7 @@ class ADBController:
         self.host = host
         self.port = port
         self.device_id = device_id
-        self.client = AdbClient(host=host, port=port)
+        self.client = TimedAdbClient(host=host, port=port)
         self.device = None
         self.scanner = DeviceScanner(host=host, port=port)
         self._cache = get_cache()
@@ -94,14 +108,24 @@ class ADBController:
     def _get_device_name_for_device(self, device) -> str:
         """Get device name for a specific device without changing self.device"""
         try:
-            result = device.shell("getprop ro.product.model")
+            result = device.shell("getprop ro.product.model", timeout=3.0)
             if result.strip():
                 return result.strip()
         except Exception as e:
             log_debug(f"getprop ro.product.model failed for {device.serial}: {e}")
         return device.serial or "Unknown Device"
+
+    def online_devices(self) -> List:
+        """Return only transports ADB reports as ready for commands."""
+        states = self.scanner.get_device_states()
+        if not states:
+            return []
+        return [
+            device for device in self.client.devices()
+            if states.get(device.serial) == "device"
+        ]
     
-    def list_devices(self) -> List[Dict[str, str]]:
+    def list_devices(self, include_app: bool = True) -> List[Dict[str, str]]:
         """Return available ADB devices without prompting or connecting.
 
         Each entry contains ``serial``, ``name``, and optionally ``current_app``.
@@ -109,17 +133,18 @@ class ADBController:
         """
         devices: List[Dict[str, str]] = []
         try:
-            for device in self.client.devices():
+            for device in self.online_devices():
                 try:
                     device_name = self._get_device_name_for_device(device)
                 except Exception as e:
                     log_debug(f"device name lookup failed for {device.serial}: {e}")
                     device_name = device.serial or "Unknown Device"
                 current_app = ""
-                try:
-                    current_app = self._get_current_app_for_device(device) or ""
-                except Exception as e:
-                    log_debug(f"current-app lookup failed for {device.serial}: {e}")
+                if include_app:
+                    try:
+                        current_app = self._get_current_app_for_device(device) or ""
+                    except Exception as e:
+                        log_debug(f"current-app lookup failed for {device.serial}: {e}")
                 entry = {
                     "serial": device.serial,
                     "name": device_name,
@@ -140,9 +165,19 @@ class ADBController:
         """
         if self.device is not None and self.device_id == serial:
             return True
+        # Selection intent is authoritative. If the requested transport is not
+        # ready, retain its serial for reconnect but never keep using an older
+        # device handle under the new UI selection.
+        self.device = None
+        self.device_id = serial
         try:
-            for device in self.client.devices():
+            for device in self.online_devices():
                 if device.serial == serial:
+                    try:
+                        device.shell("echo ok", timeout=2.0)
+                    except Exception as exc:
+                        log_warning(f"Device '{serial}' is not ready: {exc}")
+                        return False
                     self.device = device
                     self.device_id = device.serial
                     device_name = self._get_device_name_for_device(self.device)
@@ -161,7 +196,7 @@ class ADBController:
             # Ensure ADB server is running
             self.scanner.ensure_adb_server_running()
             
-            devices = self.client.devices()
+            devices = self.online_devices()
             if devices:
                 log_normal("Available devices:")
                 for device in devices:
@@ -208,7 +243,7 @@ class ADBController:
                 log_warning("ADB server connection refused, attempting to restart...")
                 if self.scanner.restart_adb_server():
                     # Try again
-                    self.client = AdbClient(host=self.host, port=self.port)
+                    self.client = TimedAdbClient(host=self.host, port=self.port)
                     return self.check_adb_connection()
             
             # Try port scanning as fallback
@@ -265,8 +300,9 @@ class ADBController:
             device_serial, host = found_devices[0]
             
             # Connect to the device
-            client = AdbClient(host=self.host, port=self.port)
-            devices = client.devices()
+            client = TimedAdbClient(host=self.host, port=self.port)
+            states = self.scanner.get_device_states()
+            devices = [d for d in client.devices() if states.get(d.serial) == "device"]
             
             for device in devices:
                 if device.serial == device_serial:
@@ -635,7 +671,7 @@ class ADBController:
         try:
             # ``shell`` raises if the device went away; this is much cheaper
             # than re-running the full check_adb_connection flow.
-            self.device.shell("echo ok")
+            self.device.shell("echo ok", timeout=2.0)
             return True
         except Exception as e:
             log_debug(f"is_connected probe failed; dropping device: {e}")
@@ -650,21 +686,30 @@ class ADBController:
         for the heavy version that also scans emulator ports.
         """
         try:
-            devices = self.client.devices()
+            devices = self.online_devices()
             if not devices:
                 self.device = None
                 return False
-            # Prefer the previously-selected device id; otherwise pick the
-            # first available one.
+            # Keep an explicit selection stable while it is temporarily gone;
+            # reconnect must not silently redirect automation to another device.
             target = None
             if self.device_id:
                 for d in devices:
                     if d.serial == self.device_id:
                         target = d
                         break
+                if target is None:
+                    self.device = None
+                    return False
             if target is None:
                 target = devices[0]
                 self.device_id = target.serial
+            try:
+                target.shell("echo ok", timeout=2.0)
+            except Exception as exc:
+                log_debug(f"device health check failed for {target.serial}: {exc}")
+                self.device = None
+                return False
             self.device = target
             return True
         except Exception as e:
@@ -672,7 +717,7 @@ class ADBController:
             self.device = None
             return False
 
-    def get_status_summary(self) -> dict:
+    def get_status_summary(self, include_app: bool = True) -> dict:
         """Return a snapshot suitable for display in a status bar.
 
         Keys:
@@ -695,11 +740,12 @@ class ADBController:
         except Exception as e:
             log_debug(f"status_summary device-name lookup failed: {e}")
             device_name = self.device_id
-        try:
-            app_pkg = _detect_current_app(self.device)
-        except Exception as e:
-            log_debug(f"status_summary current-app lookup failed: {e}")
-            app_pkg = None
+        app_pkg = None
+        if include_app:
+            try:
+                app_pkg = _detect_current_app(self.device)
+            except Exception as e:
+                log_debug(f"status_summary current-app lookup failed: {e}")
         app_name = self._get_app_name_for_package(app_pkg) if app_pkg else None
         return {
             "connected": True,

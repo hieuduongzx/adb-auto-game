@@ -44,24 +44,23 @@
   --branch-loop:    #e0a64b;
   --branch-loop-bg: #fff7ea;
   --branch-loop-line: #d09030;
-   /* Wire palette — idle / unmatched rope only. A connected link paints in the
-      source node's category (or a branch hue), matching ComfyUI's type-coloured
-      sockets. Pitched for a 1.7px line over --canvas-bg and white cards. */
-   --wire:        #6e7f96;
-   --wire-switch: #8a63e0;
+   /* Wire palette — softened, modern pastels: the rope is connective tissue,
+      the branch hue is the accent. Pitched for a 1.6px line over --canvas-bg. */
+   --wire:        #a4b1c4;
+   --wire-switch: #9d86e8;
    /* Named multi-outs that are not true/false — Repeat body/done, loop-until
       found/fail — plus a 6-hue cycle for numbered lanes (parallel / sequence /
       try-in-order / switch cases). Shared by ports, wires, midpoint discs. */
-   --wire-body:  #2f7ae5;
-   --wire-done:  #1f9d57;
-   --wire-found: #1f9d57;
-   --wire-fail:  #d6483f;
-   --lane-1: #2f7ae5;
-   --lane-2: #c45aad;
-   --lane-3: #d48a1a;
-   --lane-4: #1aa88a;
-   --lane-5: #6d5bd4;
-   --lane-6: #c45a3a;
+   --wire-body:  #6d9cf0;
+   --wire-done:  #4db37d;
+   --wire-found: #4db37d;
+   --wire-fail:  #e88a80;
+   --lane-1: #6d9cf0;
+   --lane-2: #df83c6;
+   --lane-3: #e8ac56;
+   --lane-4: #4cc0a6;
+   --lane-5: #9d8ce8;
+   --lane-6: #e0926e;
   /* Node-category accents — single source of truth for wf.css's .cat-* node
      styling AND the group-frame colour palette (js/groups.js). */
   --cat-basic:  #6f9be8;
@@ -111,11 +110,13 @@
      sit on grid lines, never half a cell off. */
   --node-w: 180px; /* Canonical geometry is also read by workflow.js. */
   --node-h: 80px;
-  /* Border-centred sockets. Render and layout read these same geometry tokens;
-     the 20px row pitch = exactly 1 cell, so every slot's dot centre lands on a
-     grid dot when the card sits on the grid. */
+  /* Sockets sit INSIDE the card (6px from the edge): the wire layer paints
+     under the cards, so a link runs behind the block and re-emerges at its far
+     edge — connection points read as embedded sockets, not edge nubs. Render
+     and layout read these same geometry tokens; the 20px row pitch = exactly
+     1 cell, so every slot's dot centre lands on a grid dot on-grid. */
   --port-sz: 8px;
-  --port-inset: -4px; /* Socket centre sits on the border, meeting its wire. */
+  --port-inset: 6px;
   --port-gap: 20px;
   /* Start / End — ring tokens, exactly 2×2 grid cells. */
   --term-size: 40px;
@@ -157,7 +158,8 @@
   --branch-loop:    #eab308;
   --branch-loop-bg: rgba(234, 179, 8, .16);
   --branch-loop-line: #eab308;
-   --wire:        #6b7f99;
+   /* Dark canvas needs luminous-but-muted wire hues to read cleanly. */
+   --wire:        #7d8da4;
    --wire-switch: #a78bfa;
    --wire-body:  #5b9cf5;
    --wire-done:  #34c370;

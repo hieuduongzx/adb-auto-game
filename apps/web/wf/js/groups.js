@@ -786,6 +786,23 @@ async function wfRunSingleNode(node){
     wfNodeTesting=false;
   }
 }
+// Run a function standalone: its own graph from its Start block, on the same
+// debug path as "Run from here". This is what makes call blocks testable like
+// normal blocks — right-click the call node (or the function row) and run the
+// function without wrapping it in a throwaway activity.
+async function wfRunFunction(fnId){
+  const fn=(typeof wfFnById==="function")?wfFnById(fnId):null;
+  if(!fn){ uiToast("This call block has no function selected.","warning"); return; }
+  if(wfRunning){ uiToast("A workflow is running — stop it first.","warning"); return; }
+  if(wfNodeTesting){ setStatus("Testing block…"); return; }
+  // Show the function's own graph so the run trail lands on its blocks.
+  if(typeof wfEditFunction==="function" && WF.edit.id!==fn.id) wfEditFunction(fn.id);
+  wfResetRunViz(); wfSetRunning(true);
+  setStatus("Running function «"+(fn.name||fn.id)+"»…");
+  const ok=await api().workflow_run_from_node(JSON.stringify(wfSerialize()), "function", fn.id, null, false);
+  if(!ok) wfSetRunning(false);
+}
+
 function wfHideMenu(){ const m=$("wf-ctxmenu"); if(!m) return; m.style.display="none";
   // The quick-connect picker adds an Esc listener and a layout class; tear both
   // down here so the shared #wf-ctxmenu is pristine for the next menu.
@@ -817,6 +834,13 @@ function wfShowMenu(clientX, clientY){
     // Test one block: runs on device, paints match overlay on Preview.
     if(_n && wfCanTestNode(_n)){
       items.push({ico:"target",label:"Test block (Ctrl+Enter)", fn:()=>wfRunSingleNode(_n)});
+    }
+    // Call blocks run their whole function graph, like a normal block test.
+    if(_n && _n.type==="call"){
+      const _fn=_n.params&&_n.params.fn&&wfFnById(_n.params.fn);
+      if(_fn) items.push({ico:"play",label:"Run function «"+_fn.name+"»",
+        title:"Run this function's whole graph on its own — same debug run as Run from here",
+        fn:()=>wfRunFunction(_fn.id)});
     }
   }
   if(WF.sel.length>1 && typeof wfPvCanPreviewNode==="function"){
@@ -911,6 +935,7 @@ function wfShowFnRowMenu(clientX, clientY, fn){
   const m=$("wf-ctxmenu"); if(!m||!fn) return;
   m.innerHTML="";
   const items=[
+    {ico:"play",  label:"Run function", title:"Run this function's whole graph on its own", fn:()=>wfRunFunction(fn.id)},
     {ico:"edit",  label:"Edit function", fn:()=>wfEditFunction(fn.id)},
     {ico:"edit",  label:"Rename", fn:()=>{
       const row=document.querySelector(`.wf-act[data-id="${fn.id}"]`);

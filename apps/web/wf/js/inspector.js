@@ -215,6 +215,15 @@ function wfRenderInspector(){
       tbtn.onclick=()=>{ if(typeof wfRunSingleNode==="function") wfRunSingleNode(node); };
       idEl.appendChild(tbtn);
     }
+    // A call block runs its whole function — the same one-click affordance the
+    // testable blocks get above, so functions are runnable standalone.
+    if(node.type==="call" && node.params && node.params.fn && typeof wfFnById==="function" && wfFnById(node.params.fn)){
+      const fbtn=document.createElement("button"); fbtn.type="button"; fbtn.className="btn sm ico wf-insp-test-btn";
+      fbtn.innerHTML=wfIco("play");
+      fbtn.title="Run function — run this function's whole graph on its own (debug run, trail on its blocks)";
+      fbtn.onclick=()=>{ if(typeof wfRunFunction==="function") wfRunFunction(node.params.fn); };
+      idEl.appendChild(fbtn);
+    }
     body.appendChild(idEl);
 
     const pblock=wfInspBlock("Parameters");

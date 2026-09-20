@@ -153,6 +153,8 @@ class DevScopeAPI:
         self._device_lock = threading.Lock()
         self._selected_serial: Optional[str] = None
         self._connected_serial: Optional[str] = None
+        self._last_deep_scan = 0.0
+        self._deep_scan_interval = 30.0
 
         # In-flight guards.
         self._capture_lock = threading.Lock()
@@ -254,6 +256,9 @@ class DevScopeAPI:
     def select_device(self, serial: str) -> bool:
         try:
             self._selected_serial = serial or None
+            self.controller.device = None
+            self.controller.device_id = serial or None
+            self._connected_serial = None
             threading.Thread(
                 target=self._connect_device, args=(serial,), daemon=True,
             ).start()
@@ -269,13 +274,21 @@ class DevScopeAPI:
         threading.Thread(target=self._restart_adb_worker, daemon=True).start()
 
     def _connect_device(self, serial: str) -> None:
+        with self._device_lock:
+            self._connect_device_locked(serial)
+
+    def _connect_device_locked(self, serial: str) -> None:
         try:
+            if serial != self._selected_serial:
+                return
             if not serial:
                 self._connected_serial = None
                 self._push("device_status", {"connected": False})
                 return
             self.controller.select_device(serial)
             self.controller.quick_refresh()
+            if serial != self._selected_serial:
+                return
             s = self.controller.get_status_summary()
             self._connected_serial = s.get("device_id") if s.get("connected") else None
             if s.get("connected"):
@@ -288,11 +301,16 @@ class DevScopeAPI:
         except Exception as e:
             log_error(f"Connect device error: {e}")
 
-    def _device_worker(self) -> None:
+    def _device_worker(self, deep: bool = False) -> None:
         with self._device_lock:
             try:
                 self.scanner.ensure_adb_server_running()
-                devices = self.controller.client.devices()
+                if deep:
+                    try:
+                        self.scanner.scan_all(stop_on_first=False)
+                    except Exception as exc:
+                        log_warning(f"ADB port scan failed: {exc}")
+                devices = self.controller.online_devices()
                 items = self.scanner.unique_devices(devices)
                 if items and not self._selected_serial:
                     first = items[0].get("serial")
@@ -304,7 +322,7 @@ class DevScopeAPI:
                             or self.controller.device_id != self._selected_serial):
                         self.controller.select_device(self._selected_serial)
                 self._push("devices_update", {"devices": items})
-                serials = {d.get("serial") for d in items if d.get("serial")}
+                serials = {d.serial for d in devices}
                 wanted = self._selected_serial or self._connected_serial
                 if wanted and wanted not in serials:
                     self.controller.mark_disconnected("no longer listed by adb devices")
@@ -316,7 +334,7 @@ class DevScopeAPI:
                             "connected": False, "serial": None, "name": "",
                         })
                 elif items:
-                    s = self.controller.get_status_summary()
+                    s = self.controller.get_status_summary(include_app=False)
                     self._connected_serial = s.get("device_id") if s.get("connected") else None
                     if s.get("connected"):
                         self._device_lost_announced = False
@@ -335,14 +353,24 @@ class DevScopeAPI:
                             self._push("device_status", {
                                 "connected": False, "serial": None, "name": "",
                             })
-            except Exception:
+            except Exception as exc:
+                log_warning(f"ADB device refresh failed: {exc}")
+                self.controller.mark_disconnected("device refresh failed")
+                self._connected_serial = None
                 self._push("devices_update", {"devices": []})
+                self._push("device_status", {
+                    "connected": False, "serial": None, "name": "",
+                })
 
     def _device_poll(self) -> None:
         while not self._closing:
             time.sleep(5)
             if not self._closing:
-                self._device_worker()
+                now = time.monotonic()
+                deep = now - self._last_deep_scan >= self._deep_scan_interval
+                if deep:
+                    self._last_deep_scan = now
+                self._device_worker(deep=deep)
 
     def _scan_ports_worker(self) -> None:
         log_info("Port scanning all known emulator ranges...")

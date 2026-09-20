@@ -210,6 +210,8 @@ class WorkflowRunnerAPI:
         self._device_lock = threading.Lock()
         self._selected_serial: Optional[str] = None
         self._connected_serial: Optional[str] = None
+        self._last_deep_scan = 0.0
+        self._deep_scan_interval = 30.0
 
         # Live preview: a background thread pushes JPEG frames to the page while
         # the Preview panel is open (set_auto_refresh). Frames come from the same
@@ -1672,7 +1674,9 @@ class WorkflowRunnerAPI:
             return False
         try:
             self._selected_serial = serial
+            self.engine.auto.adb.device = None
             self.engine.auto.adb.device_id = serial
+            self._connected_serial = None
             self.engine.set_selected_device(serial)
             threading.Thread(target=self._connect_device, args=(serial,), daemon=True).start()
             return True
@@ -1681,9 +1685,17 @@ class WorkflowRunnerAPI:
             return False
 
     def _connect_device(self, serial: str) -> None:
+        with self._device_lock:
+            self._connect_device_locked(serial)
+
+    def _connect_device_locked(self, serial: str) -> None:
         try:
+            if serial != self._selected_serial:
+                return
             self.engine.auto.adb.select_device(serial)
             self.engine.auto.adb.quick_refresh()
+            if serial != self._selected_serial:
+                return
             s = self.engine.auto.adb.get_status_summary()
             self._connected_serial = s.get("device_id") if s.get("connected") else None
             # The engine's "selected device" follows the live handle, not the
@@ -1738,11 +1750,10 @@ class WorkflowRunnerAPI:
             try:
                 if force_scan:
                     try:
-                        if not (adb.list_devices() or []):
-                            adb.scan_all_devices()
-                    except Exception:
-                        pass
-                devices = adb.list_devices() or []
+                        adb.scan_all_devices()
+                    except Exception as exc:
+                        log_warning(f"ADB port scan failed: {exc}")
+                devices = adb.list_devices(include_app=False) or []
                 if devices and not self._selected_serial:
                     first = devices[0].get("serial")
                     if first:
@@ -1752,13 +1763,8 @@ class WorkflowRunnerAPI:
                 elif devices and self._selected_serial:
                     if adb.device is None or adb.device_id != self._selected_serial:
                         adb.select_device(self._selected_serial)
-                elif not devices:
-                    try:
-                        adb.check_adb_connection()
-                    except Exception:
-                        pass
                 adb.quick_refresh()
-                s = adb.get_status_summary()
+                s = adb.get_status_summary(include_app=False)
                 self._connected_serial = s.get("device_id") if s.get("connected") else None
                 self.engine.set_selected_device(self._connected_serial or self._selected_serial)
                 self._push("devices_update", {
@@ -1767,7 +1773,11 @@ class WorkflowRunnerAPI:
                     "serial": s.get("device_id"),
                     "name": s.get("device_name") or s.get("device_id") or "",
                 })
-            except Exception:
+            except Exception as exc:
+                log_warning(f"ADB device refresh failed: {exc}")
+                adb.mark_disconnected("device refresh failed")
+                self._connected_serial = None
+                self.engine.set_selected_device(self._selected_serial)
                 self._push("devices_update", {"devices": [], "connected": False,
                                               "serial": None, "name": ""})
 
@@ -1775,7 +1785,11 @@ class WorkflowRunnerAPI:
         while not self._closing:
             time.sleep(5)
             if not self._closing and self._adb_workflow():
-                self._device_worker(force_scan=False)
+                now = time.monotonic()
+                deep = now - self._last_deep_scan >= self._deep_scan_interval
+                if deep:
+                    self._last_deep_scan = now
+                self._device_worker(force_scan=deep)
 
     # ── Teardown ─────────────────────────────────────────────────────────────
 

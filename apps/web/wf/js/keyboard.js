@@ -29,10 +29,16 @@ window.addEventListener("keydown", e => {
 
   if(typing) return;   // below here: canvas shortcuts only (let inputs keep native Ctrl+C/V)
   if(e.defaultPrevented) return;
-  // Preserve native Tab/Space/arrow behavior in controls and resizers.
+  // Space / arrows stay native on buttons (activation, tablist roving) and
+  // resizers. Tab is deliberately NOT in this list: it always toggles
+  // Canvas ↔ Preview, even with a button focused — otherwise focus left on e.g.
+  // the Preview inspector's Copy button made Tab fall back to native focus
+  // traversal, wandering through the panel's buttons/inputs instead of
+  // switching views (the advertised behaviour). Text fields returned earlier,
+  // so Tab between form fields keeps working.
   if(e.target?.closest?.('button,[role="separator"],[role="tab"],[role="button"]') &&
-    ["Tab"," ","ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) return;
-  // Tab — toggle Canvas ↔ Preview (skipped while typing in an input).
+    [" ","ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) return;
+  // Tab — toggle Canvas ↔ Preview.
   if(e.key==="Tab"){ e.preventDefault(); wfSwitchView(wfToggleView()); return; }
   // Ctrl+= / Ctrl+- / Ctrl+0 — zoom whichever view is active (graph or mirror).
   if((e.ctrlKey||e.metaKey) && (e.key==="="||e.key==="+")){ e.preventDefault();

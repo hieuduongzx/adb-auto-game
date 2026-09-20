@@ -81,7 +81,10 @@ function wfRenderActivities(){
     // so the row keeps its indicator across re-renders during a test run.
     const st=wfActStatus[act.id];
     const multisel=(typeof wfActSel!=="undefined")&&wfActSel.has(act.id);
-    el.className="wf-act"+(sel?" sel":"")+(multisel?" multisel":"")+(st==="running"?" running":"")+(st==="done"?" done":"")+(st==="errored"?" errored":"");
+    // Disabled activities dim the whole row, not just the checkbox: an
+    // unchecked box alone never told you "this one won't run".
+    el.className="wf-act"+(sel?" sel":"")+(multisel?" multisel":"")+(st==="running"?" running":"")+(st==="done"?" done":"")+(st==="errored"?" errored":"")
+      +(act.enabled===false?" off":"");
     el.dataset.id=act.id;
     // Crash marker: the block the activity last died on is one click away.
     const crash=(typeof wfActCrash!=="undefined") ? wfActCrash[act.id] : null;
@@ -92,7 +95,7 @@ Bấm để nhảy tới khối đó">${wfIco("crash")}</button>`
     el.innerHTML=
       `<span class="wf-act-runbar"></span>
        <span class="wf-act-grip" title="Drag to reorder">${WF_GRIP}</span>
-       <span class="wf-act-cb ${act.enabled?"checked":""}">${check}</span>
+       <span class="wf-act-cb ${act.enabled?"checked":""}" title="${act.enabled===false?"Disabled — this activity won't run":"Enabled"}">${check}</span>
        <span class="wf-act-name" title="Double-click to rename">${escHtml(act.name)}</span>
        ${crashBtn}
        <button class="wf-act-del" title="Delete">${wfIco("x")}</button>`;
