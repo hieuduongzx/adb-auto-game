@@ -319,23 +319,23 @@ def cmd_restart(args):
 
 
 def show_menu():
-    """Hiển thị menu tương tác"""
-    print_header("ADB Tool - Menu Chính")
-    print("1. Check         - Kiểm tra kết nối ADB")
-    print("2. Scan          - Quét thiết bị emulator")
-    print("3. List          - Liệt kê thiết bị đã kết nối")
-    print("4. Info          - Thông tin chi tiết thiết bị")
-    print("5. Screenshot    - Chụp màn hình")
-    print("6. Tap           - Chạm vào tọa độ (x y)")
-    print("7. Swipe         - Vuốt màn hình (x1 y1 x2 y2)")
-    print("8. Shell         - Thực thi lệnh shell")
-    print("9. Restart       - Khởi động lại ADB server")
-    print("0. Exit          - Thoát chương trình")
+    """Display the interactive menu."""
+    print_header("ADB Tool - Main Menu")
+    print("1. Check         - Check ADB connection")
+    print("2. Scan          - Scan emulator devices")
+    print("3. List          - List connected devices")
+    print("4. Info          - Show device information")
+    print("5. Screenshot    - Capture a screenshot")
+    print("6. Tap           - Tap coordinates (x y)")
+    print("7. Swipe         - Swipe coordinates (x1 y1 x2 y2)")
+    print("8. Shell         - Run a shell command")
+    print("9. Restart       - Restart the ADB server")
+    print("0. Exit          - Exit")
     print(f"{'='*60}\n")
 
 
 def interactive_mode():
-    """Chế độ menu tương tác"""
+    """Run the interactive menu."""
     class MockArgs:
         def __init__(self):
             self.device: str | None = None
@@ -349,39 +349,39 @@ def interactive_mode():
     
     while True:
         show_menu()
-        choice = input("Chọn chức năng (0-9): ").strip()
+        choice = input("Select an action (0-9): ").strip()
         
         args = MockArgs()
         
         if choice == '0':
-            print("Tạm biệt!")
+            print("Goodbye!")
             break
         elif choice == '1':
-            args.device = input("Device ID (Enter để bỏ qua): ").strip() or None
+            args.device = input("Device ID (press Enter to skip): ").strip() or None
             cmd_check(args)
         elif choice == '2':
-            emu = input("Emulator (bluestacks/nox/ldplayer/memu/mumu) hoặc Enter để quét tất: ").strip()
+            emu = input("Emulator (bluestacks/nox/ldplayer/memu/mumu), or press Enter to scan all: ").strip()
             args.emulator = emu if emu else None
-            with_app = input("Hiện app đang chạy của mỗi device? (y/N): ").strip().lower()
+            with_app = input("Show the running app for each device? (y/N): ").strip().lower()
             args.with_app = with_app == 'y'
             cmd_scan(args)
         elif choice == '3':
             cmd_list(args)
         elif choice == '4':
-            args.device = input("Device ID (Enter để bỏ qua): ").strip() or None
+            args.device = input("Device ID (press Enter to skip): ").strip() or None
             cmd_info(args)
         elif choice == '5':
-            args.device = input("Device ID (Enter để bỏ qua): ").strip() or None
-            args.output = input("Output filename (Enter để tự động): ").strip() or None
+            args.device = input("Device ID (press Enter to skip): ").strip() or None
+            args.output = input("Output filename (press Enter for automatic): ").strip() or None
             cmd_screenshot(args)
         elif choice == '6':
             try:
                 args.x = int(input("X coordinate: "))
                 args.y = int(input("Y coordinate: "))
-                args.device = input("Device ID (Enter để bỏ qua): ").strip() or None
+                args.device = input("Device ID (press Enter to skip): ").strip() or None
                 cmd_tap(args)
             except ValueError:
-                log_error("Tọa độ phải là số!")
+                log_error("Coordinates must be numbers")
         elif choice == '7':
             try:
                 args.x1 = int(input("Start X: "))
@@ -390,22 +390,22 @@ def interactive_mode():
                 args.y2 = int(input("End Y: "))
                 dur = input("Duration ms (Enter=300): ").strip()
                 args.duration = int(dur) if dur else 300
-                args.device = input("Device ID (Enter để bỏ qua): ").strip() or None
+                args.device = input("Device ID (press Enter to skip): ").strip() or None
                 cmd_swipe(args)
             except ValueError:
-                log_error("Tọa độ phải là số!")
+                log_error("Coordinates must be numbers")
         elif choice == '8':
-            args.device = input("Device ID (Enter để bỏ qua): ").strip() or None
-            cmd = input("Lệnh shell: ").strip()
+            args.device = input("Device ID (press Enter to skip): ").strip() or None
+            cmd = input("Shell command: ").strip()
             if cmd:
                 args.command = cmd.split()
                 cmd_shell(args)
         elif choice == '9':
             cmd_restart(args)
         else:
-            log_error("Lựa chọn không hợp lệ!")
+            log_error("Invalid selection")
         
-        input("\nNhấn Enter để tiếp tục...")
+        input("\nPress Enter to continue...")
 
 
 def main():
@@ -414,7 +414,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
-  python adb_tool.py -m                  # Chạy chế độ menu tương tác
+   python adb_tool.py -m                  # Run interactive mode
   python adb_tool.py check              # Check ADB connection
   python adb_tool.py scan               # Scan all emulator ports
   python adb_tool.py scan -e ldplayer   # Scan LDPlayer only
@@ -430,7 +430,7 @@ Examples:
     )
     
     parser.add_argument('-m', '--menu', action='store_true',
-                       help='Chạy chế độ menu tương tác (interactive mode)')
+                       help='Run interactive mode')
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
@@ -483,7 +483,7 @@ Examples:
     
     args = parser.parse_args()
     
-    # Nếu có command thì chạy command mode
+    # Run command mode when a command is provided.
     if args.command:
         # Route to appropriate command
         commands = {
@@ -504,7 +504,7 @@ Examples:
             log_error(f"Unknown command: {args.command}")
             return 1
     
-    # Mặc định chạy menu tương tác
+    # Default to interactive mode.
     interactive_mode()
     return 0
 
