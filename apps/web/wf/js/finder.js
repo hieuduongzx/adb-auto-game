@@ -88,7 +88,7 @@ function wfFindRender(listEl, q){
   listEl.innerHTML="";
   if(!wfFindHits.length){
     const e=document.createElement("div"); e.className="wf-find-empty";
-    e.textContent=terms.length?"No blocks match.":"No blocks yet.";
+     e.textContent=terms.length?"No nodes match.":"No nodes yet.";
     listEl.appendChild(e); return;
   }
   const cur=wfEditTarget();
@@ -117,7 +117,7 @@ function wfFindShow(){
   box.innerHTML=
     `<div class="wf-find-bar">
        <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
-       <input type="text" placeholder="Find block or function… (name, image, note)" spellcheck="false" autocomplete="off">
+       <input type="text" placeholder="Find node or function… (name, image, note)" spellcheck="false" autocomplete="off">
        <span class="k">Esc</span>
      </div>
      <div class="wf-find-list"></div>`;

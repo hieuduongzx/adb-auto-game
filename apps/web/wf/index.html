@@ -31,7 +31,7 @@
            the amber dot on this button — without shouting all the time. -->
       <button class="btn ico" id="wf-save-btn" onclick="wfSave()" title="Save to the current file (Ctrl+S)">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg></button>
-      <button class="btn ico" onclick="wfExport()" title="Save as… — new JSON file">
+      <button class="btn ico" onclick="wfExport()" title="Export workflow — new JSON file">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg></button>
       <span class="tb-tray-sep"></span>
       <button class="btn ico" id="wf-undo-btn" onclick="wfUndo()" title="Undo (Ctrl+Z)">
@@ -81,7 +81,7 @@
     <div class="tb-tray tb-run-aux">
       <button class="btn ico" onclick="wfValidateShow()" title="Check workflow — find broken wires, missing templates, and bad branch counts">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></button>
-      <button class="btn ico" onclick="wfRunSingleNode()" title="Test block — run the selected block and draw its match overlay on Preview (Ctrl+Enter)">
+      <button class="btn ico" onclick="wfRunSingleNode()" title="Test node — run the selected node and draw its match overlay on Preview (Ctrl+Enter)">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></button>
       <button class="btn ico" id="wf-run-menu-btn" onclick="wfShowRunMenu(this)" aria-label="Run and debug actions" title="More run & debug actions — run from selected, step debug, Runner, Build EXE" aria-haspopup="menu" aria-expanded="false">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 19.655A6 6 0 0 1 6 14v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 3.97"/><path d="M14 15.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997a1 1 0 0 1-1.517-.86z"/><path d="M14.12 3.88 16 2"/><path d="M21 5a4 4 0 0 1-3.55 3.97"/><path d="M3 21a4 4 0 0 1 3.81-4"/><path d="M3 5a4 4 0 0 0 3.55 3.97"/><path d="M6 13H2"/><path d="m8 2 1.88 1.88"/><path d="M9 7.13V6a3 3 0 1 1 6 0v1.13"/></svg></button>
@@ -200,6 +200,7 @@
       <!-- Soft watermark: name of the open activity/function (top-left of the graph). -->
       <div class="wf-cur-act" id="wf-cur-act" data-empty="1" title="Currently open activity / function" aria-live="polite"></div>
       <div id="wf-graph-stats" class="wf-graph-stats" aria-live="polite"></div>
+      <button type="button" id="wf-zoom-badge" class="wf-zoom-badge" onclick="wfZoomReset()" title="Zoom 100% — click or double-tap Space to reset" aria-label="Canvas zoom">100%</button>
       <div id="wf-world">
         <svg id="wf-wires"></svg>
       </div>
@@ -207,7 +208,7 @@
         <div class="wf-empty-card">
           <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
           <div class="t">No activity open</div>
-          <div class="s">Create an activity, then drag blocks from the left palette onto the canvas to build the flow.</div>
+          <div class="s">Create an activity, then drag nodes from the left palette onto the canvas to build the workflow.</div>
           <button class="btn accent sm" onclick="wfActAddCurrent()">+ Add activity</button>
           <div class="keys">
             <span><b>Wheel</b> zoom</span><span><b>Space</b> pan</span>
@@ -228,14 +229,18 @@
             <input id="wf-pv-hz" type="number" min="0.2" max="60" step="0.5" value="30" title="Refresh rate (Hz)">
             <span class="hz-unit">Hz</span>
           </div>
+          <!-- Shown only while something is drawn over the frame (match boxes, node
+               geometry, picked point/region, swipe) — see wfPvSyncOverlayBtn(). -->
+          <button type="button" class="btn sm" id="wf-pv-clear-overlay" hidden onclick="wfPvClearAllOverlays()" title="Remove everything drawn over the screen (match boxes, node geometry, picked point / region, swipe)">Clear overlay</button>
           <button type="button" id="wf-pv-node-chip" class="wf-pv-node-chip" hidden onclick="wfPvClearNodePreview()" title="Clear node preview"></button>
           <span class="spacer"></span>
           <span id="wf-pv-res" class="wf-pv-res"></span>
-          <span id="wf-pv-hint" class="wf-pv-hint" title="Left click = pick point (read color) · Left drag = select region (crop) · Right click = tap device · Right drag = swipe device (coords captured to the Actions panel for copy) · Middle drag = pan · Wheel = zoom">left = point · drag = region · right = tap · right-drag = swipe (→ panel)</span>
+          <span id="wf-pv-hint" class="wf-pv-hint" title="Left click = pick point (read color) · Left drag = select region (crop) · Right click = tap device · Right drag = swipe device (coords captured to the Actions panel for copy) · Middle drag = pan · Wheel = zoom · Double-tap Space = reset zoom">left = point · drag = region · right = tap · right-drag = swipe (→ panel)</span>
         </div>
         <div id="wf-pv-wrap">
           <canvas id="wf-pv-canvas"></canvas>
           <div id="wf-pv-tpl-strip" class="wf-pv-tpl-strip" hidden aria-label="Templates in node preview"></div>
+          <button type="button" id="wf-pv-zoom-badge" class="wf-zoom-badge wf-pv-zoom-badge" onclick="wfPvResetZoom()" title="Zoom 100% — click or double-tap Space to reset" aria-label="Preview zoom">100%</button>
         </div>
       </div>
       <!-- Template library — every image in the open workflow's templates/ folder
@@ -318,21 +323,16 @@
       <div id="wf-minimap" class="wf-minimap" title="Minimap — click or drag to move the view">
         <canvas id="wf-minimap-cv"></canvas>
       </div>
-      <!-- Bottom-right dock — one card, three tabs: the two graph switchers
-           (Activities, Functions) and the live Variables list. They share the
-           corner rather than stacking three floating cards on top of each
-           other, and the top edge drags to any height (double-click to reset).
-           The tab strip is the panel header, so shared/panel.js still finds its
-           .pnl-hd and mounts the Maximize tool. -->
+      <!-- Bottom-right dock: Activities and Functions. Drag the top edge to
+           resize; Variables are managed in the Inspector. -->
       <div class="pnl" id="wf-act-panel" data-dtab="act" data-pnl="wf-activities" data-pnl-title="Activities" data-pnl-tools="max">
         <div id="wf-act-resizer" title="Drag the top edge (or use arrow keys) to resize the list — double-click to reset" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize list" aria-valuemin="72" aria-valuemax="600"></div>
-        <div class="wf-dock-tabs pnl-hd" role="tablist" aria-label="Activities, functions and variables">
+        <div class="wf-dock-tabs pnl-hd" role="tablist" aria-label="Activities and functions">
           <!-- The label is its own span so the strip can ellipsize rather than
                overflow: with min-width:0 the tabs are the only part that can
                give, and without it they pushed the tools off the card edge. -->
           <button type="button" class="tab-btn active" data-dtab="act" role="tab" aria-selected="true" aria-controls="wf-dock-act" id="wf-dtab-act" onclick="wfSwitchDockTab('act')"><span class="tab-lbl">Activities</span> <span class="tab-count" id="wf-act-total"></span></button>
           <button type="button" class="tab-btn" data-dtab="fn" role="tab" aria-selected="false" aria-controls="wf-dock-fn" id="wf-dtab-fn" onclick="wfSwitchDockTab('fn')"><span class="tab-lbl">Functions</span> <span class="tab-count" id="wf-fn-count"></span></button>
-          <button type="button" class="tab-btn" data-dtab="vars" role="tab" aria-selected="false" aria-controls="wf-dock-vars" id="wf-dtab-vars" onclick="wfSwitchDockTab('vars')"><span class="tab-lbl">Variables</span> <span class="tab-count" id="wf-vars-count"></span><span class="wf-vars-live" id="wf-vars-live" title="● Live — engine is running">●</span></button>
           <span class="pnl-tools">
             <!-- Card chrome only. The per-tab buttons moved down to
                  .wf-dock-bar: three tab labels plus five buttons in one row
@@ -364,12 +364,6 @@
           <span class="wf-dock-tools" data-for="fn">
             <button class="wf-side-mini wf-side-add" id="wf-fn-add" title="Create new function">+</button>
           </span>
-          <span class="wf-dock-tools" data-for="vars">
-            <button id="wf-vars-add" class="wf-vars-add" title="Add variable (global or local)">
-              <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-            </button>
-            <button id="wf-vars-mgr" class="wf-vars-add" title="Manage global variables"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></button>
-          </span>
         </div>
         <div id="wf-act-panel-body" class="wf-act-panel-body">
           <div class="wf-dock-pane active" id="wf-dock-act" role="tabpanel" aria-labelledby="wf-dtab-act">
@@ -378,9 +372,6 @@
           </div>
           <div class="wf-dock-pane" id="wf-dock-fn" role="tabpanel" aria-labelledby="wf-dtab-fn">
             <div id="wf-functions" class="wf-act-list"></div>
-          </div>
-          <div class="wf-dock-pane" id="wf-dock-vars" role="tabpanel" aria-labelledby="wf-dtab-vars">
-            <div id="wf-vars-body" class="wf-vars-body"></div>
           </div>
         </div>
       </div>
@@ -391,9 +382,12 @@
       <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
     </button>
   </div>
-  <!-- Right: node properties. The live Variables list now lives in the
-       bottom-right dock's Variables tab, beside the two graph switchers. -->
+  <!-- Right: scoped variables and node properties. -->
   <div id="wf-inspector">
+    <section id="wf-inspector-vars" aria-label="Variables">
+      <div class="wf-side-hdr">Variables <span class="side-count" id="wf-vars-count"></span><span class="wf-vars-live" id="wf-vars-live" title="Live values">●</span></div>
+      <div id="wf-vars-body" class="wf-vars-body"></div>
+    </section>
     <!-- Properties / DevScope share one panel: same header, swapped body. The
          header keeps the panel's name in one place instead of each mode
          growing chrome of its own. -->

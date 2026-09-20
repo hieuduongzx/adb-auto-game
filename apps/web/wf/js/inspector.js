@@ -288,7 +288,6 @@ function wfRenderInspector(){
     else b.appendChild(wfActField("Retry count","num",act.maxRetries,v=>act.maxRetries=parseInt(v)||1));
     body.appendChild(b);
 
-    body.appendChild(wfVarsSection(act));
 
     body.appendChild(wfInspJsonBlock(act.type==="background"?"Background":"Activity", ()=>wfSerializeActivity(act), o=>wfApplyActivityJson(act,o)));
 
@@ -970,21 +969,27 @@ function wfActField(label,t,val,onset){
 }
 
 // Per-activity variables.
+const wfActivityVarsExpanded=new WeakSet();
 function wfVarsSection(act){
   if(!act.vars) act.vars=[];
   const b=wfInspBlock("Activity variables", act.vars.length);
-  b.style.gap="2px";
+  b.classList.add("wf-activity-vars");
+  if(!act.vars.length){
+    const empty=document.createElement("div"); empty.className="wf-vars-context";
+    empty.textContent="No activity variables yet."; b.appendChild(empty);
+  }
   act.vars.forEach((v,idx)=>wfBuildVarTree(act,v,idx,b));
   b.appendChild(wfVarAddBtn(act));
   return b;
 }
 function wfVarAddBtn(act, parentVar, parentIdx){
-  const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Variable"; add.style.alignSelf="flex-start";
+  const add=document.createElement("button"); add.type="button"; add.className="btn sm wf-activity-var-add"; add.innerHTML=wfIco("plus")+" Variable";
   add.onclick=()=>{
     wfPushUndoDebounced();
     const arr=parentVar?parentVar.children:(act.vars);
     const n=arr.length+1; const prefix=parentVar?(parentVar.name||"sub")+"_":"";
     arr.push({name:prefix+wfVarSlug("Setting "+n), label:"Setting "+n, type:"bool", value:false, children:[]});
+    wfActivityVarsExpanded.add(arr[arr.length-1]);
     wfRenderInspector();
   };
   return add;
@@ -997,25 +1002,37 @@ function wfBuildVarTree(act,v,idx,container,depth){
   v.children=v.children||[];
   const card=wfVarRow(act,v,idx,depth);
   container.appendChild(card);
-  v.children.forEach((cv,ci)=>{
-    cv.children=cv.children||[];
-    const subCard=wfVarRow(act,cv,ci,depth+1);
-    container.appendChild(subCard);
-    cv.children.forEach((ccv,cci)=>{ ccv.children=ccv.children||[]; container.appendChild(wfVarRow(act,ccv,cci,depth+2)); });
-  });
+  v.children.forEach((cv,ci)=>wfBuildVarTree(act,cv,ci,container,depth+1));
 }
 function wfVarRow(act,v,idx,depth){
   depth=depth||0;
+  const item=document.createElement("details"); item.className="wf-variable-item wf-activity-variable";
+  item.open=wfActivityVarsExpanded.has(v);
+  if(depth>0){ item.style.marginLeft=(depth*WF_VAR_INDENT)+"px"; item.classList.add("nested"); }
+  const summary=document.createElement("summary");
+  const title=document.createElement("span"); title.className="wf-variable-name";
+  const type=document.createElement("span"); type.className="wf-variable-type";
+  const value=document.createElement("span"); value.className="wf-variable-value";
+  const updateSummary=()=>{
+    title.textContent=v.label||v.name||"Variable"; type.textContent=v.type||"bool";
+    value.textContent=Array.isArray(v.value)?v.value.join(", ")||"None":String(v.value??"");
+    value.title=value.textContent;
+  };
+  updateSummary(); summary.append(title,type,value); item.appendChild(summary);
+  item.addEventListener("toggle",()=>{
+    if(item.open) wfActivityVarsExpanded.add(v); else wfActivityVarsExpanded.delete(v);
+    updateSummary();
+  });
   const card=document.createElement("div"); card.className="wf-var-card";
-  if(depth>0) card.style.marginLeft=(depth*WF_VAR_INDENT)+"px";
   // Line 1: drag-chip + title + delete + add-child button.
   const r1=document.createElement("div"); r1.className="wf-var-row";
   const chip=document.createElement("span"); chip.className="wf-var-chip"; chip.draggable=true;
-  chip.textContent="🔖"; chip.title="Drag to canvas to create a check node";
+  chip.innerHTML=wfIco("pin"); chip.title="Drag to canvas to create a check node";
   chip.addEventListener("dragstart",e=>{ wfPaletteDrag="var:"+(v.type||"bool")+":"+(v.name||""); e.dataTransfer.effectAllowed="copy"; try{e.dataTransfer.setData("text/plain",v.name||"");}catch{} });
   chip.addEventListener("dragend",()=>{ wfPaletteDrag=null; });
   r1.appendChild(chip);
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Title (shown in settings)"; lbl.style.cssText="flex:1;min-width:0;font-weight:600;";
+  lbl.setAttribute("aria-label","Variable title");
   // While the code name has never been edited by hand, keep it in sync with the
   // Title the user types ("Đọc email" → "doc_email").
   let autoName = !v.name || v.name===v.label || v.name===wfVarSlug(v.label||"");
@@ -1024,25 +1041,26 @@ function wfVarRow(act,v,idx,depth){
     if(autoName){ const s=wfVarSlug(lbl.value); if(s){ v.name=s; nm.value=s; } }
   };
   r1.appendChild(lbl);
-  const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Child"; addChild.title="Add child variable (nested)";
-  addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); wfRenderInspector(); };
+  const addChild=document.createElement("button"); addChild.type="button"; addChild.className="wf-side-mini"; addChild.innerHTML=wfIco("plus"); addChild.title="Add child variable"; addChild.setAttribute("aria-label",addChild.title);
+  addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); wfActivityVarsExpanded.add(v.children[v.children.length-1]); wfRenderInspector(); };
   r1.appendChild(addChild);
-  const del=document.createElement("button"); del.className="wf-act-del"; del.innerHTML=wfIco("x"); del.title="Delete variable";
+  const del=document.createElement("button"); del.type="button"; del.className="wf-side-mini wf-activity-var-delete"; del.innerHTML=wfIco("trash"); del.title="Delete variable"; del.setAttribute("aria-label",del.title);
   del.onclick=()=>{
     wfPushUndoDebounced();
-    // Find parent array and remove this var
-    const parentArr = depth>0 ? (findParentVarArr(act.vars, idx, depth)||act.vars) : act.vars;
-    if(depth>0){ const pi=findParentVarIdx(act.vars, idx, depth); if(pi>=0) parentArr.splice(pi,1); }
-    else act.vars.splice(idx,1);
+    // Locate by identity so siblings at the same depth cannot delete each other.
+    const remove=list=>{ const i=list.indexOf(v); if(i>=0){ list.splice(i,1); return true; } return list.some(parent=>remove(parent.children||[])); };
+    remove(act.vars);
     wfRenderInspector();
   };
   r1.appendChild(del);
   // Line 2: name + type + default value.
   const r2=document.createElement("div"); r2.className="wf-var-row";
   const nm=document.createElement("input"); nm.type="text"; nm.value=v.name||""; nm.placeholder="variable (e.g. isClaim)"; nm.style.cssText="flex:1;min-width:0;font-size:10.5px;font-family:var(--mono);";
+  nm.setAttribute("aria-label","Variable name");
   nm.oninput=()=>{ wfPushUndoDebounced(); v.name=nm.value; autoName=!v.name || v.name===wfVarSlug(v.label||""); };
   r2.appendChild(nm);
   const ty=document.createElement("select");
+  ty.setAttribute("aria-label","Variable type");
   [["bool","bool"],["number","number"],["text","text"],["path","path"],["select","select"]].forEach(([val,lab])=>{ const o=document.createElement("option"); o.value=val; o.textContent=lab; if((v.type||"bool")===val)o.selected=true; ty.appendChild(o); });
   ty.onchange=()=>{
     wfPushUndoDebounced();
@@ -1052,13 +1070,21 @@ function wfVarRow(act,v,idx,depth){
     wfRenderInspector();
   };
   r2.appendChild(ty);
-  if(v.type!=="select") r2.appendChild(wfVarValue(v));
   card.appendChild(r1); card.appendChild(r2);
+  if(v.type!=="select"){
+    const row=document.createElement("div"); row.className="wf-field wf-activity-var-default";
+    const label=document.createElement("label"); label.textContent="Default value";
+    const control=wfVarValue(v); const input=control.matches("input,select,[role=checkbox]")?control:control.querySelector("input");
+    if(input){ input.id=wfUid(); label.htmlFor=input.id; input.setAttribute("aria-label","Default value"); }
+    row.append(label,control); card.appendChild(row);
+  }
   // Line 3 (select only): options.
   if(v.type==="select"){
     card.appendChild(wfVarOptionsEditor(v));
   }
-  return card;
+  item.appendChild(card);
+  ["input","change","click"].forEach(event=>card.addEventListener(event,updateSummary));
+  return item;
 }
 // ── Helpers for nested variable deletion ───────────────────────────────────
 function wfFindVarInArr(arr, idx, depth, level){

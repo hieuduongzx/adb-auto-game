@@ -502,7 +502,41 @@ function wfPvDrawNodeShapes(ctx,colors,chip){
   }
 }
 
+// Everything currently drawn over the frame: engine/test match boxes, the search
+// crop, node-context geometry, and the hand-picked point / region / swipe.
+function wfPvHasOverlay(){
+  return !!(wfPvOverlay.length || wfPvMatchRegion || wfPvNodeShapes.length || wfPvNodePreview ||
+            wfPvRegion || wfPvPoint || wfPvSwipe);
+}
+// Keep the bar's "Clear overlay" button and the corner zoom badge in step with the
+// state. Called at the top of every wfPvDraw, so any code that changes overlay or
+// zoom state (and redraws) updates them without knowing they exist.
+function wfPvSyncOverlayBtn(){
+  const btn=document.getElementById("wf-pv-clear-overlay");
+  if(btn){ const has=wfPvHasOverlay(); if(btn.hidden===has) btn.hidden=!has; }
+  const zb=document.getElementById("wf-pv-zoom-badge");
+  if(zb){
+    const pct=Math.round(wfPvZoom*100);
+    if(zb.textContent!==pct+"%"){ zb.textContent=pct+"%"; zb.classList.toggle("zoomed",pct!==100);
+      zb.title=pct===100?"Zoom 100%":`Zoom ${pct}% — click or double-tap Space to reset`; }
+  }
+}
+// "Clear overlay" button: wipe every annotation and tell the backend so the panel
+// fields and the engine's own overlay stay in step. Local state goes first so the
+// screen clears immediately; the backend calls only follow up.
+async function wfPvClearAllOverlays(){
+  const hadSel=!!(wfPvRegion||wfPvPoint);
+  wfPvSwipe=null; wfPvRegion=null; wfPvPoint=null;
+  if(typeof pvSetRegionBadge==="function") pvSetRegionBadge(false);
+  wfPvClearNodePreview();                 // node geometry, match boxes, template strip, chip; redraws
+  if(hadSel && typeof pvClearRegion==="function") await pvClearRegion();   // zero the panel fields + backend selection
+  try{ await api().clear_overlay(); }catch{}
+  wfPvDraw();
+  setStatus("Overlay cleared");
+}
+
 function wfPvDraw(){
+  wfPvSyncOverlayBtn();
   const colors=wfPvColors();
   const cvs=wfPvCanvas; if(!cvs||!wfPvCtx||!wfPvImg) return;
   const ctx=wfPvCtx, cw=cvs.width, ch=cvs.height;
@@ -736,6 +770,7 @@ function wfPvAttachCanvas(){
   c.addEventListener("mousedown", e=>{
     // Middle button, or Space + left button → pan (like the graph canvas).
     if(e.button===1 || (e.button===0 && spaceHeld())){
+      if(spaceHeld()) wfSpaceUsed=true;   // a Space+drag pan, not a tap: no zoom reset on release
       e.preventDefault(); wfPvPanning=true; wfPvPanStart=wfPvCanvasPos(e);
       wfPvPanBase=[wfPvPanX,wfPvPanY]; c.style.cursor="grabbing"; return; }
     // Right button → tap (click) or swipe (drag) — resolved on mouseup.

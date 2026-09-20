@@ -1850,6 +1850,6 @@ def run(auto_load: Optional[str] = None) -> None:
 
 
 if __name__ == "__main__":
-    # The flow JSON to load — the Hub's Run and the designer's "Chạy GUI" pass one.
+    # The workflow JSON to load — Hub Run and Designer Open Runner pass one.
     auto = sys.argv[1] if len(sys.argv) > 1 else None
     run(auto)

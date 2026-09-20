@@ -367,7 +367,7 @@
    border and the panel fill already separate it, and the shadow only muddied
    the plane it is pinned to. */
 #wf-act-panel { position:absolute; right:14px; bottom:14px; z-index:7;
-  width:400px; max-width:calc(100% - 28px); display:flex; flex-direction:column;
+  width:320px; max-width:calc(100% - 28px); display:flex; flex-direction:column;
   min-height:0; overflow:hidden; background:var(--panel); border:1px solid var(--border);
   border-radius:var(--r-md); box-shadow:none; }
 #workflow-view.wf-preview-on #wf-act-panel,
@@ -417,11 +417,12 @@
 /* One tool group per tab — the card's data-dtab picks which one is on. */
 .wf-dock-tools { display:none; align-items:center; gap:1px; margin-left:auto; flex-shrink:0; }
 #wf-act-panel[data-dtab="act"]  .wf-dock-tools[data-for="act"],
-#wf-act-panel[data-dtab="fn"]   .wf-dock-tools[data-for="fn"],
-#wf-act-panel[data-dtab="vars"] .wf-dock-tools[data-for="vars"] { display:inline-flex; }
+#wf-act-panel[data-dtab="fn"]   .wf-dock-tools[data-for="fn"] { display:inline-flex; }
 /* Panes share the one scrolling body, so --act-h sizes whichever tab is open. */
 .wf-dock-pane { display:none; flex-direction:column; min-height:0; }
 .wf-dock-pane.active { display:flex; }
+#wf-inspector-vars { display:flex; flex-direction:column; flex:0 1 auto; min-height:120px; max-height:45%; border-bottom:1px solid var(--border2); }
+#wf-inspector-vars.live .wf-vars-live { display:inline; color:var(--run-ok); }
 .wf-vars-tabs { display:flex; gap:4px; margin-bottom:8px; }
 .wf-vars-tabs .btn { flex:1; }
 .wf-vars-tabs .active { background:var(--accent-bg); color:var(--accent); }
@@ -791,6 +792,16 @@
 #wf-zoom-lbl { font-family:var(--mono); font-size:9.5px; color:var(--dim); height:20px;
   min-width:28px; text-align:center; cursor:pointer; user-select:none; border-radius:5px; }
 #wf-zoom-lbl:hover { color:var(--accent); background:var(--alt); }
+
+/* Zoom readout — top-right corner of the graph and of the mirror. Quiet at 100%,
+   accent-coloured once the view is zoomed so "why is everything tiny" is answered
+   at a glance; clicking it (or tapping Space) returns to 100%. */
+.wf-zoom-badge { position:absolute; top:12px; right:14px; z-index:5; height:24px; min-width:46px;
+  padding:0 9px; border:1px solid var(--border2); border-radius:var(--r-sm); background:var(--panel);
+  color:var(--dim); font:600 10.5px/1 var(--mono); text-align:center; cursor:pointer; user-select:none; }
+.wf-zoom-badge:hover { color:var(--accent); border-color:var(--accent); }
+.wf-zoom-badge.zoomed { color:var(--accent); background:var(--accent-bg); border-color:var(--accent); }
+.wf-zoom-badge:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 
 /* ── Auto-layout — a single toggle button (bottom-left). ──────────────────── */
 .wf-layout-bar { position:absolute; left:12px; bottom:12px; z-index:5; }
@@ -1205,16 +1216,20 @@
 .wf-node-eye:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-node-eye.on { color:var(--accent); }
 /* Action bar — pinned to the top-right corner of a selected node. */
-.wf-node-actions { position:absolute; top:-28px; right:0; height:26px;
-  display:none; align-items:center; gap:2px; padding:0 2px;
-  border-radius:var(--r-sm); border:1px solid var(--border);
+.wf-node-actions { position:absolute; bottom:100%; right:-1px; height:26px;
+  display:none; align-items:center; gap:0; padding:0;
+  border-radius:0; border:1px solid var(--border);
   background:var(--panel); }
-.wf-node.sel:not(.wf-dragging):not(.wf-dragdone) .wf-node-actions { display:flex; }
+.wf-node.sel:not(.wf-dragging):not(.wf-dragdone) .wf-node-actions,
+.wf-node:hover:not(.wf-dragging) .wf-node-actions,
+.wf-node:focus-within .wf-node-actions { display:flex; }
 .wf-node-actions button { display:inline-flex; align-items:center; justify-content:center;
-  width:24px; height:24px; padding:0; border:none; border-radius:4px; background:transparent;
+  width:24px; height:24px; padding:0; border:none; border-radius:0; background:transparent;
   color:var(--muted); cursor:pointer; transition:background .1s, color .1s; }
 .wf-node-actions button:hover { background:var(--alt); color:var(--ink); }
 .wf-node-actions button.on { color:var(--accent); }
+.wf-node-actions .wf-act-del { color:var(--err); opacity:1; }
+.wf-node-actions button:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 .wf-node-actions .wf-act-del:hover { color:var(--err); background:var(--err-bg); }
 .wf-node-actions button svg { width:12px; height:12px; display:block; stroke:currentColor; fill:none;
   stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
@@ -1345,14 +1360,14 @@
    "|" divider — "−1.5s | +0.5s" tucked to the block's bottom edge. The pill
    chrome lives on the container; each .wf-delay-chip is just its half, so the
    runtime countdown can highlight one half without doubling the border. */
-.wf-node-delay { position:absolute; top:100%; left:calc(var(--port-inset) + 2px); margin-top:2px;
+.wf-node-delay { position:absolute; top:100%; left:-1px; margin-top:0;
   display:inline-flex; align-items:center; gap:5px; pointer-events:none; z-index:1;
-  white-space:nowrap; border:1px solid var(--border); border-radius:999px;
-  padding:1.5px 6px; background:color-mix(in srgb, var(--panel) 80%, transparent); }
+   white-space:nowrap; border:1px solid var(--border); border-radius:0;
+   padding:3px 6px; background:var(--panel); }
 .wf-delay-chip { display:inline-flex; align-items:center;
   font-family:var(--mono); font-size:8.5px; font-weight:500; letter-spacing:.02em;
   line-height:1; color:var(--dim); position:relative; overflow:hidden;
-  border-radius:3px; transition:color .12s, background .12s; }
+   border-radius:0; transition:color .12s, background .12s; }
 .wf-delay-sep { color:var(--border2); font-size:8px; line-height:1;
   user-select:none; }
 .wf-delay-label { font-variant-numeric:tabular-nums; }
@@ -1371,12 +1386,12 @@
 }
 .wf-delay-chip.counting > * { position:relative; z-index:1; }
 .wf-node-delay-live {
-  position:absolute; top:100%; left:var(--port-inset); margin-top:3px; z-index:2;
+  position:absolute; top:100%; left:-1px; margin-top:0; z-index:2;
   display:inline-flex; align-items:center; pointer-events:none;
   font-family:var(--mono); font-size:9px; font-weight:700; letter-spacing:.02em;
   line-height:1; color:var(--run-live-ink);
   font-variant-numeric:tabular-nums; white-space:nowrap;
-  background:var(--run-live-hd); border-radius:3px; padding:2px 5px;
+  background:var(--run-live-hd); border-radius:0; padding:3px 6px; border:1px solid var(--border);
   overflow:hidden;
 }
 .wf-node-delay-live::before {
@@ -1396,11 +1411,11 @@
 /* Timeout corner badge — the static limit a wait-style block runs under, top-right.
    While the block is live the same pill counts down (elapsed bar fill) until the
    engine's node_result restores it. */
-.wf-node-timeout { position:absolute; top:4px; right:5px; z-index:2;
+.wf-node-timeout { position:absolute; top:-1px; right:-1px; z-index:2;
   display:inline-flex; align-items:center; pointer-events:none;
   font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:.02em;
   line-height:1; color:var(--dim); font-variant-numeric:tabular-nums;
-  background:var(--surface); border:1px solid var(--border); border-radius:3px;
+  background:var(--surface); border:1px solid var(--border); border-radius:0;
   padding:2px 4px; white-space:nowrap; overflow:hidden; }
 .wf-node-timeout::after { content:"⏱"; font-family:inherit; margin-right:2px; opacity:.7; order:-1; }
 .wf-node-timeout.counting {
@@ -1705,6 +1720,21 @@
 .wf-points-picked { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   color:var(--muted); font-family:var(--mono); font-size:9.5px; }
 /* Variable card in activity inspector */
+.wf-activity-vars { gap:var(--s1); }
+.wf-activity-vars .wf-variable-item { min-width:0; margin-bottom:0; }
+.wf-activity-variable > summary:hover { background:var(--alt); }
+.wf-activity-variable.nested { border-left:1px solid var(--line); padding-left:var(--s2); }
+.wf-activity-variable > .wf-var-card { border:0; border-radius:0; padding:var(--s1) 0 var(--s4); gap:var(--s3); }
+.wf-activity-variable .wf-var-row { min-width:0; }
+.wf-activity-variable .wf-var-row select { max-width:40%; }
+.wf-activity-variable .wf-var-chip { display:inline-flex; align-items:center; justify-content:center;
+  width:26px; height:26px; padding:0; color:var(--muted); background:transparent; border:0; }
+.wf-activity-variable .wf-var-chip svg { width:14px; height:14px; }
+.wf-activity-variable .wf-side-mini:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.wf-activity-variable .wf-activity-var-delete:hover { color:var(--err); background:var(--err-bg); }
+.wf-activity-var-default > .wf-var-path-value { flex:1; }
+.wf-activity-var-add { align-self:flex-start; margin-top:var(--s2); }
+.wf-activity-var-add svg { width:14px; height:14px; }
 .wf-var-card { border:1px solid var(--border2); border-radius:7px; padding:6px; background:var(--panel); display:flex; flex-direction:column; gap:5px; }
 .wf-var-row { display:flex; align-items:center; gap:5px; }
 .wf-options-editor { display:flex; flex-direction:column; gap:6px; min-width:0; padding-top:6px; }
@@ -1975,6 +2005,7 @@
 .wf-pv-node-chip:hover { background:var(--accent); color:var(--on-accent); }
 .wf-pv-node-chip:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .wf-pv-node-chip[hidden] { display:none; }
+#wf-pv-clear-overlay[hidden] { display:none; }
 .wf-pv-res { font-family:var(--mono); font-size:11px; color:var(--muted); flex-shrink:0; }
 .wf-pv-hint { font-size:10.5px; color:var(--muted); }
 #wf-pv-hz { width:50px; height:28px; text-align:right; padding:0 6px; }
@@ -1984,6 +2015,11 @@
   max-width:calc(100% - 24px); padding:7px; overflow-x:auto; border:1px solid rgba(255,255,255,.16);
   border-radius:7px; background:rgba(15,18,22,.88); box-shadow:0 4px 14px rgba(0,0,0,.22); }
 .wf-pv-tpl-strip[hidden] { display:none; }
+/* The mirror is a dark stage in both themes, so its badge uses the same fixed dark
+   chip as the template strip rather than the theme panel colour. */
+.wf-pv-zoom-badge { z-index:3; background:rgba(15,18,22,.88); border-color:rgba(255,255,255,.16); color:#c2cad4; }
+.wf-pv-zoom-badge:hover { color:#fff; border-color:rgba(255,255,255,.4); }
+.wf-pv-zoom-badge.zoomed { color:#7fc0ff; background:rgba(15,18,22,.88); border-color:#4f8df0; }
 .wf-pv-tpl-item { display:flex; align-items:center; gap:7px; flex:0 0 auto; min-width:0; color:#d5e2ee; }
 .wf-pv-tpl-item + .wf-pv-tpl-item { padding-left:7px; border-left:1px solid rgba(255,255,255,.14); }
 .wf-pv-tpl-item img { display:block; max-width:110px; max-height:64px; object-fit:contain; image-rendering:auto; }

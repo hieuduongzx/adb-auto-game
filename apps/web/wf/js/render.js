@@ -490,10 +490,9 @@ function wfAllVarNames(){
 }
 let wfVarsScope="local";
 const wfVarsExpanded=new WeakSet();
-// ── Bottom-right dock tabs: Activities · Functions · Variables ──────────────
-// The three used to be separate cards (two of them fighting over the same
-// corner); they are now one card with a tab strip that doubles as its header.
-const WF_DOCK_TABS=["act","fn","vars"];
+// ── Bottom-right dock tabs: Activities · Functions ──────────────────────────
+// Variables are managed in the Inspector.
+const WF_DOCK_TABS=["act","fn"];
 let wfDockTab="act";
 try{ const t=localStorage.getItem("wfDockTab"); if(WF_DOCK_TABS.includes(t)) wfDockTab=t; }catch{}
 
@@ -513,13 +512,13 @@ function wfApplyDockTab(tab){
   document.querySelectorAll(".wf-dock-pane").forEach(p=>p.classList.toggle("active", p.id==="wf-dock-"+tab));
 }
 function wfSwitchDockTab(tab,opts){
+  if(tab==="vars"){ wfOpenInspectorVars(); return; }
   if(tab==="fns") tab="fn";                     // legacy spelling
   if(!WF_DOCK_TABS.includes(tab)) return;
   // Clicking a tab is also how you get the list back from a folded card.
   if(wfActCollapsed){ wfActCollapsed=false; wfToggleActPanel(); wfPersistPanelState(); }
   wfApplyDockTab(tab);
   try{ localStorage.setItem("wfDockTab",tab); }catch{}
-  if(tab==="vars" && !(opts&&opts.silent)) wfRenderVarsPanel();
   if(opts&&opts.focus){ const b=$("wf-dtab-"+tab); if(b) b.focus(); }
 }
 // Roving tabindex over the strip: ←/→ wrap, Home/End jump, Enter/Space are the
@@ -541,18 +540,25 @@ function wfInitDockTabs(){
     wfSwitchDockTab(WF_DOCK_TABS[j],{focus:true});
   });
 }
+function wfOpenInspectorVars(){
+  if(document.getElementById("workflow-view")?.classList.contains("wf-right-collapsed")) wfToggleSidebar("right");
+  wfRenderVarsPanel();
+  $("wf-inspector-vars")?.scrollIntoView({block:"nearest"});
+}
 function wfRenderVarsPanel(){
   const body=$("wf-vars-body"); if(!body) return;
   // Preserve an active editor while typing or receiving live-value updates.
   if(body.contains(document.activeElement)&&document.activeElement.matches("input,select")) return;
   const expandedScroll=body.scrollTop;
   body.replaceChildren();
-  // The live dot rides on the tab, not on a header — the header is the tab strip.
-  const tabBtn=$("wf-dtab-vars"); if(tabBtn) tabBtn.classList.toggle("live",Object.keys(wfLiveVars).length>0);
+  // Keep the Inspector's live indicator in sync with engine values.
+  const tabBtn=$("wf-inspector-vars"); if(tabBtn) tabBtn.classList.toggle("live",Object.keys(wfLiveVars).length>0);
   const act=wfCurAct();
+  if(!act && wfVarsScope==="local") wfVarsScope="global";
   const tabs=document.createElement("div"); tabs.className="wf-vars-tabs";
-  ["local","global"].forEach(scope=>{const b=document.createElement("button");b.type="button";b.textContent=scope==="local"?"Local":"Global";
+  ["global","local"].forEach(scope=>{const b=document.createElement("button");b.type="button";b.textContent=scope==="local"?"Local":"Global";
     b.className="btn sm"+(wfVarsScope===scope?" active":"");b.setAttribute("aria-pressed",String(wfVarsScope===scope));
+    b.disabled=scope==="local"&&!act;
     b.onclick=()=>{wfVarsScope=scope;wfRenderVarsPanel();};tabs.append(b);});
   body.append(tabs);
   const context=document.createElement("div");context.className="wf-vars-context";

@@ -795,6 +795,9 @@ const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities
   nodeDefaults:{ delayBefore:0, delayAfter:0, retryCount:0, retryDelay:0, screenshotOnFail:false },
   edit:{kind:"activity", id:null}, sel:[], selectedNode:null };
 let wfSpace=false;  // space held → pan instead of box-select
+// A Space press that never panned is a "tap"; two taps in quick succession reset
+// the zoom (keyboard.js). Armed on keydown, spent when a Space+drag pan starts.
+let wfSpaceArmed=false, wfSpaceUsed=false;
 const WF_GRID=20;   // grid step; every card dimension is a whole multiple of it
 let wfSnapOn=true;  // snap ON by default — blocks land on the grid unless you opt out
 let wfPreviewAll=false;   // global: show image thumbnail on every image block
@@ -1516,6 +1519,16 @@ function wfApplyTransform(){
   wfSyncLod();
   if(typeof wfMinimapQueue==="function") wfMinimapQueue();
   const lbl=$("wf-zoom-lbl"); if(lbl) lbl.textContent=Math.round(wfZoom*100)+"%";
+  wfSyncZoomBadge();
+}
+// Corner readout of the graph zoom (top-right of the canvas). Accent-coloured
+// whenever the view is not at 100%.
+function wfSyncZoomBadge(){
+  const b=$("wf-zoom-badge"); if(!b) return;
+  const pct=Math.round(wfZoom*100);
+  b.textContent=pct+"%";
+  b.classList.toggle("zoomed",pct!==100);
+  b.title=pct===100?"Zoom 100%":`Zoom ${pct}% — click or double-tap Space to reset to 100%`;
 }
 // Level of detail. Zoomed out far enough, 9px slot labels, flow markers and
 // timing chips stop being information and turn into speckle — the same call

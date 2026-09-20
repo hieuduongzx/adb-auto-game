@@ -14,19 +14,28 @@ function wfPopNodes(ids){
 function wfSelectOne(id){ WF.sel=id?[id]:[]; WF.selectedNode=id||null; document.querySelectorAll(".wf-node.wf-dragdone").forEach(el=>el.classList.remove("wf-dragdone")); }
 function wfToggleSel(id){ const i=WF.sel.indexOf(id); if(i>=0)WF.sel.splice(i,1); else WF.sel.push(id); WF.selectedNode=WF.sel.length?id:null; }
 function wfClearSel(){ WF.sel=[]; WF.selectedNode=null; }
-function wfDeleteNode(id){ wfDeleteNodes([id]); }
-function wfDeleteSelected(){ if(WF.sel.length) wfDeleteNodes(WF.sel.slice()); }
-function wfDeleteNodes(ids){
+function wfDeleteNode(id){ return wfDeleteNodes([id]); }
+function wfDeleteSelected(){ if(WF.sel.length) return wfDeleteNodes(WF.sel.slice()); }
+let wfDeletePending=false;
+async function wfDeleteNodes(ids){
+  if(wfDeletePending) return;
   const g=wfGraph(); if(!g) return;
   const del=ids.filter(id=>{ const n=g.nodes.find(x=>x.id===id); return n && n.type!=="start"; });
   if(!del.length) return;
+  wfDeletePending=true;
+  let confirmed;
+  try{
+    confirmed=await uiConfirm({title:del.length===1?"Delete block?":"Delete blocks?",
+      message:`Delete ${del.length} selected block(s) and their connected wires?`,ok:"Delete",danger:true});
+  }finally{ wfDeletePending=false; }
+  if(!confirmed || wfGraph()!==g) return;
   wfPushUndo();
   g.nodes=g.nodes.filter(n=>!del.includes(n.id));
   g.edges=g.edges.filter(e=>!del.includes(e.from)&&!del.includes(e.to));
   WF.sel=WF.sel.filter(id=>!del.includes(id));
   if(del.includes(WF.selectedNode)) WF.selectedNode=null;
   wfRenderCanvas(); wfRenderInspector();
-  // No confirm dialog — Ctrl+Z undoes it; nudge with a toast when many blocks go at once.
+  // Confirmed deletions remain undoable.
   if(del.length>2) uiToast(`Deleted ${del.length} blocks — Ctrl+Z to undo`,"info");
   else setStatus(`Deleted ${del.length} block(s) — Ctrl+Z to undo`);
 }

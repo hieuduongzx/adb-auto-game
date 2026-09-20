@@ -661,7 +661,7 @@ class WorkflowDesignerAPI:
     def scope_out_dir(self) -> str:
         """Resolve (lazily) and announce the folder where preview crops save.
 
-        Called by JS when entering the Preview tab so the Vùng chọn / Thư viện
+        Called by JS when entering the Preview tab so the Selection / Library
         labels reflect the current workflow's templates folder.
         """
         path = self._scope_out()
@@ -738,7 +738,7 @@ class WorkflowDesignerAPI:
             try:
                 return bool(ctrl.press_key(int(keycode)))
             except (TypeError, ValueError):
-                log_warning(f"[designer] Win32 cần mã VK dạng số, nhận '{keycode}'")
+                log_warning(f"[Designer] Win32 requires a numeric virtual-key code; received '{keycode}'")
                 return False
         if self.controller.device is None:
             return False
@@ -770,7 +770,7 @@ class WorkflowDesignerAPI:
                       clicks: int = 1) -> bool:
         """Right/middle-click test from the Preview tab (Win32 projects only)."""
         if self._capture_kind != "win32":
-            log_warning("[designer] Click phải/giữa chỉ áp dụng cho dự án Win32")
+            log_warning("[Designer] Right and middle click are available only for Win32 projects")
             return False
         ctrl = self._win32_ready()
         if ctrl is None:
@@ -782,7 +782,7 @@ class WorkflowDesignerAPI:
                        notches: int = 3) -> bool:
         """Mouse-wheel test from the Preview tab (Win32 projects only)."""
         if self._capture_kind != "win32":
-            log_warning("[designer] Cuộn con lăn chỉ áp dụng cho dự án Win32")
+            log_warning("[Designer] Wheel scrolling is available only for Win32 projects")
             return False
         ctrl = self._win32_ready()
         if ctrl is None:
@@ -1197,8 +1197,8 @@ class WorkflowDesignerAPI:
         out_dir = getattr(self, "_library_out_dir", "") or self._scope_out()
         name = os.path.basename((path or "").replace("\\", "/"))
         if not device_info.delete_asset(out_dir, path):
-            return {"ok": False, "error": f"Không xoá được '{name}'"}
-        log_info(f"🗑 Đã chuyển '{name}' vào {device_info.TRASH_DIR}/")
+            return {"ok": False, "error": f"Could not delete '{name}'"}
+        log_info(f"Moved '{name}' to {device_info.TRASH_DIR}/")
         return {"ok": True, "name": name}
 
     def template_restore(self, path: str) -> dict:
@@ -1206,8 +1206,8 @@ class WorkflowDesignerAPI:
         out_dir = getattr(self, "_library_out_dir", "") or self._scope_out()
         name = os.path.basename((path or "").replace("\\", "/"))
         if not device_info.restore_asset(out_dir, path):
-            return {"ok": False, "error": f"Không khôi phục được '{name}'"}
-        log_info(f"↩ Đã khôi phục '{name}'")
+            return {"ok": False, "error": f"Could not restore '{name}'"}
+        log_info(f"Restored '{name}'")
         return {"ok": True, "name": name}
 
     def list_trash(self) -> list:
@@ -1231,10 +1231,10 @@ class WorkflowDesignerAPI:
         # path or just the file name the rename field holds.
         src = device_info.asset_path(out_dir, path)
         if not src:
-            return {"ok": False, "error": "Không tìm thấy file gốc"}
+            return {"ok": False, "error": "Original file not found"}
         clean = _sanitize_name(os.path.splitext(str(new_name or ""))[0])
         if not clean:
-            return {"ok": False, "error": "Tên mới không hợp lệ"}
+            return {"ok": False, "error": "Invalid new name"}
         ext = os.path.splitext(src)[1]
         old_base = os.path.basename(src)
         new_base = clean + ext
@@ -1244,14 +1244,14 @@ class WorkflowDesignerAPI:
 
         dest = os.path.join(out_dir, new_base)
         if os.path.exists(dest):
-            return {"ok": False, "error": f"Đã có file '{new_base}' trong thư mục"}
+            return {"ok": False, "error": f"A file named '{new_base}' already exists in this folder"}
 
         try:
             flow = json.loads(flow_json) if flow_json else {}
         except Exception:
-            return {"ok": False, "error": "Workflow JSON không đọc được"}
+            return {"ok": False, "error": "Could not read workflow JSON"}
         if not isinstance(flow, dict):
-            return {"ok": False, "error": "Workflow JSON không hợp lệ"}
+            return {"ok": False, "error": "Invalid workflow JSON"}
 
         # Rewrite first, then move: if the JSON turns out to be unwritable the
         # file is still where every existing reference expects it.
@@ -1274,9 +1274,9 @@ class WorkflowDesignerAPI:
         try:
             os.replace(src, dest)
         except OSError as exc:
-            return {"ok": False, "error": f"Không đổi tên được: {exc}"}
+            return {"ok": False, "error": f"Could not rename file: {exc}"}
 
-        log_info(f"✎ Đổi tên '{old_base}' → '{new_base}' ({touched} block)")
+        log_info(f"Renamed '{old_base}' → '{new_base}' ({touched} node(s) updated)")
         return {"ok": True, "flow": json.dumps(flow, ensure_ascii=False),
                 "old": old_base, "new": new_base, "nodes": touched}
 

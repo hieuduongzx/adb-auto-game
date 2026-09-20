@@ -43,12 +43,12 @@ async function wfLibOpen(){
 
 async function wfLibRefresh(){
   const grid=$("wf-lib-grid");
-  if(grid) wfLibPlaceholder(grid, "Đang đọc thư mục template…");
+  if(grid) wfLibPlaceholder(grid, "Reading the template folder…");
   const sig=wfLibFlowJson(), generation=wfLibGeneration;
   let data=null;
   try{ data=await api().list_templates(sig); }catch(e){}
   if(generation!==wfLibGeneration) return;
-  if(!data){ if(grid) wfLibPlaceholder(grid, "Không đọc được thư mục template."); return; }
+  if(!data){ if(grid) wfLibPlaceholder(grid, "Could not read the template folder"); return; }
   wfLibState=data;
   wfLibFlowSig=sig;
   wfLibOverlay=null;
@@ -111,8 +111,8 @@ function wfLibRenderBar(){
   const el=$("wf-lib-counts");
   if(el){
     const bits=[`${c.total||0} template`];
-    if(c.orphan) bits.push(`${c.orphan} không dùng`);
-    if(c.missing) bits.push(`${c.missing} thiếu file`);
+    if(c.orphan) bits.push(`${c.orphan} unused`);
+    if(c.missing) bits.push(`${c.missing} missing`);
     el.textContent=bits.join(" · ");
     el.classList.toggle("has-warn", !!c.missing);
   }
@@ -132,8 +132,8 @@ function wfLibRenderGrid(){
   const shown=all.filter(wfLibMatches);
   if(!shown.length){
     wfLibPlaceholder(grid, all.length
-      ? "Không có template nào khớp bộ lọc."
-      : "Thư mục template đang trống — crop một vùng ở tab Preview để tạo cái đầu tiên.");
+      ? "No templates match the filter"
+      : "The template folder is empty — capture a region in Preview to create the first one");
     wfLibRenderSide();
     return;
   }
@@ -150,8 +150,8 @@ function wfLibCard(t){
     +(t.usedCount?" is-used":" is-orphan");
   card.dataset.path=t.path;
   card.title=t.usedCount
-    ? `${t.name}\n${t.usedCount} block dùng file này`
-    : `${t.name}\nKhông block nào dùng file này`;
+    ? `${t.name}\n${t.usedCount} node(s) use this file`
+    : `${t.name}\nNo nodes use this file`;
   const thumb=document.createElement("img");
   thumb.className="asset-thumb"; thumb.alt=t.name; thumb.loading="lazy";
   // Fetch per card, bound to this element: a querySelector pass would re-scan
@@ -162,7 +162,7 @@ function wfLibCard(t){
   const meta=document.createElement("div");
   meta.className="wf-lib-meta";
   const dim=t.w?`${t.w}×${t.h}`:"?";
-  meta.textContent=t.usedCount ? `${dim} · ${t.usedCount} block` : `${dim} · không dùng`;
+  meta.textContent=t.usedCount ? `${dim} · ${t.usedCount} node(s)` : `${dim} · unused`;
   card.append(thumb, name, meta);
   card.onclick=()=>wfLibSelect(t.path);
   return card;
@@ -186,7 +186,7 @@ function wfLibRenderSide(){
   if(!t){
     const hint=document.createElement("div");
     hint.className="wf-lib-empty";
-    hint.textContent="Chọn một template để xem block nào đang dùng nó.";
+    hint.textContent="Select a template to see which nodes use it";
     side.appendChild(hint);
     return;
   }
@@ -204,25 +204,25 @@ function wfLibRenderSide(){
   if(!t.usedCount){
     const warn=document.createElement("div");
     warn.className="wf-lib-note";
-    warn.textContent="Không block nào trong workflow dùng file này.";
+    warn.textContent="No nodes in the workflow use this file";
     side.appendChild(warn);
   } else {
     const lbl=document.createElement("div");
     lbl.className="wf-lib-side-lbl";
-    lbl.textContent=`Dùng bởi ${t.usedCount} block`;
+    lbl.textContent=`Used by ${t.usedCount} node(s)`;
     side.appendChild(lbl);
     const list=document.createElement("div");
     list.className="wf-lib-uses";
     for(const u of t.used){
       const row=document.createElement("button");
       row.type="button"; row.className="wf-lib-use";
-      row.title="Nhảy tới block này trên canvas";
+      row.title="Jump to this node on the canvas";
       const a=document.createElement("span");
       a.className="wf-lib-use-act"; a.textContent=(u.ownerKind==="function"?"ƒ ":"")+u.activity;
       const b=document.createElement("span");
       b.className="wf-lib-use-node"; b.textContent=u.nodeLabel;
       row.append(a, b);
-      row.onclick=()=>{ if(!wfJumpToNode(u.nodeId)) uiToast("Không tìm thấy block này","warning"); };
+      row.onclick=()=>{ if(!wfJumpToNode(u.nodeId)) uiToast("This node is no longer in the workflow","warning"); };
       list.appendChild(row);
     }
     side.appendChild(list);
@@ -241,12 +241,12 @@ function wfLibRenderSide(){
   create.title="Create a Tap Image block using this template";
   create.onclick=()=>wfLibCreateImageNode("tap_image",t);
   const ren=document.createElement("button");
-  ren.type="button"; ren.className="btn sm"; ren.textContent="Đổi tên";
-  ren.title="Đổi tên file và cập nhật mọi block đang trỏ tới nó";
+   ren.type="button"; ren.className="btn sm"; ren.textContent="Rename";
+   ren.title="Rename the file and update every node that references it";
   ren.onclick=()=>wfLibRename(t);
   const del=document.createElement("button");
-  del.type="button"; del.className="btn sm err"; del.textContent="Xoá";
-  del.title="Chuyển file vào _trash/ (vẫn khôi phục được)";
+   del.type="button"; del.className="btn sm err"; del.textContent="Delete";
+   del.title="Move the file to _trash/ (it can be restored)";
   del.onclick=()=>wfLibDelete(t);
   acts.append(use, create, ren, del);
   side.appendChild(acts);
@@ -266,13 +266,13 @@ function wfLibRenderMissing(){
   grid.innerHTML="";
   const rows=wfLibMissingRows();
   if(!rows.length){
-    wfLibPlaceholder(grid, "Mọi template mà block tham chiếu đều có trên đĩa.");
+    wfLibPlaceholder(grid, "Every referenced template is present on disk");
     wfLibRenderSide();
     return;
   }
   const note=document.createElement("div");
   note.className="wf-lib-empty";
-  note.textContent="Các block dưới đây trỏ tới file không có trong thư mục — chúng sẽ fail khi chạy.";
+  note.textContent="These nodes reference files missing from the folder and will fail when run";
   grid.appendChild(note);
   for(const m of rows){
     const row=document.createElement("button");
@@ -283,7 +283,7 @@ function wfLibRenderMissing(){
     w.className="wf-lib-miss-where";
     w.textContent=`${m.nodeLabel} · ${(m.ownerKind==="function"?"ƒ ":"")+m.activity} · ${m.raw}`;
     row.append(n, w);
-    row.onclick=()=>{ if(!wfJumpToNode(m.nodeId)) uiToast("Không tìm thấy block này","warning"); };
+    row.onclick=()=>{ if(!wfJumpToNode(m.nodeId)) uiToast("This node is no longer in the workflow","warning"); };
     grid.appendChild(row);
   }
   wfLibRenderSide();
@@ -296,11 +296,11 @@ async function wfLibShowDupes(){
   wfLibSelected="";
   wfLibOverlay="dupes";
   wfLibRenderBar();
-  wfLibPlaceholder(grid, "Đang so sánh ảnh…");
+  wfLibPlaceholder(grid, "Comparing images…");
   let out=null;
   try{ out=await api().find_duplicate_templates(4); }catch(e){}
   if(wfLibOverlay!=="dupes") return;                 // user navigated away
-  if(!out){ wfLibPlaceholder(grid, "Không quét được ảnh."); return; }
+  if(!out){ wfLibPlaceholder(grid, "Could not scan images"); return; }
   wfLibRenderDupes(out);
 }
 
@@ -308,14 +308,14 @@ function wfLibRenderDupes(out){
   const grid=$("wf-lib-grid"); if(!grid) return;
   grid.innerHTML="";
   out = out || wfLibState.dupes;
-  if(!out){ wfLibPlaceholder(grid, "Không quét được ảnh."); return; }
+  if(!out){ wfLibPlaceholder(grid, "Could not scan images"); return; }
   wfLibState.dupes=out;
   const groups=out.groups||[];
   const head=document.createElement("div");
   head.className="wf-lib-empty";
   head.textContent=groups.length
-    ? `${groups.length} nhóm ảnh giống nhau (đã quét ${out.scanned} file). Giữ một cái, xoá phần còn lại.`
-    : `Không tìm thấy ảnh trùng nhau (đã quét ${out.scanned} file).`;
+    ? `${groups.length} duplicate image group(s) found (${out.scanned} files scanned). Keep one and delete the rest.`
+    : `No duplicate images found (${out.scanned} files scanned).`;
   grid.appendChild(head);
   for(const g of groups){
     const box=document.createElement("div");
@@ -335,7 +335,7 @@ function wfLibRenderDupes(out){
       const sz=document.createElement("span");
       sz.className="wf-lib-dup-size"; sz.textContent=wfLibFmtSize(f.size);
       const del=document.createElement("button");
-      del.type="button"; del.className="btn sm err"; del.textContent="Xoá";
+      del.type="button"; del.className="btn sm err"; del.textContent="Delete";
       del.onclick=()=>wfLibDelete({name:f.name, path:f.path, usedCount:0});
       row.append(img, nm, sz, del);
       box.appendChild(row);
@@ -354,7 +354,7 @@ async function wfLibShowTrash(){
   wfLibSelected="";
   wfLibOverlay="trash";
   wfLibRenderBar();
-  wfLibPlaceholder(grid, "Đang đọc _trash/…");
+  wfLibPlaceholder(grid, "Reading _trash/…");
   let items=[];
   try{ items=await api().list_trash(); }catch(e){}
   if(wfLibOverlay!=="trash") return;
@@ -367,12 +367,12 @@ function wfLibRenderTrash(items){
   const list=Array.isArray(items) ? items : (wfLibState.trash||[]);
   wfLibState.trash=list;
   if(!list.length){
-    wfLibPlaceholder(grid, "_trash/ đang trống.");
+    wfLibPlaceholder(grid, "_trash/ is empty");
     wfLibRenderSide(); return;
   }
   const head=document.createElement("div");
   head.className="wf-lib-empty";
-  head.textContent=`${list.length} file đã xoá — vẫn nằm trên đĩa trong _trash/.`;
+  head.textContent=`${list.length} deleted file(s) remain on disk in _trash/`;
   grid.appendChild(head);
   for(const it of list){
     const row=document.createElement("div");
@@ -385,11 +385,11 @@ function wfLibRenderTrash(items){
     const sz=document.createElement("span");
     sz.className="wf-lib-dup-size"; sz.textContent=wfLibFmtSize(it.size);
     const back=document.createElement("button");
-    back.type="button"; back.className="btn sm"; back.textContent="Khôi phục";
+    back.type="button"; back.className="btn sm"; back.textContent="Restore";
     back.onclick=async()=>{
       const r=await api().template_restore(it.path);
-      if(r && r.ok){ if(typeof wfLibInvalidate==="function") wfLibInvalidate(); uiToast(`Đã khôi phục ${r.name}`,"success"); wfLibShowTrash(); }
-      else uiToast((r&&r.error)||"Không khôi phục được","error");
+      if(r && r.ok){ if(typeof wfLibInvalidate==="function") wfLibInvalidate(); uiToast(`Restored ${r.name}`,"success"); wfLibShowTrash(); }
+      else uiToast((r&&r.error)||"Could not restore file","error");
     };
     row.append(img, nm, sz, back);
     grid.appendChild(row);
@@ -402,17 +402,17 @@ function wfLibRenderTrash(items){
 async function wfLibDelete(t){
   const used=t.usedCount||0;
   const ok=await uiConfirm({
-    title:"Xoá template?",
+    title:"Delete template?",
     message: used
-      ? `"${t.name}" đang được ${used} block dùng. Xoá thì các block đó sẽ fail khi chạy.\n\nFile được chuyển vào _trash/ nên vẫn khôi phục được.`
-      : `Chuyển "${t.name}" vào _trash/? File vẫn nằm trên đĩa và khôi phục được từ nút Trash.`,
-    ok:"Xoá", danger:true,
+      ? `"${t.name}" is used by ${used} node(s). Deleting it will make those nodes fail when run.\n\nThe file is moved to _trash/ and can be restored.`
+      : `Move "${t.name}" to _trash/? The file remains on disk and can be restored from Trash.`,
+    ok:"Delete", danger:true,
   });
   if(!ok) return;
   const back=wfLibOverlay;               // stay in the dedupe/trash view if we were there
   const r=await api().template_delete(t.path);
-  if(!r || !r.ok){ uiToast((r&&r.error)||"Không xoá được","error"); return; }
-  uiToast(`Đã chuyển ${r.name} vào _trash/`,"success");
+  if(!r || !r.ok){ uiToast((r&&r.error)||"Could not delete file","error"); return; }
+  uiToast(`Moved ${r.name} to _trash/`,"success");
   if(typeof wfTemplateContextDeleted==="function") wfTemplateContextDeleted(t.path);
   if(wfLibState) wfLibState.dupes=null;  // invalidate before dropping the index
   wfLibInvalidate();
@@ -424,21 +424,21 @@ async function wfLibDelete(t){
 
 async function wfLibRename(t){
   const newName=await uiPrompt({
-    title:"Đổi tên template",
-    label:`Mọi block đang trỏ tới "${t.name}" sẽ được cập nhật theo.`,
+    title:"Rename template",
+    label:`Every node referencing "${t.name}" will be updated.`,
     value: t.name.replace(/\.[^.]+$/,""),
-    placeholder:"tên file mới (không cần .png)",
-    ok:"Đổi tên",
+    placeholder:"new filename (.png is optional)",
+    ok:"Rename",
   });
   if(!newName || !String(newName).trim()) return;
   const flowJson=wfLibFlowJson();
   const r=await api().rename_template(flowJson, t.path, String(newName).trim());
-  if(!r || !r.ok){ uiToast((r&&r.error)||"Không đổi tên được","error"); return; }
+  if(!r || !r.ok){ uiToast((r&&r.error)||"Could not rename file","error"); return; }
   if(typeof wfTemplateContextRenamed==="function") wfTemplateContextRenamed(t.path,r.new||"");
   if(r.flow) wfLibApplyRename(r.flow);
   if(typeof wfResetHistory==="function") wfResetHistory();
   wfLibInvalidate();
-  uiToast(`Đã đổi tên thành ${r.new} (${r.nodes} block cập nhật)`,"success");
+  uiToast(`Renamed to ${r.new} (${r.nodes} node(s) updated)`,"success");
   await wfLibRefresh();
 }
 

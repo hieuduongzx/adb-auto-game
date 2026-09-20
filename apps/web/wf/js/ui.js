@@ -141,7 +141,8 @@ const UI_SHORTCUTS = [
   ]],
   ["Canvas", [
     ["Mouse wheel","Zoom (Ctrl+= / Ctrl+− / Ctrl+0)"],
-    ["Space / middle mouse","Pan the canvas"],
+    ["Hold Space + drag / middle mouse","Pan the canvas"],
+    ["Double-tap Space","Reset zoom to 100% (Canvas and Preview)"],
     ["F","Fit — frame every block in the view"],
     ["Shift+F","Fit selection — focus the selected blocks"],
     ["Tab","Switch Edit ↔ Preview"],

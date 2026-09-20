@@ -430,7 +430,7 @@ function render(opts) {
     empty.querySelector(".empty-title").textContent = searching ? "No matches" : "No games yet";
     empty.querySelector(".empty-msg").textContent = searching
       ? `Nothing in the library matches “${FILTER.trim()}”.`
-      : "Create a game project to start building its workflow.";
+      : "Create a project to start building its workflow.";
     // Empty library → the way out is a new game; no matches → the way out is
     // dropping the search (Esc in the field does the same).
     $("btn-empty-new").hidden = searching;

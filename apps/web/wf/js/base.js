@@ -304,7 +304,7 @@ function wfCrashWhy(info){
 function wfJumpToCrash(actId){
   const info=wfActCrash[actId]; if(!info || !info.node) return false;
   const owner=(typeof wfFindNodeOwner==="function") ? wfFindNodeOwner(info.node) : null;
-  if(!owner){ setStatus("Khối đó không còn trong workflow"); wfClearActCrash(actId); wfRenderActivities(); return false; }
+  if(!owner){ setStatus("This node is no longer in the workflow"); wfClearActCrash(actId); wfRenderActivities(); return false; }
   if(owner.kind==="activity") wfSelectActivity(owner.id); else wfEditFunction(owner.id);
   WF.sel=[info.node]; WF.selectedNode=info.node;
   wfRenderCanvas(); wfRenderInspector();

@@ -655,10 +655,11 @@ function wfCanvasMouseDown(e){
   // menu, minimap, empty-state card) sit above the canvas — a press there must
   // not clear the selection or start a rubber-band box (the re-render it
   // triggers would also swallow the click).
-  if(e.target.closest("#wf-rail,.wf-layout-bar,.wf-minimap,.wf-empty-card,#wf-act-panel")) return;
+  if(e.target.closest("#wf-rail,.wf-layout-bar,.wf-minimap,.wf-empty-card,#wf-act-panel,.wf-zoom-badge")) return;
   // Middle mouse, or Space+left → pan.
   if(e.button===1 || (e.button===0 && wfSpace)){
     e.preventDefault();
+    if(wfSpace) wfSpaceUsed=true;   // a Space+drag pan, not a tap: no zoom reset on release
     wfCancelCamAnim();   // direct manipulation beats any camera tween in flight
     $("wf-canvas").classList.add("panning");
     wfGesture={mode:"pan",sx:e.clientX,sy:e.clientY,ox:wfPan.x,oy:wfPan.y};

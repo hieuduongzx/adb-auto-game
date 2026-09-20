@@ -15,7 +15,7 @@ window.addEventListener("keydown", e => {
   if((e.key==="k"||e.key==="K"||e.key==="p"||e.key==="P") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); if(typeof wfCmdShow==="function") wfCmdShow(); return; }
   // Ctrl+F — node finder (global: works even while typing, like browser find).
   if((e.key==="f"||e.key==="F") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); if(typeof wfFindShow==="function") wfFindShow(); return; }
-  // Ctrl+Enter — test the selected block (match overlay on Preview).
+   // Ctrl+Enter — test the selected node (match overlay on Preview).
   if(e.key==="Enter" && (e.ctrlKey||e.metaKey)){
     e.preventDefault();
     if(typeof wfRunSingleNode==="function") wfRunSingleNode();
@@ -47,6 +47,14 @@ window.addEventListener("keydown", e => {
     if(wfPvActive) wfPvZoomBy(1/1.2); else wfZoomBy(1/1.2); return; }
   if((e.ctrlKey||e.metaKey) && e.key==="0"){ e.preventDefault();
     if(wfPvActive) wfPvResetZoom(); else wfZoomReset(); return; }
+  // Space — held it is the pan modifier (Space+drag) in both Canvas and Preview;
+  // double-tapped without panning it resets the zoom (see keyup below). A single
+  // tap does nothing, so a stray Space press can't throw the view away. This
+  // sits before the Canvas-only guard so the Preview mirror gets it too.
+  if(e.key===" " && !e.ctrlKey && !e.metaKey && !e.altKey && (canvasView || wfCurView()==="preview")){
+    if(!e.repeat) wfSpaceUsed=false;
+    wfSpace=true; wfSpaceArmed=true;
+  }
   if(!canvasView){
     if(e.key==="Escape" && typeof wfClearSel==="function"){ wfClearSel(); if(typeof wfMarkSel==="function") wfMarkSel(); }
     return;
@@ -55,7 +63,6 @@ window.addEventListener("keydown", e => {
   if((e.key==="x"||e.key==="X") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCut(); } return; }
   if((e.key==="v"||e.key==="V") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); wfPaste(wfPointer.inside?{clientX:wfPointer.x,clientY:wfPointer.y}:null); return; }
   if((e.key==="d"||e.key==="D") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfDuplicate(); } return; }
-  if(e.key===" "){ wfSpace=true; }
   if(e.key==="Delete"||e.key==="Backspace"){ if(WF.sel.length){ e.preventDefault(); wfDeleteSelected(); return; } }
   if((e.key==="a"||e.key==="A") && (e.ctrlKey||e.metaKey)){ const g=wfGraph(); if(g){ e.preventDefault(); WF.sel=g.nodes.map(n=>n.id); WF.selectedNode=null; wfMarkSel(); wfRenderInspector(); return; } }
   if((e.key==="f"||e.key==="F") && !e.ctrlKey && !e.metaKey){ e.preventDefault(); if(e.shiftKey) wfFitSelection(); else wfFit(); return; }
@@ -73,7 +80,27 @@ window.addEventListener("keydown", e => {
     return;
   }
 });
-window.addEventListener("keyup", e => { if(e.key===" ") wfSpace=false;
+// Reset the zoom of whichever view is showing (graph → 100% around the centre,
+// mirror → fit). Library has no zoom.
+function wfResetViewZoom(){
+  const v=wfCurView();
+  if(v==="preview") wfPvResetZoom(); else if(v==="canvas") wfZoomReset();
+}
+// Two clean Space taps closer together than this reset the zoom.
+const WF_SPACE_DOUBLE_MS=350;
+let wfSpaceLastTap=0;   // performance.now() of the previous clean tap, 0 = none pending
+window.addEventListener("keyup", e => {
+  if(e.key===" "){
+    const tapped=wfSpaceArmed && !wfSpaceUsed;
+    wfSpace=false; wfSpaceArmed=false; wfSpaceUsed=false;
+    if(!tapped) wfSpaceLastTap=0;            // a pan (or a Space that was never ours) breaks the pair
+    else {
+      const now=performance.now();
+      if(wfSpaceLastTap && now-wfSpaceLastTap<=WF_SPACE_DOUBLE_MS){ wfSpaceLastTap=0; wfResetViewZoom(); }
+      else wfSpaceLastTap=now;
+    }
+  }
   if(e.key.startsWith("Arrow")) wfNudging=false;
 });
-window.addEventListener("blur",()=>{ wfNudging=false; wfSpace=false; });
+// Losing focus mid-press must not count as a tap — the keyup never arrives.
+window.addEventListener("blur",()=>{ wfNudging=false; wfSpace=false; wfSpaceArmed=false; wfSpaceUsed=false; wfSpaceLastTap=0; });

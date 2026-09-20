@@ -326,7 +326,7 @@ function wfLogBodyClick(ev){
   if(typeof wfJumpToNode!=="function" || !wfJumpToNode(id)){
     // The block is gone (workflow edited since the run) — say so rather than
     // looking broken.
-    uiToast("Không tìm thấy block này trong workflow","warning");
+     uiToast("This node is no longer in the workflow","warning");
   }
 }
 function wfCopyLog(ev){

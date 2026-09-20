@@ -169,6 +169,7 @@ function wfForgetDesignerContext(){
   if(typeof wfPvPoint!=="undefined") wfPvPoint=null;
   if(typeof wfPvRegion!=="undefined") wfPvRegion=null;
   if(typeof wfPvSwipe!=="undefined") wfPvSwipe=null;
+  if(typeof wfPvSyncOverlayBtn==="function") wfPvSyncOverlayBtn();
 }
 
 // Each activity/function keeps its own viewport, like tabs in a graphics tool.
