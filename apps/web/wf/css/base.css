@@ -105,7 +105,7 @@
   --canvas-bg:         #f3f5f8;
   --canvas-dot:        rgba(23,32,43,.09);
   --canvas-dot-minor:  #dfe4ec;
-  --node-r: 10px;  /* node card corner — ComfyUI/Blender-style rounded block */
+  --node-r: 0px;  /* Every canvas node uses a square silhouette. */
   /* Card geometry is locked to whole grid cells (WF_GRID = 20px): 9×4 cells.
      Node x/y snapping then lands the card exactly on the minor grid — edges
      sit on grid lines, never half a cell off. */

@@ -36,9 +36,12 @@ function wfFindNodeOwner(nodeId){
 // wfEditFunction which reset the camera). Used by focus so following execution
 // keeps the current zoom level and just re-centres on the running node.
 function wfFocusSwitchTarget(kind, id){
-  if(WF.edit.kind===kind && WF.edit.id===id) return false;
-  WF.edit={kind, id};
-  wfClearSel();
+  if(typeof wfSwitchEditTarget==="function"){
+    if(!wfSwitchEditTarget(kind,id)) return false;
+  } else {
+    if(WF.edit.kind===kind && WF.edit.id===id) return false;
+    WF.edit={kind,id}; wfClearSel();
+  }
   wfRenderAll();
   return true;
 }
@@ -128,6 +131,88 @@ function wfNodeUsePicks(recentMax,freqMax){
     .filter(r=>!seen.has(r.type)).slice(0,freqMax||6);
   return {recent:recent.map(r=>r.type),freq:freq.map(r=>r.type)};
 }
+
+// ── Designer handoff context ────────────────────────────────────────────────
+// Preview picks are creation context: a crop, point, or swipe can seed several
+// related blocks until the user captures something newer or opens a new flow.
+let wfLatestTemplate="";
+function wfTemplateRef(path){
+  const norm=String(path||"").trim().replace(/\\/g,"/");
+  if(!norm) return "";
+  const dir=String((typeof WF!=="undefined"&&WF.templatesDir)||"templates").replace(/^\.?[\\/]+|[\\/]+$/g,"")||"templates";
+  const marker="/"+dir+"/", at=norm.toLowerCase().lastIndexOf(marker.toLowerCase());
+  if(at>=0) return dir+"/"+norm.slice(at+marker.length);
+  if(norm.toLowerCase().startsWith((dir+"/").toLowerCase())) return norm;
+  return norm;
+}
+function wfTemplateIdentity(path){
+  const ref=wfTemplateRef(path), dir=String((typeof WF!=="undefined"&&WF.templatesDir)||"templates").replace(/^\.?[\\/]+|[\\/]+$/g,"")||"templates";
+  return ref.toLowerCase().startsWith((dir+"/").toLowerCase())?ref.slice(dir.length+1):ref;
+}
+function wfRememberTemplate(path){
+  wfLatestTemplate=wfTemplateRef(path);
+  return wfLatestTemplate;
+}
+function wfTemplateContextRenamed(oldPath,newPath){
+  const oldRef=wfTemplateRef(oldPath);
+  if(!wfLatestTemplate || wfTemplateIdentity(oldRef)!==wfTemplateIdentity(wfLatestTemplate)) return;
+  const next=wfTemplateRef(newPath);
+  const dir=String((typeof WF!=="undefined"&&WF.templatesDir)||"templates").replace(/^\.?[\\/]+|[\\/]+$/g,"")||"templates";
+  wfLatestTemplate=next.includes("/")?next:`${dir}/${next}`;
+}
+function wfTemplateContextDeleted(path){
+  const ref=wfTemplateRef(path);
+  if(wfLatestTemplate && wfTemplateIdentity(ref)===wfTemplateIdentity(wfLatestTemplate)) wfLatestTemplate="";
+}
+function wfForgetDesignerContext(){
+  wfLatestTemplate="";
+  if(typeof wfPvPoint!=="undefined") wfPvPoint=null;
+  if(typeof wfPvRegion!=="undefined") wfPvRegion=null;
+  if(typeof wfPvSwipe!=="undefined") wfPvSwipe=null;
+}
+
+// Each activity/function keeps its own viewport, like tabs in a graphics tool.
+// The map is session-only; workflow JSON remains focused on executable data.
+const wfGraphCameras=new Map();
+function wfCameraKey(edit){ return edit&&edit.id?`${edit.kind}:${edit.id}`:""; }
+function wfSaveGraphCamera(){
+  if(typeof wfPan==="undefined"||typeof wfZoom==="undefined") return;
+  const key=wfCameraKey(WF.edit); if(!key) return;
+  wfGraphCameras.set(key,{pan:{x:wfPan.x,y:wfPan.y},zoom:wfZoom});
+}
+function wfRestoreGraphCamera(kind,id){
+  if(typeof wfPan==="undefined"||typeof wfZoom==="undefined") return;
+  const saved=wfGraphCameras.get(wfCameraKey({kind,id}));
+  wfPan=saved?{x:saved.pan.x,y:saved.pan.y}:{x:0,y:0};
+  wfZoom=saved?saved.zoom:1;
+}
+function wfResetGraphCameras(){ wfGraphCameras.clear(); }
+function wfSwitchEditTarget(kind,id){
+  if(WF.edit.kind===kind&&WF.edit.id===id) return false;
+  wfSaveGraphCamera();
+  WF.edit={kind,id}; wfClearSel(); wfRestoreGraphCamera(kind,id);
+  return true;
+}
+function wfApplyTemplateToNode(node,path){
+  if(!node||!path) return false;
+  const def=typeof WF_NODES!=="undefined"&&WF_NODES[node.type];
+  const field=def&&(def.fields||[]).find(f=>f.t==="tpl"||f.t==="tpls"||f.t==="sequence_images");
+  if(!field) return false;
+  const ref=wfTemplateRef(path); if(!ref) return false;
+  node.params=node.params||{};
+  if(field.t==="tpl") node.params[field.k]=ref;
+  else if(field.t==="tpls"){
+    const list=Array.isArray(node.params[field.k])?node.params[field.k]:[];
+    if(!list.includes(ref)) list.push(ref);
+    node.params[field.k]=list;
+  } else {
+    const list=Array.isArray(node.params[field.k])?node.params[field.k]:[];
+    if(list.length) list[0]={...list[0],template:ref};
+    else list.push({template:ref,threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:.1});
+    node.params[field.k]=list;
+  }
+  return true;
+}
 function wfNewNode(type,x,y){
   wfRecordNodeUse(type);
   // Seed the universal per-node fields (timing + failure handling) from the
@@ -143,11 +228,15 @@ function wfNewNode(type,x,y){
   }
   if(picked && type==="sequence_tap" && Array.isArray(params.points) && params.points.length)
     params.points[0].x=picked[0], params.points[0].y=picked[1];
-  return wfNormalizeNode({id:wfUid(),type,x,y,params,note:"",log:"",outputLogs:{},
+  const swipe=(typeof wfPvSwipe!=="undefined"&&wfPvSwipe)?wfPvSwipe:null;
+  if(swipe && type==="swipe") Object.assign(params,{mode:"coordinates",x1:swipe.x1,y1:swipe.y1,x2:swipe.x2,y2:swipe.y2,duration:swipe.duration});
+  const node=wfNormalizeNode({id:wfUid(),type,x,y,params,note:"",log:"",outputLogs:{},
     delayBefore:num("delayBefore",0), delayAfter:num("delayAfter",0),
     retryCount:num("retryCount",0), retryDelay:num("retryDelay",0),
     screenshotOnFail:!!nd.screenshotOnFail,
     showPreview:false});
+  if(wfLatestTemplate) wfApplyTemplateToNode(node,wfLatestTemplate);
+  return node;
 }
 // Every fresh graph seeds both terminals: Start, and an End further right —
 // reaching End is what makes a function call return true, so it should always
@@ -163,7 +252,7 @@ function wfAddActivity(type){
   const id=type+"_"+wfUid().slice(1,5);
   const act={id, name:(type==="background"?"Background task ":"Activity ")+n, type,
     enabled:true, maxRetries:1, pollInterval:1.0, vars:[], graph:wfNewGraph()};
-  WF.activities.push(act); WF.edit={kind:"activity",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+  WF.activities.push(act); wfSwitchEditTarget("activity",id);
   if(typeof wfActTab==="function") wfActTab(type==="background"?"bg":"seq");
   wfRenderAll();
 }
@@ -176,14 +265,16 @@ function wfDeleteActivity(id,ev){
     wfPushUndo();
     WF.activities.splice(j,1);
     wfActSel.delete(id);
-    if(WF.edit.kind==="activity"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
+    if(WF.edit.kind==="activity"&&WF.edit.id===id){
+      const next=WF.activities[0]?WF.activities[0].id:null;
+      wfSwitchEditTarget("activity",next);
+    }
     wfRenderAll();
   });
 }
 // Re-clicking the already-open activity is a no-op (keeps the camera, and lets
 // the second click of a rename double-click land on a live row).
-function wfSelectActivity(id){ if(WF.edit.kind==="activity"&&WF.edit.id===id) return;
-  WF.edit={kind:"activity",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1; wfRenderAll(); }
+function wfSelectActivity(id){ if(!wfSwitchEditTarget("activity",id)) return; wfRenderAll(); }
 function wfToggleActivity(id,ev){ ev&&ev.stopPropagation(); const a=wfActById(id); if(a){ wfPushUndo(); a.enabled=!a.enabled; wfRenderActivities(); } }
 
 // ── Multi-select of activity rows (explorer-style) ──────────────────────────
@@ -254,7 +345,7 @@ function wfDuplicateActivity(id){
     graph:wfCloneGraph(src.graph||{nodes:[],edges:[],groups:[]}) };
   const i=WF.activities.findIndex(a=>a.id===id);
   WF.activities.splice(i<0?WF.activities.length:i+1, 0, copy);
-  WF.edit={kind:"activity",id:copy.id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+  wfSwitchEditTarget("activity",copy.id);
   if(typeof wfActTab==="function") wfActTab(copy.type==="background"?"bg":"seq");
   wfRenderAll();
   setStatus("Duplicated «"+src.name+"» → «"+copy.name+"»");
@@ -267,7 +358,7 @@ function wfDuplicateFunction(id){
     graph:wfCloneGraph(src.graph||{nodes:[],edges:[],groups:[]}) };
   const i=WF.functions.findIndex(f=>f.id===id);
   WF.functions.splice(i<0?WF.functions.length:i+1, 0, copy);
-  WF.edit={kind:"function",id:copy.id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+  wfSwitchEditTarget("function",copy.id);
   // Bring the Functions tab forward (and unfold the card) so the new row shows.
   if(typeof wfSwitchDockTab==="function") wfSwitchDockTab("fn");
   wfRenderAll();
@@ -282,15 +373,15 @@ function wfAddFunction(){
     wfPushUndo();
     const id="fn_"+wfUid().slice(1,6);
     WF.functions.push({id,name,graph:wfNewGraph()});
-    WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+    wfSwitchEditTarget("function",id);
     // Bring the Functions tab forward (and unfold the card) so the new row shows.
     if(typeof wfSwitchDockTab==="function") wfSwitchDockTab("fn");
     wfRenderAll();
   });
 }
 function wfEditFunction(id,ev){ ev&&ev.stopPropagation();
-  if(WF.edit.kind==="function"&&WF.edit.id===id) return;   // already open — keep camera
-  WF.edit={kind:"function",id}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1; wfRenderAll(); }
+  if(!wfSwitchEditTarget("function",id)) return;   // already open — keep camera
+  wfRenderAll(); }
 function wfDeleteFunction(id,ev){
   ev&&ev.stopPropagation();
   const i=WF.functions.findIndex(f=>f.id===id); if(i<0)return;
@@ -299,7 +390,10 @@ function wfDeleteFunction(id,ev){
     const j=WF.functions.findIndex(f=>f.id===id); if(j<0) return;
     wfPushUndo();
     WF.functions.splice(j,1);
-    if(WF.edit.kind==="function"&&WF.edit.id===id){ WF.edit={kind:"activity",id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); }
+    if(WF.edit.kind==="function"&&WF.edit.id===id){
+      const next=WF.activities[0]?WF.activities[0].id:null;
+      wfSwitchEditTarget("activity",next);
+    }
     wfRenderAll();
   });
 }

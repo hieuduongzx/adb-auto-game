@@ -116,6 +116,7 @@ function wfRestoreSnapshot(snap) {
   // Restore selection.
   WF.sel = (snap.sel || []).slice();
   WF.selectedNode = snap.selectedNode || null;
+  if (typeof wfRestoreGraphCamera === "function") wfRestoreGraphCamera(WF.edit.kind, WF.edit.id);
 
   // Rebuild everything.
   if (typeof wfSyncSpeedUI === "function") wfSyncSpeedUI();
@@ -124,6 +125,7 @@ function wfRestoreSnapshot(snap) {
 
 function wfUndo() {
   if (!_undoStack.length) { setStatus("Nothing to undo"); return; }
+  if (typeof wfSaveGraphCamera === "function") wfSaveGraphCamera();
   // Push current state onto redo stack before restoring.
   _redoStack.push(wfTakeSnapshot());
   const snap = _undoStack.pop();
@@ -134,10 +136,22 @@ function wfUndo() {
 
 function wfRedo() {
   if (!_redoStack.length) { setStatus("Nothing to redo"); return; }
+  if (typeof wfSaveGraphCamera === "function") wfSaveGraphCamera();
   // Push current state onto undo stack before restoring.
   _undoStack.push(wfTakeSnapshot());
   const snap = _redoStack.pop();
   wfRestoreSnapshot(snap);
   if (typeof wfMarkDirty === "function") wfMarkDirty();
   setStatus("Redone");
+}
+
+// Filesystem operations such as template rename cannot be reversed by graph
+// snapshots alone. Reset history after they succeed rather than offering an
+// Undo that restores references to a filename that no longer exists.
+function wfResetHistory() {
+  _undoStack = [];
+  _redoStack = [];
+  _undoDebounceArmed = false;
+  if (_undoDebounceTimer) clearTimeout(_undoDebounceTimer);
+  _undoDebounceTimer = null;
 }

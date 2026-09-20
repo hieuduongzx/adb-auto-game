@@ -102,7 +102,7 @@ _TEMPLATES_DIRNAME = "templates"
 _TEMPLATE_PARAM_KEYS = ("template",)
 # Node params whose value is a *list* of template paths (``t:"tpls"`` fields —
 # the "…_any" multi-image OR nodes; key "templates").
-_TEMPLATE_LIST_PARAM_KEYS = ("templates",)
+_TEMPLATE_LIST_PARAM_KEYS = ("templates", "images")
 
 
 def _sanitize_name(raw: str) -> str:
@@ -153,8 +153,9 @@ def iter_template_refs(flow: dict):
                 vals = params.get(pk)
                 if isinstance(vals, list):
                     for i, v in enumerate(vals):
-                        if v:
-                            yield node, kind, owner, pk, i, v
+                        raw = v.get("template") if isinstance(v, dict) else v
+                        if raw:
+                            yield node, kind, owner, pk, i, raw
 
 
 def _norm_tpl(raw: Any) -> str:
@@ -1264,6 +1265,8 @@ class WorkflowDesignerAPI:
                 continue
             if idx is None:
                 node["params"][pk] = rel
+            elif isinstance(node["params"][pk][idx], dict):
+                node["params"][pk][idx]["template"] = rel
             else:
                 node["params"][pk][idx] = rel
             touched += 1

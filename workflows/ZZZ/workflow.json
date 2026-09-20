@@ -2,20 +2,35 @@
   "name": "ZZZ",
   "version": 2,
   "templatesDir": "templates",
-  "controller": "win32",
-  "capture": "scrcpy",
+  "buildVersion": "1.0.0",
   "package": "",
+  "controller": "win32",
+  "ocr": "ppocr_v5_mobile",
+  "capture": "scrcpy",
+  "input": "adb",
   "win32": {
-    "window": "",
+    "window": "ZenlessZoneZero",
     "matchBy": "title",
-    "inputMode": "background_cursor"
+    "inputMode": "unity_bridge",
+    "path": ""
+  },
+  "emulator": {
+    "kind": "ldplayer",
+    "path": ""
   },
   "speedhack": {
     "enabled": false,
     "speed": 2,
-    "package": ""
+    "native": false
   },
   "globals": [],
+  "nodeDefaults": {
+    "delayBefore": 0,
+    "delayAfter": 0,
+    "retryCount": 0,
+    "retryDelay": 0,
+    "screenshotOnFail": false
+  },
   "functions": [],
   "activities": [
     {

@@ -405,6 +405,9 @@ async function wfNew(){
   const opts = await wfPromptNewWorkflow();
   if(!opts) return; // cancelled
 
+  if(typeof wfForgetDesignerContext==="function") wfForgetDesignerContext();
+  if(typeof wfResetGraphCameras==="function") wfResetGraphCameras();
+
   const name = (opts.name||"").trim() || "My Workflow";
   const controller = opts.controller==="win32" ? "win32" : "adb";
   const capture = (controller==="adb" && opts.capture==="adb") ? "adb" : "scrcpy";

@@ -1190,7 +1190,7 @@ async function wfOfferUnityBridgeDeploy(opts){
       st.bepinex
         ? ("Giữ nguyên BepInEx có sẵn ("+(st.bepinexVersion||"5.x")+")"+
            (st.bepinexOutdated ? " — đã có bản "+st.vendorBepinexVersion+", không tự nâng cấp" : ""))
-        : ("Cài BepInEx "+(st.vendorBepinexVersion||"5.x")+" x64 vào thư mục game"),
+        : ("Cài BepInEx "+(st.vendorBepinexVersion||"5.x")+" x64"+(st.flavor==="il2cpp"?" (IL2CPP, kèm .NET 6 runtime)":"")+" vào thư mục game"),
       st.pluginInstalled ? (st.pluginCurrent ? "Plugin Macro2kBridge.dll đã là bản mới nhất (copy lại)" : "Cập nhật plugin Macro2kBridge.dll")
                          : "Copy plugin Macro2kBridge.dll vào BepInEx/plugins",
     ];

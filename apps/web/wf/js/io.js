@@ -206,6 +206,8 @@ function wfHydrateGraph(g){
   return { nodes, edges, groups };
 }
 function wfHydrate(flow){
+  if(typeof wfForgetDesignerContext==="function") wfForgetDesignerContext();
+  if(typeof wfResetGraphCameras==="function") wfResetGraphCameras();
   WF.name=flow.name||"workflow"; WF.version=flow.version||2; WF.templatesDir=flow.templatesDir||"templates";
   WF.buildVersion=String(flow.buildVersion||"1.0.0").trim()||"1.0.0";
   const sh=flow.speedhack||{};

@@ -73,7 +73,7 @@ desktop.ini
 # Large vendor binaries (fetch manually into vendor/)
 vendor/frida/
 vendor/scrcpy/
-# Unity Bridge plugin build intermediates (the built DLL in vendor/unity_bridge/plugin is kept)
+# Unity Bridge plugin build intermediates (the built DLLs in vendor/unity_bridge/plugin and plugin_il2cpp are kept)
 vendor/unity_bridge/src/**/bin/
 vendor/unity_bridge/src/**/obj/
 

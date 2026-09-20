@@ -1409,7 +1409,13 @@ function wfFieldEl(node,f){
     const sub=document.createElement("div"); sub.className="wf-tpl-row"; sub.appendChild(inp); sub.appendChild(btn); sub.appendChild(img); row.appendChild(sub);   // full-width row: input + picker + thumb
     const refresh=v=>{ wfPushUndoDebounced(); node.params[f.k]=v; wfUpdNodeSum(node); wfLoadThumb(img,v); wfUpdNodePreview(node); wfRenderCanvas(); };
     inp.oninput=()=>refresh(inp.value);
-    btn.onclick=async()=>{ const p=await api().pick_template(); if(p){ inp.value=p; refresh(p); } };
+    btn.onclick=async()=>{ const p=await api().pick_template(); if(p){ if(typeof wfRememberTemplate==="function") wfRememberTemplate(p); inp.value=p; refresh(p); } };
+    if(typeof wfLatestTemplate!=="undefined" && wfLatestTemplate){
+      const latest=document.createElement("button"); latest.type="button"; latest.className="btn sm"; latest.textContent="Latest crop";
+      latest.title=wfLatestTemplate;
+      latest.onclick=()=>{ inp.value=wfLatestTemplate; refresh(wfLatestTemplate); };
+      sub.insertBefore(latest,img);
+    }
     return row;
   }
   return row;
@@ -1435,7 +1441,7 @@ function wfTplsField(node,f,row){
       const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img, path);
       const commit=v=>{ wfPushUndoDebounced(); arr()[idx]=v; wfUpdNodeSum(node); wfUpdNodePreview(node); wfLoadThumb(img,v); wfRenderCanvas(); };
       inp.oninput=()=>commit(inp.value);
-      pick.onclick=async()=>{ const pp=await api().pick_template(); if(pp){ inp.value=pp; commit(pp); } };
+      pick.onclick=async()=>{ const pp=await api().pick_template(); if(pp){ if(typeof wfRememberTemplate==="function") wfRememberTemplate(pp); inp.value=pp; commit(pp); } };
       del.onclick=()=>{ wfPushUndoDebounced(); arr().splice(idx,1); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
       r.appendChild(num); r.appendChild(inp); r.appendChild(pick); r.appendChild(del); r.appendChild(img);
       item.appendChild(r); list.appendChild(item);
@@ -1444,8 +1450,13 @@ function wfTplsField(node,f,row){
   }
   renderList();
   const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Image";
-  add.onclick=async()=>{ wfPushUndoDebounced(); const pp=await api().pick_template(); arr().push(pp||""); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
+  add.onclick=async()=>{ const pp=await api().pick_template(); if(!pp) return; wfPushUndoDebounced(); if(typeof wfRememberTemplate==="function") wfRememberTemplate(pp); arr().push(pp); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
   wrap.appendChild(list); wrap.appendChild(add);
+  if(typeof wfLatestTemplate!=="undefined" && wfLatestTemplate){
+    const latest=document.createElement("button"); latest.className="btn sm"; latest.textContent="+ Latest crop"; latest.title=wfLatestTemplate;
+    latest.onclick=()=>{ wfPushUndoDebounced(); if(!arr().includes(wfLatestTemplate)) arr().push(wfLatestTemplate); wfUpdNodeSum(node); wfUpdNodePreview(node); renderList(); wfRenderCanvas(); };
+    wrap.appendChild(latest);
+  }
   return wrap;
 }
 
@@ -1537,7 +1548,7 @@ function wfSequenceImagesField(node,f){
       const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img,item.template);
       const set=(key,value)=>{ item[key]=value; commit(); };
       inp.oninput=()=>set("template",inp.value);
-      pick.onclick=async()=>{ const path=await api().pick_template(); if(path){ inp.value=path; set("template",path); wfLoadThumb(img,path); } };
+      pick.onclick=async()=>{ const path=await api().pick_template(); if(path){ if(typeof wfRememberTemplate==="function") wfRememberTemplate(path); inp.value=path; set("template",path); wfLoadThumb(img,path); } };
       del.onclick=()=>{ wfPushUndoDebounced(); arr().splice(idx,1); renderList(); commit(); };
       title.append(num,inp,pick,del,img);
       const opts=document.createElement("div"); opts.className="wf-region-panel"; opts.style.display="grid";
@@ -1550,8 +1561,14 @@ function wfSequenceImagesField(node,f){
   }
   renderList();
   const add=document.createElement("button"); add.type="button"; add.className="btn sm"; add.textContent="+ Image tap";
-  add.onclick=async()=>{ wfPushUndoDebounced(); const path=await api().pick_template(); arr().push({template:path||"",threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:0}); renderList(); commit(); };
-  wrap.append(list,add); return wrap;
+  add.onclick=async()=>{ const path=await api().pick_template(); if(!path) return; wfPushUndoDebounced(); if(typeof wfRememberTemplate==="function") wfRememberTemplate(path); arr().push({template:path,threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:0}); renderList(); commit(); };
+  wrap.append(list,add);
+  if(typeof wfLatestTemplate!=="undefined" && wfLatestTemplate){
+    const latest=document.createElement("button"); latest.type="button"; latest.className="btn sm"; latest.textContent="+ Latest crop"; latest.title=wfLatestTemplate;
+    latest.onclick=()=>{ wfPushUndoDebounced(); arr().push({template:wfLatestTemplate,threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:.1}); renderList(); commit(); };
+    wrap.appendChild(latest);
+  }
+  return wrap;
 }
 
 function wfRegionField(node,f){
@@ -1593,6 +1610,11 @@ function wfRegionField(node,f){
     }
     sync();
   };
+  if(typeof wfPvRegion!=="undefined" && Array.isArray(wfPvRegion)){
+    const use=document.createElement("button"); use.type="button"; use.className="btn sm"; use.textContent="Use selected region";
+    use.onclick=()=>{ wfPushUndoDebounced(); const r=wfPvRegion; node.params.regionX=r[0]; node.params.regionY=r[1]; node.params.regionW=r[2]; node.params.regionH=r[3]; x.input.value=r[0]; y.input.value=r[1]; w.input.value=r[2]; h.input.value=r[3]; sync(); };
+    panel.appendChild(use);
+  }
   wrap.appendChild(hdr); wrap.appendChild(panel);
   return wrap;
 }

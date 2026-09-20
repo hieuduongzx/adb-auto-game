@@ -27,6 +27,8 @@ def _flow():
                 {"id": "n1", "type": "tap_image", "params": {"template": "templates/btn.png"}},
                 {"id": "n2", "type": "find_any",
                  "params": {"templates": ["templates/a.png", "templates/b.png"]}},
+                {"id": "n5", "type": "sequence_tap_image",
+                 "params": {"images": [{"template": "templates/step.png", "threshold": .85}]}},
                 {"id": "n3", "type": "tap", "params": {"x": 1, "y": 2}},
             ]},
         }],
@@ -61,19 +63,20 @@ class TestNormTpl(unittest.TestCase):
 class TestIterTemplateRefs(unittest.TestCase):
     def test_finds_every_shape(self):
         refs = list(iter_template_refs(_flow()))
-        # btn.png ×2 (activity + function), a.png, b.png
-        self.assertEqual(len(refs), 4)
+        # btn.png ×2 (activity + function), a.png, b.png, step.png
+        self.assertEqual(len(refs), 5)
 
     def test_scalar_and_list_positions(self):
         scalars = [r for r in iter_template_refs(_flow()) if r[4] is None]
         listed = [r for r in iter_template_refs(_flow()) if r[4] is not None]
         self.assertEqual(len(scalars), 2)
-        self.assertEqual(sorted(r[4] for r in listed), [0, 1])
+        self.assertEqual(sorted(r[4] for r in listed), [0, 0, 1])
 
     def test_list_index_points_at_the_right_value(self):
         for node, _k, _o, pk, idx, raw in iter_template_refs(_flow()):
             if idx is not None:
-                self.assertEqual(node["params"][pk][idx], raw)
+                value = node["params"][pk][idx]
+                self.assertEqual(value.get("template") if isinstance(value, dict) else value, raw)
 
     def test_skips_empty_and_none(self):
         flow = {"activities": [{"id": "a", "graph": {"nodes": [
@@ -92,11 +95,11 @@ class TestIterTemplateRefs(unittest.TestCase):
 
 class TestBuildTemplateIndex(unittest.TestCase):
     def test_counts(self):
-        idx = build_template_index(_flow(), _files("btn.png", "a.png", "b.png", "dead.png"))
-        self.assertEqual(idx["counts"]["total"], 4)
-        self.assertEqual(idx["counts"]["used"], 3)
+        idx = build_template_index(_flow(), _files("btn.png", "a.png", "b.png", "step.png", "dead.png"))
+        self.assertEqual(idx["counts"]["total"], 5)
+        self.assertEqual(idx["counts"]["used"], 4)
         self.assertEqual(idx["counts"]["orphan"], 1)
-        self.assertEqual(idx["counts"]["refs"], 4)
+        self.assertEqual(idx["counts"]["refs"], 5)
         self.assertEqual(idx["counts"]["missing"], 0)
 
     def test_usage_names_the_owning_activity_and_node(self):
@@ -112,9 +115,8 @@ class TestBuildTemplateIndex(unittest.TestCase):
         # btn.png is referenced but absent from the folder: that node will fail
         # at run time, so it must surface as `missing`, never silently vanish.
         idx = build_template_index(_flow(), _files("a.png", "b.png"))
-        self.assertEqual(idx["counts"]["missing"], 2)
-        self.assertEqual({m["nodeId"] for m in idx["missing"]}, {"n1", "n4"})
-        self.assertTrue(all(m["name"] == "btn.png" for m in idx["missing"]))
+        self.assertEqual(idx["counts"]["missing"], 3)
+        self.assertEqual({m["nodeId"] for m in idx["missing"]}, {"n1", "n4", "n5"})
         self.assertEqual(idx["counts"]["orphan"], 0)
 
     def test_subfolder_paths_still_match(self):
@@ -125,7 +127,7 @@ class TestBuildTemplateIndex(unittest.TestCase):
     def test_empty_folder_lists_every_reference_as_missing(self):
         idx = build_template_index(_flow(), [])
         self.assertEqual(idx["counts"]["total"], 0)
-        self.assertEqual(idx["counts"]["missing"], 4)
+        self.assertEqual(idx["counts"]["missing"], 5)
 
     def test_no_references_means_everything_is_an_orphan(self):
         idx = build_template_index({"activities": []}, _files("x.png", "y.png"))

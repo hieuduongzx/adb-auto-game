@@ -1054,16 +1054,15 @@
 .wf-node.condition { --node-accent:var(--cat-logic); }
 .wf-node.loop { --node-accent:var(--cat-flow); }
 .wf-node.call { --node-accent:var(--cat-logic-ink); }
-/* Shape is semantic, not decorative: decisions have opposing clipped corners,
-   loops/calls are softer reusable-flow containers, actions stay the baseline. */
-.wf-node.condition:not(.wf-stacked) { border-radius:2px 10px 2px 10px; }
-.wf-node.condition:not(.wf-stacked)::after { border-radius:2px 10px 2px 10px; }
-.wf-node.condition:not(.wf-stacked) .wf-node-hd { border-radius:1px 9px 0 0; }
-.wf-node.loop:not(.wf-stacked), .wf-node.loop_until:not(.wf-stacked), .wf-node.call:not(.wf-stacked) { border-radius:14px; }
+/* Node kinds use colour and content for semantics; every silhouette stays square. */
+.wf-node.condition:not(.wf-stacked) { border-radius:var(--node-r); }
+.wf-node.condition:not(.wf-stacked)::after { border-radius:var(--node-r); }
+.wf-node.condition:not(.wf-stacked) .wf-node-hd { border-radius:var(--node-r); }
+.wf-node.loop:not(.wf-stacked), .wf-node.loop_until:not(.wf-stacked), .wf-node.call:not(.wf-stacked) { border-radius:var(--node-r); }
 .wf-node.loop:not(.wf-stacked)::after, .wf-node.loop_until:not(.wf-stacked)::after,
-  .wf-node.call:not(.wf-stacked)::after { border-radius:14px; }
+  .wf-node.call:not(.wf-stacked)::after { border-radius:var(--node-r); }
 .wf-node.loop:not(.wf-stacked) .wf-node-hd, .wf-node.loop_until:not(.wf-stacked) .wf-node-hd,
-  .wf-node.call:not(.wf-stacked) .wf-node-hd { border-radius:13px 13px 0 0; }
+  .wf-node.call:not(.wf-stacked) .wf-node-hd { border-radius:var(--node-r); }
 /* Per-category accent colour (after kind rules so condition blocks get a cat hue). */
 .wf-node.cat-basic  { --node-accent:var(--cat-basic); }
 .wf-node.cat-image  { --node-accent:var(--cat-image); }
@@ -1112,7 +1111,7 @@
    change has no business repainting a state it is not about. */
 .wf-node.running-call:not(.running) { border-color:var(--run-live-bd) !important; }
 .wf-node.running-call::before {
-  content:""; position:absolute; inset:-3px; border-radius:calc(var(--node-r) + 3px);
+  content:""; position:absolute; inset:-3px; border-radius:var(--node-r);
   border:2px solid var(--run-live-bd); pointer-events:none; z-index:1; }
 @media (prefers-reduced-motion: no-preference){
   .wf-node.running-call::before { animation:wfCallRing 1.3s ease-in-out infinite; }
@@ -1157,10 +1156,10 @@
                          50%   {box-shadow:0 0 0 5px transparent} }
 /* Next branch is a control-flow token, not a normal action card. */
 .wf-node.try_next { width:140px; min-height:40px !important; border:none;
-  border-radius:999px; background:transparent !important; }
-.wf-node.try_next::after { border-radius:999px; }
+  border-radius:var(--node-r); background:transparent !important; }
+.wf-node.try_next::after { border-radius:var(--node-r); }
 .wf-next-body { height:44px; display:flex; align-items:center; gap:8px; padding:0 20px;
-  border:1px solid var(--cat-flow-bd); border-radius:999px; background:var(--cat-flow-bg);
+  border:1px solid var(--cat-flow-bd); border-radius:var(--node-r); background:var(--cat-flow-bg);
   box-shadow:var(--sh-sm); color:var(--cat-flow-ink); overflow:hidden; }
 .wf-next-body .ico { width:16px; height:16px; color:var(--cat-flow-ink); }
 .wf-next-body .ico svg { width:16px; height:16px; stroke-width:1.8; }
@@ -1173,19 +1172,19 @@
 .wf-node.try_next.running .wf-next-body { border-color:var(--border2); background:var(--run-live-hd); color:var(--run-live-ink); }
 .wf-node.try_next.paused .wf-next-body { border-color:var(--border2); background:var(--accent-bg); color:var(--accent); }
 
-/* ── Terminals: Start and End are both solid discs — one silhouette for "the
-   flow begins / the flow ends", told apart by colour and glyph, not shape. ─── */
+/* ── Terminals: Start and End share the same compact square silhouette and are
+   told apart by colour and glyph. ─────────────────────────────────────────── */
 .wf-node.start, .wf-node.end {
   --port-inset:2px;
   width:var(--term-size); height:var(--term-size); min-height:var(--term-size);
   border:none; background:transparent; overflow:visible;
-  border-radius:50%;
+  border-radius:var(--node-r);
 }
 .wf-node.start:not(.sel):not(.running):not(.ran-ok):not(.ran-fail):not(.paused),
 .wf-node.end:not(.sel):not(.running):not(.ran-ok):not(.ran-fail):not(.paused) {
   border:none; box-shadow:none;
 }
-.wf-node.start::after, .wf-node.end::after { box-shadow:none; border-radius:50%; }
+.wf-node.start::after, .wf-node.end::after { box-shadow:none; border-radius:var(--node-r); }
 .wf-node.start.running, .wf-node.end.running,
 .wf-node.start.ran-ok, .wf-node.end.ran-ok,
 .wf-node.start.ran-fail, .wf-node.end.ran-fail,
@@ -1198,11 +1197,11 @@
 .wf-node.start.ran-ok::after, .wf-node.end.ran-ok::after { box-shadow:var(--sh-sm); }
 .wf-node.start.ran-fail::after, .wf-node.end.ran-fail::after { box-shadow:var(--sh-sm); }
 .wf-node.start.running::after, .wf-node.end.running::after { box-shadow:var(--sh-md); }
-/* Terminal body — the disc itself. A light ring token: panel face, coloured
+/* Terminal body — a compact square. A light ring token: panel face, coloured
    ring, glyph in the terminal hue; a soft wash and shadow lift it off the
    canvas without the old solid-disc weight. */
 .wf-node-tri {
-  position:absolute; inset:0; background:var(--panel); border-radius:50%;
+  position:absolute; inset:0; background:var(--panel); border-radius:var(--node-r);
   border:1.75px solid var(--node-accent);
   display:flex; align-items:center; justify-content:center; color:var(--node-accent);
   box-shadow:var(--sh-sm), inset 0 0 0 3px color-mix(in srgb, var(--node-accent) 12%, transparent);
@@ -1300,7 +1299,7 @@
 .wf-node-hd { display:flex; align-items:center; gap:7px; padding:0 10px; height:28px;
   border-bottom:1px solid var(--nhd-bd,var(--line));
   background:var(--nhd-bg,color-mix(in srgb, var(--node-accent,var(--cat-misc)) 12%, var(--panel)));
-  border-radius:calc(var(--node-r) - 1px) calc(var(--node-r) - 1px) 0 0;
+  border-radius:var(--node-r);
   transition: background .15s, border-bottom-color .15s; }
 .wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:14px; height:14px; }
 .wf-node .ico svg { width:14px; height:14px; stroke-width:1.8; display:block; }

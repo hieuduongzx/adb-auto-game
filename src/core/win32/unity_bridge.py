@@ -1,10 +1,11 @@
 """Deploy and probe the Macro2k Unity Bridge for Unity games.
 
-The bridge is a generic BepInEx 5 plugin (``vendor/unity_bridge``) that runs
-inside a Mono Unity game and performs taps/swipes through Unity's EventSystem
-on commands sent over 127.0.0.1 (see ``Win32Controller``'s ``unity_bridge``
-input mode). This module inspects a game folder, copies BepInEx + the plugin
-into it, and pings a running bridge.
+The bridge is a generic BepInEx plugin (``vendor/unity_bridge``) that runs
+inside a Unity game and performs taps/swipes through Unity's EventSystem on
+commands sent over 127.0.0.1 (see ``Win32Controller``'s ``unity_bridge`` input
+mode). It comes in two builds: BepInEx 5 for Mono games and BepInEx 6 for
+IL2CPP games. This module inspects a game folder, copies the matching BepInEx
+pack + plugin into it, and pings a running bridge.
 """
 from __future__ import annotations
 
@@ -21,6 +22,10 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
 VENDOR_DIR = os.path.join(_PROJECT_ROOT, "vendor", "unity_bridge")
 BEPINEX_DIR = os.path.join(VENDOR_DIR, "bepinex5_x64")
 PLUGIN_DLL = os.path.join(VENDOR_DIR, "plugin", "Macro2kBridge.dll")
+# IL2CPP games: BepInEx 6 (bleeding edge, Unity.IL2CPP; ships its own .NET 6 in dotnet/).
+BEPINEX6_DIR = os.path.join(VENDOR_DIR, "bepinex6_il2cpp_x64")
+BEPINEX6_VERSION = "6.0.0-be.788"  # keep in sync with the pack in BEPINEX6_DIR
+PLUGIN_DLL_IL2CPP = os.path.join(VENDOR_DIR, "plugin_il2cpp", "Macro2kBridge.dll")
 PLUGIN_REL = os.path.join("BepInEx", "plugins", "Macro2kBridge", "Macro2kBridge.dll")
 DEFAULT_PORT = 17820
 # Doorstop loader files shipped at the game root next to the exe.
@@ -82,6 +87,13 @@ def vendored_bepinex_version() -> str:
     return _file_version(os.path.join(BEPINEX_DIR, "BepInEx", "core", "BepInEx.dll")) or "5.x"
 
 
+def _same_file(a: str, b: str) -> bool:
+    try:
+        return _sha256(a) == _sha256(b)
+    except OSError:
+        return False
+
+
 def inspect_game(exe_path: str) -> dict:
     """Describe a game install as seen by the deployer.
 
@@ -113,53 +125,65 @@ def inspect_game(exe_path: str) -> dict:
                         "Hãy chọn đúng exe của game, không phải launcher.")
         return info
 
-    if os.path.isfile(os.path.join(game_dir, "GameAssembly.dll")) \
-            or os.path.isdir(os.path.join(data_dir, "il2cpp_data")):
-        info["backend"] = "IL2CPP"
-        problems.append("Game build IL2CPP — Unity Bridge hiện chỉ hỗ trợ game Mono (BepInEx 5).")
-    else:
-        info["backend"] = "Mono"
+    il2cpp = os.path.isfile(os.path.join(game_dir, "GameAssembly.dll"))         or os.path.isdir(os.path.join(data_dir, "il2cpp_data"))
+    info["backend"] = "IL2CPP" if il2cpp else "Mono"
+    info["flavor"] = "il2cpp" if il2cpp else "mono"
+    bundled_bepinex_dir = BEPINEX6_DIR if il2cpp else BEPINEX_DIR
+    bundled_plugin = PLUGIN_DLL_IL2CPP if il2cpp else PLUGIN_DLL
+    if il2cpp:
+        info["vendorBepinexVersion"] = BEPINEX6_VERSION
 
     info["arch"] = _pe_arch(player if os.path.isfile(player) else exe_path)
     if info["arch"] and info["arch"] != "x64":
         problems.append(f"Game {info['arch']} — bản BepInEx đi kèm chỉ dành cho x64.")
 
     core = os.path.join(game_dir, "BepInEx", "core")
-    bepinex5 = False
-    if os.path.isfile(os.path.join(core, "BepInEx.Core.dll")):
-        info["bepinex"] = True
-        info["bepinexVersion"] = _file_version(os.path.join(core, "BepInEx.Core.dll")) or "6.x"
-        problems.append("Game đang dùng BepInEx 6 — plugin Unity Bridge viết cho BepInEx 5.")
-    elif os.path.isfile(os.path.join(core, "BepInEx.dll")):
-        bepinex5 = True
+    has_core6 = os.path.isfile(os.path.join(core, "BepInEx.Core.dll"))
+    has_core5 = os.path.isfile(os.path.join(core, "BepInEx.dll"))
+    # The bundled Doorstop 4 renamed its config keys and env vars; it only pairs
+    # with the bundled BepInEx core, not an older one.
+    doorstop_pairs = False
+    if il2cpp:
+        loader = os.path.join(core, "BepInEx.Unity.IL2CPP.dll")
+        if has_core6 and os.path.isfile(loader):
+            info["bepinex"] = True
+            doorstop_pairs = _same_file(loader, os.path.join(BEPINEX6_DIR, "BepInEx", "core", "BepInEx.Unity.IL2CPP.dll"))
+            info["bepinexVersion"] = BEPINEX6_VERSION if doorstop_pairs else "6.x"
+            info["bepinexOutdated"] = not doorstop_pairs
+        elif has_core6:
+            problems.append("Game đang có BepInEx 6 bản Mono (thiếu BepInEx.Unity.IL2CPP.dll) — không dùng được "
+                            "cho game IL2CPP, hãy gỡ hoặc thay bằng bản Unity.IL2CPP.")
+        elif has_core5:
+            problems.append("Game IL2CPP đang có BepInEx 5 (chỉ chạy được game Mono) — hãy gỡ BepInEx cũ "
+                            "rồi triển khai lại để cài BepInEx 6.")
+    elif has_core6:
+        problems.append("Game đang dùng BepInEx 6 — plugin Unity Bridge cho game Mono viết cho BepInEx 5.")
+    elif has_core5:
         info["bepinex"] = True
         info["bepinexVersion"] = _file_version(os.path.join(core, "BepInEx.dll")) or "5.x"
         info["bepinexOutdated"] = _version_tuple(info["bepinexVersion"]) < _version_tuple(info["vendorBepinexVersion"])
+        doorstop_pairs = info["bepinexVersion"] == info["vendorBepinexVersion"]
 
     doorstop = [n for n in ("winhttp.dll", "version.dll") if os.path.isfile(os.path.join(game_dir, n))]
     info["doorstop"] = bool(doorstop)
     if doorstop:
         # Doorstop 4 (BepInEx 5.4.23+) writes .doorstop_version; 3.x has none.
         info["doorstopVersion"] = _read_text(os.path.join(game_dir, ".doorstop_version")) or "3.x"
-    if doorstop and not info["bepinex"]:
+    if doorstop and not (has_core5 or has_core6):
         problems.append(f"Thư mục game đã có {doorstop[0]} nhưng không có BepInEx "
                         "(có thể là mod loader khác) — không ghi đè.")
-    if bepinex5 and not doorstop and info["bepinexVersion"] != info["vendorBepinexVersion"]:
-        # The bundled Doorstop 4 renamed its config keys and env vars; it only
-        # pairs with the bundled BepInEx core, not an older 5.4.22 one.
+    if info["bepinex"] and not doorstop and not doorstop_pairs:
         problems.append(f"BepInEx {info['bepinexVersion']} có sẵn nhưng thiếu doorstop (winhttp.dll). "
                         f"Doorstop đi kèm chỉ khớp BepInEx {info['vendorBepinexVersion']} — "
                         "hãy cài lại BepInEx bản đó đè lên thư mục game.")
 
     installed = os.path.join(game_dir, PLUGIN_REL)
     info["pluginInstalled"] = os.path.isfile(installed)
-    if not os.path.isfile(PLUGIN_DLL):
-        problems.append("Thiếu vendor/unity_bridge/plugin/Macro2kBridge.dll — build plugin trước.")
+    if not os.path.isfile(bundled_plugin):
+        problems.append(f"Thiếu vendor/unity_bridge/{'plugin_il2cpp' if il2cpp else 'plugin'}/Macro2kBridge.dll — "
+                        "build plugin trước.")
     elif info["pluginInstalled"]:
-        try:
-            info["pluginCurrent"] = _sha256(installed) == _sha256(PLUGIN_DLL)
-        except OSError:
-            info["pluginCurrent"] = False
+        info["pluginCurrent"] = _same_file(installed, bundled_plugin)
     return info
 
 
@@ -179,18 +203,23 @@ def _copy_tree(src: str, dst: str, overwrite: bool) -> int:
 
 
 def deploy(exe_path: str) -> dict:
-    """Install BepInEx 5 (when absent) and the bridge plugin into a game folder.
+    """Install BepInEx (when absent) and the bridge plugin into a game folder.
 
-    Existing BepInEx installs, configs and other plugins are left untouched."""
+    Mono games get BepInEx 5 + the Mono plugin, IL2CPP games BepInEx 6 + the
+    IL2CPP plugin. Existing BepInEx installs, configs and other plugins are
+    left untouched."""
     info = inspect_game(exe_path)
     if info["problems"]:
         return {"ok": False, "error": " ".join(info["problems"]), **info}
 
+    il2cpp = info["flavor"] == "il2cpp"
+    pack_dir = BEPINEX6_DIR if il2cpp else BEPINEX_DIR
+    plugin_dll = PLUGIN_DLL_IL2CPP if il2cpp else PLUGIN_DLL
     game_dir = info["gameDir"]
     actions: List[str] = []
     try:
         if not info["bepinex"]:
-            _copy_tree(BEPINEX_DIR, game_dir, overwrite=False)
+            _copy_tree(pack_dir, game_dir, overwrite=False)
             actions.append(f"Cài BepInEx {info['vendorBepinexVersion']} x64")
         elif not info["doorstop"]:
             # inspect_game only lets this through when the game's BepInEx
@@ -198,12 +227,14 @@ def deploy(exe_path: str) -> dict:
             for name in _DOORSTOP_FILES:
                 target = os.path.join(game_dir, name)
                 if not os.path.exists(target):
-                    shutil.copy2(os.path.join(BEPINEX_DIR, name), target)
+                    shutil.copy2(os.path.join(pack_dir, name), target)
+            if il2cpp:  # Doorstop's [Il2Cpp] section points at the bundled .NET 6 runtime
+                _copy_tree(os.path.join(pack_dir, "dotnet"), os.path.join(game_dir, "dotnet"), overwrite=False)
             actions.append("Bổ sung doorstop (winhttp.dll) cho BepInEx có sẵn")
 
         target = os.path.join(game_dir, PLUGIN_REL)
         os.makedirs(os.path.dirname(target), exist_ok=True)
-        shutil.copy2(PLUGIN_DLL, target)
+        shutil.copy2(plugin_dll, target)
         actions.append("Cập nhật Macro2kBridge.dll" if info["pluginInstalled"] else "Cài Macro2kBridge.dll")
     except PermissionError as exc:
         return {"ok": False, "error": f"Không ghi được vào thư mục game ({exc}). "

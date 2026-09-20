@@ -21,6 +21,8 @@ let wfLibFilterMode = "all";
 let wfLibQuery = "";
 let wfLibSelected = "";     // path of the selected template
 let wfLibOverlay = null;    // "dupes" | "trash" | null — which side view is open
+let wfLibGeneration = 0;    // invalidates list requests after filesystem changes
+let wfLibPendingSelect = "";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -42,9 +44,10 @@ async function wfLibOpen(){
 async function wfLibRefresh(){
   const grid=$("wf-lib-grid");
   if(grid) wfLibPlaceholder(grid, "Đang đọc thư mục template…");
-  const sig=wfLibFlowJson();
+  const sig=wfLibFlowJson(), generation=wfLibGeneration;
   let data=null;
   try{ data=await api().list_templates(sig); }catch(e){}
+  if(generation!==wfLibGeneration) return;
   if(!data){ if(grid) wfLibPlaceholder(grid, "Không đọc được thư mục template."); return; }
   wfLibState=data;
   wfLibFlowSig=sig;
@@ -52,8 +55,18 @@ async function wfLibRefresh(){
   // Drop a selection whose file is gone (deleted, renamed, or the workflow
   // changed under us) rather than leaving a stale detail panel open.
   const paths=(data.templates||[]).map(t=>t.path);
+  if(wfLibPendingSelect){
+    const match=(data.templates||[]).find(t=>wfTemplateIdentity(t.path)===wfLibPendingSelect);
+    if(match) wfLibSelected=match.path;
+    wfLibPendingSelect="";
+  }
   if(wfLibSelected && !paths.includes(wfLibSelected)) wfLibSelected="";
   wfLibRender();
+}
+function wfLibInvalidate(path){
+  wfLibGeneration++;
+  wfLibState=null;
+  if(path) wfLibPendingSelect=wfTemplateIdentity(path);
 }
 
 function wfLibPlaceholder(host, text){
@@ -93,6 +106,7 @@ function wfLibRender(){
 }
 
 function wfLibRenderBar(){
+  if(!wfLibState) return;
   const c=wfLibState.counts||{};
   const el=$("wf-lib-counts");
   if(el){
@@ -216,6 +230,16 @@ function wfLibRenderSide(){
 
   const acts=document.createElement("div");
   acts.className="wf-lib-acts";
+  const use=document.createElement("button");
+  use.type="button"; use.className="btn sm"; use.textContent="Use in selected";
+  const selected=typeof wfNode==="function"?wfNode(WF.selectedNode):null;
+  use.disabled=!selected || !((WF_NODES[selected.type]||{}).fields||[]).some(f=>f.t==="tpl"||f.t==="tpls"||f.t==="sequence_images");
+  use.title=use.disabled?"Select an image block on the canvas first":"Assign this template to the selected block";
+  use.onclick=()=>wfLibUseInSelected(t);
+  const create=document.createElement("button");
+  create.type="button"; create.className="btn sm"; create.textContent="Create Tap Image";
+  create.title="Create a Tap Image block using this template";
+  create.onclick=()=>wfLibCreateImageNode("tap_image",t);
   const ren=document.createElement("button");
   ren.type="button"; ren.className="btn sm"; ren.textContent="Đổi tên";
   ren.title="Đổi tên file và cập nhật mọi block đang trỏ tới nó";
@@ -224,7 +248,7 @@ function wfLibRenderSide(){
   del.type="button"; del.className="btn sm err"; del.textContent="Xoá";
   del.title="Chuyển file vào _trash/ (vẫn khôi phục được)";
   del.onclick=()=>wfLibDelete(t);
-  acts.append(ren, del);
+  acts.append(use, create, ren, del);
   side.appendChild(acts);
 }
 
@@ -324,6 +348,8 @@ function wfLibRenderDupes(out){
 // ── Trash ────────────────────────────────────────────────────────────────────
 
 async function wfLibShowTrash(){
+  if(!wfLibState) await wfLibRefresh();
+  if(!wfLibState) return;
   const grid=$("wf-lib-grid"); if(!grid) return;
   wfLibSelected="";
   wfLibOverlay="trash";
@@ -362,7 +388,7 @@ function wfLibRenderTrash(items){
     back.type="button"; back.className="btn sm"; back.textContent="Khôi phục";
     back.onclick=async()=>{
       const r=await api().template_restore(it.path);
-      if(r && r.ok){ uiToast(`Đã khôi phục ${r.name}`,"success"); wfLibShowTrash(); }
+      if(r && r.ok){ if(typeof wfLibInvalidate==="function") wfLibInvalidate(); uiToast(`Đã khôi phục ${r.name}`,"success"); wfLibShowTrash(); }
       else uiToast((r&&r.error)||"Không khôi phục được","error");
     };
     row.append(img, nm, sz, back);
@@ -387,7 +413,9 @@ async function wfLibDelete(t){
   const r=await api().template_delete(t.path);
   if(!r || !r.ok){ uiToast((r&&r.error)||"Không xoá được","error"); return; }
   uiToast(`Đã chuyển ${r.name} vào _trash/`,"success");
-  wfLibState.dupes=null;                 // the cached duplicate groups are now stale
+  if(typeof wfTemplateContextDeleted==="function") wfTemplateContextDeleted(t.path);
+  if(wfLibState) wfLibState.dupes=null;  // invalidate before dropping the index
+  wfLibInvalidate();
   await wfLibRefresh();
   // Deleting is how you work through a duplicate set, so return the user to the
   // groups they were pruning rather than to the full grid.
@@ -404,14 +432,33 @@ async function wfLibRename(t){
   });
   if(!newName || !String(newName).trim()) return;
   const flowJson=wfLibFlowJson();
-  // One undo snapshot before the rename lands, so Ctrl+Z restores the file's
-  // references and the block params together.
-  if(typeof wfPushUndo==="function") wfPushUndo();
   const r=await api().rename_template(flowJson, t.path, String(newName).trim());
   if(!r || !r.ok){ uiToast((r&&r.error)||"Không đổi tên được","error"); return; }
+  if(typeof wfTemplateContextRenamed==="function") wfTemplateContextRenamed(t.path,r.new||"");
   if(r.flow) wfLibApplyRename(r.flow);
+  if(typeof wfResetHistory==="function") wfResetHistory();
+  wfLibInvalidate();
   uiToast(`Đã đổi tên thành ${r.new} (${r.nodes} block cập nhật)`,"success");
   await wfLibRefresh();
+}
+
+function wfLibUseInSelected(t){
+  const node=typeof wfNode==="function"?wfNode(WF.selectedNode):null;
+  if(!node || typeof wfApplyTemplateToNode!=="function") return;
+  const def=WF_NODES[node.type]||{};
+  if(!(def.fields||[]).some(f=>f.t==="tpl"||f.t==="tpls"||f.t==="sequence_images")){ uiToast("Selected block does not accept templates","warning"); return; }
+  wfPushUndo(); wfApplyTemplateToNode(node,t.path);
+  wfRememberTemplate(t.path);
+  wfRenderCanvas(); wfRenderInspector();
+  uiToast(`Using ${t.name} in selected block`,"success");
+}
+
+function wfLibCreateImageNode(type,t){
+  if(typeof wfRememberTemplate==="function") wfRememberTemplate(t.path);
+  if(typeof wfSwitchView==="function") wfSwitchView("canvas");
+  const canvas=document.getElementById("wf-canvas");
+  const rect=canvas&&canvas.getBoundingClientRect?canvas.getBoundingClientRect():{left:0,top:0,width:800,height:600};
+  if(typeof wfQuickConnectAdd==="function") wfQuickConnectAdd(type,rect.left+rect.width/2,rect.top+rect.height/2,null,"out");
 }
 
 // The rewrite happened Python-side on JSON we produced, so the only thing that
@@ -427,6 +474,7 @@ function wfLibApplyRename(flowJson){
     const keep={};
     if(p.template!==undefined)  keep.template=p.template;
     if(p.templates!==undefined) keep.templates=p.templates;
+    if(p.images!==undefined)    keep.images=p.images;
     if(Object.keys(keep).length) patched.set(n.id, keep);
   });
   (flow.activities||[]).forEach(a=>scan(a.graph));

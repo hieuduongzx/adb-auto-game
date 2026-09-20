@@ -1,16 +1,27 @@
 # Unity Bridge
 
-In-game input bridge for Macro2k's `unity_bridge` Win32 input mode. A BepInEx 5
+In-game input bridge for Macro2k's `unity_bridge` Win32 input mode. A BepInEx
 plugin runs inside a Unity game, listens on `127.0.0.1:17820` and performs
 taps/swipes through Unity's EventSystem and key presses through the Input System
 and the legacy Input manager — no cursor, no focus, the window may be covered.
 
+Two builds share one protocol; Macro2k picks the right one from the game folder
+(`GameAssembly.dll` / `il2cpp_data` → IL2CPP, otherwise Mono):
+
+| Game backend | BepInEx | Plugin |
+|---|---|---|
+| Mono | 5.4.23.5 (`bepinex5_x64/`) | `plugin/Macro2kBridge.dll` |
+| IL2CPP | 6.0.0-be.788 (`bepinex6_il2cpp_x64/`) | `plugin_il2cpp/Macro2kBridge.dll` |
+
 ```
 vendor/unity_bridge/
 ├── bepinex5_x64/          BepInEx 5.4.23.5 x64, unmodified official zip (Doorstop 4.5.0)
-├── plugin/
-│   └── Macro2kBridge.dll  built plugin that gets deployed
-└── src/Macro2kBridge/     plugin source (C#, net472)
+├── bepinex6_il2cpp_x64/   BepInEx 6.0.0-be.788 Unity.IL2CPP x64, unmodified official zip (Doorstop 4.5.0, .NET 6 in dotnet/)
+├── plugin/                built Mono plugin that gets deployed
+├── plugin_il2cpp/         built IL2CPP plugin that gets deployed
+└── src/
+    ├── Macro2kBridge/         Mono plugin source (C#, net472)
+    └── Macro2kBridge.Il2Cpp/  IL2CPP plugin source (C#, net6.0, Il2CppInterop)
 ```
 
 ## Deploy
@@ -18,16 +29,27 @@ vendor/unity_bridge/
 Pick **Unity bridge** as the Win32 input mode (toolbar, Project settings, or the
 new-project dialog). Macro2k offers to deploy into the game folder:
 
-- `BepInEx/` + `winhttp.dll` + `doorstop_config.ini` + `.doorstop_version` — only when the game has no BepInEx yet
+- `BepInEx/` + `winhttp.dll` + `doorstop_config.ini` + `.doorstop_version` (IL2CPP: plus `dotnet/`) — only when the game has no BepInEx yet
 - `BepInEx/plugins/Macro2kBridge/Macro2kBridge.dll` — always (update)
 
-An existing BepInEx 5 install is never upgraded (other mods may depend on it);
-the dialog only notes when it is older than the bundled one. Doorstop 4 renamed
+An existing BepInEx install is never upgraded (other mods may depend on it);
+the dialog only notes when it differs from the bundled one. Doorstop 4 renamed
 its `doorstop_config.ini` keys, so it is only added to an existing install whose
-BepInEx version matches the bundled one.
+BepInEx build matches the bundled one. A game with the wrong BepInEx generation
+(5 on an IL2CPP game, 6 on a Mono game, or BepInEx 6 without the IL2CPP loader)
+is reported as a problem instead of being overwritten.
 
-To update the bundled BepInEx, replace `bepinex5_x64/` with the contents of the
+To update the bundled BepInEx 5, replace `bepinex5_x64/` with the contents of the
 official `BepInEx_win_x64_<version>.zip` — the version is read from `BepInEx.dll`.
+To update BepInEx 6, replace `bepinex6_il2cpp_x64/` with the contents of a
+`BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.<build>+<hash>.zip` from
+<https://builds.bepinex.dev/projects/bepinex_be>, set `BEPINEX6_VERSION` in
+`src/core/win32/unity_bridge.py`, then rebuild the IL2CPP plugin.
+
+On an IL2CPP game's first start BepInEx 6 generates `BepInEx/interop` from
+`GameAssembly.dll` + `global-metadata.dat` — this takes a minute and the log says
+so. Games that encrypt or protect their metadata can't be interop-generated and
+can't host the bridge.
 
 Restart the game afterwards. `BepInEx/LogOutput.log` should show
 `[Macro2k Unity Bridge] Listening on 127.0.0.1:17820`.
@@ -37,10 +59,17 @@ Implementation: `src/core/win32/unity_bridge.py` (inspect/deploy/ping) and
 
 ## Supported games
 
-- Unity **Mono** builds, x64, Unity 2018.3+ (.NET 4.x scripting runtime)
-- Not supported: IL2CPP builds (`GameAssembly.dll`), x86, games already on BepInEx 6
+- Unity **Mono** builds, x64, Unity 2018.3+ (.NET 4.x scripting runtime) — BepInEx 5
+- Unity **IL2CPP** builds, x64, Unity 2018.4+ whose metadata BepInEx 6 can read — BepInEx 6
+- Not supported: x86, games already on BepInEx of the other generation
 
 Games with anti-cheat may detect BepInEx.
+
+IL2CPP notes: taps/swipes go through the same EventSystem path. Legacy `Input`
+key patches rely on Il2CppInterop's Harmony support; the Input System keyboard
+injection is best effort (its interop signatures vary) and disables itself with
+a log line if the lookup fails — keys then work only for games reading the legacy
+`Input` manager.
 
 ## Protocol
 
@@ -78,3 +107,15 @@ dotnet build vendor/unity_bridge/src/Macro2kBridge -c Release -p:UnityManagedDir
 
 `UnityManagedDir` is any Unity game's `Managed` folder (compile-time references
 only, nothing from it is shipped). The build copies the DLL to `plugin/`.
+
+IL2CPP plugin:
+
+```
+dotnet build vendor/unity_bridge/src/Macro2kBridge.Il2Cpp -c Release -p:Il2CppInteropDir="<Game>\BepInEx\interop"
+```
+
+`Il2CppInteropDir` is the `BepInEx/interop` folder BepInEx 6 generated for any
+IL2CPP game (compile-time references only; the running game's own interop is
+bound at load). BepInEx runtime references come from `bepinex6_il2cpp_x64/`.
+The build copies the DLL to `plugin_il2cpp/`. Needs the .NET SDK (targets net6.0;
+the targeting pack is restored from NuGet).

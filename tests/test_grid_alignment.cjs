@@ -30,6 +30,38 @@ test('node card, terminal and try_next sizes are whole grid cells', () => {
   assert.equal(cells(+m[2]), 2, 'try_next = 2 cells tall');
 });
 
+test('every canvas node silhouette has square corners', () => {
+  assert.equal(tok(baseCss, '--node-r'), 0, 'the shared node corner token must be square');
+
+  const selectors = [
+    '.wf-node-hd',
+    '.wf-node.condition:not(.wf-stacked)',
+    '.wf-node.loop:not(.wf-stacked)',
+    '.wf-node.call:not(.wf-stacked)',
+    '.wf-node.try_next',
+    '.wf-next-body',
+    '.wf-node.start',
+    '.wf-node.end',
+    '.wf-node.start::after',
+    '.wf-node.end::after',
+    '.wf-node-tri',
+    '.wf-node.running-call::before',
+  ];
+
+  const cssWithoutComments = wfCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...cssWithoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, prelude, body]) => ({
+    selectors: prelude.split(',').map(selector => selector.trim()),
+    body,
+  }));
+  for (const selector of selectors) {
+    const rule = rules.find(candidate => candidate.selectors.includes(selector)
+      && /border-radius:/.test(candidate.body));
+    assert.ok(rule, `${selector} rule must exist`);
+    assert.match(rule.body, /border-radius:\s*(?:0|var\(--node-r\))\s*;/,
+      `${selector} must render with square corners`);
+  }
+});
+
 test('the primary port row centres on a grid dot', () => {
   const h = tok(baseCss, '--node-h'), sz = tok(baseCss, '--port-sz');
   const rowTop = Math.round((h - sz) / 2);          // WF_ROW_TOP in render.js

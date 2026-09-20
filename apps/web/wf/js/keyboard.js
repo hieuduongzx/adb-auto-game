@@ -21,9 +21,11 @@ window.addEventListener("keydown", e => {
     if(typeof wfRunSingleNode==="function") wfRunSingleNode();
     return;
   }
-  // Undo/Redo — works even while typing in inputs (global shortcuts).
-  if((e.key==="z"||e.key==="Z") && (e.ctrlKey||e.metaKey) && !e.shiftKey){ e.preventDefault(); wfUndo(); return; }
-  if(((e.key==="z"||e.key==="Z") && (e.ctrlKey||e.metaKey) && e.shiftKey) || ((e.key==="y"||e.key==="Y") && (e.ctrlKey||e.metaKey))){ e.preventDefault(); wfRedo(); return; }
+  const canvasView=typeof wfCurView!=="function"||wfCurView()==="canvas";
+  // Keep native text undo/redo while editing a field. Workflow history is a
+  // Canvas action, so Preview/Library can never mutate a graph hidden behind it.
+  if(!typing && canvasView && (e.key==="z"||e.key==="Z") && (e.ctrlKey||e.metaKey) && !e.shiftKey){ e.preventDefault(); wfUndo(); return; }
+  if(!typing && canvasView && (((e.key==="z"||e.key==="Z") && (e.ctrlKey||e.metaKey) && e.shiftKey) || ((e.key==="y"||e.key==="Y") && (e.ctrlKey||e.metaKey)))){ e.preventDefault(); wfRedo(); return; }
 
   if(typing) return;   // below here: canvas shortcuts only (let inputs keep native Ctrl+C/V)
   if(e.defaultPrevented) return;
@@ -39,6 +41,10 @@ window.addEventListener("keydown", e => {
     if(wfPvActive) wfPvZoomBy(1/1.2); else wfZoomBy(1/1.2); return; }
   if((e.ctrlKey||e.metaKey) && e.key==="0"){ e.preventDefault();
     if(wfPvActive) wfPvResetZoom(); else wfZoomReset(); return; }
+  if(!canvasView){
+    if(e.key==="Escape" && typeof wfClearSel==="function"){ wfClearSel(); if(typeof wfMarkSel==="function") wfMarkSel(); }
+    return;
+  }
   if((e.key==="c"||e.key==="C") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCopy(); } return; }
   if((e.key==="x"||e.key==="X") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCut(); } return; }
   if((e.key==="v"||e.key==="V") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); wfPaste(wfPointer.inside?{clientX:wfPointer.x,clientY:wfPointer.y}:null); return; }

@@ -102,14 +102,24 @@ async function pvCheckColor(){
 // "Capture region" saves the current drag-region crop into the open workflow's
 // templates/ folder (resolved by the backend) so it's ready to use as a node
 // template. The path comes back from Python so we can confirm where it landed.
+let pvCropPending=false;
 async function pvQuickCrop(){
-  const path = await api().quick_crop($("pv-crop-name").value);
+  if(pvCropPending){ setStatus("Saving the selected region…"); return ""; }
+  pvCropPending=true;
+  let path="";
+  try{ path = await api().quick_crop($("pv-crop-name").value); }
+  catch(e){ setStatus("Could not save region — try again"); uiToast("Could not save crop", "warning"); return ""; }
+  finally{ pvCropPending=false; }
   if(!path){ setStatus("No region — drag-select a region on the image first"); return; }
-  setStatus(`Saved region → ${path}`);
+  const ref=typeof wfRememberTemplate==="function"?wfRememberTemplate(path):path;
+  const tpl=$("pv-tpl-path"); if(tpl) tpl.value=ref;
+  if(typeof wfLibInvalidate==="function") wfLibInvalidate(ref);
+  setStatus(`Saved region → ${ref} · ready for the next image block`);
   // The crop landed in the workflow's templates folder, which is exactly what
   // the Library lists — point the user at it rather than leaving them to guess
   // where a new crop goes (the old inline asset browser is gone).
-  uiToast("Đã lưu crop vào thư viện template", "success");
+  uiToast("Crop saved · next image block will use it", "success");
+  return ref;
 }
 async function pvClearRegion(){
   $("pv-rg-x").value=$("pv-rg-y").value=$("pv-rg-w").value=$("pv-rg-h").value=0;
