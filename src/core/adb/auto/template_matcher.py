@@ -6,6 +6,7 @@ import numpy as np
 import threading
 from typing import Tuple, Optional, List, Dict
 from src.utils import log_error, log_info, log_warning
+from src.utils.asset_crypto import maybe_decrypt
 
 
 class TemplateMatcher:
@@ -29,13 +30,17 @@ class TemplateMatcher:
             if cache_key in self._cache:
                 return self._cache[cache_key].copy()
         
-        # Load from disk
+        # Load from disk. Read raw bytes (not cv2.imread's own file path) so a
+        # packaged Runner's encrypted templates (see src/utils/asset_crypto.py)
+        # decrypt transparently; a plain file (source/Designer) round-trips
+        # through maybe_decrypt as a no-op.
         try:
-            if grayscale:
-                template = cv2.imread(template_path, cv2.IMREAD_GRAYSCALE)
-            else:
-                template = cv2.imread(template_path, cv2.IMREAD_COLOR)
-            
+            with open(template_path, "rb") as fh:
+                raw = fh.read()
+            buf = np.frombuffer(maybe_decrypt(raw), dtype=np.uint8)
+            flag = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
+            template = cv2.imdecode(buf, flag)
+
             if template is None:
                 log_error(f"Could not load template: {template_path}")
                 return None

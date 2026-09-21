@@ -148,7 +148,9 @@ The version flows automatically to: window titles, the Hub version badge, the
 A single-workflow Runner (Hub **Build**, Designer **Build EXE**, or
 `python packaging/build_runner.py --workflow workflows/<Name>`) ships whatever is
 in `workflows/<Name>/vendor/` — files the player must put into the **game's own
-install folder** (BepInEx, an in-game plugin, configs…):
+install folder** (a third-party mod's files, configs…; the Unity Bridge itself
+needs none of this — it injects into the running game, see
+`vendor/unity_bridge/README.md`):
 
 ```
 dist/<Name>-Runner/
@@ -162,6 +164,21 @@ dialog lists the file count and the finished build panel has **Open
 requirements**. The built Runner warns on load until the files are found in the
 game folder, and Settings → **Game files** can copy them next to the Game path's
 `.exe`.
+
+## 6. Standalone Runner — bundled workflow.json + templates are obfuscated
+
+`build_runner.py` encrypts the bundled `workflow.json` and every image under its
+`templates/` folder in place, after PyInstaller finishes
+(`_internal/workflow/...`) — so a player who opens the installed Runner folder
+can't casually read the automation logic in a text editor or browse the
+match-template screenshots in an image viewer. `assets/icon.png`/`cover.*` (and
+anything else in the workflow folder) are left alone — those are shown to the
+player in the app UI itself. See `src/utils/asset_crypto.py` for the format and
+its (explicitly stated) limits — it's obfuscation, not real security: the key
+ships inside the Runner, so it only stops casual browsing, never a determined
+extraction. `WorkflowEngine.load_file` and `TemplateMatcher.load` auto-detect
+and decrypt transparently; a workflow saved by the Designer, or a Runner run
+from source, is plain and unaffected.
 
 ## How auto-update works
 

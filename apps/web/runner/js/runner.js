@@ -1678,40 +1678,25 @@ window.__recvFrame = function(dataUrl,w,h){
   const st=$("pv-state"); if(st && w && h) st.textContent = w+"×"+h;
 };
 
-// ── Appearance ────────────────────────────────────────────────────────────────
-// Theme and density are suite-wide: web/shared/theme.js applies them to <html>
-// and persists them through pywebview.api.save_settings(), which every Macro2k
-// window reads on launch. These two segmented controls just mirror its state.
-function syncAppearance(){
-  const cur = (window.uiTheme && window.uiTheme.current()) || { theme:"light", density:"comfortable" };
-  document.querySelectorAll("[data-theme-set]").forEach(b => {
-    const on = b.dataset.themeSet === cur.theme;
-    b.classList.toggle("on", on);
-    b.setAttribute("aria-checked", on ? "true" : "false");
-  });
-  document.querySelectorAll("[data-density-set]").forEach(b => {
-    const on = b.dataset.densitySet === cur.density;
-    b.classList.toggle("on", on);
-    b.setAttribute("aria-checked", on ? "true" : "false");
-  });
+// ── Header theme switch ───────────────────────────────────────────────────────
+function syncThemeToggle(){
+  const dark = window.uiTheme?.current().theme === "dark";
+  const button = $("theme-toggle");
+  const label = dark ? "Switch to light theme" : "Switch to dark theme";
+  button.innerHTML = uiIco(dark ? "sun" : "moon", "uico-2");
+  button.title = label;
+  button.setAttribute("aria-label", label);
 }
 
-function wireAppearance(){
-  document.querySelectorAll("[data-theme-set]").forEach(b => {
-    b.onclick = () => { if(window.uiTheme) window.uiTheme.setTheme(b.dataset.themeSet); syncAppearance(); };
-  });
-  document.querySelectorAll("[data-density-set]").forEach(b => {
-    b.onclick = () => { if(window.uiTheme) window.uiTheme.setDensity(b.dataset.densitySet); syncAppearance(); };
-  });
-  // theme.js also reconciles against the backend once pywebview is ready, which
-  // can land after first paint — follow it rather than showing a stale selection.
-  window.addEventListener("m2k-theme", syncAppearance);
-  syncAppearance();
+function wireThemeToggle(){
+  $("theme-toggle").onclick = () => window.uiTheme?.toggle();
+  window.addEventListener("m2k-theme", syncThemeToggle);
+  syncThemeToggle();
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init(){
-  wireAppearance();
+  wireThemeToggle();
   switchMobileView("activities", false);
   wireTabNav("mobile-tabs", "mobileView", switchMobileView);
   document.addEventListener("keydown", onGlobalKey, true);

@@ -496,6 +496,30 @@ def _trim_build(final: str) -> None:
         log(f"Trimmed cv2 videoio ffmpeg DLLs (−{removed:.0f} MB, unused)")
 
 
+def _encrypt_workflow_assets(final: str) -> None:
+    """Encrypt the bundled workflow.json + templates/ in place (light obfuscation
+    — see src/utils/asset_crypto.py — so a player browsing the installed Runner
+    folder can't casually read the automation logic or the match-template
+    screenshots). ``icon.*``/``cover.*``/anything else under workflow/ is left
+    alone: those are shown to the player in the app UI itself, so hiding them
+    would only break the UI for no benefit."""
+    if ROOT not in sys.path:
+        sys.path.insert(0, ROOT)
+    from src.utils.asset_crypto import encrypt_file, encrypt_tree
+
+    workflow_dir = os.path.join(final, "_internal", "workflow")
+    flow_path = os.path.join(workflow_dir, "workflow.json")
+    if not os.path.isfile(flow_path):
+        return
+    with open(flow_path, "r", encoding="utf-8") as fh:
+        flow = json.load(fh)  # still plaintext at this point — read before encrypting
+    templates_dir = os.path.join(workflow_dir, str(flow.get("templatesDir") or "templates"))
+
+    encrypt_file(flow_path)
+    n = encrypt_tree(templates_dir) if os.path.isdir(templates_dir) else 0
+    log(f"Encrypted workflow.json + {n} template image(s) (see src/utils/asset_crypto.py)")
+
+
 def _copy_vendor(needs: set[str], dest_root: str) -> None:
     dest_vendor = os.path.join(dest_root, "vendor")
     for tool in sorted(needs):
@@ -1124,6 +1148,7 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
 
         # Drop dead weight, then copy only the vendor pieces this workflow needs.
         _trim_build(final)
+        _encrypt_workflow_assets(final)
         if needs:
             progress(87, "Copying vendor tools")
             _copy_vendor(needs, final)

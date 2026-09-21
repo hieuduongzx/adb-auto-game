@@ -1057,9 +1057,15 @@ class WorkflowEngine:
 
     @staticmethod
     def load_file(path: str) -> Dict[str, Any]:
-        """Read + JSON-decode a flow file (raises on bad JSON/IO)."""
-        with open(path, "r", encoding="utf-8") as fh:
-            return json.load(fh)
+        """Read + JSON-decode a flow file (raises on bad JSON/IO).
+
+        Transparently decrypts a packaged Runner's bundled ``workflow.json``
+        (see ``src/utils/asset_crypto.py``); a plain file (source/Designer)
+        round-trips through ``maybe_decrypt`` as a no-op."""
+        from src.utils.asset_crypto import maybe_decrypt
+        with open(path, "rb") as fh:
+            raw = fh.read()
+        return json.loads(maybe_decrypt(raw).decode("utf-8"))
 
     def activities(self) -> List[Dict[str, Any]]:
         return list(self.flow.get("activities", []) or [])

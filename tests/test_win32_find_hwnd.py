@@ -153,7 +153,7 @@ class _BridgeProbe(unittest.TestCase):
             ctrl._check_bridge()
         self.assertTrue(err.called)
         message = err.call_args[0][0]
-        self.assertIn("BepInEx", message)
+        self.assertIn("COULD NOT connect", message)
         self.assertIn("127.0.0.1:17820", message)
 
 

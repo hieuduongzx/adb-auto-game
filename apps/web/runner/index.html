@@ -26,6 +26,9 @@
         <div class="app-subtitle" id="flow-sub">No workflow loaded</div>
       </div>
       <button class="update-pill" id="update-pill" type="button" onclick="showUpdates()" hidden>Update</button>
+      <button class="theme-toggle" id="theme-toggle" type="button" title="Switch to dark theme" aria-label="Switch to dark theme">
+        <i data-ico="moon" data-ico-size="uico-2" aria-hidden="true"></i>
+      </button>
       <div id="status-pill" class="status-ready">
         <div id="status-dot"></div>
         <div id="status-text">READY</div>
@@ -135,7 +138,7 @@
             <button type="button" class="act-set-x" id="act-set-close" onclick="closeActivitySettings()" title="Close" aria-label="Close settings">×</button>
           </div>
           <div class="act-set-body" id="act-set-body">
-            <div class="act-set-empty">Select the <b>⚙</b> on an activity to edit its settings here.</div>
+            <div class="act-set-empty">Select the <i data-ico="settings" data-ico-size="uico-1" aria-hidden="true"></i> settings button on an activity to edit its settings here.</div>
           </div>
         </div>
 
@@ -145,6 +148,11 @@
             <span class="rpane-title">Log</span>
             <span class="log-count" id="log-count" title="Lines shown"></span>
             <div class="rpane-sp"></div>
+            <button class="btn-log-clear" id="btn-log-export" type="button" onclick="onExportLog()"
+                    title="Save the log to a file…">Export</button>
+            <button class="btn-log-clear" type="button" onclick="onClearLog()"
+                    title="Empty the Runner's log">Clear</button>
+            <div class="log-toolbar">
             <select id="log-level" class="log-level" aria-label="Filter log by level"
                     title="Show only lines at this level or more serious" onchange="setLogLevel(this.value)">
               <option value="all">All levels</option>
@@ -155,10 +163,7 @@
               <i data-ico="search" data-ico-size="uico-0" aria-hidden="true"></i>
               <input id="log-search" type="search" aria-label="Search log" placeholder="Search" oninput="filterLog(this.value)">
             </div>
-            <button class="btn-log-clear" id="btn-log-export" type="button" onclick="onExportLog()"
-                    title="Save the log to a file…">Export</button>
-            <button class="btn-log-clear" type="button" onclick="onClearLog()"
-                    title="Empty the Runner's log">Clear</button>
+            </div>
           </div>
           <!-- Export / copy feedback; empty (and therefore hidden) at rest. -->
           <div class="log-note" id="log-note" role="status" aria-live="polite"></div>
@@ -244,24 +249,6 @@
                 <div id="speed-pkg">(load a workflow to configure)</div>
               </div>
             </details>
-
-            <section class="settings-section" id="appearance-card">
-              <div class="settings-title-row"><h2 class="settings-section-title">Appearance</h2><span class="section-state">Shared</span></div>
-              <div class="setting-row settings-choice-row">
-                <span class="setting-label">Theme</span>
-                <div class="choice-seg" id="theme-seg" role="radiogroup" aria-label="Theme">
-                  <button type="button" class="choice" data-theme-set="light" role="radio" aria-checked="true"><span class="choice-title">Light</span></button>
-                  <button type="button" class="choice" data-theme-set="dark" role="radio" aria-checked="false"><span class="choice-title">Dark</span></button>
-                </div>
-              </div>
-              <div class="setting-row settings-choice-row">
-                <span class="setting-label">Density</span>
-                <div class="choice-seg" id="density-seg" role="radiogroup" aria-label="Density">
-                  <button type="button" class="choice" data-density-set="comfortable" role="radio" aria-checked="true"><span class="choice-title">Comfortable</span></button>
-                  <button type="button" class="choice" data-density-set="compact" role="radio" aria-checked="false"><span class="choice-title">Compact</span></button>
-                </div>
-              </div>
-            </section>
 
             <details class="settings-section settings-disclosure" id="updates-section">
               <summary><span class="settings-section-title">Updates</span><span class="section-state" id="updates-summary" data-section-state="updates">Checking</span></summary>
