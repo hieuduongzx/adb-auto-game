@@ -199,6 +199,11 @@ const WF_CMP_OPS = [
   {v:"is_empty",t:"is empty"},{v:"is_not_empty",t:"is not empty"},
 ];
 
+// Colour probes: test one pixel, or scan the search region for the colour.
+// Shared by If/Wait/Loop-until colour so the wording and values can't drift.
+const WF_COLOR_WHERE = [
+  {v:"point",t:"One point (x, y)"},{v:"anywhere",t:"Anywhere in region"},
+];
 // The emulator nodes' target picker. "Selected device" resolves against the
 // toolbar's device select (the serial is handed to the engine), "Last used"
 // against the instance the last Launch emulator saved. Families are listed for
@@ -286,8 +291,8 @@ const WF_NODES = {
   // ── Color (pixel) nodes — compare screen pixels against a #RRGGBB colour.
   // Tolerance = max per-channel difference (same rule as DevScope's Inspect color).
   tap_color:  {label:"Tap color", ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"timeout",t:"num",d:10},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.color||"?"} ±${p.tolerance??10}`+(p.taps=="2"?" ×2":"")},
-  wait_color: {label:"Wait color",ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"x",t:"num"},{k:"y",t:"num"},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate - wait until the color is GONE",t:"bool",d:false}], sum:p=>(p.negate?"until gone ":"")+`(${p.x||0},${p.y||0}) = ${p.color||"?"}`},
-  if_color:   {label:"If color",  ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"x",t:"num"},{k:"y",t:"num"},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}(${p.x||0},${p.y||0}) ≈ ${p.color||"?"}`},
+  wait_color: {label:"Wait color",ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"where",lbl:"Check",t:"select",opts:WF_COLOR_WHERE,d:"point"},{k:"x",t:"num",showWhen:{where:"point"}},{k:"y",t:"num",showWhen:{where:"point"}},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate - wait until the color is GONE",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region",showWhen:{where:"anywhere"}}], sum:p=>(p.negate?"until gone ":"")+(p.where==="anywhere"?`${p.color||"?"} ±${p.tolerance??10} · region`:`(${p.x||0},${p.y||0}) = ${p.color||"?"}`)},
+  if_color:   {label:"If color",  ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"where",lbl:"Check",t:"select",opts:WF_COLOR_WHERE,d:"point"},{k:"x",t:"num",showWhen:{where:"point"}},{k:"y",t:"num",showWhen:{where:"point"}},{k:"negate",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region",showWhen:{where:"anywhere"}}], sum:p=>`${p.negate?"not ":""}`+(p.where==="anywhere"?`${p.color||"?"} ±${p.tolerance??10} · region`:`(${p.x||0},${p.y||0}) ≈ ${p.color||"?"}`)},
   read_color: {label:"Read color → variable",ico:"pipette",kind:"action",cat:"color", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"color",var:true},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>`${p.name||"?"} = px(${p.x||0},${p.y||0})`},
   loop:       {label:"Repeat",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"infinite",t:"bool",d:true},{k:"count",lbl:"Repeat count",t:"num",varRef:true,d:3,showWhen:{infinite:false}}], sum:p=>p.infinite?"∞ infinite":`${p.count}×`},
   parallel:   {label:"Parallel", ico:"parallel",kind:"parallel",cat:"flow", outs:[], fields:[{k:"count",lbl:"Thread count",t:"num",d:3,refresh:true}], sum:p=>`${p.count||3} parallel threads`},
@@ -348,6 +353,14 @@ const WF_NODES = {
     {k:"package",lbl:"Package / title contains",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
     {k:"negate",t:"bool",d:false}
   ], sum:p=>`${p.negate?"not ":""}app ~ "${wfAppTargetLabel(p)}"`},
+  // Poll If app running until it holds — or, negated, until the app is GONE
+  // (crash / "wait for the game to close"). Both backends, like If app running.
+  wait_app: {label:"Wait for app", search:"until running closed crash window", ico:"timer", kind:"condition", cat:"app", ctrl:null, outs:["true","false"], fields:[
+    {k:"pkgSrc",lbl:"Target",t:"select",opts:[{v:"project",t:"From Project settings"},{v:"custom",t:"Custom…"}],d:"project"},
+    {k:"package",lbl:"Package / title contains",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
+    {k:"timeout",lbl:"Timeout (s)",t:"num",d:30},
+    {k:"negate",lbl:"Negate - wait until it CLOSES",t:"bool",d:false}
+  ], sum:p=>`${p.negate?"until closed ":"until running "}"${wfAppTargetLabel(p)}" ≤${p.timeout??30}s`},
   // ── Utilities ──────────────────────────────────────────────────────────────
   // Capture one frame and (by default) write it to disk. Turning "Save" off makes
   // it a pure "refresh the frame now" step for the node that follows.
@@ -373,7 +386,7 @@ const WF_NODES = {
   loop_until_color: {label:"Loop until color", ico:"loop", kind:"loop_until", cat:"color", ins:["in","loop"], outs:["body","found","fail"], fields:[
     {k:"color",t:"color",d:"#ff0000"},
     {k:"tolerance",lbl:"Tolerance",t:"num",d:10},
-    {k:"where",lbl:"Check",t:"select",opts:[{v:"point",t:"One point (x, y)"},{v:"anywhere",t:"Anywhere in region"}],d:"point"},
+    {k:"where",lbl:"Check",t:"select",opts:WF_COLOR_WHERE,d:"point"},
     {k:"x",t:"num",showWhen:{where:"point"}},{k:"y",t:"num",showWhen:{where:"point"}},
     {k:"maxLoops",lbl:"Max loops (0 = ∞)",t:"num",varRef:true,d:0},
     {k:"_region",lbl:"Search region",t:"region"}
@@ -569,11 +582,16 @@ const WF_NODES = {
     {k:"pathSrc",lbl:"Game path",t:"select",opts:[{v:"project",t:"Project game path"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"path",lbl:"Program (.exe) path",t:"path",d:"",pickFile:true,showWhen:{pathSrc:"custom"}},
     {k:"args",lbl:"Arguments (optional)",t:"text",d:""},
+    {k:"unityBridge",lbl:"Inject Unity Bridge before startup",t:"bool",d:false},
     {k:"window",lbl:"Wait for window title (optional)",t:"text",d:""},
     {k:"wait",lbl:"Wait for window (s)",t:"num",d:30},
   ], sum:p=>`▶ ${wfLaunchPathLabel(p)}`},
   win_activate: {label:"Activate window", ico:"monitor", kind:"action", cat:"window", outs:["out"], fields:[], sum:()=>"bring window to front"},
   win_close:    {label:"Close window", ico:"x", kind:"action", cat:"window", outs:["out"], fields:[], sum:()=>"close target window"},
+  // Force-terminate the process (taskkill /F). Close window only asks nicely.
+  win_kill:     {label:"Kill process", search:"terminate taskkill force stop hung crash", ico:"octagon", kind:"action", cat:"window", outs:["out"], fields:[
+    {k:"tree",lbl:"Also kill child processes (/T)",t:"bool",d:true}
+  ], sum:p=>p.tree===false?"☠ force-kill process":"☠ force-kill process tree"},
   // client: W×H is the game area (captures/templates), frame added on top.
   // center: centre on the monitor's work area. Both off on nodes saved before
   // they existed (outer size, top-left kept); new nodes default both on.
@@ -755,6 +773,7 @@ function wfNormalizeNode(node){
     }
   }
   if(node.type==="key") p.keycode=wfAdbKeyValue(p.keycode);
+  if((node.type==="if_color"||node.type==="wait_color") && p.where===undefined) p.where="point";
   node.outputLogs=wfOutputLogValues(node);
   delete node.outputLog;
   return node;

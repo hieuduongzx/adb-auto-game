@@ -329,7 +329,7 @@ function wfPvCanPreviewNode(node){
   if(WF_PV_IMAGE_TYPES.has(t)) return t==="sequence_tap_image"
     ? Array.isArray(p.images)&&p.images.some(item=>item&&item.template)
     : !!(p.template||(Array.isArray(p.templates)&&p.templates.some(Boolean))||wfPvRegionOf(p));
-  if(WF_PV_POINT_TYPES.has(t)) return p.target!=="found";
+  if(WF_PV_POINT_TYPES.has(t)) return p.where==="anywhere" ? !!wfPvRegionOf(p) : p.target!=="found";
   if(WF_PV_REGION_TYPES.has(t)) return t!=="parse_var" || p.source!=="var";
   if(t==="tap_random"||t==="swipe"||t==="multi_tap"||t==="swipe_dir"||t==="tap_color"||t==="wait_stable") return true;
   if(t==="loop_until_color") return true;
@@ -351,6 +351,7 @@ function wfPvShapesForNode(node){
     return out;
   }
   if(WF_PV_POINT_TYPES.has(t)){
+    if(p.where==="anywhere") return out;   // colour scan: the search region above is the shape
     point(p.x,p.y,label);
     if((t==="win_click"||t==="tap")&&(wfPvNum(p.offsetX)||wfPvNum(p.offsetY)))
       point(wfPvNum(p.x)+wfPvNum(p.offsetX),wfPvNum(p.y)+wfPvNum(p.offsetY),"Tap with offset","ok",7);

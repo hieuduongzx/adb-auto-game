@@ -203,6 +203,9 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # Điều kiện: app/tiêu đề cửa sổ hiện tại có chứa chuỗi? (ADB: package
     # foreground; Win32: tiêu đề cửa sổ) — phát hiện game crash.
     "if_app": {"label": "Nếu app đang mở", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    # Chờ app/cửa sổ xuất hiện (hoặc BIẾN MẤT khi negate) — cặp chờ của if_app,
+    # dùng cho cả hai backend. true khi đạt điều kiện, false khi hết timeout.
+    "wait_app": {"label": "Chờ app", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     # Gỡ cài đặt app (pm uninstall, tuỳ chọn -k giữ dữ liệu). ADB-only.
     "app_uninstall": {"label": "Gỡ ứng dụng", "kind": "action", "ins": 1, "outs": ["out"]},
     # Cài APK từ file trên PC (pm install qua adb install) — cặp đối xứng với
@@ -282,6 +285,9 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "win_launch":   {"label": "Mở chương trình", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_activate": {"label": "Đưa cửa sổ lên trước", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_close":    {"label": "Đóng cửa sổ", "kind": "action", "ins": 1, "outs": ["out"]},
+    # Tắt CỨNG tiến trình sở hữu cửa sổ mục tiêu (taskkill /F) — win_close chỉ gửi
+    # WM_CLOSE nên game treo / hiện hộp thoại "Lưu?" thì không đóng được.
+    "win_kill":     {"label": "Tắt tiến trình", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_resize":   {"label": "Thay đổi kích thước", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_move":     {"label": "Di chuyển cửa sổ", "kind": "action", "ins": 1, "outs": ["out"]},
     "win_minimize": {"label": "Thu nhỏ", "kind": "action", "ins": 1, "outs": ["out"]},
@@ -845,6 +851,7 @@ class WorkflowEngine:
             "win_launch":   self._a_win_launch,
             "win_activate": self._a_win_activate,
             "win_close":    self._a_win_close,
+            "win_kill":     self._a_win_kill,
             "win_resize":   self._a_win_resize,
             "win_move":     self._a_win_move,
             "win_minimize": self._a_win_minimize,
@@ -2408,6 +2415,32 @@ class WorkflowEngine:
         y, x = hits[0]
         return (int(x) + ox, int(y) + oy)
 
+    @staticmethod
+    def _color_anywhere(params: Dict) -> bool:
+        """``where`` = "anywhere" scans the search region; default checks one point."""
+        return str(params.get("where", "point") or "point").strip().lower() == "anywhere"
+
+    def _color_probe(self, target: tuple, tol: int, params: Dict):
+        """One look at the screen for a colour node → ``(ok, x, y, region)``.
+
+        ``where=point`` (default) tests the pixel at x/y; ``where=anywhere``
+        scans the optional search region and reports where the first match sits.
+        On a miss (x, y) is the point that was tested (0,0 when scanning).
+        """
+        if self._color_anywhere(params):
+            region = self._search_region(params)
+            hit = self._find_color(target, tol, region=region)
+            return (hit is not None,
+                    int(hit[0]) if hit else 0, int(hit[1]) if hit else 0, region)
+        x, y = int(params.get("x", 0)), int(params.get("y", 0))
+        px = self._pixel_at(x, y)
+        return (px is not None and self._color_close(px, target, tol), x, y, None)
+
+    def _color_rects(self, ok: bool, x: int, y: int, label: str, hit: bool = False) -> list:
+        """Preview overlay rect for a colour probe (``hit`` = draw it as a success)."""
+        return [self._rect_from_center(x, y, 1.0 if ok else 0.0, 18, 18, 1.0,
+                                       ok or hit, label)]
+
     def _eval_color_condition(self, ntype: str, params: Dict) -> bool:
         target = self._parse_hex_color(params.get("color"))
         if target is None:
@@ -2416,48 +2449,46 @@ class WorkflowEngine:
         tol = max(0, int(params.get("tolerance", 10) or 0))
         if ntype == "if_color":
             negate = bool(params.get("negate", False))
-            x, y = int(params.get("x", 0)), int(params.get("y", 0))
-            px = self._pixel_at(x, y)
-            ok = px is not None and self._color_close(px, target, tol)
+            ok, x, y, region = self._color_probe(target, tol, params)
             if ok:
                 # Lưu vị trí "found" như các node ảnh — để "Tap → last found
                 # image" sau một node màu chạm đúng điểm vừa kiểm tra.
                 self._last_pos = (x, y)
             hex_lbl = self._bgr_to_hex(target)
             self._report_match_rects(
-                [self._rect_from_center(x, y, 1.0 if ok else 0.0, 18, 18, 1.0, ok, hex_lbl)],
-                ok=ok != negate, label=hex_lbl, conf=1.0 if ok else 0.0,
+                self._color_rects(ok, x, y, hex_lbl),
+                ok=ok != negate, label=hex_lbl, region=region, conf=1.0 if ok else 0.0,
             )
             return ok != negate
         if ntype == "wait_color":
-            x, y = int(params.get("x", 0)), int(params.get("y", 0))
             negate = bool(params.get("negate", False))
+            anywhere = self._color_anywhere(params)
             end = time.time() + max(0.0, float(params.get("timeout", 10.0)))
             hex_lbl = self._bgr_to_hex(target)
             while not self._stop.is_set():
                 self._pause.wait()
-                px = self._pixel_at(x, y)
-                ok = px is not None and self._color_close(px, target, tol)
+                ok, x, y, region = self._color_probe(target, tol, params)
+                where = "in the region" if anywhere else f"at ({x}, {y})"
                 if ok and not negate:
                     self._last_pos = (x, y)
-                    log_info(f"🎨 found color {hex_lbl} at ({x}, {y})")
+                    log_info(f"🎨 found color {hex_lbl} " + (f"at ({x}, {y})" if anywhere else where))
                     self._report_match_rects(
-                        [self._rect_from_center(x, y, 1.0, 18, 18, 1.0, True, hex_lbl)],
-                        ok=True, label=hex_lbl, conf=1.0,
+                        self._color_rects(True, x, y, hex_lbl),
+                        ok=True, label=hex_lbl, region=region, conf=1.0,
                     )
                     return True
                 if negate and not ok:
                     # Đảo: chờ đến khi màu BIẾN MẤT (nút sáng → tối, loading xong…).
-                    log_info(f"🎨 color {hex_lbl} disappeared at ({x}, {y})")
+                    log_info(f"🎨 color {hex_lbl} disappeared {where}")
                     self._report_match_rects(
-                        [self._rect_from_center(x, y, 0.0, 18, 18, 1.0, True, hex_lbl)],
-                        ok=True, label=hex_lbl, conf=0.0,
+                        self._color_rects(False, x, y, hex_lbl, hit=True),
+                        ok=True, label=hex_lbl, region=region, conf=0.0,
                     )
                     return True
                 if time.time() >= end:
                     self._report_match_rects(
-                        [self._rect_from_center(x, y, 0.0, 18, 18, 1.0, False, hex_lbl)],
-                        ok=False, label=hex_lbl, conf=0.0,
+                        self._color_rects(False, x, y, hex_lbl),
+                        ok=False, label=hex_lbl, region=region, conf=0.0,
                     )
                     return False
                 time.sleep(0.25)
@@ -2528,26 +2559,12 @@ class WorkflowEngine:
             tol = max(0, int(params.get("tolerance", 10) or 0))
             hex_lbl = self._bgr_to_hex(target)
             # "anywhere" quét cả vùng tìm; mặc định kiểm 1 điểm x/y như if_color.
-            if str(params.get("where", "point")).strip().lower() == "anywhere":
-                hit = self._find_color(target, tol, region=self._search_region(params))
-                ok = hit is not None
-                if ok:
-                    self._last_pos = (int(hit[0]), int(hit[1]))
-                self._report_match_rects(
-                    [self._rect_from_center(int(hit[0]) if ok else 0, int(hit[1]) if ok else 0,
-                                            1.0 if ok else 0.0, 18, 18, 1.0, ok, hex_lbl)],
-                    ok=ok, label=hex_lbl, conf=1.0 if ok else 0.0,
-                    region=self._search_region(params),
-                )
-                return ok
-            x, y = int(params.get("x", 0)), int(params.get("y", 0))
-            px = self._pixel_at(x, y)
-            ok = px is not None and self._color_close(px, target, tol)
+            ok, x, y, region = self._color_probe(target, tol, params)
             if ok:
                 self._last_pos = (x, y)
             self._report_match_rects(
-                [self._rect_from_center(x, y, 1.0 if ok else 0.0, 18, 18, 1.0, ok, hex_lbl)],
-                ok=ok, label=hex_lbl, conf=1.0 if ok else 0.0,
+                self._color_rects(ok, x, y, hex_lbl),
+                ok=ok, label=hex_lbl, region=region, conf=1.0 if ok else 0.0,
             )
             return ok
         if ntype == "loop_until_text":
@@ -2626,40 +2643,9 @@ class WorkflowEngine:
         if ntype == "wait_stable":
             return self._c_wait_stable(params)
         if ntype == "if_app":
-            negate = bool(params.get("negate", False))
-            # Win32: hỏi CỬA SỔ MỤC TIÊU, không phải cửa sổ đang foreground —
-            # ở input mode background (mặc định) cửa sổ game hầu như không bao
-            # giờ được focus, nên get_current_app() sẽ luôn trả về sai.
-            if getattr(self, "_controller", "adb") == "win32":
-                # pkgSrc=project ở dự án Win32 = "cửa sổ trong Project settings",
-                # tức chỉ cần hỏi nó còn sống; custom = so khớp chuỗi tiêu đề.
-                needle = ""
-                if str(params.get("pkgSrc") or "").strip().lower() != "project":
-                    needle = str(self._resolve_value(params.get("package", "")) or "").strip().lower()
-                ctrl = getattr(self.auto, "adb", None)
-                title = ""
-                alive = False
-                if ctrl is not None and hasattr(ctrl, "target_title"):
-                    title = ctrl.target_title() or ""
-                    alive = bool(title) or bool(getattr(ctrl, "device", None))
-                elif ctrl is not None:
-                    alive = bool(getattr(ctrl, "device", None))
-                ok = alive if not needle else (needle in title.lower())
-                log_info(f"🪟 target window: {title or '(not found)'} → "
-                         f"{'matched' if ok else 'not matched'}"
-                         + (f" '{needle}'" if needle else ""))
-                return ok != negate
-            needle = self._node_package(params).lower()
-            try:
-                if hasattr(self.auto.adb, "clear_info_cache"):
-                    self.auto.adb.clear_info_cache()
-                cur_app = (self.auto.adb.get_current_app() or "").lower()
-            except Exception:
-                cur_app = ""
-            ok = bool(needle) and needle in cur_app
-            log_info(f"📱 current app: {cur_app or '(?)'} → "
-                     f"{'matched' if ok else 'not matched'} '{needle}'")
-            return ok != negate
+            return self._app_match(params) != bool(params.get("negate", False))
+        if ntype == "wait_app":
+            return self._c_wait_app(params)
         if ntype == "if_image":
             tpl = self._resolve_template(params.get("template", ""))
             threshold = float(params.get("threshold", 0.85))
@@ -3002,7 +2988,7 @@ class WorkflowEngine:
     _QUICK_TIMEOUT_TYPES = frozenset({
         "tap_image", "wait_image", "tap_image_any", "wait_image_any",
         "tap_color", "wait_color", "wait_text", "scroll_find",
-        "win_wait_window", "wait_stable",
+        "win_wait_window", "wait_stable", "wait_app",
     })
 
     def run_single_node(self, node: Dict[str, Any]) -> Dict[str, Any]:
@@ -3726,7 +3712,7 @@ class WorkflowEngine:
 
     def _a_long_press(self, node, p) -> bool:
         x, y = self._pos(p)
-        return self.auto.adb.swipe(x, y, x, y, int(p.get("duration", 800)))
+        return self.auto.adb.hold_and_release(x, y, int(p.get("duration", 800)))
 
     def _a_swipe(self, node, p) -> bool:
         if p.get("mode") == "direction":
@@ -3780,12 +3766,24 @@ class WorkflowEngine:
     def _a_home(self, node, p) -> bool:
         return self.auto.go_home()
 
+    def _adb_only_blocked(self, what: str, alternative: str = "") -> bool:
+        """True — after a warning — when an ADB-only block runs in a Win32 project.
+
+        Such a block used to report success and skip, so a flow carried on as if
+        the phone step had happened. It now fails like the Win32-only blocks do
+        in an ADB project (the Designer already flags both as errors).
+        """
+        if getattr(self, "_controller", "adb") != "win32":
+            return False
+        hint = f" — use {alternative} instead" if alternative else ""
+        log_warning(f"{what} is ADB-only but this is a Win32 project{hint}")
+        return True
+
     def _a_app_stop(self, node, p) -> bool:
         """Force-stop một app (tuỳ chọn xóa dữ liệu) — cặp với launch_app cho
         flow 'game treo → dừng hẳn → mở lại'. Chỉ áp dụng cho dự án ADB."""
-        if getattr(self, "_controller", "adb") == "win32":
-            log_warning("⛔ Stop app is only available for ADB projects — use 'Close window' for Win32")
-            return True
+        if self._adb_only_blocked("⛔ Stop app", "Kill process / Close window"):
+            return False
         pkg = self._node_package(p)
         if not pkg:
             log_warning("⛔ app_stop: no package specified (Project settings or Custom)")
@@ -3807,9 +3805,8 @@ class WorkflowEngine:
 
     def _a_app_uninstall(self, node, p) -> bool:
         """pm uninstall một app (tuỳ chọn -k giữ dữ liệu/cache). ADB-only."""
-        if getattr(self, "_controller", "adb") == "win32":
-            log_warning("🗑 Uninstall app is only available for ADB projects — skipping")
-            return True
+        if self._adb_only_blocked("🗑 Uninstall app"):
+            return False
         pkg = self._node_package(p)
         if not pkg:
             log_warning("🗑 app_uninstall: no package specified (Project settings or Custom)")
@@ -3836,9 +3833,8 @@ class WorkflowEngine:
         Dùng CLI adb (không phải shell) vì APK nằm trên PC và cần được push.
         ``reinstall`` (-r) giữ dữ liệu, ``grantPerms`` (-g) cấp sẵn quyền.
         """
-        if getattr(self, "_controller", "adb") == "win32":
-            log_warning("📦 Install app is only available for ADB projects — skipping")
-            return True
+        if self._adb_only_blocked("📦 Install app"):
+            return False
         apk = str(self._resolve_value(p.get("apk", ""))).strip().strip('"')
         if not apk:
             log_warning("📦 app_install: no APK file selected")
@@ -3887,9 +3883,8 @@ class WorkflowEngine:
         Cửa thoát cho những gì chưa có node riêng. ``failIfEmpty`` cho phép coi
         "không có output" là thất bại để rẽ nhánh trong Try in order.
         """
-        if getattr(self, "_controller", "adb") == "win32":
-            log_warning("💻 ADB shell is only available for ADB projects — skipping")
-            return True
+        if self._adb_only_blocked("💻 ADB shell"):
+            return False
         cmd = str(self._resolve_value(p.get("command", ""))).strip()
         if not cmd:
             log_warning("💻 adb_shell: no command specified")
@@ -4034,19 +4029,21 @@ class WorkflowEngine:
                 pass
         try:
             import subprocess
-            safe_t = title.replace('"', '\\"')
-            safe_m = message.replace('"', '\\"')
+            # Title/message travel in the environment: they may carry OCR text or
+            # {var} values, and interpolating those into the PowerShell source
+            # broke on quotes and let $(...) run as code.
             ps = (
                 "Add-Type -AssemblyName System.Windows.Forms;"
                 "$n=New-Object System.Windows.Forms.NotifyIcon;"
                 "$n.Icon=[System.Drawing.SystemIcons]::Information;"
                 "$n.Visible=$true;"
-                f'$n.ShowBalloonTip(6000,"{safe_t}","{safe_m}",'
+                "$n.ShowBalloonTip(6000,$env:M2K_NOTIFY_TITLE,$env:M2K_NOTIFY_MSG,"
                 "[System.Windows.Forms.ToolTipIcon]::Info);"
                 "Start-Sleep 7;$n.Dispose()"
             )
             subprocess.Popen(
                 ["powershell", "-WindowStyle", "Hidden", "-NonInteractive", "-Command", ps],
+                env={**os.environ, "M2K_NOTIFY_TITLE": title, "M2K_NOTIFY_MSG": message},
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
             )
         except Exception:
@@ -4156,9 +4153,8 @@ class WorkflowEngine:
 
     def _a_screen_power(self, node, p) -> bool:
         """Wake, sleep, or toggle the device screen via key events."""
-        if getattr(self, "_controller", "adb") == "win32":
-            log_warning("🖥 Screen power is unavailable for Win32 projects — skipping")
-            return True
+        if self._adb_only_blocked("🖥 Screen power"):
+            return False
         action = str(p.get("action", "on")).strip().lower()
         dev = getattr(self.auto.adb, "device", None)
         if not dev:
@@ -5113,7 +5109,18 @@ class WorkflowEngine:
                                         "select the correct game path and run again")
         args = str(self._resolve_value(p.get("args", ""))).strip()
         cmd = f'"{path}" {args}'.strip() if args else path
-        if not ctrl.launch_app(cmd):
+        if self._truthy(p.get("unityBridge", False)):
+            try:
+                from src.core.win32 import unity_bridge
+                port = int((self._win32_cfg or {}).get("bridgePort", unity_bridge.DEFAULT_PORT))
+                launched = unity_bridge.launch_injected(path, args, port)
+            except Exception as exc:
+                launched = {"ok": False, "error": str(exc)}
+            if not launched.get("ok"):
+                return self._fail_run(node, str(launched.get("error") or "Launch with Unity Bridge failed"))
+            ctrl.last_launch_pid = int(launched["pid"])
+            log_success(f"▶ Launched with Unity Bridge (PID {ctrl.last_launch_pid})")
+        elif not ctrl.launch_app(cmd):
             return False
         window = str(self._resolve_value(p.get("window", ""))).strip()
         wait = float(p.get("wait", 0) or 0)
@@ -5155,6 +5162,25 @@ class WorkflowEngine:
         if ctrl is None:
             return False
         return bool(ctrl.close_window())
+
+    def _a_win_kill(self, node, p) -> bool:
+        """Force-terminate the process that owns the target window.
+
+        ``win_close`` only posts WM_CLOSE, which a hung game or a "Save
+        changes?" box ignores; this is the Win32 twin of ADB's Stop app.
+        Nothing to kill (window already gone) counts as success.
+        """
+        ctrl = self._win32_ctrl()
+        if ctrl is None:
+            return False
+        tree = self._truthy(p.get("tree", True))
+        res = ctrl.kill_process(tree=tree)
+        if res is None:
+            log_info("☠ target window not found (already closed? — skipping)")
+            return True
+        if res:
+            log_success("☠ target process terminated" + (" (with children)" if tree else ""))
+        return bool(res)
 
     def _a_win_resize(self, node, p) -> bool:
         ctrl = self._win32_ctrl()
@@ -5348,6 +5374,73 @@ class WorkflowEngine:
 
     # ── Win32 / ADB conditions added alongside the action handlers ─────────────
 
+    def _app_match(self, params: Dict, log: bool = True) -> bool:
+        """Is the target app (ADB package) / window (Win32 title) running now?
+
+        Shared by ``if_app`` and ``wait_app``; ``negate`` is the caller's job.
+        ``log=False`` keeps a polling caller from writing a line per probe.
+        """
+        # Win32: hỏi CỬA SỔ MỤC TIÊU, không phải cửa sổ đang foreground —
+        # ở input mode background (mặc định) cửa sổ game hầu như không bao
+        # giờ được focus, nên get_current_app() sẽ luôn trả về sai.
+        if getattr(self, "_controller", "adb") == "win32":
+            # pkgSrc=project ở dự án Win32 = "cửa sổ trong Project settings",
+            # tức chỉ cần hỏi nó còn sống; custom = so khớp chuỗi tiêu đề.
+            needle = ""
+            if str(params.get("pkgSrc") or "").strip().lower() != "project":
+                needle = str(self._resolve_value(params.get("package", "")) or "").strip().lower()
+            ctrl = getattr(self.auto, "adb", None)
+            title = ""
+            alive = False
+            if ctrl is not None and hasattr(ctrl, "target_title"):
+                title = ctrl.target_title() or ""
+                alive = bool(title) or bool(getattr(ctrl, "device", None))
+            elif ctrl is not None:
+                alive = bool(getattr(ctrl, "device", None))
+            ok = alive if not needle else (needle in title.lower())
+            if log:
+                log_info(f"🪟 target window: {title or '(not found)'} → "
+                         f"{'matched' if ok else 'not matched'}"
+                         + (f" '{needle}'" if needle else ""))
+            return ok
+        needle = self._node_package(params).lower()
+        try:
+            if hasattr(self.auto.adb, "clear_info_cache"):
+                self.auto.adb.clear_info_cache()
+            cur_app = (self.auto.adb.get_current_app() or "").lower()
+        except Exception:
+            cur_app = ""
+        ok = bool(needle) and needle in cur_app
+        if log:
+            log_info(f"📱 current app: {cur_app or '(?)'} → "
+                     f"{'matched' if ok else 'not matched'} '{needle}'")
+        return ok
+
+    def _c_wait_app(self, params: Dict) -> bool:
+        """Poll ``if_app`` until it holds (or, with ``negate``, stops holding).
+
+        True as soon as the wanted state is reached, False after ``timeout``
+        seconds — the crash-detection / "wait for the game to close" loop that
+        previously needed loop ∞ + if_app + break.
+        """
+        negate = bool(params.get("negate", False))
+        try:
+            timeout = max(0.0, float(params.get("timeout", 30.0)))
+        except (TypeError, ValueError):
+            timeout = 30.0
+        end = time.time() + timeout
+        want = "closed" if negate else "running"
+        while not self._stop.is_set():
+            self._pause.wait()
+            if self._app_match(params, log=False) != negate:
+                log_info(f"📱 app is {want}")
+                return True
+            if time.time() >= end:
+                log_warning(f"📱 app is not {want} after {timeout:g}s")
+                return False
+            time.sleep(0.5)
+        return False
+
     def _c_win_window(self, ntype: str, params: Dict) -> bool:
         """win_if_window / win_wait_window: state of the TARGET window.
 
@@ -5403,9 +5496,8 @@ class WorkflowEngine:
 
     def _c_if_screen_on(self, params: Dict) -> bool:
         """ADB: is the device display awake? (the read side of screen_power)."""
-        if getattr(self, "_controller", "adb") == "win32":
-            log_warning("🖥 'If screen is on' is only available for ADB projects — treating as on")
-            return not self._truthy(params.get("negate", False))
+        if self._adb_only_blocked("🖥 If screen is on"):
+            return False
         negate = self._truthy(params.get("negate", False))
         dev = getattr(self.auto.adb, "device", None)
         if not dev:
@@ -5427,8 +5519,7 @@ class WorkflowEngine:
 
     def _c_if_device_size(self, params: Dict) -> bool:
         """ADB: compare the Android screen resolution reported by ``wm size``."""
-        if getattr(self, "_controller", "adb") == "win32":
-            log_warning("📱 'If device size' is only available for ADB projects")
+        if self._adb_only_blocked("📱 If device size", "If window … (size)"):
             return False
         want_w = self._resolve_count(params.get("width", 1920), default=1920)
         want_h = self._resolve_count(params.get("height", 1080), default=1080)

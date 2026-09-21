@@ -41,6 +41,7 @@ class UnityBridgeDeployTests(unittest.TestCase):
             mock.patch.object(ub, "PLUGIN_DLL_MONO", str(self.plugin_mono)),
             mock.patch.object(ub, "PLUGIN_DLL_IL2CPP", str(self.plugin_il2cpp)),
             mock.patch.object(ub, "INJECT_PORT_FILE", str(self.tmp / "bridge.port")),
+            mock.patch.object(ub, "INJECT_LOG", str(self.tmp / "Macro2kBridge.log")),
             mock.patch.object(ub, "_pe_arch", return_value="x64"),
         ):
             patcher.start()
@@ -244,6 +245,26 @@ class UnityBridgeDeployTests(unittest.TestCase):
         self.assertFalse(res["ok"])
         self.assertIn("did not answer", res["error"])
 
+    def test_inject_timeout_includes_only_errors_from_the_current_attempt(self):
+        Path(ub.INJECT_LOG).write_text(
+            "12:00:00.000 [Error] stale failure\n", encoding="utf-8"
+        )
+        ok = mock.Mock(returncode=0, stdout="ok\n", stderr="")
+
+        def run(*args, **kwargs):
+            with open(ub.INJECT_LOG, "a", encoding="utf-8") as fh:
+                fh.write("12:00:01.000 [Info] Macro2kBridge loading\n")
+                fh.write("12:00:01.100 [Error] IL2CPP API is unavailable\n")
+            return ok
+
+        with mock.patch.object(ub.subprocess, "run", side_effect=run), \
+                mock.patch.object(ub, "ping", return_value=None):
+            res = ub.inject(4242, il2cpp=True, wait=0.01)
+
+        self.assertFalse(res["ok"])
+        self.assertIn("IL2CPP API is unavailable", res["error"])
+        self.assertNotIn("stale failure", res["error"])
+
     def test_inject_writes_the_port_file(self):
         ok = mock.Mock(returncode=0, stdout="ok\n", stderr="")
         with mock.patch.object(ub.subprocess, "run", return_value=ok), \
@@ -251,6 +272,29 @@ class UnityBridgeDeployTests(unittest.TestCase):
             res = ub.inject(1, il2cpp=False, port=17821)
         self.assertTrue(res["ok"])
         self.assertEqual((self.tmp / "bridge.port").read_text(), "17821")
+
+    def test_launch_injected_returns_the_created_process_id(self):
+        game = self._game(il2cpp=True)
+        completed = mock.Mock(returncode=0, stdout="ok 2468\n", stderr="")
+        with mock.patch.object(ub.subprocess, "run", return_value=completed) as run:
+            res = ub.launch_injected(str(game / "Game.exe"), "--server test", port=17822)
+
+        self.assertEqual(res, {"ok": True, "pid": 2468})
+        self.assertEqual(
+            run.call_args.args[0],
+            [str(self.injector), "launchlibrary", str(game / "Game.exe"),
+             str(self.plugin_il2cpp), "--server test"],
+        )
+        self.assertEqual((self.tmp / "bridge.port").read_text(), "17822")
+
+    def test_launch_injected_reports_injector_failure(self):
+        game = self._game(il2cpp=True)
+        completed = mock.Mock(returncode=1, stdout="err CreateProcess failed: denied\n", stderr="")
+        with mock.patch.object(ub.subprocess, "run", return_value=completed):
+            res = ub.launch_injected(str(game / "Game.exe"))
+
+        self.assertFalse(res["ok"])
+        self.assertIn("CreateProcess failed: denied", res["error"])
 
 
 if __name__ == "__main__":

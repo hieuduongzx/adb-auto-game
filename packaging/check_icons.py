@@ -48,7 +48,7 @@ ICONS_CSS = WEB / "shared" / "icons.css"
 CLEAN_APPS = ("hub", "runner")
 
 LEGACY = {
-    "wf/index.html": 67,
+    "wf/index.html": 17,
     "wf/js/render.js": 12,
     "wf/js/inspector.js": 9,
     "wf/js/io.js": 2,

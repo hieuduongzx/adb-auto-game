@@ -151,8 +151,8 @@ input { caret-color: var(--accent); text-align: center; }
    the destructive state remains unmistakable. See setPrimary() in runner.js. */
 .btn-start { flex: 1 1 220px; height: 36px; background: var(--ok); color: var(--on-ok); border-color: var(--ok); font-size: var(--t-title); font-weight: 700; }
 .btn-start:hover:not(:disabled), .btn-start:active:not(:disabled) { background: var(--ok-hover); border-color: var(--ok-hover); color: var(--on-ok); }
-.btn-start.is-stop { background: var(--runner-stop); color: var(--on-err); border-color: var(--runner-stop); }
-.btn-start.is-stop:hover:not(:disabled), .btn-start.is-stop:active:not(:disabled) { background: var(--runner-stop-hover); border-color: var(--runner-stop-hover); color: var(--on-err); }
+.btn-start.is-stop { background: var(--runner-stop); color: var(--on-fixed); border-color: var(--runner-stop); }
+.btn-start.is-stop:hover:not(:disabled), .btn-start.is-stop:active:not(:disabled) { background: var(--runner-stop-hover); border-color: var(--runner-stop-hover); color: var(--on-fixed); }
 .header-btns .btn:disabled { opacity: 1; background: var(--alt); border-color: var(--border); color: var(--muted); }
 .btn-pause { flex: 0 1 110px; background: var(--panel); color: var(--dim); border-color: var(--border2); }
 .btn-pause:hover:not(:disabled) { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-bd); }

@@ -780,6 +780,39 @@ class Win32Controller:
         except Exception:
             return False
 
+    def kill_process(self, tree: bool = True) -> Optional[bool]:
+        """Force-terminate the process owning the target window (``taskkill /F``).
+
+        ``close_window`` only posts WM_CLOSE, which a hung program (or one that
+        raises a "Save changes?" box) ignores. Returns ``True`` when the process
+        was killed, ``None`` when there is no target window to kill and ``False``
+        on failure. Never touches this app's own process or the System PID.
+        """
+        if not self.window_exists():
+            return None
+        try:
+            pid = int(self._w[5].GetWindowThreadProcessId(self.hwnd)[1])
+        except Exception as exc:
+            log_warning(f"[win32] kill: could not read the window's process: {exc}")
+            return False
+        if pid <= 4 or pid == os.getpid():
+            log_warning(f"[win32] kill: refusing to terminate PID {pid}")
+            return False
+        cmd = ["taskkill", "/PID", str(pid), "/F"] + (["/T"] if tree else [])
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=15,
+                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
+        except Exception as exc:
+            log_warning(f"[win32] kill PID {pid} failed: {exc}")
+            return False
+        if res.returncode != 0:
+            log_warning(f"[win32] kill PID {pid} failed: "
+                        f"{((res.stderr or res.stdout) or '').strip() or res.returncode}")
+            return False
+        self._held_keys.clear()
+        self.hwnd = None
+        return True
+
     def _get_window_rect(self) -> Optional[Tuple[int, int, int, int]]:
         """Return (left, top, right, bottom) in screen coordinates, or None."""
         if not self.hwnd:

@@ -9,6 +9,7 @@ using System.Text;
 
 // Macro2kInjector inject <pid> <assembly.dll> <namespace> <class> <method>
 // Macro2kInjector loadlibrary <pid> <native.dll>
+// Macro2kInjector launchlibrary <exe> <native.dll> <arguments>
 //
 // Prints one line: "ok" or "err <message>". Exit code 0 on success.
 //
@@ -42,8 +43,16 @@ internal static class Program
                 Console.WriteLine(result == null ? "ok" : "err " + result);
                 return result == null ? 0 : 1;
             }
+            if (args.Length == 4 && args[0] == "launchlibrary")
+            {
+                int pid;
+                string result = Injector.LaunchWithLibrary(args[1], args[2], args[3], out pid);
+                Console.WriteLine(result == null ? "ok " + pid : "err " + result);
+                return result == null ? 0 : 1;
+            }
             Console.WriteLine("err usage: Macro2kInjector inject <pid> <assembly.dll> <namespace> <class> <method>"
-                              + " | Macro2kInjector loadlibrary <pid> <native.dll>");
+                              + " | Macro2kInjector loadlibrary <pid> <native.dll>"
+                              + " | Macro2kInjector launchlibrary <exe> <native.dll> <arguments>");
             return 2;
         }
         catch (Exception e)
@@ -67,21 +76,72 @@ internal static class Injector
     private const int SlotRoot = 0, SlotThread = 8, SlotImage = 16, SlotAssembly = 24, SlotImage2 = 32,
         SlotClass = 40, SlotMethod = 48, SlotExc = 56, SlotStatus = 64, DataSize = 128;
 
-    /// <summary>Classic CreateRemoteThread(LoadLibraryW) injection of a native DLL (IL2CPP games).</summary>
+    public static string LaunchWithLibrary(string exePath, string dllPath, string arguments, out int pid)
+    {
+        pid = 0;
+        exePath = Path.GetFullPath(exePath);
+        if (!File.Exists(exePath)) return "executable not found: " + exePath;
+        dllPath = Path.GetFullPath(dllPath);
+        if (!File.Exists(dllPath)) return "DLL not found: " + dllPath;
+
+        var startup = new NativeMethods.STARTUPINFO();
+        startup.cb = Marshal.SizeOf(typeof(NativeMethods.STARTUPINFO));
+        NativeMethods.PROCESS_INFORMATION process;
+        string commandLine = QuoteArgument(exePath) + (string.IsNullOrWhiteSpace(arguments) ? "" : " " + arguments);
+        var command = new StringBuilder(commandLine);
+        if (!NativeMethods.CreateProcess(exePath, command, IntPtr.Zero, IntPtr.Zero, false,
+                NativeMethods.CREATE_SUSPENDED, IntPtr.Zero, Path.GetDirectoryName(exePath),
+                ref startup, out process))
+            return "CreateProcess failed: " + new Win32Exception().Message;
+
+        pid = unchecked((int)process.dwProcessId);
+        try
+        {
+            string error = LoadLibraryInto(pid, dllPath);
+            if (error != null)
+            {
+                NativeMethods.TerminateProcess(process.hProcess, 1);
+                pid = 0;
+                return error;
+            }
+            if (NativeMethods.ResumeThread(process.hThread) == uint.MaxValue)
+            {
+                string errorText = "ResumeThread failed: " + new Win32Exception().Message;
+                NativeMethods.TerminateProcess(process.hProcess, 1);
+                pid = 0;
+                return errorText;
+            }
+            return null;
+        }
+        finally
+        {
+            NativeMethods.CloseHandle(process.hThread);
+            NativeMethods.CloseHandle(process.hProcess);
+        }
+    }
+
+    private static string QuoteArgument(string value)
+    {
+        return "\"" + value.Replace("\"", "\\\"") + "\"";
+    }
+
+    /// <summary>Classic CreateRemoteThread(LoadLibraryA) injection of a native DLL (IL2CPP games).</summary>
     public static string LoadLibraryInto(int pid, string dllPath)
     {
         dllPath = Path.GetFullPath(dllPath);
         if (!File.Exists(dllPath)) return "DLL not found: " + dllPath;
 
         IntPtr kernel32 = NativeMethods.GetModuleHandle("kernel32.dll");
-        IntPtr loadLibraryW = kernel32 != IntPtr.Zero ? NativeMethods.GetProcAddress(kernel32, "LoadLibraryW") : IntPtr.Zero;
-        if (loadLibraryW == IntPtr.Zero) return "LoadLibraryW not found in kernel32.dll";
+        IntPtr loadLibraryA = kernel32 != IntPtr.Zero ? NativeMethods.GetProcAddress(kernel32, "LoadLibraryA") : IntPtr.Zero;
+        if (loadLibraryA == IntPtr.Zero) return "LoadLibraryA not found in kernel32.dll";
 
         IntPtr h = NativeMethods.OpenProcess(NativeMethods.PROCESS_ALL_ACCESS, false, pid);
         if (h == IntPtr.Zero) return "OpenProcess failed: " + new Win32Exception().Message + " (run as the same user / administrator)";
         try
         {
-            byte[] pathBytes = Encoding.Unicode.GetBytes(dllPath + "\0");
+            // Match the proven amriHook path exactly. LoadLibraryW is normally equivalent, but this
+            // game's loader accepts the ANSI remote-thread path while rejecting the wide variant.
+            byte[] pathBytes = Encoding.Default.GetBytes(dllPath + "\0");
             IntPtr pathAddr = NativeMethods.VirtualAllocEx(h, IntPtr.Zero, (UIntPtr)(uint)pathBytes.Length,
                 NativeMethods.MEM_COMMIT | NativeMethods.MEM_RESERVE, NativeMethods.PAGE_READWRITE);
             if (pathAddr == IntPtr.Zero) return "VirtualAllocEx failed: " + new Win32Exception().Message;
@@ -92,7 +152,7 @@ internal static class Injector
                     return "WriteProcessMemory failed: " + new Win32Exception().Message;
 
                 uint tid;
-                IntPtr thread = NativeMethods.CreateRemoteThread(h, IntPtr.Zero, 0, loadLibraryW, pathAddr, 0, out tid);
+                IntPtr thread = NativeMethods.CreateRemoteThread(h, IntPtr.Zero, 0, loadLibraryA, pathAddr, 0, out tid);
                 if (thread == IntPtr.Zero) return "CreateRemoteThread failed: " + new Win32Exception().Message;
                 try
                 {
@@ -100,8 +160,13 @@ internal static class Injector
                     if (wait != 0) return "LoadLibrary did not finish in 30 s (game busy?)";
                     uint exitCode;
                     NativeMethods.GetExitCodeThread(thread, out exitCode);
-                    // LoadLibraryW's return value (the loaded module handle, or 0 on failure) becomes the thread's exit code.
+                    // LoadLibraryA's return value (the loaded module handle, or 0 on failure) becomes the thread's exit code.
                     if (exitCode == 0) return "LoadLibrary failed inside the game process (bad DLL, missing dependency, or a load-time crash).";
+                    // A non-zero remote-thread exit code is not sufficient: an exception status is also non-zero,
+                    // and security software can unload a newly loaded module immediately after LoadLibrary returns.
+                    // Confirm that Windows still reports the requested DLL in the target process.
+                    string verifyError = VerifyModuleLoaded(pid, dllPath);
+                    if (verifyError != null) return verifyError + " (remote thread exit code 0x" + exitCode.ToString("X8") + ")";
                     return null;
                 }
                 finally
@@ -118,6 +183,33 @@ internal static class Injector
         {
             NativeMethods.CloseHandle(h);
         }
+    }
+
+    private static string VerifyModuleLoaded(int pid, string dllPath)
+    {
+        string expected = Path.GetFullPath(dllPath);
+        Exception lastError = null;
+        for (int attempt = 0; attempt < 10; attempt++)
+        {
+            try
+            {
+                Process process = Process.GetProcessById(pid);
+                process.Refresh();
+                foreach (ProcessModule module in process.Modules)
+                {
+                    if (string.Equals(Path.GetFullPath(module.FileName), expected, StringComparison.OrdinalIgnoreCase))
+                        return null;
+                }
+            }
+            catch (Exception e) when (e is Win32Exception || e is InvalidOperationException)
+            {
+                lastError = e;
+            }
+            System.Threading.Thread.Sleep(100);
+        }
+        if (lastError != null)
+            return "LoadLibrary returned success, but the loaded module could not be verified: " + lastError.Message;
+        return "the remote loader returned a non-zero value, but the DLL is not present in the target process";
     }
 
     public static string Inject(int pid, string dllPath, string ns, string cls, string method)
@@ -350,6 +442,26 @@ internal static class NativeMethods
     public const uint MEM_COMMIT = 0x1000, MEM_RESERVE = 0x2000, MEM_RELEASE = 0x8000;
     public const uint PAGE_READWRITE = 0x04, PAGE_EXECUTE_READWRITE = 0x40;
     public const uint DONT_RESOLVE_DLL_REFERENCES = 0x1;
+    public const uint CREATE_SUSPENDED = 0x00000004;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct STARTUPINFO
+    {
+        public int cb;
+        public string lpReserved;
+        public string lpDesktop;
+        public string lpTitle;
+        public int dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute, dwFlags;
+        public short wShowWindow, cbReserved2;
+        public IntPtr lpReserved2, hStdInput, hStdOutput, hStdError;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PROCESS_INFORMATION
+    {
+        public IntPtr hProcess, hThread;
+        public uint dwProcessId, dwThreadId;
+    }
 
     [DllImport("kernel32.dll", SetLastError = true)] public static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
     [DllImport("kernel32.dll", SetLastError = true)] public static extern bool CloseHandle(IntPtr h);
@@ -363,4 +475,11 @@ internal static class NativeMethods
     [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)] public static extern IntPtr GetProcAddress(IntPtr lib, string name);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] public static extern IntPtr GetModuleHandle(string name);
     [DllImport("kernel32.dll", SetLastError = true)] public static extern bool GetExitCodeThread(IntPtr thread, out uint exitCode);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool CreateProcess(string applicationName, StringBuilder commandLine,
+        IntPtr processAttributes, IntPtr threadAttributes, bool inheritHandles, uint creationFlags,
+        IntPtr environment, string currentDirectory, ref STARTUPINFO startupInfo,
+        out PROCESS_INFORMATION processInformation);
+    [DllImport("kernel32.dll", SetLastError = true)] public static extern uint ResumeThread(IntPtr thread);
+    [DllImport("kernel32.dll", SetLastError = true)] public static extern bool TerminateProcess(IntPtr process, uint exitCode);
 }

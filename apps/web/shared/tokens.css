@@ -64,6 +64,8 @@
   --on-accent: #ffffff;
   --on-ok: #ffffff;
   --on-err: #ffffff;
+  /* Ink on a fill that keeps its hue in both themes (Stop, group chips, category badges). */
+  --on-fixed: #ffffff;
 
   /* Type scale — seven steps, and the only sizes the suite is allowed to use.
      Bumped one step vs the original 10.5–17 range so hierarchy reads from

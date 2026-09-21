@@ -101,11 +101,13 @@ static void* (*il2cpp_resolve_icall)(const char*) = nullptr; // optional
 static bool ResolveApi(HMODULE ga)
 {
     bool ok = true;
+    static bool reportedMissing = false;
 #define RESOLVE(ret, name, args) \
     name = reinterpret_cast<decltype(name)>(GetProcAddress(ga, #name)); \
-    if (!name) { Log("Error", "GameAssembly.dll does not export " #name); ok = false; }
+    if (!name) { if (!reportedMissing) Log("Error", "GameAssembly.dll does not export " #name); ok = false; }
     IL2CPP_API(RESOLVE)
     il2cpp_resolve_icall = reinterpret_cast<decltype(il2cpp_resolve_icall)>(GetProcAddress(ga, "il2cpp_resolve_icall"));
+    if (!ok) reportedMissing = true;
     return ok;
 }
 
@@ -777,7 +779,8 @@ static DWORD g_mainThread = 0;
 static HHOOK g_hook = nullptr;
 static HMODULE g_self = nullptr;
 static SOCKET g_listen = INVALID_SOCKET;
-static bool g_inited = false, g_initFailed = false;
+static bool g_inited = false;
+static ULONGLONG g_nextInitAttempt = 0;
 
 // uGUI's StandaloneInputModule ignores input while EventSystem.isFocused is false; the field behind it
 // is forced on every tick.
@@ -880,10 +883,15 @@ static void TickInner()
 {
     if (!g_inited)
     {
-        if (!g_initFailed) { g_inited = InitIl2Cpp(); g_initFailed = !g_inited; }
-        if (g_initFailed)
+        ULONGLONG now = GetTickCount64();
+        if (now >= g_nextInitAttempt)
         {
-            while (Cmd* c = PopCommand()) c->Complete("err the IL2CPP API is unavailable (see the bridge log)");
+            g_inited = InitIl2Cpp();
+            if (!g_inited) g_nextInitAttempt = now + 500;
+        }
+        if (!g_inited)
+        {
+            while (Cmd* c = PopCommand()) c->Complete("err the IL2CPP API is unavailable; retrying (see the bridge log)");
             return;
         }
     }

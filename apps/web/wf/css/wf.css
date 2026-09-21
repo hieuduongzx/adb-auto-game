@@ -180,7 +180,7 @@
 .wf-win-target:hover { background:var(--panel); color:var(--accent); }
 .wf-win-target:focus-visible, #wf-bar-win32-matchby:focus-visible, #wf-bar-win32-mode:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 .wf-win-target #wf-bar-win32-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wf-win-target > svg { width:12px; height:12px; flex-shrink:0; fill:none; stroke:currentColor;
+.wf-win-target > svg, .wf-win-target > i > svg { width:12px; height:12px; flex-shrink:0; fill:none; stroke:currentColor;
   stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
 #wf-bar-win32-dot.configured { background:var(--cat-win32); box-shadow:none; }
 #wf-bar-win32-matchby, #wf-bar-win32-mode { height:30px; padding:0 20px 0 7px; border:0; border-radius:6px;
@@ -624,7 +624,7 @@
 
 /* ── Functions — the dock's second tab; reusable subgraphs ────────────────── */
 .wf-fn { cursor:pointer; }
-.wf-badge.fn { display:inline-flex; align-items:center; justify-content:center; color:var(--on-accent);
+.wf-badge.fn { display:inline-flex; align-items:center; justify-content:center; color:var(--on-fixed);
   background:var(--cat-logic-ink); border:none; font-size:9.5px; font-weight:800;
   padding:2px 5px; letter-spacing:.02em; border-radius:var(--r-xs); min-width:16px; }
 /* Function rows: purple tint + subtle hover */
@@ -867,7 +867,7 @@
   gap:7px; padding:28px 36px 24px; text-align:center;
   background:var(--panel); border:1px solid var(--border2); border-radius:var(--r-lg);
   box-shadow:var(--sh-md); }
-.wf-empty-card > svg { width:32px; height:32px; stroke-width:1.35; color:var(--accent); opacity:.55; margin-bottom:5px; }
+.wf-empty-card > svg, .wf-empty-card > i > svg { width:32px; height:32px; stroke-width:1.35; color:var(--accent); opacity:.55; margin-bottom:5px; }
 .wf-empty-card .t { font-size:14px; font-weight:700; color:var(--ink); }
 .wf-empty-card .s { font-size:11.5px; color:var(--dim); max-width:280px; line-height:1.6; }
 .wf-empty-card .btn { margin-top:9px; min-width:140px; }
@@ -957,7 +957,7 @@
   margin:7px 7px 0; padding:0 8px; height:30px; border-radius:var(--r-sm);
   background:var(--surface); border:1px solid var(--border); }
 .wf-qc-search:focus-within { border-color:var(--accent); }
-.wf-qc-search > svg { color:var(--muted); flex-shrink:0; }
+.wf-qc-search > svg, .wf-qc-search > i > svg { color:var(--muted); flex-shrink:0; }
 .wf-qc-search input { flex:1; min-width:0; height:100%; padding:0; border:none;
   background:none; font-family:var(--sans); font-size:11.5px; font-weight:600; color:var(--ink); }
 .wf-qc-search input:focus { outline:none; box-shadow:none; }
@@ -1094,12 +1094,12 @@
 .wf-group { position:absolute; z-index:0; border:1.5px dashed; border-radius:var(--node-r); pointer-events:none; }
 .wf-group.sel { border-style:solid; box-shadow:0 0 0 1px currentColor; }
 .wf-group-hd { position:absolute; left:-1.5px; top:-23px; max-width:280px; height:22px; display:flex; align-items:center; gap:6px;
-  padding:0 4px 0 9px; border-radius:var(--node-r); font-size:11px; font-weight:700; color:var(--on-accent);
+  padding:0 4px 0 9px; border-radius:var(--node-r); font-size:11px; font-weight:700; color:var(--on-fixed);
   pointer-events:auto; cursor:move; white-space:nowrap; }
 .wf-group-name { overflow:hidden; text-overflow:ellipsis; }
-.wf-group-del { color:var(--on-accent); opacity:.85; line-height:0; padding:2px; border-radius:var(--r-xs); flex-shrink:0; cursor:pointer; display:flex; align-items:center; }
+.wf-group-del { color:var(--on-fixed); opacity:.85; line-height:0; padding:2px; border-radius:var(--r-xs); flex-shrink:0; cursor:pointer; display:flex; align-items:center; }
 .wf-group-del svg { width:12px; height:12px; stroke-width:2.2; display:block; }
-.wf-group-del:hover { opacity:1; background:color-mix(in srgb, var(--on-accent) 25%, transparent); }
+.wf-group-del:hover { opacity:1; background:color-mix(in srgb, var(--on-fixed) 25%, transparent); }
 .wf-group-resize { position:absolute; right:-5px; bottom:-5px; width:14px; height:14px; cursor:nwse-resize; pointer-events:auto;
   border-right:2.5px solid currentColor; border-bottom:2.5px solid currentColor; border-radius:var(--node-r); opacity:.6; }
 .wf-group-resize:hover { opacity:1; }
@@ -1888,7 +1888,7 @@
 .wf-vald { width:min(480px, calc(100% - 24px)); }
 .wf-vald-bar { display:flex; align-items:center; gap:8px; padding:8px 10px;
   border-bottom:1px solid var(--line); }
-.wf-vald-bar > svg { width:14px; height:14px; stroke-width:2; color:var(--warn); flex-shrink:0; }
+.wf-vald-bar > svg, .wf-vald-bar > i > svg { width:14px; height:14px; stroke-width:2; color:var(--warn); flex-shrink:0; }
 .wf-vald-sum { font-size:12px; color:var(--dim); }
 .wf-vald-sum .e  { color:var(--err); font-weight:700; }
 .wf-vald-sum .w  { color:var(--warn); font-weight:700; }

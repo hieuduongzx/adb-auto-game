@@ -1,5 +1,5 @@
 {
-  "name": "ZZZ",
+  "name": "z",
   "version": 2,
   "templatesDir": "templates",
   "buildVersion": "1.0.0",
@@ -9,10 +9,10 @@
   "capture": "scrcpy",
   "input": "adb",
   "win32": {
-    "window": "UnityWndClass",
-    "matchBy": "class",
+    "window": "DragonTraveler.exe",
+    "matchBy": "exe",
     "inputMode": "unity_bridge",
-    "path": "D:\\HoYoPlay\\games\\ZenlessZoneZero Game\\ZenlessZoneZero.exe"
+    "path": "D:\\Games\\DragonTraveler\\client\\DragonTraveler.exe"
   },
   "emulator": {
     "kind": "ldplayer",
@@ -49,10 +49,32 @@
             "params": {}
           },
           {
-            "id": "ni3sjpgz",
+            "id": "nna4o2pn",
+            "type": "tap_random",
+            "x": 180,
+            "y": 40,
+            "params": {
+              "x1": 0,
+              "y1": 0,
+              "x2": 100,
+              "y2": 100
+            }
+          },
+          {
+            "id": "nqe38xsk",
+            "type": "loop",
+            "x": 200,
+            "y": 200,
+            "params": {
+              "infinite": true,
+              "count": 3
+            }
+          },
+          {
+            "id": "ndnpwrx8",
             "type": "win_launch",
-            "x": 140,
-            "y": 50,
+            "x": 220,
+            "y": -60,
             "params": {
               "pathSrc": "project",
               "path": "",
@@ -65,9 +87,20 @@
         ],
         "edges": [
           {
+            "from": "nqe38xsk",
+            "fromPort": "body",
+            "to": "nna4o2pn"
+          },
+          {
+            "from": "nna4o2pn",
+            "fromPort": "out",
+            "to": "nqe38xsk",
+            "toPort": "loop"
+          },
+          {
             "from": "nstart",
             "fromPort": "out",
-            "to": "ni3sjpgz"
+            "to": "ndnpwrx8"
           }
         ],
         "groups": []

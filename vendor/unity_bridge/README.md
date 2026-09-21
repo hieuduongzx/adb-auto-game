@@ -13,7 +13,7 @@ protocol; Macro2k picks the right one from the game folder (`GameAssembly.dll` /
 | Game backend | Injection | Plugin |
 |---|---|---|
 | Mono | managed DLL, via the game's own Mono runtime (`Macro2kInjector.exe inject`) | `plugin_inject/Macro2kBridge.Inject.dll` |
-| IL2CPP | native DLL, `LoadLibraryW` (`Macro2kInjector.exe loadlibrary`) | `plugin_il2cpp/Macro2kBridge.Il2Cpp.dll` |
+| IL2CPP | native DLL, `LoadLibraryA` (`Macro2kInjector.exe loadlibrary`) | `plugin_il2cpp/Macro2kBridge.Il2Cpp.dll` |
 
 ```
 vendor/unity_bridge/
@@ -60,6 +60,7 @@ no embedded runtime.
 ```
 Macro2kInjector.exe inject <pid> <assembly.dll> <namespace> <class> <method>   -> "ok" | "err <message>"
 Macro2kInjector.exe loadlibrary <pid> <native.dll>                             -> "ok" | "err <message>"
+Macro2kInjector.exe launchlibrary <exe> <native.dll> <arguments>               -> "ok <pid>" | "err <message>"
 ```
 
 `inject` (Mono): resolves the game's already-loaded `mono-2.0-*.dll` exports (read
@@ -75,12 +76,17 @@ on that remote thread, not Unity's main thread, so it hooks
 and the Camera callbacks are stripped from Unity 6 games) to reach the main
 thread and create the bridge's `GameObject` there.
 
-`loadlibrary` (IL2CPP): the classic `CreateRemoteThread(LoadLibraryW)` injection
+`loadlibrary` (IL2CPP): the classic `CreateRemoteThread(LoadLibraryA)` injection
 of a native DLL. `bridge.cpp`'s `DllMain` does the rest: it resolves the
 `il2cpp_*` exports from `GameAssembly.dll`, waits for the game's `UnityWndClass`
 window, and installs a `WH_GETMESSAGE` hook on the main thread (a background
 thread keeps posting `WM_NULL` so the hook fires every frame even when the
 window doesn't otherwise get messages).
+
+`launchlibrary` starts the game suspended, injects the IL2CPP DLL, then resumes
+the main thread. The **Launch program** workflow node exposes this as **Inject
+Unity Bridge before startup** for games that only accept injection before their
+startup protection is initialized.
 
 Both modes: Macro2k injects automatically when a `unity_bridge` workflow attaches
 to the game (`Win32Controller._inject_bridge` → `unity_bridge.ensure_injected`)

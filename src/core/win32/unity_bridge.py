@@ -179,7 +179,7 @@ def _run_injector(args: List[str]) -> dict:
     return {"ok": True}
 
 
-def inject(pid: int, il2cpp: bool, port: int = DEFAULT_PORT, wait: float = 10.0) -> dict:
+def inject(pid: int, il2cpp: bool, port: int = DEFAULT_PORT, wait: float = 15.0) -> dict:
     """Load the bridge DLL into a running game and wait until it answers ping.
 
     Returns {"ok": True, "reply": ...} or {"ok": False, "error": ...}."""
@@ -192,6 +192,10 @@ def inject(pid: int, il2cpp: bool, port: int = DEFAULT_PORT, wait: float = 10.0)
             fh.write(str(int(port)))
     except OSError:
         pass
+    try:
+        log_offset = os.path.getsize(INJECT_LOG)
+    except OSError:
+        log_offset = 0
     if il2cpp:
         res = _run_injector(["loadlibrary", str(int(pid)), plugin_dll])
     else:
@@ -205,7 +209,46 @@ def inject(pid: int, il2cpp: bool, port: int = DEFAULT_PORT, wait: float = 10.0)
         if reply and reply.startswith("ok"):
             return {"ok": True, "reply": reply}
         time.sleep(0.25)
-    return {"ok": False, "error": f"The DLL was loaded but the bridge did not answer on port {port}. See {INJECT_LOG}."}
+    detail = ""
+    try:
+        with open(INJECT_LOG, "r", encoding="utf-8", errors="replace") as fh:
+            fh.seek(log_offset)
+            errors = [line.strip() for line in fh if "[Error]" in line]
+        if errors:
+            detail = " Bridge error: " + errors[-1]
+    except OSError:
+        pass
+    return {"ok": False, "error": f"The DLL was loaded but the bridge did not answer on port {port}.{detail} See {INJECT_LOG}."}
+
+
+def launch_injected(exe_path: str, arguments: str = "", port: int = DEFAULT_PORT) -> dict:
+    """Launch an IL2CPP game suspended, inject the native bridge, then resume it."""
+    for path, what in ((INJECTOR_EXE, "injector"), (PLUGIN_DLL_IL2CPP, "plugin"),
+                       (exe_path, "game executable")):
+        if not os.path.isfile(path):
+            return {"ok": False, "error": f"The Unity Bridge {what} is missing ({path})."}
+    try:
+        with open(INJECT_PORT_FILE, "w", encoding="ascii") as fh:
+            fh.write(str(int(port)))
+    except OSError:
+        pass
+    try:
+        proc = subprocess.run(
+            [INJECTOR_EXE, "launchlibrary", exe_path, PLUGIN_DLL_IL2CPP, arguments or ""],
+            capture_output=True, text=True, timeout=60,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"ok": False, "error": f"Cannot run the injector: {exc}"}
+    line = (proc.stdout or "").strip().splitlines()[-1:] or [""]
+    if proc.returncode != 0 or not line[0].startswith("ok "):
+        detail = line[0][4:] if line[0].startswith("err ") else (proc.stderr or line[0] or "unknown error").strip()
+        return {"ok": False, "error": f"Launch with Unity Bridge failed: {detail}. See {INJECT_LOG}."}
+    try:
+        pid = int(line[0].split(None, 1)[1])
+    except (IndexError, ValueError):
+        return {"ok": False, "error": f"Injector returned an invalid process id: {line[0]}"}
+    return {"ok": True, "pid": pid}
 
 
 def ensure_injected(exe_path: str, port: int = DEFAULT_PORT, pid: Optional[int] = None) -> dict:
