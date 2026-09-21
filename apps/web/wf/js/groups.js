@@ -100,12 +100,14 @@ function wfRenderGroups(){
   });
 }
 function wfStartGroupMove(e,gr){
+  if(wfGesture?.mode==="connect") return;
   if(e.button!==0 || e.target.closest(".wf-group-del")) return;
   e.stopPropagation();
   const members=wfNodesInGroup(gr).map(n=>({id:n.id, ox:n.x, oy:n.y}));
   wfGesture={mode:"groupmove", gr, gx:gr.x, gy:gr.y, sx:e.clientX, sy:e.clientY, members};
 }
 function wfStartGroupResize(e,gr){
+  if(wfGesture?.mode==="connect") return;
   if(e.button!==0) return; e.stopPropagation();
   wfGesture={mode:"groupresize", gr, ow:gr.w, oh:gr.h, sx:e.clientX, sy:e.clientY};
 }
@@ -206,6 +208,7 @@ function wfShowAlignGuides(dragId, al, portSnapped){
 }
 
 function wfStartMove(e,n){
+  if(wfGesture?.mode==="connect") return;
   if(e.button!==0||e.target.closest(".wf-port,.wf-node-eye")) return;
   e.stopPropagation();
   if(e.shiftKey||e.ctrlKey){ wfToggleSel(n.id); wfMarkSel(); wfRenderInspector(); return; }
@@ -220,10 +223,31 @@ function wfStartMove(e,n){
   const items=ids.map(id=>{ const nn=g.nodes.find(x=>x.id===id); return nn?{id,ox:nn.x,oy:nn.y}:null; }).filter(Boolean);
   wfGesture={mode:"move",items,sx:e.clientX,sy:e.clientY,dragId:n.id};
 }
-function wfStartConnect(e,nodeId,port){
+function wfCancelConnect(){
+  if(wfGesture?.mode!=="connect" && !wfGesture?.connection) return false;
+  wfGesture=null;
+  wfClearTemp(); wfHighlightTarget(null);
+  $("wf-canvas").classList.remove("wf-connecting", "panning");
+  return true;
+}
+function wfStartConnect(e,nodeId,port,direction="out"){
   if(e.button!==0) return; e.stopPropagation(); e.preventDefault();
-  wfGesture={mode:"connect",from:nodeId,port};
-  $("wf-canvas").classList.add("wf-connecting");   // let drops land on nodes, not wires
+  if(wfGesture?.mode==="connect"){
+    const s=wfGesture, g=wfGraph();
+    if(!g || s.graph!==g){ wfCancelConnect(); return; }
+    if(s.direction===direction || s.from===nodeId) return;
+    const edge=s.direction==="in"
+      ? {from:nodeId,fromPort:port,to:s.from,toPort:s.port}
+      : {from:s.from,fromPort:s.port,to:nodeId,toPort:port};
+    wfPushUndo();
+    g.edges=g.edges.filter(ed=>!(ed.from===edge.from && ed.fromPort===edge.fromPort));
+    g.edges.push(edge);
+    wfCancelConnect(); wfRenderCanvas();
+    return;
+  }
+  wfGesture={mode:"connect",from:nodeId,port,direction,graph:wfGraph(),sx:e.clientX,sy:e.clientY};
+  $("wf-canvas").classList.add("wf-connecting");
+  wfDrawTempWire(e.clientX,e.clientY);
 }
 // Loose connect: the drop only has to land *anywhere on the target node*, not
 // exactly on its input dot. The node under the pointer becomes the target.
@@ -662,10 +686,11 @@ function wfCanvasMouseDown(e){
     if(wfSpace) wfSpaceUsed=true;   // a Space+drag pan, not a tap: no zoom reset on release
     wfCancelCamAnim();   // direct manipulation beats any camera tween in flight
     $("wf-canvas").classList.add("panning");
-    wfGesture={mode:"pan",sx:e.clientX,sy:e.clientY,ox:wfPan.x,oy:wfPan.y};
+    const connection=wfGesture?.mode==="connect" ? wfGesture : null;
+    wfGesture={mode:"pan",sx:e.clientX,sy:e.clientY,ox:wfPan.x,oy:wfPan.y,connection};
     return;
   }
-  if(e.button!==0) return;
+  if(e.button!==0 || wfGesture?.mode==="connect") return;
   const wr=$("wf-world").getBoundingClientRect();
   // Group-draw mode: left-drag on empty canvas draws a new group rectangle.
   if(wfGroupMode){
@@ -1036,6 +1061,9 @@ function wfInitCanvas(){
   canvas.addEventListener("mousemove",e=>{ wfPointer.x=e.clientX; wfPointer.y=e.clientY; wfPointer.inside=true; });
   canvas.addEventListener("mouseleave",()=>{ wfPointer.inside=false; });
   canvas.addEventListener("contextmenu",e=>{
+    if(wfCancelConnect()){ e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+  canvas.addEventListener("contextmenu",e=>{
     // Preview tab owns its own right-click (tap device); skip the graph menu.
     if(wfPvActive) return;
     e.preventDefault();
@@ -1224,7 +1252,10 @@ function wfInitCanvas(){
       wfPan.y=wfGesture.oy+(e.clientY-wfGesture.sy);
       wfWorldMotionHint();
       wfApplyTransform();
+      if(wfGesture.connection) wfDrawTempWire(e.clientX,e.clientY);
     } else if(wfGesture.mode==="connect"){
+      if(wfGesture.graph!==wfGraph()){ wfCancelConnect(); return; }
+      if(Math.hypot(e.clientX-wfGesture.sx,e.clientY-wfGesture.sy)>4) wfGesture.dragged=true;
       wfDrawTempWire(e.clientX,e.clientY);
       const tid=wfNodeUnderPointer(e.clientX,e.clientY);
       wfHighlightTarget(tid && tid!==wfGesture.from ? tid : null);
@@ -1233,10 +1264,22 @@ function wfInitCanvas(){
   document.addEventListener("mouseup",e=>{
     if(!wfGesture) return;
     if(wfGesture.mode==="connect"){
+      if(e.button!==0) return;
+      if(wfGesture.graph!==wfGraph()){ wfCancelConnect(); return; }
+      if(wfGesture.latched || (!wfGesture.dragged && Math.hypot(e.clientX-wfGesture.sx,e.clientY-wfGesture.sy)<=4)){
+        wfGesture.latched=true;
+        return;
+      }
+      if(wfGesture.direction==="in"){
+        const p=document.elementFromPoint(e.clientX,e.clientY)?.closest(".wf-port.out");
+        if(p) wfStartConnect(e,p.closest(".wf-node").dataset.node,p.dataset.port,"out");
+        if(wfGesture) wfCancelConnect();
+        return;
+      }
       const tid=wfNodeUnderPointer(e.clientX,e.clientY);
       // Snapshot before mutating the graph so Ctrl+Z removes the new wire
       // instead of recording the already-connected state.
-      if(tid) wfPushUndo();
+      if(tid && tid!==wfGesture.from) wfPushUndo();
       const connected = tid ? wfConnectTo(tid, e.clientX, e.clientY) : false;
       wfClearTemp(); wfHighlightTarget(null);
       // A new wire changes which nodes are "wired in" → rebuild so the warning
@@ -1268,6 +1311,11 @@ function wfInitCanvas(){
       if(moved) wfPushUndo();  // plain move — push before the final render
     } else if(wfGesture.mode==="pan"){
       $("wf-canvas").classList.remove("panning");
+      if(wfGesture.connection){
+        wfGesture=wfGesture.connection;
+        wfDrawTempWire(e.clientX,e.clientY);
+        return;
+      }
     }
     $("wf-canvas").classList.remove("wf-connecting");
     wfGesture=null;

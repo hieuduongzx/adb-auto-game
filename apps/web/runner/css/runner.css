@@ -1,17 +1,14 @@
 /* Macro2k Runner — calm, compact operator console.
    Loaded after ../shared/base.css; only app-specific rules live here. */
 
-/* Runner-only control inks: solid buttons retain contrast in both themes. */
+/* Runner-only control inks. Start uses the shared soft success palette; Stop
+   stays solid because it is the destructive action during a live run. */
 :root {
-  --runner-start: #197346;
-  --runner-start-hover: #125d38;
   --runner-stop: #b33332;
   --runner-stop-hover: #942827;
   --runner-selected-ink: #2459a5;
 }
 :root[data-theme="dark"] {
-  --runner-start: #227c4e;
-  --runner-start-hover: #298858;
   --runner-selected-ink: #a9caff;
   --muted: #a0adbf;
   --log-muted: #a0adbf;
@@ -133,10 +130,10 @@ input { caret-color: var(--accent); text-align: center; }
 /* Control buttons */
 .header-btns { display: flex; align-items: center; gap: var(--s3); }
 .header-btns .btn { height: 40px; font-size: var(--t-title); padding: 0 var(--s5); border-radius: var(--r-md); }
-/* One primary button, green while it means Start and red once it means Stop —
-   see setPrimary() in runner.js. */
-.btn-start { flex: 2; background: var(--runner-start); color: var(--on-ok); border-color: var(--runner-start); font-size: var(--t-title); font-weight: 700; border-radius: var(--r-md); }
-.btn-start:hover:not(:disabled), .btn-start:active:not(:disabled) { background: var(--runner-start-hover); border-color: var(--runner-start-hover); color: var(--on-ok); }
+/* One primary button: Start is a quiet success tint; Stop becomes solid red so
+   the destructive state remains unmistakable. See setPrimary() in runner.js. */
+.btn-start { flex: 2; background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-bd); font-size: var(--t-title); font-weight: 700; border-radius: var(--r-md); }
+.btn-start:hover:not(:disabled), .btn-start:active:not(:disabled) { background: color-mix(in srgb, var(--ok-bg) 76%, var(--ok-bd)); border-color: var(--ok); color: var(--ok-ink); }
 .btn-start.is-stop { background: var(--runner-stop); color: var(--on-err); border-color: var(--runner-stop); }
 .btn-start.is-stop:hover:not(:disabled), .btn-start.is-stop:active:not(:disabled) { background: var(--runner-stop-hover); border-color: var(--runner-stop-hover); color: var(--on-err); }
 .header-btns .btn:disabled { opacity: 1; background: var(--alt); border-color: var(--border); color: var(--muted); }
@@ -232,9 +229,9 @@ input { caret-color: var(--accent); text-align: center; }
    The rules below cover layout and colour only. */
 .task-btns { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 .btn-icon { width: 28px; height: 28px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; transition: background .12s, color .12s; }
-.btn-gear { color: var(--dim); background: var(--surface); border: 1px solid var(--border); }
-.btn-gear.active { color: var(--runner-selected-ink); background: var(--accent-bg); border-color: var(--accent-bd); }
-.btn-gear:hover { background: var(--alt); color: var(--dim); }
+.btn-gear { color: var(--dim); background: transparent; border: 1px solid transparent; }
+.btn-gear.active { color: var(--runner-selected-ink); background: var(--accent-bg); border-color: transparent; }
+.btn-gear:hover { background: var(--alt); color: var(--ink); border-color: transparent; }
 /* Per-activity Run — ok-green like Start, quiet until the row is pointed at. */
 .btn-run-one { color: var(--muted); }
 .task-row:hover .btn-run-one:not(:disabled), .btn-run-one:focus-visible { color: var(--ok); }

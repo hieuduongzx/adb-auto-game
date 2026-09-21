@@ -6094,6 +6094,23 @@
               "fn": "fn_yt9m6"
             },
             "delayBefore": 1
+          },
+          {
+            "id": "naz6fh8j",
+            "type": "resize_emulator",
+            "x": 220,
+            "y": 440,
+            "params": {
+              "emulator": "selected",
+              "index": 0,
+              "pathSrc": "project",
+              "path": "",
+              "width": 1920,
+              "height": 1080,
+              "x": 0,
+              "y": 0
+            },
+            "delayBefore": 1
           }
         ],
         "edges": [

@@ -1520,6 +1520,8 @@ function wfApplyTransform(){
   w.style.transform = wfZoom===1 ? "none" : `scale(${wfZoom})`;
   wfSyncGrid();
   wfSyncLod();
+  const connection=wfGesture?.connection || (wfGesture?.mode==="connect" ? wfGesture : null);
+  if(connection && Number.isFinite(connection.mx)) wfDrawTempWire(connection.mx,connection.my);
   if(typeof wfMinimapQueue==="function") wfMinimapQueue();
   const lbl=$("wf-zoom-lbl"); if(lbl) lbl.textContent=Math.round(wfZoom*100)+"%";
   wfSyncZoomBadge();

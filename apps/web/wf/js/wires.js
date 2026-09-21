@@ -318,13 +318,16 @@ function wfDeleteWire(ed){
 }
 
 function wfDrawTempWire(mx,my){
-  const a=wfPortPt(wfGesture.from,wfGesture.port); if(!a) return;
+  const s=wfGesture?.connection || wfGesture;
+  if(!s || s.mode!=="connect") return;
+  s.mx=mx; s.my=my;
+  const a=wfPortPt(s.from,s.port); if(!a) return;
   const wr=$("wf-world").getBoundingClientRect();
   const b={ x:(mx-wr.left)/wfZoom, y:(my-wr.top)/wfZoom };
   const svg=$("wf-wires"); let t=svg.querySelector(".temp");
   if(!t){ t=document.createElementNS(WF_NS,"path"); t.setAttribute("class","temp"); svg.appendChild(t); }
   if(!wfWireIdx.ports.size) wfWireIndexRebuild();
-  t.setAttribute("d",wfWirePath(a,b));
+  t.setAttribute("d",s.direction==="in" ? wfWirePath(b,a) : wfWirePath(a,b));
 }
 
 function wfClearTemp(){ const t=$("wf-wires").querySelector(".temp"); if(t)t.remove(); }

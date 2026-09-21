@@ -2,6 +2,7 @@
 let wfNudging=false;
 window.addEventListener("keydown", e => {
   const typing = e.target && (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable);
+  if(e.key==="Escape" && typeof wfCancelConnect==="function" && wfCancelConnect()){ e.preventDefault(); return; }
   // F1 (or ? outside an input) — shortcuts sheet.
   if(e.key==="F1" || (e.key==="?" && !typing)){ e.preventDefault(); if(typeof uiShowShortcuts==="function") uiShowShortcuts(); return; }
   if((e.key==="s"||e.key==="S") && (e.ctrlKey||e.metaKey)){

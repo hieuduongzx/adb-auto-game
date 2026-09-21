@@ -1196,7 +1196,7 @@ function wfNodeEl(n){
   if(actEye){ actEye.addEventListener("mousedown",e=>e.stopPropagation()); actEye.addEventListener("click",e=>{ e.stopPropagation(); wfPushUndoDebounced(); n.showPreview=!n.showPreview; wfRenderCanvas(); }); }
   const actCopy=el.querySelector(".wf-act-copy");
   if(actCopy){ actCopy.addEventListener("mousedown",e=>e.stopPropagation()); actCopy.addEventListener("click",e=>{ e.stopPropagation(); wfSelectOne(n.id); wfMarkSel(); wfCopy(); wfPaste({clientX:e.clientX+20,clientY:e.clientY+20}); }); }
-  el.querySelectorAll(".wf-port.out").forEach(p=>p.addEventListener("mousedown",e=>wfStartConnect(e,n.id,p.dataset.port)));
+  el.querySelectorAll(".wf-port").forEach(p=>p.addEventListener("mousedown",e=>wfStartConnect(e,n.id,p.dataset.port,p.classList.contains("in")?"in":"out")));
   // Connection completion is handled globally (drop anywhere on a node = connect).
   return el;
 }
