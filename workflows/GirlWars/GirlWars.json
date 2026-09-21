@@ -6075,23 +6075,23 @@
             "delayBefore": 1
           },
           {
-            "id": "nyl7y97k",
-            "type": "stop_sequence",
-            "x": 3840,
-            "y": 320,
+            "id": "nt1vhud2",
+            "type": "set_var",
+            "x": 3640,
+            "y": 400,
             "params": {
-              "sequenceId": "main"
+              "name": "pinnacle_crystal.done",
+              "value": "true"
             },
             "delayBefore": 1
           },
           {
-            "id": "nt1vhud2",
-            "type": "set_var",
-            "x": 3640,
-            "y": 320,
+            "id": "n6t0kzpb",
+            "type": "call",
+            "x": 3860,
+            "y": 400,
             "params": {
-              "name": "pinnacle_crystal.done",
-              "value": "true"
+              "fn": "fn_yt9m6"
             },
             "delayBefore": 1
           }
@@ -6583,7 +6583,12 @@
           {
             "from": "nt1vhud2",
             "fromPort": "out",
-            "to": "nyl7y97k"
+            "to": "n6t0kzpb"
+          },
+          {
+            "from": "n6t0kzpb",
+            "fromPort": "true",
+            "to": "nt1m0dej"
           }
         ],
         "groups": []
