@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Macro2kInjector - loads a managed DLL into a running Mono Unity game (x64) by calling the
+    game's own Mono embedding API from a remote thread, then invokes one static method.
+    Runs on the .NET Framework that ships with Windows, so nothing has to be installed.
+    Build:  dotnet build -c Release  (output is copied to vendor/unity_bridge/injector)
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>Macro2kInjector</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Version>1.0.0</Version>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <VendorInjectorDir>$(MSBuildThisFileDirectory)..\..\injector</VendorInjectorDir>
+  </PropertyGroup>
+
+  <Target Name="CopyToVendor" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(VendorInjectorDir)" />
+  </Target>
+</Project>

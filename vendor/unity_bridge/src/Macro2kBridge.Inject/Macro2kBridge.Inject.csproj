@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Macro2k Unity Bridge - standalone build for Mono Unity games where BepInEx cannot run
+    (stripped Unity 6 runtime). No BepInEx and no Harmony: Macro2k injects the DLL into the
+    running game with Macro2kInjector, which calls Macro2k.UnityBridge.Inject.Loader.Load().
+    Same protocol as the IL2CPP plugin.
+    Build:  dotnet build -c Release  (output is copied to vendor/unity_bridge/plugin_inject)
+    Compiled against the game's own mscorlib/System/UnityEngine (no framework reference
+    assemblies), so the compiler rejects every API its stripping removed:
+      dotnet build -c Release -p:UnityManagedDir="D:\Game\Game_Data\Managed"
+  -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>Macro2kBridge.Inject</AssemblyName>
+    <RootNamespace>Macro2k.UnityBridge</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Version>1.1.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoStdLib>true</NoStdLib>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <NoConfig>true</NoConfig>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <UnityManagedDir Condition="'$(UnityManagedDir)' == ''">D:\Programs\Steam\steamapps\common\StarSavior\Data\Managed</UnityManagedDir>
+    <VendorPluginDir>$(MSBuildThisFileDirectory)..\..\plugin_inject</VendorPluginDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="mscorlib">
+      <HintPath>$(UnityManagedDir)\mscorlib.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System">
+      <HintPath>$(UnityManagedDir)\System.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Core">
+      <HintPath>$(UnityManagedDir)\System.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(UnityManagedDir)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(UnityManagedDir)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(UnityManagedDir)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(UnityManagedDir)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="CopyToVendor" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(VendorPluginDir)" />
+  </Target>
+</Project>
