@@ -21,9 +21,9 @@
 <div id="toolbar">
   <div class="tb-zone tb-left">
     <div class="tb-tray tb-tray-doc">
-      <button class="btn ico" onclick="wfNew()" title="New — create an empty workflow">
+      <button class="btn ico" onclick="wfNew()" title="New - create an empty workflow">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></button>
-      <button class="btn ico" onclick="wfImport()" title="Open… — workflow from JSON file">
+      <button class="btn ico" onclick="wfImport()" title="Open… - workflow from JSON file">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></button>
       <span class="tb-tray-sep"></span>
       <!-- Save is a ghost icon, not a second filled button: Test run is the one
@@ -31,7 +31,7 @@
            the amber dot on this button — without shouting all the time. -->
       <button class="btn ico" id="wf-save-btn" onclick="wfSave()" title="Save to the current file (Ctrl+S)">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg></button>
-      <button class="btn ico" onclick="wfExport()" title="Export workflow — new JSON file">
+      <button class="btn ico" onclick="wfExport()" title="Export workflow - new JSON file">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg></button>
       <span class="tb-tray-sep"></span>
       <button class="btn ico" id="wf-undo-btn" onclick="wfUndo()" title="Undo (Ctrl+Z)">
@@ -40,8 +40,8 @@
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></svg></button>
     </div>
     <!-- Project identity: gear + name as one tray. -->
-    <div class="wf-title-tray" title="Project — click the gear for package / ADB / OCR settings">
-      <button type="button" class="btn sm ico" id="wf-proj-settings" onclick="wfOpenProjectSettings()" title="Project settings — package, ADB/Win32, OCR model…" aria-label="Project settings">
+    <div class="wf-title-tray" title="Project - click the gear for package / ADB / OCR settings">
+      <button type="button" class="btn sm ico" id="wf-proj-settings" onclick="wfOpenProjectSettings()" title="Project settings - package, ADB/Win32, OCR model…" aria-label="Project settings">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
       <input id="wf-name" type="text" placeholder="Workflow name" value="My Workflow" aria-label="Workflow name">
@@ -61,13 +61,13 @@
         <option value="exe">Name / EXE</option>
       </select>
       <select id="wf-bar-win32-mode" onchange="wfBarWinInputChanged(this.value)" aria-label="Win32 input mode" title="How input is delivered to the target window">
-        <option value="background">Background — PostMessage</option>
-        <option value="background_sync">Background sync — SendMessage</option>
+        <option value="background">Background - PostMessage</option>
+        <option value="background_sync">Background sync - SendMessage</option>
         <option value="background_cursor">Background + cursor</option>
-        <option value="background_window">Window-pos — no cursor move</option>
-        <option value="anchored_touch">Anchored touch — WM_POINTER</option>
-        <option value="unity_bridge">Unity bridge — in-game plugin</option>
-        <option value="foreground">Foreground — real mouse</option>
+        <option value="background_window">Window-pos - no cursor move</option>
+        <option value="anchored_touch">Anchored touch - WM_POINTER</option>
+        <option value="unity_bridge">Unity bridge - in-game plugin</option>
+        <option value="foreground">Foreground - real mouse</option>
       </select>
     </div>
   </div>
@@ -79,13 +79,13 @@
   <div class="tb-zone tb-center">
     <button class="btn ok ico tb-run-btn" id="wf-run-btn" onclick="wfToggleRun()" title="Test run"></button>
     <div class="tb-tray tb-run-aux">
-      <button class="btn ico" onclick="wfValidateShow()" title="Check workflow — find broken wires, missing templates, and bad branch counts">
+      <button class="btn ico" onclick="wfValidateShow()" title="Check workflow - find broken wires, missing templates, and bad branch counts">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></button>
-      <button class="btn ico" onclick="wfRunSingleNode()" title="Test node — run the selected node and draw its match overlay on Preview (Ctrl+Enter)">
+      <button class="btn ico" onclick="wfRunSingleNode()" title="Test node - run the selected node and draw its match overlay on Preview (Ctrl+Enter)">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></button>
-      <button class="btn ico" id="wf-run-menu-btn" onclick="wfShowRunMenu(this)" aria-label="Run and debug actions" title="More run & debug actions — run from selected, step debug, Runner, Build EXE" aria-haspopup="menu" aria-expanded="false">
+      <button class="btn ico" id="wf-run-menu-btn" onclick="wfShowRunMenu(this)" aria-label="Run and debug actions" title="More run & debug actions - run from selected, step debug, Runner, Build EXE" aria-haspopup="menu" aria-expanded="false">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 19.655A6 6 0 0 1 6 14v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 3.97"/><path d="M14 15.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997a1 1 0 0 1-1.517-.86z"/><path d="M14.12 3.88 16 2"/><path d="M21 5a4 4 0 0 1-3.55 3.97"/><path d="M3 21a4 4 0 0 1 3.81-4"/><path d="M3 5a4 4 0 0 0 3.55 3.97"/><path d="M6 13H2"/><path d="m8 2 1.88 1.88"/><path d="M9 7.13V6a3 3 0 1 1 6 0v1.13"/></svg></button>
-      <button class="btn ico" id="wf-step-next-btn" onclick="wfDebugStep()" title="Next step — resume the paused debug run">
+      <button class="btn ico" id="wf-step-next-btn" onclick="wfDebugStep()" title="Next step - resume the paused debug run">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
     </div>
     <div id="wf-run-status" class="wf-run-status ok" title="Run status">
@@ -99,8 +99,8 @@
     <!-- Speed hack — one compact chip in the header; the value input and the
          inject/stop button live in its popover so the niche (root-only) control
          no longer occupies prime header space. All original ids/handlers stay. -->
-    <div id="wf-speed-group" class="wf-speed-group" title="Speed hack — separate from Test run (uses workflow package)">
-      <button class="btn sm ico" id="wf-speed-chip-btn" onclick="wfSpeedPopToggle(event)" title="Speed hack settings (Frida — root required)" aria-haspopup="true" aria-expanded="false">
+    <div id="wf-speed-group" class="wf-speed-group" title="Speed hack - separate from Test run (uses workflow package)">
+      <button class="btn sm ico" id="wf-speed-chip-btn" onclick="wfSpeedPopToggle(event)" title="Speed hack settings (Frida - root required)" aria-haspopup="true" aria-expanded="false">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg>
         <span id="wf-speed-chip">2×</span>
       </button>
@@ -115,13 +115,13 @@
           <span class="hz-unit">×</span>
         </div>
         <div class="wf-speed-pop-row">
-          <label class="wf-speed-pop-ck" title="Run the clock hook as compiled C instead of JS: much cheaper per call, so it stays smooth at high speeds. Some protected games crash when Frida compiles it — leave off unless the game tolerates it. Applies on the next injection.">
+          <label class="wf-speed-pop-ck" title="Run the clock hook as compiled C instead of JS: much cheaper per call, so it stays smooth at high speeds. Some protected games crash when Frida compiles it - leave off unless the game tolerates it. Applies on the next injection.">
             <input id="wf-speed-native" type="checkbox" onchange="wfSpeedChanged()">
             <span>Native hook</span>
           </label>
         </div>
         <div class="wf-speed-pop-row">
-          <button class="btn sm" id="wf-speed-btn" onclick="wfToggleSpeed()" title="Speed hack: Off (accelerate the game with Frida — root required)">Enable</button>
+          <button class="btn sm" id="wf-speed-btn" onclick="wfToggleSpeed()" title="Speed hack: Off (accelerate the game with Frida - root required)">Enable</button>
           <button class="btn sm ico ok" id="wf-speed-run-btn" onclick="wfSpeedRun()" title="Enable speed hack" style="display:none"></button>
         </div>
         <p class="wf-speed-pop-hint">Frida · root required · uses the workflow package (Project settings). Independent of Test run.</p>
@@ -143,9 +143,9 @@
       <select id="device-select" onchange="onDeviceChange(this.value)" aria-label="ADB device">
         <option value="">Scanning…</option>
       </select>
-      <button class="btn ico sm" onclick="onRefreshDevices()" title="Refresh — rescan connected devices">
+      <button class="btn ico sm" onclick="onRefreshDevices()" title="Refresh - rescan connected devices">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
-      <button class="btn ico sm" id="wf-device-menu-btn" onclick="wfShowDeviceMenu(this)" title="Device tools — scan ports, restart ADB" aria-haspopup="menu" aria-expanded="false">
+      <button class="btn ico sm" id="wf-device-menu-btn" onclick="wfShowDeviceMenu(this)" title="Device tools - scan ports, restart ADB" aria-haspopup="menu" aria-expanded="false">
         <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <span class="ctl-sep" aria-hidden="true"></span>
@@ -158,14 +158,14 @@
     </div>
     </div>
     <button class="btn ico theme-btn" type="button" data-theme-toggle title="Switch between the light and dark theme" aria-label="Switch theme"><svg class="uico ico-sun" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg><svg class="uico ico-moon" aria-hidden="true" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg></button>
-    <button class="btn ico" onclick="wfCmdShow()" title="Command palette — every action, searchable (Ctrl+K)" aria-label="Command palette">
+    <button class="btn ico" onclick="wfCmdShow()" title="Command palette - every action, searchable (Ctrl+K)" aria-label="Command palette">
       <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg></button>
     <button class="btn ico" id="wf-shortcuts-btn" onclick="uiShowShortcuts()" title="Keyboard &amp; mouse shortcuts (F1)" aria-label="Shortcuts">
       <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button>
     <div id="wf-view-tabs" class="wf-view-tabs" role="tablist" aria-label="View">
-      <button class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Edit mode — design the workflow graph (Tab)">Edit</button>
-      <button class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview mode — live device mirror + scope tools (Tab)">Preview</button>
-      <button class="wf-view-tab" data-view="library" onclick="wfSwitchView('library')" title="Template library — every image this workflow uses, and what is no longer used (Ctrl+K → Go to Library)">Library</button>
+      <button class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Edit mode - design the workflow graph (Tab)">Edit</button>
+      <button class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview mode - live device mirror + scope tools (Tab)">Preview</button>
+      <button class="wf-view-tab" data-view="library" onclick="wfSwitchView('library')" title="Template library - every image this workflow uses, and what is no longer used (Ctrl+K → Go to Library)">Library</button>
     </div>
   </div>
 </div>
@@ -200,7 +200,7 @@
       <!-- Soft watermark: name of the open activity/function (top-left of the graph). -->
       <div class="wf-cur-act" id="wf-cur-act" data-empty="1" title="Currently open activity / function" aria-live="polite"></div>
       <div id="wf-graph-stats" class="wf-graph-stats" aria-live="polite"></div>
-      <button type="button" id="wf-zoom-badge" class="wf-zoom-badge" onclick="wfZoomReset()" title="Zoom 100% — click or double-tap Space to reset" aria-label="Canvas zoom">100%</button>
+      <button type="button" id="wf-zoom-badge" class="wf-zoom-badge" onclick="wfZoomReset()" title="Zoom 100% - click or double-tap Space to reset" aria-label="Canvas zoom">100%</button>
       <div id="wf-world">
         <svg id="wf-wires"></svg>
       </div>
@@ -252,7 +252,7 @@
         <div id="wf-pv-wrap">
           <canvas id="wf-pv-canvas"></canvas>
           <div id="wf-pv-tpl-strip" class="wf-pv-tpl-strip" hidden aria-label="Templates in node preview"></div>
-          <button type="button" id="wf-pv-zoom-badge" class="wf-zoom-badge wf-pv-zoom-badge" onclick="wfPvResetZoom()" title="Zoom 100% — click or double-tap Space to reset" aria-label="Preview zoom">100%</button>
+          <button type="button" id="wf-pv-zoom-badge" class="wf-zoom-badge wf-pv-zoom-badge" onclick="wfPvResetZoom()" title="Zoom 100% - click or double-tap Space to reset" aria-label="Preview zoom">100%</button>
         </div>
       </div>
       <!-- Template library — every image in the open workflow's templates/ folder
@@ -266,7 +266,7 @@
           <span class="log-filters" id="wf-lib-filters" role="group" aria-label="Filter templates">
             <button class="log-f on" data-lf="all"    onclick="wfLibFilter('all',event)"    title="Every file in the folder">All</button>
             <button class="log-f"    data-lf="used"   onclick="wfLibFilter('used',event)"   title="Referenced by at least one block">Used</button>
-            <button class="log-f"    data-lf="orphan" onclick="wfLibFilter('orphan',event)" title="No block references it — dead weight">Orphan</button>
+            <button class="log-f"    data-lf="orphan" onclick="wfLibFilter('orphan',event)" title="No block references it - dead weight">Orphan</button>
             <button class="log-f"    data-lf="missing" onclick="wfLibFilter('missing',event)" title="A block references it but the file is not in the folder">Missing</button>
           </span>
           <span class="log-search-wrap">
@@ -292,13 +292,13 @@
             <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg></button>
           <button class="btn sm ico" id="wf-preview-btn" onclick="wfTogglePreview()" title="Image preview: Off">
             <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></button>
-          <button class="btn sm ico" id="wf-group-btn" onclick="wfToggleGroupMode()" title="Create group: Off — click then drag to draw a frame (or select nodes first, then click)">
+          <button class="btn sm ico" id="wf-group-btn" onclick="wfToggleGroupMode()" title="Create group: Off - click then drag to draw a frame (or select nodes first, then click)">
             <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></button>
           <button class="btn sm ico" id="wf-align-btn" onclick="wfToggleAlign()" title="Smart align: On">
             <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2v20"/><path d="M8 10H4a2 2 0 0 1-2-2V6c0-1.1.9-2 2-2h4"/><path d="M16 10h4a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-4"/><path d="M8 20H7a2 2 0 0 1-2-2v-2c0-1.1.9-2 2-2h1"/><path d="M16 14h1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1"/></svg></button>
           <!-- Link style — spline (ComfyUI default) → linear → straight. The icon
                shows the shape that is live; the mode persists in localStorage. -->
-          <button class="btn sm ico" id="wf-link-btn" data-mode="spline" onclick="wfCycleLinkMode()" title="Link style: Spline — click to cycle (spline → linear → straight)">
+          <button class="btn sm ico" id="wf-link-btn" data-mode="spline" onclick="wfCycleLinkMode()" title="Link style: Spline - click to cycle (spline → linear → straight)">
             <svg class="uico wf-link-ico" data-for="spline" aria-hidden="true" viewBox="0 0 24 24"><circle cx="4" cy="18" r="2"/><circle cx="20" cy="6" r="2"/><path d="M6 18c6 0 6-12 12-12"/></svg>
             <svg class="uico wf-link-ico" data-for="linear" aria-hidden="true" viewBox="0 0 24 24"><circle cx="4" cy="18" r="2"/><circle cx="20" cy="6" r="2"/><path d="M5.6 16.4 18.4 7.6"/></svg>
             <svg class="uico wf-link-ico" data-for="straight" aria-hidden="true" viewBox="0 0 24 24"><circle cx="4" cy="18" r="2"/><circle cx="20" cy="6" r="2"/><path d="M6 18h6V6h6"/></svg></button>
@@ -312,13 +312,13 @@
           <button type="button" id="wf-zoom-lbl" onclick="wfZoomReset()" title="Reset zoom to 100%">100%</button>
           <button class="btn sm ico" id="wf-zoom-in" onclick="wfZoomBy(1.1)" title="Zoom in">
             <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
-          <button class="btn sm ico" id="wf-zoom-fit" onclick="wfFit()" title="Fit view — show all blocks (F)" aria-label="Fit all nodes"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+          <button class="btn sm ico" id="wf-zoom-fit" onclick="wfFit()" title="Fit view - show all blocks (F)" aria-label="Fit all nodes"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
           <button class="btn sm ico" id="wf-fit-selection" onclick="wfFitSelection()" title="Fit selected nodes (Shift+F)" aria-label="Fit selected nodes" disabled><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></button>
         </div>
       </div>
       <!-- Auto-layout — one button that opens a menu of layout strategies. -->
       <div id="wf-layout-bar" class="wf-layout-bar">
-        <button class="wf-layout-toggle" id="wf-layout-toggle" onclick="wfToggleLayoutMenu(event)" title="Arrange blocks — Ctrl+Z to undo" aria-expanded="false" aria-controls="wf-layout-menu">
+        <button class="wf-layout-toggle" id="wf-layout-toggle" onclick="wfToggleLayoutMenu(event)" title="Arrange blocks - Ctrl+Z to undo" aria-expanded="false" aria-controls="wf-layout-menu">
           <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
           <span>Arrange</span>
         </button>
@@ -332,13 +332,13 @@
         </div>
       </div>
       <!-- Minimap — bird's-eye view; click/drag to jump. -->
-      <div id="wf-minimap" class="wf-minimap" title="Minimap — click or drag to move the view">
+      <div id="wf-minimap" class="wf-minimap" title="Minimap - click or drag to move the view">
         <canvas id="wf-minimap-cv"></canvas>
       </div>
       <!-- Bottom-right dock: Activities and Functions. Drag the top edge to
            resize; Variables are managed in the Inspector. -->
       <div class="pnl" id="wf-act-panel" data-dtab="act" data-pnl="wf-activities" data-pnl-title="Activities" data-pnl-tools="max">
-        <div id="wf-act-resizer" title="Drag the top edge (or use arrow keys) to resize the list — double-click to reset" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize list" aria-valuemin="72" aria-valuemax="600"></div>
+        <div id="wf-act-resizer" title="Drag the top edge (or use arrow keys) to resize the list - double-click to reset" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize list" aria-valuemin="72" aria-valuemax="600"></div>
         <div class="wf-dock-tabs pnl-hd" role="tablist" aria-label="Activities and functions">
           <!-- The label is its own span so the strip can ellipsize rather than
                overflow: with min-width:0 the tabs are the only part that can
@@ -350,7 +350,7 @@
                  .wf-dock-bar: three tab labels plus five buttons in one row
                  overflowed the card and clipped them off its right edge.
                  panel.js appends Maximize after this. -->
-            <button class="wf-side-mini" id="wf-act-collapse" aria-controls="wf-act-panel-body" aria-expanded="true" title="Collapse — fold the list away, keep the tabs">
+            <button class="wf-side-mini" id="wf-act-collapse" aria-controls="wf-act-panel-body" aria-expanded="true" title="Collapse - fold the list away, keep the tabs">
               <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
             </button>
           </span>
@@ -368,7 +368,7 @@
             <button class="wf-side-mini" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)" aria-pressed="false">
               <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/></svg>
             </button>
-            <button class="wf-side-mini" id="wf-act-dbg" title="Debug overlay: Off — when on, every image/color/OCR match draws its box + confidence on Preview" aria-pressed="false">
+            <button class="wf-side-mini" id="wf-act-dbg" title="Debug overlay: Off - when on, every image/color/OCR match draws its box + confidence on Preview" aria-pressed="false">
               <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="1"/><path d="M18.944 12.33a1 1 0 0 0 0-.66 7.5 7.5 0 0 0-13.888 0 1 1 0 0 0 0 .66 7.5 7.5 0 0 0 13.888 0"/></svg>
             </button>
             <button class="wf-side-mini wf-side-add" id="wf-act-add" title="Add activity">+</button>
@@ -753,7 +753,7 @@
   <span id="footer-dot"></span>
   <span id="status-text">Ready</span>
   <span class="spacer"></span>
-  <span id="hover-pos" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:88px;text-align:right;">—</span>
+  <span id="hover-pos" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:88px;text-align:right;">-</span>
   <span style="color:var(--border);margin:0 3px;">·</span>
   <span id="footer-out" style="font-size:11px;color:var(--log-muted);font-family:var(--mono);">workflow → workflows/</span>
 </div>

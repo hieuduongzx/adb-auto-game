@@ -33,7 +33,7 @@ function wfCmdCatalog() {
     { t: "Toggle Preview / Edit", s: "switch canvas ↔ device mirror", k: "Tab", run: () => wfSwitchView(wfToggleView()) },
     { t: "Go to Edit", s: "show the node graph", k: "", run: () => wfSwitchView("canvas") },
     { t: "Go to Preview", s: "show the live device mirror", k: "", run: () => wfSwitchView("preview") },
-    { t: "Go to Library", s: "template library — usage, orphans, duplicates", k: "", run: () => wfSwitchView("library") },
+    { t: "Go to Library", s: "template library - usage, orphans, duplicates", k: "", run: () => wfSwitchView("library") },
     { t: "Add activity", s: "create a new sequence activity", k: "", run: () => (typeof wfActAddCurrent === "function") && wfActAddCurrent() },
     { t: "Add function", s: "create a reusable function", k: "", run: () => (typeof wfAddFunction === "function") && wfAddFunction() },
     { t: "Toggle snap to grid", s: "20px grid snap when dragging nodes", k: "", run: () => (typeof wfToggleSnap === "function") && wfToggleSnap() },

@@ -39,10 +39,10 @@ function wfAddGroup(x,y,w,h){
   const groups=wfGroups();
   const gr={ id:"g"+wfUid().slice(1), name:"Group "+(groups.length+1),
     x:Math.round(x), y:Math.round(y), w:Math.round(w), h:Math.round(h), color:groups.length%WF_GROUP_COLORS.length };
-  groups.push(gr); wfRenderCanvas(); setStatus(`Created "${gr.name}" — drag the title to move the whole group`);
+  groups.push(gr); wfRenderCanvas(); setStatus(`Created "${gr.name}" - drag the title to move the whole group`);
   return gr;
 }
-function wfDeleteGroup(id){ wfPushUndo(); const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); setStatus("Group deleted (blocks kept) — Ctrl+Z to undo"); } }
+function wfDeleteGroup(id){ wfPushUndo(); const groups=wfGroups(); const i=groups.findIndex(x=>x.id===id); if(i>=0){ groups.splice(i,1); wfRenderCanvas(); setStatus("Group deleted (blocks kept) - Ctrl+Z to undo"); } }
 function wfRenameGroup(gr){ uiPrompt({title:"Rename group", label:"Group name", value:gr.name||""}).then(nm=>{
   if(nm===null) return; nm=nm.trim(); if(!nm||nm===gr.name) return;
   wfPushUndo(); gr.name=nm; wfRenderCanvas();
@@ -719,7 +719,7 @@ function wfCanvasMouseDown(e){
 let wfGroupMode=false;
 function wfSetGroupMode(on){
   wfGroupMode=!!on;
-  const b=$("wf-group-btn"); if(b){ b.classList.toggle("on",wfGroupMode); b.title="Create group: "+(wfGroupMode?"on — drag to draw a frame":"Off"); }
+  const b=$("wf-group-btn"); if(b){ b.classList.toggle("on",wfGroupMode); b.title="Create group: "+(wfGroupMode?"on - drag to draw a frame":"Off"); }
   const c=$("wf-canvas"); if(c) c.style.cursor=wfGroupMode?"crosshair":"";
 }
 function wfToggleGroupMode(){
@@ -767,10 +767,10 @@ async function wfRunSingleNode(node){
     node = WF.selectedNode ? wfNode(WF.selectedNode) : null;
   }
   if(!node){ uiToast("Select a block to test.","warning"); return; }
-  if(wfRunning){ uiToast("A workflow is running — stop it before testing a single block.","warning"); return; }
+  if(wfRunning){ uiToast("A workflow is running - stop it before testing a single block.","warning"); return; }
   if(wfNodeTesting){ setStatus("Testing block…"); return; }
   if(!wfCanTestNode(node)){
-    uiToast("Structural blocks (loop/call/…) can't be tested alone — use Run from selected.","warning");
+    uiToast("Structural blocks (loop/call/…) can't be tested alone - use Run from selected.","warning");
     return;
   }
   const def=WF_NODES[node.type]||{};
@@ -828,7 +828,7 @@ async function wfRunSingleNode(node){
 async function wfRunFunction(fnId){
   const fn=(typeof wfFnById==="function")?wfFnById(fnId):null;
   if(!fn){ uiToast("This call block has no function selected.","warning"); return; }
-  if(wfRunning){ uiToast("A workflow is running — stop it first.","warning"); return; }
+  if(wfRunning){ uiToast("A workflow is running - stop it first.","warning"); return; }
   if(wfNodeTesting){ setStatus("Testing block…"); return; }
   // Show the function's own graph so the run trail lands on its blocks.
   if(typeof wfEditFunction==="function" && WF.edit.id!==fn.id) wfEditFunction(fn.id);
@@ -874,7 +874,7 @@ function wfShowMenu(clientX, clientY){
     if(_n && _n.type==="call"){
       const _fn=_n.params&&_n.params.fn&&wfFnById(_n.params.fn);
       if(_fn) items.push({ico:"play",label:"Run function «"+_fn.name+"»",
-        title:"Run this function's whole graph on its own — same debug run as Run from here",
+        title:"Run this function's whole graph on its own - same debug run as Run from here",
         fn:()=>wfRunFunction(_fn.id)});
     }
   }
@@ -1044,10 +1044,10 @@ function wfShowRunMenu(btn){
   const m=$("wf-ctxmenu"); if(!m) return;
   wfMenuItems(m, [
     {ico:"play",   label:"Run from selected block",        fn:()=>wfRunFromSelected(false), title:"Start the run at the selected block instead of Start"},
-    {ico:"skip",   label:"Step debug from here",           fn:()=>wfStartStepRun(),         title:"Run one block at a time — pause after each, resume with Next step"},
+    {ico:"skip",   label:"Step debug from here",           fn:()=>wfStartStepRun(),         title:"Run one block at a time - pause after each, resume with Next step"},
     {sep:true},
-    {ico:"rocket", label:"Run GUI — open Runner",          fn:()=>wfRunGui(),               title:"Open the Runner app with the current workflow"},
-    {ico:"box",    label:"Build EXE — standalone Runner",  fn:()=>wfBuildExe(), id:"wf-build-btn", title:"Package this workflow into a standalone Runner .exe"},
+    {ico:"rocket", label:"Run GUI - open Runner",          fn:()=>wfRunGui(),               title:"Open the Runner app with the current workflow"},
+    {ico:"box",    label:"Build EXE - standalone Runner",  fn:()=>wfBuildExe(), id:"wf-build-btn", title:"Package this workflow into a standalone Runner .exe"},
   ]);
   wfMenuShowUnder(m, btn, "run");
 }
@@ -1057,7 +1057,7 @@ function wfShowDeviceMenu(btn){
   if(wfMenuToggleCheck(btn,"device")) return;
   const m=$("wf-ctxmenu"); if(!m) return;
   wfMenuItems(m, [
-    {ico:"search", label:"Scan ports — find emulators", fn:()=>onScanPorts(),  title:"Probe known emulator ports (LDPlayer, MuMu, Nox…)"},
+    {ico:"search", label:"Scan ports - find emulators", fn:()=>onScanPorts(),  title:"Probe known emulator ports (LDPlayer, MuMu, Nox…)"},
     {ico:"power",  label:"Restart ADB server",          fn:()=>onRestartAdb(), title:"Kill and restart the ADB server when devices vanish"},
   ]);
   wfMenuShowUnder(m, btn, "device");

@@ -59,14 +59,14 @@ function wfFocusFollow(nodeId){
 function wfSyncFocusBtn(){
   const b=$("wf-act-focus");
   if(b){ b.classList.toggle("on", wfFocusOn); b.setAttribute("aria-pressed",String(wfFocusOn)); b.title = wfFocusOn
-    ? "Focus: ON — auto-centre on the running block (follows into/out of functions). Click to turn off."
-    : "Focus: OFF — canvas stays put during a run. Click to turn on."; }
+    ? "Focus: ON - auto-centre on the running block (follows into/out of functions). Click to turn off."
+    : "Focus: OFF - canvas stays put during a run. Click to turn on."; }
 }
 function wfSyncDebugOverlayBtn(){
   const b=$("wf-act-dbg");
   if(b){ b.classList.toggle("on", wfDebugOverlayOn); b.setAttribute("aria-pressed",String(wfDebugOverlayOn)); b.title = wfDebugOverlayOn
-    ? "Debug overlay: ON — image/color/OCR matches draw box + conf on Preview (doesn't switch tabs). Click to turn off."
-    : "Debug overlay: OFF — matches aren't drawn during a run. Click to turn on."; }
+    ? "Debug overlay: ON - image/color/OCR matches draw box + conf on Preview (doesn't switch tabs). Click to turn off."
+    : "Debug overlay: OFF - matches aren't drawn during a run. Click to turn on."; }
 }
 // Toggle follow-focus. When turned on mid-run, immediately snap to the block
 // that's running right now — using the engine's true current node (wfLiveNode),
@@ -92,7 +92,7 @@ function wfToggleDebugOverlay(){
     setStatus("Debug overlay off");
   } else {
     // Never force a tab switch — just arm the draw flag; the user opens Preview when they want to look.
-    setStatus("Debug overlay on — match boxes draw on the Preview tab");
+    setStatus("Debug overlay on - match boxes draw on the Preview tab");
   }
 }
 // Should the current match event be painted? Debug-overlay toggle, or a

@@ -359,7 +359,7 @@ async function onCaptureBackendChange(backend){
   if(typeof WF!=="undefined") WF.captureBackend=(backend==="adb")?"adb":"scrcpy";
   if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
   await wfApplyCaptureBackend(backend);
-  setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (fast/headless)")+" — saved with workflow");
+  setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (fast/headless)")+" - saved with workflow");
 }
 // Apply backend process-wide + sync the Source dropdown (no dirty mark).
 async function wfApplyCaptureBackend(backend){
@@ -379,7 +379,7 @@ async function onInputBackendChange(backend){
   if(typeof WF!=="undefined") WF.inputBackend=(backend==="scrcpy")?"scrcpy":"adb";
   if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
   await wfApplyInputBackend(backend);
-  setStatus("ADB input: "+(S.inputBackend==="scrcpy"?"scrcpy control (fast)":"ADB shell input")+" — saved with workflow");
+  setStatus("ADB input: "+(S.inputBackend==="scrcpy"?"scrcpy control (fast)":"ADB shell input")+" - saved with workflow");
 }
 async function wfApplyInputBackend(backend){
   const want=(backend==="scrcpy")?"scrcpy":"adb";

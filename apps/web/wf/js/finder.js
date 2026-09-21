@@ -106,7 +106,7 @@ function wfFindRender(listEl, q){
   });
   if(wfFindHits.length>30){
     const more=document.createElement("div"); more.className="wf-find-empty";
-    more.textContent=`+${wfFindHits.length-30} more results — type to narrow down`;
+    more.textContent=`+${wfFindHits.length-30} more results - type to narrow down`;
     listEl.appendChild(more);
   }
 }

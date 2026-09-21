@@ -211,7 +211,7 @@ function wfRenderInspector(){
     if(typeof wfCanTestNode==="function" && wfCanTestNode(node)){
       const tbtn=document.createElement("button"); tbtn.type="button"; tbtn.className="btn sm ico wf-insp-test-btn";
       tbtn.innerHTML=wfIco("target");
-      tbtn.title="Test block — run this block and draw its match overlay (green = above threshold, red = best below threshold · Ctrl+Enter)";
+      tbtn.title="Test block - run this block and draw its match overlay (green = above threshold, red = best below threshold · Ctrl+Enter)";
       tbtn.onclick=()=>{ if(typeof wfRunSingleNode==="function") wfRunSingleNode(node); };
       idEl.appendChild(tbtn);
     }
@@ -220,7 +220,7 @@ function wfRenderInspector(){
     if(node.type==="call" && node.params && node.params.fn && typeof wfFnById==="function" && wfFnById(node.params.fn)){
       const fbtn=document.createElement("button"); fbtn.type="button"; fbtn.className="btn sm ico wf-insp-test-btn";
       fbtn.innerHTML=wfIco("play");
-      fbtn.title="Run function — run this function's whole graph on its own (debug run, trail on its blocks)";
+      fbtn.title="Run function - run this function's whole graph on its own (debug run, trail on its blocks)";
       fbtn.onclick=()=>{ if(typeof wfRunFunction==="function") wfRunFunction(node.params.fn); };
       idEl.appendChild(fbtn);
     }
@@ -255,9 +255,9 @@ function wfRenderInspector(){
     if(node.type==="try_chain" || node.type==="try_next"){
       const tip=document.createElement("div"); tip.className="wf-insp-tip wf-insp-pair-tip";
       if(node.type==="try_chain"){
-        tip.innerHTML=`<b>Paired with Next branch</b> — runs arms <b>1 → 2 → …</b> on fail. Drop <b>Next branch</b> inside an arm to skip to the next arm without a real failure.`;
+        tip.innerHTML=`<b>Paired with Next branch</b> - runs arms <b>1 → 2 → …</b> on fail. Drop <b>Next branch</b> inside an arm to skip to the next arm without a real failure.`;
       } else {
-        tip.innerHTML=`<b>Paired with Try in order</b> — place this inside a try arm to stop that arm and advance to the next numbered port (or <b>fail</b> if none left). Outside Try in order it does nothing.`;
+        tip.innerHTML=`<b>Paired with Try in order</b> - place this inside a try arm to stop that arm and advance to the next numbered port (or <b>fail</b> if none left). Outside Try in order it does nothing.`;
       }
       body.appendChild(tip);
     }
@@ -798,7 +798,7 @@ function wfNodeDefaultsModal(){
     if(!v) return;
     WF.nodeDefaults=wfReadDefaults(boxes,shotCb);
     if(typeof wfMarkDirty==="function") wfMarkDirty();
-    uiToast("Node defaults saved — new blocks will use them.","success");
+    uiToast("Node defaults saved - new blocks will use them.","success");
   });
 }
 // Read the dialog's inputs into a WF.nodeDefaults-shaped object.
@@ -891,7 +891,7 @@ function wfFailShotBlock(node){
   if(!path) return null;
   const b=wfInspBlock("Failure screenshot");
   const img=document.createElement("img");
-  img.className="wf-fail-shot"; img.title="The screen when this block failed — click to open the original image";
+  img.className="wf-fail-shot"; img.title="The screen when this block failed - click to open the original image";
   img.addEventListener("click",()=>{ try{ api().open_path(path); }catch{} });
   try{ api().image_thumbnail(path, 460).then(d=>{ if(d) img.src=d; else img.remove(); }); }catch{}
   b.appendChild(img);
@@ -1277,7 +1277,7 @@ function wfAttachCoordPaste(node, f, inp){
     // image region) — leave the native paste alone, but say why it didn't take.
     if(nums.length>keys.length){
       e.preventDefault();
-      if(typeof uiToast==="function") uiToast("Clipboard has more values than this block holds — paste it into the matching block.","warning");
+      if(typeof uiToast==="function") uiToast("Clipboard has more values than this block holds - paste it into the matching block.","warning");
       return;
     }
     e.preventDefault();
@@ -1437,7 +1437,7 @@ function wfFieldEl(node,f){
   if(f.t==="text" && f.insertVar){ row.appendChild(wfInsertVarBtn(inp)); }
 
   if(f.t==="tpl"){
-    row.classList.add("full");   // label on top — a truncated "templa…" path tells the user nothing
+    row.classList.add("full");   // label on top - a truncated "templa…" path tells the user nothing
     inp.style.fontSize="10px";
     const btn=document.createElement("button"); btn.className="btn sm"; btn.textContent="Choose…";
     const img=document.createElement("img"); img.className="wf-tpl-preview"; wfLoadThumb(img, node.params[f.k]);
@@ -1481,7 +1481,7 @@ function wfTplsField(node,f,row){
       r.appendChild(num); r.appendChild(inp); r.appendChild(pick); r.appendChild(del); r.appendChild(img);
       item.appendChild(r); list.appendChild(item);
     });
-    if(!arr().length){ const e=document.createElement("div"); e.className="wf-tpls-empty"; e.textContent="No images — add at least 2 to use \"or\"."; list.appendChild(e); }
+    if(!arr().length){ const e=document.createElement("div"); e.className="wf-tpls-empty"; e.textContent="No images - add at least 2 to use \"or\"."; list.appendChild(e); }
   }
   renderList();
   const add=document.createElement("button"); add.className="btn sm"; add.textContent="+ Image";
@@ -1519,7 +1519,7 @@ function wfPointsField(node,f){
       del.onclick=()=>{ wfPushUndoDebounced(); arr().splice(idx,1); wfUpdNodeSum(node); renderList(); };
       row.appendChild(num); row.appendChild(x); row.appendChild(y); row.appendChild(del); list.appendChild(row);
     });
-    if(!arr().length){ const empty=document.createElement("div"); empty.className="wf-tpls-empty"; empty.textContent="No touch points — add at least 2."; list.appendChild(empty); }
+    if(!arr().length){ const empty=document.createElement("div"); empty.className="wf-tpls-empty"; empty.textContent="No touch points - add at least 2."; list.appendChild(empty); }
   }
   renderList();
   const actions=document.createElement("div"); actions.className="wf-points-actions";
@@ -1592,7 +1592,7 @@ function wfSequenceImagesField(node,f){
       });
       block.append(title,opts); list.appendChild(block);
     });
-    if(!arr().length){ const e=document.createElement("div"); e.className="wf-tpls-empty"; e.textContent="No images — add at least 1."; list.appendChild(e); }
+    if(!arr().length){ const e=document.createElement("div"); e.className="wf-tpls-empty"; e.textContent="No images - add at least 1."; list.appendChild(e); }
   }
   renderList();
   const add=document.createElement("button"); add.type="button"; add.className="btn sm"; add.textContent="+ Image tap";

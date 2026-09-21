@@ -114,7 +114,7 @@ function uiModal(spec){
 // ── A11y: every icon-only button gets an aria-label from its title (static chrome, runs once) ──
 function uiAriaPass(root){
   (root||document).querySelectorAll("button[title]:not([aria-label])")
-    .forEach(b=>b.setAttribute("aria-label", b.getAttribute("title").split("—")[0].trim()));
+    .forEach(b=>b.setAttribute("aria-label", b.getAttribute("title").split(" - ")[0].trim()));
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",()=>uiAriaPass());
 else uiAriaPass();
@@ -143,8 +143,8 @@ const UI_SHORTCUTS = [
     ["Mouse wheel","Zoom (Ctrl+= / Ctrl+− / Ctrl+0)"],
     ["Hold Space + drag / middle mouse","Pan the canvas"],
     ["Double-tap Space","Reset zoom to 100% (Canvas and Preview)"],
-    ["F","Fit — frame every block in the view"],
-    ["Shift+F","Fit selection — focus the selected blocks"],
+    ["F","Fit - frame every block in the view"],
+    ["Shift+F","Fit selection - focus the selected blocks"],
     ["Tab","Switch Edit ↔ Preview"],
     ["Right click","Context menu (block / wire / group)"],
   ]],
@@ -158,7 +158,7 @@ const UI_SHORTCUTS = [
   ]],
   ["Test runs", [
     ["Ctrl+Enter","Test one block (match overlay on Preview)"],
-    ["Debug overlay","Button beside Focus on the Activities panel — on = every match draws on Preview during a run"],
+    ["Debug overlay","Button beside Focus on the Activities panel - on = every match draws on Preview during a run"],
     ["Esc","Stop the run · close panel / clear selection"],
     ["Drop a chip onto a wire","Splice the block into that wire"],
   ]],

@@ -30,9 +30,10 @@
   border-bottom: 1px solid var(--border);
 }
 .lib-brand {
-  width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--r-md);
+  width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--r-sm);
   display: flex; align-items: center; justify-content: center;
-  background: var(--ink); color: var(--panel);
+  background: var(--accent); color: var(--on-accent);
+  font-family: var(--mono); font-size: var(--t-ui); font-weight: 700; letter-spacing: -.04em;
 }
 /* Sizes come from the shared ladder (icons.css) — no per-call-site width or
    stroke-width here. The rules below cover layout and colour only. */
@@ -184,8 +185,8 @@
   justify-content: center;
   gap: 6px;
   border-radius: var(--r-sm);
-  border: 1px solid var(--border2);
-  background: var(--panel);
+  border: 1px solid var(--accent-bd);
+  background: var(--accent-bg);
   color: var(--accent);
   font-size: var(--t-ui);
   font-weight: 700;
@@ -247,33 +248,11 @@
   min-height: 40px;
   min-width: 0;
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-content: center;
-  column-gap: 10px;
-  row-gap: 3px;
+  row-gap: 4px;
   margin-top: 10px;
   padding: 0 2px;
-}
-/* The game's icon — the same art its built Runner .exe carries. */
-.game-icon {
-  grid-row: 1 / span 2;
-  align-self: center;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--r-sm);
-  object-fit: cover;
-  object-position: 50% 30%;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
-}
-.icon-mono {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: hsl(var(--tone) 40% 30%);
-  color: hsl(var(--tone) 45% 93%);
-  font-size: var(--t-caption);
-  font-weight: 600;
-  letter-spacing: -.02em;
 }
 .game-name {
   font-size: var(--t-title);
@@ -304,7 +283,7 @@
   align-items: center;
   height: 17px;
   padding: 0 5px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   border: 1px solid transparent;
   font-size: var(--t-micro);
   font-weight: 700;
@@ -324,16 +303,10 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: hsl(var(--tone) 30% 91%);
+  background:
+    radial-gradient(120% 80% at 50% 0%, hsl(var(--tone) 34% 95%), transparent 70%),
+    hsl(var(--tone) 30% 90%);
   color: hsl(var(--tone) 40% 29%);
-}
-.game-art-empty::before {
-  content: "";
-  position: absolute;
-  inset: 10px;
-  border: 1px dashed hsl(var(--tone) 26% 74%);
-  border-radius: calc(var(--r-sm) - 1px);
-  pointer-events: none;
 }
 .art-initials {
   font-size: clamp(28px, calc(var(--card-w) * .25), 64px);
@@ -346,8 +319,12 @@
   font-size: var(--t-micro);
   color: hsl(var(--tone) 22% 38%);
 }
-:root[data-theme="dark"] .game-art-empty { background: hsl(var(--tone) 18% 19%); color: hsl(var(--tone) 42% 78%); }
-:root[data-theme="dark"] .game-art-empty::before { border-color: hsl(var(--tone) 16% 32%); }
+:root[data-theme="dark"] .game-art-empty {
+  background:
+    radial-gradient(120% 80% at 50% 0%, hsl(var(--tone) 22% 25%), transparent 70%),
+    hsl(var(--tone) 18% 18%);
+  color: hsl(var(--tone) 42% 78%);
+}
 :root[data-theme="dark"] .art-hint { color: hsl(var(--tone) 14% 66%); }
 
 /* ── Loading — two rows of placeholder cards while the list arrives ─────── */
@@ -358,7 +335,7 @@
 .game.skeleton:hover { border-color: var(--line); }
 .game.skeleton .game-cover { cursor: default; border-color: var(--line); background: var(--alt); }
 .game.skeleton .game-info { pointer-events: none; }
-.sk-line { display: block; width: 68%; height: 9px; border-radius: 4px; background: var(--alt); }
+.sk-line { display: block; width: 68%; height: 9px; border-radius: var(--r-xs); background: var(--alt); }
 .sk-line.short { width: 40%; }
 .sk-line.run { width: auto; flex: 1 1 auto; height: 34px; border-radius: var(--r-sm); }
 .sk-dots { display: flex; gap: var(--s1); flex-shrink: 0; }

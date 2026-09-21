@@ -181,7 +181,7 @@ function outcomeMessage(outcome, data){
   if(outcome === "completed") return `All ${total} ${noun} finished${took}.`;
   if(outcome === "failed"){
     const first = seq.find(a=>a.status === "failed");
-    const which = first && first.name ? ` — “${first.name}” failed` : "";
+    const which = first && first.name ? `: “${first.name}” failed` : "";
     return `${failed} of ${total} ${noun} failed${which}.`;
   }
   if(outcome === "stopped") return `Stopped after ${settled} of ${total} ${noun}${took}.`;
@@ -198,7 +198,7 @@ function setOutcome(outcome, data){
   const msg = (data && typeof data.message === "string" && data.message.trim()) || outcomeMessage(outcome, data);
   row.hidden = false;
   row.className = "run-outcome outcome-" + spec.cls;
-  text.textContent = msg ? `${spec.word} — ${msg}` : spec.word;
+  text.textContent = msg ? `${spec.word}: ${msg}` : spec.word;
   paintStatusPill(); updateProgress();
 }
 function dismissOutcome(){
@@ -964,8 +964,8 @@ async function onExportLog(){
     setLogNote(`Log saved${where}.`, "ok", true);
     setDiagNote(`Log saved${where}.`, "ok");
   } else if(res && res.cancelled){
-    setLogNote("Export cancelled — nothing was saved.", "", true);
-    setDiagNote("Export cancelled — nothing was saved.", "");
+    setLogNote("Export cancelled. Nothing was saved.", "", true);
+    setDiagNote("Export cancelled. Nothing was saved.", "");
   } else {
     const why = (res && res.error) ? `: ${res.error}` : ".";
     setLogNote(`Couldn't save the log${why}`, "warn");
@@ -1021,7 +1021,7 @@ async function onDiagnostics(force){
   if(!list) return;
   if(!hasApi("get_diagnostics")){
     list.innerHTML = "";
-    setDiagNote("Diagnostics aren't available in this build — Export log… still works.", "warn");
+    setDiagNote("Diagnostics aren't available in this build. Export log… still works.", "warn");
     ["btn-diag-refresh","btn-diag-export","btn-diag-folder"].forEach(id=>{ const b = $(id); if(b) b.disabled = true; });
     return;
   }
@@ -1228,7 +1228,7 @@ async function maybePromptGamePath(key){
   _gamePromptFor = key;
   await promptGamePath(st.path
     ? `The game is not at the saved path any more:\n${st.path}\n\nChoose the game's .exe so the Runner can start it.`
-    : "This game is started from its .exe. Choose the game's .exe once before the first run — the Runner remembers it.");
+    : "This game is started from its .exe. Choose the game's .exe once before the first run. The Runner remembers it.");
 }
 // Game files: when a game ships required files and they aren't in the game
 // folder yet, offer to copy them — one prompt per loaded game, same idea as the
@@ -1274,8 +1274,8 @@ function renderRequirements(req){
   st.className = "req-status " + (r.installed ? "ok" : "warn");
   if(r.installed) st.textContent = "Files installed. Restart the game if it is open.";
   else if(!isWin) st.textContent = `Copy these ${files} into the game's install folder.`;
-  else if(!r.gameDir) st.textContent = `Not installed — set the Game path above, then copy these ${files} into the game folder.`;
-  else st.textContent = `${r.missing} of ${files} missing in ${r.gameDir} — copy them into the game folder.`;
+  else if(!r.gameDir) st.textContent = `Not installed. Set the Game path above, then copy these ${files} into the game folder.`;
+  else st.textContent = `${r.missing} of ${files} missing in ${r.gameDir}. Copy them into the game folder.`;
   refreshButtons();
 }
 async function onReqOpen(){
@@ -1428,7 +1428,7 @@ function applyRunnerInfo(r){
   U.supported = !!r.supported; U.version = r.version || ""; U.repo = r.repo || "";
   if(r.update && Object.keys(r.update).length) U.update = r.update;
   $("upd-version").textContent = U.version ? `v${U.version}` : "Not a standalone build";
-  $("upd-repo").textContent = U.repo || "—";
+  $("upd-repo").textContent = U.repo || "-";
   $("upd-repo").title = U.repo ? `https://github.com/${U.repo}` : "";
   renderUpdate();
 }

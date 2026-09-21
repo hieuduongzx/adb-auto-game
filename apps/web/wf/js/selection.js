@@ -36,8 +36,8 @@ async function wfDeleteNodes(ids){
   if(del.includes(WF.selectedNode)) WF.selectedNode=null;
   wfRenderCanvas(); wfRenderInspector();
   // Confirmed deletions remain undoable.
-  if(del.length>2) uiToast(`Deleted ${del.length} blocks — Ctrl+Z to undo`,"info");
-  else setStatus(`Deleted ${del.length} block(s) — Ctrl+Z to undo`);
+  if(del.length>2) uiToast(`Deleted ${del.length} blocks - Ctrl+Z to undo`,"info");
+  else setStatus(`Deleted ${del.length} block(s) - Ctrl+Z to undo`);
 }
 
 // ── Copy / paste ──────────────────────────────────────────────────────────────

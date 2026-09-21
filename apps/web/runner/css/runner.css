@@ -13,6 +13,7 @@
   --runner-log-muted: #8491a1;
   --runner-log-line: #303946;
   --runner-log-error-bg: #3a2528;
+  --runner-log-error-ink: #ff9f97;
   --runner-log-warning-bg: #393225;
 }
 :root[data-theme="dark"] {
@@ -68,7 +69,7 @@ input { caret-color: var(--accent); text-align: center; }
 .header-title-block { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 /* The game's icon — the same art as its .exe and its Hub card. */
 .app-icon {
-  width: 36px; height: 36px; flex-shrink: 0; border-radius: 7px; overflow: hidden;
+  width: 36px; height: 36px; flex-shrink: 0; border-radius: var(--r-sm); overflow: hidden;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
 }
@@ -127,7 +128,8 @@ input { caret-color: var(--accent); text-align: center; }
 .run-outcome[hidden] { display:none; }
 .outcome-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; background:var(--muted); }
 .outcome-text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.outcome-x { border:0; background:transparent; color:var(--muted); cursor:pointer; padding:2px 5px; font-size:16px; line-height:1; }
+.outcome-x { border:0; background:transparent; color:var(--muted); cursor:pointer; padding:4px 5px; border-radius:var(--r-xs); display:inline-flex; align-items:center; }
+.outcome-x:hover { background: var(--alt); color: var(--ink); }
 .outcome-completed { background:var(--ok-bg); border-color:var(--ok-bd); color:var(--ok-ink); }
 .outcome-completed .outcome-dot { background:var(--ok); }
 .outcome-failed { background:var(--err-bg); border-color:var(--err-bd); color:var(--err); }
@@ -138,21 +140,21 @@ input { caret-color: var(--accent); text-align: center; }
 /* Progress bar */
 #header-progress { display: flex; align-items: center; gap: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--line); }
 .prog-count { font-size: var(--t-caption); font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums; min-width: 28px; flex-shrink: 0; }
-.prog-bar-track { flex: 1; height: 6px; border-radius: 2px; background: var(--track); overflow: hidden; }
-.prog-bar-fill { height: 100%; border-radius: 2px; background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
+.prog-bar-track { flex: 1; height: 6px; border-radius: var(--r-xs); background: var(--track); overflow: hidden; }
+.prog-bar-fill { height: 100%; border-radius: var(--r-xs); background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
 .prog-elapsed { font-family: var(--mono); font-size: var(--t-ui); font-weight: 500; color: var(--dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
 /* Control buttons */
 .header-btns { display: flex; align-items: center; gap: var(--s2); }
-.header-btns .btn { height: 32px; font-size: var(--t-body); padding: 0 18px; border-radius: var(--r-sm); }
+.header-btns .btn { height: 36px; font-size: var(--t-body); padding: 0 18px; border-radius: var(--r-sm); }
 /* One primary button: Start is a quiet success tint; Stop becomes solid red so
    the destructive state remains unmistakable. See setPrimary() in runner.js. */
-.btn-start { flex: 0 1 220px; background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-bd); font-size: var(--t-title); font-weight: 700; border-radius: var(--r-md); }
-.btn-start:hover:not(:disabled), .btn-start:active:not(:disabled) { background: color-mix(in srgb, var(--ok-bg) 76%, var(--ok-bd)); border-color: var(--ok); color: var(--ok-ink); }
+.btn-start { flex: 1 1 220px; height: 36px; background: var(--ok); color: var(--on-ok); border-color: var(--ok); font-size: var(--t-title); font-weight: 700; }
+.btn-start:hover:not(:disabled), .btn-start:active:not(:disabled) { background: var(--ok-hover); border-color: var(--ok-hover); color: var(--on-ok); }
 .btn-start.is-stop { background: var(--runner-stop); color: var(--on-err); border-color: var(--runner-stop); }
 .btn-start.is-stop:hover:not(:disabled), .btn-start.is-stop:active:not(:disabled) { background: var(--runner-stop-hover); border-color: var(--runner-stop-hover); color: var(--on-err); }
 .header-btns .btn:disabled { opacity: 1; background: var(--alt); border-color: var(--border); color: var(--muted); }
-.btn-pause { flex: 0 1 110px; background: var(--panel); color: var(--dim); border-color: var(--border2); border-radius: var(--r-md); }
+.btn-pause { flex: 0 1 110px; background: var(--panel); color: var(--dim); border-color: var(--border2); }
 .btn-pause:hover:not(:disabled) { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-bd); }
 
 /* ── Tabs — segmented control (operator console) ───────────────────────── */
@@ -424,9 +426,9 @@ input { caret-color: var(--accent); text-align: center; }
 .btn-path-pick { height: 30px; }
 
 /* Toggle switch (square operator-console variant) */
-.toggle { width: 38px; height: 22px; border-radius: 5px; background: var(--dot-off); flex-shrink: 0; position: relative; transition: background .2s; cursor: pointer; }
+.toggle { width: 38px; height: 22px; border-radius: var(--r-sm); background: var(--dot-off); flex-shrink: 0; position: relative; transition: background .2s; cursor: pointer; }
 .toggle.on { background: var(--accent); }
-.toggle::after { content: ''; position: absolute; width: 18px; height: 18px; border-radius: 3px; background: var(--on-accent); top: 2px; left: 2px; transition: transform .2s var(--ease-out); }
+.toggle::after { content: ''; position: absolute; width: 18px; height: 18px; border-radius: var(--r-xs); background: var(--on-accent); top: 2px; left: 2px; transition: transform .2s var(--ease-out); }
 .toggle.on::after { transform: translateX(16px); }
 .toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -438,7 +440,7 @@ input { caret-color: var(--accent); text-align: center; }
 #speed-pkg { font-size: var(--t-micro); font-family: var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Log ───────────────────────────────────────────────────────────────── */
-.log-count { font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); background: var(--alt); border-radius: 4px; padding: 1px 6px; min-width: 17px; text-align: center; }
+.log-count { font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); background: var(--alt); border-radius: var(--r-xs); padding: 1px 6px; min-width: 17px; text-align: center; }
 .log-count:empty { display: none; }
 .log-search-wrap { display: flex; align-items: center; gap: var(--s2); min-height: 28px; padding: 3px 8px; border: 1px solid var(--border2); border-radius: var(--r-sm); background: var(--panel); flex: 1 1 160px; min-width: 120px; max-width: 240px; color: var(--muted); }
 .log-search-wrap:focus-within { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -451,6 +453,8 @@ input { caret-color: var(--accent); text-align: center; }
    errors — see WorkflowRunnerAPI._on_log), so it reads a step larger than the
    Designer's step-by-step log. */
 .log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px 9px; background: var(--runner-log-bg); color: var(--runner-log-ink); user-select: text; scrollbar-color: #566170 var(--runner-log-bg); }
+.log-body:empty { display: flex; align-items: center; justify-content: center; padding: var(--s6); }
+.log-body:empty::before { content: "No output yet. Lines appear here once a run starts."; max-width: 260px; text-align: center; font-family: var(--sans); font-size: var(--t-caption); line-height: 1.5; color: var(--runner-log-muted); }
 .log-line { display: flex; gap: 7px; padding: 3px 0; border-bottom: 1px solid var(--runner-log-line); font-family: var(--mono); font-size: var(--t-ui); line-height: 1.6; white-space: nowrap; }
 .log-line:last-child { border-bottom: 0; }
 .log-line.lv-error { background: var(--runner-log-error-bg); }
@@ -465,11 +469,13 @@ input { caret-color: var(--accent); text-align: center; }
 .log-scope { font-weight: 600; color: #79aaff; }
 .log-scope.is-app { color: var(--runner-log-muted); }
 .log-line.k-run .log-msg, .log-line.k-activity .log-msg { font-weight: 600; color: #edf2f7; }
-.log-line.lv-error .log-msg { color: var(--err); }
-.log-info    { color: var(--accent); }
-.log-success { color: var(--ok); }
-.log-warning { color: var(--warn); }
-.log-error   { color: var(--err); }
+.log-line.lv-error .log-msg { color: var(--runner-log-error-ink); }
+/* The log is a dark surface in both themes, so its tags use their own light
+   inks (the semantic tokens are tuned for the light panels: ~2-3:1 here). */
+.log-info    { color: #86b4ff; }
+.log-success { color: #57d590; }
+.log-warning { color: #e8bf68; }
+.log-error   { color: var(--runner-log-error-ink); }
 
 /* ── Narrow window (down to the 420px minimum) ──────────────────────────── */
 @media (max-width: 448px) {
@@ -481,7 +487,7 @@ input { caret-color: var(--accent); text-align: center; }
 @media (max-width: 640px) {
   #app { padding: var(--s3); gap: var(--s3); }
   #header-card { padding: var(--s4); gap: var(--s3); }
-  .app-icon { width: 36px; height: 36px; border-radius: 8px; }
+  .app-icon { width: 36px; height: 36px; border-radius: var(--r-md); }
   #mobile-tabs { display: flex; flex-shrink: 0; padding: 0; gap: var(--s3); border-bottom: 1px solid var(--border2); }
   .mobile-tab { flex: 1; min-width: 0; padding: 10px 6px; border-bottom: 2px solid transparent; color: var(--dim); font-size: var(--t-body); font-weight: 600; }
   .mobile-tab:hover { color: var(--runner-selected-ink); background: var(--accent-bg); }

@@ -273,20 +273,20 @@ const WF_NODES = {
   back:       {label:"Back",      ico:"back",kind:"action",cat:"input", hidden:true, outs:["out"], fields:[], sum:()=>"Back key"},
   home:       {label:"Home",      ico:"home",kind:"action",cat:"input", hidden:true, outs:["out"], fields:[], sum:()=>"Home key"},
   tap_image:  {label:"Tap image",  ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")},
-  wait_image: {label:"Wait image",   ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate — wait until it DISAPPEARS",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>(p.negate?"until gone ":"")+wfBase(p.template)},
+  wait_image: {label:"Wait image",   ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate - wait until it DISAPPEARS",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>(p.negate?"until gone ":"")+wfBase(p.template)},
   if_image:   {label:"If image",   ico:"help",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.negate?"not ":""}found ${wfBase(p.template)}`},
   // "…_any" = OR over several images: true when ANY listed template matches.
   tap_image_any: {label:"Tap any image", ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBaseAny(p.templates)+(p.taps=="2"?" ×2":"")+(p.mode==="parallel"?" //":"")},
   wait_image_any:{label:"Wait any image",  ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBaseAny(p.templates)+(p.mode==="parallel"?" //":"")},
   if_image_any:  {label:"If any image",  ico:"layers",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.negate?"not ":""}found ${wfBaseAny(p.templates)}${p.mode==="parallel"?" //":""}`},
-  wait_text:  {label:"Wait text",   ico:"scan_text",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate — wait until it DISAPPEARS",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>(p.negate?"until gone ":"")+`"${p.text||""}"`},
+  wait_text:  {label:"Wait text",   ico:"scan_text",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate - wait until it DISAPPEARS",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>(p.negate?"until gone ":"")+`"${p.text||""}"`},
   if_text:    {label:"If text",   ico:"type",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`${p.negate?"not ":""}contains "${p.text||""}"`},
   read_var:   {label:"Read → variable",ico:"search",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`→ ${p.name||"?"}`},
   parse_var:  {label:"Parse → variable",ico:"scissors",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"OCR region"},{v:"var",t:"From variable"}],d:"region"},{k:"fromVar",lbl:"Source variable",t:"text",d:"",var:true,showWhen:{source:"var"}},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num",showWhen:{source:"region"}},{k:"y",t:"num",showWhen:{source:"region"}},{k:"w",t:"num",d:200,showWhen:{source:"region"}},{k:"h",t:"num",d:80,showWhen:{source:"region"}},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:"",showWhen:{source:"region"}}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
   // ── Color (pixel) nodes — compare screen pixels against a #RRGGBB colour.
   // Tolerance = max per-channel difference (same rule as DevScope's Inspect color).
   tap_color:  {label:"Tap color", ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"timeout",t:"num",d:10},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.color||"?"} ±${p.tolerance??10}`+(p.taps=="2"?" ×2":"")},
-  wait_color: {label:"Wait color",ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"x",t:"num"},{k:"y",t:"num"},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate — wait until the color is GONE",t:"bool",d:false}], sum:p=>(p.negate?"until gone ":"")+`(${p.x||0},${p.y||0}) = ${p.color||"?"}`},
+  wait_color: {label:"Wait color",ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"x",t:"num"},{k:"y",t:"num"},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate - wait until the color is GONE",t:"bool",d:false}], sum:p=>(p.negate?"until gone ":"")+`(${p.x||0},${p.y||0}) = ${p.color||"?"}`},
   if_color:   {label:"If color",  ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"x",t:"num"},{k:"y",t:"num"},{k:"negate",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}(${p.x||0},${p.y||0}) ≈ ${p.color||"?"}`},
   read_color: {label:"Read color → variable",ico:"pipette",kind:"action",cat:"color", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"color",var:true},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>`${p.name||"?"} = px(${p.x||0},${p.y||0})`},
   loop:       {label:"Repeat",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"infinite",t:"bool",d:true},{k:"count",lbl:"Repeat count",t:"num",varRef:true,d:3,showWhen:{infinite:false}}], sum:p=>p.infinite?"∞ infinite":`${p.count}×`},
@@ -600,7 +600,7 @@ const WF_NODES = {
     {k:"state",lbl:"State",t:"select",opts:WF_WIN_STATES,d:"exists"},
     ...WF_WIN_SIZE_FIELDS,
     {k:"timeout",lbl:"Timeout (s)",t:"num",d:30},
-    {k:"negate",lbl:"Negate — wait for the opposite",t:"bool",d:false}
+    {k:"negate",lbl:"Negate - wait for the opposite",t:"bool",d:false}
   ], sum:p=>`🪟 ${p.negate?"not ":""}${wfWinStateLabel(p)} ≤${p.timeout??30}s`},
   // Win32's answer to Device info → variable.
   win_info:     {label:"Window info → variable", ico:"monitor", kind:"action", cat:"window", outs:["out"], fields:[
@@ -830,10 +830,10 @@ function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$(
   api().save_settings({snap:wfSnapOn, snapMigrated:true, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), logH: logH||undefined, sideW, inspW, actH: wfActH||null, sideCollapsed:wfSideCollapsed, inspCollapsed:wfInspCollapsed}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
-  const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off")+" — Smart align overrides the grid only on matched axes (hold Alt for free placement)"; s.classList.toggle("on",wfSnapOn); }
+  const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off")+" - Smart align overrides the grid only on matched axes (hold Alt for free placement)"; s.classList.toggle("on",wfSnapOn); }
   const p=$("wf-preview-btn"); if(p){ p.title="Image preview: "+(wfPreviewAll?"On":"Off"); p.classList.toggle("on",wfPreviewAll); }
-  const a=$("wf-align-btn"); if(a){ a.title="Smart align: "+(wfAlignOn?"On":"Off")+" — edges, centres, and ports override grid snapping only when matched (hold Alt to pause both)"; a.classList.toggle("on",wfAlignOn); }
-  const m=$("wf-minimap-btn"); if(m){ m.title="Minimap: "+(wfMinimapOn?"On":"Off")+" — bird's-eye view of the graph, click to jump the camera"; m.classList.toggle("on",wfMinimapOn); }
+  const a=$("wf-align-btn"); if(a){ a.title="Smart align: "+(wfAlignOn?"On":"Off")+" - edges, centres, and ports override grid snapping only when matched (hold Alt to pause both)"; a.classList.toggle("on",wfAlignOn); }
+  const m=$("wf-minimap-btn"); if(m){ m.title="Minimap: "+(wfMinimapOn?"On":"Off")+" - bird's-eye view of the graph, click to jump the camera"; m.classList.toggle("on",wfMinimapOn); }
   if(typeof wfSyncLinkModeBtn==="function") wfSyncLinkModeBtn();
   if(typeof wfSyncFocusBtn==="function") wfSyncFocusBtn();
   if(typeof wfSyncDebugOverlayBtn==="function") wfSyncDebugOverlayBtn();
@@ -891,7 +891,7 @@ function wfSyncSpeedUI(){
   if(win32){ wfSpeedPopClose(); return; }
   const b=$("wf-speed-btn");
   if(b){
-    b.title = "Speed hack: "+(sh.enabled?"On":"Off")+" (accelerate the game with Frida — root required · set package in Project settings)";
+    b.title = "Speed hack: "+(sh.enabled?"On":"Off")+" (accelerate the game with Frida - root required · set package in Project settings)";
     b.classList.toggle("on",sh.enabled);
     b.textContent = sh.enabled ? "Disable" : "Enable";
   }
@@ -998,7 +998,7 @@ function wfSyncBackendChrome(){
   const cfg=WF.win32||{};
   const target=String(cfg.window||"").trim();
   const targetEl=$("wf-bar-win32-label");
-  if(targetEl){ targetEl.textContent=target||"Choose window"; targetEl.title=target||"No fixed target — choose an open window"; }
+  if(targetEl){ targetEl.textContent=target||"Choose window"; targetEl.title=target||"No fixed target - choose an open window"; }
   const dot=$("wf-bar-win32-dot"); if(dot) dot.classList.toggle("configured",!!target);
   const matchBy=wfNormWinMatchBy(cfg.matchBy);
   const matchEl=$("wf-bar-win32-matchby"); if(matchEl && document.activeElement!==matchEl) matchEl.value=matchBy;
@@ -1193,7 +1193,7 @@ async function wfOfferUnityBridgeDeploy(opts){
       return;
     }
     const steps=[
-      "Không copy file nào vào thư mục game — Macro2k nạp Macro2kBridge thẳng vào tiến trình game đang chạy"
+      "Không copy file nào vào thư mục game - Macro2k nạp Macro2kBridge thẳng vào tiến trình game đang chạy"
       +(st.backend==="IL2CPP" ? " (DLL native, LoadLibrary)" : " (DLL managed, qua Mono runtime)"),
       "Tự nạp lại mỗi khi workflow gắn vào game (không cần thao tác lại sau khi restart game)",
     ];
@@ -1204,14 +1204,14 @@ async function wfOfferUnityBridgeDeploy(opts){
         list(steps)+
         `<div class="ui-modal-msg" style="opacity:.75">Plugin chạy trong game và nhận lệnh tap/swipe qua 127.0.0.1:${escHtml(String(st.port||17820))}. `+
         `Cần game đang mở để nạp được ngay; nếu chưa mở, Macro2k sẽ tự nạp khi workflow gắn vào game. `+
-        `Game online có anti-cheat có thể phát hiện việc nạp DLL — tự cân nhắc rủi ro.</div>`,
+        `Game online có anti-cheat có thể phát hiện việc nạp DLL - tự cân nhắc rủi ro.</div>`,
       buttons:[{label:"Để sau", value:false}, {label:"Triển khai", value:true, kind:"accent"}]});
     if(!ok) return;
     let res=null;
     try{ res=await api().unity_bridge_deploy(st.exe); }catch(e){ res={ok:false, error:String(e)}; }
     if(res && res.ok){
       uiToast(res.injected ? "Đã nạp Unity Bridge vào game đang chạy"
-                           : "Unity Bridge sẽ được nạp khi workflow gắn vào game — hãy mở game trước","success",{dur:6000});
+                           : "Unity Bridge sẽ được nạp khi workflow gắn vào game - hãy mở game trước","success",{dur:6000});
       setStatus("Unity Bridge: "+(res.actions||[]).join(" · "));
     }else{
       uiToast("Triển khai thất bại: "+((res&&res.error)||"unknown"),"error",{dur:8000});
@@ -1237,8 +1237,8 @@ function wfOpenProjectSettings(){
       rowCtrl.innerHTML=
         `<label for="wf-controller">Project type</label>`+
         `<select id="wf-controller" title="ADB device/emulator or Win32 PC window">`+
-          `<option value="adb">ADB — Android device / emulator</option>`+
-          `<option value="win32">Win32 — PC program window</option>`+
+          `<option value="adb">ADB - Android device / emulator</option>`+
+          `<option value="win32">Win32 - PC program window</option>`+
         `</select>`+
         `<div class="hint">Chooses capture + input backend for the whole workflow.</div>`;
       secCtrl.appendChild(rowCtrl);
@@ -1257,8 +1257,8 @@ function wfOpenProjectSettings(){
       rowInput.innerHTML=
         `<label for="wf-input-select">Input method</label>`+
         `<select id="wf-input-select" title="How taps/swipes reach the device">`+
-          `<option value="adb">ADB shell — compatible</option>`+
-          `<option value="scrcpy">scrcpy control — fast</option>`+
+          `<option value="adb">ADB shell - compatible</option>`+
+          `<option value="scrcpy">scrcpy control - fast</option>`+
         `</select>`+
         `<div class="hint">scrcpy control injects input over the existing mirror socket (much lower latency); falls back to ADB shell automatically.</div>`;
       secAdb.appendChild(rowInput);
@@ -1320,13 +1320,13 @@ function wfOpenProjectSettings(){
         `<div class="wf-proj-row">`+
           `<label for="wf-win32-mode">Input mode</label>`+
           `<select id="wf-win32-mode" title="How input is delivered to the window">`+
-            `<option value="background">Background — PostMessage</option>`+
-            `<option value="background_sync">Background sync — SendMessage</option>`+
-            `<option value="background_cursor">Background + cursor — Unity / Unreal</option>`+
-            `<option value="background_window">Window-pos — no cursor move</option>`+
-            `<option value="anchored_touch">Anchored touch — WM_POINTER</option>`+
-            `<option value="unity_bridge">Unity bridge — in-game plugin</option>`+
-            `<option value="foreground">Foreground — real mouse</option>`+
+            `<option value="background">Background - PostMessage</option>`+
+            `<option value="background_sync">Background sync - SendMessage</option>`+
+            `<option value="background_cursor">Background + cursor - Unity / Unreal</option>`+
+            `<option value="background_window">Window-pos - no cursor move</option>`+
+            `<option value="anchored_touch">Anchored touch - WM_POINTER</option>`+
+            `<option value="unity_bridge">Unity bridge - in-game plugin</option>`+
+            `<option value="foreground">Foreground - real mouse</option>`+
           `</select>`+
         `</div>`+
         `<div class="wf-proj-row" id="wf-unity-bridge-row" style="display:none">`+
@@ -1533,7 +1533,7 @@ function wfSyncZoomBadge(){
   const pct=Math.round(wfZoom*100);
   b.textContent=pct+"%";
   b.classList.toggle("zoomed",pct!==100);
-  b.title=pct===100?"Zoom 100%":`Zoom ${pct}% — click or double-tap Space to reset to 100%`;
+  b.title=pct===100?"Zoom 100%":`Zoom ${pct}% - click or double-tap Space to reset to 100%`;
 }
 // Level of detail. Zoomed out far enough, 9px slot labels, flow markers and
 // timing chips stop being information and turn into speckle — the same call

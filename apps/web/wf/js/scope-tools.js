@@ -108,9 +108,9 @@ async function pvQuickCrop(){
   pvCropPending=true;
   let path="";
   try{ path = await api().quick_crop($("pv-crop-name").value); }
-  catch(e){ setStatus("Could not save region — try again"); uiToast("Could not save crop", "warning"); return ""; }
+  catch(e){ setStatus("Could not save region - try again"); uiToast("Could not save crop", "warning"); return ""; }
   finally{ pvCropPending=false; }
-  if(!path){ setStatus("No region — drag-select a region on the image first"); return; }
+  if(!path){ setStatus("No region - drag-select a region on the image first"); return; }
   const ref=typeof wfRememberTemplate==="function"?wfRememberTemplate(path):path;
   const tpl=$("pv-tpl-path"); if(tpl) tpl.value=ref;
   if(typeof wfLibInvalidate==="function") wfLibInvalidate(ref);
@@ -192,7 +192,7 @@ function pvDrawSwipeMini(s){
 function pvCopySwipe(btn){
   const s=pvSwipeVals();
   pvCopyText(`${s.x1}, ${s.y1}, ${s.x2}, ${s.y2}, ${s.duration}`, btn);
-  setStatus(`Swipe copied (${s.x1},${s.y1}) → (${s.x2},${s.y2}) · ${s.duration}ms — paste into a Swipe block`);
+  setStatus(`Swipe copied (${s.x1},${s.y1}) → (${s.x2},${s.y2}) · ${s.duration}ms - paste into a Swipe block`);
 }
 function pvClearSwipePreview(){
   if(typeof wfPvSwipe!=="undefined") wfPvSwipe=null;

@@ -13,7 +13,7 @@ function wfRenderAll(){
     cur.dataset.empty = label ? "0" : "1";
     cur.classList.toggle("is-fn", !!isFn && !!label);
     cur.title = !isFn ? ((t&&t.name)?("Activity · "+t.name):"No activity open")
-      : "Function · "+((t&&t.name)||"")+" — click to go back to the activity";
+      : "Function · "+((t&&t.name)||"")+" - click to go back to the activity";
     // One-time wiring: clicking the ƒ breadcrumb returns to the last activity.
     if(!cur.__backWired){
       cur.__backWired=true;
@@ -95,7 +95,7 @@ Bấm để nhảy tới khối đó">${wfIco("crash")}</button>`
     el.innerHTML=
       `<span class="wf-act-runbar"></span>
        <span class="wf-act-grip" title="Drag to reorder">${WF_GRIP}</span>
-       <span class="wf-act-cb ${act.enabled?"checked":""}" title="${act.enabled===false?"Disabled — this activity won't run":"Enabled"}">${check}</span>
+       <span class="wf-act-cb ${act.enabled?"checked":""}" title="${act.enabled===false?"Disabled - this activity won't run":"Enabled"}">${check}</span>
        <span class="wf-act-name" title="Double-click to rename">${escHtml(act.name)}</span>
        ${crashBtn}
        <button class="wf-act-del" title="Delete">${wfIco("x")}</button>`;
@@ -131,7 +131,7 @@ Bấm để nhảy tới khối đó">${wfIco("crash")}</button>`
   }
   if(bgWrap){
     if(!bgActs.length){
-      bgWrap.innerHTML='<div class="wf-list-empty">No background tasks yet.<span class="hint">They run in parallel on an interval — click + to add one.</span></div>';
+      bgWrap.innerHTML='<div class="wf-list-empty">No background tasks yet.<span class="hint">They run in parallel on an interval - click + to add one.</span></div>';
     } else bgActs.forEach(a=>rowInto(bgWrap, a));
   }
   wfToggleActPanel();   // re-apply the persisted collapsed state on every render
@@ -893,7 +893,7 @@ function wfNodeWarnings(n, def, g){
   for(const f of (def.fields||[])){
     if(f.t==="tpl" && !String(n.params[f.k]||"").trim()) w.push("No template image selected");
     if(f.t==="tpls"){ const a=n.params[f.k]; if(!Array.isArray(a)||!a.filter(x=>String(x||"").trim()).length) w.push("No images in the list"); }
-    if(f.t==="color" && !/^#[0-9a-fA-F]{6}$/.test(String(n.params[f.k]||""))) w.push("Invalid color — need #RRGGBB");
+    if(f.t==="color" && !/^#[0-9a-fA-F]{6}$/.test(String(n.params[f.k]||""))) w.push("Invalid color - need #RRGGBB");
   }
   if(n.type==="switch"){
     const cs=(n.params&&n.params.cases)||[];
@@ -904,11 +904,11 @@ function wfNodeWarnings(n, def, g){
   if(n.type==="and" && g){
     const expected=Math.max(1,parseInt(n.params&&n.params.count)||2);
     const incoming=(g.edges||[]).filter(ed=>ed.to===n.id).length;
-    if(!incoming) w.push("No incoming wire — this block will never run");
+    if(!incoming) w.push("No incoming wire - this block will never run");
     else if(incoming!==expected) w.push(`Expected ${expected} incoming branches, found ${incoming}`);
   }
   if(def.kind!=="start" && def.kind!=="note" && n.type!=="and" && g && !(g.edges||[]).some(ed=>ed.to===n.id))
-    w.push("No incoming wire — this block will never run");
+    w.push("No incoming wire - this block will never run");
   return w;
 }
 // Swatch dot for the node summary of color nodes (t:"color" field) — shows the
@@ -1137,7 +1137,7 @@ function wfNodeEl(n){
                  : incoming ? wfWireTone(incoming.fromPort, port, src, incoming) : "";
       ip.className="wf-port in"+(tone?" "+tone:"")+(incoming?" connected":"");
       ip.dataset.node=n.id; ip.dataset.port=port; ip.style.top=top+"px";
-      ip.title=port==="loop"?"Loop return — drop a wire here":"Input — drop a wire here";
+      ip.title=port==="loop"?"Loop return - drop a wire here":"Input - drop a wire here";
       el.appendChild(ip);
       if(ins.length>1){ const lbl=document.createElement("span"); lbl.className="wf-port-lbl in"+(port==="loop"?" loop":"");
         const txt=WF_IN_LBL[port]||port;
@@ -1155,7 +1155,7 @@ function wfNodeEl(n){
     const tone = outgoing ? wfWireTone(port, outgoing.toPort||"in", n, outgoing) : wfWireTone(port,"in", n);
     op.className="wf-port out"+(tone?" "+tone:"")+(outgoing?" connected":"");
     op.dataset.node=n.id; op.dataset.port=port; op.style.top=top+"px";
-    op.title=(WF_PORT_LBL[port]||port)+" — drag to connect; drop on empty canvas to add a node";
+    op.title=(WF_PORT_LBL[port]||port)+" - drag to connect; drop on empty canvas to add a node";
     el.appendChild(op);
     let lblTxt;
     if(n.type==="switch") lblTxt = (port==="default") ? "else" : "#"+(i+1);

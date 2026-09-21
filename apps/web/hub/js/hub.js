@@ -332,12 +332,6 @@ function initialsFor(name) {
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
   return (words[0][0] + words[1][0]).toUpperCase();
 }
-/** The game's small icon: assets/icon.*, else the cover, else its initials. */
-function iconHtmlFor(g, cls) {
-  const src = g.icon || g.cover;
-  if (src) return `<img class="${cls}" src="${escHtml(src)}" alt="" decoding="async" draggable="false">`;
-  return `<span class="${cls} icon-mono" aria-hidden="true">${escHtml(initialsFor(g.name))}</span>`;
-}
 function emptyArtHtml(name) {
   return `<span class="game-art-empty" aria-hidden="true">` +
     `<span class="art-initials">${escHtml(initialsFor(name))}</span>` +
@@ -370,7 +364,6 @@ function cardHtml(g, i) {
       `<span class="game-building" title="Show build progress"><span class="build-dot"></span>Building <span class="chip-pct">${building ? (BUILD.progress || 0) : 0}%</span></span>` +
     `</button>` +
     `<div class="game-info">` +
-      iconHtmlFor(g, "game-icon") +
       `<span class="game-name" title="${name}">${name}</span>` +
       `<span class="game-meta">` +
         `<span class="ctrl-tag ${ctrl}">${ctrl === "win32" ? "Win32" : "ADB"}</span>` +
@@ -658,7 +651,7 @@ function applyBuild(state, opts) {
 
   const wasActive = prev && (prev.state === "running" || prev.state === "cancelling") && prev.startedAt === BUILD.startedAt;
   if (wasActive && BUILD.state === "done") toast((BUILD.releaseUrl ? `Published ${BUILD.name} v${BUILD.version}` : `Built ${BUILD.name} v${BUILD.version}`)
-    + (BUILD.requirements ? " — ships requirements\\ for the game folder" : ""), "success");
+    + (BUILD.requirements ? ", ships requirements\\ for the game folder" : ""), "success");
   else if (wasActive && BUILD.state === "failed") toast(`Build failed: ${BUILD.error || BUILD.name}`, "error");
   else if (wasActive && BUILD.state === "cancelled") toast(`Build cancelled: ${BUILD.name}`, "info");
 
@@ -904,9 +897,7 @@ function wire() {
     const card = img.closest(".game");
     const meta = GAMES.find((g) => card && g.path === card.dataset.path);
     const name = meta ? meta.name : "";
-    if (img.classList.contains("game-icon")) {
-      img.insertAdjacentHTML("afterend", `<span class="game-icon icon-mono" aria-hidden="true">${escHtml(initialsFor(name))}</span>`);
-    } else if (img.classList.contains("game-img")) {
+    if (img.classList.contains("game-img")) {
       img.insertAdjacentHTML("afterend", emptyArtHtml(name));
     } else {
       return;

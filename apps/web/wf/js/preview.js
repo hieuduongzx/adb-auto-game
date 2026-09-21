@@ -153,7 +153,7 @@ function wfZoomApplyMode(mode){
     if(out) out.onclick=()=>wfZoomBy(1/1.1);
     if(inb) inb.onclick=()=>wfZoomBy(1.1);
     if(lbl){ lbl.onclick=wfZoomReset; lbl.title="Reset 100%"; }
-    if(fit){ fit.onclick=wfFit; fit.title="Fit view — show all blocks (F)"; }
+    if(fit){ fit.onclick=wfFit; fit.title="Fit view - show all blocks (F)"; }
     if(lbl) lbl.textContent=Math.round(wfZoom*100)+"%";
   }
 }
@@ -400,7 +400,7 @@ function wfPvNodePreviewStatus(){
   const chip=document.getElementById("wf-pv-node-chip"); if(!chip) return;
   if(!wfPvNodePreview){ chip.hidden=true; chip.textContent=""; return; }
   chip.hidden=false; chip.textContent=wfPvNodePreview.summary||"Node preview";
-  chip.title=(wfPvNodePreview.labels||[]).join(" · ")+" — click to clear";
+  chip.title=(wfPvNodePreview.labels||[]).join(" · ")+" - click to clear";
 }
 function wfPvClearNodePreview(){
   wfPvNodePreview=null; wfPvNodeShapes=[]; wfPvOverlay=[]; wfPvMatchRegion=null; wfPvOverlayMeta=null; wfPvNodePreviewStatus();
@@ -448,7 +448,7 @@ async function wfPvPreviewNodes(nodes){
   const labels=nodes.map(wfPvNodeLabel);
   wfPvNodePreview={nodeIds:nodes.map(n=>n.id),labels,summary:nodes.length===1?labels[0]:`${nodes.length} blocks`};
   wfPvNodePreviewStatus(); wfPvFit();
-  if(!ok && typeof uiToast==="function") uiToast("No live frame — showing geometry when capture becomes available.","warning");
+  if(!ok && typeof uiToast==="function") uiToast("No live frame - showing geometry when capture becomes available.","warning");
   // Image nodes: match templates against the captured frame without executing
   // Tap/Wait. This paints actual hits; filename/search rectangles stay as the
   // reference layer even when nothing matches.
@@ -518,7 +518,7 @@ function wfPvSyncOverlayBtn(){
   if(zb){
     const pct=Math.round(wfPvZoom*100);
     if(zb.textContent!==pct+"%"){ zb.textContent=pct+"%"; zb.classList.toggle("zoomed",pct!==100);
-      zb.title=pct===100?"Zoom 100%":`Zoom ${pct}% — click or double-tap Space to reset`; }
+      zb.title=pct===100?"Zoom 100%":`Zoom ${pct}% - click or double-tap Space to reset`; }
   }
 }
 // "Clear overlay" button: wipe every annotation and tell the backend so the panel
@@ -791,7 +791,7 @@ function wfPvAttachCanvas(){
     wfPvHover=p;
     wfPvHoverHex=p?wfPvPixelAt(p[0],p[1]):"";
     const hp=document.getElementById("hover-pos");
-    if(hp) hp.textContent = p?`${p[0]}, ${p[1]}${wfPvHoverHex?" · "+wfPvHoverHex:""}`:"—";
+    if(hp) hp.textContent = p?`${p[0]}, ${p[1]}${wfPvHoverHex?" · "+wfPvHoverHex:""}`:"-";
     if(wfPvRDrag){ wfPvRDrag.c=[cx,cy]; wfPvDraw(); return; }
     if(wfPvDragging){ wfPvDragEnd=[cx,cy]; wfPvDraw(); return; }
     if(wfPvImg) wfPvDraw();   // refresh the crosshair/HUD
@@ -854,7 +854,7 @@ function wfPvAttachCanvas(){
     if(wfPvPanning){ wfPvPanning=false; c.style.cursor="crosshair"; }
     wfPvHover=null; wfPvHoverHex="";
     if(wfPvImg) wfPvDraw();
-    const hp=document.getElementById("hover-pos"); if(hp) hp.textContent="—";
+    const hp=document.getElementById("hover-pos"); if(hp) hp.textContent="-";
   });
 
   // The tap/swipe now happens on right-mouseup (short = tap, drag = swipe);

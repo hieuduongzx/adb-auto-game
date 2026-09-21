@@ -294,7 +294,7 @@ let _wfAutosaveFailAt=0;    // throttle the failure toast (autosave retries ofte
 function wfSyncDirtyUI(){
   const b=$("wf-save-btn");
   if(b){ b.classList.toggle("dirty", wfDirty);
-    b.title = wfDirty ? "Save (Ctrl+S) — unsaved changes" : "Save to the current file (Ctrl+S)"; }
+    b.title = wfDirty ? "Save (Ctrl+S) - unsaved changes" : "Save to the current file (Ctrl+S)"; }
 }
 function wfMarkDirty(){
   wfDirty=true; wfSyncDirtyUI();
@@ -318,7 +318,7 @@ async function wfAutosave(){
   // errors until the user lost work.
   if(failed && Date.now()-_wfAutosaveFailAt>60000){
     _wfAutosaveFailAt=Date.now();
-    if(typeof uiToast==="function") uiToast("Autosave failed — use Ctrl+S and check the log.","error");
+    if(typeof uiToast==="function") uiToast("Autosave failed - use Ctrl+S and check the log.","error");
   }
 }
 // Block closing the window while there are unsaved changes (best-effort in WebView2).
@@ -337,9 +337,9 @@ async function wfSave(){
   try{
     const r=await api().workflow_save(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
     if(r&&r.ok){ wfHasFile=true; wfMarkClean(); setStatus("Workflow saved"); uiToast("Workflow saved","success",{dur:1600}); }
-    else uiToast("Save failed — check the log for details.","error");
+    else uiToast("Save failed - check the log for details.","error");
   }catch(e){
-    uiToast("Save failed — "+String(e&&e.message||e||"unknown error"),"error");
+    uiToast("Save failed - "+String(e&&e.message||e||"unknown error"),"error");
   }finally{
     wfSaving=false;
     if(btn){ btn.disabled=false; btn.classList.remove("saving"); btn.removeAttribute("aria-busy"); btn.title=oldTitle||"Save workflow"; }
@@ -360,7 +360,7 @@ function wfNormVersion(raw){
   return parts.length ? parts.join(".") : "1.0.0";
 }
 async function wfBuildExe(){
-  if(wfBuilding){ uiToast("A build is already running — check the log.","info"); return; }
+  if(wfBuilding){ uiToast("A build is already running - check the log.","info"); return; }
   if(!WF.activities || !WF.activities.length){ uiToast("Add at least one activity before building.","error"); return; }
   const cur=wfNormVersion(WF.buildVersion||"1.0.0");
   let verInp=null;
@@ -372,7 +372,7 @@ async function wfBuildExe(){
         `<div class="wf-new-form">`+
           `<div class="wf-new-field">`+
             `<div class="ui-modal-lbl">Workflow</div>`+
-            `<div class="hint" style="margin-top:2px">${escHtml(WF.name||"workflow")} — packages the Runner + this one workflow (no Designer). Only the vendor tools it uses are bundled.</div>`+
+            `<div class="hint" style="margin-top:2px">${escHtml(WF.name||"workflow")} - packages the Runner + this one workflow (no Designer). Only the vendor tools it uses are bundled.</div>`+
           `</div>`+
           `<div class="wf-new-field">`+
             `<label class="ui-modal-lbl" for="wf-build-ver">Version</label>`+
@@ -422,7 +422,7 @@ async function wfOnBuildDone(data){
     if(open && data.path){ try{ await api().reveal_path(data.path); }catch{} }
   }else{
     setStatus("Build failed");
-    uiToast("Build failed — "+((data&&data.error)||"see the log for details"),"error");
+    uiToast("Build failed - "+((data&&data.error)||"see the log for details"),"error");
   }
 }
 
@@ -498,7 +498,7 @@ async function wfToggleRun(){
 // activities are sent as disabled so the engine skips them without mutating
 // the designer's enable checkboxes.
 async function wfRunOneActivity(actId){
-  if(wfRunning){ uiToast("A workflow is already running — stop it first.","warning"); return; }
+  if(wfRunning){ uiToast("A workflow is already running - stop it first.","warning"); return; }
   const act=(WF.activities||[]).find(a=>a.id===actId);
   if(!act){ uiToast("Activity not found.","error"); return; }
   // Open the target activity so the live node trail paints on the right graph.
@@ -509,7 +509,7 @@ async function wfRunOneActivity(actId){
 // (explorer-style selection — nothing to do with the enable checkboxes).
 // Ctrl+right-click on any row is the quick gesture; the row menu exposes it too.
 async function wfRunSelectedActs(){
-  if(wfRunning){ uiToast("A workflow is already running — stop it first.","warning"); return; }
+  if(wfRunning){ uiToast("A workflow is already running - stop it first.","warning"); return; }
   // Keep the designer's list order, not click order.
   const ids=(WF.activities||[]).filter(a=>wfActSel.has(a.id)).map(a=>a.id);
   if(!ids.length){
@@ -528,7 +528,7 @@ async function wfStartRunFlow(onlyId){
     if(errs){
       const pick=await uiModal({
         title:"The workflow has errors",
-        body:`<div class="ui-modal-msg">Found <b>${errs} error${errs===1?"":"s"}</b>${issues.length-errs?` and ${issues.length-errs} warning${issues.length-errs===1?"":"s"}`:""} — the flow may stop midway or take the wrong branch.</div>`,
+        body:`<div class="ui-modal-msg">Found <b>${errs} error${errs===1?"":"s"}</b>${issues.length-errs?` and ${issues.length-errs} warning${issues.length-errs===1?"":"s"}`:""} - the flow may stop midway or take the wrong branch.</div>`,
         buttons:[
           {label:"Cancel", value:"cancel"},
           {label:"View errors", value:"view"},

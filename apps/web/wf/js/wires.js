@@ -63,7 +63,7 @@ function wfCycleLinkMode(){
 function wfSyncLinkModeBtn(){
   const b=document.getElementById("wf-link-btn"); if(!b) return;
   b.dataset.mode=wfLinkMode;
-  b.title="Link style: "+WF_LINK_MODE_LBL[wfLinkMode]+" — click to cycle (spline → linear → straight)";
+  b.title="Link style: "+WF_LINK_MODE_LBL[wfLinkMode]+" - click to cycle (spline → linear → straight)";
 }
 
 // ── Link shapes ──────────────────────────────────────────────────────────────
@@ -314,7 +314,7 @@ function wfDeleteWire(ed){
   wfPushUndo();
   const i=g.edges.indexOf(ed); if(i>=0) g.edges.splice(i,1);
   wfRenderCanvas();
-  setStatus("Wire deleted — Ctrl+Z to undo");
+  setStatus("Wire deleted - Ctrl+Z to undo");
 }
 
 function wfDrawTempWire(mx,my){

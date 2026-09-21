@@ -133,7 +133,7 @@ function wfLibRenderGrid(){
   if(!shown.length){
     wfLibPlaceholder(grid, all.length
       ? "No templates match the filter"
-      : "The template folder is empty — capture a region in Preview to create the first one");
+      : "The template folder is empty - capture a region in Preview to create the first one");
     wfLibRenderSide();
     return;
   }

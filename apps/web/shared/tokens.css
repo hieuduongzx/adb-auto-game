@@ -76,6 +76,10 @@
   --t-head: 19px;      /* app title in a header card */
   --t-display: 22px;   /* hero numbers, empty-state headline */
 
+  /* Shape scale, one rule for the suite: xs 4 = tags and badges inside a row,
+     sm 6 = controls (buttons, inputs, checkboxes), md 10 = containers (cards,
+     panels, popovers), lg 14 = modals. 999px is for pills and status dots only. */
+  --r-xs: 4px;
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 14px;
@@ -143,6 +147,11 @@
   --err-bd:       rgba(224, 108, 100, .36);
 
   --accent-soft:  #93b4f3;
+  /* The dark-theme fills are light, so the ink on them goes dark (white on
+     #6aa1ff is 2.6:1; these are all above 7:1). */
+  --on-accent: #0a1424;
+  --on-ok:     #04140b;
+  --on-err:    #1c0806;
   --track:        #2e3746;
   --checker:      #2a3240;
 

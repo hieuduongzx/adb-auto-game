@@ -312,7 +312,7 @@
 /* Asset library */
 .asset-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(88px,1fr)); gap: 7px; }
 .asset-card { display: flex; flex-direction: column; cursor: pointer; text-align:left;
-  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
   transition: border-color .12s, box-shadow .12s; }
 .asset-card:hover, .asset-card.active { border-color: var(--border2); box-shadow: var(--sh-sm); }
 .asset-thumb { width: 100%; height: 66px; object-fit: contain; background: var(--shade2); display: block; }
@@ -356,14 +356,14 @@
 .log-count:empty { display: none; }
 .log-count.has-err { color: var(--err); background: var(--err-bg); }
 .btn-log-clear { font-size: var(--t-caption); font-weight: 600; color: var(--muted);
-  padding: 3px 7px; border-radius: 5px; transition: color .1s, background .1s; }
+  padding: 3px 7px; border-radius: var(--r-sm); transition: color .1s, background .1s; }
 .btn-log-clear:hover { color: var(--dim); background: var(--alt); }
 .btn-log-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Level filter chips in the log header; data-filter on #log-card hides the rest. */
 .log-filters { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px;
-  padding: 2px; border-radius: 7px; background: var(--alt); border: 1px solid var(--border); }
+  padding: 2px; border-radius: var(--r-sm); background: var(--alt); border: 1px solid var(--border); }
 .log-f { font-family: var(--mono); font-size: var(--t-micro); font-weight: 700; color: var(--muted);
-  padding: 2px 7px; border-radius: 5px; transition: color .1s, background .1s; }
+  padding: 2px 7px; border-radius: var(--r-sm); transition: color .1s, background .1s; }
 .log-f:hover { color: var(--ink); }
 .log-f.on { background: var(--panel); color: var(--accent); box-shadow: var(--sh-sm); }
 /* One hidden class for every filter (level, source, search) — see
@@ -394,6 +394,8 @@
 .log-line.has-node:hover .log-msg { text-decoration: underline; text-underline-offset: 2px; }
 .log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 12px;
   background: var(--log-bg); user-select: text; cursor: text; }
+.log-body:empty { display: flex; align-items: center; justify-content: center; }
+.log-body:empty::before { content: "No log lines yet. Run the workflow or a single node to see output here."; font-size: var(--t-caption); color: var(--log-muted); }
 .log-line { display: flex; gap: 7px; font-family: var(--mono); font-size: var(--t-micro);
   line-height: 1.75; white-space: nowrap; }
 .log-ts  { color: var(--log-muted); flex-shrink: 0; }
@@ -433,4 +435,4 @@
 .ui-keys-row { display: flex; align-items: baseline; gap: 10px; font-size: var(--t-body); color: var(--ink2); }
 .ui-kbd { flex-shrink: 0; min-width: 138px; font-family: var(--mono); font-size: var(--t-micro);
   font-weight: 600; color: var(--dim); background: var(--alt);
-  border: 1px solid var(--border2); border-radius: 5px; padding: 2px 7px; text-align: center; }
+  border: 1px solid var(--border2); border-radius: var(--r-sm); padding: 2px 7px; text-align: center; }

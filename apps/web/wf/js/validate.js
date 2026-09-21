@@ -15,8 +15,8 @@ function wfValidationIssues(){
     // always returns F (false); a sequence activity without one is always
     // marked failed (red) after a run. Background tasks poll forever — skip.
     if(!nodes.some(n=>n.type==="end")){
-      if(ctx.kind==="function") add("warn","Function has no End node — calls will always return F (false)",ctx,null);
-      else if(ctx.owner.type!=="background") add("warn","Activity has no End node — it will always be marked failed (red)",ctx,null);
+      if(ctx.kind==="function") add("warn","Function has no End node - calls will always return F (false)",ctx,null);
+      else if(ctx.owner.type!=="background") add("warn","Activity has no End node - it will always be marked failed (red)",ctx,null);
     }
     edges.forEach(e=>{
       if(!byId.has(e.from)) add("err",`Wire starts from missing node ${e.from}`,ctx,null);
@@ -48,7 +48,7 @@ function wfValidationIssues(){
         if(lp.pathSrc==="custom"){
           if(!String(lp.path||"").trim()) add("err","Launch program: choose an executable or path variable",ctx,n.id);
         }else if(!String((WF.win32||{}).path||"").trim()){
-          add("warn","Launch program: no game path in Project settings — set it there, or in the Runner's Settings tab",ctx,n.id);
+          add("warn","Launch program: no game path in Project settings - set it there, or in the Runner's Settings tab",ctx,n.id);
         }
       }
       if(n.type==="parallel"){
@@ -124,7 +124,7 @@ function wfValidatePanelShow(issues){
   canvas.appendChild(p);
   const list=p.querySelector("#wf-vald-list");
   if(!issues.length){
-    list.innerHTML=`<div class="wf-find-empty">The workflow is ready to run — no broken wires, missing templates or bad branches found.</div>`;
+    list.innerHTML=`<div class="wf-find-empty">The workflow is ready to run - no broken wires, missing templates or bad branches found.</div>`;
   }
   issues.forEach(i=>{
     // Two-line rows: owner on top, full message below (wraps — never clipped).
@@ -168,7 +168,7 @@ function wfClearDebugPause(){
 }
 function wfDebugAutoStep(){
   if(!wfDebugMode) return;
-  setStatus("Paused — click Next step");
+  setStatus("Paused - click Next step");
   const el=wfNodeElById(wfRunNode); if(el) el.classList.add("paused");
   const nb=$("wf-step-next-btn"); if(nb) nb.classList.add("paused");
 }

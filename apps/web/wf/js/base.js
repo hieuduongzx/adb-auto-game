@@ -297,7 +297,7 @@ function wfCrashWhy(info){
   const why = { failed:"this block did not complete successfully",
                 error:"this block raised an error",
                 dead_end:"the outgoing branch is not connected" }[info.reason] || info.reason || "";
-  return `${what}${why?" — "+why:""}${info.message?": "+info.message:""}`;
+  return `${what}${why?" - "+why:""}${info.message?": "+info.message:""}`;
 }
 // Jump the editor to an activity's crash block: switch to its graph, select it
 // and centre the camera — the same move as clicking a validation issue.
@@ -528,7 +528,7 @@ function wfPaintNodeDelay(){
     const label=chip.querySelector(".wf-timeout-label");
     const left=wfFmtRemain(remain);
     if(label) label.textContent=left;
-    chip.title="Timeout — "+left+" left";
+    chip.title="Timeout - "+left+" left";
     return;
   }
   // Prefer the existing static chip for this phase; fall back to a floating badge
@@ -546,7 +546,7 @@ function wfPaintNodeDelay(){
     const label=chip.querySelector(".wf-delay-label");
     if(label) label.textContent=text;
     else chip.innerHTML=`<span class="wf-delay-label">${text}</span>`;
-    chip.title=(st.phase==="after"?"After":"Before")+" wait — "+left+" left";
+    chip.title=(st.phase==="after"?"After":"Before")+" wait - "+left+" left";
     const live=el.querySelector(".wf-node-delay-live"); if(live) live.remove();
   } else {
     let live=el.querySelector(".wf-node-delay-live");
@@ -558,7 +558,7 @@ function wfPaintNodeDelay(){
     live.dataset.phase=st.phase;
     live.style.setProperty("--pct", pct.toFixed(1));
     live.innerHTML=`<span class="wf-delay-label">${text}</span>`;
-    live.title=(st.phase==="after"?"After":"Before")+" wait — "+left+" left";
+    live.title=(st.phase==="after"?"After":"Before")+" wait - "+left+" left";
   }
   if(remain<=0){
     // Local clock finished; leave paint until engine's end event restores chips
@@ -638,7 +638,7 @@ function rebuildDeviceSelect(devices, connected){
   const sel=$("device-select"), prev=sel.value; sel.innerHTML="";
   if(!devices||!devices.length){
     const o=document.createElement("option"); o.value="";
-    o.textContent="No devices — auto-scanning…";
+    o.textContent="No devices - auto-scanning…";
     sel.appendChild(o); sel.disabled=true; return;
   }
   sel.disabled=false;
