@@ -321,8 +321,7 @@
 .wf-side-sec { display:flex; flex-direction:column; min-height:0; }
 .wf-side-sec + .wf-side-sec { border-top:1px solid var(--border2); }
 
-/* Properties / DevScope share one panel below Variables — it takes the rest of
-   the column and scrolls internally. */
+/* Properties / DevScope fill the Inspector and scroll internally. */
 #wf-insp-panel { flex:1; min-height:0; }
 /* A maximized sidebar panel is a free-floating card again, so the column's
    hairlines and the section divider it inherited must not follow it over. */
@@ -362,7 +361,7 @@
 /* Debug overlay on = teal tint so it reads apart from Focus (blue accent). */
 #wf-act-dbg.on { color:var(--cat-image); background:var(--cat-image-bg); }
 
-/* ── Bottom-right dock: Activities · Functions · Variables in one card ───── */
+/* ── Bottom-right dock: Activities · Functions in one card ───────────────── */
 /* Flat: no drop shadow. The dock sits on a canvas, not above it — a hairline
    border and the panel fill already separate it, and the shadow only muddied
    the plane it is pinned to. */
@@ -421,8 +420,28 @@
 /* Panes share the one scrolling body, so --act-h sizes whichever tab is open. */
 .wf-dock-pane { display:none; flex-direction:column; min-height:0; }
 .wf-dock-pane.active { display:flex; }
-#wf-inspector-vars { display:flex; flex-direction:column; flex:0 1 auto; min-height:120px; max-height:45%; border-bottom:1px solid var(--border2); }
-#wf-inspector-vars.live .wf-vars-live { display:inline; color:var(--run-ok); }
+/* Variables are a top-right disclosure on the canvas: the compact labelled
+   trigger is always findable, while the editor only consumes space on demand. */
+.wf-vars-panel { position:absolute; top:12px; right:12px; z-index:8; width:320px;
+  max-width:calc(100% - 24px); max-height:calc(100% - 24px); display:flex;
+  flex-direction:column; overflow:hidden; background:var(--panel); border:1px solid var(--border);
+  border-radius:var(--r-md); box-shadow:var(--sh-sm); }
+#workflow-view.wf-preview-on .wf-vars-panel,
+#workflow-view.wf-library-on .wf-vars-panel { display:none; }
+.wf-vars-toggle { width:100%; min-height:36px; padding:0 var(--s2) 0 var(--s3); display:flex;
+  align-items:center; gap:var(--s2); color:var(--ink); background:var(--panel); border:0;
+  font-size:var(--t-body); font-weight:600; cursor:pointer; text-align:left; flex-shrink:0; }
+.wf-vars-toggle:hover { color:var(--accent); background:var(--accent-bg); }
+.wf-vars-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:-3px; }
+.wf-vars-chevron { width:14px; height:14px; margin-left:auto; color:var(--muted);
+  fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
+  transition:transform .15s var(--ease); }
+.wf-vars-panel:not(.collapsed) .wf-vars-chevron { transform:rotate(180deg); }
+.wf-vars-panel.collapsed { width:auto; }
+.wf-vars-panel.collapsed .wf-vars-body { display:none; }
+.wf-vars-panel:not(.collapsed) .wf-vars-toggle { border-bottom:1px solid var(--line); }
+.wf-vars-panel.live .wf-vars-live { display:inline; color:var(--run-ok); }
+.wf-vars-body { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:var(--s3); }
 .wf-vars-tabs { display:flex; gap:4px; margin-bottom:8px; }
 .wf-vars-tabs .btn { flex:1; }
 .wf-vars-tabs .active { background:var(--accent-bg); color:var(--accent); }
@@ -1769,7 +1788,7 @@
 .wf-region-cell input { width:100%; min-width:0; box-sizing:border-box; text-align:center; padding:2px 1px; font-size:10px; height:20px; background:var(--panel); }
 .wf-empty-note { font-size:11.5px; color:var(--muted); padding:6px 2px; text-align:center; }
 
-/* ── Live variables — the dock's third tab ───────────────────────────────── */
+/* ── Live variables ───────────────────────────────────────────────────────── */
 /* .wf-vars-hdr and friends outlive the old right-column panel: the Global-vars
    popover (.wf-globs-pop) still builds its header out of the same classes. */
 .wf-vars-hdr { display:flex; align-items:center; gap:var(--s2); height:var(--pnl-hd-h);
@@ -1794,10 +1813,7 @@
 .wf-vars-add svg { width:14px; height:14px; stroke-width:2; display:block; }
 .wf-vars-add:hover { color:var(--accent); background:var(--accent-bg); }
 .wf-vars-add:active { transform:scale(.92); }
-#wf-dtab-vars.live .wf-vars-live { display:inline; color:var(--run-ok); animation:wfPulse 1.4s ease-in-out infinite; }
 @keyframes wfPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-/* No max-height here — the dock card's --act-h is what bounds the list. */
-.wf-vars-body { flex:1; min-height:0; overflow-y:auto; padding:4px 7px 7px; }
 .wf-vars-empty { color:var(--muted); padding:10px 8px; font-size:11px; line-height:1.45;
   border:1px dashed var(--border); border-radius:7px; background:var(--surface); margin:2px 0; }
 .wf-vars-sep { font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;

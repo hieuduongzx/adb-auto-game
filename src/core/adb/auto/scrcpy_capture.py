@@ -137,7 +137,7 @@ def capture_adb_screen(controller) -> Optional[np.ndarray]:
     try:
         return decode_screencap(controller.capture_screen_raw())
     except Exception as exc:
-        log_warning(f"[capture] ADB screencap lỗi: {exc}")
+        log_warning(f"[capture] ADB screencap failed: {exc}")
         return None
 
 
@@ -156,8 +156,8 @@ def capture_screen(controller, timeout: float = 1.5) -> Optional[np.ndarray]:
         global _UNAVAILABLE_LOGGED
         if not _UNAVAILABLE_LOGGED:
             _UNAVAILABLE_LOGGED = True
-            log_warning("[capture] scrcpy không khả dụng (thiếu PyAV hoặc "
-                        "vendor/scrcpy/scrcpy-server) → dùng ADB screencap")
+            log_warning("[capture] scrcpy unavailable (PyAV or "
+                        "vendor/scrcpy/scrcpy-server missing) → using ADB screencap")
         return capture_adb_screen(controller)
     frame = capture_scrcpy_screen(controller, timeout=timeout)
     if frame is None:
@@ -171,7 +171,7 @@ def capture_screen(controller, timeout: float = 1.5) -> Optional[np.ndarray]:
         now = time.monotonic()
         if now - _LAST_NO_FRAME_LOG >= 1.0:
             _LAST_NO_FRAME_LOG = now
-            log_warning("[capture] scrcpy chưa có frame")
+            log_warning("[capture] scrcpy has no frame yet")
     return frame
 
 
@@ -324,25 +324,25 @@ class ScrcpyFrameSource:
         if self._failed_starts >= 2:
             self._dead = True
             log_warning(
-                f"[capture] scrcpy không stream được trên {self.serial} "
-                f"({self._last_error or 'không có frame'}) "
-                "→ tự chuyển sang ADB screencap cho máy này")
+                f"[capture] scrcpy could not stream on {self.serial} "
+                f"({self._last_error or 'no frame'}) "
+                "→ switching this device to ADB screencap")
         else:
-            log_debug(f"[capture] scrcpy chưa stream được trên {self.serial}, "
-                      f"sẽ thử lại ({self._last_error or 'không có frame'})")
+            log_debug(f"[capture] scrcpy could not stream on {self.serial} yet; "
+                      f"will retry ({self._last_error or 'no frame'})")
 
     def _launch_and_connect(self) -> bytes:
         """Push server, forward a port, start it, return the first bytes."""
         r = _adb_run(self.serial, "push", _scrcpy_server(), self.JAR_REMOTE)
         if r.returncode != 0:
-            raise RuntimeError(f"adb push thất bại: {(r.stderr or r.stdout).strip()}")
+            raise RuntimeError(f"adb push failed: {(r.stderr or r.stdout).strip()}")
 
         # MuMu wipes /data/local/tmp periodically, so the jar is re-pushed on
         # every session start; a running server keeps its (unlinked) dex alive.
         scid = f"{random.getrandbits(31):08x}"
         r = _adb_run(self.serial, "forward", "tcp:0", f"localabstract:scrcpy_{scid}")
         if r.returncode != 0:
-            raise RuntimeError(f"adb forward thất bại: {(r.stderr or r.stdout).strip()}")
+            raise RuntimeError(f"adb forward failed: {(r.stderr or r.stdout).strip()}")
         self._port = int(r.stdout.strip())
 
         cmd = [
@@ -367,7 +367,7 @@ class ScrcpyFrameSource:
         deadline = time.monotonic() + 5.0
         while time.monotonic() < deadline and not self._stopping:
             if self._proc.poll() is not None:
-                raise RuntimeError("scrcpy-server thoát sớm")
+                raise RuntimeError("scrcpy-server exited early")
             try:
                 sock = socket.create_connection(("127.0.0.1", self._port), timeout=2.0)
             except OSError:
@@ -386,7 +386,7 @@ class ScrcpyFrameSource:
             except OSError:
                 pass
             time.sleep(0.2)
-        raise RuntimeError("scrcpy-server không gửi dữ liệu")
+        raise RuntimeError("scrcpy-server sent no data")
 
     def _stream_loop(self, chunk: bytes) -> bool:
         codec = CodecContext.create("h264", "r")

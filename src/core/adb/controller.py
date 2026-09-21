@@ -465,7 +465,7 @@ class ADBController:
             self.device.shell(f"input keyevent {keycode}")
             return True
         except Exception as e:
-            log_error(f"⌨ gửi phím '{android_key_name(keycode)}' lỗi: {e}")
+            log_error(f"⌨ failed to send key '{android_key_name(keycode)}': {e}")
             return False
 
     def go_back(self) -> bool:
@@ -518,7 +518,7 @@ class ADBController:
         except Exception:
             pass
         tail = f" — {reason}" if reason else ""
-        log_warning(f"Device mất kết nối: {serial}{tail} — đã dừng capture")
+        log_warning(f"Device disconnected: {serial}{tail} — capture stopped")
         return True
 
     def capture_screen_raw(self) -> Optional[bytes]:

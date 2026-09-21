@@ -450,7 +450,7 @@ function wfRenderCanvas(){
   wfRenderVarsPanel();
 }
 
-// ── Variables panel (bottom-right of canvas) ──────────────────────────────────
+// ── Variables panel (top-right of canvas) ─────────────────────────────────────
 // Collect every variable the user can reference: declared on the current
 // activity (with their declared default), plus any live values the engine has
 // pushed during a test run. Live values override declared defaults.
@@ -490,8 +490,34 @@ function wfAllVarNames(){
 }
 let wfVarsScope="local";
 const wfVarsExpanded=new WeakSet();
+let wfVarsPanelOpen=false;
+try{ wfVarsPanelOpen=localStorage.getItem("wfVarsPanelOpen")==="1"; }catch{}
+
+function wfApplyVarsPanel(){
+  const panel=$("wf-vars-panel"), toggle=$("wf-vars-toggle"), body=$("wf-vars-body"); if(!panel||!toggle||!body) return;
+  panel.classList.toggle("collapsed",!wfVarsPanelOpen);
+  toggle.setAttribute("aria-expanded",String(wfVarsPanelOpen));
+  toggle.title=wfVarsPanelOpen?"Hide variables":"Show variables";
+  body.hidden=!wfVarsPanelOpen;
+}
+function wfToggleVarsPanel(force){
+  wfVarsPanelOpen=typeof force==="boolean"?force:!wfVarsPanelOpen;
+  wfApplyVarsPanel();
+  try{ localStorage.setItem("wfVarsPanelOpen",wfVarsPanelOpen?"1":"0"); }catch{}
+  if(wfVarsPanelOpen) wfRenderVarsPanel();
+}
+function wfInitVarsPanel(){
+  wfApplyVarsPanel();
+  const toggle=$("wf-vars-toggle");
+  if(toggle&&!toggle.dataset.wired){ toggle.dataset.wired="1"; toggle.onclick=()=>wfToggleVarsPanel(); }
+  if(document.documentElement.dataset.varsEscapeWired) return;
+  document.documentElement.dataset.varsEscapeWired="1";
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape"&&wfVarsPanelOpen&&!e.defaultPrevented) wfToggleVarsPanel(false);
+  });
+}
 // ── Bottom-right dock tabs: Activities · Functions ──────────────────────────
-// Variables are managed in the Inspector.
+// Variables use their own top-right canvas disclosure.
 const WF_DOCK_TABS=["act","fn"];
 let wfDockTab="act";
 try{ const t=localStorage.getItem("wfDockTab"); if(WF_DOCK_TABS.includes(t)) wfDockTab=t; }catch{}
@@ -541,9 +567,8 @@ function wfInitDockTabs(){
   });
 }
 function wfOpenInspectorVars(){
-  if(document.getElementById("workflow-view")?.classList.contains("wf-right-collapsed")) wfToggleSidebar("right");
-  wfRenderVarsPanel();
-  $("wf-inspector-vars")?.scrollIntoView({block:"nearest"});
+  wfToggleVarsPanel(true);
+  $("wf-vars-toggle")?.focus();
 }
 function wfRenderVarsPanel(){
   const body=$("wf-vars-body"); if(!body) return;
@@ -551,8 +576,8 @@ function wfRenderVarsPanel(){
   if(body.contains(document.activeElement)&&document.activeElement.matches("input,select")) return;
   const expandedScroll=body.scrollTop;
   body.replaceChildren();
-  // Keep the Inspector's live indicator in sync with engine values.
-  const tabBtn=$("wf-inspector-vars"); if(tabBtn) tabBtn.classList.toggle("live",Object.keys(wfLiveVars).length>0);
+  // Keep the disclosure's live indicator in sync with engine values.
+  const panel=$("wf-vars-panel"); if(panel) panel.classList.toggle("live",Object.keys(wfLiveVars).length>0);
   const act=wfCurAct();
   if(!act && wfVarsScope==="local") wfVarsScope="global";
   const tabs=document.createElement("div"); tabs.className="wf-vars-tabs";
@@ -651,7 +676,7 @@ function wfAddQuickLocal(){
 // current activity). Click a Local row or add via "+" → Local.
 function wfShowLocalsEditor(){
   wfVarsScope="local"; const act=wfCurAct(); if(act&&act.vars?.length) wfVarsExpanded.add(act.vars[act.vars.length-1]);
-  wfSwitchDockTab("vars");   // make sure the tab is on screen before filling it
+  wfToggleVarsPanel(true);
 }
 function wfShowLocalsEditorLegacy(){
   wfHideGlobsEditor();
@@ -760,7 +785,7 @@ function wfToggleGlobsEditor(){
 function wfHideGlobsEditor(){ const p=document.getElementById("wf-globs-pop"); if(p) p.remove(); wfGlobsOpen=false; }
 function wfShowGlobsEditor(){
   wfVarsScope="global"; if(WF.globals?.length) wfVarsExpanded.add(WF.globals[WF.globals.length-1]);
-  wfSwitchDockTab("vars");   // make sure the tab is on screen before filling it
+  wfToggleVarsPanel(true);
 }
 function wfShowGlobsEditorLegacy(){
   wfHideGlobsEditor();

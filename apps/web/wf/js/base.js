@@ -294,9 +294,9 @@ function wfClearAllActCrash(){
 function wfCrashWhy(info){
   if(!info) return "";
   const what = info.name || info.label || info.type || "block";
-  const why = { failed:"khối này chạy không thành công",
-                error:"khối này ném lỗi",
-                dead_end:"nhánh đi ra chưa nối đi đâu" }[info.reason] || info.reason || "";
+  const why = { failed:"this block did not complete successfully",
+                error:"this block raised an error",
+                dead_end:"the outgoing branch is not connected" }[info.reason] || info.reason || "";
   return `${what}${why?" — "+why:""}${info.message?": "+info.message:""}`;
 }
 // Jump the editor to an activity's crash block: switch to its graph, select it
@@ -309,7 +309,7 @@ function wfJumpToCrash(actId){
   WF.sel=[info.node]; WF.selectedNode=info.node;
   wfRenderCanvas(); wfRenderInspector();
   const n=wfNode(info.node); if(n) wfCenterOnNode(n);
-  setStatus("Dừng tại: "+wfCrashWhy(info));
+  setStatus("Stopped at: "+wfCrashWhy(info));
   return true;
 }
 function wfNodeElById(id){ return id ? document.querySelector(`.wf-node[data-node="${id}"]`) : null; }

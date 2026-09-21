@@ -319,10 +319,11 @@ const wfBaseAny=t=>{ const a=(Array.isArray(t)?t:[]).filter(Boolean); if(!a.leng
 
 // Condition types a switch case may use — instant checks only (no wait_* timeout,
 // no tap_* side-effect). Kept in sync with SWITCH_CASE_TYPES in engine.py.
-// Controller-specific entries (if_screen_on = ADB, win_if_window = Win32) are
+// Controller-specific entries (if_screen_on/if_device_size = ADB,
+// win_if_window = Win32) are
 // filtered per project by wfSwitchCaseTypes().
 const WF_SWITCH_CASE_TYPES = ["if_image","if_image_any","if_text","if_var","if_time",
-  "if_color","if_app","if_screen_on","win_if_window"];
+  "if_color","if_app","if_screen_on","if_device_size","win_if_window"];
 // The subset usable in the current project (see wfNodeCtrl in workflow.js).
 function wfSwitchCaseTypes(){
   const ctrl=(typeof WF!=="undefined"&&WF.controller)||"adb";

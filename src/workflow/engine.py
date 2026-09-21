@@ -225,6 +225,7 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     "screen_power":{"label": "Bật/tắt màn hình", "kind": "action",    "ins": 1, "outs": ["out"]},
     # Màn hình thiết bị đang bật? (cặp đọc cho screen_power). ADB-only.
     "if_screen_on":{"label": "Nếu màn hình đang bật", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    "if_device_size":{"label": "Nếu kích thước thiết bị", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     # Chạy một câu adb shell tuỳ ý, lưu stdout vào biến — cửa thoát cho những
     # thứ chưa có node riêng. ADB-only.
     "adb_shell":   {"label": "ADB shell → biến", "kind": "action", "ins": 1, "outs": ["out"]},
@@ -672,7 +673,8 @@ def _tcp_listener_pids(port: int) -> List[int]:
 # wait_* timeout blocking, no tap_* side-effect), so evaluating one case never
 # stalls the others. Kept in sync with the designer's case-type dropdown.
 SWITCH_CASE_TYPES = ("if_image", "if_image_any", "if_text", "if_var", "if_time",
-                     "if_color", "if_app", "if_screen_on", "win_if_window")
+                     "if_color", "if_app", "if_screen_on", "if_device_size",
+                     "win_if_window")
 
 
 class WorkflowEngine:
@@ -1100,9 +1102,9 @@ class WorkflowEngine:
             if ok:
                 log_info(f"OCR model: {getattr(ocr, 'backend_name', name)}")
             else:
-                log_warning(f"OCR model '{name}' không khả dụng")
+                log_warning(f"OCR model '{name}' is unavailable")
         except Exception as e:
-            log_warning(f"Không đổi được OCR model '{name}': {e}")
+            log_warning(f"Could not change OCR model to '{name}': {e}")
 
     def _apply_capture_backend(self) -> None:
         """Apply the flow's ADB capture source (scrcpy / adb screencap).
@@ -1123,7 +1125,7 @@ class WorkflowEngine:
             set_capture_backend(name)
             log_info(f"Capture backend: {name}")
         except Exception as e:
-            log_warning(f"Không đổi được capture backend '{name}': {e}")
+            log_warning(f"Could not change capture backend to '{name}': {e}")
 
     def _apply_input_backend(self) -> None:
         """Apply the flow's ADB input transport ("adb" shell vs "scrcpy" control).
@@ -1144,7 +1146,7 @@ class WorkflowEngine:
             set_input_backend(name)
             log_info(f"ADB input backend: {name}")
         except Exception as e:
-            log_warning(f"Không đổi được ADB input backend '{name}': {e}")
+            log_warning(f"Could not change ADB input backend to '{name}': {e}")
 
     def _flow_has_node_type(self, *ntypes: str) -> bool:
         """True if any activity/function graph in the loaded flow contains a
@@ -1212,8 +1214,7 @@ class WorkflowEngine:
                     self._apply_ocr_backend()
                     return True
                 log_error(
-                    f"Win32: không tìm thấy cửa sổ "
-                    f"'{target}' — kiểm tra Project settings"
+                    f"Win32: window '{target}' not found — check Project settings"
                 )
                 return False
             self.auto._update_screen_size()
@@ -1495,8 +1496,8 @@ class WorkflowEngine:
         if start_id:
             cur = start_id if start_id in nodes else None
             if cur is None:
-                log_warning(f"Không tìm thấy block bắt đầu '{start_id}' — "
-                            "block có thể đã bị xoá khỏi graph", kind=LOG_KIND_ACTIVITY)
+                log_warning(f"Start block '{start_id}' not found — "
+                            "it may have been deleted from the graph", kind=LOG_KIND_ACTIVITY)
                 return False
         else:
             start = next((n for n in nodes.values() if n.get("type") == "start"), None)
@@ -1572,10 +1573,10 @@ class WorkflowEngine:
                 # Abandon the current try_chain arm and let the outer try_chain
                 # advance to the next numbered port (or "fail" if none left).
                 if self._try_chain_mode:
-                    log_info("↩ thử nhánh kế — bỏ nhánh hiện tại")
+                    log_info("↩ trying next branch — abandoning current branch")
                     self._branch_failed = True
                 else:
-                    log_warning("'Thử nhánh kế' ngoài Try in order — không có hiệu lực")
+                    log_warning("'Try next branch' outside Try in order — no effect")
                 self._node_done(node, nid, "ok", None)
                 break
             elif kind == "condition":
@@ -1584,7 +1585,7 @@ class WorkflowEngine:
                 except Exception as e:
                     # A crash inside a condition counts as "false".
                     res = False
-                    log_error(f"Block '{label}' lỗi: {e}")
+                    log_error(f"Block '{label}' error: {e}")
                 port = "true" if res else "false"
                 self._node_done(node, nid, "ok", port)  # branch taken
                 nxt = self._next(adj, cur, port)
@@ -1597,7 +1598,7 @@ class WorkflowEngine:
             elif kind == "loop":
                 if self._break_loop:
                     self._break_loop = False
-                    log_info(f"↺ thoát vòng lặp sau {counters.get(cur, 0)} lần (break)")
+                    log_info(f"↺ exited loop after {counters.get(cur, 0)} iterations (break)")
                     counters[cur] = 0
                     loop_port = "done"
                 elif self._truthy(params.get("infinite", False)):
@@ -1610,7 +1611,7 @@ class WorkflowEngine:
                         counters[cur] = done + 1
                         loop_port = "body"
                     else:
-                        log_info(f"↺ vòng lặp xong {done} lần")
+                        log_info(f"↺ loop completed {done} iterations")
                         counters[cur] = 0
                         loop_port = "done"
                 self._node_done(node, nid, "ok", loop_port)
@@ -1625,19 +1626,19 @@ class WorkflowEngine:
                 lu_port = None
                 if self._break_loop:
                     self._break_loop = False
-                    log_info(f"↺ thoát 'lặp đến khi {what}' sau {counters.get(cur, 0)} vòng (break)")
+                    log_info(f"↺ exited 'loop until {what}' after {counters.get(cur, 0)} iterations (break)")
                     counters[cur] = 0
                     lu_port = "found"
                 else:
                     if self._loop_until_hit(ntype, params):
-                        log_info(f"↺ {what} sau {counters.get(cur, 0)} vòng")
+                        log_info(f"↺ {what} after {counters.get(cur, 0)} iterations")
                         counters[cur] = 0
                         lu_port = "found"
                     else:
                         done = counters.get(cur, 0)
                         max_loops = self._resolve_count(params.get("maxLoops", 0), default=0)
                         if max_loops > 0 and done >= max_loops:
-                            log_warning(f"↺ chưa {what} sau {done} vòng — nhánh fail")
+                            log_warning(f"↺ not {what} after {done} iterations — branch failed")
                             counters[cur] = 0
                             lu_port = "fail"
                         else:
@@ -1682,7 +1683,7 @@ class WorkflowEngine:
                         self._node_done(node, nid, "ok", "out")
                         cur = self._next(adj, cur, "out")
                     else:
-                        log_warning(f"And cần {expected} nhánh song song")
+                        log_warning(f"And requires {expected} parallel branches")
                         self._branch_failed = True
                         self._node_done(node, nid, "fail", "out")
                         break
@@ -1692,7 +1693,7 @@ class WorkflowEngine:
                         self._node_done(node, nid, "ok", None)
                         break
                     if not ok:
-                        log_warning(f"And fail: có nhánh lỗi trước khi gộp {expected} nhánh")
+                        log_warning(f"And failed: a branch failed before {expected} branches joined")
                         self._branch_failed = True
                         self._node_done(node, nid, "fail", "out")
                         break
@@ -1702,7 +1703,7 @@ class WorkflowEngine:
                 # Pick one of count numbered ports at random (uniform distribution).
                 count = max(1, int(params.get("count", 2)))
                 chosen = str(random.randint(1, count))
-                log_info(f"🎲 ngẫu nhiên → nhánh {chosen}/{count}")
+                log_info(f"🎲 random → branch {chosen}/{count}")
                 self._node_done(node, nid, "ok", chosen)
                 cur = self._next(adj, cur, chosen)
             elif kind == "try_chain":
@@ -1723,7 +1724,7 @@ class WorkflowEngine:
                     if not tgt:
                         continue
                     attempted += 1
-                    log_info(f"thử nhánh {port}/{count}")
+                    log_info(f"trying branch {port}/{count}")
                     self._node_done(node, nid, "ok", port)
                     self._vars = dict(vars0)
                     self._last_pos = pos0
@@ -1732,10 +1733,10 @@ class WorkflowEngine:
                     self._try_chain_mode = True
                     self._walk(nodes, adj, tgt, {}, depth)
                     if not self._branch_failed:
-                        log_success(f"nhánh {port} thành công")
+                        log_success(f"branch {port} succeeded")
                         success = True
                         break
-                    log_warning(f"nhánh {port} fail → thử nhánh kế")
+                    log_warning(f"branch {port} failed → trying next branch")
 
                 self._try_chain_mode = try0
                 self._break_loop = break0
@@ -1748,7 +1749,7 @@ class WorkflowEngine:
                 self._branch_failed = failed0
                 self._node_done(node, nid, "fail", "fail")
                 if attempted:
-                    log_warning("tất cả nhánh thử lần lượt đều fail")
+                    log_warning("all ordered branches failed")
                 cur = self._next(adj, cur, "fail")
             elif kind == "sequence":
                 # Chạy các nhánh 1..N LẦN LƯỢT: dù nhánh trước fail hay thành
@@ -1770,7 +1771,7 @@ class WorkflowEngine:
                     if not tgt:
                         continue
                     ran += 1
-                    log_info(f"▶ chạy lần lượt nhánh {port}/{count}")
+                    log_info(f"▶ running sequential branch {port}/{count}")
                     self._node_done(node, nid, "ok", port)
                     self._branch_failed = False
                     self._break_loop = False
@@ -1787,7 +1788,7 @@ class WorkflowEngine:
                 # try_chain bao ngoài), nhưng không chặn các nhánh còn lại.
                 self._branch_failed = bool(failed0 or any_failed)
                 if ran:
-                    log_info(f"⇉ chạy xong {ran} nhánh lần lượt")
+                    log_info(f"⇉ completed {ran} sequential branches")
                 # Cổng "end": đường tiếp tục chính, chạy SAU khi tất cả nhánh
                 # 1..N đã xong (dù nhánh nào fail). Có dây "end" thì lỗi của các
                 # nhánh chỉ mang tính best-effort (vẫn ghi log) — kết quả thật do
@@ -1797,7 +1798,7 @@ class WorkflowEngine:
                 end_tgt = self._next(adj, cur, "end")
                 if end_tgt and not self._stop.is_set():
                     if any_failed:
-                        log_warning("↳ nhánh lần lượt có lỗi — tiếp tục qua cổng 'end'")
+                        log_warning("↳ a sequential branch failed — continuing through the 'end' port")
                     self._branch_failed = failed0
                     self._node_done(node, nid, "ok", "end")
                     self._break_loop = break0
@@ -1821,7 +1822,7 @@ class WorkflowEngine:
                             taken = f"c{i}"
                             break
                     except Exception as e:
-                        log_warning(f"switch case {i} ({ctype}) lỗi: {e}")
+                        log_warning(f"switch case {i} ({ctype}) error: {e}")
                 self._node_done(node, nid, "ok", taken)
                 nxt = self._next(adj, cur, taken)
                 cur = nxt if nxt is not None else self._next(adj, cur, "default")
@@ -1832,9 +1833,9 @@ class WorkflowEngine:
                 ok_call = False
                 if fn is None:
                     names = ", ".join(self._label(f) for f in self._functions.values())
-                    log_warning(f"call → không tìm thấy hàm '{fid}'"
-                                + (f" — workflow có: {names}" if names
-                                   else " — workflow chưa có hàm nào"),
+                    log_warning(f"call → function '{fid}' not found"
+                                + (f" — workflow has: {names}" if names
+                                   else " — workflow has no functions"),
                                 kind=LOG_KIND_ACTIVITY)
                 elif depth >= MAX_CALL_DEPTH:
                     log_warning("Max function call depth reached (recursion?)", kind=LOG_KIND_ACTIVITY)
@@ -1846,7 +1847,7 @@ class WorkflowEngine:
                     ok_call = self._reached_end
                     self._reached_end = outer_end
                     if not ok_call:
-                        log_warning(f"ƒ {fn.get('name', fid)} → false (dead-end, không tới node End)")
+                        log_warning(f"ƒ {fn.get('name', fid)} → false (dead end, did not reach an End node)")
                 # Result port: "true" khi function tới node End, "false" khi dead-end.
                 port = "true" if ok_call else "false"
                 self._node_done(node, nid, "ok" if ok_call else "fail", port)
@@ -1873,8 +1874,8 @@ class WorkflowEngine:
                     # The type name is all there is to report — no spec means no
                     # label — so say what its absence implies instead of echoing
                     # a bare identifier the user has never seen.
-                    log_warning(f"Block '{ntype}' không có trong bản engine này — "
-                                "workflow có thể được lưu bởi bản mới hơn",
+                    log_warning(f"Block '{ntype}' is unavailable in this engine version — "
+                                "the workflow may have been saved by a newer version",
                                 kind=LOG_KIND_ACTIVITY)
                     ok_act = False
                     self._branch_failed = True
@@ -1898,7 +1899,7 @@ class WorkflowEngine:
         # one (the dead end is just its unwired "fail" port).
         if not cur and last_nid and not self._stop.is_set():
             self._note_crash(nodes.get(last_nid), "dead_end",
-                             "nhánh đi ra từ khối này chưa nối đi đâu — không tới được khối Kết thúc",
+                             "this block's output is not connected — cannot reach an End block",
                              weak=True)
         return True
 
@@ -1945,7 +1946,7 @@ class WorkflowEngine:
             threads.append(t)
             t.start()
 
-        log_info(f"⇉ chạy song song {len(threads)} nhánh")
+        log_info(f"⇉ running {len(threads)} parallel branches")
         for t in threads:
             t.join()
 
@@ -1954,8 +1955,8 @@ class WorkflowEngine:
                 join_ctx["failed"] = True
                 self._emit("on_node_done", bid, "fail", "out")
                 log_warning(
-                    f"And '{bid}' chỉ nhận {state.get('arrived', 0)}/"
-                    f"{state.get('expected', 0)} nhánh"
+                    f"And '{bid}' received only {state.get('arrived', 0)}/"
+                    f"{state.get('expected', 0)} branches"
                 )
 
         # All branches done. If they converged at a join node, the last-arriving
@@ -2366,7 +2367,7 @@ class WorkflowEngine:
             return None
         h, w = screen.shape[:2]
         if not (0 <= x < w and 0 <= y < h):
-            log_warning(f"điểm ({x}, {y}) nằm ngoài màn hình {w}×{h}")
+            log_warning(f"point ({x}, {y}) is outside the {w}×{h} screen")
             return None
         return tuple(int(c) for c in screen[y, x][:3])
 
@@ -2404,7 +2405,7 @@ class WorkflowEngine:
     def _eval_color_condition(self, ntype: str, params: Dict) -> bool:
         target = self._parse_hex_color(params.get("color"))
         if target is None:
-            log_warning(f"'{ntype}': màu không hợp lệ ({params.get('color')!r}) — cần #RRGGBB")
+            log_warning(f"'{ntype}': invalid color ({params.get('color')!r}) — expected #RRGGBB")
             return False
         tol = max(0, int(params.get("tolerance", 10) or 0))
         if ntype == "if_color":
@@ -2433,7 +2434,7 @@ class WorkflowEngine:
                 ok = px is not None and self._color_close(px, target, tol)
                 if ok and not negate:
                     self._last_pos = (x, y)
-                    log_info(f"🎨 thấy màu {hex_lbl} tại ({x}, {y})")
+                    log_info(f"🎨 found color {hex_lbl} at ({x}, {y})")
                     self._report_match_rects(
                         [self._rect_from_center(x, y, 1.0, 18, 18, 1.0, True, hex_lbl)],
                         ok=True, label=hex_lbl, conf=1.0,
@@ -2441,7 +2442,7 @@ class WorkflowEngine:
                     return True
                 if negate and not ok:
                     # Đảo: chờ đến khi màu BIẾN MẤT (nút sáng → tối, loading xong…).
-                    log_info(f"🎨 màu {hex_lbl} đã biến mất tại ({x}, {y})")
+                    log_info(f"🎨 color {hex_lbl} disappeared at ({x}, {y})")
                     self._report_match_rects(
                         [self._rect_from_center(x, y, 0.0, 18, 18, 1.0, True, hex_lbl)],
                         ok=True, label=hex_lbl, conf=0.0,
@@ -2468,7 +2469,7 @@ class WorkflowEngine:
                         [self._rect_from_center(hit[0], hit[1], 1.0, 18, 18, 1.0, True, hex_lbl)],
                         ok=True, label=hex_lbl, region=region, conf=1.0,
                     )
-                    return self._tap_at(hit[0], hit[1], params, label=f"màu {hex_lbl}")
+                    return self._tap_at(hit[0], hit[1], params, label=f"color {hex_lbl}")
                 if time.time() >= end:
                     self._report_match_rects(
                         [], ok=False, label=hex_lbl, region=region, conf=0.0,
@@ -2484,7 +2485,7 @@ class WorkflowEngine:
         value = self._bgr_to_hex(px) if px is not None else ""
         if name:
             self._set_var(name, value)
-            log_info(f"🎨 {name} = {value or '(không đọc được)'}")
+            log_info(f"🎨 {name} = {value or '(unreadable)'}")
         return True
 
     @staticmethod
@@ -2501,22 +2502,22 @@ class WorkflowEngine:
     def _loop_until_label(self, ntype: str, params: Dict) -> str:
         """Short human label of what the loop is waiting for (log lines)."""
         if ntype == "loop_until_color":
-            return f"thấy màu {params.get('color') or '?'}"
+            return f"found color {params.get('color') or '?'}"
         if ntype == "loop_until_text":
-            return f"thấy chữ \"{params.get('text') or ''}\""
+            return f"found text \"{params.get('text') or ''}\""
         if ntype == "loop_until_var":
-            return (f"biến {params.get('name') or '?'} "
+            return (f"variable {params.get('name') or '?'} "
                     f"{params.get('op') or '=='} {params.get('value')}")
         tpl = str(params.get("template") or "")
-        return f"thấy ảnh {os.path.basename(tpl) if tpl else '?'}"
+        return f"found image {os.path.basename(tpl) if tpl else '?'}"
 
     def _loop_until_hit(self, ntype: str, params: Dict) -> bool:
         """One probe of a loop_until node's exit condition."""
         if ntype == "loop_until_color":
             target = self._parse_hex_color(params.get("color"))
             if target is None:
-                log_warning(f"loop_until_color: màu không hợp lệ "
-                            f"({params.get('color')!r}) — cần #RRGGBB")
+                log_warning(f"loop_until_color: invalid color "
+                            f"({params.get('color')!r}) — expected #RRGGBB")
                 return False
             tol = max(0, int(params.get("tolerance", 10) or 0))
             hex_lbl = self._bgr_to_hex(target)
@@ -2596,13 +2597,13 @@ class WorkflowEngine:
                 if self._stop.is_set():
                     break
                 self._pause.wait()
-                if self._tap_at(int(hx), int(hy), params, label="ảnh"):
+                if self._tap_at(int(hx), int(hy), params, label="image"):
                     tapped += 1
                 if delay:
                     self._sleep(delay)
             if tapped:
                 self._last_pos = (int(hits[0][0]), int(hits[0][1]))
-                log_info(f"👆 chạm {tapped} vị trí khớp {os.path.basename(tpl)}")
+                log_info(f"👆 tapped {tapped} matches for {os.path.basename(tpl)}")
             return tapped > 0
         if ntype == "if_emulator":
             return self._c_if_emulator(params)
@@ -2612,6 +2613,8 @@ class WorkflowEngine:
             return self._c_win_window(ntype, params)
         if ntype == "if_screen_on":
             return self._c_if_screen_on(params)
+        if ntype == "if_device_size":
+            return self._c_if_device_size(params)
         if ntype == "find_image_pos":
             return self._c_find_image_pos(params)
         if ntype == "wait_stable":
@@ -2636,8 +2639,8 @@ class WorkflowEngine:
                 elif ctrl is not None:
                     alive = bool(getattr(ctrl, "device", None))
                 ok = alive if not needle else (needle in title.lower())
-                log_info(f"🪟 cửa sổ mục tiêu: {title or '(không thấy)'} → "
-                         f"{'khớp' if ok else 'không khớp'}"
+                log_info(f"🪟 target window: {title or '(not found)'} → "
+                         f"{'matched' if ok else 'not matched'}"
                          + (f" '{needle}'" if needle else ""))
                 return ok != negate
             needle = self._node_package(params).lower()
@@ -2648,8 +2651,8 @@ class WorkflowEngine:
             except Exception:
                 cur_app = ""
             ok = bool(needle) and needle in cur_app
-            log_info(f"📱 app hiện tại: {cur_app or '(?)'} → "
-                     f"{'khớp' if ok else 'không khớp'} '{needle}'")
+            log_info(f"📱 current app: {cur_app or '(?)'} → "
+                     f"{'matched' if ok else 'not matched'} '{needle}'")
             return ok != negate
         if ntype == "if_image":
             tpl = self._resolve_template(params.get("template", ""))
@@ -2676,7 +2679,7 @@ class WorkflowEngine:
                                  parallel=parallel, region=self._search_region(params))
             if hit:
                 self._last_pos = hit
-                log_info(f"🔍 thấy ảnh ({hit[0]}, {hit[1]})")
+                log_info(f"🔍 found image at ({hit[0]}, {hit[1]})")
             return hit is not None
         if ntype == "tap_image_any":
             templates = self._templates_list(params)
@@ -2687,7 +2690,7 @@ class WorkflowEngine:
             if not hit:
                 return False  # no match — false branch fires; no log (tap-miss is expected)
             self._last_pos = hit
-            return self._tap_at(hit[0], hit[1], params, label="ảnh")
+            return self._tap_at(hit[0], hit[1], params, label="image")
         if ntype == "tap_image":
             # Find (with timeout), remember position, optionally wait, then tap.
             tpl = self._resolve_template(params.get("template", ""))
@@ -2713,7 +2716,7 @@ class WorkflowEngine:
                     self._pause.wait()
                     if self._find_template(tpl, threshold=threshold, region=region,
                                            report=False) is None:
-                        log_info(f"🔍 ảnh {os.path.basename(tpl)} đã biến mất")
+                        log_info(f"🔍 image {os.path.basename(tpl)} disappeared")
                         self._report_template_match(tpl, None, threshold, region)
                         return True
                     if time.time() >= end:
@@ -2727,7 +2730,7 @@ class WorkflowEngine:
             )
             if res:
                 self._last_pos = (res[0], res[1])
-                log_info(f"🔍 thấy ảnh {os.path.basename(tpl)} ({res[0]}, {res[1]})")
+                log_info(f"🔍 found image {os.path.basename(tpl)} at ({res[0]}, {res[1]})")
             return res is not None
         if ntype == "wait_text":
             needle = str(self._resolve_value(params.get("text", "")) or "")
@@ -2741,7 +2744,7 @@ class WorkflowEngine:
                     self._pause.wait()
                     found, _read = self.auto.region_find_text(needle, region=region, whitelist=wl)
                     if not found:
-                        log_info(f"🔤 chữ '{needle}' đã biến mất")
+                        log_info(f"🔤 text '{needle}' disappeared")
                         self._report_ocr_region(region, True, needle)
                         return True
                     if time.time() >= end:
@@ -2762,8 +2765,8 @@ class WorkflowEngine:
             found, read = self.auto.region_find_text(
                 needle, region=region, whitelist=self._ocr_whitelist(params))
             log_info(
-                f"🔤 if_text vùng {region}: đọc được {read!r} → "
-                f"{'thấy' if found else 'không thấy'} '{needle}'"
+                f"🔤 if_text region {region}: read {read!r} → "
+                f"{'found' if found else 'not found'} '{needle}'"
             )
             ok = bool(found) != negate
             self._report_ocr_region(region, ok, needle)
@@ -2795,7 +2798,7 @@ class WorkflowEngine:
                 if res:
                     self._report_template_match(template, res, threshold, region)
                     self._last_pos = (res[0], res[1])
-                    log_info(f"🔍 thấy ảnh sau {i} lần vuốt ({res[0]}, {res[1]})")
+                    log_info(f"🔍 found image after {i} swipes at ({res[0]}, {res[1]})")
                     return True
                 if i == max_sw - 1:
                     self._report_template_match(template, None, threshold, region)
@@ -2860,7 +2863,7 @@ class WorkflowEngine:
                 try:
                     return re.search(needle, hay) is not None
                 except re.error as exc:
-                    log_warning(f"regex không hợp lệ /{needle}/: {exc}")
+                    log_warning(f"invalid regex /{needle}/: {exc}")
                     return False
             h, n = hay.lower(), needle.lower()
             if op == "contains":
@@ -2976,7 +2979,7 @@ class WorkflowEngine:
             try:
                 ctrl.release_all_keys()
             except Exception as exc:
-                log_warning(f"⌨ nhả phím lỗi: {exc}")
+                log_warning(f"⌨ failed to release keys: {exc}")
         for aid in list(self._bg_threads.keys()):
             self.stop_background(aid)
         if (self._seq_thread and self._seq_thread.is_alive()
@@ -3011,7 +3014,7 @@ class WorkflowEngine:
         Returns ``{status, port}`` so the caller can relay the outcome.
         """
         if self.running:
-            log_warning("Đang chạy — không thể chạy 1 block")
+            log_warning("A run is active — cannot run a single block")
             return {"status": "busy", "port": None}
         if not self._ensure_ready():
             return {"status": "error", "port": None}
@@ -3046,7 +3049,7 @@ class WorkflowEngine:
             elif kind in ("loop", "loop_until", "parallel", "sequence", "and", "join",
                           "random", "switch", "try_chain", "call"):
                 # Structural nodes don't make sense standalone; report no-op.
-                log_info(f"Block '{label}' là cấu trúc — chạy trong luồng")
+                log_info(f"Block '{label}' is structural — run it in a workflow")
                 port = None
             else:
                 handler = self._actions.get(ntype)
@@ -3055,12 +3058,12 @@ class WorkflowEngine:
                     status = "ok" if ok_act else "fail"
                     port = "out"
                 else:
-                    log_warning(f"Block '{ntype}' không có trong bản engine này — "
-                                "workflow có thể được lưu bởi bản mới hơn")
+                    log_warning(f"Block '{ntype}' is unavailable in this engine version — "
+                                "the workflow may have been saved by a newer version")
                     status = "fail"
                     port = "out"
         except Exception as e:
-            log_error(f"Block '{label}' lỗi: {e}")
+            log_error(f"Block '{label}' error: {e}")
             status = "fail"
             port = "false" if kind == "condition" else "out"
         self._node_done(work, nid, status, port)
@@ -3310,7 +3313,7 @@ class WorkflowEngine:
                 ok_act = handler(node, params) is not False
                 last_error = None
             except Exception as e:
-                log_error(f"Block '{label}' lỗi: {e}")
+                log_error(f"Block '{label}' error: {e}")
                 ok_act = False
                 last_error = e
             if ok_act:
@@ -3319,19 +3322,19 @@ class WorkflowEngine:
             if self._stop.is_set():
                 break
             if attempt < attempts:
-                log_warning(f"✖ '{label}' fail → retry {attempt}/{attempts - 1}")
+                log_warning(f"✖ '{label}' failed → retry {attempt}/{attempts - 1}")
                 if delay:
                     self._sleep(delay)
         self._branch_failed = True
         if self._stop.is_set() and getattr(self, "_fatal", ""):
             return False    # _fail_run already logged and recorded the real reason
         if last_error is None:
-            log_warning(f"✖ '{label}' không thực hiện được")
+            log_warning(f"✖ '{label}' could not be completed")
         self._note_crash(
             node,
             "error" if last_error is not None else "failed",
             str(last_error) if last_error is not None
-            else f"không thực hiện được sau {attempts} lần thử",
+            else f"could not be completed after {attempts} attempts",
         )
         self._save_failure_screenshot(node)
         return False
@@ -3366,7 +3369,7 @@ class WorkflowEngine:
             return self._last_pos
         return (int(p.get("x", 0)), int(p.get("y", 0)))
 
-    def _tap_at(self, x: int, y: int, params: Dict, label: str = "ảnh") -> bool:
+    def _tap_at(self, x: int, y: int, params: Dict, label: str = "image") -> bool:
         """Tap a found image's center, applying the node's optional offsetX/offsetY
         (handy when the thing to tap sits beside the matched icon). Honours the
         ``taps`` field (1 / 2-double) and logs the actual tapped point."""
@@ -3377,7 +3380,7 @@ class WorkflowEngine:
         ok = bool(self.auto.tap(tx, ty, tap_count=tc))
         if ok:
             suffix = f" (+{ox},{oy})" if (ox or oy) else ""
-            log_info(f"👆 chạm {label} ({tx}, {ty}){suffix}")
+            log_info(f"👆 tapped {label} at ({tx}, {ty}){suffix}")
         return ok
 
     def _a_tap(self, node, p) -> bool:
@@ -3386,7 +3389,7 @@ class WorkflowEngine:
         taps = 2 if str(p.get("taps", "1")) == "2" else 1
         ok = self.auto.tap(x, y, tap_count=taps)
         if ok:
-            log_info(f"👆 chạm ({x}, {y})" + (" ×2" if taps == 2 else ""))
+            log_info(f"👆 tapped ({x}, {y})" + (" ×2" if taps == 2 else ""))
         return ok
 
     def _a_multi_tap(self, node, p) -> bool:
@@ -3404,7 +3407,7 @@ class WorkflowEngine:
             except (TypeError, ValueError):
                 continue
         if len(points) < 2:
-            log_warning("multi-point tap cần ít nhất 2 điểm")
+            log_warning("multi-point tap requires at least 2 points")
             return False
         # Most Android devices expose at most ten touch slots. Limiting here also
         # prevents malformed workflow JSON from spawning an unbounded batch.
@@ -3417,20 +3420,20 @@ class WorkflowEngine:
         ok = bool(self.auto.multi_tap(points, duration_ms=duration_ms))
         if ok:
             coords = ", ".join(f"({x}, {y})" for x, y in points)
-            log_info(f"👆 chạm đồng thời {len(points)} điểm: {coords} · {duration_ms}ms")
+            log_info(f"👆 tapped {len(points)} points simultaneously: {coords} · {duration_ms}ms")
         return ok
 
     def _a_sequence_tap(self, node, p) -> bool:
         """Tap fixed points one by one, waiting after each tap."""
         points = p.get("points", []) if isinstance(p.get("points"), list) else []
         if not points:
-            log_warning("sequence tap cần ít nhất 1 điểm")
+            log_warning("sequence tap requires at least 1 point")
             return False
         sequence_id = str(p.get("sequenceId", "main") or "main")
         stop_event = self._sequence_stop_event(sequence_id, reset=True)
         for raw in points[:50]:
             if stop_event.is_set():
-                log_info(f"■ dừng sequence '{sequence_id}'")
+                log_info(f"■ stopped sequence '{sequence_id}'")
                 return True
             try:
                 if isinstance(raw, dict):
@@ -3445,7 +3448,7 @@ class WorkflowEngine:
                 continue
             if not self.auto.tap(x, y, tap_count=1):
                 return False
-            log_info(f"👆 chạm tuần tự ({x}, {y})")
+            log_info(f"👆 sequential tap at ({x}, {y})")
             if delay and self._sequence_delay(stop_event, delay):
                 return True
         return True
@@ -3454,13 +3457,13 @@ class WorkflowEngine:
         """Find and tap each template in order, waiting after each tap."""
         images = p.get("images", []) if isinstance(p.get("images"), list) else []
         if not images:
-            log_warning("sequence tap image cần ít nhất 1 ảnh")
+            log_warning("sequence tap image requires at least 1 image")
             return False
         sequence_id = str(p.get("sequenceId", "main") or "main")
         stop_event = self._sequence_stop_event(sequence_id, reset=True)
         for raw in images[:50]:
             if stop_event.is_set():
-                log_info(f"■ dừng sequence '{sequence_id}'")
+                log_info(f"■ stopped sequence '{sequence_id}'")
                 return True
             if not isinstance(raw, dict):
                 continue
@@ -3505,14 +3508,14 @@ class WorkflowEngine:
     def _a_stop_sequence(self, node, p) -> bool:
         sequence_id = str(p.get("sequenceId", "main") or "main")
         self._sequence_stop_event(sequence_id).set()
-        log_info(f"■ yêu cầu dừng sequence '{sequence_id}'")
+        log_info(f"■ requested stop for sequence '{sequence_id}'")
         return True
 
     def _a_double_tap(self, node, p) -> bool:
         x, y = self._pos(p)
         ok = self.auto.tap(x, y, tap_count=2)
         if ok:
-            log_info(f"👆 chạm đúp ({x}, {y})")
+            log_info(f"👆 double-tapped ({x}, {y})")
         return ok
 
     def _a_swipe_dir(self, node, p) -> bool:
@@ -3551,7 +3554,7 @@ class WorkflowEngine:
         ry = random.randint(lo_y, hi_y)
         ok = self.auto.tap(rx, ry)
         if ok:
-            log_info(f"👆 chạm ngẫu nhiên ({rx}, {ry})")
+            log_info(f"👆 random tap at ({rx}, {ry})")
         return ok
 
     def _a_wait_random(self, node, p) -> bool:
@@ -3560,7 +3563,7 @@ class WorkflowEngine:
         if hi < lo:
             lo, hi = hi, lo
         dur = random.uniform(lo, hi)
-        log_info(f"⏳ Đợi {dur:.1f}s (ngẫu nhiên {lo:g}–{hi:g}s)")
+        log_info(f"⏳ Waiting {dur:.1f}s (random {lo:g}–{hi:g}s)")
         self._sleep(dur)
         return True
 
@@ -3655,7 +3658,7 @@ class WorkflowEngine:
             self._set_var(name, self._coerce(text.strip()))
             log_info(
                 f"🔤 read {name} = {self._vars[name]!r} "
-                f"(OCR vùng {region}: {text!r})"
+                f"(OCR region {region}: {text!r})"
             )
         return True
 
@@ -3678,20 +3681,20 @@ class WorkflowEngine:
             region = self._region(p)
             try:
                 text = self.auto.read_text(region=region, whitelist=self._ocr_whitelist(p)) or ""
-                log_info(f"🔤 parse_var OCR vùng {region}: {text!r}")
+                log_info(f"🔤 parse_var OCR region {region}: {text!r}")
             except Exception as exc:
-                log_warning(f"parse_var OCR lỗi: {exc}")
+                log_warning(f"parse_var OCR error: {exc}")
                 text = ""
         pattern = str(p.get("pattern", "")).strip()
         if not pattern:
             if name:
                 self._set_var(name, self._coerce(text.strip()))
-                log_info(f"parse {name} = {self._vars[name]!r} (không pattern)")
+                log_info(f"parse {name} = {self._vars[name]!r} (no pattern)")
             return True
         try:
             m = re.search(pattern, text, re.MULTILINE)
         except re.error as exc:
-            log_error(f"parse_var regex lỗi: {exc}")
+            log_error(f"parse_var regex error: {exc}")
             if name:
                 self._set_var(name, "")
             return False
@@ -3707,12 +3710,12 @@ class WorkflowEngine:
                 value = m.group(0) or ""
         if name:
             self._set_var(name, self._coerce(value.strip()))
-            log_info(f"parse {name} = {self._vars[name]!r} (từ {text!r})")
+            log_info(f"parse {name} = {self._vars[name]!r} (from {text!r})")
         return True
 
     def _a_break(self, node, p) -> bool:
         self._break_loop = True
-        log_info("break — sẽ thoát vòng lặp kế tiếp")
+        log_info("break — will exit the next loop")
         return True
 
     def _a_long_press(self, node, p) -> bool:
@@ -3732,7 +3735,7 @@ class WorkflowEngine:
         if p.get("mode") == "random":
             return self._a_wait_random(node, p)
         secs = float(p.get("seconds", 1.0))
-        log_info(f"⏱ Đợi {secs:g}s")
+        log_info(f"⏱ Waiting {secs:g}s")
         self._sleep(secs)
         return True
 
@@ -3751,7 +3754,7 @@ class WorkflowEngine:
         if not android_key_is_known(code):
             # `input keyevent` nhận mọi chuỗi, nên lỗi typo chỉ lộ ra ở thiết bị
             # dưới dạng lỗi mờ nghĩa — gọi tên giá trị đáng ngờ ngay tại đây.
-            log_warning(f"⌨ '{code}' không phải keycode Android đã biết — vẫn gửi thử")
+            log_warning(f"⌨ '{code}' is not a known Android keycode — sending anyway")
         try:
             ok = self.auto.press_key(int(code))
         except (TypeError, ValueError):
@@ -3759,7 +3762,7 @@ class WorkflowEngine:
                 self.auto.adb.device.shell(f"input keyevent {code}")
                 ok = True
             except Exception as exc:
-                log_warning(f"⌨ gửi phím '{name}' lỗi: {exc}")
+                log_warning(f"⌨ failed to send key '{name}': {exc}")
                 return False
         if ok:
             log_info(f"⌨ {name}")
@@ -3775,11 +3778,11 @@ class WorkflowEngine:
         """Force-stop một app (tuỳ chọn xóa dữ liệu) — cặp với launch_app cho
         flow 'game treo → dừng hẳn → mở lại'. Chỉ áp dụng cho dự án ADB."""
         if getattr(self, "_controller", "adb") == "win32":
-            log_warning("⛔ Dừng ứng dụng chỉ áp dụng cho dự án ADB — dùng 'Đóng cửa sổ' cho Win32")
+            log_warning("⛔ Stop app is only available for ADB projects — use 'Close window' for Win32")
             return True
         pkg = self._node_package(p)
         if not pkg:
-            log_warning("⛔ app_stop: chưa có package (Project settings hoặc Custom)")
+            log_warning("⛔ app_stop: no package specified (Project settings or Custom)")
             return False
         dev = getattr(self.auto.adb, "device", None)
         if not dev:
@@ -3788,22 +3791,22 @@ class WorkflowEngine:
             dev.shell(f"am force-stop {pkg}")
             if self._truthy(p.get("clearData", False)):
                 dev.shell(f"pm clear {pkg}")
-                log_info(f"⛔ đã dừng + xóa dữ liệu '{pkg}'")
+                log_info(f"⛔ stopped '{pkg}' and cleared its data")
             else:
-                log_info(f"⛔ đã dừng '{pkg}'")
+                log_info(f"⛔ stopped '{pkg}'")
             return True
         except Exception as exc:
-            log_warning(f"app_stop lỗi: {exc}")
+            log_warning(f"app_stop error: {exc}")
             return False
 
     def _a_app_uninstall(self, node, p) -> bool:
         """pm uninstall một app (tuỳ chọn -k giữ dữ liệu/cache). ADB-only."""
         if getattr(self, "_controller", "adb") == "win32":
-            log_warning("🗑 Gỡ ứng dụng chỉ áp dụng cho dự án ADB — bỏ qua")
+            log_warning("🗑 Uninstall app is only available for ADB projects — skipping")
             return True
         pkg = self._node_package(p)
         if not pkg:
-            log_warning("🗑 app_uninstall: chưa có package (Project settings hoặc Custom)")
+            log_warning("🗑 app_uninstall: no package specified (Project settings or Custom)")
             return False
         dev = getattr(self.auto.adb, "device", None)
         if not dev:
@@ -3813,12 +3816,12 @@ class WorkflowEngine:
             out = (dev.shell(f"pm uninstall {keep}{pkg}") or "").strip()
             ok = "success" in out.lower()
             if ok:
-                log_info(f"🗑 đã gỡ '{pkg}'{' (giữ dữ liệu)' if keep else ''}")
+                log_info(f"🗑 uninstalled '{pkg}'{' (kept data)' if keep else ''}")
             else:
-                log_warning(f"🗑 gỡ '{pkg}' thất bại: {out or '(không có phản hồi)'}")
+                log_warning(f"🗑 failed to uninstall '{pkg}': {out or '(no response)'}")
             return ok
         except Exception as exc:
-            log_warning(f"app_uninstall lỗi: {exc}")
+            log_warning(f"app_uninstall error: {exc}")
             return False
 
     def _a_app_install(self, node, p) -> bool:
@@ -3828,25 +3831,25 @@ class WorkflowEngine:
         ``reinstall`` (-r) giữ dữ liệu, ``grantPerms`` (-g) cấp sẵn quyền.
         """
         if getattr(self, "_controller", "adb") == "win32":
-            log_warning("📦 Cài ứng dụng chỉ áp dụng cho dự án ADB — bỏ qua")
+            log_warning("📦 Install app is only available for ADB projects — skipping")
             return True
         apk = str(self._resolve_value(p.get("apk", ""))).strip().strip('"')
         if not apk:
-            log_warning("📦 app_install: chưa chọn file APK")
+            log_warning("📦 app_install: no APK file selected")
             return False
         if not os.path.isfile(apk):
-            log_warning(f"📦 app_install: không thấy file '{apk}'")
+            log_warning(f"📦 app_install: file '{apk}' not found")
             return False
         serial = str(getattr(self.auto.adb, "device_id", "") or "").strip()
         if not serial:
-            log_warning("📦 app_install: chưa có thiết bị")
+            log_warning("📦 app_install: no device connected")
             return False
         import subprocess
 
         from src.core.adb.constants import get_adb_path
         adb = get_adb_path()
         if not adb:
-            log_warning("📦 app_install: không tìm thấy adb.exe")
+            log_warning("📦 app_install: adb.exe not found")
             return False
         cmd = [adb, "-s", serial, "install"]
         if self._truthy(p.get("reinstall", True)):
@@ -3863,13 +3866,13 @@ class WorkflowEngine:
             out = ((res.stdout or "") + (res.stderr or "")).strip()
             ok = "success" in out.lower()
             if ok:
-                log_success(f"📦 đã cài '{os.path.basename(apk)}'")
+                log_success(f"📦 installed '{os.path.basename(apk)}'")
             else:
-                log_warning(f"📦 cài '{os.path.basename(apk)}' thất bại: "
-                            f"{out or '(không có phản hồi)'}")
+                log_warning(f"📦 failed to install '{os.path.basename(apk)}': "
+                            f"{out or '(no response)'}")
             return ok
         except Exception as exc:
-            log_warning(f"app_install lỗi: {exc}")
+            log_warning(f"app_install error: {exc}")
             return False
 
     def _a_adb_shell(self, node, p) -> bool:
@@ -3879,20 +3882,20 @@ class WorkflowEngine:
         "không có output" là thất bại để rẽ nhánh trong Try in order.
         """
         if getattr(self, "_controller", "adb") == "win32":
-            log_warning("💻 ADB shell chỉ áp dụng cho dự án ADB — bỏ qua")
+            log_warning("💻 ADB shell is only available for ADB projects — skipping")
             return True
         cmd = str(self._resolve_value(p.get("command", ""))).strip()
         if not cmd:
-            log_warning("💻 adb_shell: chưa có câu lệnh")
+            log_warning("💻 adb_shell: no command specified")
             return False
         dev = getattr(self.auto.adb, "device", None)
         if not dev:
-            log_warning("💻 adb_shell: chưa có thiết bị")
+            log_warning("💻 adb_shell: no device connected")
             return False
         try:
             out = (dev.shell(cmd) or "").strip()
         except Exception as exc:
-            log_warning(f"💻 adb_shell '{cmd}' lỗi: {exc}")
+            log_warning(f"💻 adb_shell '{cmd}' error: {exc}")
             return False
         name = str(p.get("name", "") or "").strip()
         if name:
@@ -3908,7 +3911,7 @@ class WorkflowEngine:
             ctrl = getattr(self.auto, "adb", None)
             if ctrl is None or not hasattr(ctrl, "close_window"):
                 return False
-            log_info("🚪 đóng cửa sổ mục tiêu")
+            log_info("🚪 closing target window")
             return bool(ctrl.close_window())
         try:
             if hasattr(self.auto.adb, "clear_info_cache"):
@@ -3917,24 +3920,24 @@ class WorkflowEngine:
         except Exception:
             cur = ""
         if not cur:
-            log_warning("🚪 không xác định được app đang mở")
+            log_warning("🚪 could not identify the current app")
             return False
         dev = getattr(self.auto.adb, "device", None)
         if not dev:
             return False
         try:
             dev.shell(f"am force-stop {cur}")
-            log_info(f"🚪 đã thoát '{cur}'")
+            log_info(f"🚪 exited '{cur}'")
             return True
         except Exception as exc:
-            log_warning(f"app_exit lỗi: {exc}")
+            log_warning(f"app_exit error: {exc}")
             return False
 
     def _a_launch_app(self, node, p) -> bool:
         # package: Project settings (pkgSrc=project) hoặc custom/var (pkgSrc=custom).
         pkg = self._node_package(p)
         if not pkg:
-            log_warning("🚀 launch_app: chưa có package (Project settings hoặc Custom)")
+            log_warning("🚀 launch_app: no package specified (Project settings or Custom)")
             return False
         if not self.auto.adb.launch_app(pkg):
             return False
@@ -3951,10 +3954,10 @@ class WorkflowEngine:
                 except Exception:
                     cur = ""
                 if cur and pkg in cur:
-                    log_success(f"'{pkg}' đã lên foreground")
+                    log_success(f"'{pkg}' is now in the foreground")
                     return True
                 time.sleep(0.5)
-            log_warning(f"'{pkg}' chưa lên foreground sau {wait:.0f}s")
+            log_warning(f"'{pkg}' did not reach the foreground after {wait:.0f}s")
         return True
 
     def _a_screenshot(self, node, p) -> bool:
@@ -3966,7 +3969,7 @@ class WorkflowEngine:
         """
         img = self.auto.capture_screen()
         if img is None:
-            log_warning("📷 không lấy được frame")
+            log_warning("📷 could not capture a frame")
             return False
         if not self._truthy(p.get("save", True)):
             return True
@@ -3984,16 +3987,16 @@ class WorkflowEngine:
             # Unicode-safe write (cv2.imwrite chokes on non-ASCII Windows paths).
             ok, buf = cv2.imencode(".png", img)
             if not ok:
-                log_warning("📷 mã hoá PNG thất bại")
+                log_warning("📷 PNG encoding failed")
                 return False
             buf.tofile(path)
-            log_info(f"📷 đã lưu {path}")
+            log_info(f"📷 saved {path}")
             name = str(p.get("pathVar", "") or "").strip()
             if name:
                 self._set_var(name, path)
             return True
         except Exception as exc:
-            log_warning(f"📷 lưu ảnh lỗi: {exc}")
+            log_warning(f"📷 failed to save image: {exc}")
             return False
 
     def _a_log(self, node, p) -> bool:
@@ -4014,7 +4017,7 @@ class WorkflowEngine:
     def _a_notify(self, node, p) -> bool:
         # Title cũng điền {var} như message (designer đánh dấu insertVar cả hai).
         title   = self._format_msg(str(p.get("title", "Workflow"))).strip() or "Workflow"
-        message = self._format_msg(str(p.get("message", "Đã hoàn thành!")))
+        message = self._format_msg(str(p.get("message", "Completed!")))
         sound   = bool(p.get("sound", True))
         log_info(f"🔔 {title}: {message}", kind=LOG_KIND_USER)
         if sound:
@@ -4083,7 +4086,7 @@ class WorkflowEngine:
         node and ``launch_emulator``'s optional ``at`` schedule."""
         m = re.match(r"^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$", target)
         if not m:
-            log_warning(f"⏰ Hẹn giờ: định dạng không hợp lệ '{target}' (cần HH:MM)")
+            log_warning(f"⏰ Schedule: invalid time '{target}' (expected HH:MM)")
             return False
         hh, mm, ss = int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
         now = time.localtime()
@@ -4093,9 +4096,9 @@ class WorkflowEngine:
             if next_day:
                 delay += 86400
             else:
-                log_info(f"⏰ {hh:02d}:{mm:02d} đã qua — bỏ qua chờ")
+                log_info(f"⏰ {hh:02d}:{mm:02d} has passed — skipping wait")
                 return True
-        log_info(f"⏰ Hẹn giờ đến {hh:02d}:{mm:02d}:{ss:02d} — chờ {delay}s")
+        log_info(f"⏰ Scheduled for {hh:02d}:{mm:02d}:{ss:02d} — waiting {delay}s")
         self._sleep(delay)
         return True
 
@@ -4142,13 +4145,13 @@ class WorkflowEngine:
                 m = re.search(r"src\s+(\d+\.\d+\.\d+\.\d+)", _sh("ip route"))
                 return m.group(1) if m else ""
         except Exception as exc:
-            log_warning(f"device_info '{prop}' lỗi: {exc}")
+            log_warning(f"device_info '{prop}' error: {exc}")
         return ""
 
     def _a_screen_power(self, node, p) -> bool:
         """Wake, sleep, or toggle the device screen via key events."""
         if getattr(self, "_controller", "adb") == "win32":
-            log_warning("🖥 Bật/tắt màn hình không áp dụng cho dự án Win32 — bỏ qua")
+            log_warning("🖥 Screen power is unavailable for Win32 projects — skipping")
             return True
         action = str(p.get("action", "on")).strip().lower()
         dev = getattr(self.auto.adb, "device", None)
@@ -4165,10 +4168,10 @@ class WorkflowEngine:
                     dev.shell("input keyevent 224")
                 elif action == "off" and is_on:
                     dev.shell("input keyevent 223")
-            log_info(f"🖥 màn hình: {action}")
+            log_info(f"🖥 screen: {action}")
             return True
         except Exception as exc:
-            log_warning(f"screen_power '{action}' lỗi: {exc}")
+            log_warning(f"screen_power '{action}' error: {exc}")
             return False
 
     # ── Emulator launch ───────────────────────────────────────────────────────
@@ -4195,20 +4198,20 @@ class WorkflowEngine:
         argv = self._emulator_launch_argv(p, kind, index)
         if not argv:
             log_error(
-                f"▶ Không dựng được lệnh mở '{kind}' — đặt 'Đường dẫn' "
-                f"tới thư mục cài / console .exe, hoặc dùng 'Lệnh tùy chỉnh'"
+                f"▶ Could not build the launch command for '{kind}' — set 'Path' "
+                f"to the install folder or console .exe, or use 'Custom command'"
             )
             return False
 
         import subprocess
         try:
-            log_info(f"▶ Mở giả lập: {' '.join(argv)}")
+            log_info(f"▶ Launching emulator: {' '.join(argv)}")
             subprocess.Popen(
                 argv,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
             )
         except Exception as exc:
-            log_error(f"▶ Mở giả lập lỗi: {exc}")
+            log_error(f"▶ Failed to launch emulator: {exc}")
             return False
 
         wait = float(p.get("wait", 0) or 0)
@@ -4349,14 +4352,14 @@ class WorkflowEngine:
         """
         serial = self._current_selected_serial()
         if not serial:
-            log_warning(f"🖥 {verb}: chưa chọn thiết bị nào ở thanh công cụ — chọn thiết bị, "
-                        f"hoặc đổi 'Emulator' sang 'Last used (saved)' / hãng cụ thể")
+            log_warning(f"🖥 {verb}: no toolbar device selected — select a device, "
+                        f"or set 'Emulator' to 'Last used (saved)' or a specific vendor")
             return None
         _, port = _split_emulator_serial(serial)
         cands = _emulator_port_candidates(port) if port else []
         if not cands:
-            log_warning(f"🖥 {verb}: thiết bị đang chọn '{serial}' không khớp cổng ADB của "
-                        f"giả lập nào — chọn hãng giả lập cụ thể trong node")
+            log_warning(f"🖥 {verb}: selected device '{serial}' does not match any emulator "
+                        f"ADB port — select a specific emulator vendor in the node")
             return None
         running = _enum_player_windows()
         if len(cands) == 1:
@@ -4365,12 +4368,12 @@ class WorkflowEngine:
         else:
             live = [c for c in cands if running.get(c[0])]
             if len(live) != 1:
-                names = " và ".join(f"'{k}'" for k, _ in cands)
-                log_warning(f"🖥 {verb}: cổng {port} dùng chung cho {names} mà không thấy "
-                            f"tiến trình nào đang chạy — chọn hãng giả lập cụ thể trong node")
+                names = " and ".join(f"'{k}'" for k, _ in cands)
+                log_warning(f"🖥 {verb}: port {port} is shared by {names}, but no matching "
+                            f"process is running — select a specific emulator vendor in the node")
                 return None
             kind, index = live[0]
-            note = " (theo tiến trình đang chạy)"
+            note = " (based on running process)"
         # The running instance's own exe path beats the project setting: several
         # copies of one emulator installed side by side answer the same family.
         path = ""
@@ -4378,7 +4381,7 @@ class WorkflowEngine:
             if rec.get("exe_path"):
                 path = os.path.dirname(rec["exe_path"])
                 break
-        log_info(f"🖥 {verb}: thiết bị đang chọn {serial} → {kind} #{index}{note}")
+        log_info(f"🖥 {verb}: selected device {serial} → {kind} #{index}{note}")
         return kind, index, path or self._emulator_path(p), ""
 
     def _emulator_pc_target(self, p: Dict, verb: str) -> Optional[tuple]:
@@ -4403,8 +4406,8 @@ class WorkflowEngine:
         if kind == "last":
             saved = self._load_emulator_state()
             if not saved:
-                log_warning(f"🖥 {verb}: chưa có giả lập nào được lưu — "
-                            f"chạy node 'Mở giả lập' trước, hoặc chọn hãng giả lập cụ thể")
+                log_warning(f"🖥 {verb}: no saved emulator — "
+                            f"run a 'Launch emulator' node first or select a specific vendor")
                 return None
             kind = str(saved.get("emulator") or "").lower()
             try:
@@ -4416,7 +4419,7 @@ class WorkflowEngine:
             if not instance:
                 instance = str(saved.get("instance") or "").strip()
         if kind not in EMU_PLAYER_EXES:
-            log_warning(f"🖥 {verb}: không nhận diện được hãng giả lập '{kind}' — chọn hãng cụ thể trong node")
+            log_warning(f"🖥 {verb}: unrecognized emulator vendor '{kind}' — select a specific vendor in the node")
             return None
         return kind, index, path, instance
 
@@ -4451,7 +4454,7 @@ class WorkflowEngine:
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
             return r.stdout or ""
         except Exception as exc:
-            log_warning(f"🖥 Console '{args_key}' lỗi: {exc}")
+            log_warning(f"🖥 Console '{args_key}' error: {exc}")
             return None
 
     def _taskkill_emulator_window(self, kind: str, path: str, *,
@@ -4476,7 +4479,7 @@ class WorkflowEngine:
                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
             return True
         except Exception as exc:
-            log_warning(f"🖥 Taskkill giả lập lỗi: {exc}")
+            log_warning(f"🖥 Failed to terminate emulator: {exc}")
             return False
 
     def _selected_instance_hints(self, p: Dict
@@ -4528,16 +4531,16 @@ class WorkflowEngine:
         hwnd, how = _pick_player_window(_enum_player_windows(), kind, install_dir,
                                         pid_hints=hints, strict=strict)
         if how == "ambiguous":
-            log_warning(f"🖥 Resize: '{kind}' đang mở nhiều cửa sổ mà không xác định được "
-                        f"cửa sổ của {self._current_selected_serial()} — đóng bớt instance, "
-                        f"hoặc chọn hãng + index cụ thể trong node")
+            log_warning(f"🖥 Resize: '{kind}' has multiple windows and the window for "
+                        f"{self._current_selected_serial()} could not be identified — close extra instances "
+                        f"or select a specific vendor and index in the node")
             return False
         if not hwnd:
-            log_warning(f"🖥 Không thấy cửa sổ giả lập '{kind}' #{index} — giả lập chưa mở?")
+            log_warning(f"🖥 Emulator window '{kind}' #{index} not found — is it running?")
             return False
         if how == "largest":
-            log_warning(f"🖥 Resize: '{kind}' đang mở nhiều cửa sổ — nhắm vào cửa sổ lớn "
-                        f"nhất, có thể sai instance")
+            log_warning(f"🖥 Resize: '{kind}' has multiple windows — targeting the largest, "
+                        f"which may be the wrong instance")
         try:
             import win32api
             import win32con
@@ -4579,17 +4582,17 @@ class WorkflowEngine:
             after = _emulator_render_child(hwnd)
             got = (after[1], after[2]) if after else None
             if got and got != (w, h):
-                log_warning(f"🖥 Vùng hiển thị sau resize là {got[0]}×{got[1]} "
-                            f"(yêu cầu {w}×{h}) — window có thể bị kẹp kích thước tối thiểu")
+                log_warning(f"🖥 Display area after resize is {got[0]}×{got[1]} "
+                            f"(requested {w}×{h}) — the window may enforce a minimum size")
             # Name the window: with two instances of one family open, this is
             # how the user sees which one the node actually acted on.
             title = (win32gui.GetWindowText(hwnd) or "").strip()
-            log_success(f"🖥 Resize giả lập {kind} #{index}"
-                        f"{f' — cửa sổ {title!r}' if title else ''}"
-                        f" → hiển thị {w}×{h} tại ({l}, {t})")
+            log_success(f"🖥 Resized emulator {kind} #{index}"
+                        f"{f' — window {title!r}' if title else ''}"
+                        f" → display {w}×{h} at ({l}, {t})")
             return True
         except Exception as exc:
-            log_warning(f"🖥 Resize giả lập lỗi: {exc}")
+            log_warning(f"🖥 Emulator resize failed: {exc}")
             return False
 
     def _a_kill_emulator(self, node, p) -> bool:
@@ -4603,7 +4606,7 @@ class WorkflowEngine:
         finds). Returns True when the kill command was issued or there was
         nothing to kill; False only when the target couldn't even be resolved.
         """
-        target = self._emulator_pc_target(p, "Tắt giả lập")
+        target = self._emulator_pc_target(p, "Stop emulator")
         if not target:
             return False
         kind, index, path, _ = target
@@ -4611,17 +4614,17 @@ class WorkflowEngine:
 
         # 1) console shutdown — leaves no zombie VM process behind.
         if self._run_emulator_console(kind, path, "quit_args", index) is not None:
-            log_success(f"🖥 Đã tắt giả lập {kind} #{index}")
+            log_success(f"🖥 Stopped emulator {kind} #{index}")
             return True
         # 2) fallback: taskkill the player window's process tree (BlueStacks has
         #    no console verb; or the console exe couldn't be resolved).
         killed = self._taskkill_emulator_window(kind, path, pid_hints=hints, strict=strict)
         if killed is None:
-            log_info(f"🖥 Không thấy cửa sổ giả lập '{kind}' #{index} (đã tắt sẵn? — bỏ qua)")
+            log_info(f"🖥 Emulator window '{kind}' #{index} not found (already stopped? — skipping)")
             return True
         if not killed:
             return False
-        log_success(f"🖥 Đã tắt giả lập {kind} #{index}")
+        log_success(f"🖥 Stopped emulator {kind} #{index}")
         return True
 
     def _a_restart_emulator(self, node, p) -> bool:
@@ -4633,7 +4636,7 @@ class WorkflowEngine:
         ``wait`` > 0 the node then polls the instance's ADB until Android
         reports ``sys.boot_completed`` so the next node can drive the device.
         """
-        target = self._emulator_pc_target(p, "Restart giả lập")
+        target = self._emulator_pc_target(p, "Restart emulator")
         if not target:
             return False
         kind, index, path, instance = target
@@ -4646,13 +4649,13 @@ class WorkflowEngine:
         # instance name can't be read off an ADB serial — so say so instead of
         # relaunching whatever instance the console would default to.
         if strict and kind == "bluestacks" and not instance:
-            log_warning("🖥 Restart giả lập: BlueStacks cần tên instance — điền 'Instance "
-                        "name' trong node (không suy ra được từ thiết bị đang chọn)")
+            log_warning("🖥 Restart emulator: BlueStacks requires an instance name — set 'Instance "
+                        "name' in the node (it cannot be derived from the selected device)")
             return False
 
         if self._run_emulator_console(kind, path, "restart_args", index) is None:
             # No console restart verb (BlueStacks) → kill, then relaunch.
-            log_info(f"🖥 '{kind}' không có lệnh restart — tắt rồi mở lại")
+            log_info(f"🖥 '{kind}' has no restart command — stopping and relaunching")
             killed = self._taskkill_emulator_window(kind, path, pid_hints=hints, strict=strict)
             if killed is False:
                 return False
@@ -4661,19 +4664,19 @@ class WorkflowEngine:
             argv = self._emulator_launch_argv(
                 {**p, "path": path, "instance": instance, "command": ""}, kind, index)
             if not argv:
-                log_error(f"🖥 Không dựng được lệnh mở lại '{kind}' — đặt 'Đường dẫn' tới thư mục cài")
+                log_error(f"🖥 Could not build relaunch command for '{kind}' — set 'Path' to the install folder")
                 return False
             import subprocess
             try:
-                log_info(f"🖥 Mở lại giả lập: {' '.join(argv)}")
+                log_info(f"🖥 Relaunching emulator: {' '.join(argv)}")
                 subprocess.Popen(argv, creationflags=getattr(
                     subprocess, "CREATE_NO_WINDOW", 0x08000000))
             except Exception as exc:
-                log_error(f"🖥 Mở lại giả lập lỗi: {exc}")
+                log_error(f"🖥 Failed to relaunch emulator: {exc}")
                 return False
 
         if wait <= 0:
-            log_success(f"🖥 Đã gửi lệnh restart giả lập {kind} #{index}")
+            log_success(f"🖥 Sent restart command to emulator {kind} #{index}")
             return True
         # An instance that is still shutting down would answer the *old* ADB
         # session; give it a moment before polling for the fresh boot.
@@ -4687,19 +4690,19 @@ class WorkflowEngine:
         port = sel_port or self._emulator_adb_port(port_params, kind, index)
         host = f"127.0.0.1:{port}" if port else None
         if not host:
-            log_warning(f"🖥 Không suy ra được cổng ADB của '{kind}' #{index} — bỏ qua bước chờ")
+            log_warning(f"🖥 Could not determine ADB port for '{kind}' #{index} — skipping wait")
             return True
         end = time.time() + wait
         while not self._stop.is_set():
             self._pause.wait()
             if self._emulator_adb_ready(host):
-                log_success(f"🖥 Giả lập {kind} #{index} đã restart & boot xong ({host})")
+                log_success(f"🖥 Emulator {kind} #{index} restarted and finished booting ({host})")
                 self._maybe_attach_emulator(p, host)
                 return True
             if time.time() >= end:
                 break
             time.sleep(1.0)
-        log_warning(f"🖥 Giả lập {kind} #{index} chưa boot xong sau {wait:.0f}s")
+        log_warning(f"🖥 Emulator {kind} #{index} did not finish booting after {wait:.0f}s")
         return False
 
     def _a_emulator_resolution(self, node, p) -> bool:
@@ -4712,15 +4715,15 @@ class WorkflowEngine:
         needs a restart of the instance to take effect, which ``restart`` does
         here when asked.
         """
-        target = self._emulator_pc_target(p, "Đổi resolution")
+        target = self._emulator_pc_target(p, "Change resolution")
         if not target:
             return False
         kind, index, path, _ = target
         spec = EMULATOR_CONSOLES.get(kind) or {}
         keys = spec.get("res_keys")
         if not keys:
-            log_warning(f"🖥 '{kind}' không hỗ trợ đổi resolution qua console — "
-                        f"đổi tay trong Settings của giả lập (chỉ MuMu hỗ trợ)")
+            log_warning(f"🖥 '{kind}' does not support console resolution changes — "
+                        f"change it in the emulator settings (only MuMu is supported)")
             return False
         try:
             w = max(200, int(float(p.get("width", 1920) or 1920)))
@@ -4731,7 +4734,7 @@ class WorkflowEngine:
         exe = self._resolve_console_exe(
             path, spec.get("exes", []), spec.get("dirs", []), spec.get("subdirs"))
         if not exe:
-            log_warning(f"🖥 Không thấy console của '{kind}' — đặt 'Đường dẫn' tới thư mục cài")
+            log_warning(f"🖥 Console for '{kind}' not found — set 'Path' to the install folder")
             return False
         # A custom w/h/dpi only applies when the mode is switched off the presets.
         argv = [exe, "setting", "-v", str(index),
@@ -4746,16 +4749,16 @@ class WorkflowEngine:
                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
             out = (r.stdout or "") + (r.stderr or "")
         except Exception as exc:
-            log_warning(f"🖥 Đổi resolution lỗi: {exc}")
+            log_warning(f"🖥 Resolution change failed: {exc}")
             return False
         if "errcode" in out.lower() and '"errcode": 0' not in out:
-            log_warning(f"🖥 Console từ chối đổi resolution: {out.strip()[:200]}")
+            log_warning(f"🖥 Console rejected the resolution change: {out.strip()[:200]}")
             return False
-        log_success(f"🖥 Resolution giả lập {kind} #{index} → {w}×{h} @ {dpi}dpi")
+        log_success(f"🖥 Emulator resolution {kind} #{index} → {w}×{h} @ {dpi}dpi")
         if bool(p.get("restart", True)):
             # The instance reads resolution at boot, so it must cycle to apply.
             return self._a_restart_emulator(node, {**p, "wait": p.get("wait", 120)})
-        log_info("🖥 Cần restart giả lập để resolution mới có hiệu lực")
+        log_info("🖥 Restart the emulator to apply the new resolution")
         return True
 
     def _c_if_emulator(self, p: Dict) -> bool:
@@ -4969,7 +4972,7 @@ class WorkflowEngine:
         """
         hosts: List[str] = [f"127.0.0.1:{port}"] if port else []
         if not hosts and resolver is None:
-            log_info(f"▶ Chờ giả lập khởi động {wait:.0f}s (không rõ cổng ADB)")
+            log_info(f"▶ Waiting {wait:.0f}s for emulator startup (ADB port unknown)")
             self._sleep(wait)
             return None
         end = time.time() + wait
@@ -4988,11 +4991,11 @@ class WorkflowEngine:
                         hosts.append(host)
             for host in hosts:
                 if self._emulator_adb_ready(host):
-                    log_success(f"▶ Giả lập sẵn sàng — ADB {host}")
+                    log_success(f"▶ Emulator ready — ADB {host}")
                     return host
             time.sleep(1.0)
         label = ", ".join(hosts) or "?"
-        log_warning(f"▶ Chưa thấy ADB {label} sau {wait:.0f}s")
+        log_warning(f"▶ ADB {label} not found after {wait:.0f}s")
         return None
 
     # ── Win32 handlers ─────────────────────────────────────────────────────────
@@ -5000,7 +5003,7 @@ class WorkflowEngine:
     def _win32_ctrl(self):
         """Return the Win32 controller if this is a Win32 flow, else None."""
         if getattr(self, "_controller", "adb") != "win32":
-            log_warning("Node Win32 chỉ chạy trong dự án Win32 (đổi Controller ở Project settings)")
+            log_warning("Win32 nodes only run in Win32 projects (change Controller in Project settings)")
             return None
         return getattr(self.auto, "adb", None)
 
@@ -5097,11 +5100,11 @@ class WorkflowEngine:
             return False
         path = self._win_launch_path(p)
         if not path:
-            return self._fail_run(node, "Launch program: chưa có đường dẫn game — chọn ở "
+            return self._fail_run(node, "Launch program: no game path specified — select it in "
                                         "Runner Settings → Game (Designer: Project settings / Custom)")
         if not os.path.isfile(path):
-            return self._fail_run(node, f"Launch program: không tìm thấy game tại '{path}' — "
-                                        "chọn lại đường dẫn game rồi chạy lại")
+            return self._fail_run(node, f"Launch program: game not found at '{path}' — "
+                                        "select the correct game path and run again")
         args = str(self._resolve_value(p.get("args", ""))).strip()
         cmd = f'"{path}" {args}'.strip() if args else path
         if not ctrl.launch_app(cmd):
@@ -5120,17 +5123,17 @@ class WorkflowEngine:
                 if hwnd:
                     ctrl.hwnd = hwnd
                     title = ctrl._w[1].GetWindowText(hwnd) or window
-                    log_success(f"🪟 Cửa sổ '{title}' đã mở và được gắn")
+                    log_success(f"🪟 Window '{title}' opened and attached")
                     try:
                         self.auto._update_screen_size()
                         if not getattr(self.auto, "capture_running", False):
                             self.auto.start_continuous_capture()
                     except Exception as exc:
-                        log_warning(f"Win32 capture chưa sẵn sàng: {exc}")
+                        log_warning(f"Win32 capture is not ready: {exc}")
                     return True
                 time.sleep(0.5)
             label = window or f"PID {ctrl.last_launch_pid}"
-            log_warning(f"🪟 Chưa thấy cửa sổ '{label}' sau {wait:.0f}s")
+            log_warning(f"🪟 Window '{label}' not found after {wait:.0f}s")
         return True
 
     def _a_win_activate(self, node, p) -> bool:
@@ -5159,7 +5162,7 @@ class WorkflowEngine:
         client = self._truthy(p.get("client", False))
         ok = bool(ctrl.resize_window(w, h, center=center, client=client))
         log_info(f"🪟 resize → {w}×{h}{' (client)' if client else ''}"
-                 f"{' · căn giữa' if center else ''}")
+                 f"{' · centered' if center else ''}")
         return ok
 
     def _a_win_move(self, node, p) -> bool:
@@ -5227,7 +5230,7 @@ class WorkflowEngine:
         if ctrl is None:
             return False
         if not hasattr(ctrl, "click"):
-            log_warning("🖱 Backend Win32 không hỗ trợ click nhiều nút")
+            log_warning("🖱 Win32 backend does not support multiple mouse buttons")
             return False
         x, y = self._pos(p)
         x += int(p.get("offsetX", 0) or 0)
@@ -5245,7 +5248,7 @@ class WorkflowEngine:
         if ctrl is None:
             return False
         if not hasattr(ctrl, "scroll"):
-            log_warning("🖱 Backend Win32 không hỗ trợ con lăn")
+            log_warning("🖱 Win32 backend does not support mouse wheel input")
             return False
         x, y = self._pos(p)
         direction = str(p.get("direction", "down")).strip().lower()
@@ -5257,7 +5260,7 @@ class WorkflowEngine:
         signed = notches if direction in ("up", "right") else -notches
         ok = bool(ctrl.scroll(x, y, notches=signed, horizontal=horizontal))
         if ok:
-            log_info(f"🖱 cuộn {direction} ×{notches} tại ({x}, {y})")
+            log_info(f"🖱 scrolled {direction} ×{notches} at ({x}, {y})")
         return ok
 
     def _a_win_mouse_move(self, node, p) -> bool:
@@ -5266,12 +5269,12 @@ class WorkflowEngine:
         if ctrl is None:
             return False
         if not hasattr(ctrl, "move_mouse"):
-            log_warning("🖱 Backend Win32 không hỗ trợ di chuột")
+            log_warning("🖱 Win32 backend does not support mouse movement")
             return False
         x, y = self._pos(p)
         ok = bool(ctrl.move_mouse(x, y))
         if ok:
-            log_info(f"🖱 di chuột → ({x}, {y})")
+            log_info(f"🖱 moved pointer → ({x}, {y})")
         return ok
 
     def _a_win_hotkey(self, node, p) -> bool:
@@ -5280,13 +5283,13 @@ class WorkflowEngine:
         if ctrl is None:
             return False
         if not hasattr(ctrl, "press_hotkey"):
-            log_warning("⌨ Backend Win32 không hỗ trợ tổ hợp phím")
+            log_warning("⌨ Win32 backend does not support hotkeys")
             return False
         try:
             vk = int(p.get("keycode", 13))
         except (TypeError, ValueError):
-            log_warning(f"⌨ win_hotkey: mã phím không hợp lệ '{p.get('keycode')}' — "
-                        "chọn một phím trong danh sách của block")
+            log_warning(f"⌨ win_hotkey: invalid key code '{p.get('keycode')}' — "
+                        "select a key from the block's list")
             return False
         mods = {k: self._truthy(p.get(k, False)) for k in ("ctrl", "shift", "alt", "win")}
         ok = bool(ctrl.press_hotkey(vk, **mods))
@@ -5307,14 +5310,14 @@ class WorkflowEngine:
         try:
             vk = int(p.get("keycode", 13))
         except (TypeError, ValueError):
-            log_warning(f"⌨ win_key: mã phím không hợp lệ '{p.get('keycode')}' — "
-                        "chọn một phím trong danh sách của block")
+            log_warning(f"⌨ win_key: invalid key code '{p.get('keycode')}' — "
+                        "select a key from the block's list")
             return False
         mode = str(p.get("mode", "press") or "press").strip().lower()
         hold = self._resolve_count(p.get("hold", 80), default=80)
         ok = bool(ctrl.press_key(vk, hold_ms=hold, action=mode))
         if ok:
-            what = {"down": "giữ", "up": "nhả"}.get(mode, f"nhấn {hold}ms")
+            what = {"down": "held", "up": "released"}.get(mode, f"pressed for {hold}ms")
             # vk_name() falls back to "VK{n}" for codes the table doesn't cover —
             # still a code, but at least a recognisable one, and the user has no
             # other clue which key fired.
@@ -5371,23 +5374,23 @@ class WorkflowEngine:
                     return abs(seen["w"] - want_w) <= tol and abs(seen["h"] - want_h) <= tol
                 return bool(ctrl.window_exists())
             except Exception as exc:
-                log_warning(f"🪟 kiểm tra cửa sổ lỗi: {exc}")
+                log_warning(f"🪟 window check failed: {exc}")
                 return False
 
         what = (f"client {want_w}×{want_h}" + (f"±{tol}" if tol else "")) if state == "size" else state
-        now = lambda: f" (hiện {seen['w']}×{seen['h']})" if state == "size" else ""  # noqa: E731
+        now = lambda: f" (current {seen['w']}×{seen['h']})" if state == "size" else ""  # noqa: E731
         if ntype == "win_if_window":
             ok = probe()
-            log_info(f"🪟 cửa sổ {what} → {'có' if ok else 'không'}{now()}")
+            log_info(f"🪟 window {what} → {'yes' if ok else 'no'}{now()}")
             return ok != negate
         end = time.time() + max(0.0, float(params.get("timeout", 30) or 0))
         while not self._stop.is_set():
             self._pause.wait()
             if probe() != negate:
-                log_info(f"🪟 cửa sổ {what}{' (đảo)' if negate else ''} — sẵn sàng{now()}")
+                log_info(f"🪟 window {what}{' (negated)' if negate else ''} — ready{now()}")
                 return True
             if time.time() >= end:
-                log_warning(f"🪟 hết thời gian chờ cửa sổ {what}{now()}")
+                log_warning(f"🪟 timed out waiting for window {what}{now()}")
                 return False
             time.sleep(0.25)
         return False
@@ -5395,7 +5398,7 @@ class WorkflowEngine:
     def _c_if_screen_on(self, params: Dict) -> bool:
         """ADB: is the device display awake? (the read side of screen_power)."""
         if getattr(self, "_controller", "adb") == "win32":
-            log_warning("🖥 'Nếu màn hình đang bật' chỉ áp dụng cho dự án ADB — coi như bật")
+            log_warning("🖥 'If screen is on' is only available for ADB projects — treating as on")
             return not self._truthy(params.get("negate", False))
         negate = self._truthy(params.get("negate", False))
         dev = getattr(self.auto.adb, "device", None)
@@ -5411,10 +5414,34 @@ class WorkflowEngine:
                 # Older/AOSP builds: fall back to the display-power state line.
                 on = "mScreenOn=true" in out or "Display Power: state=ON" in out
         except Exception as exc:
-            log_warning(f"if_screen_on lỗi: {exc}")
+            log_warning(f"if_screen_on error: {exc}")
             return False != negate
-        log_info(f"🖥 màn hình {'đang bật' if on else 'đang tắt'}")
+        log_info(f"🖥 screen is {'on' if on else 'off'}")
         return on != negate
+
+    def _c_if_device_size(self, params: Dict) -> bool:
+        """ADB: compare the Android screen resolution reported by ``wm size``."""
+        if getattr(self, "_controller", "adb") == "win32":
+            log_warning("📱 'If device size' is only available for ADB projects")
+            return False
+        want_w = self._resolve_count(params.get("width", 1920), default=1920)
+        want_h = self._resolve_count(params.get("height", 1080), default=1080)
+        tolerance = max(0, self._resolve_count(params.get("tolerance", 0), default=0))
+        negate = self._truthy(params.get("negate", False))
+        try:
+            width, height = self.auto.adb.get_screen_size()
+        except Exception as exc:
+            log_warning(f"📱 failed to read device size: {exc}")
+            return False
+        width, height = int(width or 0), int(height or 0)
+        if width <= 0 or height <= 0:
+            log_warning("📱 could not read device size")
+            return False
+        matches = abs(width - want_w) <= tolerance and abs(height - want_h) <= tolerance
+        expected = f"{want_w}×{want_h}" + (f"±{tolerance}" if tolerance else "")
+        log_info(f"📱 size {width}×{height}, expected {expected} → "
+                 f"{'matched' if matches else 'not matched'}")
+        return matches != negate
 
     def _c_find_image_pos(self, params: Dict) -> bool:
         """Find a template and store its centre in two variables (x / y).
@@ -5428,7 +5455,7 @@ class WorkflowEngine:
             region=self._search_region(params),
         )
         if not res:
-            log_info(f"🔍 không thấy {os.path.basename(tpl) if tpl else '?'} — không ghi biến")
+            log_info(f"🔍 {os.path.basename(tpl) if tpl else '?'} not found — variables unchanged")
             return False
         x, y = int(res[0]), int(res[1])
         self._last_pos = (x, y)
@@ -5438,7 +5465,7 @@ class WorkflowEngine:
             self._set_var(nx, x)
         if ny:
             self._set_var(ny, y)
-        log_info(f"🔍 {os.path.basename(tpl) if tpl else '?'} tại ({x}, {y})"
+        log_info(f"🔍 {os.path.basename(tpl) if tpl else '?'} at ({x}, {y})"
                  + (f" → {nx}/{ny}" if (nx or ny) else ""))
         return True
 
@@ -5486,11 +5513,11 @@ class WorkflowEngine:
                     if stable_since is None:
                         stable_since = time.time()
                     elif time.time() - stable_since >= settle:
-                        log_info(f"🧊 màn hình ổn định (Δ={diff:.2f} ≤ {tol:g})")
+                        log_info(f"🧊 screen stable (Δ={diff:.2f} ≤ {tol:g})")
                         return True
                 else:
                     stable_since = None
             if time.time() >= end:
-                log_warning(f"🧊 màn hình chưa ổn định sau {timeout:g}s")
+                log_warning(f"🧊 screen not stable after {timeout:g}s")
                 return False
         return False

@@ -103,7 +103,10 @@ SPEC = os.path.join(ROOT, "packaging", "runner_build.spec")
 VENDOR_SRC = os.path.join(ROOT, "vendor")
 
 # The vendor sub-tools we know how to trim to.
-VENDOR_TOOLS = ("adb", "scrcpy", "frida")
+VENDOR_TOOLS = ("adb", "scrcpy", "frida", "unity_bridge")
+# unity_bridge ships only the built injector + plugin DLLs (see _copy_vendor) —
+# never src/ (C#/C++ sources) or README.md, which the Runner never reads.
+UNITY_BRIDGE_RUNTIME_DIRS = ("injector", "plugin_inject", "plugin_il2cpp")
 EMULATOR_NODES = {"launch_emulator", "if_emulator", "wait_emulator"}
 # Folders a running Runner writes into; never shipped in an update zip.
 USER_DIRS = ("data", "out", "logs")
@@ -237,7 +240,9 @@ def compute_vendor_needs(flow: dict) -> set[str]:
                     node_types.add(str(t))
 
     is_adb = controller == "adb"
+    is_win32 = controller == "win32"
     has_emulator = bool(node_types & EMULATOR_NODES)
+    input_mode = str((flow.get("win32") or {}).get("inputMode") or "").strip().lower()
 
     needs: set[str] = set()
     # adb.exe — any ADB device work (device controller, adb capture, emulator).
@@ -251,6 +256,11 @@ def compute_vendor_needs(flow: dict) -> set[str]:
     # frida, so a Win32 workflow never needs this ~107 MB tree.
     if is_adb and bool(speedhack.get("enabled")):
         needs.add("frida")
+    # unity_bridge — the in-game input plugin + Macro2kInjector.exe. Injected at
+    # runtime (see vendor/unity_bridge/README.md); without this the Runner falls
+    # back to anchored_touch, which most games ignore.
+    if is_win32 and input_mode == "unity_bridge":
+        needs.add("unity_bridge")
     return needs
 
 
@@ -493,10 +503,31 @@ def _copy_vendor(needs: set[str], dest_root: str) -> None:
         if not os.path.isdir(src):
             log(f"WARNING: vendor/{tool} not found — skipping (runtime may fail)")
             continue
+        if tool == "unity_bridge":
+            # Private implementation detail (the player never touches it), unlike
+            # adb/scrcpy which are real standalone tools kept external in vendor/:
+            # bundled into _internal/ (must match runner_build.spec's
+            # contents_directory="_internal") — see unity_bridge._vendor_dir().
+            # Only the built injector + plugin DLLs ship — never src/ or README.md.
+            dst = os.path.join(dest_root, "_internal", "vendor", "unity_bridge")
+            if os.path.isdir(dst):
+                shutil.rmtree(dst, ignore_errors=True)
+            copied_any = False
+            for sub in UNITY_BRIDGE_RUNTIME_DIRS:
+                sub_src = os.path.join(src, sub)
+                if os.path.isdir(sub_src):
+                    shutil.copytree(sub_src, os.path.join(dst, sub))
+                    copied_any = True
+            if copied_any:
+                log("Copying vendor/unity_bridge (injector + plugin DLLs only, into _internal/) …")
+            else:
+                log("WARNING: vendor/unity_bridge has no built injector/plugin — "
+                    "build them first (see vendor/unity_bridge/README.md)")
+            continue
         dst = os.path.join(dest_vendor, tool)
-        log(f"Copying vendor/{tool} …")
         if os.path.isdir(dst):
             shutil.rmtree(dst, ignore_errors=True)
+        log(f"Copying vendor/{tool} …")
         shutil.copytree(src, dst)
 
 
@@ -601,14 +632,31 @@ def preflight(workflow_dir: str, *, flow: dict | None = None, app_name: str = ""
 
     # ── The vendor tools this workflow's graph actually uses ─────────────────
     needs = compute_vendor_needs(flow)
-    missing = [t for t in sorted(needs) if not os.path.isdir(os.path.join(VENDOR_SRC, t))]
+
+    def _vendor_ready(tool: str) -> bool:
+        if tool == "unity_bridge":
+            # README.md + src/ are always checked in; what the Runner actually
+            # needs is the built injector and at least one plugin DLL.
+            base = os.path.join(VENDOR_SRC, tool)
+            has_injector = os.path.isfile(os.path.join(base, "injector", "Macro2kInjector.exe"))
+            has_plugin = any(os.path.isdir(os.path.join(base, sub)) and os.listdir(os.path.join(base, sub))
+                             for sub in ("plugin_inject", "plugin_il2cpp"))
+            return has_injector and has_plugin
+        return os.path.isdir(os.path.join(VENDOR_SRC, tool))
+
+    missing = [t for t in sorted(needs) if not _vendor_ready(t)]
     if missing:
         listed = ", ".join(f"vendor/{t}" for t in missing)
+        hint = ("Fetch the tool into vendor/ (see packaging/build.md) — the build would "
+                "copy it into the Runner, and without it the Runner fails at runtime.")
+        if "unity_bridge" in missing:
+            hint = ("Build vendor/unity_bridge's injector and at least one plugin DLL first "
+                    "(see vendor/unity_bridge/README.md) — the build would copy them into the "
+                    "Runner, and without them the Runner falls back to anchored_touch at runtime.")
         issues.append(_issue(
             "vendor", "warn" if allow_missing_vendor else "fail",
             f"this workflow needs {listed}, which {'is' if len(missing) == 1 else 'are'} not in this checkout",
-            "Fetch the tool into vendor/ (see packaging/build.md) — the build would "
-            "copy it into the Runner, and without it the Runner fails at runtime."))
+            hint))
     elif needs:
         issues.append(_issue("vendor", "ok", "vendors: " + ", ".join(sorted(needs))))
 

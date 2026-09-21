@@ -9,8 +9,6 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Threading;
-using BepInEx.Logging;
-using HarmonyLib;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -51,7 +49,8 @@ namespace Macro2k.UnityBridge
         private readonly bool _ignoreFocus;
         private readonly ConcurrentQueue<BridgeCommand> _queue = new ConcurrentQueue<BridgeCommand>();
 
-        private TcpListener _listener;
+        // Socket, not TcpListener: Unity 6 games strip TcpListener from System.dll
+        private Socket _listener;
         private volatile bool _running;
         private bool _focusApplied;
         private int _nextPointerId = -100;
@@ -74,23 +73,22 @@ namespace Macro2k.UnityBridge
             if (_running) return;
             try
             {
-                _listener = new TcpListener(IPAddress.Loopback, _port);
-                _listener.Start();
+                _listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                _listener.Bind(new IPEndPoint(IPAddress.Loopback, _port));
+                _listener.Listen(8);
             }
             catch (Exception e)
             {
                 _log.LogError($"Cannot listen on 127.0.0.1:{_port} ({e.Message}). " +
                               "Another bridge (or app) may already use this port.");
+                try { _listener?.Close(); } catch { }
                 _listener = null;
                 return;
             }
 
             _running = true;
             Active = this;
-            // Early (Awake), before game code JITs callers of Input.GetKey and
-            // possibly inlines them past the patch.
             KeyInjector.Log = _log;
-            KeyInjector.ApplyLegacyPatches();
             new Thread(AcceptLoop) { IsBackground = true, Name = "Macro2kBridge-Accept" }.Start();
             _log.LogInfo($"Listening on 127.0.0.1:{_port}");
         }
@@ -101,11 +99,12 @@ namespace Macro2k.UnityBridge
             _running = false;
             if (Active == this) Active = null;
 
-            try { _listener?.Stop(); } catch { }
+            try { _listener?.Close(); } catch { }
             _listener = null;
 
             while (_queue.TryDequeue(out var cmd)) cmd.Complete("err bridge stopped");
             ReleaseAllKeys();
+            LegacyInput.Shutdown();
             _log.LogInfo("Stopped");
         }
 
@@ -113,9 +112,11 @@ namespace Macro2k.UnityBridge
         public void Tick()
         {
             if (!_running) return;
+            LegacyInput.Tick();
+            if (_ignoreFocus) ForceEventSystemFocus();
 
             // Applied lazily: the Input System settings object may not exist yet
-            // when BepInEx's chainloader runs.
+            // at startup.
             if (!_focusApplied)
             {
                 _focusApplied = true;
@@ -143,7 +144,16 @@ namespace Macro2k.UnityBridge
         {
             if (!_ignoreFocus) return;
 
-            Application.runInBackground = true;
+            // Reflection: Unity 6 games strip engine members, and the setter is
+            // often gone (then the game's own Player Setting stays in effect).
+            MethodInfo setRunInBackground = typeof(Application)
+                .GetProperty("runInBackground", BindingFlags.Public | BindingFlags.Static)?.GetSetMethod();
+            if (setRunInBackground != null)
+                setRunInBackground.Invoke(null, new object[] { true });
+            else
+                _log.LogWarning("Application.runInBackground is stripped from this game; it is " +
+                                (Application.runInBackground ? "enabled" : "DISABLED, the game pauses while unfocused") +
+                                " in its Player Settings.");
 
             // UnityEngine.InputSystem.InputSystem.settings.backgroundBehavior = IgnoreFocus
             try
@@ -162,23 +172,29 @@ namespace Macro2k.UnityBridge
                 _log.LogWarning($"Input System settings not changed: {e.Message}");
             }
 
-            // EventSystem.isFocused -> true (uGUI input modules skip input while unfocused)
-            try
+            // EventSystem.isFocused is not patched: the pointer simulation below drives
+            // ExecuteEvents itself and does not depend on it.
+        }
+
+        private static FieldInfo _hasFocusField;
+        private static bool _hasFocusResolved;
+
+        /// <summary>
+        /// uGUI's StandaloneInputModule ignores input while EventSystem.isFocused is false (window not
+        /// in front). The BepInEx builds patched that getter with Harmony; here the field behind it is set
+        /// every frame instead, since a getter this small is usually inlined into its callers.
+        /// </summary>
+        private void ForceEventSystemFocus()
+        {
+            EventSystem es = EventSystem.current;
+            if (es == null) return;
+            if (!_hasFocusResolved)
             {
-                MethodInfo getter = AccessTools.PropertyGetter(typeof(EventSystem), "isFocused");
-                if (getter == null)
-                {
-                    _log.LogInfo("EventSystem.isFocused not present in this Unity version; skipped");
-                    return;
-                }
-                var harmony = new Harmony(Macro2kBridgePlugin.PluginGuid);
-                harmony.Patch(getter, postfix: new HarmonyMethod(typeof(InputBridgePatches), nameof(InputBridgePatches.IsFocusedPostfix)));
-                _log.LogInfo("EventSystem.isFocused patched");
+                _hasFocusResolved = true;
+                _hasFocusField = typeof(EventSystem).GetField("m_HasFocus", BindingFlags.NonPublic | BindingFlags.Instance);
+                _log.LogInfo(_hasFocusField != null ? "EventSystem focus is forced on" : "EventSystem.m_HasFocus not found; unfocused windows may ignore input");
             }
-            catch (Exception e)
-            {
-                _log.LogWarning($"EventSystem.isFocused patch failed: {e.Message}");
-            }
+            if (_hasFocusField != null) _hasFocusField.SetValue(es, true);
         }
 
         internal static Type FindType(string fullName)
@@ -203,10 +219,10 @@ namespace Macro2k.UnityBridge
         {
             while (_running)
             {
-                TcpClient client;
+                Socket client;
                 try
                 {
-                    client = _listener.AcceptTcpClient();
+                    client = _listener.Accept();
                 }
                 catch
                 {
@@ -216,19 +232,19 @@ namespace Macro2k.UnityBridge
             }
         }
 
-        private void HandleClient(TcpClient client)
+        private void HandleClient(Socket client)
         {
             try
             {
                 using (client)
-                using (NetworkStream stream = client.GetStream())
+                using (var stream = new NetworkStream(client, false))
                 using (var reader = new StreamReader(stream, Encoding.UTF8))
-                using (var writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" })
+                using (var writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true })
                 {
                     string line;
                     while (_running && (line = reader.ReadLine()) != null)
                     {
-                        writer.WriteLine(Dispatch(line));
+                        writer.Write(Dispatch(line) + "\n"); // TextWriter.NewLine's setter is stripped in Unity 6 games
                     }
                 }
             }
@@ -309,10 +325,59 @@ namespace Macro2k.UnityBridge
                     ExecuteKey(cmd);
                     return;
 
+                case "probe":
+                {
+                    if (a.Length < 3 || !TryParse(a[1], out float x) || !TryParse(a[2], out float y))
+                    {
+                        cmd.Complete("err usage: probe x y [refW refH]");
+                        return;
+                    }
+                    cmd.Complete(Probe(ToScreen(x, y, a, 3)));
+                    return;
+                }
+
                 default:
                     cmd.Complete("err unknown command: " + a[0]);
                     return;
             }
+        }
+
+        /// <summary>Diagnostics: what an EventSystem raycast finds at a point and who would handle it.</summary>
+        private string Probe(Vector2 pos)
+        {
+            Pointer p = NewPointer(pos);
+            if (p == null) return "err no EventSystem";
+            EventSystem es = EventSystem.current;
+            var results = new List<RaycastResult>();
+            es.RaycastAll(p.Data, results);
+            var sb = new StringBuilder("ok module=");
+            sb.Append(es.currentInputModule != null ? es.currentInputModule.GetType().Name : "none");
+            sb.Append(" hits=").Append(results.Count);
+            int shown = 0;
+            foreach (RaycastResult r in results)
+            {
+                if (r.gameObject == null || shown++ >= 6) continue;
+                GameObject down = ExecuteEvents.GetEventHandler<IPointerDownHandler>(r.gameObject);
+                GameObject click = ExecuteEvents.GetEventHandler<IPointerClickHandler>(r.gameObject);
+                sb.Append(" | ").Append(PathOf(r.gameObject))
+                  .Append(" {down=").Append(down != null ? PathOf(down) : "-")
+                  .Append(" click=").Append(click != null ? PathOf(click) : "-");
+                if (down != null)
+                {
+                    sb.Append(" comps=");
+                    foreach (Component c in down.GetComponents<Component>())
+                    {
+                        if (c == null) continue;
+                        sb.Append(c.GetType().FullName);
+                        foreach (Type t in c.GetType().GetInterfaces())
+                            if (typeof(IEventSystemHandler).IsAssignableFrom(t) && t != typeof(IEventSystemHandler))
+                                sb.Append('+').Append(t.Name);
+                        sb.Append(',');
+                    }
+                }
+                sb.Append('}');
+            }
+            return sb.ToString();
         }
 
         private void ExecuteKey(BridgeCommand cmd)
@@ -400,12 +465,28 @@ namespace Macro2k.UnityBridge
             GameObject target = RaycastUpdate(p);
             if (target == null) { cmd.Complete("miss"); yield break; }
 
+            // StandaloneInputModule reads the legacy Input itself: feeding it through LegacyInput is enough,
+            // and also running the EventSystem simulation would click twice.
+            if (UsesLegacyInputModule() && LegacyInput.MouseBegin(pos))
+            {
+                float legacyReleaseAt = Time.unscaledTime + holdSeconds;
+                yield return null;
+                while (Time.unscaledTime < legacyReleaseAt) yield return null;
+                LegacyInput.MouseEnd();
+                yield return null;
+                yield return null; // the module sees Up on the frame after the release
+                cmd.Complete("ok " + PathOf(target));
+                yield break;
+            }
+
             if (!TryStep(() => PressDown(p, target), cmd)) yield break;
+            LegacyInput.MouseBegin(pos);
 
             float releaseAt = Time.unscaledTime + holdSeconds;
             yield return null; // down and up never share a frame
             while (Time.unscaledTime < releaseAt) yield return null;
 
+            LegacyInput.MouseEnd();
             if (!TryStep(() => { RaycastUpdate(p); Release(p); }, cmd)) yield break;
             cmd.Complete("ok " + PathOf(target));
         }
@@ -418,7 +499,26 @@ namespace Macro2k.UnityBridge
             GameObject target = RaycastUpdate(p);
             if (target == null) { cmd.Complete("miss"); yield break; }
 
+            if (UsesLegacyInputModule() && LegacyInput.MouseBegin(from))
+            {
+                yield return null;
+                float legacyStart = Time.unscaledTime;
+                float progress = 0f;
+                while (progress < 1f)
+                {
+                    progress = seconds <= 0f ? 1f : Mathf.Clamp01((Time.unscaledTime - legacyStart) / seconds);
+                    LegacyInput.MouseMove(Vector2.Lerp(from, to, progress));
+                    yield return null;
+                }
+                LegacyInput.MouseEnd();
+                yield return null;
+                yield return null;
+                cmd.Complete("ok " + PathOf(target));
+                yield break;
+            }
+
             if (!TryStep(() => PressDown(p, target), cmd)) yield break;
+            LegacyInput.MouseBegin(from);
             yield return null;
 
             float start = Time.unscaledTime;
@@ -427,12 +527,25 @@ namespace Macro2k.UnityBridge
             {
                 t = seconds <= 0f ? 1f : Mathf.Clamp01((Time.unscaledTime - start) / seconds);
                 Vector2 next = Vector2.Lerp(from, to, t);
-                if (!TryStep(() => Move(p, next), cmd)) yield break;
+                LegacyInput.MouseMove(next);
+                if (!TryStep(() => Move(p, next), cmd)) { LegacyInput.MouseEnd(); yield break; }
                 yield return null;
             }
 
+            LegacyInput.MouseEnd();
             if (!TryStep(() => Release(p), cmd)) yield break;
             cmd.Complete("ok " + PathOf(target));
+        }
+
+        private static bool UsesLegacyInputModule()
+        {
+            EventSystem es = EventSystem.current;
+            BaseInputModule module = es != null ? es.currentInputModule : null;
+            for (Type t = module != null ? module.GetType() : null; t != null; t = t.BaseType)
+            {
+                if (t.Name == "StandaloneInputModule") return true;
+            }
+            return false;
         }
 
         /// <summary>A game handler throwing must not leave the command hanging.</summary>
@@ -652,13 +765,6 @@ namespace Macro2k.UnityBridge
         }
     }
 
-    internal static class InputBridgePatches
-    {
-        public static void IsFocusedPostfix(ref bool __result)
-        {
-            if (InputBridge.Active?.IgnoreFocus == true) __result = true;
-        }
-    }
 
     /// <summary>
     /// Simulated keys for the bridge. Keeps the set of held keys and feeds it to
@@ -668,7 +774,7 @@ namespace Macro2k.UnityBridge
     ///    Keyboard.current.xKey.isPressed / wasPressedThisFrame all see it. Window
     ///    messages from outside can't do this: the Input System identifies keys by
     ///    scan code and ignores messages while the window is unfocused.
-    ///  - Legacy Input manager: Harmony postfixes on Input.GetKey / GetKeyDown /
+    ///  - Legacy Input manager: LegacyInput hooks Input.GetKey / GetKeyDown /
     ///    GetKeyUp and GetAxis(Raw) "Horizontal" / "Vertical" (WASD + arrows).
     /// Main thread only (Tick / coroutines). The real keyboard keeps working; a
     /// state event from a physical key can override the simulated state until the
@@ -691,7 +797,6 @@ namespace Macro2k.UnityBridge
         // script's Update in that frame sees it exactly once (commands run mid-frame).
         private static readonly Dictionary<KeyCode, int> DownFrame = new Dictionary<KeyCode, int>();
         private static readonly Dictionary<KeyCode, int> UpFrame = new Dictionary<KeyCode, int>();
-        private static bool _patched;
 
         private static bool _inputSystemResolved;
         private static Type _keyType;
@@ -806,6 +911,7 @@ namespace Macro2k.UnityBridge
         {
             Held[key.Vk] = key;
             if (key.LegacyKey.HasValue) DownFrame[key.LegacyKey.Value] = Time.frameCount + 1;
+            LegacyInput.KeysChanged();
             PushKeyboardState();
         }
 
@@ -813,6 +919,7 @@ namespace Macro2k.UnityBridge
         {
             Held.Remove(key.Vk);
             if (key.LegacyKey.HasValue) UpFrame[key.LegacyKey.Value] = Time.frameCount + 1;
+            LegacyInput.KeysChanged();
             // Pushed even when the key wasn't held — clears a key stuck by an earlier run.
             PushKeyboardState();
         }
@@ -825,6 +932,7 @@ namespace Macro2k.UnityBridge
                 if (key.LegacyKey.HasValue) UpFrame[key.LegacyKey.Value] = Time.frameCount + 1;
             }
             Held.Clear();
+            LegacyInput.KeysChanged();
             PushKeyboardState();
         }
 
@@ -856,66 +964,47 @@ namespace Macro2k.UnityBridge
             return false;
         }
 
-        #region Legacy Input patches
+        #region Legacy Input (see LegacyInput.cs: it hooks Input.GetKey / GetKeyDown / GetKeyUp / GetAxis while keys are held)
 
-        internal static void ApplyLegacyPatches()
+        internal static bool SimHeld(KeyCode key)
         {
-            if (_patched) return;
-            _patched = true;
-            try
-            {
-                var harmony = new Harmony(Macro2kBridgePlugin.PluginGuid);
-                Type self = typeof(KeyInjector);
-                Type[] keyArg = { typeof(KeyCode) };
-                Type[] axisArg = { typeof(string) };
-                harmony.Patch(AccessTools.Method(typeof(Input), nameof(Input.GetKey), keyArg),
-                    postfix: new HarmonyMethod(self, nameof(GetKeyPostfix)));
-                harmony.Patch(AccessTools.Method(typeof(Input), nameof(Input.GetKeyDown), keyArg),
-                    postfix: new HarmonyMethod(self, nameof(GetKeyDownPostfix)));
-                harmony.Patch(AccessTools.Method(typeof(Input), nameof(Input.GetKeyUp), keyArg),
-                    postfix: new HarmonyMethod(self, nameof(GetKeyUpPostfix)));
-                harmony.Patch(AccessTools.Method(typeof(Input), nameof(Input.GetAxis), axisArg),
-                    postfix: new HarmonyMethod(self, nameof(GetAxisPostfix)));
-                harmony.Patch(AccessTools.Method(typeof(Input), nameof(Input.GetAxisRaw), axisArg),
-                    postfix: new HarmonyMethod(self, nameof(GetAxisPostfix)));
-                Log?.LogInfo("Legacy Input key patches applied");
-            }
-            catch (Exception e)
-            {
-                Log?.LogWarning($"Legacy Input key patches failed: {e.Message}");
-            }
+            return Held.Count > 0 && IsHeld(key);
         }
 
-        public static void GetKeyPostfix(KeyCode key, ref bool __result)
+        // GetKeyDown / GetKeyUp answer true on the frame AFTER the command (see DownFrame / UpFrame).
+        internal static bool SimDown(KeyCode key)
         {
-            if (!__result && Held.Count > 0 && IsHeld(key)) __result = true;
+            int frame;
+            return DownFrame.TryGetValue(key, out frame) && frame == Time.frameCount;
         }
 
-        public static void GetKeyDownPostfix(KeyCode key, ref bool __result)
+        internal static bool SimUp(KeyCode key)
         {
-            if (!__result && DownFrame.TryGetValue(key, out int frame) && frame == Time.frameCount) __result = true;
+            int frame;
+            return UpFrame.TryGetValue(key, out frame) && frame == Time.frameCount;
         }
 
-        public static void GetKeyUpPostfix(KeyCode key, ref bool __result)
+        /// <summary>WASD / arrows as the "Horizontal" / "Vertical" axes; 0 when nothing simulated applies.</summary>
+        internal static float SimAxis(string axisName)
         {
-            if (!__result && UpFrame.TryGetValue(key, out int frame) && frame == Time.frameCount) __result = true;
-        }
-
-        public static void GetAxisPostfix(string axisName, ref float __result)
-        {
-            if (__result != 0f || Held.Count == 0) return;
-            float value = 0f;
+            if (Held.Count == 0) return 0f;
             if (axisName == "Horizontal")
             {
-                value = (IsHeld(KeyCode.D) || IsHeld(KeyCode.RightArrow) ? 1f : 0f)
-                        - (IsHeld(KeyCode.A) || IsHeld(KeyCode.LeftArrow) ? 1f : 0f);
+                return (IsHeld(KeyCode.D) || IsHeld(KeyCode.RightArrow) ? 1f : 0f)
+                       - (IsHeld(KeyCode.A) || IsHeld(KeyCode.LeftArrow) ? 1f : 0f);
             }
-            else if (axisName == "Vertical")
+            if (axisName == "Vertical")
             {
-                value = (IsHeld(KeyCode.W) || IsHeld(KeyCode.UpArrow) ? 1f : 0f)
-                        - (IsHeld(KeyCode.S) || IsHeld(KeyCode.DownArrow) ? 1f : 0f);
+                return (IsHeld(KeyCode.W) || IsHeld(KeyCode.UpArrow) ? 1f : 0f)
+                       - (IsHeld(KeyCode.S) || IsHeld(KeyCode.DownArrow) ? 1f : 0f);
             }
-            if (value != 0f) __result = value;
+            return 0f;
+        }
+
+        /// <summary>True while the legacy hooks still have something to report (held keys or a pending edge).</summary>
+        internal static bool Busy
+        {
+            get { return Held.Count > 0; }
         }
 
         #endregion

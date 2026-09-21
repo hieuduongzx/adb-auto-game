@@ -271,10 +271,6 @@ function updateLogCount(){
   // — counting only visible lines, so an active filter cannot hide the alarm.
   c.classList.toggle("has-err", hasErr);
 }
-// Kept as an alias: the Variables panel is a tab on the dock card now, so
-// "toggle it" means "bring that tab forward" (which also unfolds the card).
-function wfToggleVarsPanel(){ wfSwitchDockTab("vars"); }
-
 function wfToggleLog(ev){
   const c=$("log-card"); if(!c) return;
   const isCollapsed = c.classList.contains("collapsed");

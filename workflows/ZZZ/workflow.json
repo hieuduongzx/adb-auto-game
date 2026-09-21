@@ -9,8 +9,8 @@
   "capture": "scrcpy",
   "input": "adb",
   "win32": {
-    "window": "ZenlessZoneZero",
-    "matchBy": "title",
+    "window": "UnityWndClass",
+    "matchBy": "class",
     "inputMode": "unity_bridge",
     "path": ""
   },

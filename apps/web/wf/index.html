@@ -217,6 +217,18 @@
           </div>
         </div>
       </div>
+      <!-- Variables stay close to the graph without permanently taking canvas
+           space. The labelled trigger remains visible while the editor folds
+           down from the top-right corner. -->
+      <section id="wf-vars-panel" class="wf-vars-panel collapsed" aria-label="Variables">
+        <button type="button" id="wf-vars-toggle" class="wf-vars-toggle" aria-expanded="false" aria-controls="wf-vars-body" title="Show variables">
+          <span>Variables</span>
+          <span class="side-count" id="wf-vars-count"></span>
+          <span class="wf-vars-live" id="wf-vars-live" title="Live values">●</span>
+          <svg class="wf-vars-chevron uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div id="wf-vars-body" class="wf-vars-body" hidden></div>
+      </section>
       <!-- Live device mirror — only captures while this tab is active (scope-like). -->
       <div id="wf-preview-pane" class="wf-preview-pane" style="display:none">
         <div class="wf-pv-bar">
@@ -382,12 +394,9 @@
       <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
     </button>
   </div>
-  <!-- Right: scoped variables and node properties. -->
+  <!-- Right: node properties. Variables live on the canvas so they stay
+       available even when this sidebar is collapsed. -->
   <div id="wf-inspector">
-    <section id="wf-inspector-vars" aria-label="Variables">
-      <div class="wf-side-hdr">Variables <span class="side-count" id="wf-vars-count"></span><span class="wf-vars-live" id="wf-vars-live" title="Live values">●</span></div>
-      <div id="wf-vars-body" class="wf-vars-body"></div>
-    </section>
     <!-- Properties / DevScope share one panel: same header, swapped body. The
          header keeps the panel's name in one place instead of each mode
          growing chrome of its own. -->

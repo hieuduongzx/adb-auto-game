@@ -180,8 +180,8 @@ class ScrcpyControlSession:
                 return True
             if not self._start():
                 self._dead = True
-                log_warning(f"[input] scrcpy control không khởi động được trên "
-                            f"{self.serial} ({self._last_error}) → dùng ADB shell input")
+                log_warning(f"[input] scrcpy control failed to start on "
+                            f"{self.serial} ({self._last_error}) → using ADB shell input")
                 return False
             return True
 
@@ -189,7 +189,7 @@ class ScrcpyControlSession:
         try:
             server, version = self._server_paths()
             if not server or not os.path.isfile(server):
-                self._last_error = "thiếu vendor/scrcpy/scrcpy-server"
+                self._last_error = "vendor/scrcpy/scrcpy-server is missing"
                 return False
             r = self._adb("push", server, self.JAR_REMOTE)
             if r.returncode != 0:
@@ -220,15 +220,15 @@ class ScrcpyControlSession:
             deadline = time.monotonic() + 6.0
             while time.monotonic() < deadline:
                 if proc.poll() is not None:
-                    self._last_error = "scrcpy-server thoát sớm"
+                    self._last_error = "scrcpy-server exited early"
                     return False
                 sock = self._probe_socket(port)
                 if sock is not None:
                     self._sock = sock
-                    log_info(f"[input] scrcpy control sẵn sàng ({self.serial})")
+                    log_info(f"[input] scrcpy control ready ({self.serial})")
                     return True
                 time.sleep(0.25)
-            self._last_error = "scrcpy-server không mở control socket"
+            self._last_error = "scrcpy-server did not open the control socket"
             return False
         except Exception as exc:
             self._last_error = str(exc)
@@ -282,7 +282,7 @@ class ScrcpyControlSession:
                 self._sock.sendall(data)
             return True
         except Exception as exc:
-            log_debug(f"[input] scrcpy control send lỗi ({self.serial}): {exc}")
+            log_debug(f"[input] scrcpy control send failed ({self.serial}): {exc}")
             self._dead = True
             return False
 

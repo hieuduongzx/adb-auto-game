@@ -1004,7 +1004,7 @@ class WorkflowDesignerAPI:
             return {"exe": exe, "problems": [str(exc)], "bridgeRunning": False}
 
     def unity_bridge_deploy(self, exe: str) -> dict:
-        """Copy BepInEx (if missing) + the bridge plugin into the game folder."""
+        """Inject the bridge plugin into the running game (see unity_bridge.deploy)."""
         try:
             from src.core.win32 import unity_bridge
             result = unity_bridge.deploy(exe)

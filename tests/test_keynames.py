@@ -79,9 +79,9 @@ class TestAndroidKeyNames(unittest.TestCase):
 
 class TestDescribeKeyEvent(unittest.TestCase):
     def test_win_modes(self):
-        self.assertEqual(describe_key_event("win", 0x0D, "press", 80), "Enter nhấn 80ms")
-        self.assertEqual(describe_key_event("win", 0x0D, "down"), "Enter giữ")
-        self.assertEqual(describe_key_event("win", 0x0D, "up"), "Enter nhả")
+        self.assertEqual(describe_key_event("win", 0x0D, "press", 80), "Enter pressed for 80ms")
+        self.assertEqual(describe_key_event("win", 0x0D, "down"), "Enter held down")
+        self.assertEqual(describe_key_event("win", 0x0D, "up"), "Enter released")
         self.assertEqual(describe_key_event("win", 0x0D, "press"), "Enter")
 
     def test_android_ignores_mode(self):

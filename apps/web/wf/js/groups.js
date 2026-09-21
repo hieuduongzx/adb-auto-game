@@ -651,11 +651,11 @@ function wfWireInsertSplice(g, edge, node){
 function wfCanvasMouseDown(e){
   if(e.target.closest(".wf-node")||e.target.closest(".wf-group")) return;
   wfCancelCamAnim();   // a press on the canvas takes the camera back by hand
-  // Floating overlays (the Activities/Functions/Variables dock card, layout
+  // Floating overlays (the dock cards, layout
   // menu, minimap, empty-state card) sit above the canvas — a press there must
   // not clear the selection or start a rubber-band box (the re-render it
   // triggers would also swallow the click).
-  if(e.target.closest("#wf-rail,.wf-layout-bar,.wf-minimap,.wf-empty-card,#wf-act-panel,.wf-zoom-badge")) return;
+  if(e.target.closest("#wf-rail,.wf-layout-bar,.wf-minimap,.wf-empty-card,#wf-act-panel,#wf-vars-panel,.wf-zoom-badge")) return;
   // Middle mouse, or Space+left → pan.
   if(e.button===1 || (e.button===0 && wfSpace)){
     e.preventDefault();
@@ -1070,9 +1070,10 @@ function wfInitCanvas(){
   document.querySelectorAll(".wf-act-tab").forEach(tab=>{
     tab.onclick=(e)=>{ e.stopPropagation(); wfActTab(tab.dataset.tab); };
   });
-  // Dock card: Activities / Functions / Variables tab strip (also restores the
+  // Dock card: Activities / Functions tab strip (also restores the
   // tab the user left the card on).
   if(typeof wfInitDockTabs==="function") wfInitDockTabs();
+  if(typeof wfInitVarsPanel==="function") wfInitVarsPanel();
   const aadd=$("wf-act-add");
   if(aadd) aadd.onclick=(e)=>{ e.stopPropagation(); wfActAddCurrent(); };
   const afocus=$("wf-act-focus");

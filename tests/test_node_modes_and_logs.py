@@ -36,6 +36,27 @@ class TestNodeModesAndLogs(unittest.TestCase):
         self.engine._a_swipe({}, {'x1': 1, 'y1': 2, 'x2': 3, 'y2': 4, 'duration': 5})
         self.engine.auto.swipe.assert_called_once_with(1, 2, 3, 4, 5)
 
+    def test_if_device_size_matches_with_tolerance(self):
+        self.engine.auto.adb.get_screen_size.return_value = (1918, 1082)
+
+        self.assertTrue(self.engine._eval_condition(
+            'if_device_size', {'width': 1920, 'height': 1080, 'tolerance': 2}
+        ))
+
+    def test_if_device_size_rejects_unknown_size_even_when_negated(self):
+        self.engine.auto.adb.get_screen_size.return_value = (0, 0)
+
+        self.assertFalse(self.engine._eval_condition(
+            'if_device_size', {'width': 1920, 'height': 1080, 'negate': True}
+        ))
+
+    def test_if_device_size_supports_negating_a_known_mismatch(self):
+        self.engine.auto.adb.get_screen_size.return_value = (1600, 900)
+
+        self.assertTrue(self.engine._eval_condition(
+            'if_device_size', {'width': 1920, 'height': 1080, 'negate': True}
+        ))
+
     def test_sequence_tap_runs_points_in_order_with_each_delay_after_tap(self):
         points = [
             {'x': 10, 'y': 20, 'delay': 0.5},

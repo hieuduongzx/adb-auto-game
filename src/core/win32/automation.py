@@ -264,7 +264,7 @@ class Win32Controller:
     def attach(self) -> bool:
         pattern, by, _ = self._match
         if not pattern:
-            log_error("[win32] Chưa đặt tên/lớp cửa sổ mục tiêu (Project settings)")
+            log_error("[win32] Target window name/class is not set (Project settings)")
             return False
         hwnd = self._find_hwnd(pattern, by)
         if not hwnd and by == "title":
@@ -277,17 +277,17 @@ class Win32Controller:
             if exe:
                 hwnd = self._find_hwnd(exe, "exe")
                 if hwnd:
-                    log_info(f"[win32] Không khớp tiêu đề '{pattern}' — "
-                             f"gắn theo chương trình '{exe}' thay thế")
+                    log_info(f"[win32] Title '{pattern}' did not match — "
+                             f"attached by executable '{exe}' instead")
         if not hwnd:
-            log_warning(f"[win32] Không tìm thấy cửa sổ khớp '{pattern}' ({by})")
+            log_warning(f"[win32] No window matches '{pattern}' ({by})")
             self._log_window_list()
             self.hwnd = None
             return False
         self.hwnd = hwnd
         _, win32gui = self._w[0], self._w[1]
-        title = win32gui.GetWindowText(hwnd) or "(tiêu đề không đọc được)"
-        log_info(f"[win32] Gắn cửa sổ 0x{hwnd:X} — '{title}'")
+        title = win32gui.GetWindowText(hwnd) or "(unreadable title)"
+        log_info(f"[win32] Attached window 0x{hwnd:X} — '{title}'")
         self._warn_if_uipi_blocked()
         if self._bridge_mode():
             self._check_bridge()
@@ -313,18 +313,40 @@ class Win32Controller:
             return
         port = self._bridge_port()
         reply = unity_bridge.ping(port)
+        if not (reply and reply.startswith("ok")):
+            reply = self._inject_bridge(unity_bridge, port) or reply
         if reply and reply.startswith("ok"):
-            log_info(f"[win32] unity_bridge đã kết nối plugin 127.0.0.1:{port} — {reply}")
+            log_info(f"[win32] unity_bridge connected to plugin at 127.0.0.1:{port} — {reply}")
         else:
             log_error(
-                f"[win32] unity_bridge KHÔNG kết nối được plugin tại 127.0.0.1:{port} "
-                "(game chưa nạp BepInEx/Macro2kBridge, hoặc plugin lỗi). "
-                "Sau khi copy file game (Settings → Game files) PHẢI khởi động lại game; "
-                "kiểm tra BepInEx\\LogOutput.log trong thư mục game. "
-                "Trong lúc đó tool tạm dùng anchored_touch nên có thể không điều khiển được."
+                f"[win32] unity_bridge COULD NOT connect to the plugin at 127.0.0.1:{port} "
+                "(injection failed or the game hasn't loaded the DLL yet — see %TEMP%\\Macro2kBridge.log; "
+                "an injection error above, if any, has the reason). Make sure the game is running and "
+                "attach again; anti-cheat can also block injection. "
+                "The tool will use anchored_touch for now, which may not control the game."
             )
         # Either way one message is enough — stop _bridge_call repeating it.
         self._bridge_warned = True
+
+    def _inject_bridge(self, unity_bridge, port: int) -> Optional[str]:
+        """No BepInEx: load the bridge DLL straight into the attached game's process.
+        Returns the bridge's ping reply, or None when the game can't be identified or
+        injection failed (already logged)."""
+        try:
+            import win32process
+            pid = win32process.GetWindowThreadProcessId(self.hwnd)[1]
+            exe = process_exe_path(pid)
+            if not exe or unity_bridge.inspect_game(exe).get("problems"):
+                return None
+            log_info(f"[win32] unity_bridge: injecting the bridge into {os.path.basename(exe)} (pid {pid})")
+            res = unity_bridge.ensure_injected(exe, port, pid=pid)
+            if not res.get("ok"):
+                log_error(f"[win32] unity_bridge injection failed: {res.get('error')}")
+                return None
+            return res.get("reply")
+        except Exception as exc:
+            log_error(f"[win32] unity_bridge injection error: {exc}")
+            return None
 
     def _exe_pattern(self) -> str:
         """Basename of the configured game program (``cfg['path']``)."""
@@ -363,7 +385,7 @@ class Win32Controller:
             return
         if not rows:
             return
-        log_warning(f"[win32] {len(rows)} cửa sổ đang mở (tiêu đề | lớp | exe):")
+        log_warning(f"[win32] {len(rows)} open windows (title | class | exe):")
         for title, cls, pid in rows[:limit]:
             log_warning(f"[win32]   '{title}' | {cls} | "
                         f"{process_exe_name(pid) or f'pid {pid}'}")
@@ -388,10 +410,10 @@ class Win32Controller:
             ph = win32api.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
             if self._integrity_level(ph) > self._integrity_level(win32api.GetCurrentProcess()):
                 log_error(
-                    "[win32] ⚠ Cửa sổ mục tiêu chạy quyền CAO HƠN tool (Run as "
-                    "Administrator) — Windows (UIPI) sẽ chặn mọi thao tác "
-                    "chuột/phím (Access is denied), chỉ xem/capture được. "
-                    "→ Đóng tool và mở lại bằng 'Run as Administrator'."
+                    "[win32] ⚠ Target window has HIGHER privileges than the tool (Run as "
+                    "Administrator) — Windows (UIPI) will block all mouse/keyboard input "
+                    "(Access is denied); only viewing/capture will work. "
+                    "→ Close the tool and reopen it with 'Run as Administrator'."
                 )
         except Exception:
             pass  # best-effort — never block attach on the diagnostics
@@ -403,11 +425,11 @@ class Win32Controller:
             code = exc.args[0] if isinstance(exc.args[0], int) else None
         if code == 5:
             log_error(
-                f"[win32] {api} bị chặn (Access is denied) — game đang chạy quyền "
-                "Admin cao hơn tool. Mở lại tool bằng 'Run as Administrator'."
+                f"[win32] {api} blocked (Access is denied) — the game has higher Admin "
+                "privileges than the tool. Reopen the tool with 'Run as Administrator'."
             )
         else:
-            log_error(f"[win32] {api} lỗi: {exc}")
+            log_error(f"[win32] {api} failed: {exc}")
 
     def _find_hwnd(self, pattern: str, by: str) -> Optional[int]:
         win32gui, win32process = self._w[1], self._w[5]
@@ -418,7 +440,7 @@ class Win32Controller:
             try:
                 want_pid = int(pattern)
             except (TypeError, ValueError):
-                log_error(f"[win32] PID không hợp lệ: '{pattern}'")
+                log_error(f"[win32] Invalid PID: '{pattern}'")
                 return None
         found: List[int] = []
         # Windows whose exe matched but whose title is unreadable. A game started
@@ -514,7 +536,7 @@ class Win32Controller:
         win32gui, win32con = self._w[1], self._w[3]
         try:
             if not win32gui.IsWindow(self.hwnd):
-                log_warning("[win32] Cửa sổ mục tiêu đã đóng")
+                log_warning("[win32] Target window has closed")
                 self.hwnd = None
                 self._wgc_stop()
                 return None
@@ -528,7 +550,7 @@ class Win32Controller:
             if w <= 0 or h <= 0:
                 return None
         except Exception as exc:
-            log_error(f"[win32] Lỗi chụp cửa sổ: {exc}")
+            log_error(f"[win32] Window capture failed: {exc}")
             return None
         methods = ["print", "wgc", "blt", "screen"]
         if self._cap_method in methods:
@@ -539,7 +561,7 @@ class Win32Controller:
             try:
                 img = getattr(self, "_cap_" + name)(w, h)
             except Exception as exc:
-                log_debug(f"[win32] capture '{name}' lỗi: {exc}")
+                log_debug(f"[win32] capture '{name}' failed: {exc}")
                 img = None
             if img is None:
                 continue
@@ -551,8 +573,8 @@ class Win32Controller:
                 continue
             if name != self._cap_method:
                 self._cap_method = name
-                extra = " — cửa sổ phải hiện trên màn hình, không bị che" if name == "screen" else ""
-                log_info(f"[win32] Capture dùng phương pháp '{name}'{extra}")
+                extra = " — window must be visible on screen and unobstructed" if name == "screen" else ""
+                log_info(f"[win32] Capture is using method '{name}'{extra}")
             return img
         # Every method came back black — likely the screen really is black.
         return dark
@@ -577,7 +599,7 @@ class Win32Controller:
             try:
                 from windows_capture import WindowsCapture
             except ImportError:
-                log_debug("[win32] gói 'windows-capture' chưa cài (pip install windows-capture)")
+                log_debug("[win32] Package 'windows-capture' is not installed (pip install windows-capture)")
                 return None
             s = {"hwnd": self.hwnd, "lock": threading.Lock(), "frame": None,
                  "event": threading.Event(), "control": None, "dead": False}
@@ -600,7 +622,7 @@ class Win32Controller:
             try:
                 s["control"] = cap.start_free_threaded()
             except Exception as exc:
-                log_debug(f"[win32] WGC không khởi động được: {exc}")
+                log_debug(f"[win32] WGC could not start: {exc}")
                 return None
             self._wgc = s
         if not s["event"].wait(timeout=2.0) or s.get("dead"):
@@ -655,7 +677,7 @@ class Win32Controller:
             ok = ctypes.windll.user32.PrintWindow(
                 self.hwnd, save_dc.GetSafeHdc(), _PW_CLIENTONLY | _PW_RENDERFULLCONTENT)
             if not ok:
-                log_debug("[win32] PrintWindow trả về 0 (frame có thể đen)")
+                log_debug("[win32] PrintWindow returned 0 (frame may be black)")
             return True  # some windows paint fine despite returning 0
 
         try:
@@ -744,10 +766,10 @@ class Win32Controller:
                 if fg == target:
                     return True
                 time.sleep(0.025)
-            log_warning("[win32] Không thể đưa cửa sổ mục tiêu lên foreground")
+            log_warning("[win32] Could not bring target window to the foreground")
             return False
         except Exception as exc:
-            log_warning(f"[win32] activate lỗi: {exc}")
+            log_warning(f"[win32] activate failed: {exc}")
             return False
 
     def close_window(self) -> bool:
@@ -833,11 +855,11 @@ class Win32Controller:
             borderless = self._is_borderless()
             if borderless:
                 log_warning(
-                    "[win32] ⚠ Cửa sổ đang borderless (WS_POPUP, không viền). "
-                    "Game engine (Unity/DirectX) tự quản lý swapchain và thường ignore WM_SIZE. "
-                    "Resize qua Win32 API CÓ THỂ không có hiệu lực. "
-                    "→ Gợi ý: chuyển game sang Windowed mode (có viền) trong Settings game, "
-                    "hoặc dùng node 'Win style' để ép windowed (experimental)."
+                    "[win32] ⚠ Window is borderless (WS_POPUP, no border). "
+                    "The game engine (Unity/DirectX) manages its own swapchain and often ignores WM_SIZE. "
+                    "Resizing through the Win32 API MAY have no effect. "
+                    "→ Tip: switch the game to Windowed mode (with borders) in game settings, "
+                    "or use the 'Win style' node to force windowed mode (experimental)."
                 )
 
             w, h = int(width), int(height)
@@ -884,16 +906,16 @@ class Win32Controller:
                 after = self._get_window_rect() or (0, 0, 0, 0)
                 got = (after[2] - after[0], after[3] - after[1])
             if abs(got[0] - want[0]) > 2 or abs(got[1] - want[1]) > 2:
-                hint = ("→ Bật 'Size = game area (client)' để vùng game đúng tỉ lệ game hỗ trợ (vd 16:9)."
+                hint = ("→ Enable 'Size = game area (client)' so the game area uses a supported aspect ratio (e.g. 16:9)."
                         if not client else
-                        "→ Game không chấp nhận kích thước này (tỉ lệ / độ phân giải không hỗ trợ, hoặc lớn hơn màn hình).")
-                log_warning(f"[win32] ⚠ Game đã tự đổi lại kích thước: muốn "
-                            f"{want[0]}×{want[1]} {'client' if client else '(cả khung)'}, "
-                            f"hiện {got[0]}×{got[1]}. {hint}")
+                        "→ The game rejected this size (unsupported aspect ratio/resolution, or larger than the screen).")
+                log_warning(f"[win32] ⚠ Game changed the size back: requested "
+                            f"{want[0]}×{want[1]} {'client' if client else '(full window)'}, "
+                            f"now {got[0]}×{got[1]}. {hint}")
                 return False
             return True
         except Exception as exc:
-            log_warning(f"[win32] resize_window lỗi: {exc}")
+            log_warning(f"[win32] resize_window failed: {exc}")
             return False
 
     def move_window(self, x: int, y: int) -> bool:
@@ -910,7 +932,7 @@ class Win32Controller:
             log_info(f"[win32] move_window → ({x}, {y})  size {w}×{h}")
             return True
         except Exception as exc:
-            log_warning(f"[win32] move_window lỗi: {exc}")
+            log_warning(f"[win32] move_window failed: {exc}")
             return False
 
     def minimize_window(self) -> bool:
@@ -921,7 +943,7 @@ class Win32Controller:
             self._w[1].ShowWindow(self.hwnd, win32con.SW_MINIMIZE)
             return True
         except Exception as exc:
-            log_warning(f"[win32] minimize_window lỗi: {exc}")
+            log_warning(f"[win32] minimize_window failed: {exc}")
             return False
 
     def maximize_window(self) -> bool:
@@ -932,7 +954,7 @@ class Win32Controller:
             self._w[1].ShowWindow(self.hwnd, win32con.SW_MAXIMIZE)
             return True
         except Exception as exc:
-            log_warning(f"[win32] maximize_window lỗi: {exc}")
+            log_warning(f"[win32] maximize_window failed: {exc}")
             return False
 
     def restore_window(self) -> bool:
@@ -943,7 +965,7 @@ class Win32Controller:
             self._w[1].ShowWindow(self.hwnd, win32con.SW_RESTORE)
             return True
         except Exception as exc:
-            log_warning(f"[win32] restore_window lỗi: {exc}")
+            log_warning(f"[win32] restore_window failed: {exc}")
             return False
 
     def set_always_on_top(self, on_top: bool = True) -> bool:
@@ -956,7 +978,7 @@ class Win32Controller:
                                   win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE | win32con.SWP_SHOWWINDOW)
             return True
         except Exception as exc:
-            log_warning(f"[win32] set_always_on_top lỗi: {exc}")
+            log_warning(f"[win32] set_always_on_top failed: {exc}")
             return False
 
     def set_window_title(self, title: str) -> bool:
@@ -966,7 +988,7 @@ class Win32Controller:
             self._w[1].SetWindowText(self.hwnd, str(title))
             return True
         except Exception as exc:
-            log_warning(f"[win32] set_window_title lỗi: {exc}")
+            log_warning(f"[win32] set_window_title failed: {exc}")
             return False
 
     def set_window_style(self, style_name: str = "windowed") -> bool:
@@ -1005,7 +1027,7 @@ class Win32Controller:
             log_info(f"[win32] set_window_style → {s} (experimental)")
             return True
         except Exception as exc:
-            log_warning(f"[win32] set_window_style lỗi: {exc}")
+            log_warning(f"[win32] set_window_style failed: {exc}")
             return False
 
     def find_window_by_pid(self, pid: Optional[int]) -> Optional[int]:
@@ -1051,14 +1073,14 @@ class Win32Controller:
                 self.last_launch_pid = int(proc.pid)
                 return True
             except Exception as exc:
-                log_error(f"[win32] Không mở được '{target}': {exc}")
+                log_error(f"[win32] Could not open '{target}': {exc}")
                 return False
         hwnd = self._find_hwnd(target, "title")
         if hwnd:
             self.hwnd = hwnd
             self.last_launch_pid = None
             return self.activate()
-        log_warning(f"[win32] launch: '{target}' không phải file tồn tại và không có cửa sổ khớp")
+        log_warning(f"[win32] launch: '{target}' is not an existing file and no window matches it")
         return False
 
     # ── input: coordinates are CLIENT-area pixels (same space as capture) ──────
@@ -1103,8 +1125,8 @@ class Win32Controller:
         except OSError as exc:
             if not self._bridge_warned:
                 self._bridge_warned = True
-                log_warning(f"[win32] unity_bridge: không kết nối được plugin 127.0.0.1:{port} "
-                            f"({exc}) — game đã load BD2MOD chưa? Tạm dùng anchored_touch.",
+                log_warning(f"[win32] unity_bridge: could not connect to plugin at 127.0.0.1:{port} "
+                            f"({exc}) — has the game loaded BD2MOD? Using anchored_touch for now.",
                             kind=LOG_KIND_ACTIVITY)
             return None
 
@@ -1118,10 +1140,10 @@ class Win32Controller:
             if not self._bridge_miss_warned:
                 self._bridge_miss_warned = True
                 log_warning(
-                    f"[win32] unity_bridge: plugin phản hồi nhưng {what} không trúng UI "
-                    "(EventSystem) — tool chuyển sang anchored_touch. Kiểm tra toạ độ "
-                    "theo độ phân giải cửa sổ.", kind=LOG_KIND_ACTIVITY)
-            log_debug(f"[win32] unity_bridge: {what} không trúng UI — thử anchored_touch")
+                    f"[win32] unity_bridge: plugin responded, but {what} missed the UI "
+                    "(EventSystem) — switching to anchored_touch. Check coordinates "
+                    "against the window resolution.", kind=LOG_KIND_ACTIVITY)
+            log_debug(f"[win32] unity_bridge: {what} missed the UI — trying anchored_touch")
             return None
         log_warning(f"[win32] unity_bridge {what}: {reply}")
         return False
@@ -1233,7 +1255,7 @@ class Win32Controller:
                 from .pointer import SyntheticTouch
                 self._touch_dev = SyntheticTouch()
             except Exception as exc:
-                log_warning(f"[win32] anchored_touch không khả dụng: {exc}")
+                log_warning(f"[win32] anchored_touch is unavailable: {exc}")
                 self._touch_dev = False
         return self._touch_dev or None
 
@@ -1254,7 +1276,7 @@ class Win32Controller:
             from .pointer import AnchorWindow
             anchor = AnchorWindow()
         except Exception as exc:
-            log_warning(f"[win32] anchored_touch: lỗi tạo anchor window: {exc}")
+            log_warning(f"[win32] anchored_touch: could not create anchor window: {exc}")
             return None
         if not anchor.ready:
             return None
@@ -1368,15 +1390,15 @@ class Win32Controller:
         if dev is None or not dev.ready:
             if not self._anchored_warned:
                 self._anchored_warned = True
-                log_warning("[win32] anchored_touch cần Windows 10 1809+ — "
-                            "tạm dùng PostMessage. Đổi Input mode trong Project settings.")
+                log_warning("[win32] anchored_touch requires Windows 10 1809+ — "
+                            "using PostMessage for now. Change Input mode in Project settings.")
             return None
         anchor = self._thread_anchor()
         if anchor is None:
             if not self._anchored_warned:
                 self._anchored_warned = True
-                log_warning("[win32] anchored_touch: không tạo được anchor window — "
-                            "tạm dùng PostMessage.")
+                log_warning("[win32] anchored_touch: could not create anchor window — "
+                            "using PostMessage for now.")
             return None
         origin = self._anchor_screen_pos()
         if origin is None:
@@ -1387,8 +1409,8 @@ class Win32Controller:
             if self._anchored_occluded(sx, sy):
                 if not self._anchored_warned:
                     self._anchored_warned = True
-                    log_warning("[win32] anchored_touch: điểm chạm đang bị cửa sổ khác che. "
-                                "Hãy để cửa sổ game lộ ra, hoặc dùng input mode khác.")
+                    log_warning("[win32] anchored_touch: touch point is covered by another window. "
+                                "Keep the game window visible or use another input mode.")
                 return None
         # Unity's EventSystem (StandaloneInputModule / InputSystemUIInputModule)
         # drops UI input while the app is unfocused: touches still reach
@@ -1812,8 +1834,8 @@ class Win32Controller:
         if reply.startswith("err unknown command"):
             if not self._bridge_key_warned:
                 self._bridge_key_warned = True
-                log_warning("[win32] unity_bridge: plugin trong game chưa hỗ trợ phím (lệnh key) — "
-                            "build lại plugin rồi mở lại game; tạm gửi phím qua window message",
+                log_warning("[win32] unity_bridge: in-game plugin does not support keys (key command) — "
+                            "rebuild the plugin and reopen the game; using window messages for now",
                             kind=LOG_KIND_ACTIVITY)
             return None
         if reply.startswith("ok"):
@@ -1890,7 +1912,7 @@ class Win32Controller:
         if btn in ("", "left", "l"):
             return self.tap(x, y, duration=duration, tap_count=click_count)
         if btn not in _MOUSE_BUTTONS:
-            log_warning(f"[win32] click: nút '{button}' không hợp lệ (left/right/middle)")
+            log_warning(f"[win32] click: invalid button '{button}' (left/right/middle)")
             return False
         if not self.hwnd:
             return False
@@ -2273,11 +2295,11 @@ class Win32GameAutomation(ADBGameAutomation):
         try:
             return self.adb.capture_frame()
         except Exception as exc:
-            log_error(f"[win32] capture_screen lỗi: {exc}")
+            log_error(f"[win32] capture_screen failed: {exc}")
             return None
 
     def _continuous_capture_worker(self):
-        log_info("[win32] Bắt đầu luồng chụp cửa sổ liên tục")
+        log_info("[win32] Starting continuous window capture thread")
         while self.capture_running:
             try:
                 screen = self.capture_screen()
@@ -2286,9 +2308,9 @@ class Win32GameAutomation(ADBGameAutomation):
                         self.latest_screen = screen
                 time.sleep(self.capture_interval)
             except Exception as exc:
-                log_error(f"[win32] Lỗi luồng chụp: {exc}")
+                log_error(f"[win32] Capture thread failed: {exc}")
                 time.sleep(self.capture_interval)
-        log_info("[win32] Dừng luồng chụp cửa sổ")
+        log_info("[win32] Stopping continuous window capture thread")
 
     def start_continuous_capture(self):
         import threading
@@ -2309,4 +2331,4 @@ class Win32GameAutomation(ADBGameAutomation):
                     self.latest_screen = screen
                 return
             time.sleep(0.05)
-        log_warning("[win32] Đã bật chụp nhưng chưa có frame đầu tiên")
+        log_warning("[win32] Capture started but the first frame is not available")

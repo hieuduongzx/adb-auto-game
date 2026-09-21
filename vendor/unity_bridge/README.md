@@ -1,75 +1,154 @@
 # Unity Bridge
 
-In-game input bridge for Macro2k's `unity_bridge` Win32 input mode. A BepInEx
-plugin runs inside a Unity game, listens on `127.0.0.1:17820` and performs
-taps/swipes through Unity's EventSystem and key presses through the Input System
-and the legacy Input manager — no cursor, no focus, the window may be covered.
+In-game input bridge for Macro2k's `unity_bridge` Win32 input mode. A DLL injected
+into the running game listens on `127.0.0.1:17820` and performs taps/swipes through
+Unity's EventSystem and key presses through the Input System and the legacy Input
+manager — no cursor, no focus, the window may be covered.
 
-Two builds share one protocol; Macro2k picks the right one from the game folder
-(`GameAssembly.dll` / `il2cpp_data` → IL2CPP, otherwise Mono):
+No BepInEx, nothing is ever copied into the game folder: `Macro2kInjector.exe`
+loads the bridge DLL straight into the running process. Two builds share one
+protocol; Macro2k picks the right one from the game folder (`GameAssembly.dll` /
+`il2cpp_data` → IL2CPP, otherwise Mono):
 
-| Game backend | BepInEx | Plugin |
+| Game backend | Injection | Plugin |
 |---|---|---|
-| Mono | 5.4.23.5 (`bepinex5_x64/`) | `plugin/Macro2kBridge.dll` |
-| IL2CPP | 6.0.0-be.788 (`bepinex6_il2cpp_x64/`) | `plugin_il2cpp/Macro2kBridge.dll` |
+| Mono | managed DLL, via the game's own Mono runtime (`Macro2kInjector.exe inject`) | `plugin_inject/Macro2kBridge.Inject.dll` |
+| IL2CPP | native DLL, `LoadLibraryW` (`Macro2kInjector.exe loadlibrary`) | `plugin_il2cpp/Macro2kBridge.Il2Cpp.dll` |
 
 ```
 vendor/unity_bridge/
-├── bepinex5_x64/          BepInEx 5.4.23.5 x64, unmodified official zip (Doorstop 4.5.0)
-├── bepinex6_il2cpp_x64/   BepInEx 6.0.0-be.788 Unity.IL2CPP x64, unmodified official zip (Doorstop 4.5.0, .NET 6 in dotnet/)
-├── plugin/                built Mono plugin that gets deployed
-├── plugin_il2cpp/         built IL2CPP plugin that gets deployed
+├── injector/              Macro2kInjector.exe (x64, .NET Framework 4.7.2 — ships with Windows)
+├── plugin_inject/         built Mono plugin that gets injected (managed DLL)
+├── plugin_il2cpp/         built IL2CPP plugin that gets injected (native DLL)
 └── src/
-    ├── Macro2kBridge/         Mono plugin source (C#, net472)
-    └── Macro2kBridge.Il2Cpp/  IL2CPP plugin source (C#, net6.0, Il2CppInterop)
+    ├── Macro2kBridge.Inject/  Mono plugin source (C#, net472): InputBridge.cs (protocol + uGUI
+    │                          simulation), LegacyInput.cs (legacy Input hooks), Loader.cs (entry point)
+    ├── Macro2kInjector/       injector source (both injection modes)
+    └── Macro2kBridge.Il2Cpp/  IL2CPP plugin source (bridge.cpp, native C++, MSVC)
 ```
 
-## Deploy
+### Why no BepInEx
+
+BepInEx was the original approach (Doorstop-hijack the process, load a managed
+plugin through it) and still works for most games, but two things ruled it out:
+
+- **Unity 6 Mono games can strip their runtime library.** Tried on a Unity
+  6000.0.61f1 game: `mscorlib.dll` has no `Module.GetPEKind`, no
+  `File.ReadAllLines`, no Reflection.Emit, and engine members such as
+  `Application.runInBackground`'s setter or `TcpListener` are gone too. BepInEx's
+  preloader dies on `Module.GetPEKind` before it even loads a plugin. Replacing
+  `BepInEx/core`'s corlibs with full ones (BepInEx's documented fix) makes BepInEx
+  start, but then **the game renders black** — with or without any plugin. Patching
+  BepInEx's `GetPEKind` calls instead gets the game rendering again, but the next
+  stripped API breaks the preloader, and `Supports SRE: False` rules out
+  Harmony/MonoMod anyway.
+- **IL2CPP has no managed runtime to load a plugin into in the first place.**
+  BepInEx's IL2CPP support works by hijacking the process at startup (via
+  Doorstop) and hosting its own .NET runtime + Il2CppInterop bindings before
+  Unity initializes. That only works from process start, needs the game's
+  interop assemblies generated up front, and is a lot of moving parts for
+  something a much smaller native DLL can do directly (below).
+
+Injecting after the game is already running sidesteps both: the Mono build talks
+to the Mono runtime that's already loaded (`mono_thread_attach`,
+`mono_assembly_load_from_full`, ...), and the IL2CPP build talks to the
+`il2cpp_*` C API that `GameAssembly.dll` itself exports — no interop generation,
+no embedded runtime.
+
+### Injector
+
+```
+Macro2kInjector.exe inject <pid> <assembly.dll> <namespace> <class> <method>   -> "ok" | "err <message>"
+Macro2kInjector.exe loadlibrary <pid> <native.dll>                             -> "ok" | "err <message>"
+```
+
+`inject` (Mono): resolves the game's already-loaded `mono-2.0-*.dll` exports (read
+locally to get the offsets, since a well-known system DLL loads at the same
+address in every process), copies the assembly and a small x64 stub into the
+target process, and runs the stub on a remote thread: `mono_thread_attach` →
+`mono_image_open_from_data` → `mono_assembly_load_from_full` →
+`mono_class_from_name` → `mono_runtime_invoke` on
+`Macro2k.UnityBridge.Inject.Loader.Load()` → `mono_thread_detach`. `Load()` runs
+on that remote thread, not Unity's main thread, so it hooks
+`RenderPipelineManager.beginContextRendering` / `SceneManager.sceneLoaded` /
+`Application.focusChanged` (whichever fires first — `Application.onBeforeRender`
+and the Camera callbacks are stripped from Unity 6 games) to reach the main
+thread and create the bridge's `GameObject` there.
+
+`loadlibrary` (IL2CPP): the classic `CreateRemoteThread(LoadLibraryW)` injection
+of a native DLL. `bridge.cpp`'s `DllMain` does the rest: it resolves the
+`il2cpp_*` exports from `GameAssembly.dll`, waits for the game's `UnityWndClass`
+window, and installs a `WH_GETMESSAGE` hook on the main thread (a background
+thread keeps posting `WM_NULL` so the hook fires every frame even when the
+window doesn't otherwise get messages).
+
+Both modes: Macro2k injects automatically when a `unity_bridge` workflow attaches
+to the game (`Win32Controller._inject_bridge` → `unity_bridge.ensure_injected`)
+and from the designer's deploy dialog. The injection lives in the process, so it
+happens again on every game start; the port is handed over in
+`%TEMP%\Macro2kBridge.port` and the bridge logs to `%TEMP%\Macro2kBridge.log`.
+The game must run as the same user (not elevated unless Macro2k is too), x64
+only. Anti-cheat may detect process injection — **never inject into a game with
+kernel-mode anti-cheat** (a driver such as `.sys`/kernel service shipped with the
+
+`unity_bridge._vendor_dir()` (`src/core/win32/unity_bridge.py`) resolves where the
+injector + plugin DLLs live: a packaged single-workflow **Runner** ships them
+*inside* `_internal/vendor/unity_bridge/` (a private implementation detail, unlike
+adb/scrcpy which stay in the visible external `vendor/` — see
+`packaging/build_runner.py`'s `_copy_vendor`), while a full Designer/Hub build and
+running from source keep the external `vendor/unity_bridge/` (unchanged; falls
+back there when nothing is bundled into `_internal`/`_macro2k`).
+game); there is no way to make that safe.
+
+### Mono plugin notes
+
+Compiled against the target game's own `mscorlib`/`System`/`UnityEngine` (no
+framework reference assemblies), so the compiler rejects every API a game's
+Unity 6 stripping removed: `TcpListener` → `Socket`, `File.AppendAllText` →
+manual `FileStream`, `TextWriter.NewLine`'s setter and
+`Application.runInBackground`'s setter are worked around already (see
+`InputBridge.cs`). No Harmony, so legacy `Input.GetKey*`/`GetMouseButton*` and
+`EventSystem.isFocused` are not patched the BepInEx way; instead
+`LegacyInput.cs` breakpoint-hooks the JIT'd `Input` icall wrappers directly
+(`0xCC` + a vectored exception handler) only while a tap/key is simulated, with
+a trampoline to the original body for games that also poll the real mouse/keys.
+`EventSystem.isFocused` is forced by writing its backing field every tick
+instead of patching the getter.
+
+### IL2CPP plugin notes
+
+`bridge.cpp` is a small native x64 DLL — no Il2CppInterop, no embedded .NET
+runtime. It calls `il2cpp_class_from_name` / `il2cpp_runtime_invoke` etc.
+directly to find `EventSystem`, build a `PointerEventData`, raycast, and drive
+`IPointerDownHandler`/`IPointerUpHandler`/`IPointerClickHandler`/drag handlers
+through `ExecuteEvents`-equivalent logic — mirroring uGUI's own
+`PointerInputModule`. Games whose input module is `StandaloneInputModule`
+(reads the legacy `Input` manager itself) are fed through the same
+breakpoint-hook technique as the Mono build instead, to avoid a double click.
+`EventSystem.isFocused` is forced the same way (its backing field, every tick).
+Keys are not implemented for IL2CPP yet (`err unknown command`; Macro2k falls
+back to window messages). Games whose IL2CPP metadata is encrypted/obfuscated
+past what stock `il2cpp_class_from_name` can resolve won't work.
+
+## Deploy / inject
 
 Pick **Unity bridge** as the Win32 input mode (toolbar, Project settings, or the
-new-project dialog). Macro2k offers to deploy into the game folder:
+new-project dialog). Macro2k injects into the running game; if the game isn't
+running yet, it injects the next time a `unity_bridge` workflow attaches to it.
+Leftover `BepInEx/`, `winhttp.dll`, `doorstop_config.ini`, `.doorstop_version`,
+`dotnet/` from an older Macro2k version that still used BepInEx are removed from
+the game folder first (a "modded" BepInEx install can itself trip anti-cheat
+even though Macro2k no longer uses it).
 
-- `BepInEx/` + `winhttp.dll` + `doorstop_config.ini` + `.doorstop_version` (IL2CPP: plus `dotnet/`) — only when the game has no BepInEx yet
-- `BepInEx/plugins/Macro2kBridge/Macro2kBridge.dll` — always (update)
-
-An existing BepInEx install is never upgraded (other mods may depend on it);
-the dialog only notes when it differs from the bundled one. Doorstop 4 renamed
-its `doorstop_config.ini` keys, so it is only added to an existing install whose
-BepInEx build matches the bundled one. A game with the wrong BepInEx generation
-(5 on an IL2CPP game, 6 on a Mono game, or BepInEx 6 without the IL2CPP loader)
-is reported as a problem instead of being overwritten.
-
-To update the bundled BepInEx 5, replace `bepinex5_x64/` with the contents of the
-official `BepInEx_win_x64_<version>.zip` — the version is read from `BepInEx.dll`.
-To update BepInEx 6, replace `bepinex6_il2cpp_x64/` with the contents of a
-`BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.<build>+<hash>.zip` from
-<https://builds.bepinex.dev/projects/bepinex_be>, set `BEPINEX6_VERSION` in
-`src/core/win32/unity_bridge.py`, then rebuild the IL2CPP plugin.
-
-On an IL2CPP game's first start BepInEx 6 generates `BepInEx/interop` from
-`GameAssembly.dll` + `global-metadata.dat` — this takes a minute and the log says
-so. Games that encrypt or protect their metadata can't be interop-generated and
-can't host the bridge.
-
-Restart the game afterwards. `BepInEx/LogOutput.log` should show
-`[Macro2k Unity Bridge] Listening on 127.0.0.1:17820`.
-
-Implementation: `src/core/win32/unity_bridge.py` (inspect/deploy/ping) and
-`Win32Controller._tap_bridge` / `_swipe_bridge` (client).
+Implementation: `src/core/win32/unity_bridge.py` (inspect/deploy/inject/ping) and
+`Win32Controller._tap_bridge` / `_swipe_bridge` / `_inject_bridge` (client).
 
 ## Supported games
 
-- Unity **Mono** builds, x64, Unity 2018.3+ (.NET 4.x scripting runtime) — BepInEx 5
-- Unity **IL2CPP** builds, x64, Unity 2018.4+ whose metadata BepInEx 6 can read — BepInEx 6
-- Not supported: x86, games already on BepInEx of the other generation
-
-Games with anti-cheat may detect BepInEx.
-
-IL2CPP notes: taps/swipes go through the same EventSystem path. Legacy `Input`
-key patches rely on Il2CppInterop's Harmony support; the Input System keyboard
-injection is best effort (its interop signatures vary) and disables itself with
-a log line if the lookup fails — keys then work only for games reading the legacy
-`Input` manager.
+- Unity **Mono** builds, x64, Unity 2018.3+
+- Unity **IL2CPP** builds, x64, whose metadata isn't encrypted/obfuscated past
+  what `il2cpp_class_from_name` can resolve
+- Not supported: x86, games with kernel-mode anti-cheat (do not attempt)
 
 ## Protocol
 
@@ -81,9 +160,10 @@ One command per line, one reply per line. Coordinates are client-area pixels
 | `ping` | `ok Macro2kBridge <version> <screenW> <screenH>` |
 | `tap x y [holdMs] [refW refH]` | `ok <object path>` · `miss` · `err <message>` |
 | `swipe x1 y1 x2 y2 [ms] [refW refH]` | `ok <object path>` · `miss` · `err <message>` |
-| `key vk [holdMs]` | `ok key <name>` · `err <message>` (replies after the release) |
-| `keydown vk` | `ok keydown <name>` — stays held until `keyup` |
-| `keyup vk` · `keyup all` | `ok keyup <name>` |
+| `probe x y [refW refH]` | `ok module=<name> hits=<n> \| <path> {down=... click=... comps=...} ...` (diagnostics) |
+| `key vk [holdMs]` | `ok key <name>` · `err <message>` (replies after the release; **Mono only**) |
+| `keydown vk` | `ok keydown <name>` — stays held until `keyup` (**Mono only**) |
+| `keyup vk` · `keyup all` | `ok keyup <name>` (**Mono only**) |
 
 `miss` = no EventSystem target under the point (e.g. world objects the game
 reads from `Input` directly); Macro2k then falls back to anchored touch.
@@ -91,31 +171,33 @@ reads from `Input` directly); Macro2k then falls back to anchored touch.
 `vk` is a Windows virtual-key code (letters, digits, F1–F12, numpad digits,
 arrows, Enter/Esc/Space/Tab/Backspace, Shift/Ctrl/Alt, Insert/Delete/Home/End/
 PageUp/PageDown). A held key is queued as a `KeyboardState` into the Input System
-(found by reflection; skipped when the game doesn't ship it) and reported by
-Harmony postfixes on `Input.GetKey/GetKeyDown/GetKeyUp` and `GetAxis(Raw)`
+(found by reflection; skipped when the game doesn't ship it) and reported by the
+legacy-Input hooks for `Input.GetKey/GetKeyDown/GetKeyUp` and `GetAxis(Raw)`
 `Horizontal`/`Vertical`. Keys still held are released when the bridge stops;
 Macro2k also sends `keyup` for them when a run stops. A plugin older than 1.1.0
 answers `err unknown command` and Macro2k falls back to window messages.
 
-Config (`BepInEx/config/com.macro2k.unitybridge.cfg`): `Port`, `IgnoreFocus`.
+Config: `Port` comes from `%TEMP%\Macro2kBridge.port` (written by Macro2k before
+injecting); `IgnoreFocus` is always on.
 
-## Build the plugin
-
-```
-dotnet build vendor/unity_bridge/src/Macro2kBridge -c Release -p:UnityManagedDir="<Game>_Data\Managed"
-```
-
-`UnityManagedDir` is any Unity game's `Managed` folder (compile-time references
-only, nothing from it is shipped). The build copies the DLL to `plugin/`.
-
-IL2CPP plugin:
+## Build
 
 ```
-dotnet build vendor/unity_bridge/src/Macro2kBridge.Il2Cpp -c Release -p:Il2CppInteropDir="<Game>\BepInEx\interop"
+dotnet build vendor/unity_bridge/src/Macro2kInjector -c Release
 ```
 
-`Il2CppInteropDir` is the `BepInEx/interop` folder BepInEx 6 generated for any
-IL2CPP game (compile-time references only; the running game's own interop is
-bound at load). BepInEx runtime references come from `bepinex6_il2cpp_x64/`.
-The build copies the DLL to `plugin_il2cpp/`. Needs the .NET SDK (targets net6.0;
-the targeting pack is restored from NuGet).
+Mono plugin — must be compiled against the **target game's own** `Managed`
+folder (not a generic Unity install), so the compiler catches APIs that game's
+build stripped:
+
+```
+dotnet build vendor/unity_bridge/src/Macro2kBridge.Inject -c Release -p:UnityManagedDir="<Game>_Data\Managed"
+```
+
+IL2CPP plugin — MSVC, x64 (Visual Studio's "Desktop development with C++"
+workload; `build.bat` finds `vcvars64.bat` under `Program Files\Microsoft Visual
+Studio\*\*\VC\Auxiliary\Build`):
+
+```
+vendor\unity_bridge\src\Macro2kBridge.Il2Cpp\build.bat
+```

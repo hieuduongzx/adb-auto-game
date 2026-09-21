@@ -904,7 +904,7 @@
           {
             "id": "n8yuntx7",
             "type": "end",
-            "x": 1140,
+            "x": 1120,
             "y": 60,
             "params": {},
             "delayBefore": 1
@@ -5005,8 +5005,7 @@
             "params": {
               "fn": "fn_yt9m6"
             },
-            "delayBefore": 0.5,
-            "delayAfter": 0.5
+            "delayBefore": 1
           },
           {
             "id": "nt1m0dej",
@@ -5019,8 +5018,7 @@
               "y": 327,
               "taps": "1"
             },
-            "delayBefore": 0.5,
-            "delayAfter": 0.5
+            "delayBefore": 1
           },
           {
             "id": "nbrs6gpm",
@@ -5037,8 +5035,7 @@
               "direction": "up",
               "distance": 400
             },
-            "delayBefore": 0.5,
-            "delayAfter": 0.5
+            "delayBefore": 1
           },
           {
             "id": "nxuysbnn",
@@ -5049,8 +5046,7 @@
               "infinite": false,
               "count": 3
             },
-            "delayBefore": 0.5,
-            "delayAfter": 0.5
+            "delayBefore": 1
           },
           {
             "id": "nwr52ryq",
@@ -5067,8 +5063,7 @@
               "direction": "up",
               "distance": 400
             },
-            "delayBefore": 0.5,
-            "delayAfter": 0.5
+            "delayBefore": 1
           },
           {
             "id": "n99nlha8",
@@ -5079,8 +5074,7 @@
               "infinite": false,
               "count": 8
             },
-            "delayBefore": 0.5,
-            "delayAfter": 0.5
+            "delayBefore": 1
           },
           {
             "id": "n113yc7p",
@@ -5467,7 +5461,7 @@
           {
             "id": "nqcf6lx3",
             "type": "call",
-            "x": 2460,
+            "x": 2464,
             "y": 220,
             "params": {
               "fn": "fn_hh4kj"
@@ -5889,14 +5883,6 @@
             "delayBefore": 1
           },
           {
-            "id": "nqp63arp",
-            "type": "end",
-            "x": 3710,
-            "y": 420,
-            "params": {},
-            "delayBefore": 1
-          },
-          {
             "id": "no28dxky",
             "type": "if_var",
             "x": 1360,
@@ -6085,6 +6071,27 @@
               "template": "templates/crop_20260921_014105_1615_860_145_51.png",
               "threshold": 0.85,
               "negate": false
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nyl7y97k",
+            "type": "stop_sequence",
+            "x": 3840,
+            "y": 320,
+            "params": {
+              "sequenceId": "main"
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "nt1vhud2",
+            "type": "set_var",
+            "x": 3640,
+            "y": 320,
+            "params": {
+              "name": "pinnacle_crystal.done",
+              "value": "true"
             },
             "delayBefore": 1
           }
@@ -6468,11 +6475,6 @@
             "to": "n64wclf6"
           },
           {
-            "from": "n64wclf6",
-            "fromPort": "out",
-            "to": "nqp63arp"
-          },
-          {
             "from": "no28dxky",
             "fromPort": "true",
             "to": "noion3x8"
@@ -6572,6 +6574,16 @@
             "from": "npjw7o1d",
             "fromPort": "false",
             "to": "npp6icrh"
+          },
+          {
+            "from": "n64wclf6",
+            "fromPort": "out",
+            "to": "nt1vhud2"
+          },
+          {
+            "from": "nt1vhud2",
+            "fromPort": "out",
+            "to": "nyl7y97k"
           }
         ],
         "groups": []

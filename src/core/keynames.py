@@ -2,7 +2,7 @@
 
 Key presses reach the engine as bare integers — Windows virtual-key codes for
 Win32 projects, Android keycodes for ADB ones — and the log used to echo that
-number straight back ("⌨ VK13 nhấn 80ms"). Nobody reads a run log to learn that
+number straight back ("⌨ VK13 pressed for 80ms"). Nobody reads a run log to learn that
 13 means Enter.
 
 The designer already solved this on its side: ``WF_WIN_KEYS`` +
@@ -165,9 +165,9 @@ def describe_key_event(kind: str, code, mode: str = "press",
         return android_key_name(code)
     name = vk_name(code)
     if mode == "down":
-        return f"{name} giữ"
+        return f"{name} held down"
     if mode == "up":
-        return f"{name} nhả"
+        return f"{name} released"
     if hold_ms is None:
         return name
-    return f"{name} nhấn {hold_ms}ms"
+    return f"{name} pressed for {hold_ms}ms"

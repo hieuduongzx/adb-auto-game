@@ -420,6 +420,12 @@ const WF_NODES = {
   screen_power:  {label:"Screen power", ico:"power", kind:"action", cat:"device", outs:["out"], fields:[{k:"action",lbl:"Action",t:"select",opts:[{v:"on",t:"Wake / On"},{v:"off",t:"Sleep / Off"},{v:"toggle",t:"Toggle (power key)"}],d:"on"}], sum:p=>`🖥 ${({on:"wake",off:"sleep",toggle:"toggle"})[p.action||"on"]}`},
   // Read side of Screen power — branch on whether the display is awake.
   if_screen_on:  {label:"If screen is on", ico:"power", kind:"condition", cat:"device", outs:["true","false"], fields:[{k:"negate",lbl:"Negate (screen is off)",t:"bool",d:false}], sum:p=>`🖥 screen ${p.negate?"off":"on"}?`},
+  if_device_size:{label:"If device size", ico:"smartphone", kind:"condition", cat:"device", outs:["true","false"], fields:[
+    {k:"width",lbl:"Screen width",t:"num",d:1920},
+    {k:"height",lbl:"Screen height",t:"num",d:1080},
+    {k:"tolerance",lbl:"Tolerance (px)",t:"num",d:0},
+    {k:"negate",lbl:"Negate (different size)",t:"bool",d:false}
+  ], sum:p=>`📱 ${p.negate?"not ":""}${p.width??1920}×${p.height??1080}${Number(p.tolerance)?`±${p.tolerance}`:""}`},
   // Escape hatch: run any adb shell command and capture stdout into a variable.
   adb_shell:     {label:"ADB shell → variable", ico:"log", kind:"action", cat:"device", outs:["out"], fields:[
     {k:"command",lbl:"Shell command",t:"text",insertVar:true,d:"getprop ro.product.model"},
@@ -1168,9 +1174,6 @@ async function wfOfferUnityBridgeDeploy(opts){
     if(!opts.force && st && st.bridgeRunning){
       uiToast("Unity Bridge đang chạy trong game ("+st.bridge+")","success"); return;
     }
-    if(!opts.force && st && st.pluginInstalled && st.pluginCurrent){
-      uiToast("Unity Bridge đã cài — khởi động lại game để nạp plugin","info",{dur:5000}); return;
-    }
     if(!st || !st.exe){
       const pick=await uiConfirm({title:"Unity Bridge",
         message:"Chưa xác định được game từ cửa sổ mục tiêu (chưa chọn cửa sổ hoặc game chưa mở). Chọn file .exe của game Unity để triển khai plugin?",
@@ -1190,26 +1193,26 @@ async function wfOfferUnityBridgeDeploy(opts){
       return;
     }
     const steps=[
-      st.bepinex
-        ? ("Giữ nguyên BepInEx có sẵn ("+(st.bepinexVersion||"5.x")+")"+
-           (st.bepinexOutdated ? " — đã có bản "+st.vendorBepinexVersion+", không tự nâng cấp" : ""))
-        : ("Cài BepInEx "+(st.vendorBepinexVersion||"5.x")+" x64"+(st.flavor==="il2cpp"?" (IL2CPP, kèm .NET 6 runtime)":"")+" vào thư mục game"),
-      st.pluginInstalled ? (st.pluginCurrent ? "Plugin Macro2kBridge.dll đã là bản mới nhất (copy lại)" : "Cập nhật plugin Macro2kBridge.dll")
-                         : "Copy plugin Macro2kBridge.dll vào BepInEx/plugins",
+      "Không copy file nào vào thư mục game — Macro2k nạp Macro2kBridge thẳng vào tiến trình game đang chạy"
+      +(st.backend==="IL2CPP" ? " (DLL native, LoadLibrary)" : " (DLL managed, qua Mono runtime)"),
+      "Tự nạp lại mỗi khi workflow gắn vào game (không cần thao tác lại sau khi restart game)",
     ];
+    if(st.legacyBepinex) steps.push("Dọn các file BepInEx cũ còn sót trong thư mục game (từ bản Macro2k trước)");
     if(st.bridgeRunning) steps.push("Bridge đang chạy: "+st.bridge);
     const ok=await uiModal({title:"Triển khai Unity Bridge?",
       body:`<div class="ui-modal-msg">Game: <b>${escHtml(st.gameDir||"")}</b><br>Unity ${escHtml(st.backend||"")} · ${escHtml(st.arch||"?")}</div>`+
         list(steps)+
         `<div class="ui-modal-msg" style="opacity:.75">Plugin chạy trong game và nhận lệnh tap/swipe qua 127.0.0.1:${escHtml(String(st.port||17820))}. `+
-        `Game online có anti-cheat có thể phát hiện mod — tự cân nhắc rủi ro.</div>`,
+        `Cần game đang mở để nạp được ngay; nếu chưa mở, Macro2k sẽ tự nạp khi workflow gắn vào game. `+
+        `Game online có anti-cheat có thể phát hiện việc nạp DLL — tự cân nhắc rủi ro.</div>`,
       buttons:[{label:"Để sau", value:false}, {label:"Triển khai", value:true, kind:"accent"}]});
     if(!ok) return;
     let res=null;
     try{ res=await api().unity_bridge_deploy(st.exe); }catch(e){ res={ok:false, error:String(e)}; }
     if(res && res.ok){
-      uiToast("Đã triển khai Unity Bridge — khởi động lại game để nạp plugin","success",{dur:6000});
-      setStatus("Unity Bridge: "+(res.actions||[]).join(" · ")+" → "+(res.gameDir||""));
+      uiToast(res.injected ? "Đã nạp Unity Bridge vào game đang chạy"
+                           : "Unity Bridge sẽ được nạp khi workflow gắn vào game — hãy mở game trước","success",{dur:6000});
+      setStatus("Unity Bridge: "+(res.actions||[]).join(" · "));
     }else{
       uiToast("Triển khai thất bại: "+((res&&res.error)||"unknown"),"error",{dur:8000});
     }
