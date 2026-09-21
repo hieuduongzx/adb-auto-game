@@ -281,7 +281,6 @@ class Win32Controller:
                              f"attached by executable '{exe}' instead")
         if not hwnd:
             log_warning(f"[win32] No window matches '{pattern}' ({by})")
-            self._log_window_list()
             self.hwnd = None
             return False
         self.hwnd = hwnd

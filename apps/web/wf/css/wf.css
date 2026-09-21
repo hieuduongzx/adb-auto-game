@@ -1091,18 +1091,19 @@
 .wf-node.cat-misc   { --node-accent:var(--cat-misc); }
 .wf-node.conn-target::after { box-shadow:var(--sh-md); }
 /* ── Groups (frames) ────────────────────────────────────────────────────────── */
-.wf-group { position:absolute; z-index:0; border:1.5px dashed; border-radius:10px; pointer-events:none; }
+.wf-group { position:absolute; z-index:0; border:1.5px dashed; border-radius:var(--node-r); pointer-events:none; }
 .wf-group.sel { border-style:solid; box-shadow:0 0 0 1px currentColor; }
 .wf-group-hd { position:absolute; left:-1.5px; top:-23px; max-width:280px; height:22px; display:flex; align-items:center; gap:6px;
-  padding:0 4px 0 9px; border-radius:8px 8px 0 0; font-size:11px; font-weight:700; color:var(--on-accent);
+  padding:0 4px 0 9px; border-radius:var(--node-r); font-size:11px; font-weight:700; color:var(--on-accent);
   pointer-events:auto; cursor:move; white-space:nowrap; }
 .wf-group-name { overflow:hidden; text-overflow:ellipsis; }
 .wf-group-del { color:var(--on-accent); opacity:.85; line-height:0; padding:2px; border-radius:4px; flex-shrink:0; cursor:pointer; display:flex; align-items:center; }
 .wf-group-del svg { width:12px; height:12px; stroke-width:2.2; display:block; }
 .wf-group-del:hover { opacity:1; background:color-mix(in srgb, var(--on-accent) 25%, transparent); }
 .wf-group-resize { position:absolute; right:-5px; bottom:-5px; width:14px; height:14px; cursor:nwse-resize; pointer-events:auto;
-  border-right:2.5px solid currentColor; border-bottom:2.5px solid currentColor; border-bottom-right-radius:9px; opacity:.6; }
+  border-right:2.5px solid currentColor; border-bottom:2.5px solid currentColor; border-radius:var(--node-r); opacity:.6; }
 .wf-group-resize:hover { opacity:1; }
+#wf-canvas.wf-over-group { cursor:move; }
 /* The block the engine is on right now — saturated amber card + pulsing halo.
    The border carries the state too, not just the fill: a neutral --border2 here
    meant "running" read as a tint alone, which is weak against a busy canvas and

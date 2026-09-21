@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).parents[1]
 PYTHON_ROOTS = (ROOT / "src", ROOT / "apps")
 WEB_ROOT = ROOT / "apps" / "web"
+WORKFLOW_ROOT = ROOT / "workflows"
 VIETNAMESE = re.compile(
     r"[ÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠƯ"
     r"àáâãèéêìíòóôõùúăđĩũơư"
@@ -40,6 +41,30 @@ def test_python_runtime_logs_are_english():
                 if name in LOG_CALLS and VIETNAMESE.search(_literal_text(node.args[0])):
                     violations.append(f"{path.relative_to(ROOT)}:{node.lineno}")
     assert not violations, "Vietnamese runtime logs:\n" + "\n".join(violations)
+
+
+def test_workflow_runtime_logs_are_english():
+    violations = []
+    for path in WORKFLOW_ROOT.rglob("*.json"):
+        try:
+            tree = ast.literal_eval(path.read_text(encoding="utf-8"))
+        except (SyntaxError, ValueError):
+            import json
+            tree = json.loads(path.read_text(encoding="utf-8"))
+
+        def visit(value, location=""):
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    child_location = f"{location}.{key}"
+                    if "log" in key.lower() and isinstance(child, str) and VIETNAMESE.search(child):
+                        violations.append(f"{path.relative_to(ROOT)}:{child_location}")
+                    visit(child, child_location)
+            elif isinstance(value, list):
+                for index, child in enumerate(value):
+                    visit(child, f"{location}[{index}]")
+
+        visit(tree)
+    assert not violations, "Vietnamese workflow logs:\n" + "\n".join(violations)
 
 
 def test_web_status_messages_are_english():

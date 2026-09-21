@@ -121,8 +121,9 @@ class _AttachFallback(unittest.TestCase):
 
     def test_attach_does_not_use_exe_when_no_path_is_configured(self):
         ctrl = self._ctrl("", found=_ELEVATED[0])
-        ctrl._log_window_list = lambda: None
-        self.assertFalse(ctrl.attach())
+        with mock.patch.object(ctrl, "_log_window_list") as window_dump:
+            self.assertFalse(ctrl.attach())
+        window_dump.assert_not_called()
         self.assertNotIn("exe", [by for _pattern, by in ctrl.calls])
 
 

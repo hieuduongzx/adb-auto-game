@@ -7,11 +7,24 @@
   --runner-stop: #b33332;
   --runner-stop-hover: #942827;
   --runner-selected-ink: #2459a5;
+  /* Compact Pro keeps execution output visually separate from the form UI. */
+  --runner-log-bg: #202730;
+  --runner-log-ink: #c7d0db;
+  --runner-log-muted: #8491a1;
+  --runner-log-line: #303946;
+  --runner-log-error-bg: #3a2528;
+  --runner-log-warning-bg: #393225;
 }
 :root[data-theme="dark"] {
   --runner-selected-ink: #a9caff;
   --muted: #a0adbf;
   --log-muted: #a0adbf;
+  --runner-log-bg: #171c23;
+  --runner-log-ink: #cbd4df;
+  --runner-log-muted: #8e9bad;
+  --runner-log-line: #29313d;
+  --runner-log-error-bg: #382326;
+  --runner-log-warning-bg: #373024;
 }
 ::selection { background: var(--accent-bd); color: var(--ink); }
 input { caret-color: var(--accent); text-align: center; }
@@ -25,35 +38,37 @@ input { caret-color: var(--accent); text-align: center; }
 .theme-toggle:hover { background: var(--accent-bg); border-color: var(--accent-bd); color: var(--runner-selected-ink); }
 
 /* ── App frame ─────────────────────────────────────────────────────────── */
-#app { padding: var(--s4); gap: var(--s4); }
+/* Compact Pro: spend the window on activities and output, not outer chrome. */
+#app { padding: var(--s3); gap: var(--s3); }
 
-/* Split body: left = activities (tabs + lists), right = activity settings + log. */
-#main-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--s4); }
+/* Split body: a little more room for long activity names, while the log remains
+   the larger workspace. Six-pixel gutters keep both columns visually related. */
+#main-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--s3); }
 #mobile-tabs { display: none; }
-#main-split { flex: 1; min-height: 0; display: flex; gap: var(--s4); }
-#pane-left  { flex: 1 1 44%; min-width: 0; display: flex; flex-direction: column; gap: var(--s3); }
-#pane-right { flex: 1 1 56%; min-width: 0; display: flex; flex-direction: column; gap: var(--s3); }
+#main-split { flex: 1; min-height: 0; display: flex; gap: var(--s3); }
+#pane-left  { flex: 1 1 48%; min-width: 0; display: flex; flex-direction: column; gap: var(--s2); }
+#pane-right { flex: 1 1 52%; min-width: 0; display: flex; flex-direction: column; gap: var(--s2); }
 
 /* ── Header card ───────────────────────────────────────────────────────── */
 /* One flex column: the progress row sits between title and controls only while
    a run is live, and a column gap gives the right spacing in both states —
    margins on the rows above it left a dead 11px gap whenever it was hidden. */
 #header-card {
-  padding: var(--s5);
+  padding: 10px 12px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--s4);
+  gap: var(--s3);
 }
 .header-top {
   display: flex;
   align-items: center;
-  gap: var(--s4);
+  gap: 10px;
 }
 .header-title-block { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 /* The game's icon — the same art as its .exe and its Hub card. */
 .app-icon {
-  width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px; overflow: hidden;
+  width: 36px; height: 36px; flex-shrink: 0; border-radius: 7px; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
 }
@@ -61,10 +76,10 @@ input { caret-color: var(--accent); text-align: center; }
 .app-icon img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
 .app-icon.mono {
   background: hsl(var(--tone) 40% 30%); color: hsl(var(--tone) 45% 93%);
-  font-size: var(--t-head); font-weight: 600; letter-spacing: -.02em;
+  font-size: var(--t-title); font-weight: 700; letter-spacing: -.02em;
 }
 .app-title {
-  font-size: var(--t-head);
+  font-size: 16px;
   font-weight: 700;
   color: var(--ink);
   line-height: 1.1;
@@ -88,11 +103,11 @@ input { caret-color: var(--accent); text-align: center; }
 /* Status pill — square, semantic tint only */
 #status-pill {
   display: flex; align-items: center; gap: 7px;
-  padding: 6px 9px; border-radius: var(--r-sm);
+  min-height: 26px; padding: 4px 8px; border-radius: var(--r-sm);
   flex-shrink: 0; transition: background .2s, border-color .2s;
   border: 1px solid var(--status-border, var(--border));
 }
-#status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; transition: background .3s; }
+#status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; transition: background .3s; }
 #status-text { font-size: var(--t-caption); font-weight: 600; letter-spacing: .025em; white-space: nowrap; }
 .status-ready   { background: var(--surface); }
 .status-running, .status-done { background: var(--ok-bg); --status-border: var(--ok-bd); }
@@ -121,33 +136,33 @@ input { caret-color: var(--accent); text-align: center; }
 .outcome-stopped .outcome-dot { background:var(--warn); }
 
 /* Progress bar */
-#header-progress { display: flex; align-items: center; gap: var(--s4); padding-top: var(--s2); border-top: 1px solid var(--line); }
+#header-progress { display: flex; align-items: center; gap: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--line); }
 .prog-count { font-size: var(--t-caption); font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums; min-width: 28px; flex-shrink: 0; }
 .prog-bar-track { flex: 1; height: 6px; border-radius: 2px; background: var(--track); overflow: hidden; }
 .prog-bar-fill { height: 100%; border-radius: 2px; background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
 .prog-elapsed { font-family: var(--mono); font-size: var(--t-ui); font-weight: 500; color: var(--dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
 /* Control buttons */
-.header-btns { display: flex; align-items: center; gap: var(--s3); }
-.header-btns .btn { height: 40px; font-size: var(--t-title); padding: 0 var(--s5); border-radius: var(--r-md); }
+.header-btns { display: flex; align-items: center; gap: var(--s2); }
+.header-btns .btn { height: 32px; font-size: var(--t-body); padding: 0 18px; border-radius: var(--r-sm); }
 /* One primary button: Start is a quiet success tint; Stop becomes solid red so
    the destructive state remains unmistakable. See setPrimary() in runner.js. */
-.btn-start { flex: 2; background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-bd); font-size: var(--t-title); font-weight: 700; border-radius: var(--r-md); }
+.btn-start { flex: 0 1 220px; background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-bd); font-size: var(--t-title); font-weight: 700; border-radius: var(--r-md); }
 .btn-start:hover:not(:disabled), .btn-start:active:not(:disabled) { background: color-mix(in srgb, var(--ok-bg) 76%, var(--ok-bd)); border-color: var(--ok); color: var(--ok-ink); }
 .btn-start.is-stop { background: var(--runner-stop); color: var(--on-err); border-color: var(--runner-stop); }
 .btn-start.is-stop:hover:not(:disabled), .btn-start.is-stop:active:not(:disabled) { background: var(--runner-stop-hover); border-color: var(--runner-stop-hover); color: var(--on-err); }
 .header-btns .btn:disabled { opacity: 1; background: var(--alt); border-color: var(--border); color: var(--muted); }
-.btn-pause { flex: 1; background: var(--panel); color: var(--dim); border-color: var(--border2); border-radius: var(--r-md); }
+.btn-pause { flex: 0 1 110px; background: var(--panel); color: var(--dim); border-color: var(--border2); border-radius: var(--r-md); }
 .btn-pause:hover:not(:disabled) { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-bd); }
 
 /* ── Tabs — segmented control (operator console) ───────────────────────── */
 #tabs-bar {
   display: flex; align-items: center; gap: 0; flex-shrink: 0;
   background: var(--alt); border: 1px solid var(--border); border-radius: var(--r-md);
-  padding: 3px; gap: 3px; overflow: hidden;
+  padding: 2px; gap: 2px; overflow: hidden;
 }
 .tab-btn {
-  flex: 1; justify-content: center; padding: 9px 10px; border-radius: var(--r-sm);
+  flex: 1; justify-content: center; padding: 7px 9px; border-radius: var(--r-sm);
   border: none; color: var(--dim);
   display: inline-flex; align-items: center; gap: 5px;
   font-size: var(--t-body); font-weight: 600;
@@ -162,10 +177,10 @@ input { caret-color: var(--accent); text-align: center; }
 .tab-pane { display: none; flex-direction: column; min-height: 0; overflow: hidden; padding: 0; }
 .tab-pane.active { display: flex; flex: 1; }
 #tab-wrapper { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.pane-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 2px 0; gap: var(--s3); overflow: hidden; }
+.pane-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; gap: var(--s2); overflow: hidden; }
 
 /* The tab already names the list, so the header carries "3 of 5 enabled". */
-.list-header { display: flex; align-items: center; gap: 4px; padding: 0 2px; min-height: 26px; flex-shrink: 0; }
+.list-header { display: flex; align-items: center; gap: 4px; padding: 0 2px; min-height: 24px; flex-shrink: 0; }
 .list-label { font-size: var(--t-caption); font-weight: 600; letter-spacing: 0; color: var(--dim); text-transform: none; flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
 .btn-sel { font-size: var(--t-ui); font-weight: 600; padding: 3px 8px; border-radius: var(--r-sm); color: var(--accent); transition: background .1s; }
 .btn-sel:hover { background: var(--accent-bg); }
@@ -178,7 +193,7 @@ input { caret-color: var(--accent); text-align: center; }
 
 /* Selection uses a blue outline; execution uses semantic tint + status text.
    Both remain legible when the selected activity is also running or failed. */
-.task-row { position: relative; display: flex; align-items: center; gap: var(--s2); padding: 4px 10px; min-height: 38px; border-bottom: 1px solid var(--line); transition: background .1s; }
+.task-row { position: relative; display: flex; align-items: center; gap: var(--s2); padding: 3px 8px; min-height: 40px; border-bottom: 1px solid var(--line); transition: background .1s; }
 .task-row:last-child { border-bottom: none; }
 .task-row:hover { background: var(--surface); }
 .task-row.is-selected { background: var(--accent-bg); outline: 1px solid var(--accent); outline-offset: -1px; z-index: 1; }
@@ -202,7 +217,7 @@ input { caret-color: var(--accent); text-align: center; }
 
 /* Name block */
 .task-name-block { flex: 1; min-width: 0; cursor: pointer; }
-.task-name { font-size: var(--t-body); font-weight: 600; line-height: 1.4; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
+.task-name { font-size: var(--t-ui); font-weight: 600; line-height: 1.35; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
 .task-row.task-off .task-name { color: var(--muted); font-weight: 500; }
 .task-meta { display: flex; align-items: center; gap: 5px; margin-top: 0; font-size: var(--t-caption); line-height: 1.2; color: var(--dim); white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
 .task-meta:empty { display: none; }
@@ -228,7 +243,7 @@ input { caret-color: var(--accent); text-align: center; }
 /* Sizes come from the shared ladder (icons.css) — see the markup's uico class.
    The rules below cover layout and colour only. */
 .task-btns { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-.btn-icon { width: 28px; height: 28px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; transition: background .12s, color .12s; }
+.btn-icon { width: 26px; height: 26px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; transition: background .12s, color .12s; }
 .btn-gear { color: var(--dim); background: transparent; border: 1px solid transparent; }
 .btn-gear.active { color: var(--runner-selected-ink); background: var(--accent-bg); border-color: transparent; }
 .btn-gear:hover { background: var(--alt); color: var(--ink); border-color: transparent; }
@@ -246,10 +261,10 @@ input { caret-color: var(--accent); text-align: center; }
 #r-tabs {
   display: flex; align-items: stretch; flex-shrink: 0;
   background: var(--alt); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
-  padding: 3px; gap: 3px;
+  padding: 2px; gap: 2px;
 }
 .rtab {
-  flex: 1; justify-content: center; min-width: 0; padding: 9px 10px;
+  flex: 1; justify-content: center; min-width: 0; padding: 7px 9px;
   border: none; border-radius: var(--r-sm);
   display: inline-flex; align-items: center; gap: 5px;
   font-size: var(--t-body); font-weight: 600; color: var(--dim);
@@ -264,8 +279,8 @@ input { caret-color: var(--accent); text-align: center; }
 .rpane { display: none; flex: 1; min-width: 0; min-height: 0; flex-direction: column;
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
 .rpane.active { display: flex; }
-.rpane-hd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); flex-shrink: 0; background: var(--surface); }
-.log-toolbar { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; flex-basis: 100%; }
+.rpane-hd { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--s2); padding: 6px 9px; border-bottom: 1px solid var(--line); flex-shrink: 0; background: var(--surface); }
+.log-toolbar { display: flex; align-items: center; gap: var(--s2); flex: 1 1 220px; min-width: 150px; }
 .log-toolbar .log-search-wrap { flex: 1 1 120px; max-width: none; }
 .log-level { min-width: 0; max-width: 100%; height: 28px; }
 .log-note:empty, .diag-status:empty { display: none; }
@@ -278,10 +293,10 @@ input { caret-color: var(--accent); text-align: center; }
 .diag-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .rpane-title { font-size: var(--t-body); font-weight: 600; color: var(--ink); }
 .rpane-sp { flex: 1; }
-.rpane-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s4) var(--s5); display: flex; flex-direction: column; gap: var(--s2); }
+.rpane-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s3) var(--s4); display: flex; flex-direction: column; gap: var(--s2); }
 
 /* Activity settings pane */
-.act-set-hd { display: flex; align-items: center; gap: 6px; padding: 10px 8px 10px 13px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.act-set-hd { display: flex; align-items: center; gap: 6px; padding: 7px 7px 7px 10px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
 .act-set-title { flex: 1; min-width: 0; font-size: var(--t-body); font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .act-set-back { display: none; align-items: center; gap: 4px; padding: 4px 6px; border-radius: var(--r-sm); color: var(--accent); font-size: var(--t-caption); font-weight: 600; }
 .activity-save-status { flex-shrink: 0; font-size: var(--t-caption); color: var(--muted); }
@@ -289,7 +304,7 @@ input { caret-color: var(--accent); text-align: center; }
 .activity-save-status.error { color: var(--err); }
 .act-set-x { width: 24px; height: 24px; flex-shrink: 0; border-radius: var(--r-sm); color: var(--muted); font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center; }
 .act-set-x:hover { background: var(--alt); color: var(--dim); }
-.act-set-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 13px; }
+.act-set-body { flex: 1; min-height: 0; overflow-y: auto; padding: 9px 10px; }
 .act-set-empty { font-size: var(--t-body); color: var(--muted); text-align: center; padding: var(--s6) var(--s4); line-height: 1.6; }
 .act-set-empty svg { display: inline-block; vertical-align: middle; }
 .act-set-empty b { color: var(--dim); }
@@ -311,7 +326,7 @@ input { caret-color: var(--accent); text-align: center; }
 .pv-btn.off { color: var(--accent); background: var(--accent-bg); }
 .pv-body { position: relative; flex: 1; min-height: 0; background: var(--log-bg); display: flex; align-items: center; justify-content: center; overflow: hidden; }
 /* Keep the screen useful without starving the log on short windows. */
-#preview-card:not(.is-max) .pv-body { height: clamp(100px, 25vh, 280px); flex: none; }
+#preview-card:not(.is-max) .pv-body { height: clamp(90px, 22vh, 240px); flex: none; }
 #pv-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
 /* Before the first frame the <img> has no src — hide it, or its alt text is
    drawn on top of "No preview". */
@@ -435,21 +450,21 @@ input { caret-color: var(--accent); text-align: center; }
 /* The Runner log is the operator's feed (milestones, the workflow's own notes,
    errors — see WorkflowRunnerAPI._on_log), so it reads a step larger than the
    Designer's step-by-step log. */
-.log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 10px 8px; background: var(--log-bg); user-select: text; }
-.log-line { display: flex; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: var(--t-ui); line-height: 1.6; white-space: nowrap; }
+.log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px 9px; background: var(--runner-log-bg); color: var(--runner-log-ink); user-select: text; scrollbar-color: #566170 var(--runner-log-bg); }
+.log-line { display: flex; gap: 7px; padding: 3px 0; border-bottom: 1px solid var(--runner-log-line); font-family: var(--mono); font-size: var(--t-ui); line-height: 1.6; white-space: nowrap; }
 .log-line:last-child { border-bottom: 0; }
-.log-line.lv-error { background: var(--err-bg); }
-.log-line.lv-warning { background: var(--warn-bg); }
-.log-line.lv-error .log-ts { color: var(--err); }
-.log-line.lv-warning .log-ts { color: var(--warn); }
+.log-line.lv-error { background: var(--runner-log-error-bg); }
+.log-line.lv-warning { background: var(--runner-log-warning-bg); }
+.log-line.lv-error .log-ts { color: #ef8b84; }
+.log-line.lv-warning .log-ts { color: #e2ba64; }
 .log-line.hidden { display: none; }
-.log-ts  { color: var(--log-muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.log-ts  { color: var(--runner-log-muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .log-tag { font-weight: 700; flex-shrink: 0; }
-.log-msg { min-width: 0; color: var(--log-ink); white-space: normal; overflow-wrap: anywhere; }
+.log-msg { min-width: 0; color: var(--runner-log-ink); white-space: normal; overflow-wrap: anywhere; }
 /* "[Activity]" prefix; lines that belong to no activity say [Runner], quietly. */
-.log-scope { font-weight: 600; color: var(--accent); }
-.log-scope.is-app { color: var(--muted); }
-.log-line.k-run .log-msg, .log-line.k-activity .log-msg { font-weight: 600; color: var(--ink); }
+.log-scope { font-weight: 600; color: #79aaff; }
+.log-scope.is-app { color: var(--runner-log-muted); }
+.log-line.k-run .log-msg, .log-line.k-activity .log-msg { font-weight: 600; color: #edf2f7; }
 .log-line.lv-error .log-msg { color: var(--err); }
 .log-info    { color: var(--accent); }
 .log-success { color: var(--ok); }
@@ -500,7 +515,7 @@ input { caret-color: var(--accent); text-align: center; }
 }
 
 /* ── Footer / status bar ───────────────────────────────────────────────── */
-#footer { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s3) var(--s4); flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
+#footer { display: flex; flex-direction: column; gap: var(--s1); padding: var(--s2) var(--s3); flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
 .footer-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); font-size: var(--t-caption); }
 #tabs-bar .tab-btn:focus-visible, .rtab:focus-visible { outline-offset: -3px; }
 .drag-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; color: var(--accent); }

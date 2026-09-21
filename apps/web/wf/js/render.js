@@ -716,6 +716,15 @@ function wfShowLocalsEditorLegacy(){
     pop.style.left=Math.max(8, Math.min(window.innerWidth-250, left))+"px";
   }
 }
+function wfRefreshVarTitle(input,v){
+  // The compact panel preserves focused editors instead of rebuilding them.
+  // Update the owning summary in place so a child stops showing "Sub 1" as
+  // soon as its Title changes, then refresh any other variable views.
+  const details=input.closest("details.wf-variable-item");
+  const title=details&&details.querySelector("summary .wf-variable-name");
+  if(title) title.textContent=v.label||v.name||"Variable";
+  wfRenderVarsPanel();
+}
 function wfLocalRow(act,v,idx,render){
   // Same fields as global rows, but edits write into act.vars.
   const card=document.createElement("div"); card.className="wf-glob-card";
@@ -735,7 +744,7 @@ function wfLocalRow(act,v,idx,render){
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Title"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
   // Keep the code name in sync with the Title until it's edited by hand.
   let autoName = !v.name || v.name===v.label || v.name===wfVarSlug(v.label||"");
-  lbl.oninput=()=>{ wfPushUndoDebounced(); v.label=lbl.value; if(autoName){ const s=wfVarSlug(lbl.value); if(s){ v.name=s; nm.value=s; wfRenderVarsPanel(); } } };
+  lbl.oninput=()=>{ wfPushUndoDebounced(); v.label=lbl.value; wfRefreshVarTitle(lbl,v); if(autoName){ const s=wfVarSlug(lbl.value); if(s){ v.name=s; nm.value=s; } } };
   r1b.appendChild(lbl);
   card.appendChild(r1b);
   const r2=document.createElement("div"); r2.className="wf-var-row";
@@ -837,7 +846,7 @@ function wfGlobRow(v,idx,render){
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Title"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
   // Keep the code name in sync with the Title until it's edited by hand.
   let autoName = !v.name || v.name===v.label || v.name===wfVarSlug(v.label||"");
-  lbl.oninput=()=>{ wfPushUndoDebounced(); v.label=lbl.value; if(autoName){ const s=wfVarSlug(lbl.value); if(s){ v.name=s; nm.value=s; wfRenderVarsPanel(); } } };
+  lbl.oninput=()=>{ wfPushUndoDebounced(); v.label=lbl.value; wfRefreshVarTitle(lbl,v); if(autoName){ const s=wfVarSlug(lbl.value); if(s){ v.name=s; nm.value=s; } } };
   r1b.appendChild(lbl);
   card.appendChild(r1b);
   const r2=document.createElement("div"); r2.className="wf-var-row";

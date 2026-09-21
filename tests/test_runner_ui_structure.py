@@ -2,7 +2,10 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 
-RUNNER_HTML = Path(__file__).parents[1] / "apps" / "web" / "runner" / "index.html"
+RUNNER_DIR = Path(__file__).parents[1] / "apps" / "web" / "runner"
+RUNNER_HTML = RUNNER_DIR / "index.html"
+RUNNER_CSS = RUNNER_DIR / "css" / "runner.css"
+RUNNER_BACKEND = Path(__file__).parents[1] / "apps" / "workflow_runner.py"
 
 
 class _RunnerHTML(HTMLParser):
@@ -70,3 +73,17 @@ def test_activity_settings_announces_save_state():
 
     assert status["attrs"].get("role") == "status"
     assert status["attrs"].get("aria-live") == "polite"
+
+
+def test_compact_pro_log_remains_a_dark_console_in_light_theme():
+    css = RUNNER_CSS.read_text(encoding="utf-8")
+
+    assert "--runner-log-bg: #202730" in css
+    assert ".log-body" in css and "background: var(--runner-log-bg)" in css
+    assert ".log-msg" in css and "color: var(--runner-log-ink)" in css
+
+
+def test_loading_a_workflow_does_not_add_a_redundant_runner_log_line():
+    source = RUNNER_BACKEND.read_text(encoding="utf-8")
+
+    assert "Loaded workflow:" not in source

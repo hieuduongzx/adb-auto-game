@@ -104,7 +104,22 @@ function wfStartGroupMove(e,gr){
   if(e.button!==0 || e.target.closest(".wf-group-del")) return;
   e.stopPropagation();
   const members=wfNodesInGroup(gr).map(n=>({id:n.id, ox:n.x, oy:n.y}));
-  wfGesture={mode:"groupmove", gr, gx:gr.x, gy:gr.y, sx:e.clientX, sy:e.clientY, members};
+  wfGesture={mode:"groupmove", gr, gx:gr.x, gy:gr.y, sx:e.clientX, sy:e.clientY, members, undoPushed:false};
+}
+// Group frames deliberately have pointer-events:none so they never cover their
+// blocks or wires. Hit-test their model rectangles when the pointer is over
+// otherwise-empty canvas instead. For nested/overlapping frames, the smallest
+// containing group is the most specific target.
+function wfGroupAtClientPoint(clientX,clientY){
+  const wr=$("wf-world").getBoundingClientRect();
+  const x=(clientX-wr.left)/wfZoom, y=(clientY-wr.top)/wfZoom;
+  let hit=null, hitArea=Infinity;
+  wfGroups().forEach(gr=>{
+    if(x<gr.x || x>gr.x+gr.w || y<gr.y || y>gr.y+gr.h) return;
+    const area=gr.w*gr.h;
+    if(area<hitArea){ hit=gr; hitArea=area; }
+  });
+  return hit;
 }
 function wfStartGroupResize(e,gr){
   if(wfGesture?.mode==="connect") return;
@@ -232,19 +247,9 @@ function wfCancelConnect(){
 }
 function wfStartConnect(e,nodeId,port,direction="out"){
   if(e.button!==0) return; e.stopPropagation(); e.preventDefault();
-  if(wfGesture?.mode==="connect"){
-    const s=wfGesture, g=wfGraph();
-    if(!g || s.graph!==g){ wfCancelConnect(); return; }
-    if(s.direction===direction || s.from===nodeId) return;
-    const edge=s.direction==="in"
-      ? {from:nodeId,fromPort:port,to:s.from,toPort:s.port}
-      : {from:s.from,fromPort:s.port,to:nodeId,toPort:port};
-    wfPushUndo();
-    g.edges=g.edges.filter(ed=>!(ed.from===edge.from && ed.fromPort===edge.fromPort));
-    g.edges.push(edge);
-    wfCancelConnect(); wfRenderCanvas();
-    return;
-  }
+  // Connections are drag-only. A second press cannot complete an existing
+  // gesture; this also prevents an interrupted drag from becoming click-connect.
+  if(wfGesture?.mode==="connect") return;
   wfGesture={mode:"connect",from:nodeId,port,direction,graph:wfGraph(),sx:e.clientX,sy:e.clientY};
   $("wf-canvas").classList.add("wf-connecting");
   wfDrawTempWire(e.clientX,e.clientY);
@@ -673,7 +678,7 @@ function wfWireInsertSplice(g, edge, node){
 }
 
 function wfCanvasMouseDown(e){
-  if(e.target.closest(".wf-node")||e.target.closest(".wf-group")) return;
+  if(e.target.closest(".wf-node")||e.target.closest(".wf-group")||e.target.closest("g.wire-grp")) return;
   wfCancelCamAnim();   // a press on the canvas takes the camera back by hand
   // Floating overlays (the dock cards, layout
   // menu, minimap, empty-state card) sit above the canvas — a press there must
@@ -699,6 +704,10 @@ function wfCanvasMouseDown(e){
     wfGesture={mode:"groupdraw", sx:(e.clientX-wr.left)/wfZoom, sy:(e.clientY-wr.top)/wfZoom};
     return;
   }
+  // A frame cannot receive pointer events because it sits behind its nodes and
+  // wires. Empty canvas inside one still acts as a move handle.
+  const group=wfGroupAtClientPoint(e.clientX,e.clientY);
+  if(group){ wfStartGroupMove(e,group); return; }
   // Plain left on empty → rubber-band select.
   if(!e.shiftKey) wfClearSel();
   const box=document.createElement("div"); box.id="wf-selbox"; box.className="wf-selbox";
@@ -1058,8 +1067,12 @@ function wfInitCanvas(){
   const canvas=$("wf-canvas");
   canvas.addEventListener("mousedown",wfCanvasMouseDown);
   // Track the pointer over the canvas so Ctrl+V pastes under the cursor.
-  canvas.addEventListener("mousemove",e=>{ wfPointer.x=e.clientX; wfPointer.y=e.clientY; wfPointer.inside=true; });
-  canvas.addEventListener("mouseleave",()=>{ wfPointer.inside=false; });
+  canvas.addEventListener("mousemove",e=>{
+    wfPointer.x=e.clientX; wfPointer.y=e.clientY; wfPointer.inside=true;
+    const blocked=e.target.closest(".wf-node,.wf-group,g.wire-grp") || wfGesture || wfGroupMode || wfSpace;
+    canvas.classList.toggle("wf-over-group", !blocked && !!wfGroupAtClientPoint(e.clientX,e.clientY));
+  });
+  canvas.addEventListener("mouseleave",()=>{ wfPointer.inside=false; canvas.classList.remove("wf-over-group"); });
   canvas.addEventListener("contextmenu",e=>{
     if(wfCancelConnect()){ e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
@@ -1225,8 +1238,12 @@ function wfInitCanvas(){
       // Snap the group frame first, then apply the same snapped delta to members
       // so the whole group moves on-grid when snapping is on.
       const gr=wfGesture.gr;
-      gr.x=wfSnap(wfGesture.gx+(e.clientX-wfGesture.sx)/wfZoom);
-      gr.y=wfSnap(wfGesture.gy+(e.clientY-wfGesture.sy)/wfZoom);
+      const nextX=wfSnap(wfGesture.gx+(e.clientX-wfGesture.sx)/wfZoom);
+      const nextY=wfSnap(wfGesture.gy+(e.clientY-wfGesture.sy)/wfZoom);
+      if((nextX!==wfGesture.gx || nextY!==wfGesture.gy) && !wfGesture.undoPushed){
+        wfPushUndo(); wfGesture.undoPushed=true;
+      }
+      gr.x=nextX; gr.y=nextY;
       const sdx=gr.x-wfGesture.gx, sdy=gr.y-wfGesture.gy;
       const gel=document.querySelector(`.wf-group[data-group="${gr.id}"]`);
       if(gel){ gel.style.left=gr.x+"px"; gel.style.top=gr.y+"px"; }
@@ -1266,14 +1283,20 @@ function wfInitCanvas(){
     if(wfGesture.mode==="connect"){
       if(e.button!==0) return;
       if(wfGesture.graph!==wfGraph()){ wfCancelConnect(); return; }
-      if(wfGesture.latched || (!wfGesture.dragged && Math.hypot(e.clientX-wfGesture.sx,e.clientY-wfGesture.sy)<=4)){
-        wfGesture.latched=true;
-        return;
-      }
+      if(!wfGesture.dragged){ wfCancelConnect(); return; }
       if(wfGesture.direction==="in"){
         const p=document.elementFromPoint(e.clientX,e.clientY)?.closest(".wf-port.out");
-        if(p) wfStartConnect(e,p.closest(".wf-node").dataset.node,p.dataset.port,"out");
-        if(wfGesture) wfCancelConnect();
+        if(p){
+          const g=wfGraph(), from=p.closest(".wf-node").dataset.node, fromPort=p.dataset.port;
+          if(g && from!==wfGesture.from){
+            wfPushUndo();
+            g.edges=g.edges.filter(ed=>!(ed.from===from && ed.fromPort===fromPort));
+            g.edges.push({from,fromPort,to:wfGesture.from,toPort:wfGesture.port});
+            wfCancelConnect(); wfRenderCanvas();
+            return;
+          }
+        }
+        wfCancelConnect();
         return;
       }
       const tid=wfNodeUnderPointer(e.clientX,e.clientY);

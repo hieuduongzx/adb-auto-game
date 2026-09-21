@@ -62,6 +62,20 @@ test('every canvas node silhouette has square corners', () => {
   }
 });
 
+test('canvas group frames use the same square geometry as nodes', () => {
+  const cssWithoutComments = wfCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...cssWithoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, prelude, body]) => ({
+    selectors: prelude.split(',').map(selector => selector.trim()),
+    body,
+  }));
+  for (const selector of ['.wf-group', '.wf-group-hd', '.wf-group-resize']) {
+    const rule = rules.find(candidate => candidate.selectors.includes(selector));
+    assert.ok(rule, `${selector} rule must exist`);
+    assert.match(rule.body, /border-radius:\s*(?:0|var\(--node-r\))\s*;/,
+      `${selector} must use square node geometry`);
+  }
+});
+
 test('the primary port row centres on a grid dot', () => {
   const h = tok(baseCss, '--node-h'), sz = tok(baseCss, '--port-sz');
   const rowTop = Math.round((h - sz) / 2);          // WF_ROW_TOP in render.js

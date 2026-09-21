@@ -4,51 +4,75 @@ const vm=require('node:vm');
 const test=require('node:test');
 const path=require('node:path');
 function setup(){
-  const handlers={}, canvasHandlers={}, classes=new Set(), graph={nodes:[],edges:[]}, undo=[];
-  const canvas={classList:{add:x=>classes.add(x),remove:(...xs)=>xs.forEach(x=>classes.delete(x))},addEventListener:(n,f,capture)=>{ if(!canvasHandlers[n] || capture) canvasHandlers[n]=f; },getBoundingClientRect:()=>({left:0,top:0})};
-  const ctx=vm.createContext({getComputedStyle:()=>({getPropertyValue:()=>''}),document:{addEventListener:(n,f)=>handlers[n]=f,querySelectorAll:()=>[],querySelector:()=>null},window:{addEventListener:(n,f)=>handlers['window:'+n]=f},
-    $:id=>id==='wf-canvas'?canvas:null,wfGesture:null,wfCanvasReady:false,wfPointer:{},wfPvActive:false,wfSpace:false,wfPan:{x:0,y:0},wfZoom:1,WF:{sel:[]},
-    wfGraph:()=>graph,wfPushUndo:()=>undo.push(JSON.parse(JSON.stringify(graph))),wfClearTemp(){},wfDrawTempWire(){},wfDrawWires(){},wfRenderCanvas(){},wfCancelCamAnim(){},wfWorldMotionHint(){},wfApplyTransform(){},wfSetZoom(){},
+  const handlers={}, canvasHandlers={}, classes=new Set(), graph={nodes:[],edges:[]}, groups=[], undo=[];
+  const canvas={classList:{add:x=>classes.add(x),remove:(...xs)=>xs.forEach(x=>classes.delete(x)),toggle(x,on){on?classes.add(x):classes.delete(x);}},addEventListener:(n,f,capture)=>{ if(!canvasHandlers[n] || capture) canvasHandlers[n]=f; },getBoundingClientRect:()=>({left:0,top:0})};
+  const world={getBoundingClientRect:()=>({left:0,top:0})};
+  let pointElement=null;
+  const ctx=vm.createContext({getComputedStyle:()=>({getPropertyValue:()=>''}),document:{addEventListener:(n,f)=>handlers[n]=f,querySelectorAll:()=>[],querySelector:()=>null,elementFromPoint:()=>pointElement},window:{addEventListener:(n,f)=>handlers['window:'+n]=f},
+    $:id=>id==='wf-canvas'?canvas:id==='wf-world'?world:null,wfGesture:null,wfCanvasReady:false,wfPointer:{},wfPvActive:false,wfSpace:false,wfGroupMode:false,wfPan:{x:0,y:0},wfZoom:1,WF:{sel:[]},
+    wfGraph:()=>graph,wfNode:id=>graph.nodes.find(node=>node.id===id),wfSnap:x=>x,
+    wfPushUndo:()=>{const snap=JSON.parse(JSON.stringify(graph));snap.groups=JSON.parse(JSON.stringify(groups));undo.push(snap);},wfClearTemp(){},wfDrawTempWire(){},wfDrawWires(){},wfRenderCanvas(){},wfCancelCamAnim(){},wfWorldMotionHint(){},wfApplyTransform(){},wfSetZoom(){},
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../apps/web/wf/js/groups.js'),'utf8'),ctx);
+  ctx.wfGroups=()=>groups;
   ctx.wfInitCanvas();
   ctx.wfNodeUnderPointer=()=> 'b'; ctx.wfNearestInPort=()=> 'in';
   const event=(x=10,y=20,button=0)=>({clientX:x,clientY:y,button,target:{closest:()=>null},preventDefault(){},stopPropagation(){},stopImmediatePropagation(){}});
-  return {ctx,handlers,canvasHandlers,graph,undo,classes,event};
+  return {ctx,handlers,canvasHandlers,graph,groups,undo,classes,event,setPointElement:el=>{pointElement=el;}};
 }
-test('click release keeps wire armed, second port click connects with undo',()=>{
- const {ctx,handlers,event,graph,undo}=setup();
+test('clicking a port without dragging cancels instead of arming click-connect',()=>{
+ const {ctx,handlers,event,graph,undo,classes}=setup();
  ctx.wfStartConnect(event(),'a','out','out'); handlers.mouseup(event());
- assert.equal(ctx.wfGesture?.mode,'connect'); assert.equal(graph.edges.length,0);
- ctx.wfStartConnect(event(300,200),'b','in','in');
- assert.deepEqual(JSON.parse(JSON.stringify(graph.edges)),[{from:'a',fromPort:'out',to:'b',toPort:'in'}]);
- assert.equal(undo.length,1); assert.equal(undo[0].edges.length,0); assert.equal(ctx.wfGesture,null);
+ assert.equal(ctx.wfGesture,null); assert.equal(graph.edges.length,0); assert.equal(undo.length,0);
+ assert.ok(!classes.has('wf-connecting'));
+ ctx.wfStartConnect(event(300,200),'b','in','in'); handlers.mouseup(event(300,200));
+ assert.equal(ctx.wfGesture,null); assert.equal(graph.edges.length,0);
 });
-test('input-first click connects exact loop input and replaces only chosen output',()=>{
- const {ctx,handlers,event,graph}=setup();
+test('input-first drag connects exact input and replaces only chosen output',()=>{
+ const {ctx,handlers,event,graph,undo,setPointElement}=setup();
  graph.edges=[{from:'a',fromPort:'true',to:'old',toPort:'in'},{from:'a',fromPort:'false',to:'other',toPort:'in'}];
- ctx.wfStartConnect(event(),'b','loop','in'); handlers.mouseup(event());
- ctx.wfStartConnect(event(300,200),'a','true','out');
+ const node={dataset:{node:'a'}}, port={dataset:{port:'true'},closest:sel=>sel==='.wf-port.out'?port:sel==='.wf-node'?node:null};
+ setPointElement(port);
+ ctx.wfStartConnect(event(),'b','loop','in'); handlers.mousemove(event(300,200)); handlers.mouseup(event(300,200));
  assert.deepEqual(JSON.parse(JSON.stringify(graph.edges)),[{from:'a',fromPort:'false',to:'other',toPort:'in'},{from:'a',fromPort:'true',to:'b',toPort:'loop'}]);
+ assert.equal(undo.length,1); assert.equal(ctx.wfGesture,null);
 });
-test('same direction and self connections are ignored without undo',()=>{
- const {ctx,handlers,event,graph,undo}=setup();
- ctx.wfStartConnect(event(),'a','out','out'); handlers.mouseup(event());
- ctx.wfStartConnect(event(),'b','out','out'); ctx.wfStartConnect(event(),'a','in','in');
- assert.equal(graph.edges.length,0); assert.equal(undo.length,0); assert.equal(ctx.wfGesture.from,'a');
-});
-test('pending wire survives pan and empty canvas clicks; right click cancels',()=>{
- const {ctx,handlers,canvasHandlers,event,graph,classes}=setup();
- ctx.wfStartConnect(event(),'a','out','out'); handlers.mouseup(event());
- ctx.wfCanvasMouseDown(event()); handlers.mouseup(event());
- ctx.wfCanvasMouseDown(event(10,20,1)); handlers.mousemove(event(110,120,1)); handlers.mouseup(event(110,120,1));
- assert.equal(ctx.wfPan.x,100); assert.equal(ctx.wfGesture?.mode,'connect'); assert.ok(classes.has('wf-connecting'));
+test('right click cancels an active drag connection',()=>{
+ const {ctx,canvasHandlers,event,graph,classes}=setup();
+ ctx.wfStartConnect(event(),'a','out','out');
+ assert.equal(ctx.wfGesture?.mode,'connect'); assert.ok(classes.has('wf-connecting'));
  canvasHandlers.contextmenu(event(110,120,2));
  assert.equal(ctx.wfGesture,null); assert.equal(graph.edges.length,0); assert.ok(!classes.has('wf-connecting'));
 });
+test('dragging empty space inside the smallest group moves its frame and members',()=>{
+ const {ctx,handlers,event,graph,groups,undo}=setup();
+ graph.nodes.push({id:'inside',x:130,y:130},{id:'outside',x:500,y:500});
+ groups.push(
+   {id:'large',x:0,y:0,w:400,h:400},
+   {id:'small',x:100,y:100,w:200,h:200},
+ );
+ ctx.wfCanvasMouseDown(event(150,150));
+ assert.equal(ctx.wfGesture?.mode,'groupmove');
+ assert.equal(ctx.wfGesture.gr.id,'small');
+ handlers.mousemove(event(190,210));
+ assert.deepEqual([groups[1].x,groups[1].y],[140,160]);
+ assert.deepEqual([graph.nodes[0].x,graph.nodes[0].y],[170,190]);
+ assert.deepEqual([graph.nodes[1].x,graph.nodes[1].y],[500,500]);
+ assert.equal(undo.length,1,'the original position is snapshotted once');
+ handlers.mousemove(event(210,230));
+ handlers.mouseup(event(210,230));
+ assert.equal(undo.length,1);
+});
+test('clicking group interior without moving does not create undo history',()=>{
+ const {ctx,handlers,event,groups,undo}=setup();
+ groups.push({id:'group',x:0,y:0,w:200,h:200});
+ ctx.wfCanvasMouseDown(event(50,50));
+ handlers.mouseup(event(50,50));
+ assert.equal(undo.length,0);
+});
 test('group drag cannot replace a pending connection',()=>{
  const {ctx,handlers,event}=setup();
- ctx.wfStartConnect(event(),'a','out','out'); handlers.mouseup(event());
+ ctx.wfStartConnect(event(),'a','out','out');
  ctx.wfNodesInGroup=()=>[];
  ctx.wfStartGroupMove(event(),{x:0,y:0});
  assert.equal(ctx.wfGesture.mode,'connect');
@@ -58,13 +82,13 @@ test('group drag cannot replace a pending connection',()=>{
 test('Escape cancels pending wire before run/selection shortcuts',()=>{
  const {ctx,handlers,event,graph}=setup();
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../apps/web/wf/js/keyboard.js'),'utf8'),ctx);
- ctx.wfStartConnect(event(),'a','out','out'); handlers.mouseup(event());
+ ctx.wfStartConnect(event(),'a','out','out');
  handlers['window:keydown']({...event(),key:'Escape'});
  assert.equal(ctx.wfGesture,null); assert.equal(graph.edges.length,0);
 });
 test('zoom redraws pending wire at last pointer position',()=>{
  const {ctx,handlers,event}=setup();
- ctx.wfStartConnect(event(),'a','out','out'); handlers.mouseup(event());
+ ctx.wfStartConnect(event(),'a','out','out');
  ctx.wfGesture.mx=120; ctx.wfGesture.my=80;
  const source=fs.readFileSync(path.join(__dirname,'../apps/web/wf/js/workflow.js'),'utf8');
  vm.runInContext(source.slice(source.indexOf('function wfApplyTransform(){'),source.indexOf('// Corner readout')),ctx);

@@ -1052,7 +1052,6 @@ class WorkflowRunnerAPI:
         # engine.load applies flow["capture"] process-wide — sync the Source dropdown.
         backend = get_capture_backend()
         self._push("capture_backend", {"backend": backend})
-        log_success(f"Loaded workflow: {flow.get('name', os.path.basename(path))}")
         req = self._requirements_payload()
         if req and not req.get("installed"):
             log_warning(f"This game needs extra files: copy everything in {req['folder']} "
@@ -1073,6 +1072,8 @@ class WorkflowRunnerAPI:
                  "icon": self._icon_url(),
                  "iconKey": self._icon_key()}
         self._push("flow_loaded", state)
+        workflow_name = str(flow.get("name") or os.path.basename(path))
+        log_success(f"Automation initialized successfully — {workflow_name}")
         # unity_bridge: show from the start whether the in-game plugin answers.
         self._push_bridge_status(force=True)
         # The controller just changed: start (or park) ADB device watching.
@@ -1162,6 +1163,9 @@ class WorkflowRunnerAPI:
                         self.engine.start_background(a)
                     else:
                         self.engine.stop_background(activity_id)
+                state = "enabled" if enabled else "disabled"
+                activity_name = str(a.get("name") or activity_id)
+                log_info(f"Activity {state} — {activity_name}")
                 return True
         return False
 

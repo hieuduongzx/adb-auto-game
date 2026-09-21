@@ -18,7 +18,7 @@ from typing import Dict, Optional, Tuple, Type
 import numpy as np
 
 from src.core.adb.auto.ppocr_onnx import PPOCRv5Recognizer
-from src.utils import log_error, log_info, log_warning
+from src.utils import log_error, log_warning
 
 
 Region = Tuple[int, int, int, int]
@@ -126,9 +126,7 @@ class OCRReader:
         self._available = False
         self._backend: Optional[OCRBackend] = None
         self._init_backend()
-        if self._available:
-            log_info(f"OCR model ready ({OCR_MODEL_LABELS[self._backend_name]})")
-        else:
+        if not self._available:
             log_warning(
                 "PP-OCRv5 Mobile is unavailable. Check ONNX Runtime and the "
                 "bundled assets under assets/ocr/ppocr_v5_mobile."

@@ -51,6 +51,17 @@ def test_variables_panel_is_a_collapsed_canvas_overlay():
     assert panel in body["parents"]
 
 
+def test_child_variable_titles_refresh_the_corner_panel_while_typing():
+    render_source = DESIGNER_JS.read_text(encoding="utf-8")
+    inspector_source = (DESIGNER_JS.parent / "inspector.js").read_text(encoding="utf-8")
+
+    # Global/local editor rows and the Properties activity-variable editor must
+    # all repaint the compact corner summary after changing a Title.
+    assert "function wfRefreshVarTitle" in render_source
+    assert render_source.count("v.label=lbl.value; wfRefreshVarTitle(lbl,v);") >= 2
+    assert "v.label=lbl.value; wfRenderVarsPanel();" in inspector_source
+
+
 def test_variables_panel_has_persisted_toggle_and_escape_behavior():
     source = DESIGNER_JS.read_text(encoding="utf-8")
     events_source = DESIGNER_EVENTS_JS.read_text(encoding="utf-8")

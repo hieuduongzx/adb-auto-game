@@ -1037,7 +1037,7 @@ function wfVarRow(act,v,idx,depth){
   // Title the user types ("Đọc email" → "doc_email").
   let autoName = !v.name || v.name===v.label || v.name===wfVarSlug(v.label||"");
   lbl.oninput=()=>{
-    wfPushUndoDebounced(); v.label=lbl.value;
+    wfPushUndoDebounced(); v.label=lbl.value; wfRenderVarsPanel();
     if(autoName){ const s=wfVarSlug(lbl.value); if(s){ v.name=s; nm.value=s; } }
   };
   r1.appendChild(lbl);

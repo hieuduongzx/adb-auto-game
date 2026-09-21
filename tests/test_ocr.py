@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 
 from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
+from src.utils import add_log_subscriber, remove_log_subscriber
 from src.core.adb.auto.ppocr_onnx import (
     PPOCRv5Recognizer,
     decode_ctc,
@@ -86,6 +87,18 @@ class OCRONNXIntegrationTests(unittest.TestCase):
 
 
 class OCRModelTests(unittest.TestCase):
+    def test_ready_model_does_not_emit_a_routine_success_log(self):
+        messages = []
+        subscriber = lambda level, message: messages.append((level, message))
+        add_log_subscriber(subscriber)
+        try:
+            reader = OCRReader()
+        finally:
+            remove_log_subscriber(subscriber)
+
+        self.assertTrue(reader.available)
+        self.assertFalse(any("OCR model ready" in message for _, message in messages))
+
     def test_default_reader_recognizes_without_paddleocr_installed(self):
         crop = cv2.imread(str(ROOT / "tests" / "fixtures" / "ocr" / "score_42.png"))
         with patch.dict(sys.modules, {"paddleocr": None}):
