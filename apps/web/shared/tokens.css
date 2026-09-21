@@ -1,5 +1,7 @@
 /* Macro2k shared product tokens.
    Every WebView surface loads this file before its app-specific stylesheet. */
+@import url("fonts/fonts.css");
+
 :root {
   --bg:        #eef1f5;
   --panel:     #ffffff;
@@ -90,6 +92,7 @@
   --z-dropdown: 55;
   --z-modal: 70;
   --z-toast: 80;
+  --z-overlay: 90;   /* blocking full-window overlay (update progress); above toasts */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out: var(--ease);
   color-scheme: light;

@@ -292,7 +292,7 @@
               "center": true
             },
             "note": "Resize window game về 1920×1080 — khớp template & tọa độ đã ghi",
-            "log": "Đặt kích thước cửa sổ về 1920x1080",
+            "log": "Resizing the game window to 1920x1080",
             "delayBefore": 15
           },
           {
@@ -307,7 +307,7 @@
               "wait": 30,
               "pathSrc": "project"
             },
-            "log": "Đang khởi động game"
+            "log": "Starting game"
           },
           {
             "id": "nan17tve",
