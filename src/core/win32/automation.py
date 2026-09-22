@@ -211,15 +211,29 @@ class Win32Controller:
 
     # ── config ────────────────────────────────────────────────────────────────
     def configure(self, cfg: dict) -> None:
-        self.cfg = dict(cfg or {})
-        # A config change may point at a different window — force a re-attach
-        # and re-probe of the capture method.
+        cfg = dict(cfg or {})
+        # Preview retries this every couple of seconds. Dropping the window on
+        # an unchanged config makes attach() (and its log) fire on every retry.
+        same = cfg == self.cfg and self.hwnd and self._window_alive()
+        self.cfg = cfg
+        if same:
+            return
+        # A real config change may point at a different window — re-attach and
+        # re-probe the capture method.
         self.hwnd = None
         self._cap_method = None
         self._wgc_stop()
         self._touch_stop()
         self._bridge_warned = False
         self._bridge_miss_warned = False
+
+    def _window_alive(self) -> bool:
+        if not self.hwnd:
+            return False
+        try:
+            return bool(self._w[1].IsWindow(self.hwnd))
+        except Exception:
+            return False
 
     def _touch_stop(self) -> None:
         """Release the synthetic touch device + anchor window (if any)."""
@@ -283,13 +297,15 @@ class Win32Controller:
             log_warning(f"[win32] No window matches '{pattern}' ({by})")
             self.hwnd = None
             return False
+        changed = self.hwnd != hwnd
         self.hwnd = hwnd
-        _, win32gui = self._w[0], self._w[1]
-        title = win32gui.GetWindowText(hwnd) or "(unreadable title)"
-        log_info(f"[win32] Attached window 0x{hwnd:X} — '{title}'")
-        self._warn_if_uipi_blocked()
-        if self._bridge_mode():
-            self._check_bridge()
+        if changed:
+            _, win32gui = self._w[0], self._w[1]
+            title = win32gui.GetWindowText(hwnd) or "(unreadable title)"
+            log_info(f"[win32] Attached window 0x{hwnd:X} — '{title}'")
+            self._warn_if_uipi_blocked()
+            if self._bridge_mode():
+                self._check_bridge()
         return True
 
     def _bridge_port(self) -> int:
@@ -314,9 +330,7 @@ class Win32Controller:
         reply = unity_bridge.ping(port)
         if not (reply and reply.startswith("ok")):
             reply = self._inject_bridge(unity_bridge, port) or reply
-        if reply and reply.startswith("ok"):
-            log_info(f"[win32] unity_bridge connected to plugin at 127.0.0.1:{port} — {reply}")
-        else:
+        if not (reply and reply.startswith("ok")):
             log_error(
                 f"[win32] unity_bridge COULD NOT connect to the plugin at 127.0.0.1:{port} "
                 "(injection failed or the game hasn't loaded the DLL yet — see %TEMP%\\Macro2kBridge.log; "

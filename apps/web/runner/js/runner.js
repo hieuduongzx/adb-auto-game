@@ -76,8 +76,12 @@ function uiDialog(spec){
       box.appendChild(hd); box.setAttribute("aria-labelledby", titleId);
     }
     const bd = document.createElement("div"); bd.className = "ui-modal-bd";
-    const msg = document.createElement("p"); msg.className = "ui-modal-msg"; msg.textContent = spec.message || "";
-    bd.appendChild(msg); box.appendChild(bd);
+    if(spec.message){
+      const msg = document.createElement("p"); msg.className = "ui-modal-msg"; msg.textContent = spec.message;
+      bd.appendChild(msg);
+    }
+    if(typeof spec.body === "function") spec.body(bd);
+    box.appendChild(bd);
     const ft = document.createElement("div"); ft.className = "ui-modal-ft";
     let primary = null;
     const onKey = e=>{
@@ -270,21 +274,18 @@ function switchTab(tab){
   document.querySelectorAll(".tab-pane").forEach(p=>p.classList.toggle("active", p.id==="tab-"+tab));
   syncTabIndex($("tabs-bar"));
 }
-// Right column: Activity settings | Log | Settings.
+// Right column: Activity settings | Log. Changelog and runner settings are header popovers.
 function switchRTab(tab){
+  if(tab!=="act" && tab!=="log") tab="log";
   document.querySelectorAll("#r-tabs .rtab").forEach(b=>{ const on=b.dataset.rtab===tab; b.classList.toggle("active",on); b.setAttribute("aria-selected",String(on)); });
   document.querySelectorAll("#r-content .rpane").forEach(p=>p.classList.toggle("active", p.id==="r-"+tab));
   syncTabIndex($("r-tabs"));
-  // Diagnostics read the disk and the running build — fetch them the first time
-  // the pane that shows them is opened, not on every launch.
-  if(tab==="settings") ensureDiagnostics();
-  // Lines that arrived while the pane was hidden couldn't scroll it — jump to the newest.
   if(tab==="log"){
-    const body = $("log-body"); body.scrollTop = body.scrollHeight;
+    const body = $("log-body"); if(body){ body.scrollTop = body.scrollHeight; }
     renderLogCount();
   }
   if(window.matchMedia && window.matchMedia("(max-width: 640px)").matches){
-    switchMobileView(tab === "settings" ? "settings" : (tab === "log" ? "log" : "activity"), false);
+    switchMobileView(tab==="log" ? "log" : "activity", false);
   }
 }
 
@@ -292,7 +293,7 @@ function switchRTab(tab){
 // both stay useful. This navigation makes them three predictable views while
 // preserving the desktop split above the breakpoint.
 function switchMobileView(view, syncPanel=true){
-  const allowed = ["activities", "activity", "log", "settings"];
+  const allowed = ["activities", "activity", "log"];
   if(!allowed.includes(view)) view = "activities";
   S.mobileView = view;
   const shell = $("main-split");
@@ -304,7 +305,7 @@ function switchMobileView(view, syncPanel=true){
     btn.setAttribute("aria-selected", String(on));
     btn.tabIndex = on ? 0 : -1;
   });
-  if(syncPanel && (view === "log" || view === "settings")) switchRTab(view);
+  if(syncPanel && view === "log") switchRTab(view);
 }
 
 // Roving tabindex: the selected tab is the one Tab reaches; the arrows move
@@ -599,12 +600,36 @@ function buildSettingsPanel(a){
   // only; the variable's code name is noise for the player.
   const vars = a.vars || [];
   if(vars.length){
-    const g = group("Options");
-    vars.forEach(v=>{
+    const g = group("");
+    const activeOptions=v=>{
+      if(v.display==="toggle-group"&&v.multiple) return Array.isArray(v.value)?v.value.slice():[];
+      return v.value!=null&&v.value!==""?[String(v.value)]:[];
+    };
+    function appendSettingVar(container, v, path){
+      const block=document.createElement("div"); block.className="setting-var-block";
       const row = document.createElement("div"); row.className = "setting-row";
       const lbl = document.createElement("span"); lbl.className = "setting-label";
       lbl.textContent = v.label || v.name;
       row.appendChild(lbl);
+      const sub=document.createElement("div"); sub.className="setting-var-nested";
+      function fillSub(){
+        sub.replaceChildren();
+        (v.children||[]).forEach(child=>{
+          if(child&&child.name) appendSettingVar(sub, child, path+"."+child.name);
+        });
+        if((v.type||"bool")!=="select") return;
+        const owner=v.label||v.name||"this setting";
+        activeOptions(v).forEach(opt=>{
+          const kids=((v.optionChildren||{})[opt])||[];
+          if(!kids.length) return;
+          const nest=document.createElement("div"); nest.className="setting-option-nest";
+          nest.setAttribute("aria-label", owner);
+          kids.forEach(child=>{
+            if(child&&child.name) appendSettingVar(nest, child, path+"."+opt+"."+child.name);
+          });
+          sub.appendChild(nest);
+        });
+      }
 
       const type = v.type || "bool";
       if(type==="bool"){
@@ -614,7 +639,7 @@ function buildSettingsPanel(a){
           const old = v.value, next = !old;
           cb.disabled = true; setActivitySaveState("Saving…");
           try{
-            const ok = await api().set_activity_var(a.id,v.name,next);
+            const ok = await api().set_activity_var(a.id,path,next);
             if(!ok) throw new Error();
             v.value=next; cb.classList.toggle("checked",next); cb.setAttribute("aria-pressed",String(next));
             setActivitySaveState("Saved", "ok");
@@ -633,7 +658,7 @@ function buildSettingsPanel(a){
         const error=document.createElement("span"); error.className="setting-choice-error";
         error.setAttribute("role","alert"); error.hidden=true;
         // Native radios provide exclusive selection and arrow-key navigation.
-        const name="var-choice-"+a.id+"-"+v.name;
+        const name="var-choice-"+a.id+"-"+path;
         options.forEach(option=>{
           const label=document.createElement("label"); label.className="setting-choice";
           const input=document.createElement("input"); input.type=multi?"checkbox":"radio"; input.name=name;
@@ -646,9 +671,10 @@ function buildSettingsPanel(a){
             const hadFocus=document.activeElement===input;
             inputs.forEach(el=>{ el.disabled=true; });
             try{
-              const ok=await api().set_activity_var(a.id,v.name,value);
+              const ok=await api().set_activity_var(a.id,path,value);
               if(!ok) throw new Error("Setting was not saved");
               v.value=value;
+              fillSub();
               setActivitySaveState("Saved", "ok");
             }catch(_){
               error.textContent="Couldn't save this choice. Please try again."; error.hidden=false;
@@ -671,7 +697,10 @@ function buildSettingsPanel(a){
         (v.options||[]).forEach(o=>{ const op=document.createElement("option"); op.value=op.textContent=o; if(String(v.value)===String(o))op.selected=true; sel.appendChild(op); });
         sel.onchange = async()=>{
           const old=v.value, value=sel.value; sel.disabled=true; setActivitySaveState("Saving…");
-          try{ if(!await api().set_activity_var(a.id,v.name,value)) throw new Error(); v.value=value; setActivitySaveState("Saved", "ok"); }
+          try{
+            if(!await api().set_activity_var(a.id,path,value)) throw new Error();
+            v.value=value; fillSub(); setActivitySaveState("Saved", "ok");
+          }
           catch(_){ sel.value=old; setActivitySaveState("Couldn't save", "error"); }
           finally{ sel.disabled=false; }
         };
@@ -683,14 +712,18 @@ function buildSettingsPanel(a){
         inp.onchange = async()=>{
           const old=v.value, val=type==="number" ? (parseFloat(inp.value)||0) : inp.value;
           inp.disabled=true; setActivitySaveState("Saving…");
-          try{ if(!await api().set_activity_var(a.id,v.name,val)) throw new Error(); v.value=val; setActivitySaveState("Saved", "ok"); }
+          try{ if(!await api().set_activity_var(a.id,path,val)) throw new Error(); v.value=val; setActivitySaveState("Saved", "ok"); }
           catch(_){ inp.value=old ?? ""; setActivitySaveState("Couldn't save", "error"); }
           finally{ inp.disabled=false; }
         };
         row.appendChild(inp);
       }
-      g.appendChild(row);
-    });
+      block.appendChild(row);
+      block.appendChild(sub);
+      fillSub();
+      container.appendChild(block);
+    }
+    vars.forEach(v=>{ if(v&&v.name) appendSettingVar(g, v, v.name); });
     panel.appendChild(g);
   }
 
@@ -698,7 +731,7 @@ function buildSettingsPanel(a){
   // workflow). Default 1; an activity is tried this many times before failing.
   // Always last, after the activity's own config.
   {
-    const g = group("Execution");
+    const g = group("");
     const row = document.createElement("div"); row.className = "setting-row";
     const lbl = document.createElement("span"); lbl.className = "setting-label"; lbl.textContent = "Attempts";
     const inp = document.createElement("input");
@@ -1422,6 +1455,145 @@ window.__recv = function(raw){
   if(type==="update_progress"){ showUpdateProgress(data.pct, data.stage); return; }
 };
 
+// ── Changelog ────────────────────────────────────────────────────────────────
+// Release notes are untrusted Markdown. Build DOM nodes only — never innerHTML.
+const UCL = { history: [], pending: null, autoShowEnabled: true, shownVersion: "", shouldAutoShow: false, selected: "" };
+let _autoChangelogFor = null;
+
+function applyChangelog(data){
+  data = data || {};
+  UCL.history = (data.history || []).map(row => Object.assign({}, row));
+  UCL.pending = data.pending ? Object.assign({}, data.pending) : null;
+  UCL.autoShowEnabled = data.autoShowEnabled !== false;
+  UCL.shownVersion = data.shownVersion || "";
+  UCL.shouldAutoShow = !!data.shouldAutoShow;
+  if(!UCL.history.some(row => row.version === UCL.selected)) UCL.selected = UCL.history.length ? UCL.history[0].version : "";
+  const box = $("changelog-auto-show");
+  if(box) box.checked = UCL.autoShowEnabled;
+  const dot = $("notes-dot");
+  if(dot) dot.hidden = !(UCL.pending && UCL.shouldAutoShow);
+  renderChangelog();
+}
+
+function renderMarkdown(host, markdown){
+  host.textContent = "";
+  const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
+  let list = null, listKind = "", quote = null, code = null, para = [];
+  const flushPara = () => {
+    if(!para.length) return;
+    const p = document.createElement("p");
+    appendInline(p, para.join(" "));
+    host.appendChild(p);
+    para = [];
+  };
+  const closeBlocks = () => { flushPara(); list = null; quote = null; };
+  lines.forEach(line => {
+    if(code){
+      if(line.trim().startsWith("```")){ host.appendChild(code); code = null; }
+      else code.appendChild(document.createTextNode(line + "\n"));
+      return;
+    }
+    if(line.trim().startsWith("```")){ closeBlocks(); code = document.createElement("pre"); const c = document.createElement("code"); code.appendChild(c); return; }
+    const heading = /^(#{1,3})\s+(.*)$/.exec(line);
+    if(heading){ closeBlocks(); const h = document.createElement("h" + (heading[1].length + 2)); appendInline(h, heading[2]); host.appendChild(h); return; }
+    const item = /^(\s*)([-*]|\d+\.)\s+(.*)$/.exec(line);
+    if(item){
+      flushPara(); quote = null;
+      const kind = item[2] === "-" || item[2] === "*" ? "ul" : "ol";
+      if(!list || listKind !== kind){ list = document.createElement(kind); listKind = kind; host.appendChild(list); }
+      const li = document.createElement("li"); appendInline(li, item[3]); list.appendChild(li); return;
+    }
+    if(line.startsWith(">")){ flushPara(); list = null; if(!quote){ quote = document.createElement("blockquote"); host.appendChild(quote); } appendInline(quote, line.replace(/^>\s?/, "")); quote.appendChild(document.createElement("br")); return; }
+    if(!line.trim()){ closeBlocks(); return; }
+    list = null; quote = null; para.push(line.trim());
+  });
+  closeBlocks();
+  if(code) host.appendChild(code);
+}
+
+function appendInline(parent, text){
+  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\[[^\]]+\]\(https:\/\/[^)\s]+\))/g;
+  let last = 0, match;
+  const src = String(text || "");
+  while((match = re.exec(src))){
+    if(match.index > last) parent.appendChild(document.createTextNode(src.slice(last, match.index)));
+    if(match[1]){ const code = document.createElement("code"); code.textContent = match[1].slice(1, -1); parent.appendChild(code); }
+    else if(match[2]){ const strong = document.createElement("strong"); strong.textContent = match[2].slice(2, -2); parent.appendChild(strong); }
+    else if(match[3]){
+      const labeled = /^\[([^\]]+)\]\((https:\/\/[^)\s]+)\)$/.exec(match[3]);
+      const a = document.createElement("a");
+      a.href = labeled[2]; a.textContent = labeled[1]; a.rel = "noopener noreferrer";
+      a.addEventListener("click", (e) => { e.preventDefault(); api().open_external_url(labeled[2]); });
+      parent.appendChild(a);
+    }
+    last = match.index + match[0].length;
+  }
+  if(last < src.length) parent.appendChild(document.createTextNode(src.slice(last)));
+}
+
+function appendChangelog(parent, markdown, title){
+  if(!String(markdown || "").trim()) return;
+  const wrap = document.createElement("div"); wrap.className = "changelog-md";
+  if(title){ const h = document.createElement("h3"); h.textContent = title; wrap.appendChild(h); }
+  renderMarkdown(wrap, markdown);
+  parent.appendChild(wrap);
+}
+
+function renderChangelog(){
+  const list = $("changelog-list"), body = $("changelog-body"), empty = $("changelog-empty");
+  const title = $("changelog-title"), date = $("changelog-date"), link = $("btn-changelog-release");
+  if(!list || !body) return;
+  list.textContent = "";
+  const head = $("changelog-body-hd");
+  if(!UCL.history.length){
+    if(empty) empty.hidden = false;
+    body.hidden = true;
+    if(head) head.hidden = true;
+    if(title) title.textContent = "";
+    if(date) date.textContent = "";
+    if(link) link.hidden = true;
+    return;
+  }
+  if(empty) empty.hidden = true;
+  body.hidden = false;
+  if(head) head.hidden = false;
+  UCL.history.forEach(row => {
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "changelog-ver"; btn.textContent = "v" + row.version;
+    btn.setAttribute("aria-current", row.version === UCL.selected ? "true" : "false");
+    btn.onclick = () => { UCL.selected = row.version; renderChangelog(); };
+    list.appendChild(btn);
+  });
+  const row = UCL.history.find(item => item.version === UCL.selected) || UCL.history[0];
+  if(title) title.textContent = "v" + row.version;
+  if(date) date.textContent = row.publishedAt ? String(row.publishedAt).slice(0, 10) : "";
+  body.textContent = "";
+  renderMarkdown(body, row.markdown || "No notes for this version.");
+  if(link){
+    link.hidden = !row.page;
+    link.onclick = () => { if(row.page) api().open_external_url(row.page); };
+  }
+}
+
+async function onChangelogRefresh(){
+  try{ applyChangelog(await api().changelog_refresh()); }catch(e){}
+}
+async function onChangelogAutoShow(checked){
+  try{ applyChangelog(await api().set_changelog_auto_show(!!checked)); }catch(e){}
+}
+async function maybeShowPendingChangelog(){
+  if(!UCL.shouldAutoShow || !UCL.pending) return;
+  const version = String(UCL.pending.version || "");
+  if(!version || _autoChangelogFor === version) return;
+  _autoChangelogFor = version;
+  await uiDialog({
+    title: "What's new in v" + version,
+    body(bd){ appendChangelog(bd, UCL.pending.markdown, ""); },
+    buttons: [{ label:"Close", value:true, kind:"ok" }],
+  });
+  try{ applyChangelog(await api().acknowledge_changelog(version)); }catch(e){}
+}
+
 // ── Version + self-update ────────────────────────────────────────────────────
 function applyRunnerInfo(r){
   r = r || {};
@@ -1430,6 +1602,7 @@ function applyRunnerInfo(r){
   $("upd-version").textContent = U.version ? `v${U.version}` : "Not a standalone build";
   $("upd-repo").textContent = U.repo || "-";
   $("upd-repo").title = U.repo ? `https://github.com/${U.repo}` : "";
+  applyChangelog(r.changelog || {});
   renderUpdate();
 }
 function renderUpdate(){
@@ -1459,7 +1632,7 @@ function renderUpdate(){
   else status.textContent = "Checks for a newer version when the Runner opens.";
 }
 function showUpdates(){
-  switchRTab("settings");
+  openHeaderPop("settings");
   const section = $("updates-section"); if(section) section.open = true;
   const card = section || $("updates-card");
   if(card) card.scrollIntoView({ block:"nearest", behavior:"smooth" });
@@ -1467,8 +1640,7 @@ function showUpdates(){
   if(apply && !apply.hidden && !apply.disabled) apply.focus();
 }
 function focusUpdateProgress(){
-  // Move the user to the live progress card before the blocking API call starts.
-  switchRTab("settings");
+  openHeaderPop("settings");
   const section = $("updates-section"); if(section) section.open = true;
   const card = section || $("updates-card");
   if(card) card.scrollIntoView({ block:"nearest", behavior:"smooth" });
@@ -1487,6 +1659,7 @@ async function maybePromptUpdate(){
   const install = await uiDialog({
     title: "Runner update available",
     message: `Version v${key} is available. You are using v${U.version || "?"}.\n\nUpdate replaces the files in this Runner folder, keeps your data and settings, then restarts the Runner.`,
+    body(bd){ appendChangelog(bd, up.markdown, "What's new"); },
     buttons: [
       { label:"Later", value:false },
       { label:"Update & restart", value:true, kind:"ok" },
@@ -1498,6 +1671,7 @@ async function onUpdateCheck(){
   if(!U.supported || U.checking) return;
   U.checking = true; renderUpdate();
   try{ U.update = await api().update_check(); }catch(e){ U.update = { error: String(e) }; }
+  if(U.update && U.update.changelog) applyChangelog(U.update.changelog);
   U.checking = false; renderUpdate();
   await maybePromptUpdate();
 }
@@ -1688,10 +1862,62 @@ function syncThemeToggle(){
   button.setAttribute("aria-label", label);
 }
 
+function placeHeaderPop(pop, anchor){
+  const rect = anchor.getBoundingClientRect();
+  const width = Math.min(440, window.innerWidth - 16);
+  pop.style.width = width + "px";
+  let left = rect.right - width;
+  left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+  pop.style.left = left + "px";
+  pop.style.top = (rect.bottom + 6) + "px";
+}
+function closeHeaderPops(except){
+  ["notes", "settings"].forEach(name=>{
+    if(name===except) return;
+    const pop = $(name+"-pop"), btn = $(name+"-toggle");
+    if(pop) pop.hidden = true;
+    if(btn) btn.setAttribute("aria-expanded", "false");
+  });
+}
+function openHeaderPop(name){
+  const pop = $(name+"-pop"), btn = $(name+"-toggle");
+  if(!pop || !btn) return;
+  const open = pop.hidden;
+  closeHeaderPops();
+  if(!open) return;
+  if(name==="settings") ensureDiagnostics();
+  if(name==="notes") renderChangelog();
+  pop.hidden = false;
+  btn.setAttribute("aria-expanded", "true");
+  placeHeaderPop(pop, btn);
+}
+function mountRunnerSettings(){
+  const pop = $("settings-pop"), src = $("runner-settings-src");
+  if(pop && src && !pop.querySelector(".rpane-scroll")) pop.appendChild(src.content.cloneNode(true));
+}
+function wireHeaderPops(){
+  mountRunnerSettings();
+  $("notes-toggle").onclick = ()=>openHeaderPop("notes");
+  $("settings-toggle").onclick = ()=>openHeaderPop("settings");
+  document.addEventListener("mousedown", e=>{
+    if(e.target.closest(".header-pop, .header-tools, #update-pill")) return;
+    closeHeaderPops();
+  });
+  document.addEventListener("keydown", e=>{
+    if(e.key==="Escape") closeHeaderPops();
+  });
+  window.addEventListener("resize", ()=>{
+    ["notes", "settings"].forEach(name=>{
+      const pop = $(name+"-pop"), btn = $(name+"-toggle");
+      if(pop && !pop.hidden && btn) placeHeaderPop(pop, btn);
+    });
+  });
+}
 function wireThemeToggle(){
   $("theme-toggle").onclick = () => window.uiTheme?.toggle();
   window.addEventListener("m2k-theme", syncThemeToggle);
   syncThemeToggle();
+  wireHeaderPops();
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -1707,6 +1933,7 @@ async function init(){
   if(!window.pywebview||!window.pywebview.api){ $("dev-label").textContent="PyWebView unavailable"; return; }
   const st = await api().get_state();
   applyRunnerInfo(st.runner);
+  await maybeShowPendingChangelog();
   await maybePromptUpdate();
   S.connectedSerial = st.connectedSerial||null;
   S.captureBackend = st.captureBackend||"scrcpy";

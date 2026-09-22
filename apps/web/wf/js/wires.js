@@ -215,7 +215,11 @@ function wfDrawWires(){
   const world=$("wf-world");
   if(world && world.offsetParent===null){ wfWiresStale=true; return; }   // canvas hidden — measurements would be 0
   wfWiresStale=false;
-  const temp=svg.querySelector(".temp");
+  // Keep the dashed preview only while a connect drag is still in progress.
+  // A finished drop used to redraw the canvas before clearing the gesture, so
+  // this pass glued the preview back on top of the real wire.
+  const connecting=wfGesture?.mode==="connect" || wfGesture?.connection?.mode==="connect";
+  const temp=connecting ? svg.querySelector(".temp") : null;
   svg.innerHTML=""; if(temp) svg.appendChild(temp);
   if(!g) return;
   wfWireIndexRebuild();

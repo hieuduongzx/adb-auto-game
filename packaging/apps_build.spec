@@ -94,6 +94,28 @@ web_datas = [
      os.path.join("assets", "ocr", "ppocr_v5_mobile")),
 ]
 
+# --- build toolchain, so a frozen Hub can build standalone Runners ----------
+# The Hub's Build dialog runs packaging/build_runner.py with the system Python
+# (the one that has PyInstaller). That script locates the checkout from its own
+# path, so the source files it reads must sit inside the bundle with the same
+# layout: the spec, the entry it analyses, the icon guard, and the two src
+# modules it imports. vendor/ stays external (build.ps1 copies it next to the exe).
+# Destinations are directories, not file paths: PyInstaller treats a destination
+# whose basename equals the source file's name as a directory and nests the file
+# inside it, so "packaging/build_runner.py" would land one level too deep.
+# Do not copy ``src/__init__.py`` as data: a physical ``_macro2k/src`` package
+# would shadow the compiled package in the exe and make ``src.runner_update``
+# impossible to import from the frozen Hub.
+web_datas += [
+    (os.path.join(SPECPATH, "build_runner.py"), "packaging"),
+    (os.path.join(SPECPATH, "runner_build.spec"), "packaging"),
+    (os.path.join(SPECPATH, "entry_runner_single.py"), "packaging"),
+    (os.path.join(SPECPATH, "check_icons.py"), "packaging"),
+    (os.path.join(SPECPATH, "app.ico"), "packaging"),
+    (os.path.join(ROOT, "apps", "web"), os.path.join("apps", "web")),
+]
+
+
 # --- exclude the world we don't ship -----------------------------------------
 excludes = [
     "PySide6", "shiboken6", "PyQt5", "PyQt6", "qtawesome",

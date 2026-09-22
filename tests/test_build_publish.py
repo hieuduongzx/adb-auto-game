@@ -182,5 +182,39 @@ class TestBuildScratch(unittest.TestCase):
                 self.assertEqual(Path(work).parent, Path(scratch))
 
 
+class TestFrozenBuildRoots(unittest.TestCase):
+    """A frozen Hub runs build_runner.py from the copy bundled in its exe.
+
+    That copy sits inside the bundle, which has no vendor/ and no dist/. The
+    checkout being built is the working directory the Hub launches it in, so the
+    script has to split "where my own files are" from "the checkout".
+    """
+
+    def test_checkout_is_the_working_directory_when_the_bundle_has_no_vendor(self):
+        with tempfile.TemporaryDirectory() as bundle, tempfile.TemporaryDirectory() as checkout:
+            os.makedirs(os.path.join(checkout, "vendor"))
+            with mock.patch.object(br, "__file__", os.path.join(bundle, "packaging", "build_runner.py")), \
+                 mock.patch.object(br.os, "getcwd", return_value=checkout):
+                script_root, checkout_root = br._resolve_roots()
+            self.assertEqual(script_root, bundle)
+            self.assertEqual(checkout_root, checkout)
+
+    def test_a_source_checkout_is_its_own_root(self):
+        with tempfile.TemporaryDirectory() as checkout:
+            os.makedirs(os.path.join(checkout, "vendor"))
+            with mock.patch.object(br, "__file__", os.path.join(checkout, "packaging", "build_runner.py")):
+                script_root, checkout_root = br._resolve_roots()
+            self.assertEqual(script_root, checkout)
+            self.assertEqual(checkout_root, checkout)
+
+    def test_output_lands_in_the_checkout_dist_not_the_bundle(self):
+        with tempfile.TemporaryDirectory() as bundle, tempfile.TemporaryDirectory() as checkout:
+            os.makedirs(os.path.join(checkout, "dist"))
+            with mock.patch.object(br, "ROOT", bundle), \
+                 mock.patch.object(br.os, "getcwd", return_value=checkout):
+                self.assertEqual(br._output_root(""), os.path.join(checkout, "dist"))
+            self.assertEqual(br._output_root(os.path.join(checkout, "custom")),
+                             os.path.join(checkout, "custom"))
+
 if __name__ == "__main__":
     unittest.main()

@@ -26,9 +26,18 @@
         <div class="app-subtitle" id="flow-sub">No workflow loaded</div>
       </div>
       <button class="update-pill" id="update-pill" type="button" onclick="showUpdates()" hidden>Update</button>
-      <button class="theme-toggle" id="theme-toggle" type="button" title="Switch to dark theme" aria-label="Switch to dark theme">
-        <i data-ico="moon" data-ico-size="uico-2" aria-hidden="true"></i>
-      </button>
+      <div class="header-tools">
+        <button class="theme-toggle" id="notes-toggle" type="button" title="What's new" aria-label="What's new" aria-expanded="false" aria-controls="notes-pop">
+          <i data-ico="bell" data-ico-size="uico-2" aria-hidden="true"></i>
+          <span class="notes-dot" id="notes-dot" hidden></span>
+        </button>
+        <button class="theme-toggle" id="settings-toggle" type="button" title="Runner settings" aria-label="Runner settings" aria-expanded="false" aria-controls="settings-pop">
+          <i data-ico="settings" data-ico-size="uico-2" aria-hidden="true"></i>
+        </button>
+        <button class="theme-toggle" id="theme-toggle" type="button" title="Switch to dark theme" aria-label="Switch to dark theme">
+          <i data-ico="moon" data-ico-size="uico-2" aria-hidden="true"></i>
+        </button>
+      </div>
       <div id="status-pill" class="status-ready">
         <div id="status-dot"></div>
         <div id="status-text">READY</div>
@@ -70,7 +79,6 @@
   <div id="mobile-tabs" role="tablist" aria-label="Runner views" aria-orientation="horizontal">
     <button class="mobile-tab active" type="button" role="tab" aria-selected="true" aria-controls="pane-left" data-mobile-view="activities" onclick="switchMobileView('activities')">Activities</button>
     <button class="mobile-tab" type="button" role="tab" aria-selected="false" aria-controls="r-log" data-mobile-view="log" onclick="switchMobileView('log')">Log</button>
-    <button class="mobile-tab" type="button" role="tab" aria-selected="false" aria-controls="r-settings" data-mobile-view="settings" onclick="switchMobileView('settings')">Settings</button>
   </div>
   <div id="main-split" tabindex="-1" role="region" aria-label="Activities and runner panels">
 
@@ -115,15 +123,13 @@
       </div>
     </div><!-- /pane-left -->
 
-    <!-- RIGHT: Activity settings | Log | Settings, then Preview -->
+    <!-- RIGHT: Activity settings | Log, then Preview -->
     <div id="pane-right">
       <div id="r-tabs" role="tablist" aria-label="Runner panels" aria-orientation="horizontal">
         <button class="rtab" id="rtab-btn-act" data-rtab="act" onclick="switchRTab('act')"
                 role="tab" aria-selected="false" aria-controls="r-act" tabindex="-1">Activity</button>
         <button class="rtab active" id="rtab-btn-log" data-rtab="log" onclick="switchRTab('log')"
                 role="tab" aria-selected="true" aria-controls="r-log" tabindex="0">Log<span class="tab-count" id="rtab-log-count"></span></button>
-        <button class="rtab"        id="rtab-btn-settings" data-rtab="settings" onclick="switchRTab('settings')"
-                role="tab" aria-selected="false" aria-controls="r-settings" tabindex="-1">Settings</button>
       </div>
 
       <div id="r-content">
@@ -170,8 +176,7 @@
           <div class="log-body" id="log-body" role="log" aria-live="polite" aria-relevant="additions"></div>
         </div>
 
-        <!-- Settings (project-wide) -->
-        <div class="rpane" id="r-settings" role="tabpanel" aria-labelledby="rtab-btn-settings" tabindex="0">
+        <template id="runner-settings-src">
           <div class="rpane-scroll">
             <section class="settings-section" id="game-card" style="display:none">
               <h2 class="settings-section-title">Game</h2>
@@ -259,6 +264,10 @@
                 </dl>
                 <p class="upd-status" id="upd-status" role="status" aria-live="polite">Updates are available in a Runner built from the Macro2k Hub.</p>
                 <div class="upd-bar" id="upd-bar" hidden><div class="upd-bar-fill" id="upd-bar-fill"></div></div>
+                <label class="upd-auto">
+                  <input type="checkbox" id="changelog-auto-show" checked onchange="onChangelogAutoShow(this.checked)">
+                  Automatically show changelog after updates
+                </label>
                 <div class="upd-actions">
                   <button class="btn" id="btn-upd-check" type="button" onclick="onUpdateCheck()"
                           title="Ask GitHub for a newer published build">Check for updates</button>
@@ -283,7 +292,7 @@
               </div>
             </details>
           </div>
-        </div>
+        </template>
       </div><!-- /r-content -->
 
       <!-- Live preview (game screen) -->
@@ -307,6 +316,28 @@
     </div><!-- /pane-right -->
 
   </div><!-- /main-split -->
+
+  <div class="header-pop" id="notes-pop" hidden>
+    <div class="header-pop-hd">
+      <span class="rpane-title">What's new</span>
+      <div class="rpane-sp"></div>
+      <button class="btn-log-clear" id="btn-changelog-refresh" type="button" onclick="onChangelogRefresh()">Refresh</button>
+      <button class="btn-log-clear" id="btn-changelog-release" type="button" hidden>Release page</button>
+    </div>
+    <div class="changelog-layout">
+      <div class="changelog-list" id="changelog-list" role="list" aria-label="Versions"></div>
+      <article class="changelog-article">
+        <p class="changelog-empty" id="changelog-empty">No release notes yet. Publish a Runner update with a changelog from the Hub.</p>
+        <header class="changelog-hd" id="changelog-body-hd">
+          <h2 id="changelog-title"></h2>
+          <time id="changelog-date"></time>
+        </header>
+        <div class="changelog-body" id="changelog-body" hidden></div>
+      </article>
+    </div>
+  </div>
+
+  <div class="header-pop header-pop-settings" id="settings-pop" hidden></div>
 
   <!-- ── Footer ──────────────────────────────────────────────────────── -->
   <div id="footer">

@@ -635,11 +635,13 @@
 #wf-canvas { flex:1; min-height:0; position:relative; overflow:hidden; cursor:grab;
   --grid-dot: var(--canvas-dot);
   --grid-dot-minor: var(--canvas-dot-minor);
+  --grid-line: var(--canvas-grid-line);
+  --grid-line-major: var(--canvas-grid-major);
   background-color:var(--canvas-bg);
   background-image:
     radial-gradient(circle, var(--grid-dot) 1.3px, transparent 1.5px),
     radial-gradient(circle, var(--grid-dot-minor) 0.8px, transparent 1px);
-  background-size:100px 100px, 20px 20px;
+  background-size:80px 80px, 16px 16px;
   background-position:0 0, 0 0; }
 
 #wf-canvas.panning { cursor:grabbing; }
@@ -1168,10 +1170,10 @@
 @keyframes wfStepPulse { 0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent)}
                          50%   {box-shadow:0 0 0 5px transparent} }
 /* Next branch is a control-flow token, not a normal action card. */
-.wf-node.try_next { width:140px; min-height:40px !important; border:none;
+.wf-node.try_next { width:112px; min-height:32px !important; border:none;
   border-radius:var(--node-r); background:transparent !important; }
 .wf-node.try_next::after { border-radius:var(--node-r); }
-.wf-next-body { height:44px; display:flex; align-items:center; gap:8px; padding:0 20px;
+.wf-next-body { height:32px; display:flex; align-items:center; gap:6px; padding:0 12px;
   border:1px solid var(--cat-flow-bd); border-radius:var(--node-r); background:var(--cat-flow-bg);
   box-shadow:var(--sh-sm); color:var(--cat-flow-ink); overflow:hidden; }
 .wf-next-body .ico { width:16px; height:16px; color:var(--cat-flow-ink); }
@@ -1186,7 +1188,7 @@
 .wf-node.try_next.paused .wf-next-body { border-color:var(--border2); background:var(--accent-bg); color:var(--accent); }
 
 /* ── Terminals: Start and End share the same compact square silhouette and are
-   told apart by colour and glyph. ─────────────────────────────────────────── */
+   told apart by colour and glyph. ─────────────────────────────────────────────── */
 .wf-node.start, .wf-node.end {
   --port-inset:4px;
   width:var(--term-size); height:var(--term-size); min-height:var(--term-size);
@@ -1219,7 +1221,7 @@
   display:flex; align-items:center; justify-content:center; color:var(--node-accent);
   box-shadow:var(--sh-sm), inset 0 0 0 3px color-mix(in srgb, var(--node-accent) 12%, transparent);
 }
-.wf-node-tri svg { width:14px; height:14px; stroke-width:1.8; display:block; }
+.wf-node-tri svg { width:18px; height:18px; stroke-width:1.8; display:block; }
 .wf-node.start .wf-node-tri svg { margin-left:1px; } /* optical centre for play */
 .wf-node-tri-lbl {
   position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:4px;
@@ -1254,8 +1256,9 @@
 .wf-node-actions button svg { width:12px; height:12px; display:block; stroke:currentColor; fill:none;
   stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
 .wf-node-act-spacer { flex:1; }
-/* Image preview — compact square on the right of the body. */
-.wf-node-prevrow { display:flex; align-items:center; gap:7px; padding:6px 12px; min-height:32px; }
+/* Image preview — compact square beside the summary. Padding matches the
+   summary so a hidden thumb doesn't change the card's height. */
+.wf-node-prevrow { display:flex; align-items:center; gap:6px; padding:6px 10px 5px; min-height:0; }
 .wf-node-prevrow .wf-node-sum { padding:0; flex:1; min-width:0; }
 .wf-node-thumb { flex-shrink:0; width:22px; height:22px; object-fit:contain;
   background:var(--panel) repeating-conic-gradient(var(--checker) 0% 25%, transparent 0% 50%) 50%/5px 5px;
@@ -1303,7 +1306,10 @@
 /* Note (sticky) block */
 .wf-node.note { width:var(--node-w); border:1px solid var(--border2); background:var(--warn-bg); }
 .wf-node.note .wf-node-hd { background:transparent; border-bottom:1px dashed var(--warn-bd); }
-.wf-node.note .wf-node-sum { white-space:normal; color:var(--note-ink); font-family:var(--sans); font-size:11px; }
+.wf-node.note .wf-node-sum { overflow:visible; white-space:normal; color:var(--note-ink);
+  font-family:var(--sans); font-size:11px; }
+.wf-node.note .wf-sum-main { display:block; white-space:normal; overflow:visible;
+  color:inherit; font-family:inherit; font-weight:450; font-size:inherit; -webkit-line-clamp:unset; }
 .wf-node.note .wf-node-title { color:var(--note-ink); }
 .wf-selbox { position:absolute; border:1px solid var(--accent);
   background:color-mix(in srgb, var(--accent) 10%, transparent);
@@ -1313,16 +1319,17 @@
 /* Node header: a title bar in the ComfyUI/Blender sense. The face is the same
    neutral card for every block; the category survives as a whisper of the
    block's own accent in the header and as the icon's hue (below). */
-.wf-node-hd { display:flex; align-items:center; gap:7px; padding:0 10px; height:28px;
+.wf-node-hd { display:flex; align-items:center; gap:5px; padding:0 7px; height:var(--node-hd);
   border-bottom:1px solid var(--nhd-bd,var(--line));
   background:var(--nhd-bg,color-mix(in srgb, var(--node-accent,var(--cat-misc)) 12%, var(--panel)));
   border-radius:var(--node-r);
   transition: background .15s, border-bottom-color .15s; }
-.wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:14px; height:14px; }
-.wf-node .ico svg { width:14px; height:14px; stroke-width:1.8; display:block; }
+.wf-node .ico { flex-shrink:0; color:var(--node-accent,var(--ink2)); display:flex; align-items:center; justify-content:center; width:11px; height:11px; }
+.wf-node .ico svg { width:11px; height:11px; stroke-width:1.8; display:block; }
+.wf-next-body .ico, .wf-next-body .ico svg { width:16px; height:16px; }
 .wf-node.call .ico { font-style:italic; font-weight:700; }
-.wf-node-title { font-size:var(--t-caption); font-weight:600; color:var(--ntitle,var(--ink)); flex:1; min-width:0;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-node-title { font-size:11px; font-weight:600; color:var(--ntitle,var(--ink)); flex:1; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.2; }
 .wf-node.has-tf .wf-node-title { padding-right:0; }
 /* Structural kinds that lack a cat class: borrow the nearest category's accent.
    --node-accent drives the header icon, the header tint and the plate these
@@ -1357,13 +1364,32 @@
   background:var(--run-warn); color:var(--shade); font-size:10px; font-weight:800; line-height:16px;
   text-align:center; box-shadow:var(--sh-md); z-index:3; cursor:help; }
 .wf-node.has-warn { border-color:var(--border2); }
-/* Default per-block summary line (the auto description under the title). The
-   side padding clears the inset port dots — a card's text never runs under one. */
-.wf-node-sum { font-family:var(--mono); font-size:var(--t-micro); color:var(--dim); padding:6px 12px;
-  line-height:1.5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Body under the title. Line 1 is the identity (name, text, point); line 2
+   is the qualifiers, and that row clips first when it doesn't fit. No fixed
+   height — a note, retry or log row under this must still fit the 64px card. */
+.wf-node-sum { display:flex; flex-direction:column; justify-content:center; gap:2px;
+  padding:6px 10px 5px; overflow:hidden;
+  font-family:var(--mono); font-size:11px; line-height:1.25; color:var(--ink2); }
+.wf-sum-line { display:flex; align-items:center; gap:4px; min-width:0; }
+.wf-sum-main { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:var(--ink); font-weight:600; }
+.wf-sum-file { display:flex; min-width:0; overflow:hidden; }
+.wf-sum-head { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wf-sum-tail { flex:0 0 auto; white-space:nowrap; }
+/* One phrase and no qualifier: use the second line instead of cutting at ~18 chars.
+   Notes opt out — their text is the whole card and must wrap without a clamp. */
+.wf-node-sum:not(:has(.wf-sum-meta)) .wf-sum-main:not(.wf-sum-file) {
+  white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.wf-node.note .wf-node-sum .wf-sum-main {
+  display:block; white-space:normal; overflow:visible; -webkit-line-clamp:unset; }
+.wf-sum-meta { display:flex; align-items:center; min-width:0; overflow:hidden;
+  font-size:var(--t-micro); line-height:1.2; font-weight:500; color:var(--muted); }
+.wf-sum-chip { flex:0 0 auto; white-space:nowrap; }
+.wf-sum-chip + .wf-sum-chip::before { content:"·"; margin:0 4px; color:var(--border2); }
+.wf-sum-chip:last-child { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
 /* Live colour swatch in a color node's summary line. */
 .wf-node-colordot { display:inline-block; width:8px; height:8px; border-radius:2px;
-  margin-right:4px; vertical-align:-1px; border:1px solid var(--border2); }
+  flex-shrink:0; vertical-align:-1px; border:1px solid var(--border2); }
 .wf-node-note { display:flex; align-items:flex-start; gap:5px; font-size:9.5px; font-style:italic;
   color:var(--muted); background:transparent; border-top:1px solid var(--line);
   border-radius:0 0 var(--node-r) var(--node-r); padding:3px 8px 4px; white-space:normal;
@@ -1516,9 +1542,9 @@
 /* Slot labels sit INSIDE the card next to their dot, the way ComfyUI and
    Blender label sockets — nothing floats in the canvas gutter any more. The
    body reserves a gutter for them via .slots-out / .slots-in below. */
-.wf-port-lbl { position:absolute; margin-top:-1px; font-size:var(--t-micro); font-weight:600;
-  line-height:12px; color:var(--dim); white-space:nowrap; pointer-events:none;
-  right:calc(var(--port-inset) + var(--port-sz) + 4px); }
+.wf-port-lbl { position:absolute; margin-top:-1px; font-size:8px; font-weight:600;
+  line-height:10px; color:var(--dim); white-space:nowrap; pointer-events:none;
+  right:calc(var(--port-inset) + var(--port-sz) + 3px); }
 .wf-port-lbl.in { right:auto; text-align:left;
   left:calc(var(--port-inset) + var(--port-sz) + 4px); }
 /* Multi-slot blocks: keep the summary/preview clear of the labelled dot column.
@@ -1758,8 +1784,11 @@
 .wf-var-card { border:1px solid var(--border2); border-radius:var(--r-sm); padding:6px; background:var(--panel); display:flex; flex-direction:column; gap:5px; }
 .wf-var-row { display:flex; align-items:center; gap:5px; }
 .wf-options-editor { display:flex; flex-direction:column; gap:6px; min-width:0; padding-top:6px; }
-.wf-options-heading { display:flex; align-items:center; justify-content:space-between; padding-right:26px; font-size:10.5px; font-weight:600; color:var(--muted); }
-.wf-option-row { display:grid; grid-template-columns:minmax(0,1fr) 20px 24px; align-items:center; gap:6px; }
+.wf-options-heading { display:grid; grid-template-columns:minmax(0,1fr) 20px 24px 24px; align-items:center; gap:6px; font-size:10.5px; font-weight:600; color:var(--muted); }
+.wf-options-heading span:last-child { text-align:center; }
+.wf-option-block { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.wf-option-children { display:flex; flex-direction:column; gap:6px; margin-left:12px; }
+.wf-option-row { display:grid; grid-template-columns:minmax(0,1fr) 20px 24px 24px; align-items:center; gap:6px; }
 .wf-option-row input[type="text"] { width:100%; min-width:0; font-size:11px; padding:5px 6px; }
 .wf-option-row input[type="radio"], .wf-option-row input[type="checkbox"] { width:14px; height:14px; margin:0; accent-color:var(--accent); justify-self:center; }
 .wf-option-row button:disabled { opacity:.6; cursor:not-allowed; }

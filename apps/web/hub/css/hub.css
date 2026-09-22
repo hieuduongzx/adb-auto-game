@@ -248,11 +248,34 @@
   min-height: 40px;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr);
   align-content: center;
+  column-gap: 9px;
   row-gap: 4px;
   margin-top: 10px;
   padding: 0 2px;
+}
+/* The game's icon — assets/icon.*, the same art the Runner header and the built .exe use. */
+.game-icon {
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  object-position: 50% 30%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.icon-mono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--tone) 40% 30%);
+  color: hsl(var(--tone) 45% 93%);
+  font-size: var(--t-caption);
+  font-weight: 600;
+  letter-spacing: -.02em;
 }
 .game-name {
   font-size: var(--t-title);
@@ -328,19 +351,28 @@
 :root[data-theme="dark"] .art-hint { color: hsl(var(--tone) 14% 66%); }
 
 /* ── Loading — two rows of placeholder cards while the list arrives ─────── */
-/* The skeleton carries the footer's boxes as well as the cover and the name
-   lines, so a row does not change height under the reader when the real cards
-   land in it. */
+/* The skeleton carries the footer's boxes as well as the cover, the icon and
+   the name lines, so a row does not change height under the reader when the
+   real cards land in it. */
 .game.skeleton { background: var(--panel); }
 .game.skeleton:hover { border-color: var(--line); }
 .game.skeleton .game-cover { cursor: default; border-color: var(--line); background: var(--alt); }
 .game.skeleton .game-info { pointer-events: none; }
+.sk-icon {
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  background: var(--alt);
+}
 .sk-line { display: block; width: 68%; height: 9px; border-radius: var(--r-xs); background: var(--alt); }
 .sk-line.short { width: 40%; }
 .sk-line.run { width: auto; flex: 1 1 auto; height: 34px; border-radius: var(--r-sm); }
 .sk-dots { display: flex; gap: var(--s1); flex-shrink: 0; }
 .sk-dot { width: 30px; height: 30px; border-radius: var(--r-sm); background: var(--alt); }
 .game.skeleton .game-cover,
+.game.skeleton .sk-icon,
 .game.skeleton .sk-line,
 .game.skeleton .sk-dot { animation: skPulse 1.4s ease-in-out infinite; }
 @keyframes skPulse { 50% { opacity: .5; } }
@@ -388,6 +420,10 @@
   border-top: 1px solid var(--line);
   background: var(--panel);
 }
+.setting-path-row { display: flex; align-items: center; gap: 6px; }
+.setting-path-row input { flex: 1; min-width: 0; height: 32px; font-family: var(--mono); font-size: var(--t-caption); }
+.setting-path-row .btn { height: 32px; flex-shrink: 0; }
+.form-hint { margin: 6px 0 0; font-size: var(--t-caption); color: var(--muted); line-height: 1.45; }
 .foot-path {
   flex: 1 1 220px; min-width: 0;
   font-family: var(--mono); font-size: var(--t-micro); color: var(--muted);
@@ -396,6 +432,10 @@
 }
 /* ── Build dialog ────────────────────────────────────────────────────────── */
 .build-field { margin-bottom: 4px; }
+.build-changelog {
+  width: 100%; min-height: 120px; resize: vertical; box-sizing: border-box;
+  font: inherit; font-size: var(--t-caption); line-height: 1.45;
+}
 .build-repo[hidden] { display: none; }
 .build-check { display: flex; align-items: flex-start; gap: 9px; padding: 9px 11px; margin-bottom: 8px;
   border: 1px solid var(--border2); border-radius: var(--r-md); background: var(--surface); cursor: pointer; }

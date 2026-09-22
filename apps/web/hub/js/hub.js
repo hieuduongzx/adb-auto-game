@@ -337,6 +337,12 @@ function emptyArtHtml(name) {
     `<span class="art-initials">${escHtml(initialsFor(name))}</span>` +
     `<span class="art-hint">assets/cover.png</span></span>`;
 }
+/** The game's small icon: assets/icon.*, else the cover, else its initials. */
+function iconHtmlFor(g, cls) {
+  const src = g.icon || g.cover;
+  if (src) return `<img class="${cls}" src="${escHtml(src)}" alt="" decoding="async" draggable="false">`;
+  return `<span class="${cls} icon-mono" aria-hidden="true">${escHtml(initialsFor(g.name))}</span>`;
+}
 
 // ── Render ───────────────────────────────────────────────────────────────────
 function filtered() {
@@ -364,6 +370,7 @@ function cardHtml(g, i) {
       `<span class="game-building" title="Show build progress"><span class="build-dot"></span>Building <span class="chip-pct">${building ? (BUILD.progress || 0) : 0}%</span></span>` +
     `</button>` +
     `<div class="game-info">` +
+      iconHtmlFor(g, "game-icon") +
       `<span class="game-name" title="${name}">${name}</span>` +
       `<span class="game-meta">` +
         `<span class="ctrl-tag ${ctrl}">${ctrl === "win32" ? "Win32" : "ADB"}</span>` +
@@ -382,14 +389,14 @@ function cardHtml(g, i) {
 }
 
 /** Two rows of placeholder cards. The boxes stand in for the footer's Run and
-    tools as well as the cover and the name lines, so a row keeps its height
-    when the real cards land in it. */
+    tools as well as the cover, the icon and the name lines, so a row keeps its
+    height when the real cards land in it. */
 function renderSkeleton() {
   const grid = $("grid");
   grid.innerHTML = Array.from({ length: gridColumns() * 2 }, (_, i) =>
     `<div class="game skeleton" aria-hidden="true" style="--i:${i}">` +
       `<span class="game-cover"></span>` +
-      `<span class="game-info"><span class="sk-line"></span><span class="sk-line short"></span></span>` +
+      `<span class="game-info"><span class="sk-icon"></span><span class="sk-line"></span><span class="sk-line short"></span></span>` +
       `<span class="game-foot">` +
         `<span class="sk-line run"></span>` +
         `<span class="sk-dots"><span class="sk-dot"></span><span class="sk-dot"></span><span class="sk-dot"></span></span>` +
@@ -443,6 +450,55 @@ function render(opts) {
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
+async function openSettings() {
+  const a = api();
+  if (!a) return;
+  let current = ($("footer-path") && $("footer-path").textContent) || "";
+  try {
+    const info = await a.get_workflows_dir();
+    if (info && info.dir) current = info.dir;
+  } catch {}
+  let chosen = current;
+  const saved = await modal({
+    title: "Settings",
+    buttons: [
+      { label: "Cancel", value: false },
+      { label: "Save", value: true, kind: "accent" },
+    ],
+    body(bd) {
+      bd.innerHTML =
+        `<div class="form-field">` +
+          `<label for="hub-workflows-dir">Workflow folder</label>` +
+          `<div class="setting-path-row">` +
+            `<input id="hub-workflows-dir" type="text" spellcheck="false" autocomplete="off">` +
+            `<button class="btn" id="hub-workflows-browse" type="button">Browse…</button>` +
+          `</div>` +
+          `<p class="form-hint">Games in this folder appear in the library. Clear it and save to use the default folder.</p>` +
+        `</div>`;
+      const input = bd.querySelector("#hub-workflows-dir");
+      input.value = current;
+      input.addEventListener("input", () => { chosen = input.value.trim(); });
+      bd.querySelector("#hub-workflows-browse").onclick = async () => {
+        try {
+          const picked = await a.pick_workflows_dir();
+          if (picked && picked.dir) { input.value = picked.dir; chosen = picked.dir; }
+        } catch {
+          toast("Couldn't open the folder picker", "error");
+        }
+      };
+    },
+  });
+  if (!saved) return;
+  try {
+    const res = await a.set_workflows_dir(chosen);
+    if (!res || !res.ok) { toast((res && res.error) || "Couldn't save the folder", "error"); return; }
+    toast("Workflow folder saved", "success");
+    await loadList();
+  } catch {
+    toast("Couldn't save the folder", "error");
+  }
+}
+
 async function loadList(opts) {
   const a = api();
   if (!a) return;
@@ -581,6 +637,14 @@ function promptBuild(info) {
           `<label for="build-repo">Update repository</label>` +
           `<input id="build-repo" type="text" spellcheck="false" autocomplete="off" value="${escHtml(info.repo)}" placeholder="owner/name">` +
         `</div>` +
+        `<div class="form-field build-field build-notes" hidden>` +
+          `<label for="build-changelog">Changelog</label>` +
+          `<textarea id="build-changelog" class="build-changelog" spellcheck="true" placeholder="What changed in this version (Markdown)"></textarea>` +
+        `</div>` +
+        `<label class="build-check build-notes" hidden>` +
+          `<input type="checkbox" id="build-auto-show" disabled>` +
+          `<span><b>Show after update</b><small>Installed Runners open this changelog once when the new version starts.</small></span>` +
+        `</label>` +
         `<dl class="build-facts">` +
           `<dt>Icon</dt><dd class="build-icon">` +
             (info.iconPreview ? `<img src="${info.iconPreview}" alt="">` : "") +
@@ -593,15 +657,38 @@ function promptBuild(info) {
         (info.exists ? `<p class="ui-modal-hint">The previous build in that folder is replaced.</p>` : "");
       const publish = bd.querySelector("#build-publish");
       const repoField = bd.querySelector(".build-repo");
-      publish.addEventListener("change", () => { repoField.hidden = !publish.checked; });
-      form = { version: bd.querySelector("#build-version"), publish, repo: bd.querySelector("#build-repo") };
+      const notes = bd.querySelectorAll(".build-notes");
+      const changelog = bd.querySelector("#build-changelog");
+      const autoShow = bd.querySelector("#build-auto-show");
+      let notesWereFilled = false;
+      const syncPublish = () => {
+        const on = !!publish.checked;
+        repoField.hidden = !on;
+        notes.forEach((el) => { el.hidden = !on; });
+      };
+      changelog.addEventListener("input", () => {
+        notesWereFilled = syncChangelogAutoShow(changelog, autoShow, notesWereFilled);
+      });
+      publish.addEventListener("change", syncPublish);
+      form = { version: bd.querySelector("#build-version"), publish, repo: bd.querySelector("#build-repo"), changelog, autoShow };
     },
     buttons: [{ label: "Cancel", value: false }, { label: "Build", value: true, kind: "accent" }],
   }).then((ok) => (ok ? {
     version: (form.version.value || "").trim() || info.version,
     publish: !!form.publish.checked,
     repo: (form.repo.value || "").trim() || info.repo,
+    changelog: form.publish.checked ? (form.changelog.value || "") : "",
+    autoShow: !!(form.publish.checked && form.autoShow.checked && (form.changelog.value || "").trim()),
   } : null));
+}
+
+/** Turn "show after update" on when notes appear, and off when they are cleared. */
+function syncChangelogAutoShow(textarea, checkbox, wasNonEmpty) {
+  const nonEmpty = !!String(textarea.value || "").trim();
+  checkbox.disabled = !nonEmpty;
+  if (!nonEmpty) checkbox.checked = false;
+  else if (!wasNonEmpty) checkbox.checked = true;
+  return nonEmpty;
 }
 
 async function buildWorkflow(path) {
@@ -613,7 +700,12 @@ async function buildWorkflow(path) {
   const a = api();
   if (!a) return;
   let info = null;
-  try { info = await a.build_info(path); } catch {}
+  try {
+    info = await a.build_info(path);
+  } catch (err) {
+    toast(`Build check failed: ${err && err.message ? err.message : String(err)}`, "error");
+    return;
+  }
   if (!info || !info.ok) {
     toast((info && info.error) || "Build is not available", "error");
     return;
@@ -621,7 +713,7 @@ async function buildWorkflow(path) {
   const choice = await promptBuild(info);
   if (choice == null) return;
   let res = null;
-  try { res = await a.build_runner(path, choice.version, choice.publish, choice.repo); } catch {}
+  try { res = await a.build_runner(path, choice.version, choice.publish, choice.repo, choice.changelog, choice.autoShow); } catch {}
   if (!res || !res.ok) {
     toast((res && res.error) || "Build did not start", "error");
     return;
@@ -834,6 +926,7 @@ function wire() {
     button.onclick = () => { if (window.uiTheme) window.uiTheme.toggle(); };
   });
   $("btn-refresh").onclick = () => loadList();
+  $("btn-settings").onclick = () => openSettings();
   $("btn-new").onclick = () => createWorkflow();
   $("btn-empty-new").onclick = () => createWorkflow();
 
@@ -897,7 +990,9 @@ function wire() {
     const card = img.closest(".game");
     const meta = GAMES.find((g) => card && g.path === card.dataset.path);
     const name = meta ? meta.name : "";
-    if (img.classList.contains("game-img")) {
+    if (img.classList.contains("game-icon")) {
+      img.insertAdjacentHTML("afterend", `<span class="game-icon icon-mono" aria-hidden="true">${escHtml(initialsFor(name))}</span>`);
+    } else if (img.classList.contains("game-img")) {
       img.insertAdjacentHTML("afterend", emptyArtHtml(name));
     } else {
       return;

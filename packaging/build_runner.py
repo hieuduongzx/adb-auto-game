@@ -98,9 +98,42 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SPEC = os.path.join(ROOT, "packaging", "runner_build.spec")
+def _resolve_roots() -> tuple[str, str]:
+    """``(script_root, checkout_root)``.
+
+    ``script_root`` is where this script's own files live: the repo root in a
+    source checkout, the frozen Hub's bundle when it runs the bundled copy.
+    ``checkout_root`` is the checkout being built (``vendor/``, ``apps/``,
+    ``dist/``). The Hub launches this script with that checkout as its working
+    directory, which is the only clue available once the script sits inside a
+    bundle that has no ``vendor/`` of its own.
+    """
+    script_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    checkout = script_root
+    if not os.path.isdir(os.path.join(checkout, "vendor")) \
+            and os.path.isdir(os.path.join(os.getcwd(), "vendor")):
+        checkout = os.getcwd()
+    return script_root, checkout
+
+
+_SCRIPT_ROOT, ROOT = _resolve_roots()
+SPEC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runner_build.spec")
 VENDOR_SRC = os.path.join(ROOT, "vendor")
+
+
+def _output_root(out_dir: str) -> str:
+    """Where the built Runner folder goes.
+
+    An explicit ``out_dir`` wins. Otherwise it goes into the checkout's
+    ``dist/`` — the working directory the Hub launched us in — rather than into
+    a frozen Hub's bundle, which is where ``ROOT`` lands for the bundled copy.
+    """
+    if out_dir:
+        return out_dir
+    cwd = os.getcwd()
+    if os.path.isdir(os.path.join(cwd, "dist")):
+        return os.path.join(cwd, "dist")
+    return os.path.join(ROOT, "dist")
 
 # The vendor sub-tools we know how to trim to.
 VENDOR_TOOLS = ("adb", "scrcpy", "frida", "unity_bridge")
@@ -186,7 +219,7 @@ def tag_prefix(app_name: str) -> str:
 def default_repo() -> str:
     """``owner/name`` of the update repo declared in ``src/version.py``."""
     try:
-        with open(os.path.join(ROOT, "src", "version.py"), "r", encoding="utf-8") as fh:
+        with open(os.path.join(_SCRIPT_ROOT, "src", "version.py"), "r", encoding="utf-8") as fh:
             match = re.search(r'"https://github\.com/([^"/]+/[^"/]+?)(?:\.git)?/?"', fh.read())
         return match.group(1) if match else ""
     except OSError:
@@ -642,7 +675,7 @@ def preflight(workflow_dir: str, *, flow: dict | None = None, app_name: str = ""
         ("entry", os.path.join("packaging", "entry_runner_single.py"),
          "The Runner entry script the spec analyses."),
     ):
-        if not os.path.isfile(os.path.join(ROOT, filename)):
+        if not os.path.isfile(os.path.join(_SCRIPT_ROOT, filename)):
             issues.append(_issue(code, "fail", f"{filename} is missing",
                                  f"{why} Building needs a source checkout."))
 
@@ -829,7 +862,7 @@ def icon_guard() -> tuple[bool, str]:
     exactly the kind of failure a build must refuse to ship, so this runs before
     PyInstaller rather than after it.
     """
-    script = os.path.join(ROOT, "packaging", "check_icons.py")
+    script = os.path.join(_SCRIPT_ROOT, "packaging", "check_icons.py")
     if not os.path.isfile(script):
         return True, ""        # trimmed checkout — nothing to guard
     try:
@@ -911,8 +944,26 @@ def publish_checks(repo: str, app_name: str, version: str,
     return []
 
 
+def compose_release_notes(display_name: str, version: str,
+                          notes_file: str = "", auto_show: bool = False) -> str:
+    """GitHub release body: optional authored notes plus a display flag.
+
+    An empty notes file becomes the short default sentence and never asks the
+    Runner to open a changelog on its own."""
+    text = ""
+    if notes_file:
+        with open(notes_file, "r", encoding="utf-8") as fh:
+            text = fh.read().strip()
+    if not text:
+        text = f"Standalone Runner for {display_name}, version {version}."
+        auto_show = False
+    meta = json.dumps({"autoShow": bool(auto_show)}, separators=(",", ":"))
+    return f"<!-- macro2k-runner: {meta} -->\n\n{text}\n"
+
+
 def publish(final: str, app_name: str, display_name: str, version: str,
-            repo: str, dry_run: bool = False) -> str:
+            repo: str, dry_run: bool = False, notes_file: str = "",
+            auto_show: bool = False) -> str:
     """Zip ``final`` and publish it as a GitHub Release. Returns the release URL.
 
     The rules about what may be published live in :func:`publish_checks` and are
@@ -938,13 +989,24 @@ def publish(final: str, app_name: str, display_name: str, version: str,
     progress(95, "Uploading to GitHub")
     log(f"Publishing {tag} to {repo} … ({os.path.getsize(zip_path) / (1024 * 1024):.0f} MB, "
         f"this takes as long as your uplink needs)")
+    notes = compose_release_notes(display_name, version, notes_file, auto_show)
+    fd, publish_notes = tempfile.mkstemp(suffix=".md", prefix="m2k-release-")
+    os.close(fd)
     # UPLOAD_TIMEOUT, not the preflight's short leash — see the constant.
-    result = _gh([
-        "release", "create", tag, zip_path, "--repo", repo,
-        "--title", f"{display_name} Runner {version}",
-        "--notes", f"Standalone Runner for {display_name}, version {version}.",
-        "--latest=false",
-    ], timeout=UPLOAD_TIMEOUT)
+    try:
+        with open(publish_notes, "w", encoding="utf-8") as fh:
+            fh.write(notes)
+        result = _gh([
+            "release", "create", tag, zip_path, "--repo", repo,
+            "--title", f"{display_name} Runner {version}",
+            "--notes-file", publish_notes,
+            "--latest=false",
+        ], timeout=UPLOAD_TIMEOUT)
+    finally:
+        try:
+            os.remove(publish_notes)
+        except OSError:
+            pass
     if result.returncode == _GH_TIMEOUT:
         # gh creates the release before it uploads the file, so a kill here can
         # leave the tag published with no asset — which the next run refuses as
@@ -984,7 +1046,8 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
           out_dir: str = "", repo: str = "", do_publish: bool = False,
           publish_dry_run: bool = False, verbose: bool = False,
           save_version: bool = False, flow_path: str = "",
-          allow_missing_vendor: bool = False) -> str:
+          allow_missing_vendor: bool = False, notes_file: str = "",
+          auto_show: bool = False) -> str:
     """Build the runner exe. Returns the output folder path.
 
     *flow_path* pins the exact workflow JSON to bundle and version-stamp (the
@@ -1030,7 +1093,7 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
     log(f"Updates  : {repo + ' · tag ' + tag_prefix(app_name) + version if repo else '(no update repo)'}")
 
     scratch, stage, work = _make_build_scratch()
-    out_root = out_dir or os.path.join(ROOT, "dist")
+    out_root = _output_root(out_dir)
     final = os.path.join(out_root, f"{app_name}-Runner")
 
     # Build metadata bundled into the exe: its version + where updates live.
@@ -1171,9 +1234,10 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
         release_url = ""
         if do_publish or publish_dry_run:
             release_url = publish(final, app_name, display_name, version, repo,
-                                  dry_run=publish_dry_run)
+                                  dry_run=publish_dry_run, notes_file=notes_file,
+                                  auto_show=auto_show)
         if save_version:
-            _save_version(flow_path, version, repo)
+            _save_version(resolved, version, repo)
 
         progress(100, "Published" if release_url else "Built")
         if release_url:
@@ -1213,6 +1277,10 @@ def main() -> int:
                     help="Downgrade a missing vendor/<tool> to a warning and build anyway.")
     ap.add_argument("--verbose", action="store_true",
                     help="Echo every PyInstaller line (prefixed '..').")
+    ap.add_argument("--notes-file", default="",
+                    help="UTF-8 Markdown changelog published as the GitHub release body.")
+    ap.add_argument("--auto-show", action="store_true",
+                    help="Open this changelog once after a Runner installs the update.")
     args = ap.parse_args()
     try:
         if args.preflight:
@@ -1225,7 +1293,8 @@ def main() -> int:
         build(args.workflow, name=args.name, version=args.version, out_dir=args.out,
               repo=args.repo, do_publish=args.publish, publish_dry_run=args.publish_dry_run,
               verbose=args.verbose, save_version=args.save_version,
-              flow_path=args.flow_path, allow_missing_vendor=args.allow_missing_vendor)
+              flow_path=args.flow_path, allow_missing_vendor=args.allow_missing_vendor,
+              notes_file=args.notes_file, auto_show=args.auto_show)
     except PreflightError:
         # preflight(emit=True) already printed every finding, including the
         # summary line the callers parse — don't bury it under a second one.

@@ -38,6 +38,38 @@ def normalize_backend_name(name: Optional[str]) -> str:
     return value
 
 
+def text_matches(
+    haystack: str,
+    needle: str,
+    *,
+    case_sensitive: bool = False,
+    normalize_whitespace: bool = True,
+) -> bool:
+    """Whether OCR output contains ``needle``.
+
+    An empty needle never matches. Whitespace is collapsed, and a second
+    comparison drops spaces entirely so ``"TOUCH TO START"`` still matches an
+    OCR line that glued the words together. Punctuation stays, so a short
+    token is not invented by deleting letters.
+    """
+    def norm(value: str, drop_spaces: bool) -> str:
+        text = str(value or "")
+        if not case_sensitive:
+            text = text.casefold()
+        if normalize_whitespace:
+            text = re.sub(r"\s+", "" if drop_spaces else " ", text).strip()
+        return text
+
+    target = norm(needle, False)
+    if not target:
+        return False
+    found = norm(haystack, False)
+    if target in found:
+        return True
+    target_glued = norm(needle, True)
+    return bool(target_glued) and target_glued in norm(haystack, True)
+
+
 def _apply_whitelist(text: str, whitelist: Optional[str]) -> str:
     if not whitelist:
         return text
@@ -213,16 +245,15 @@ class OCRReader:
         **kwargs,
     ) -> Tuple[bool, str]:
         text = self.read_text(screen, region=region, **kwargs)
+        if not str(needle or "").strip():
+            return False, text
         if not text:
             return False, ""
-        haystack, target = text, needle
-        if normalize_whitespace:
-            haystack = re.sub(r"\s+", "", haystack)
-            target = re.sub(r"\s+", "", target)
-        if not case_sensitive:
-            haystack = haystack.lower()
-            target = target.lower()
-        return target in haystack, text
+        return text_matches(
+            text, needle,
+            case_sensitive=case_sensitive,
+            normalize_whitespace=normalize_whitespace,
+        ), text
 
     def contains_text(self, screen, needle, region=None, **kwargs) -> bool:
         return self.find_text(screen, needle, region=region, **kwargs)[0]
@@ -251,4 +282,5 @@ __all__ = [
     "OCR_MODEL_LABELS",
     "KNOWN_BACKENDS",
     "normalize_backend_name",
+    "text_matches",
 ]

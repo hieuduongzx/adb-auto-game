@@ -1300,16 +1300,22 @@ function wfInitCanvas(){
         return;
       }
       const tid=wfNodeUnderPointer(e.clientX,e.clientY);
+      const from=wfGesture.from, fromPort=wfGesture.port;
       // Snapshot before mutating the graph so Ctrl+Z removes the new wire
       // instead of recording the already-connected state.
-      if(tid && tid!==wfGesture.from) wfPushUndo();
+      if(tid && tid!==from) wfPushUndo();
       const connected = tid ? wfConnectTo(tid, e.clientX, e.clientY) : false;
-      wfClearTemp(); wfHighlightTarget(null);
+      // End the drag before any redraw. wfRenderCanvas calls wfApplyTransform,
+      // which repaints the dashed preview for as long as a connect gesture is
+      // live, and wfDrawWires then keeps that path — so the blue dashed wire
+      // stayed on screen after the drop, on top of a port that already had a link.
+      wfCancelConnect();
       // A new wire changes which nodes are "wired in" → rebuild so the warning
       // badges refresh; otherwise just redraw the wires (cheaper, no node change).
       if(connected){ wfRenderCanvas(); }
-      else if(!tid) wfShowQuickConnectMenu(e.clientX,e.clientY,wfGesture.from,wfGesture.port);
+      else if(!tid) wfShowQuickConnectMenu(e.clientX,e.clientY,from,fromPort);
       else wfDrawWires();
+      return;
     } else if(wfGesture.mode==="groupresize"){
       wfPushUndo(); wfRenderCanvas();
     } else if(wfGesture.mode==="groupdraw"){

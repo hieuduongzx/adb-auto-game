@@ -3,7 +3,7 @@
 // IL2CPP has no managed runtime to load an assembly into, so the bridge talks to the game
 // through the il2cpp_* C API that GameAssembly.dll exports (the same idea as the Mono build,
 // which calls mono_*). Same line protocol as the Mono build (see ../../README.md):
-//   ping | tap x y [holdMs] [refW refH] | swipe x1 y1 x2 y2 [ms] [refW refH] | probe x y [refW refH]
+//   ping | tap | swipe | probe | key vk [holdMs] | keydown vk | keyup vk | keyup all
 //
 // Threads: a socket server (worker threads) queues commands; everything that touches the game runs
 // on Unity's main thread, reached through a WH_GETMESSAGE hook (a poster thread keeps the game's
@@ -35,7 +35,7 @@
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "user32.lib")
 
-static const char* kVersion = "1.1.0";
+static const char* kVersion = "1.2.0";
 static const int kDefaultPort = 17820;
 
 // ───────────────────────────────────────────────────────────────────────────────────────────
@@ -329,7 +329,9 @@ static void* GetEventHandler(void* go, void* iface)
 // ───────────────────────────────────────────────────────────────────────────────────────────
 // legacy Input: simulated mouse through breakpoint hooks on the Unity icalls
 // ───────────────────────────────────────────────────────────────────────────────────────────
-enum HookKind { HK_HELD, HK_DOWN, HK_UP, HK_POS };
+enum HookKind { HK_HELD, HK_DOWN, HK_UP, HK_POS, HK_KEY, HK_KEY_DOWN, HK_KEY_UP, HK_KEY_NAME, HK_KEY_DOWN_NAME, HK_KEY_UP_NAME };
+
+static bool KeyHookAnswer(HookKind kind, int keyCode, DWORD64 strPtr, int frame);
 
 struct BpHook
 {
@@ -353,33 +355,70 @@ static int HookFrame()
     return g_frameIcall ? g_frameIcall() : 0;
 }
 
+static std::vector<BpHook> g_keyHooks;
+static bool g_keyHooksUnavailable = false;
+static bool PatchByte(void* addr, uint8_t value, uint8_t* previous);
+
+// Run the real icall once. The breakpoint is lifted around the call so this does not re-enter Veh.
+static int CallIntIcall(BpHook& h, int arg)
+{
+    PatchByte(h.addr, h.original, nullptr);
+    int result = reinterpret_cast<int (*)(int)>(h.addr)(arg);
+    PatchByte(h.addr, 0xCC, nullptr);
+    h.on = true;
+    return result;
+}
+static int CallStrIcall(BpHook& h, void* str)
+{
+    PatchByte(h.addr, h.original, nullptr);
+    int result = reinterpret_cast<int (*)(void*)>(h.addr)(str);
+    PatchByte(h.addr, 0xCC, nullptr);
+    h.on = true;
+    return result;
+}
+
 static LONG CALLBACK Veh(PEXCEPTION_POINTERS ep)
 {
     if (ep->ExceptionRecord->ExceptionCode != EXCEPTION_BREAKPOINT) return EXCEPTION_CONTINUE_SEARCH;
     void* at = ep->ExceptionRecord->ExceptionAddress;
-    for (const BpHook& h : g_hooks)
+    auto answer = [&](std::vector<BpHook>& hooks, bool keys) -> bool
     {
-        if (!h.on || h.addr != at) continue;
-        CONTEXT* c = ep->ContextRecord;
-        int button = (int)(c->Rcx & 0xFFFFFFFF);
-        int frame = HookFrame();
-        switch (h.kind)
+        for (BpHook& h : hooks)
         {
-        case HK_HELD: c->Rax = (button == 0 && g_mouseHeld && frame >= g_downFrame) ? 1 : 0; break;
-        case HK_DOWN: c->Rax = (button == 0 && frame == g_downFrame) ? 1 : 0; break;
-        case HK_UP: c->Rax = (button == 0 && frame == g_upFrame) ? 1 : 0; break;
-        case HK_POS:
-        {
-            float* out = reinterpret_cast<float*>(c->Rcx); // Vector3 through the hidden result pointer
-            out[0] = g_mouseX; out[1] = g_mouseY; out[2] = 0.f;
-            c->Rax = c->Rcx;
-            break;
+            if (!h.on || h.addr != at) continue;
+            CONTEXT* c = ep->ContextRecord;
+            int arg = (int)(c->Rcx & 0xFFFFFFFF);
+            int frame = HookFrame();
+            if (!keys)
+            {
+                switch (h.kind)
+                {
+                case HK_HELD: c->Rax = (arg == 0 && g_mouseHeld && frame >= g_downFrame) ? 1 : 0; break;
+                case HK_DOWN: c->Rax = (arg == 0 && frame == g_downFrame) ? 1 : 0; break;
+                case HK_UP: c->Rax = (arg == 0 && frame == g_upFrame) ? 1 : 0; break;
+                case HK_POS:
+                {
+                    float* out = reinterpret_cast<float*>(c->Rcx);
+                    out[0] = g_mouseX; out[1] = g_mouseY; out[2] = 0.f;
+                    c->Rax = c->Rcx;
+                    break;
+                }
+                default: break;
+                }
+            }
+            else
+            {
+                bool sim = KeyHookAnswer(h.kind, arg, c->Rcx, frame);
+                int real = (h.kind >= HK_KEY_NAME) ? CallStrIcall(h, reinterpret_cast<void*>(c->Rcx)) : CallIntIcall(h, arg);
+                c->Rax = (sim || real) ? 1 : 0;
+            }
+            c->Rip = *reinterpret_cast<DWORD64*>(c->Rsp);
+            c->Rsp += 8;
+            return true;
         }
-        }
-        c->Rip = *reinterpret_cast<DWORD64*>(c->Rsp); // behave like `ret`: skip the original
-        c->Rsp += 8;
-        return EXCEPTION_CONTINUE_EXECUTION;
-    }
+        return false;
+    };
+    if (answer(g_hooks, false) || answer(g_keyHooks, true)) return EXCEPTION_CONTINUE_EXECUTION;
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
@@ -467,6 +506,382 @@ static void MouseEnd()
 static void MouseTick(int frame)
 {
     if (!g_hooks.empty() && !g_mouseHeld && g_restoreFrame != kNoFrame && frame >= g_restoreFrame) UninstallMouseHooks();
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────
+// keys. Legacy Input icalls (GetKey*) plus the Input System keyboard.
+// A queued KeyboardState does not stick: the next input update applies the real
+// keyboard (no scan code was ever sent) and wipes it. While a key is simulated
+// the keyboard's state-event writer is skipped, and InputState.Change writes the
+// held set directly so wasPressedThisFrame is true only on the transition.
+// ───────────────────────────────────────────────────────────────────────────────────────────
+static const int kMaxSimKeys = 8;
+struct SimKey
+{
+    int vk = 0;
+    int code = 0;      // UnityEngine.KeyCode
+    int inputKey = -1; // UnityEngine.InputSystem.Key, -1 when this VK has no match
+    int downFrame = 0;
+    int upFrame = -1;
+    bool held = false;
+    char name[24] = {};
+};
+static SimKey g_sim[kMaxSimKeys];
+static int g_keyEventFrame = -100000;
+static bool g_blockKeyboard = false;
+static bool g_inputSystemOff = false;
+static bool g_inputSystemReady = false;
+static void* g_updateStateMethod = nullptr;
+static void* g_updateStateOrig = nullptr;
+
+static bool IEquals(const std::string& a, const char* b)
+{
+    size_t n = strlen(b);
+    if (a.size() != n) return false;
+    for (size_t i = 0; i < n; i++)
+        if (tolower((unsigned char)a[i]) != tolower((unsigned char)b[i])) return false;
+    return true;
+}
+
+// Input System Key values (stable since 1.0; None=0 ... appended at the end).
+static bool MapVk(int vk, int& code, int& inputKey, char* name, size_t nameCap)
+{
+    code = 0; inputKey = -1; name[0] = 0;
+    if (vk >= 0x41 && vk <= 0x5A)
+    {
+        code = 97 + (vk - 0x41);          // KeyCode.A
+        inputKey = 15 + (vk - 0x41);      // Key.A
+        snprintf(name, nameCap, "%c", (char)vk);
+        return true;
+    }
+    if (vk >= 0x30 && vk <= 0x39)
+    {
+        code = vk;                        // KeyCode.Alpha0 == '0'
+        inputKey = vk == 0x30 ? 50 : 41 + (vk - 0x31); // Key.Digit0 is 50; Digit1..9 are 41..49
+        snprintf(name, nameCap, "Alpha%c", (char)vk);
+        return true;
+    }
+    if (vk >= 0x70 && vk <= 0x7B)
+    {
+        int n = vk - 0x6F;
+        code = 282 + (n - 1);             // KeyCode.F1
+        inputKey = 94 + (n - 1);          // Key.F1
+        snprintf(name, nameCap, "F%d", n);
+        return true;
+    }
+    if (vk >= 0x60 && vk <= 0x69)
+    {
+        int n = vk - 0x60;
+        code = 256 + n;                   // KeyCode.Keypad0
+        inputKey = 84 + n;                // Key.Numpad0
+        snprintf(name, nameCap, "Keypad%d", n);
+        return true;
+    }
+    struct Row { int vk; int code; int inputKey; const char* name; };
+    static const Row rows[] = {
+        { 0x08, 8, 65, "Backspace" }, { 0x09, 9, 3, "Tab" }, { 0x0D, 13, 2, "Return" },
+        { 0x10, 304, 51, "LeftShift" }, { 0xA0, 304, 51, "LeftShift" }, { 0xA1, 303, 52, "RightShift" },
+        { 0x11, 306, 55, "LeftControl" }, { 0xA2, 306, 55, "LeftControl" }, { 0xA3, 305, 56, "RightControl" },
+        { 0x12, 308, 53, "LeftAlt" }, { 0xA4, 308, 53, "LeftAlt" }, { 0xA5, 307, 54, "RightAlt" },
+        { 0x1B, 27, 60, "Escape" }, { 0x20, 32, 1, "Space" },
+        { 0x21, 280, 67, "PageUp" }, { 0x22, 281, 66, "PageDown" },
+        { 0x23, 279, 69, "End" }, { 0x24, 278, 68, "Home" },
+        { 0x25, 276, 61, "LeftArrow" }, { 0x26, 273, 63, "UpArrow" },
+        { 0x27, 275, 62, "RightArrow" }, { 0x28, 274, 64, "DownArrow" },
+        { 0x2D, 277, 70, "Insert" }, { 0x2E, 127, 71, "Delete" },
+    };
+    for (const Row& r : rows)
+    {
+        if (r.vk != vk) continue;
+        code = r.code; inputKey = r.inputKey;
+        snprintf(name, nameCap, "%s", r.name);
+        return true;
+    }
+    return false;
+}
+
+static bool SimHeldCode(int code, int frame)
+{
+    for (const SimKey& s : g_sim)
+        if (s.code == code && s.held && frame >= s.downFrame) return true;
+    return false;
+}
+static bool SimDownCode(int code, int frame)
+{
+    for (const SimKey& s : g_sim)
+        if (s.code == code && frame == s.downFrame) return true;
+    return false;
+}
+static bool SimUpCode(int code, int frame)
+{
+    for (const SimKey& s : g_sim)
+        if (s.code == code && frame == s.upFrame) return true;
+    return false;
+}
+static bool SimNamed(const std::string& name, HookKind kind, int frame)
+{
+    for (const SimKey& s : g_sim)
+    {
+        if (!IEquals(name, s.name)) continue;
+        if (kind == HK_KEY_DOWN_NAME) return frame == s.downFrame;
+        if (kind == HK_KEY_UP_NAME) return frame == s.upFrame;
+        return s.held && frame >= s.downFrame;
+    }
+    return false;
+}
+
+static bool KeyHookAnswer(HookKind kind, int keyCode, DWORD64 strPtr, int frame)
+{
+    if (kind == HK_KEY) return SimHeldCode(keyCode, frame);
+    if (kind == HK_KEY_DOWN) return SimDownCode(keyCode, frame);
+    if (kind == HK_KEY_UP) return SimUpCode(keyCode, frame);
+    std::string name = Utf8(reinterpret_cast<void*>(strPtr));
+    return SimNamed(name, kind, frame);
+}
+
+static bool AnyKeyPending(int frame)
+{
+    for (const SimKey& s : g_sim)
+        if (s.held || s.upFrame >= frame) return true;
+    return false;
+}
+
+static void UninstallKeyHooks()
+{
+    for (BpHook& h : g_keyHooks)
+        if (h.on) { PatchByte(h.addr, h.original, nullptr); h.on = false; }
+}
+
+static void* (*g_arrayNew)(void*, uintptr_t) = nullptr;
+static void* g_keyboardClass = nullptr;
+static void* g_getKeyboard = nullptr;
+static void* g_stateClass = nullptr;
+static void* g_stateCtor = nullptr;
+static void* g_keyClass = nullptr;
+static void* g_change = nullptr;
+
+static bool ExecutablePtr(void* p)
+{
+    if (!p) return false;
+    MEMORY_BASIC_INFORMATION info;
+    if (!VirtualQuery(p, &info, sizeof info)) return false;
+    DWORD prot = info.Protect & 0xFF;
+    return info.State == MEM_COMMIT && (prot == PAGE_EXECUTE || prot == PAGE_EXECUTE_READ || prot == PAGE_EXECUTE_READWRITE || prot == PAGE_EXECUTE_WRITECOPY);
+}
+
+using UpdateStateFn = bool(__fastcall*)(void*, void*, void*, int);
+static bool __fastcall UpdateStateDetour(void* self, void* device, void* eventPtr, int updateType)
+{
+    if (g_blockKeyboard && device)
+    {
+        const char* n = il2cpp_class_get_name(il2cpp_object_get_class(device));
+        if (n && strcmp(n, "Keyboard") == 0) return false; // drop the OS keyboard snapshot
+    }
+    return reinterpret_cast<UpdateStateFn>(g_updateStateOrig)(self, device, eventPtr, updateType);
+}
+
+static bool InstallKeyHooks()
+{
+    if (g_keyHooksUnavailable) return false;
+    if (!g_keyHooks.empty())
+    {
+        for (BpHook& h : g_keyHooks) if (!h.on) { PatchByte(h.addr, 0xCC, &h.original); h.on = true; }
+        return true;
+    }
+    if (!g_frameIcall) g_frameIcall = reinterpret_cast<int (*)()>(ResolveIcall("UnityEngine.Time::get_frameCount", ""));
+    if (!g_frameIcall) { Log("Warning", "Time.frameCount icall not found; legacy key hooks disabled"); g_keyHooksUnavailable = true; return false; }
+    struct Spec { HookKind kind; const char* name; const char* sig; bool str; };
+    const Spec specs[] = {
+        { HK_KEY, "UnityEngine.Input::GetKey", "UnityEngine.KeyCode", false },
+        { HK_KEY, "UnityEngine.Input::GetKeyInt", "UnityEngine.KeyCode", false },
+        { HK_KEY_DOWN, "UnityEngine.Input::GetKeyDown", "UnityEngine.KeyCode", false },
+        { HK_KEY_DOWN, "UnityEngine.Input::GetKeyDownInt", "UnityEngine.KeyCode", false },
+        { HK_KEY_UP, "UnityEngine.Input::GetKeyUp", "UnityEngine.KeyCode", false },
+        { HK_KEY_UP, "UnityEngine.Input::GetKeyUpInt", "UnityEngine.KeyCode", false },
+        { HK_KEY_NAME, "UnityEngine.Input::GetKey", "System.String", true },
+        { HK_KEY_NAME, "UnityEngine.Input::GetKeyString", "System.String", true },
+        { HK_KEY_DOWN_NAME, "UnityEngine.Input::GetKeyDown", "System.String", true },
+        { HK_KEY_DOWN_NAME, "UnityEngine.Input::GetKeyDownString", "System.String", true },
+        { HK_KEY_UP_NAME, "UnityEngine.Input::GetKeyUp", "System.String", true },
+        { HK_KEY_UP_NAME, "UnityEngine.Input::GetKeyUpString", "System.String", true },
+    };
+    for (const Spec& s : specs)
+    {
+        void* addr = ResolveIcall(s.name, s.sig);
+        if (!addr) addr = ResolveIcall(s.name, nullptr);
+        if (!addr) continue;
+        bool dup = false;
+        for (const BpHook& h : g_keyHooks) if (h.addr == addr) dup = true;
+        if (dup) continue;
+        BpHook h;
+        h.kind = s.kind; h.addr = addr;
+        g_keyHooks.push_back(h);
+    }
+    if (g_keyHooks.empty()) { Log("Warning", "no Input.GetKey icall; legacy key hooks disabled"); g_keyHooksUnavailable = true; return false; }
+    if (!g_veh) g_veh = AddVectoredExceptionHandler(1, Veh);
+    for (BpHook& h : g_keyHooks)
+    {
+        if (PatchByte(h.addr, 0xCC, &h.original)) h.on = true;
+        Log("Info", "hooked key icall kind=%d at %p", (int)h.kind, h.addr);
+    }
+    return true;
+}
+
+static void InstallKeyboardBlock()
+{
+    if (g_updateStateOrig || g_inputSystemOff) return;
+    void* manager = Cls("UnityEngine.InputSystem", "InputManager");
+    void* method = Method(manager, "UpdateState", 3);
+    if (!method) { g_inputSystemOff = true; Log("Warning", "InputManager.UpdateState not found; Input System keys disabled"); return; }
+    void* param = il2cpp_method_get_param(method, 1);
+    void* paramClass = param ? il2cpp_class_from_type(param) : nullptr;
+    const char* paramName = paramClass ? il2cpp_class_get_name(paramClass) : "";
+    if (!paramName || !strstr(paramName, "Event"))
+    {
+        g_inputSystemOff = true;
+        Log("Warning", "InputManager.UpdateState(3) is not the event writer (%s); Input System keys disabled", paramName ? paramName : "?");
+        return;
+    }
+    void* fn = *reinterpret_cast<void**>(method); // MethodInfo::methodPointer
+    if (!ExecutablePtr(fn)) { g_inputSystemOff = true; Log("Warning", "UpdateState methodPointer is not executable"); return; }
+    DWORD old;
+    if (!VirtualProtect(method, sizeof(void*), PAGE_READWRITE, &old)) { g_inputSystemOff = true; return; }
+    g_updateStateOrig = fn;
+    *reinterpret_cast<void**>(method) = (void*)UpdateStateDetour;
+    VirtualProtect(method, sizeof(void*), old, &old);
+    g_updateStateMethod = method;
+    Log("Info", "Input System keyboard events are dropped while a key is simulated");
+}
+
+static void* (*g_valueBox)(void*, void*) = nullptr;
+
+static bool WriteInputSystemKeys()
+{
+    if (g_inputSystemOff) return false;
+    if (!g_getKeyboard)
+    {
+        HMODULE ga = GetModuleHandleW(L"GameAssembly.dll");
+        g_arrayNew = ga ? reinterpret_cast<void* (*)(void*, uintptr_t)>(GetProcAddress(ga, "il2cpp_array_new")) : nullptr;
+        g_valueBox = ga ? reinterpret_cast<void* (*)(void*, void*)>(GetProcAddress(ga, "il2cpp_value_box")) : nullptr;
+        g_keyboardClass = Cls("UnityEngine.InputSystem", "Keyboard");
+        g_getKeyboard = Method(g_keyboardClass, "get_current", 0);
+        g_stateClass = Cls("UnityEngine.InputSystem.LowLevel", "KeyboardState");
+        g_stateCtor = Method(g_stateClass, ".ctor", 1);
+        g_keyClass = Cls("UnityEngine.InputSystem", "Key");
+        g_change = Method(Cls("UnityEngine.InputSystem.LowLevel", "InputState"), "Change", 4);
+        if (!g_arrayNew || !g_getKeyboard || !g_stateCtor || !g_keyClass || !g_change)
+        {
+            g_inputSystemOff = true;
+            Log("Warning", "Input System keyboard API not found; keys use legacy Input.GetKey only");
+            return false;
+        }
+        InstallKeyboardBlock();
+    }
+    if (g_inputSystemOff) return false;
+    void* keyboard = Call(g_getKeyboard, nullptr);
+    if (g_exc || !keyboard) return false;
+    int keys[kMaxSimKeys];
+    int n = 0;
+    for (const SimKey& s : g_sim)
+        if (s.held && s.inputKey >= 0 && n < kMaxSimKeys) keys[n++] = s.inputKey;
+    void* arr = g_arrayNew(g_keyClass, (uintptr_t)n);
+    if (!arr) return false;
+    int* data = reinterpret_cast<int*>(static_cast<char*>(arr) + 4 * sizeof(void*)); // Il2CppArray header, then elements
+    for (int i = 0; i < n; i++) data[i] = keys[i];
+    // Failure here must stick: an access fault is caught by the tick filter, and a retry would fault again.
+    g_inputSystemOff = true;
+    void* boxed = il2cpp_object_new(g_stateClass);
+    void* ctorArgs[1] = { arr };
+    Call(g_stateCtor, boxed, ctorArgs);
+    if (g_exc || !boxed) { Log("Warning", "KeyboardState ctor failed; Input System keys disabled"); return false; }
+    void* state = il2cpp_object_unbox(boxed);
+    int updateType = 0; // 0 = "use the current update" inside InputState.Change
+    void* changeArgs[4] = { keyboard, state, &updateType, nullptr };
+    Call(g_change, nullptr, changeArgs);
+    if (g_exc) { Log("Warning", "InputState.Change failed; Input System keys disabled"); return false; }
+    g_inputSystemOff = false;
+    g_inputSystemReady = true;
+    return true;
+}
+
+static void KeyTick(int frame)
+{
+    for (SimKey& s : g_sim)
+        if (!s.held && s.upFrame >= 0 && frame > s.upFrame) { s.upFrame = -1; s.vk = 0; }
+    if (!g_keyHooks.empty() && !AnyKeyPending(frame) && frame > g_keyEventFrame + 2) UninstallKeyHooks();
+}
+
+static int InputSystemFilter(unsigned code)
+{
+    Log("Warning", "Input System key write faulted (0x%08X); legacy GetKey only", code);
+    g_inputSystemOff = true;
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+static void WriteInputSystemKeysGuarded()
+{
+    __try { WriteInputSystemKeys(); }
+    __except (InputSystemFilter(GetExceptionCode())) {}
+}
+
+static bool KeySet(int vk, bool down, const char** outName)
+{
+    int code = 0, inputKey = -1;
+    char name[24];
+    if (!MapVk(vk, code, inputKey, name, sizeof name)) return false;
+    SimKey* slot = nullptr;
+    for (SimKey& s : g_sim) if (s.vk == vk) { slot = &s; break; }
+    if (!slot)
+    {
+        for (SimKey& s : g_sim) if (!s.held && s.upFrame < 0) { slot = &s; break; }
+    }
+    if (!slot) return false;
+    int frame = FrameCount();
+    slot->vk = vk;
+    slot->code = code;
+    slot->inputKey = inputKey;
+    snprintf(slot->name, sizeof slot->name, "%s", name);
+    if (down)
+    {
+        slot->held = true;
+        slot->downFrame = frame + 1; // the frame after the command, same as the Mono build
+        slot->upFrame = -1;
+    }
+    else
+    {
+        slot->held = false;
+        int up = frame + 1;
+        if (up < slot->downFrame + 1) up = slot->downFrame + 1;
+        slot->upFrame = up;
+    }
+    g_keyEventFrame = frame;
+    g_blockKeyboard = true;
+    InstallKeyHooks();
+    WriteInputSystemKeysGuarded();
+    bool any = false;
+    for (const SimKey& s : g_sim) if (s.held) any = true;
+    if (!any) g_blockKeyboard = false;
+    if (outName) *outName = slot->name;
+    return true;
+}
+
+static void KeyReleaseAll()
+{
+    int frame = FrameCount();
+    bool any = false;
+    for (SimKey& s : g_sim)
+    {
+        if (!s.held) continue;
+        any = true;
+        s.held = false;
+        int up = frame + 1;
+        if (up < s.downFrame + 1) up = s.downFrame + 1;
+        s.upFrame = up;
+    }
+    if (!any) return;
+    g_keyEventFrame = frame;
+    g_blockKeyboard = true;
+    WriteInputSystemKeysGuarded();
+    g_blockKeyboard = false;
 }
 
 // StandaloneInputModule reads the legacy Input itself: feeding it is enough, and also replaying
@@ -655,6 +1070,7 @@ struct Cmd
     void Complete(const std::string& r) { reply = r; SetEvent(done); }
 };
 
+static bool ParseInt(const std::string& s, int& out);
 static bool ParseFloat(const std::string& s, float& out)
 {
     char* end = nullptr;
@@ -679,6 +1095,43 @@ struct Job
     Cmd* cmd = nullptr;
     virtual ~Job() {}
     virtual bool Step(int frame, ULONGLONG nowMs) = 0; // true when finished
+};
+
+struct KeyHoldJob : Job
+{
+    int vk = 0;
+    float holdMs = 80;
+    int phase = 0;
+    int startFrame = 0;
+    int releaseFrame = 0;
+    ULONGLONG startMs = 0;
+    char name[24] = {};
+
+    bool Step(int frame, ULONGLONG now) override
+    {
+        if (phase == 0)
+        {
+            const char* n = nullptr;
+            if (!KeySet(vk, true, &n)) { cmd->Complete("err unsupported key VK " + std::to_string(vk)); return true; }
+            snprintf(name, sizeof name, "%s", n ? n : "?");
+            startFrame = frame;
+            startMs = now;
+            phase = 1;
+            return false;
+        }
+        if (phase == 1)
+        {
+            if (frame <= startFrame) return false; // down and up never share a frame
+            if ((float)(now - startMs) < holdMs) return false;
+            KeySet(vk, false, nullptr);
+            releaseFrame = frame;
+            phase = 2;
+            return false;
+        }
+        if (frame < releaseFrame + 2) return false; // GetKeyUp is visible on the following frame
+        cmd->Complete(std::string("ok key ") + name);
+        return true;
+    }
 };
 
 struct TapJob : Job
@@ -862,12 +1315,55 @@ static void StartCommand(Cmd* cmd)
         if (a.size() < 3 || !ParseFloat(a[1], x) || !ParseFloat(a[2], y)) { cmd->Complete("err usage: probe x y [refW refH]"); return; }
         cmd->Complete(Probe(ToScreen(x, y, a, 3)));
     }
+    else if (verb == "key" || verb == "keydown" || verb == "keyup")
+    {
+        if (verb == "keyup" && a.size() > 1 && Lower(a[1]) == "all")
+        {
+            KeyReleaseAll();
+            cmd->Complete("ok keyup all");
+            return;
+        }
+        int vk = 0;
+        if (a.size() < 2 || !ParseInt(a[1], vk))
+        {
+            cmd->Complete("err usage: " + verb + (verb == "key" ? " vk [holdMs]" : " vk"));
+            return;
+        }
+        if (verb == "keydown")
+        {
+            const char* n = nullptr;
+            if (!KeySet(vk, true, &n)) { cmd->Complete("err unsupported key VK " + std::to_string(vk)); return; }
+            cmd->Complete(std::string("ok keydown ") + (n ? n : ""));
+            return;
+        }
+        if (verb == "keyup")
+        {
+            const char* n = nullptr;
+            if (!KeySet(vk, false, &n)) { cmd->Complete("err unsupported key VK " + std::to_string(vk)); return; }
+            cmd->Complete(std::string("ok keyup ") + (n ? n : ""));
+            return;
+        }
+        float hold = 80.f;
+        if (a.size() > 2) ParseFloat(a[2], hold);
+        KeyHoldJob* job = new KeyHoldJob();
+        job->cmd = cmd;
+        job->vk = vk;
+        job->holdMs = hold;
+        g_job = job;
+    }
     else
     {
-        // keys are not implemented in the IL2CPP build; the same reply older plugins gave, so Macro2k
-        // falls back to window messages
         cmd->Complete("err unknown command: " + a[0]);
     }
+}
+
+static bool ParseInt(const std::string& s, int& out)
+{
+    char* end = nullptr;
+    long v = strtol(s.c_str(), &end, 10);
+    if (!end || *end || s.empty()) return false;
+    out = (int)v;
+    return true;
 }
 
 static Cmd* PopCommand()
@@ -899,6 +1395,7 @@ static void TickInner()
     ULONGLONG now = GetTickCount64();
     ForceFocus();
     MouseTick(frame);
+    KeyTick(frame);
     if (g_job && g_job->Step(frame, now)) { delete g_job; g_job = nullptr; }
     if (!g_job)
     {
@@ -955,7 +1452,7 @@ static LRESULT CALLBACK GetMsgProc(int code, WPARAM wParam, LPARAM lParam)
 static int EstimateDurationMs(const std::vector<std::string>& a)
 {
     std::string verb = Lower(a[0]);
-    size_t index = verb == "tap" ? 3 : verb == "swipe" ? 5 : 0;
+    size_t index = verb == "tap" ? 3 : verb == "swipe" ? 5 : verb == "key" ? 2 : 0;
     float ms;
     return index && a.size() > index && ParseFloat(a[index], ms) && ms > 0 ? (int)ms : 0;
 }

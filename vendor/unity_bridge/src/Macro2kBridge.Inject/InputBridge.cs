@@ -793,6 +793,7 @@ namespace Macro2k.UnityBridge
         internal static ManualLogSource Log;
 
         private static readonly Dictionary<int, MappedKey> Held = new Dictionary<int, MappedKey>();
+        private static bool _inputSystemOff;
         // GetKeyDown / GetKeyUp answer true on the frame AFTER the command, so every
         // script's Update in that frame sees it exactly once (commands run mid-frame).
         private static readonly Dictionary<KeyCode, int> DownFrame = new Dictionary<KeyCode, int>();
@@ -936,23 +937,57 @@ namespace Macro2k.UnityBridge
             PushKeyboardState();
         }
 
-        private static void PushKeyboardState()
+        private static object[] SnapshotKeys()
         {
-            ResolveInputSystem();
-            if (_queueStateEvent == null) return;
-            object keyboard = _keyboardCurrent.GetValue(null, null);
-            if (keyboard == null) return;
-
             var pressed = new List<object>();
             foreach (MappedKey key in Held.Values)
             {
                 if (key.NewKey != null) pressed.Add(key.NewKey);
             }
-            Array keys = Array.CreateInstance(_keyType, pressed.Count);
-            for (int i = 0; i < pressed.Count; i++) keys.SetValue(pressed[i], i);
+            return pressed.ToArray();
+        }
 
-            object state = _stateCtor.Invoke(new object[] { keys });
-            _queueStateEvent.Invoke(null, new object[] { keyboard, state, -1.0 });
+        private static void PushKeyboardState()
+        {
+            // InputState.Change, reapplied after every InputSystem.Update. A single
+            // QueueStateEvent is overwritten by the real keyboard on the next frame,
+            // which is why a Key node used to report success and the game saw nothing.
+            if (_inputSystemOff) return;
+            try
+            {
+                InputSystemKeys.Collect = SnapshotKeys;
+                InputSystemKeys.Apply(SnapshotKeys());
+            }
+            catch (Exception e)
+            {
+                _inputSystemOff = true;
+                Log?.LogWarning("Input System key injection unavailable (" + e.GetType().Name + ": " + e.Message +
+                                "); legacy Input.GetKey hooks only");
+            }
+        }
+
+        /// <summary>edge 0 = held, 1 = down this frame, 2 = up this frame. Name is a KeyCode name.</summary>
+        internal static bool SimNamed(string name, int edge)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            try
+            {
+                if (!Enum.IsDefined(typeof(KeyCode), name))
+                {
+                    // "space" / "SPACE" — Enum.Parse without ignoreCase misses them.
+                    string titled = char.ToUpperInvariant(name[0]) + name.Substring(1);
+                    if (!Enum.IsDefined(typeof(KeyCode), titled)) return false;
+                    name = titled;
+                }
+                var code = (KeyCode)Enum.Parse(typeof(KeyCode), name);
+                if (edge == 1) return SimDown(code);
+                if (edge == 2) return SimUp(code);
+                return SimHeld(code);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static bool IsHeld(KeyCode code)

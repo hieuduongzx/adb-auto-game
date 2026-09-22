@@ -3,7 +3,7 @@
 // fits the result to view. Notes are excluded (they float free). Nodes keep their
 // x/y in world coords; stacks/groups are not touched (members follow their head).
 const WF_LAY_NODE_W=WF_GEOMETRY.width, WF_LAY_NODE_H=WF_GEOMETRY.height,
-  WF_LAY_GAP_X=36, WF_LAY_GAP_Y=28, WF_LAY_COMPACT_GAP=20;
+  WF_LAY_GAP_X=32, WF_LAY_GAP_Y=24, WF_LAY_COMPACT_GAP=16;
 // Approximate node height: real DOM height when available, else the default.
 function wfNodeH(n){
   const el=wfNodeElById(n.id); return el?el.offsetHeight:WF_LAY_NODE_H;
@@ -310,9 +310,13 @@ let wfGesture=null;     // {mode:'pan'|'move'|'connect', ...}
 let wfPaletteDrag=null; // node type being dragged from palette
 let wfCanvasReady=false;
 const wfUid=()=>"n"+Math.random().toString(36).slice(2,9);
-const wfBase=p=>{ if(!p)return"(image)"; const s=String(p).replace(/\\/g,"/").split("/").pop(); return s.length>14?"…"+s.slice(-13):s; };
-// Summary for a multi-image ("…_any") node: list up to 2 names, else a count.
-const wfBaseAny=t=>{ const a=(Array.isArray(t)?t:[]).filter(Boolean); if(!a.length)return"(no image)"; return a.length<=2?a.map(wfBase).join(" / "):a.length+" images"; };
+// Basename only. The card truncates visually (head ellipsis, tail kept) so a
+// long crop name still shows its date and its size; the old 14-character chop
+// threw the date away before the card ever saw it.
+const wfBase=p=>{ if(!p)return"(image)"; const s=String(p).replace(/\\/g,"/").split("/").pop(); return s||"(image)"; };
+// Summary for a multi-image ("…_any") node: one name, two names, or the first
+// plus a count. The card puts the "+N" / second name on the qualifier line.
+const wfBaseAny=t=>{ const a=(Array.isArray(t)?t:[]).filter(Boolean); if(!a.length)return"(no image)"; if(a.length===1)return wfBase(a[0]); if(a.length===2)return wfBase(a[0])+" / "+wfBase(a[1]); return wfBase(a[0])+" +"+(a.length-1); };
 
 // Top-level mode switch: Tools (helper) ↔ Workflow (node-graph).
 /* (mode switching removed — the designer is its own standalone window) */

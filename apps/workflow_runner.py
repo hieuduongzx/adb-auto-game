@@ -449,6 +449,16 @@ class WorkflowRunnerAPI:
     # The engine's step-by-step detail (taps, matches, branches taken) is the
     # Designer's log, not this one.
     _RUNNER_LOG_KINDS = frozenset({LOG_KIND_RUN, LOG_KIND_ACTIVITY, LOG_KIND_USER})
+    # Win32 internals (window handle, capture API, bridge handshake). Errors
+    # still pass: a failed attach is something the operator can act on.
+    _TECH_LOG = (
+        "[win32] Attached window",
+        "[win32] Capture is using",
+        "[win32] Starting continuous",
+        "[win32] Stopping continuous",
+        "[win32] unity_bridge connected",
+        "[win32] unity_bridge: injecting",
+    )
 
     def _on_log(self, level: str, message: str, meta: Optional[dict] = None) -> None:
         meta = meta or {}
@@ -460,6 +470,8 @@ class WorkflowRunnerAPI:
             # Untagged lines from src/core while an activity runs are that
             # step's internals; outside a run they are app / device news.
             if activity:
+                return
+            if message.startswith(self._TECH_LOG):
                 return
         bucket = {"info": "info", "success": "success",
                   "warning": "warning", "error": "error"}.get(level, "info")
@@ -551,11 +563,12 @@ class WorkflowRunnerAPI:
                 except (TypeError, ValueError):
                     pass
             saved_vars = saved.get("vars") or {}
-            for var in act.get("vars", []) or []:
-                if var.get("name") in saved_vars:
-                    var["value"] = saved_vars[var.get("name")]
+            if isinstance(saved_vars, dict):
+                for full, var in self._each_activity_var(act.get("vars") or []):
+                    if full in saved_vars:
+                        var["value"] = saved_vars[full]
         for act in acts:
-            for var in act.get("vars", []) or []:
+            for _full, var in self._each_activity_var(act.get("vars") or []):
                 if var.get("type") == "select":
                     options = var.get("options") or []
                     if var.get("display") == "toggle-group" and var.get("multiple"):
@@ -907,11 +920,76 @@ class WorkflowRunnerAPI:
             "builtAt": str(info.get("builtAt") or ""),
             "supported": runner_update.updates_supported(info),
             "update": dict(self._update),
+            "changelog": self._changelog_payload(),
         }
+
+    def _changelog_auto_show_enabled(self) -> bool:
+        with self._runner_config_lock:
+            raw = (self._runner_config or {}).get("autoShowChangelog", True)
+        return raw is not False
+
+    def _changelog_payload(self, refresh: bool = False) -> dict:
+        info = self._runner_info
+        history = runner_update.refresh_history(info) if refresh else runner_update.load_history(info)
+        pending = runner_update.read_pending(info)
+        if pending and not any(row.get("version") == pending.get("version") for row in history):
+            history = [pending] + history
+        history.sort(key=lambda row: runner_update.parse_version(row.get("version")), reverse=True)
+        current = str(info.get("version") or "")
+        with self._runner_config_lock:
+            shown = str((self._runner_config or {}).get("shownChangelogVersion") or "")
+        auto = self._changelog_auto_show_enabled()
+        notes = (pending or {}).get("markdown") or ""
+        should = bool(
+            pending and pending.get("version") == current and str(notes).strip()
+            and pending.get("autoShow") is True and auto and shown != current
+        )
+        return {
+            "history": history,
+            "pending": pending,
+            "autoShowEnabled": auto,
+            "shownVersion": shown,
+            "shouldAutoShow": should,
+        }
+
+    def changelog_refresh(self) -> dict:
+        return self._changelog_payload(refresh=True)
+
+    def set_changelog_auto_show(self, enabled: bool) -> dict:
+        with self._runner_config_lock:
+            self._runner_config["autoShowChangelog"] = bool(enabled)
+            self._save_runner_config()
+        return self._changelog_payload()
+
+    def acknowledge_changelog(self, version: str) -> dict:
+        version = str(version or "")
+        current = str(self._runner_info.get("version") or "")
+        if version and version == current:
+            with self._runner_config_lock:
+                self._runner_config["shownChangelogVersion"] = version
+                self._save_runner_config()
+            runner_update.acknowledge_pending(self._runner_info, version)
+        return self._changelog_payload()
+
+    def open_external_url(self, url: str) -> bool:
+        """Open an https link from a changelog. Rejects every other scheme."""
+        from urllib.parse import urlparse
+        import webbrowser
+        parsed = urlparse(str(url or ""))
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            return False
+        try:
+            return bool(webbrowser.open(parsed.geturl()))
+        except Exception:
+            return False
 
     def _auto_check_update(self) -> None:
         result = runner_update.check(self._runner_info)
         self._update = result
+        try:
+            runner_update.refresh_history(self._runner_info)
+        except Exception:
+            pass
         if result.get("available"):
             log_success(f"Update available: v{result.get('version')}")
             self._push("update_available", result)
@@ -920,6 +998,11 @@ class WorkflowRunnerAPI:
         """Ask GitHub for a newer release of this Runner."""
         result = runner_update.check(self._runner_info)
         self._update = result
+        try:
+            runner_update.refresh_history(self._runner_info)
+        except Exception:
+            pass
+        result["changelog"] = self._changelog_payload()
         return result
 
     def update_apply(self) -> dict:
@@ -1024,12 +1107,7 @@ class WorkflowRunnerAPI:
                 "pollInterval": a.get("pollInterval", 1.0),
                 "maxRetries": a.get("maxRetries", 1),
                 "nodeCount": len(graph.get("nodes", []) or []),
-                "vars": [{"name": v.get("name"), "label": v.get("label", ""),
-                          "type": v.get("type", "bool"), "value": v.get("value"),
-                          "options": v.get("options") or [],
-                          "display": v.get("display", "dropdown"),
-                          "multiple": v.get("display") == "toggle-group" and bool(v.get("multiple"))}
-                         for v in (a.get("vars") or [])],
+                "vars": [self._var_payload(v) for v in (a.get("vars") or [])],
                 "runtimeSettings": self._runtime_settings_for_activity(a),
             })
         return out
@@ -1202,12 +1280,53 @@ class WorkflowRunnerAPI:
                 return {"ok": True, "retries": retries}
         return {"ok": False, "retries": 1}
 
+    def _each_activity_var(self, variables, prefix: str = ""):
+        """Yield ``(dotted name, var)`` for a variable tree.
+
+        Select options contribute ``parent.<option>.<child>``, the same key the
+        engine seeds and the Runner settings panel edits.
+        """
+        for var in variables or []:
+            if not isinstance(var, dict):
+                continue
+            name = str(var.get("name") or "").strip()
+            if not name:
+                continue
+            full = f"{prefix}.{name}" if prefix else name
+            yield full, var
+            yield from self._each_activity_var(var.get("children") or [], full)
+            option_children = var.get("optionChildren") or {}
+            if isinstance(option_children, dict):
+                for option, kids in option_children.items():
+                    opt = str(option).strip()
+                    if opt and isinstance(kids, list):
+                        yield from self._each_activity_var(kids, f"{full}.{opt}")
+
+    def _var_payload(self, v: dict) -> dict:
+        item = {"name": v.get("name"), "label": v.get("label", ""),
+                "type": v.get("type", "bool"), "value": v.get("value"),
+                "options": v.get("options") or [],
+                "display": v.get("display", "dropdown"),
+                "multiple": v.get("display") == "toggle-group" and bool(v.get("multiple"))}
+        children = [self._var_payload(c) for c in (v.get("children") or []) if isinstance(c, dict)]
+        if children:
+            item["children"] = children
+        option_children = v.get("optionChildren") or {}
+        if isinstance(option_children, dict):
+            packed = {}
+            for option, kids in option_children.items():
+                if isinstance(kids, list) and kids:
+                    packed[str(option)] = [self._var_payload(c) for c in kids if isinstance(c, dict)]
+            if packed:
+                item["optionChildren"] = packed
+        return item
+
     def set_activity_var(self, activity_id: str, name: str, value) -> bool:
         """Override an activity variable's value (used at run time)."""
         for a in self.flow.get("activities", []) or []:
             if a.get("id") == activity_id:
-                for v in a.get("vars", []) or []:
-                    if v.get("name") == name:
+                for full, v in self._each_activity_var(a.get("vars") or []):
+                    if full == name:
                         if v.get("type") == "select":
                             options = v.get("options") or []
                             if v.get("display") == "toggle-group" and v.get("multiple"):
@@ -1223,7 +1342,7 @@ class WorkflowRunnerAPI:
                             if not isinstance(saved_vars, dict):
                                 saved_vars = {}
                                 act_cfg["vars"] = saved_vars
-                            saved_vars[str(name)] = value
+                            saved_vars[str(full)] = value
                             self._save_runner_config()
                         return True
         return False

@@ -54,7 +54,7 @@ namespace Macro2k.UnityBridge
         private static int _keysEventFrame = -1;
 
         private static Hook[] _mouseHooks, _keyHooks;
-        private static Hook _hMouse, _hMouseDown, _hMouseUp, _hMousePos, _hKey, _hKeyDown, _hKeyUp, _hAxis, _hAxisRaw;
+        private static Hook _hMouse, _hMouseDown, _hMouseUp, _hMousePos, _hKey, _hKeyDown, _hKeyUp, _hKeyName, _hKeyDownName, _hKeyUpName, _hAxis, _hAxisRaw;
         private static bool _mouseUnavailable, _keysUnavailable;
 
         // ── mouse ───────────────────────────────────────────────────────────────────────────
@@ -157,6 +157,21 @@ namespace Macro2k.UnityBridge
             return KeyInjector.SimUp(key) || RealKey(_hKeyUp, key);
         }
 
+        private static bool GetKeyNameHook(string name)
+        {
+            return KeyInjector.SimNamed(name, 0) || RealName(_hKeyName, name);
+        }
+
+        private static bool GetKeyDownNameHook(string name)
+        {
+            return KeyInjector.SimNamed(name, 1) || RealName(_hKeyDownName, name);
+        }
+
+        private static bool GetKeyUpNameHook(string name)
+        {
+            return KeyInjector.SimNamed(name, 2) || RealName(_hKeyUpName, name);
+        }
+
         private static float GetAxisHook(string axisName)
         {
             float real = RealAxis(_hAxis, axisName);
@@ -177,6 +192,11 @@ namespace Macro2k.UnityBridge
         private static bool RealKey(Hook h, KeyCode key)
         {
             return h != null && h.Trampoline != IntPtr.Zero && ((delegate*<KeyCode, bool>)h.Trampoline)(key);
+        }
+
+        private static bool RealName(Hook h, string name)
+        {
+            return h != null && h.Trampoline != IntPtr.Zero && ((delegate*<string, bool>)h.Trampoline)(name);
         }
 
         private static float RealAxis(Hook h, string name)
@@ -224,10 +244,14 @@ namespace Macro2k.UnityBridge
                 {
                     var list = new List<Hook>();
                     Type[] keyArg = { typeof(KeyCode) };
+                    Type[] nameArg = { typeof(string) };
                     Type[] axisArg = { typeof(string) };
                     _hKey = Add(list, typeof(Input).GetMethod("GetKey", keyArg), "GetKeyHook");
                     _hKeyDown = Add(list, typeof(Input).GetMethod("GetKeyDown", keyArg), "GetKeyDownHook");
                     _hKeyUp = Add(list, typeof(Input).GetMethod("GetKeyUp", keyArg), "GetKeyUpHook");
+                    _hKeyName = Add(list, typeof(Input).GetMethod("GetKey", nameArg), "GetKeyNameHook");
+                    _hKeyDownName = Add(list, typeof(Input).GetMethod("GetKeyDown", nameArg), "GetKeyDownNameHook");
+                    _hKeyUpName = Add(list, typeof(Input).GetMethod("GetKeyUp", nameArg), "GetKeyUpNameHook");
                     _hAxis = Add(list, typeof(Input).GetMethod("GetAxis", axisArg), "GetAxisHook");
                     _hAxisRaw = Add(list, typeof(Input).GetMethod("GetAxisRaw", axisArg), "GetAxisRawHook");
                     if (list.Count == 0) throw new InvalidOperationException("no Input key members found");
@@ -245,13 +269,47 @@ namespace Macro2k.UnityBridge
             }
         }
 
+        /// <summary>
+        /// Patch a static method for the life of the process. Returns the trampoline
+        /// (original body) or Zero when the JIT prologue is not one this builder knows,
+        /// in which case the method is left untouched.
+        /// </summary>
+        internal static IntPtr HookPermanent(MethodBase target, MethodBase replacement)
+        {
+            if (target == null || replacement == null) return IntPtr.Zero;
+            try
+            {
+                var list = new List<Hook>();
+                Hook h = Add(list, target, replacement);
+                if (h == null || h.Trampoline == IntPtr.Zero)
+                {
+                    ManualLogSource.Write("Warning", "Not hooking " + target.DeclaringType + "." + target.Name + " (unexpected JIT prologue)");
+                    return IntPtr.Zero;
+                }
+                Apply(list.ToArray());
+                return h.Trampoline;
+            }
+            catch (Exception e)
+            {
+                ManualLogSource.Write("Warning", "Not hooking " + target.Name + ": " + e.Message);
+                return IntPtr.Zero;
+            }
+        }
+
         private static Hook Add(List<Hook> list, MethodBase target, string replacementName)
         {
             if (target == null) return null;
+            MethodBase replacement = typeof(LegacyInput).GetMethod(replacementName, BindingFlags.NonPublic | BindingFlags.Static);
+            return Add(list, target, replacement);
+        }
+
+        private static Hook Add(List<Hook> list, MethodBase target, MethodBase replacement)
+        {
+            if (target == null || replacement == null) return null;
             var h = new Hook
             {
                 Target = target,
-                Replacement = typeof(LegacyInput).GetMethod(replacementName, BindingFlags.NonPublic | BindingFlags.Static),
+                Replacement = replacement,
                 Address = CodeAddress(target),
             };
             Marshal.Copy(h.Address, h.Original, 0, PatchSize);
@@ -294,7 +352,7 @@ namespace Macro2k.UnityBridge
         {
             Restore(_keyHooks);
             _keyHooks = null;
-            _hKey = _hKeyDown = _hKeyUp = _hAxis = _hAxisRaw = null;
+            _hKey = _hKeyDown = _hKeyUp = _hKeyName = _hKeyDownName = _hKeyUpName = _hAxis = _hAxisRaw = null;
         }
 
         private static void Restore(Hook[] hooks)
@@ -355,10 +413,32 @@ namespace Macro2k.UnityBridge
         /// </summary>
         private static IntPtr CodeAddress(MethodBase method)
         {
-            IntPtr code = mono_compile_method(method.MethodHandle.Value);
+            IntPtr code = Compile(method.MethodHandle.Value);
             if (code == IntPtr.Zero) throw new InvalidOperationException("mono_compile_method failed for " + method.Name);
             return code;
         }
+
+        // Unity ships mono-2.0-bdwgc, older players ship mono-2.0-sgen, a few ship mono.dll.
+        // A single DllImport name fails the key hooks on every game that isn't bdwgc.
+        private static IntPtr Compile(IntPtr method)
+        {
+            if (GetModuleHandle("mono-2.0-bdwgc.dll") != IntPtr.Zero) return CompileBdwgc(method);
+            if (GetModuleHandle("mono-2.0-sgen.dll") != IntPtr.Zero) return CompileSgen(method);
+            if (GetModuleHandle("mono.dll") != IntPtr.Zero) return CompileMono(method);
+            throw new InvalidOperationException("no mono-2.0 runtime is loaded");
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr GetModuleHandle(string name);
+
+        [DllImport("mono-2.0-bdwgc.dll", EntryPoint = "mono_compile_method")]
+        private static extern IntPtr CompileBdwgc(IntPtr method);
+
+        [DllImport("mono-2.0-sgen.dll", EntryPoint = "mono_compile_method")]
+        private static extern IntPtr CompileSgen(IntPtr method);
+
+        [DllImport("mono.dll", EntryPoint = "mono_compile_method")]
+        private static extern IntPtr CompileMono(IntPtr method);
 
         private static void Write(IntPtr address, byte[] code)
         {
@@ -370,9 +450,6 @@ namespace Macro2k.UnityBridge
             uint ignored;
             VirtualProtect(address, (UIntPtr)(uint)code.Length, old, out ignored);
         }
-
-        [DllImport("mono-2.0-bdwgc.dll")]
-        private static extern IntPtr mono_compile_method(IntPtr method);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool VirtualProtect(IntPtr address, UIntPtr size, uint newProtect, out uint oldProtect);

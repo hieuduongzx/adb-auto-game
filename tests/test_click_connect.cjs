@@ -37,6 +37,18 @@ test('input-first drag connects exact input and replaces only chosen output',()=
  assert.deepEqual(JSON.parse(JSON.stringify(graph.edges)),[{from:'a',fromPort:'false',to:'other',toPort:'in'},{from:'a',fromPort:'true',to:'b',toPort:'loop'}]);
  assert.equal(undo.length,1); assert.equal(ctx.wfGesture,null);
 });
+test('dropping onto a node clears the dashed preview before the canvas redraws',()=>{
+ const {ctx,handlers,event}=setup();
+ const seen=[];
+ ctx.wfRenderCanvas=()=>seen.push(ctx.wfGesture && ctx.wfGesture.mode);
+ ctx.wfDrawWires=()=>seen.push('wires:'+(ctx.wfGesture && ctx.wfGesture.mode));
+ ctx.wfStartConnect(event(),'a','out','out');
+ handlers.mousemove(event(80,80));
+ handlers.mouseup(event(80,80));
+ assert.equal(ctx.wfGesture,null);
+ assert.deepEqual(seen, [null]);
+ assert.ok(!seen.includes('connect'));
+});
 test('right click cancels an active drag connection',()=>{
  const {ctx,canvasHandlers,event,graph,classes}=setup();
  ctx.wfStartConnect(event(),'a','out','out');

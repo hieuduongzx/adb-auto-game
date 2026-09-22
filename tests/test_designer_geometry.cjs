@@ -8,7 +8,7 @@ function load(file, extra = {}) {
   const ctx = vm.createContext({
     document: { addEventListener() {} }, window: { addEventListener() {} },
     localStorage: { getItem() { return null; } },
-    WF_GEOMETRY: { width:184, height:78 }, ...extra,
+    WF_GEOMETRY: { width:144, height:64 }, ...extra,
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../apps/web/wf/js', file), 'utf8'), ctx);
   return ctx;
@@ -44,7 +44,7 @@ test('compact layout respects wide nodes and tall multi-output nodes', () => {
 });
 
 test('standard arrange modes keep connected nodes close without overlap', () => {
-  const size=[184,78];
+  const size=[144,64];
   const ctx=load('layout.js',{
     WF_GEOMETRY:{width:size[0],height:size[1]},wfSnap:x=>x,
     wfNodeElById:()=>({offsetWidth:size[0],offsetHeight:size[1]}),
@@ -54,15 +54,15 @@ test('standard arrange modes keep connected nodes close without overlap', () => 
     edges:[{from:'a',to:'b'},{from:'b',to:'c'}],
   });
   const horizontal=makeGraph();ctx.wfLayoutHorizontal(horizontal);
-  assert.equal(horizontal.nodes[1].x-horizontal.nodes[0].x-size[0],36);
-  assert.equal(horizontal.nodes[2].x-horizontal.nodes[1].x-size[0],36);
+  assert.equal(horizontal.nodes[1].x-horizontal.nodes[0].x-size[0],32);
+  assert.equal(horizontal.nodes[2].x-horizontal.nodes[1].x-size[0],32);
   const vertical=makeGraph();ctx.wfLayoutVertical(vertical);
-  assert.equal(vertical.nodes[1].y-vertical.nodes[0].y-size[1],28);
-  assert.equal(vertical.nodes[2].y-vertical.nodes[1].y-size[1],28);
+  assert.equal(vertical.nodes[1].y-vertical.nodes[0].y-size[1],24);
+  assert.equal(vertical.nodes[2].y-vertical.nodes[1].y-size[1],24);
 });
 
-test('compact arrange uses a 20px gutter in both directions', () => {
-  const size=[184,78];
+test('compact arrange uses a 16px gutter in both directions', () => {
+  const size=[144,64];
   const ctx=load('layout.js',{
     WF_GEOMETRY:{width:size[0],height:size[1]},wfSnap:x=>x,
     wfNodeElById:()=>({offsetWidth:size[0],offsetHeight:size[1]}),
@@ -71,12 +71,12 @@ test('compact arrange uses a 20px gutter in both directions', () => {
   ctx.wfLayoutCompact(g);
   const xs=[...new Set(g.nodes.map(n=>n.x))].sort((a,b)=>a-b);
   const ys=[...new Set(g.nodes.map(n=>n.y))].sort((a,b)=>a-b);
-  assert.equal(xs[1]-xs[0]-size[0],20);
-  assert.equal(ys[1]-ys[0]-size[1],20);
+  assert.equal(xs[1]-xs[0]-size[0],16);
+  assert.equal(ys[1]-ys[0]-size[1],16);
 });
 
 test('radial arrange contracts sparse rings while keeping nodes separate', () => {
-  const size=[184,78];
+  const size=[144,64];
   const ctx=load('layout.js',{
     WF_GEOMETRY:{width:size[0],height:size[1]},wfSnap:x=>x,
     wfNodeElById:()=>({offsetWidth:size[0],offsetHeight:size[1]}),
@@ -96,7 +96,7 @@ test('radial arrange contracts sparse rings while keeping nodes separate', () =>
 });
 
 test('radial arrange uses both axes for a deep sparse workflow', () => {
-  const size=[184,78];
+  const size=[144,64];
   const ctx=load('layout.js',{
     WF_GEOMETRY:{width:size[0],height:size[1]},wfSnap:x=>x,
     wfNodeElById:()=>({offsetWidth:size[0],offsetHeight:size[1]}),

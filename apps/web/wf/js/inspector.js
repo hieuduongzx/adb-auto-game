@@ -335,7 +335,7 @@ function wfFieldLabel(f){
 // dropdown on text fields (log, message, format string…).
 function wfVarInfoMap(){
   const map={};
-  const walk=(vars,prefix,scope)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; if(!map[full]) map[full]={type:v.type||"bool", scope, value:v.value, options:v.options, multiple:v.display==="toggle-group"&&!!v.multiple}; walk(v.children,full,scope); }); };
+  const walk=(vars,prefix,scope)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; if(!map[full]) map[full]={type:v.type||"bool", scope, value:v.value, options:v.options, multiple:v.display==="toggle-group"&&!!v.multiple}; walk(v.children,full,scope); wfActiveOptionChildren(v).forEach(([opt,kids])=>walk(kids, full+"."+opt, scope)); }); };
   walk(WF.globals,"","global");
   const act=wfCurAct(); if(act) walk(act.vars,"","activity");
   const g=wfGraph(); wfGraphVarNames(g).forEach(n=>{ if(!map[n]) map[n]={type:"text", scope:"node", value:undefined}; });
@@ -982,6 +982,41 @@ function wfVarsSection(act){
   b.appendChild(wfVarAddBtn(act));
   return b;
 }
+function wfRefreshVarViews(){
+  if(typeof wfRenderVarsPanel==="function") wfRenderVarsPanel();
+  if(typeof wfRenderInspector==="function") wfRenderInspector();
+}
+// Identity delete across both a variable's own children and each select option's children.
+function wfRemoveVarFromTree(list, target){
+  if(!Array.isArray(list)) return false;
+  const i=list.indexOf(target);
+  if(i>=0){ list.splice(i,1); return true; }
+  return list.some(parent=>{
+    if(wfRemoveVarFromTree(parent.children||[], target)) return true;
+    const oc=parent.optionChildren;
+    if(!oc||typeof oc!=="object"||Array.isArray(oc)) return false;
+    return Object.keys(oc).some(key=>wfRemoveVarFromTree(oc[key], target));
+  });
+}
+function wfActiveOptionChildren(v){
+  if(!v||v.type!=="select") return [];
+  const oc=v.optionChildren;
+  if(!oc||typeof oc!=="object"||Array.isArray(oc)) return [];
+  const multi=v.display==="toggle-group"&&!!v.multiple;
+  const active=multi?(Array.isArray(v.value)?v.value:[v.value]):[v.value];
+  return active.filter(opt=>Array.isArray(oc[opt])).map(opt=>[opt, oc[opt]]);
+}
+function wfOptionChildList(v, option, create){
+  if(!v.optionChildren||typeof v.optionChildren!=="object"||Array.isArray(v.optionChildren)){
+    if(!create) return [];
+    v.optionChildren={};
+  }
+  if(!Array.isArray(v.optionChildren[option])){
+    if(!create) return [];
+    v.optionChildren[option]=[];
+  }
+  return v.optionChildren[option];
+}
 function wfVarAddBtn(act, parentVar, parentIdx){
   const add=document.createElement("button"); add.type="button"; add.className="btn sm wf-activity-var-add"; add.innerHTML=wfIco("plus")+" Variable";
   add.onclick=()=>{
@@ -997,15 +1032,19 @@ function wfVarAddBtn(act, parentVar, parentIdx){
 // Nested-variable indent step — one 4pt-scale unit (var(--s4), 12px) per depth,
 // shared with wfBuildGlobChildren (render.js) so activity vars and globals nest identically.
 const WF_VAR_INDENT = 12;
-function wfBuildVarTree(act,v,idx,container,depth){
+function wfBuildVarTree(act,v,idx,container,depth,ctx){
   depth=depth||0;
+  ctx=ctx||{};
   v.children=v.children||[];
-  const card=wfVarRow(act,v,idx,depth);
+  const card=wfVarRow(act,v,idx,depth,ctx);
   container.appendChild(card);
-  v.children.forEach((cv,ci)=>wfBuildVarTree(act,cv,ci,container,depth+1));
+  const full=(ctx.prefix?ctx.prefix+".":"")+(v.name||"");
+  const childCtx={prefix:full, rootList:ctx.rootList||(act&&act.vars)||[], rerender:ctx.rerender};
+  v.children.forEach((cv,ci)=>wfBuildVarTree(act,cv,ci,container,depth+1,childCtx));
 }
-function wfVarRow(act,v,idx,depth){
+function wfVarRow(act,v,idx,depth,ctx){
   depth=depth||0;
+  ctx=ctx||{};
   const item=document.createElement("details"); item.className="wf-variable-item wf-activity-variable";
   item.open=wfActivityVarsExpanded.has(v);
   if(depth>0){ item.style.marginLeft=(depth*WF_VAR_INDENT)+"px"; item.classList.add("nested"); }
@@ -1028,7 +1067,8 @@ function wfVarRow(act,v,idx,depth){
   const r1=document.createElement("div"); r1.className="wf-var-row";
   const chip=document.createElement("span"); chip.className="wf-var-chip"; chip.draggable=true;
   chip.innerHTML=wfIco("pin"); chip.title="Drag to canvas to create a check node";
-  chip.addEventListener("dragstart",e=>{ wfPaletteDrag="var:"+(v.type||"bool")+":"+(v.name||""); e.dataTransfer.effectAllowed="copy"; try{e.dataTransfer.setData("text/plain",v.name||"");}catch{} });
+  const fullName=(ctx.prefix?ctx.prefix+".":"")+(v.name||"");
+  chip.addEventListener("dragstart",e=>{ wfPaletteDrag="var:"+(v.type||"bool")+":"+fullName; e.dataTransfer.effectAllowed="copy"; try{e.dataTransfer.setData("text/plain",fullName);}catch{} });
   chip.addEventListener("dragend",()=>{ wfPaletteDrag=null; });
   r1.appendChild(chip);
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Title (shown in settings)"; lbl.style.cssText="flex:1;min-width:0;font-weight:600;";
@@ -1041,16 +1081,18 @@ function wfVarRow(act,v,idx,depth){
     if(autoName){ const s=wfVarSlug(lbl.value); if(s){ v.name=s; nm.value=s; } }
   };
   r1.appendChild(lbl);
-  const addChild=document.createElement("button"); addChild.type="button"; addChild.className="wf-side-mini"; addChild.innerHTML=wfIco("plus"); addChild.title="Add child variable"; addChild.setAttribute("aria-label",addChild.title);
-  addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); wfActivityVarsExpanded.add(v.children[v.children.length-1]); wfRenderInspector(); };
-  r1.appendChild(addChild);
+  if(v.type!=="select"){
+    const addChild=document.createElement("button"); addChild.type="button"; addChild.className="wf-side-mini"; addChild.innerHTML=wfIco("plus"); addChild.title="Add child variable"; addChild.setAttribute("aria-label",addChild.title);
+    addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); wfActivityVarsExpanded.add(v.children[v.children.length-1]); wfRefreshVarViews(); };
+    r1.appendChild(addChild);
+  }
   const del=document.createElement("button"); del.type="button"; del.className="wf-side-mini wf-activity-var-delete"; del.innerHTML=wfIco("trash"); del.title="Delete variable"; del.setAttribute("aria-label",del.title);
   del.onclick=()=>{
     wfPushUndoDebounced();
-    // Locate by identity so siblings at the same depth cannot delete each other.
-    const remove=list=>{ const i=list.indexOf(v); if(i>=0){ list.splice(i,1); return true; } return list.some(parent=>remove(parent.children||[])); };
-    remove(act.vars);
-    wfRenderInspector();
+    // Locate by identity so siblings at the same depth cannot delete each other,
+    // including a child that belongs to one select option.
+    wfRemoveVarFromTree(ctx.rootList||(act&&act.vars)||[], v);
+    (ctx.rerender||wfRefreshVarViews)();
   };
   r1.appendChild(del);
   // Line 2: name + type + default value.
@@ -1080,7 +1122,11 @@ function wfVarRow(act,v,idx,depth){
   }
   // Line 3 (select only): options.
   if(v.type==="select"){
-    card.appendChild(wfVarOptionsEditor(v));
+    card.appendChild(wfVarOptionsEditor(v,{
+      act, depth, prefix:ctx.prefix||"",
+      rootList:ctx.rootList||(act&&act.vars)||[],
+      rerender:ctx.rerender||wfRefreshVarViews,
+    }));
   }
   item.appendChild(card);
   ["input","change","click"].forEach(event=>card.addEventListener(event,updateSummary));
@@ -1106,9 +1152,11 @@ function findParentVarIdx(arr, idx, depth){
   return result?result.i:-1;
 }
 // Edit one option per row; both radio columns write the same default/test value.
-function wfVarOptionsEditor(v){
+function wfVarOptionsEditor(v, ctx){
+  ctx=ctx||{};
   const editor=document.createElement("div"); editor.className="wf-options-editor";
   const uid=wfUid();
+  const rerender=ctx.rerender||wfRefreshVarViews;
   function changed(){ if(typeof wfRenderVarsPanel==="function") wfRenderVarsPanel(); }
   function draw(){
     editor.replaceChildren();
@@ -1141,6 +1189,10 @@ function wfVarOptionsEditor(v){
         }
         if(value===option){ input.value=value; return; }
         wfPushUndoDebounced(); options[index]=value;
+        if(v.optionChildren&&Object.prototype.hasOwnProperty.call(v.optionChildren, option)){
+          v.optionChildren[value]=v.optionChildren[option];
+          delete v.optionChildren[option];
+        }
         if(v.value===option) v.value=value;
         else if(multi) v.value=(v.value||[]).map(o=>o===option?value:o);
         changed(); draw();
@@ -1153,12 +1205,37 @@ function wfVarOptionsEditor(v){
       del.innerHTML=wfIco("x"); del.title="Remove "+option; del.setAttribute("aria-label",del.title);
       del.disabled=options.length===1; del.onclick=()=>{
         wfPushUndoDebounced(); options.splice(index,1);
+        if(v.optionChildren) delete v.optionChildren[option];
         if(multi) v.value=(v.value||[]).filter(o=>options.includes(o));
         else if(!options.includes(v.value)) v.value=options[0]||"";
         changed(); draw();
         editor.querySelectorAll('.wf-option-row input[type="text"]')[Math.min(index,options.length-1)]?.focus();
       };
-      row.append(input,radio,del); editor.appendChild(row);
+      const addKid=document.createElement("button"); addKid.type="button"; addKid.className="btn sm ico";
+      addKid.innerHTML=wfIco("plus"); addKid.title="Add variable for "+option; addKid.setAttribute("aria-label", addKid.title);
+      addKid.onclick=()=>{
+        wfPushUndoDebounced();
+        const list=wfOptionChildList(v, option, true);
+        const n=list.length+1;
+        const slug=wfVarSlug(option)||"option";
+        const child={name:(v.name||"var")+"_"+slug+"_"+n, label:option+" "+n, type:"bool", value:false, children:[]};
+        list.push(child);
+        wfActivityVarsExpanded.add(child);
+        rerender();
+      };
+      row.append(input,radio,addKid,del);
+      const block=document.createElement("div"); block.className="wf-option-block";
+      block.appendChild(row);
+      if(!checked(option)){ editor.appendChild(block); return; }
+      const kids=wfOptionChildList(v, option, false);
+      if(kids.length){
+        const nest=document.createElement("div"); nest.className="wf-option-children";
+        const parentName=(ctx.prefix?ctx.prefix+".":"")+(v.name||"");
+        const childCtx={prefix:parentName+"."+option, rootList:ctx.rootList||(ctx.act&&ctx.act.vars)||[], rerender};
+        kids.forEach((cv,ci)=>wfBuildVarTree(ctx.act||null, cv, ci, nest, 0, childCtx));
+        block.appendChild(nest);
+      }
+      editor.appendChild(block);
     });
     const add=document.createElement("button"); add.type="button"; add.className="btn sm wf-option-add";
     add.textContent="+ Add option"; add.onclick=()=>{
@@ -1766,8 +1843,10 @@ function wfUpdNodeSum(node){
   const el=document.querySelector(`.wf-node[data-node="${node.id}"] .wf-node-sum`);
   let s=""; try{ s=def.sum(node.params); }catch{}
   if(!el) return;
+  el.title=s;
   const dot=typeof wfColorDotHtml==="function"?wfColorDotHtml(node,def):"";
-  if(dot) el.innerHTML=dot+escHtml(s); else el.textContent=s;
+  const region=typeof wfRegionChip==="function"?wfRegionChip(node):"";
+  el.innerHTML=wfNodeSumHtml(s, dot, {plain:def.kind==="note", chips:region?[region]:[]});
 }
 
 // Image-template helpers.

@@ -7,7 +7,8 @@ from pathlib import Path
 
 
 source = ast.parse((Path(__file__).parents[1] / "apps/workflow_runner.py").read_text(encoding="utf-8"))
-names = {"_apply_runner_config", "_activities_payload", "set_activity_var"}
+names = {"_apply_runner_config", "_activities_payload", "set_activity_var",
+         "_each_activity_var", "_var_payload"}
 methods = [node for cls in source.body if isinstance(cls, ast.ClassDef)
            for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in names]
 namespace = {"List": list, "CAPTURE_BACKENDS": ()}
@@ -20,6 +21,8 @@ class RunnerVariableDisplayTests(unittest.TestCase):
             _apply_runner_config = namespace["_apply_runner_config"]
             _activities_payload = namespace["_activities_payload"]
             set_activity_var = namespace["set_activity_var"]
+            _each_activity_var = namespace["_each_activity_var"]
+            _var_payload = namespace["_var_payload"]
 
             def _runtime_settings_for_activity(self, activity):
                 return []
@@ -81,10 +84,10 @@ class RunnerVariableDisplayTests(unittest.TestCase):
     def test_engine_keeps_choices_as_list_and_checks_whole_options(self):
         tree = ast.parse((Path(__file__).parents[1] / "src/workflow/engine.py").read_text(encoding="utf-8"))
         methods = [node for cls in tree.body if isinstance(cls, ast.ClassDef)
-                   for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in {"_seed_var", "_compare", "_resolve_value", "_a_set_var", "_coerce"}]
+                   for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in {"_seed_var", "_compare", "_resolve_value", "_a_set_var", "_coerce", "_truthy"}]
         scope = {"Dict": dict, "Any": object, "log_info": lambda message: None}
         exec(compile(ast.Module(body=methods, type_ignores=[]), "engine.py", "exec"), scope)
-        engine = type("Engine", (), {name: scope[name] for name in ("_seed_var", "_compare", "_resolve_value", "_a_set_var", "_coerce")})()
+        engine = type("Engine", (), {name: scope[name] for name in ("_seed_var", "_compare", "_resolve_value", "_a_set_var", "_coerce", "_truthy")})()
         values = {}
         engine._seed_var({"name": "mode", "type": "select", "display": "toggle-group", "multiple": True,
                           "options": ["Hard", "Very Hard"], "value": ["Very Hard"]}, values)
@@ -99,6 +102,64 @@ class RunnerVariableDisplayTests(unittest.TestCase):
         self.assertTrue(engine._compare(values["mode"], "==", ["Hard", "Very Hard"]))
         engine._a_set_var({}, {"name": "mode", "value": []})
         self.assertEqual(values["mode"], [])
+        values.clear()
+        engine._seed_var({"name": "mode", "type": "select", "value": "Hard", "options": ["Easy", "Hard"],
+                          "children": [{"name": "shared", "type": "bool", "value": True}],
+                          "optionChildren": {
+                              "Easy": [{"name": "lives", "type": "number", "value": 3}],
+                              "Hard": [{"name": "lives", "type": "number", "value": 1}],
+                          }}, values)
+        self.assertEqual(values["mode"], "Hard")
+        self.assertIs(values["mode.shared"], True)
+        self.assertNotIn("mode.Easy.lives", values)
+        self.assertEqual(values["mode.Hard.lives"], 1)
+        values.clear()
+        engine._seed_var({"name": "mode", "type": "select", "display": "toggle-group", "multiple": True,
+                          "value": ["Easy", "Hard"], "options": ["Easy", "Hard"],
+                          "optionChildren": {
+                              "Easy": [{"name": "lives", "type": "number", "value": 3}],
+                              "Hard": [{"name": "lives", "type": "number", "value": 1}],
+                          }}, values)
+        self.assertEqual(values["mode.Easy.lives"], 3)
+        self.assertEqual(values["mode.Hard.lives"], 1)
+
+    def test_changing_a_select_swaps_its_option_children(self):
+        tree = ast.parse((Path(__file__).parents[1] / "src/workflow/engine.py").read_text(encoding="utf-8"))
+        wanted = {"_seed_var", "_set_var", "_sync_option_children", "_select_defs", "_coerce", "_truthy"}
+        methods = [node for cls in tree.body if isinstance(cls, ast.ClassDef)
+                   for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in wanted]
+        scope = {"Dict": dict, "List": list, "Any": object, "log_info": lambda message: None, "Optional": object}
+        exec(compile(ast.Module(body=methods, type_ignores=[]), "engine.py", "exec"), scope)
+        engine = type("Engine", (), {name: scope[name] for name in wanted})()
+        element = {"name": "element", "type": "select", "value": "Fire", "options": ["Fire", "Water"],
+                   "optionChildren": {"Fire": [{"name": "dmg", "type": "number", "value": 3}],
+                                      "Water": [{"name": "wet", "type": "bool", "value": True}]}}
+        engine.flow = {"globals": [], "activities": [{"vars": [element]}]}
+        engine._globals = {}
+        engine._ctx = type("Ctx", (), {})()
+        engine._emit = lambda *args: None
+        engine._vars = {}
+        engine._seed_var(element, engine._vars)
+        engine._set_var("element", "Water")
+        self.assertEqual(engine._vars["element"], "Water")
+        self.assertNotIn("element.Fire.dmg", engine._vars)
+        self.assertIs(engine._vars["element.Water.wet"], True)
+
+    def test_option_child_saves_under_its_value(self):
+        runner = self.runner()
+        var = runner.flow["activities"][0]["vars"][0]
+        var["optionChildren"] = {"Hard": [{"name": "lives", "type": "number", "value": 1}]}
+        self.assertTrue(runner.set_activity_var("act", "difficulty.Hard.lives", 9))
+        self.assertEqual(var["optionChildren"]["Hard"][0]["value"], 9)
+        self.assertEqual(runner.saved["activities"]["act"]["vars"]["difficulty.Hard.lives"], 9)
+        restored = self.runner(saved=runner.saved)
+        restored.flow["activities"][0]["vars"][0]["optionChildren"] = {
+            "Hard": [{"name": "lives", "type": "number", "value": 1}]}
+        restored._apply_runner_config()
+        self.assertEqual(restored.flow["activities"][0]["vars"][0]["optionChildren"]["Hard"][0]["value"], 9)
+        payload = runner._activities_payload()[0]["vars"][0]
+        self.assertEqual(payload["optionChildren"]["Hard"][0]["name"], "lives")
+        self.assertEqual(payload["value"], "Normal")
 
     def test_invalid_default_and_stale_saved_choice_fall_back(self):
         for saved in ({}, {"activities": {"act": {"vars": {"difficulty": "removed"}}}}):

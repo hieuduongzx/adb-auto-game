@@ -103,9 +103,13 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 # 4. Promote staging/Macro2k -> dist/Macro2k.
 Write-Host "==> Assembling output folder: $OutDir" -ForegroundColor Cyan
 $keepVendor = (Test-Path (Join-Path $OutDir "vendor")) -and $SkipVendor
+# These folders belong to the user, not to the PyInstaller payload. In
+# particular, data/designer_settings.json stores the custom workflowsDir.
+# Preserve them across every rebuild just as the installer/updater does.
+$userDirs = @("data", "workflows", "out", "logs")
 if (Test-Path $OutDir) {
-    # Preserve an existing vendor/ on -SkipVendor; wipe everything else.
     Get-ChildItem $OutDir -Force | Where-Object {
+        ($userDirs -notcontains $_.Name) -and
         -not ($keepVendor -and $_.Name -eq "vendor")
     } | Remove-Item -Recurse -Force
 } else {

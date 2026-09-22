@@ -876,7 +876,8 @@ class WorkflowEngine:
         """Write a variable and notify ``on_var`` subscribers (live var panel).
 
         If ``name`` is a declared global, the shared ``_globals`` dict is kept
-        in sync so other threads/activities see the latest value too.
+        in sync so other threads/activities see the latest value too. Changing a
+        select drops the previous option's children and seeds the new one's.
         """
         if not name:
             return
@@ -884,6 +885,67 @@ class WorkflowEngine:
         if name in self._globals:
             self._globals[name] = value
         self._emit("on_var", name, value)
+        self._sync_option_children(name, value)
+
+    def _select_defs(self) -> List[tuple]:
+        """``(dotted name, select var)`` for every declared select in the flow."""
+        found: List[tuple] = []
+
+        def walk(variables, prefix: str = "") -> None:
+            for var in variables or []:
+                if not isinstance(var, dict):
+                    continue
+                nm = str(var.get("name") or "").strip()
+                if not nm:
+                    continue
+                full = f"{prefix}.{nm}" if prefix else nm
+                if var.get("type") == "select":
+                    found.append((full, var))
+                walk(var.get("children") or [], full)
+                option_children = var.get("optionChildren") or {}
+                if isinstance(option_children, dict):
+                    for option, kids in option_children.items():
+                        opt = str(option).strip()
+                        if opt and isinstance(kids, list):
+                            walk(kids, f"{full}.{opt}")
+
+        flow = self.flow if isinstance(self.flow, dict) else {}
+        walk(flow.get("globals") or [])
+        for act in flow.get("activities") or []:
+            if isinstance(act, dict):
+                walk(act.get("vars") or [])
+        return found
+
+    def _sync_option_children(self, name: str, value: Any) -> None:
+        """Keep only the option branches that match a select's new value."""
+        # Later declarations win, matching seed order: activity vars override globals.
+        matches = [var for full, var in self._select_defs() if full == name]
+        match = matches[-1] if matches else None
+        if match is None:
+            return
+        active = {str(item) for item in value} if isinstance(value, list) else {str(value)}
+        option_children = match.get("optionChildren") or {}
+        if not isinstance(option_children, dict):
+            return
+        # Drop only keys that belong to an option. A child of the select itself
+        # (``mode.shared``) stays; switching options must not reset it.
+        options = {str(option).strip() for option in option_children if str(option).strip()}
+        prefix = f"{name}."
+        for key in list(self._vars):
+            if not str(key).startswith(prefix):
+                continue
+            head = str(key)[len(prefix):].split(".", 1)[0]
+            if head in options:
+                del self._vars[key]
+                self._emit("on_var", key, None)
+        for option, kids in option_children.items():
+            opt = str(option).strip()
+            if opt in active and isinstance(kids, list):
+                for child in kids:
+                    self._seed_var(child, self._vars, f"{name}.{opt}")
+        for key, seeded in self._vars.items():
+            if key.startswith(prefix):
+                self._emit("on_var", key, seeded)
 
     @property
     def _vars(self) -> Dict[str, Any]:
@@ -2064,7 +2126,8 @@ class WorkflowEngine:
     def _seed_vars(self, act: Dict) -> Dict[str, Any]:
         """Initial variable values for a thread: globals first, then the
         activity's own declared ``vars`` (which may override a same-named
-        global for this run). Nested children are flattened with dotted keys."""
+        global for this run). Nested children are flattened with dotted keys.
+        A select option's own children use ``parent.<option>.<child>``."""
         out: Dict[str, Any] = {}
         for v in (self._globals or {}).items():
             out[v[0]] = v[1]
@@ -2091,6 +2154,16 @@ class WorkflowEngine:
             out[full] = "" if val is None else str(val)
         for child in (v.get("children") or []):
             self._seed_var(child, out, full)
+        if t == "select":
+            selected = out[full]
+            active = {str(o) for o in selected} if isinstance(selected, list) else {str(selected)}
+            option_children = v.get("optionChildren") or {}
+            if isinstance(option_children, dict):
+                for option, kids in option_children.items():
+                    opt = str(option).strip()
+                    if opt in active and isinstance(kids, list):
+                        for child in kids:
+                            self._seed_var(child, out, f"{full}.{opt}")
 
     @staticmethod
     def _region(params: Dict) -> tuple:
@@ -2725,30 +2798,56 @@ class WorkflowEngine:
                 log_info(f"🔍 found image {os.path.basename(tpl)} at ({res[0]}, {res[1]})")
             return res is not None
         if ntype == "wait_text":
-            needle = str(self._resolve_value(params.get("text", "")) or "")
+            needle = str(self._resolve_value(params.get("text", "")) or "").strip()
             region = self._region(params)
             wl = self._ocr_whitelist(params)
             timeout = float(params.get("timeout", 10.0))
-            if bool(params.get("negate", False)):
-                # Đảo: chờ đến khi chữ BIẾN MẤT khỏi vùng OCR.
-                end = time.time() + max(0.0, timeout)
-                while not self._stop.is_set():
-                    self._pause.wait()
-                    found, _read = self.auto.region_find_text(needle, region=region, whitelist=wl)
-                    if not found:
-                        log_info(f"🔤 text '{needle}' disappeared")
-                        self._report_ocr_region(region, True, needle)
-                        return True
-                    if time.time() >= end:
+            # Same rules as the other bool params: the string "false" is off.
+            # bool("false") is True, which inverted Negate and returned immediately.
+            negate = self._truthy(params.get("negate", False))
+            if not needle:
+                log_warning("Wait text: no text to look for")
+                self._report_ocr_region(region, False, needle)
+                return False
+            # Poll here, not in wait_for_text_in_region: that helper cannot see
+            # the workflow pause, so a paused run kept recognising text and
+            # could take the true branch before the user resumed.
+            end = time.time() + max(0.0, timeout)
+            last_read = ""
+            while not self._stop.is_set():
+                self._pause.wait()
+                if self._stop.is_set():
+                    return False
+                found, read = self.auto.region_find_text(needle, region=region, whitelist=wl)
+                if read:
+                    last_read = read
+                if negate:
+                    # A blank read means the phrase is not on screen. OCR being
+                    # unavailable is not the same thing — that stays false.
+                    if not getattr(self.auto.ocr, "available", False):
+                        log_warning("Wait text: OCR is unavailable")
                         self._report_ocr_region(region, False, needle)
                         return False
-                    time.sleep(0.5)   # OCR nặng hơn match ảnh — poll thưa hơn
-                return False
-            found = bool(self.auto.wait_for_text_in_region(
-                needle, region=region, timeout=timeout, whitelist=wl,
-            ))
-            self._report_ocr_region(region, found, needle)
-            return found
+                    if not found:
+                        log_info(f"🔤 text '{needle}' disappeared — read: {read!r}")
+                        self._report_ocr_region(region, True, needle)
+                        return True
+                elif found:
+                    x, y, w, h = region
+                    self._last_pos = (int(x) + max(0, int(w)) // 2,
+                                      int(y) + max(0, int(h)) // 2)
+                    log_info(f"🔤 found text '{needle}' — read: {read!r}")
+                    self._report_ocr_region(region, True, needle)
+                    return True
+                if time.time() >= end:
+                    log_info(
+                        f"🔤 timeout ({timeout:g}s) waiting for '{needle}' "
+                        f"in {region} — last read: {last_read!r}"
+                    )
+                    self._report_ocr_region(region, False, needle)
+                    return False
+                time.sleep(min(0.5, max(0.0, end - time.time())))
+            return False
         if ntype == "if_text":
             negate = bool(params.get("negate", False))
             # needle nhận biến — đồng bộ với if_app.package.

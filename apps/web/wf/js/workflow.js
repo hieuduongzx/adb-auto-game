@@ -3,8 +3,8 @@
 const WF_GEOMETRY=(()=>{
   const css=getComputedStyle(document.documentElement);
   const px=(name,fallback)=>parseFloat(css.getPropertyValue(name))||fallback;
-  return Object.freeze({width:px('--node-w',184),height:px('--node-h',78),
-    terminal:px('--term-size',42),port:px('--port-sz',10),
+  return Object.freeze({width:px('--node-w',144),height:px('--node-h',64),
+    terminal:px('--term-size',48),port:px('--port-sz',6),
     inset:px('--port-inset',-5),gap:px('--port-gap',20)});
 })();
 // Icon set: a compact inline-SVG library (Lucide-style, 24×24, stroke 1.8) so the
@@ -273,8 +273,8 @@ const WF_NODES = {
     {k:"max",lbl:"Maximum (s)",t:"num",d:2,step:.5,showWhen:{mode:"random"}}
   ],sum:p=>p.mode==="random"?`${p.min??.5}–${p.max??2}s · random`:`${p.seconds??1}s`},
   wait_random:{label:"Random wait",ico:"hourglass",kind:"action",cat:"basic", hidden:true, outs:["out"], fields:[{k:"min",t:"num",d:.5,step:.5},{k:"max",t:"num",d:2,step:.5}], sum:p=>`${p.min}-${p.max}s`},
-  send_text:  {label:"Input text", ico:"keyboard",kind:"action",cat:"input", outs:["out"], fields:[{k:"text",t:"text",insertVar:true}], sum:p=>`"${p.text||""}"`},
-  key: {label:"Key (ADB)",search:"back home android preset",ico:"disc",kind:"action",cat:"input",outs:["out"],fields:[{k:"keycode",lbl:"Key preset",t:"key",opts:WF_ADB_KEYS,d:"4"}],sum:p=>wfAdbKeyLabel(p.keycode??"4")},
+  send_text:  {label:"Type text", ico:"keyboard",kind:"action",cat:"input", outs:["out"], fields:[{k:"text",t:"text",insertVar:true}], sum:p=>`"${p.text||""}"`},
+  key: {label:"Press key",search:"back home android preset",ico:"disc",kind:"action",cat:"input",outs:["out"],fields:[{k:"keycode",lbl:"Key preset",t:"key",opts:WF_ADB_KEYS,d:"4"}],sum:p=>wfAdbKeyLabel(p.keycode??"4")},
   back:       {label:"Back",      ico:"back",kind:"action",cat:"input", hidden:true, outs:["out"], fields:[], sum:()=>"Back key"},
   home:       {label:"Home",      ico:"home",kind:"action",cat:"input", hidden:true, outs:["out"], fields:[], sum:()=>"Home key"},
   tap_image:  {label:"Tap image",  ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBase(p.template)+(p.taps=="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")},
@@ -286,15 +286,15 @@ const WF_NODES = {
   if_image_any:  {label:"If any image",  ico:"layers",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.negate?"not ":""}found ${wfBaseAny(p.templates)}${p.mode==="parallel"?" //":""}`},
   wait_text:  {label:"Wait text",   ico:"scan_text",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate - wait until it DISAPPEARS",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>(p.negate?"until gone ":"")+`"${p.text||""}"`},
   if_text:    {label:"If text",   ico:"type",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`${p.negate?"not ":""}contains "${p.text||""}"`},
-  read_var:   {label:"Read → variable",ico:"search",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`→ ${p.name||"?"}`},
-  parse_var:  {label:"Parse → variable",ico:"scissors",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"OCR region"},{v:"var",t:"From variable"}],d:"region"},{k:"fromVar",lbl:"Source variable",t:"text",d:"",var:true,showWhen:{source:"var"}},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num",showWhen:{source:"region"}},{k:"y",t:"num",showWhen:{source:"region"}},{k:"w",t:"num",d:200,showWhen:{source:"region"}},{k:"h",t:"num",d:80,showWhen:{source:"region"}},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:"",showWhen:{source:"region"}}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
+  read_var:   {label:"Read text to variable",ico:"search",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`→ ${p.name||"?"}`},
+  parse_var:  {label:"Parse text to variable",ico:"scissors",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"OCR region"},{v:"var",t:"From variable"}],d:"region"},{k:"fromVar",lbl:"Source variable",t:"text",d:"",var:true,showWhen:{source:"var"}},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num",showWhen:{source:"region"}},{k:"y",t:"num",showWhen:{source:"region"}},{k:"w",t:"num",d:200,showWhen:{source:"region"}},{k:"h",t:"num",d:80,showWhen:{source:"region"}},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:"",showWhen:{source:"region"}}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
   // ── Color (pixel) nodes — compare screen pixels against a #RRGGBB colour.
   // Tolerance = max per-channel difference (same rule as DevScope's Inspect color).
   tap_color:  {label:"Tap color", ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"timeout",t:"num",d:10},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.color||"?"} ±${p.tolerance??10}`+(p.taps=="2"?" ×2":"")},
   wait_color: {label:"Wait color",ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"where",lbl:"Check",t:"select",opts:WF_COLOR_WHERE,d:"point"},{k:"x",t:"num",showWhen:{where:"point"}},{k:"y",t:"num",showWhen:{where:"point"}},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate - wait until the color is GONE",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region",showWhen:{where:"anywhere"}}], sum:p=>(p.negate?"until gone ":"")+(p.where==="anywhere"?`${p.color||"?"} ±${p.tolerance??10} · region`:`(${p.x||0},${p.y||0}) = ${p.color||"?"}`)},
   if_color:   {label:"If color",  ico:"droplet",kind:"condition",cat:"color", outs:["true","false"], fields:[{k:"color",t:"color",d:"#ff0000"},{k:"tolerance",lbl:"Tolerance",t:"num",d:10},{k:"where",lbl:"Check",t:"select",opts:WF_COLOR_WHERE,d:"point"},{k:"x",t:"num",showWhen:{where:"point"}},{k:"y",t:"num",showWhen:{where:"point"}},{k:"negate",t:"bool",d:false},{k:"_region",lbl:"Search region",t:"region",showWhen:{where:"anywhere"}}], sum:p=>`${p.negate?"not ":""}`+(p.where==="anywhere"?`${p.color||"?"} ±${p.tolerance??10} · region`:`(${p.x||0},${p.y||0}) ≈ ${p.color||"?"}`)},
-  read_color: {label:"Read color → variable",ico:"pipette",kind:"action",cat:"color", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"color",var:true},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>`${p.name||"?"} = px(${p.x||0},${p.y||0})`},
-  loop:       {label:"Repeat",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"infinite",t:"bool",d:true},{k:"count",lbl:"Repeat count",t:"num",varRef:true,d:3,showWhen:{infinite:false}}], sum:p=>p.infinite?"∞ infinite":`${p.count}×`},
+  read_color: {label:"Read color to variable",ico:"pipette",kind:"action",cat:"color", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"color",var:true},{k:"x",t:"num"},{k:"y",t:"num"}], sum:p=>`${p.name||"?"} = px(${p.x||0},${p.y||0})`},
+  loop:       {label:"Loop",   ico:"loop",kind:"loop", cat:"flow",   ins:["in","loop"], outs:["body","done"], fields:[{k:"infinite",t:"bool",d:true},{k:"count",lbl:"Loop count",t:"num",varRef:true,d:3,showWhen:{infinite:false}}], sum:p=>p.infinite?"∞ infinite":`${p.count}×`},
   parallel:   {label:"Parallel", ico:"parallel",kind:"parallel",cat:"flow", outs:[], fields:[{k:"count",lbl:"Thread count",t:"num",d:3,refresh:true}], sum:p=>`${p.count||3} parallel threads`},
   // Sequential fan-out: run branches 1..N one after another, ALWAYS. Unlike Try
   // in order it never stops on a success and never gives up on a failure — every
@@ -307,7 +307,7 @@ const WF_NODES = {
   join:       {label:"Join",       ico:"git_merge",kind:"join",  cat:"flow", outs:["out"], fields:[], sum:()=>"wait for all threads → continue"},
   and:        {label:"And",        ico:"git_merge",kind:"and",   cat:"flow", outs:["out"], fields:[{k:"count",lbl:"Branch count",t:"num",d:2,refresh:true}], sum:p=>`${p.count||2} branches · all must succeed`},
   "break":    {label:"Break loop",ico:"octagon",kind:"action",cat:"flow",  outs:["out"], fields:[], sum:()=>"break"},
-  stop:       {label:"Stop all",ico:"octagon",kind:"stop", cat:"flow",  outs:[],      fields:[], sum:()=>"stop session"},
+  stop:       {label:"Stop workflow",ico:"octagon",kind:"stop", cat:"flow",  outs:[],      fields:[], sum:()=>"stop session"},
   set_var:    {label:"Set variable",  ico:"pin",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"value",t:"text",varRef:true,d:"0"}], sum:p=>`${p.name||"?"} = ${p.value}`},
   calc_var:   {label:"Calculate variable", ico:"calculator",kind:"action",cat:"logic", outs:["out"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:[{v:"+",t:"+ Add"},{v:"-",t:"− Subtract"},{v:"*",t:"× Multiply"},{v:"/",t:"÷ Divide"},{v:"%",t:"% Remainder"},{v:"min",t:"Min of the two"},{v:"max",t:"Max of the two"},{v:"round",t:"Round (value = decimals)"},{v:"abs",t:"Absolute value"},{v:"=",t:"= Assign"}],d:"+"},{k:"value",t:"text",varRef:true,d:"1"}], sum:p=>`${p.name} ${p.op}= ${p.value}`},
   if_var:     {label:"If variable",  ico:"hash",kind:"condition",cat:"logic",outs:["true","false"], fields:[{k:"name",t:"text",d:"i",var:true},{k:"op",t:"select",opts:WF_CMP_OPS,d:"=="},{k:"value",t:"text",varRef:true,d:"0"}], sum:p=>`${p.name} ${p.op} ${p.value}`},
@@ -331,7 +331,7 @@ const WF_NODES = {
     {k:"clearData",lbl:"Clear app data (pm clear)",t:"bool",d:false}
   ], sum:p=>`⛔ ${wfPkgLabel(p)}`+(p.clearData?" +clear":"")},
   // Exit the current app — no package needed (ADB: force-stop foreground · Win32: close the window).
-  app_exit: {label:"Exit current app", ico:"x", kind:"action", cat:"app", ctrl:null, outs:["out"], fields:[], sum:()=>"exit current app"},
+  app_exit: {label:"Exit app", ico:"x", kind:"action", cat:"app", ctrl:null, outs:["out"], fields:[], sum:()=>"exit current app"},
   // Uninstall an app (pm uninstall; -k = keep data). ADB-only at runtime.
   app_uninstall: {label:"Uninstall app", ico:"trash", kind:"action", cat:"app", ctrl:"adb", outs:["out"], fields:[
     {k:"pkgSrc",lbl:"Package source",t:"select",opts:[{v:"project",t:"Project package"},{v:"custom",t:"Custom…"}],d:"project"},
@@ -340,7 +340,7 @@ const WF_NODES = {
   ], sum:p=>`🗑 ${wfPkgLabel(p)}`+(p.keepData?" ·keep":"")},
   // Install an APK sitting on the PC (adb install) — the missing counterpart of
   // Uninstall app. ADB-only.
-  app_install: {label:"Install app (APK)", ico:"box", kind:"action", cat:"app", ctrl:"adb", outs:["out"], fields:[
+  app_install: {label:"Install app", ico:"box", kind:"action", cat:"app", ctrl:"adb", outs:["out"], fields:[
     {k:"apk",lbl:"APK file",t:"path",d:"",pickFile:true},
     {k:"reinstall",lbl:"Reinstall, keep data (-r)",t:"bool",d:true},
     {k:"grantPerms",lbl:"Grant all permissions (-g)",t:"bool",d:false},
@@ -348,14 +348,14 @@ const WF_NODES = {
   ], sum:p=>`📦 ${(String(p.apk||"(apk)")).split(/[\\/]/).pop()}`+(p.reinstall?" -r":"")},
   // ADB: package of the foreground app contains a string · Win32: the TARGET
   // window's own title contains it (blank = "is my target window still alive?").
-  if_app: {label:"If app running", ico:"smartphone", kind:"condition", cat:"app", ctrl:null, outs:["true","false"], fields:[
+  if_app: {label:"If app is running", ico:"smartphone", kind:"condition", cat:"app", ctrl:null, outs:["true","false"], fields:[
     {k:"pkgSrc",lbl:"Target",t:"select",opts:[{v:"project",t:"From Project settings"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"package",lbl:"Package / title contains",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
     {k:"negate",t:"bool",d:false}
   ], sum:p=>`${p.negate?"not ":""}app ~ "${wfAppTargetLabel(p)}"`},
   // Poll If app running until it holds — or, negated, until the app is GONE
   // (crash / "wait for the game to close"). Both backends, like If app running.
-  wait_app: {label:"Wait for app", search:"until running closed crash window", ico:"timer", kind:"condition", cat:"app", ctrl:null, outs:["true","false"], fields:[
+  wait_app: {label:"Wait until app", search:"until running closed crash window", ico:"timer", kind:"condition", cat:"app", ctrl:null, outs:["true","false"], fields:[
     {k:"pkgSrc",lbl:"Target",t:"select",opts:[{v:"project",t:"From Project settings"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"package",lbl:"Package / title contains",t:"text",varRef:true,showWhen:{pkgSrc:"custom"}},
     {k:"timeout",lbl:"Timeout (s)",t:"num",d:30},
@@ -375,8 +375,8 @@ const WF_NODES = {
   notify:        {label:"Notify",      ico:"bell",   kind:"action",    cat:"misc",   outs:["out"],         fields:[{k:"title",lbl:"Title",t:"text",insertVar:true,d:"Workflow"},{k:"message",lbl:"Message",t:"text",insertVar:true,d:"Completed!"},{k:"sound",lbl:"Play sound",t:"bool",d:true}], sum:p=>`🔔 [${p.title||"Workflow"}] ${p.message||""}`},
   // Function call returns a boolean: "true" when the function's walk reached an
   // End node, "false" when it dead-ended (e.g. a node inside timed out).
-  call:          {label:"Function",       ico:"function", kind:"call",      cat:null,     outs:["true","false"], fields:[]},
-  scroll_find:   {label:"Scroll to image",   ico:"scroll",   kind:"condition", cat:"image",  outs:["true","false"],fields:[{k:"template",t:"tpl"},{k:"direction",lbl:"Swipe direction",t:"select",opts:[{v:"up",t:"↑ Up"},{v:"down",t:"↓ Down"},{v:"left",t:"← Left"},{v:"right",t:"→ Right"}],d:"up"},{k:"max_swipes",lbl:"Max swipes",t:"num",d:10},{k:"swipe_distance",lbl:"Distance (px)",t:"num",d:400},{k:"threshold",t:"num",d:.85,step:.05},{k:"swipe_duration",lbl:"Swipe duration (ms)",t:"num",d:300},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${({"up":"↑","down":"↓","left":"←","right":"→"})[p.direction]||"↑"} ≤${p.max_swipes||10}× → ${wfBase(p.template)}`},
+  call:          {label:"Call function",       ico:"function", kind:"call",      cat:null,     outs:["true","false"], fields:[]},
+  scroll_find:   {label:"Scroll until image",   ico:"scroll",   kind:"condition", cat:"image",  outs:["true","false"],fields:[{k:"template",t:"tpl"},{k:"direction",lbl:"Swipe direction",t:"select",opts:[{v:"up",t:"↑ Up"},{v:"down",t:"↓ Down"},{v:"left",t:"← Left"},{v:"right",t:"→ Right"}],d:"up"},{k:"max_swipes",lbl:"Max swipes",t:"num",d:10},{k:"swipe_distance",lbl:"Distance (px)",t:"num",d:400},{k:"threshold",t:"num",d:.85,step:.05},{k:"swipe_duration",lbl:"Swipe duration (ms)",t:"num",d:300},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${({"up":"↑","down":"↓","left":"←","right":"→"})[p.direction]||"↑"} ≤${p.max_swipes||10}× → ${wfBase(p.template)}`},
   // Loop the body until the template appears: body loops back via the "loop"
   // port; image found → "found"; maxLoops exhausted (0 = ∞) → "fail". Replaces
   // the loop-∞ + if_image + break cluster.
@@ -405,7 +405,7 @@ const WF_NODES = {
   ], sum:p=>`↺ until ${p.name||"?"} ${p.op||">="} ${p.value}`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
   // Find a template and store its centre in two variables — the only way to get
   // a match position into arithmetic (the implicit "last found" can only be tapped).
-  find_image_pos: {label:"Find image → position", ico:"search", kind:"condition", cat:"image", outs:["true","false"], fields:[
+  find_image_pos: {label:"Find image position", ico:"search", kind:"condition", cat:"image", outs:["true","false"], fields:[
     {k:"template",t:"tpl"},
     {k:"nameX",lbl:"X → variable",t:"text",d:"foundX",var:true},
     {k:"nameY",lbl:"Y → variable",t:"text",d:"foundY",var:true},
@@ -414,33 +414,33 @@ const WF_NODES = {
   ], sum:p=>`${wfBase(p.template)} → ${p.nameX||"?"}, ${p.nameY||"?"}`},
   // Wait for the screen to stop changing (animation / loading settled) instead of
   // guessing a fixed Wait duration.
-  wait_stable: {label:"Wait until screen settles", ico:"hourglass", kind:"condition", cat:"basic", outs:["true","false"], fields:[
+  wait_stable: {label:"Wait until still", ico:"hourglass", kind:"condition", cat:"basic", outs:["true","false"], fields:[
     {k:"settle",lbl:"Must stay still for (s)",t:"num",d:1,step:.5},
     {k:"timeout",lbl:"Timeout (s)",t:"num",d:15},
     {k:"tolerance",lbl:"Pixel change tolerance",t:"num",d:2,step:.5},
     {k:"_region",lbl:"Search region",t:"region"}
   ], sum:p=>`🧊 still ${p.settle??1}s · ≤${p.timeout??15}s`},
   // Tap EVERY position matching the template on the current frame (loot-collection sweeps).
-  tap_all_images: {label:"Tap all matches", ico:"layers", kind:"condition", cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxTaps",lbl:"Max taps (0 = all)",t:"num",varRef:true,d:0},{k:"delayBetween",lbl:"Delay between taps (s)",t:"num",d:.15,step:.05},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`tap all ${wfBase(p.template)}`+((parseInt(p.maxTaps)||0)>0?` ≤${p.maxTaps}`:"")+(p.taps=="2"?" ×2":"")},
+  tap_all_images: {label:"Tap all images", ico:"layers", kind:"condition", cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxTaps",lbl:"Max taps (0 = all)",t:"num",varRef:true,d:0},{k:"delayBetween",lbl:"Delay between taps (s)",t:"num",d:.15,step:.05},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`tap all ${wfBase(p.template)}`+((parseInt(p.maxTaps)||0)>0?` ≤${p.maxTaps}`:"")+(p.taps=="2"?" ×2":"")},
   random_branch: {label:"Random branch",ico:"dice",   kind:"random",    cat:"flow",   outs:[],              fields:[{k:"count",lbl:"Branch count",t:"num",d:2,refresh:true}], sum:p=>`🎲 ${p.count||2} even branches`},
-  format_var:    {label:"Format string",ico:"type",   kind:"action",    cat:"logic",  outs:["out"],         fields:[{k:"name",lbl:"Target variable",t:"text",d:"text",var:true},{k:"template",lbl:"Template string",t:"text",insertVar:true,d:"Round {round}/{total}"}], sum:p=>`${p.name||"?"} = "${p.template||""}"`},
+  format_var:    {label:"Format text to variable",ico:"type",   kind:"action",    cat:"logic",  outs:["out"],         fields:[{k:"name",lbl:"Target variable",t:"text",d:"text",var:true},{k:"template",lbl:"Template string",t:"text",insertVar:true,d:"Round {round}/{total}"}], sum:p=>`${p.name||"?"} = "${p.template||""}"`},
   // ── Time ───────────────────────────────────────────────────────────────────
-  get_time:      {label:"Get time → variable", ico:"clock", kind:"action", cat:"time", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"now",var:true},{k:"part",lbl:"Value",t:"select",opts:[{v:"hm",t:"HH:MM"},{v:"hms",t:"HH:MM:SS"},{v:"hour",t:"Hour (0-23)"},{v:"minute",t:"Minute"},{v:"second",t:"Second"},{v:"date",t:"Date YYYY-MM-DD"},{v:"datetime",t:"Date & time"},{v:"weekday",t:"Weekday (1=Mon…7=Sun)"},{v:"timestamp",t:"Unix timestamp"},{v:"custom",t:"Custom (strftime)"}],d:"hm"},{k:"format",lbl:"strftime format",t:"text",d:"%H:%M",showWhen:{part:"custom"}}], sum:p=>`${p.name||"?"} = ${({hm:"HH:MM",hms:"HH:MM:SS",hour:"hour",minute:"minute",second:"second",date:"date",datetime:"datetime",weekday:"weekday",timestamp:"timestamp",custom:p.format||"?"})[p.part||"hm"]}`},
+  get_time:      {label:"Read time to variable", ico:"clock", kind:"action", cat:"time", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"now",var:true},{k:"part",lbl:"Value",t:"select",opts:[{v:"hm",t:"HH:MM"},{v:"hms",t:"HH:MM:SS"},{v:"hour",t:"Hour (0-23)"},{v:"minute",t:"Minute"},{v:"second",t:"Second"},{v:"date",t:"Date YYYY-MM-DD"},{v:"datetime",t:"Date & time"},{v:"weekday",t:"Weekday (1=Mon…7=Sun)"},{v:"timestamp",t:"Unix timestamp"},{v:"custom",t:"Custom (strftime)"}],d:"hm"},{k:"format",lbl:"strftime format",t:"text",d:"%H:%M",showWhen:{part:"custom"}}], sum:p=>`${p.name||"?"} = ${({hm:"HH:MM",hms:"HH:MM:SS",hour:"hour",minute:"minute",second:"second",date:"date",datetime:"datetime",weekday:"weekday",timestamp:"timestamp",custom:p.format||"?"})[p.part||"hm"]}`},
   wait_until:    {label:"Wait until time", ico:"alarm", kind:"action", cat:"time", outs:["out"], fields:[{k:"time",lbl:"Time",t:"time",d:"08:00"},{k:"nextDay",lbl:"If passed → wait next day",t:"bool",d:true}], sum:p=>`⏰ ${p.time||"08:00"}`},
-  if_time:       {label:"If within time", ico:"clock", kind:"condition", cat:"time", outs:["true","false"], fields:[{k:"from",lbl:"From",t:"time",d:"08:00"},{k:"to",lbl:"To",t:"time",d:"22:00"},{k:"negate",lbl:"Negate (outside window)",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}${p.from||"00:00"}–${p.to||"23:59"}`},
+  if_time:       {label:"If time is between", ico:"clock", kind:"condition", cat:"time", outs:["true","false"], fields:[{k:"from",lbl:"From",t:"time",d:"08:00"},{k:"to",lbl:"To",t:"time",d:"22:00"},{k:"negate",lbl:"Negate (outside window)",t:"bool",d:false}], sum:p=>`${p.negate?"not ":""}${p.from||"00:00"}–${p.to||"23:59"}`},
   // ── Device (ADB / emulator) ────────────────────────────────────────────────
-  device_info:   {label:"Device info → variable", ico:"smartphone", kind:"action", cat:"device", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"info",var:true},{k:"prop",lbl:"Property",t:"select",opts:[{v:"battery",t:"Battery level (%)"},{v:"current_app",t:"Current app package"},{v:"width",t:"Screen width"},{v:"height",t:"Screen height"},{v:"model",t:"Model"},{v:"brand",t:"Brand"},{v:"android",t:"Android version"},{v:"sdk",t:"SDK level"},{v:"serial",t:"Serial"},{v:"ip",t:"IP address"}],d:"battery"}], sum:p=>`${p.name||"?"} = ${p.prop||"battery"}`},
+  device_info:   {label:"Read device to variable", ico:"smartphone", kind:"action", cat:"device", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"info",var:true},{k:"prop",lbl:"Property",t:"select",opts:[{v:"battery",t:"Battery level (%)"},{v:"current_app",t:"Current app package"},{v:"width",t:"Screen width"},{v:"height",t:"Screen height"},{v:"model",t:"Model"},{v:"brand",t:"Brand"},{v:"android",t:"Android version"},{v:"sdk",t:"SDK level"},{v:"serial",t:"Serial"},{v:"ip",t:"IP address"}],d:"battery"}], sum:p=>`${p.name||"?"} = ${p.prop||"battery"}`},
   screen_power:  {label:"Screen power", ico:"power", kind:"action", cat:"device", outs:["out"], fields:[{k:"action",lbl:"Action",t:"select",opts:[{v:"on",t:"Wake / On"},{v:"off",t:"Sleep / Off"},{v:"toggle",t:"Toggle (power key)"}],d:"on"}], sum:p=>`🖥 ${({on:"wake",off:"sleep",toggle:"toggle"})[p.action||"on"]}`},
   // Read side of Screen power — branch on whether the display is awake.
-  if_screen_on:  {label:"If screen is on", ico:"power", kind:"condition", cat:"device", outs:["true","false"], fields:[{k:"negate",lbl:"Negate (screen is off)",t:"bool",d:false}], sum:p=>`🖥 screen ${p.negate?"off":"on"}?`},
-  if_device_size:{label:"If device size", ico:"smartphone", kind:"condition", cat:"device", outs:["true","false"], fields:[
+  if_screen_on:  {label:"If screen on", ico:"power", kind:"condition", cat:"device", outs:["true","false"], fields:[{k:"negate",lbl:"Negate (screen is off)",t:"bool",d:false}], sum:p=>`🖥 screen ${p.negate?"off":"on"}?`},
+  if_device_size:{label:"If screen size", ico:"smartphone", kind:"condition", cat:"device", outs:["true","false"], fields:[
     {k:"width",lbl:"Screen width",t:"num",d:1920},
     {k:"height",lbl:"Screen height",t:"num",d:1080},
     {k:"tolerance",lbl:"Tolerance (px)",t:"num",d:0},
     {k:"negate",lbl:"Negate (different size)",t:"bool",d:false}
   ], sum:p=>`📱 ${p.negate?"not ":""}${p.width??1920}×${p.height??1080}${Number(p.tolerance)?`±${p.tolerance}`:""}`},
   // Escape hatch: run any adb shell command and capture stdout into a variable.
-  adb_shell:     {label:"ADB shell → variable", ico:"log", kind:"action", cat:"device", outs:["out"], fields:[
+  adb_shell:     {label:"Run shell to variable", ico:"log", kind:"action", cat:"device", outs:["out"], fields:[
     {k:"command",lbl:"Shell command",t:"text",insertVar:true,d:"getprop ro.product.model"},
     {k:"name",lbl:"Output → variable",t:"text",d:"out",var:true},
     {k:"failIfEmpty",lbl:"Treat empty output as failure",t:"bool",d:false}
@@ -462,7 +462,7 @@ const WF_NODES = {
   // Is an emulator instance booted & its ADB responding (sys.boot_completed)?
   // "Last used" re-checks the instance saved by the last successful Launch
   // emulator (data/emulator_state.json) — skip the boot when it's already up.
-  if_emulator:{label:"If emulator ready", ico:"monitor", kind:"condition", cat:"device", outs:["true","false"], fields:[
+  if_emulator:{label:"If emulator is ready", ico:"monitor", kind:"condition", cat:"device", outs:["true","false"], fields:[
     {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"}],d:"last"},
     {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
     {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
@@ -471,7 +471,7 @@ const WF_NODES = {
   // Poll until the emulator finishes Android boot (adb connect + sys.boot_completed
   // == 1), or until timeout. Use after Launch emulator (with wait=0) or when the
   // instance is already starting outside this flow.
-  wait_emulator:{label:"Wait emulator ready", ico:"timer", kind:"condition", cat:"device", outs:["true","false"], fields:[
+  wait_emulator:{label:"Wait until emulator ready", ico:"timer", kind:"condition", cat:"device", outs:["true","false"], fields:[
     {k:"emulator",lbl:"Emulator",t:"select",opts:[{v:"last",t:"Last used (saved)"},{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"}],d:"last"},
     {k:"index",lbl:"Instance index (ignored for Last used)",t:"num",d:0},
     {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
@@ -522,7 +522,7 @@ const WF_NODES = {
   // were cropped against. Resize emulator only changes the PC window, so a
   // 1920×1080 window over a 1600×900 device still letterboxes. MuMu only; the
   // instance must restart to apply, which this node does by default.
-  emulator_resolution:{label:"Emulator resolution", ico:"smartphone", kind:"action", cat:"device", outs:["out"], fields:[
+  emulator_resolution:{label:"Set emulator resolution", ico:"smartphone", kind:"action", cat:"device", outs:["out"], fields:[
     {k:"emulator",lbl:"Emulator (MuMu only)",t:"select",opts:WF_EMU_TARGET_OPTS_MUMU,d:"selected"},
     {k:"index",lbl:"Instance index (ignored for Last used / Selected)",t:"num",d:0},
     {k:"pathSrc",lbl:"Install folder",t:"select",opts:[{v:"project",t:"Project emulator setting"},{v:"custom",t:"Custom…"}],d:"project"},
@@ -539,10 +539,10 @@ const WF_NODES = {
   // Only used when the project's Controller = Win32. The tap/swipe/image/color/
   // OCR nodes still work on Win32 through the shared screen-capture pipeline;
   // these cover what a single left-button touch model can't express.
-  win_send_text:{label:"Input text", ico:"keyboard", kind:"action", cat:"win32", outs:["out"], fields:[{k:"text",t:"text",insertVar:true}], sum:p=>`"${p.text||""}"`},
+  win_send_text:{label:"Type text", ico:"keyboard", kind:"action", cat:"win32", outs:["out"], fields:[{k:"text",t:"text",insertVar:true}], sum:p=>`"${p.text||""}"`},
   // mode: press = down → hold → up (a game only moves while the key is down, so
   // walking wants a few hundred ms); down / up keep a key held across blocks.
-  win_key:      {label:"Key (Win32)",search:"press key escape esc preset", ico:"disc", kind:"action", cat:"win32", outs:["out"], fields:[
+  win_key:      {label:"Press key",search:"press key escape esc preset", ico:"disc", kind:"action", cat:"win32", outs:["out"], fields:[
     {k:"keycode",lbl:"Key preset",t:"key",opts:WF_WIN_KEYS,d:"13"},
     {k:"mode",lbl:"Action",t:"select",opts:[{v:"press",t:"Press (down → hold → up)"},{v:"down",t:"Hold down (until Release)"},{v:"up",t:"Release (key up)"}],d:"press"},
     {k:"hold",lbl:"Hold (ms)",t:"num",d:80,showWhen:{mode:"press"}},
@@ -609,19 +609,19 @@ const WF_NODES = {
   win_style:    {label:"Set window style", ico:"settings", kind:"action", cat:"window", outs:["out"], fields:[{k:"style",lbl:"Style",t:"select",opts:[{v:"windowed",t:"Windowed (with frame)"},{v:"borderless",t:"Borderless"},{v:"popup",t:"Popup"}],d:"windowed"}], sum:p=>`${p.style||"windowed"}`},
   // Win32 conditions — the target window's own state (crash detection etc.), not
   // the foreground window's. Previously Win32 projects had no condition at all.
-  win_if_window:{label:"If window …", ico:"help", kind:"condition", cat:"window", outs:["true","false"], fields:[
+  win_if_window:{label:"If window", ico:"help", kind:"condition", cat:"window", outs:["true","false"], fields:[
     {k:"state",lbl:"State",t:"select",opts:WF_WIN_STATES,d:"exists"},
     ...WF_WIN_SIZE_FIELDS,
     {k:"negate",t:"bool",d:false}
   ], sum:p=>`🪟 ${p.negate?"not ":""}${wfWinStateLabel(p)}`},
-  win_wait_window:{label:"Wait for window …", ico:"timer", kind:"condition", cat:"window", outs:["true","false"], fields:[
+  win_wait_window:{label:"Wait until window", ico:"timer", kind:"condition", cat:"window", outs:["true","false"], fields:[
     {k:"state",lbl:"State",t:"select",opts:WF_WIN_STATES,d:"exists"},
     ...WF_WIN_SIZE_FIELDS,
     {k:"timeout",lbl:"Timeout (s)",t:"num",d:30},
     {k:"negate",lbl:"Negate - wait for the opposite",t:"bool",d:false}
   ], sum:p=>`🪟 ${p.negate?"not ":""}${wfWinStateLabel(p)} ≤${p.timeout??30}s`},
   // Win32's answer to Device info → variable.
-  win_info:     {label:"Window info → variable", ico:"monitor", kind:"action", cat:"window", outs:["out"], fields:[
+  win_info:     {label:"Read window to variable", ico:"monitor", kind:"action", cat:"window", outs:["out"], fields:[
     {k:"name",lbl:"Target variable",t:"text",d:"info",var:true},
     {k:"prop",lbl:"Property",t:"select",opts:[{v:"width",t:"Client width"},{v:"height",t:"Client height"},{v:"x",t:"Window X (screen)"},{v:"y",t:"Window Y (screen)"},{v:"title",t:"Title"},{v:"class",t:"Class name"},{v:"pid",t:"Process ID"},{v:"exe",t:"Executable"},{v:"hwnd",t:"Window handle"},{v:"foreground",t:"Is foreground (true/false)"},{v:"minimized",t:"Is minimized (true/false)"}],d:"width"}
   ], sum:p=>`${p.name||"?"} = ${p.prop||"width"}`},
@@ -674,9 +674,9 @@ const WF_PAL_PAIRS = [
     hint:"Try arms 1→2→… · Next branch skips to the next arm" },
 ];
 // "body" is where the loop's contents hang off; the loop-back INPUT is what is
-// labelled "loop" (WF_IN_LBL). Calling both of them "loop" made a Repeat block
+// labelled "loop" (WF_IN_LBL). Calling both of them "loop" made a Loop block
 // read as if it had the same port twice.
-const WF_PORT_LBL = { out:"", "true":"True", "false":"False", body:"body", done:"done", found:"found", fail:"fail", "1":"1", "2":"2", "3":"3" };
+const WF_PORT_LBL = { out:"", "true":"T", "false":"F", body:"body", done:"done", found:"found", fail:"fail", "1":"1", "2":"2", "3":"3" };
 // Input-side port labels (only shown for nodes with >1 input, e.g. the loop).
 const WF_IN_LBL = { in:"in", loop:"loop" };
 
@@ -823,7 +823,7 @@ let wfSpace=false;  // space held → pan instead of box-select
 // A Space press that never panned is a "tap"; two taps in quick succession reset
 // the zoom (keyboard.js). Armed on keydown, spent when a Space+drag pan starts.
 let wfSpaceArmed=false, wfSpaceUsed=false;
-const WF_GRID=20;   // grid step; every card dimension is a whole multiple of it
+const WF_GRID=16;   // grid step; every card dimension is a whole multiple of it
 let wfSnapOn=true;  // snap ON by default — blocks land on the grid unless you opt out
 let wfPreviewAll=false;   // global: show image thumbnail on every image block
 let wfMinimapOn=false;    // minimap is opt-in (default off)
@@ -1001,6 +1001,9 @@ function wfPopulateOcrBackends(backs){
 const WF_WIN_MATCH_MODES=new Set(["title","class","pid","exe"]);
 const WF_WIN_INPUT_MODES=new Set(["background","background_sync","background_cursor",
   "background_window","anchored_touch","unity_bridge","foreground"]);
+// Last Win32 input mode this document was on. wfSyncControllerUI seeds it on
+// open/re-sync so loading a unity_bridge workflow does not look like a switch.
+let wfLastWinMode=null;
 function wfNormWinMatchBy(value){
   const mode=String(value||"").trim().toLowerCase();
   return WF_WIN_MATCH_MODES.has(mode)?mode:"title";
@@ -1052,9 +1055,10 @@ function wfSyncControllerUI(){
   const gp=$("wf-win32-path"); if(gp && document.activeElement!==gp) gp.value=w.path||"";
   const mb=$("wf-win32-matchby"); if(mb) mb.value=wfNormWinMatchBy(w.matchBy);
   const md=$("wf-win32-mode"); if(md) md.value=wfNormWinInputMode(w.inputMode);
-  // A project created by the Hub can already be on the bridge without ever
-  // passing through a change handler — offer the deploy here too.
-  wfWinInputModeSwitched(null, wfNormWinInputMode(w.inputMode));
+  // Remember the mode already on this document so a later real switch (bar or
+  // settings) can offer deploy. Do not prompt just because the designer opened
+  // or re-synced a workflow that was already on unity_bridge.
+  wfLastWinMode=wfNormWinInputMode(w.inputMode);
   const inSel=$("wf-input-select");
   if(inSel && document.activeElement!==inSel) inSel.value=(WF.inputBackend==="scrcpy")?"scrcpy":"adb";
   wfSyncPackageUI();
@@ -1170,10 +1174,8 @@ function wfBarWinInputChanged(value){
   wfWinInputModeSwitched(prevMode, w.inputMode);
 }
 // ── Unity Bridge: offer to deploy the in-game plugin when the mode is chosen ──
-// The last mode this document was on, so a re-sync (which passes prev=null) can
-// still tell a real switch — into the bridge, or already sitting on it — from a
-// no-op. Kept here rather than at the call sites so every path stays in step.
-let wfLastWinMode=null;
+// wfLastWinMode is declared with the other Win32 mode helpers (above) so the
+// open/re-sync path can seed it before this function runs.
 function wfWinInputModeSwitched(prev, next){
   const before=prev||wfLastWinMode;
   wfLastWinMode=next;
@@ -1465,7 +1467,7 @@ function wfOpenProjectSettings(){
     wfSyncSpeedUI();
   });
 }
-function wfToggleSnap(){ wfSnapOn=!wfSnapOn; wfSyncToggleBtns(); wfSaveSettings(); }
+function wfToggleSnap(){ wfSnapOn=!wfSnapOn; wfSyncToggleBtns(); wfSyncGrid(); wfSaveSettings(); }
 function wfTogglePreview(){ wfPreviewAll=!wfPreviewAll; wfSyncToggleBtns(); wfRenderCanvas(); wfSaveSettings(); }
 let wfRunning=false;
 let wfPan={x:0,y:0};
@@ -1486,25 +1488,39 @@ function wfSyncGrid(){
   const c=$("wf-canvas"); if(!c) return;
   const z=wfZoom;
   const px=wfCrispPx(wfPan.x), py=wfCrispPx(wfPan.y);
-  // Read the dot color from CSS so the grid follows the active theme.
   const cs=getComputedStyle(c);
   const dotMajor=(cs.getPropertyValue("--grid-dot")||"rgba(20,30,45,.10)").trim();
   const dotMinor=(cs.getPropertyValue("--grid-dot-minor")||"#d9dee6").trim();
-  // A radial-gradient paints its dot at the CENTRE of each background tile by
-  // default, so the grid dots sat half a cell off from the world's (0,0) — a
-  // node corner snapped to x=0 floated between dots. Position each layer at
-  // its top-left corner (and off by half a dot so the ink centres exactly on
-  // the grid line), and start the tile pattern half a cell back so tile 0's
-  // corner — where world origin and node corners live — gets the dot.
+  const lineMinor=(cs.getPropertyValue("--grid-line")||"rgba(20,30,45,.045)").trim();
+  const lineMajor=(cs.getPropertyValue("--grid-line-major")||"rgba(20,30,45,.075)").trim();
+  const cell=WF_GRID*z, major=WF_GRID*5*z;
+
+  // Snap mode gets graph-paper lines. Both pitches and their origin follow the
+  // world transform, so snapped node edges continue to sit directly on lines.
+  if(wfSnapOn){
+    const hairline=Math.max(.5, wfCrispPx(1));
+    const layers=[
+      `linear-gradient(to right, ${lineMinor} ${hairline}px, transparent ${hairline}px)`,
+      `linear-gradient(to bottom, ${lineMinor} ${hairline}px, transparent ${hairline}px)`,
+      `linear-gradient(to right, ${lineMajor} ${hairline}px, transparent ${hairline}px)`,
+      `linear-gradient(to bottom, ${lineMajor} ${hairline}px, transparent ${hairline}px)`,
+    ];
+    c.style.backgroundImage=layers.join(",");
+    c.style.backgroundSize=[cell,cell,major,major].map(v=>`${v}px ${v}px`).join(",");
+    c.style.backgroundPosition=Array(4).fill(`${px}px ${py}px`).join(",");
+    return;
+  }
+
+  // Grid off keeps the quieter dotted stage rather than showing snap guides.
   const halfDot=1.6*z;
   const pos=[`${wfCrispPx(px-halfDot)}px ${wfCrispPx(py-halfDot)}px`,
-             `${wfCrispPx(px-halfDot-10*z)}px ${wfCrispPx(py-halfDot-10*z)}px`];
+             `${wfCrispPx(px-halfDot-(WF_GRID/2)*z)}px ${wfCrispPx(py-halfDot-(WF_GRID/2)*z)}px`];
   const layers=[`radial-gradient(circle at 0 0, ${dotMajor} ${(1.4*z).toFixed(2)}px, transparent ${(1.6*z).toFixed(2)}px)`];
-  const sizes=[`${100*z}px ${100*z}px`];
+  const sizes=[`${major}px ${major}px`];
   if(z>=0.55){
     const r=Math.max(.8, z);
     layers.push(`radial-gradient(circle at 0 0, ${dotMinor} ${r.toFixed(2)}px, transparent ${(r+.2).toFixed(2)}px)`);
-    sizes.push(`${20*z}px ${20*z}px`);
+    sizes.push(`${cell}px ${cell}px`);
   }
   c.style.backgroundImage=layers.join(",");
   c.style.backgroundSize=sizes.join(",");

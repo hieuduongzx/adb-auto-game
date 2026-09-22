@@ -7,7 +7,7 @@ from unittest.mock import patch
 import cv2
 import numpy as np
 
-from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader
+from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCRReader, text_matches
 from src.utils import add_log_subscriber, remove_log_subscriber
 from src.core.adb.auto.ppocr_onnx import (
     PPOCRv5Recognizer,
@@ -74,6 +74,19 @@ class OCRCTCDecoderTests(unittest.TestCase):
     def test_out_of_range_ids_do_not_shift_valid_characters(self):
         scores = _scores_for([1, 5, 2], 6)
         self.assertEqual(decode_ctc(scores, ("A", "B", "C")), "AB")
+
+
+class OCRTextMatchTests(unittest.TestCase):
+    def test_empty_needle_does_not_match_recognised_text(self):
+        self.assertFalse(text_matches("TOUCH TO START", ""))
+        self.assertFalse(text_matches("TOUCH TO START", "   "))
+
+    def test_phrase_matches_when_ocr_drops_spaces(self):
+        self.assertTrue(text_matches("TOUCHTOSTART", "TOUCH TO START"))
+        self.assertTrue(text_matches("touch to start", "TOUCH TO START"))
+
+    def test_missing_word_does_not_match(self):
+        self.assertFalse(text_matches("TOUCH TO", "TOUCH TO START"))
 
 
 class OCRONNXIntegrationTests(unittest.TestCase):

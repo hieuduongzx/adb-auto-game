@@ -8,7 +8,7 @@ const wfCss = fs.readFileSync(path.join(__dirname, '../apps/web/wf/css/wf.css'),
 const renderJs = fs.readFileSync(path.join(__dirname, '../apps/web/wf/js/render.js'), 'utf8');
 const workflowJs = fs.readFileSync(path.join(__dirname, '../apps/web/wf/js/workflow.js'), 'utf8');
 
-const GRID = 20;
+const GRID = 16;
 const tok = (src, name) => {
   const m = src.match(new RegExp(name.replace(/[-]/g, '\\-') + ':\\s*(-?[\\d.]+)px'));
   assert.ok(m, name + ' must be a px token');
@@ -22,7 +22,8 @@ const cells = v => {
 test('node card, terminal and try_next sizes are whole grid cells', () => {
   assert.equal(cells(tok(baseCss, '--node-w')), 9, 'card = 9 cells wide');
   assert.equal(cells(tok(baseCss, '--node-h')), 4, 'card = 4 cells tall');
-  assert.equal(cells(tok(baseCss, '--term-size')), 2, 'start/end = 2 cells');
+  assert.equal(cells(tok(baseCss, '--term-size')), 3, 'start/end = 3 cells');
+  assert.equal(tok(baseCss, '--port-sz'), 6, 'connection dots stay visually compact');
   assert.equal(cells(tok(baseCss, '--port-gap')), 1, 'slot pitch = 1 cell');
   const m = wfCss.match(/\.wf-node\.try_next \{[^}]*width:(\d+)px[^}]*min-height:(\d+)px/);
   assert.ok(m, 'try_next rule found');
@@ -83,11 +84,11 @@ test('the primary port row centres on a grid dot', () => {
   assert.equal(center % GRID, 0, `port centre ${center}px must sit on a ${GRID}px line`);
 });
 
-test('WF_GRID stays 20 and grown multi-port cards snap to whole cells', () => {
+test('WF_GRID stays 16 and grown multi-port cards snap to whole cells', () => {
   const m = workflowJs.match(/const WF_GRID=(\d+)/);
   assert.ok(m, 'WF_GRID constant found');
-  assert.equal(+m[1], 20);
-  assert.match(renderJs, /Math\.ceil\([^)]*WF_ROW_TOP[\s\S]{0,120}?\/20\)\*20/,
+  assert.equal(+m[1], 16);
+  assert.match(renderJs, /Math\.ceil\([^)]*WF_ROW_TOP[\s\S]{0,160}?\/WF_GRID\)\*WF_GRID/,
     'multi-port minHeight must snap up to a whole cell');
 });
 
@@ -96,7 +97,7 @@ test('drop offsets put the card corner at the pointer and on-grid', () => {
   // (screen-centre insert) — a half-card 90px (4.5 cells) pushed the corner
   // dead centre of a cell, which is exactly the "never on a grid point" bug.
   for (const [file, pat, want] of [
-    ['render.js', /wfSnap\(\(cr\.left\+cr\.width\/2-wr\.left\)\/wfZoom-(\d+)\)/, 100],
+    ['render.js', /wfSnap\(\(cr\.left\+cr\.width\/2-wr\.left\)\/wfZoom-(\d+)\)/, 80],
     ['groups.js', /wfSnap\(\(e\.clientX-wr\.left\)\/wfZoom\)/, null],
   ]) {
     const src = fs.readFileSync(path.join(__dirname, '../apps/web/wf/js', file), 'utf8');

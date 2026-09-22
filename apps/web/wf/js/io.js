@@ -1,6 +1,40 @@
 // ── Export / import / run ────────────────────────────────────────────────────
-function wfSerialVars(vars){ return vars.map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[], multiple:v.type==="select"&&v.display==="toggle-group"&&!!v.multiple, display:v.type==="select"&&v.display==="toggle-group"?"toggle-group":undefined, children:v.children&&v.children.length?wfSerialVars(v.children):undefined})); }
-function wfHydVars(vars){ return (vars||[]).map(v=>({name:v.name||"var",label:v.label||"",type:v.type||"bool",value:v.value,options:v.options||[], multiple:v.type==="select"&&v.display==="toggle-group"&&!!v.multiple, display:v.display==="toggle-group"?"toggle-group":"dropdown", children:v.children?wfHydVars(v.children):[]})); }
+// Per-option children live beside the select's own children. The map key is the
+// option text, so renaming an option moves the bucket and deleting it drops it.
+function wfSerialOptionChildren(v){
+  const src=v&&v.optionChildren;
+  if(!src||typeof src!=="object"||Array.isArray(src)) return undefined;
+  const out={};
+  Object.keys(src).forEach(key=>{
+    const list=src[key];
+    if(Array.isArray(list)&&list.length) out[key]=wfSerialVars(list);
+  });
+  return Object.keys(out).length?out:undefined;
+}
+function wfHydOptionChildren(src){
+  const out={};
+  if(!src||typeof src!=="object"||Array.isArray(src)) return out;
+  Object.keys(src).forEach(key=>{ if(Array.isArray(src[key])) out[key]=wfHydVars(src[key]); });
+  return out;
+}
+function wfSerialVars(vars){
+  return (vars||[]).map(v=>({
+    name:v.name||"var", label:v.label||"", type:v.type||"bool", value:v.value, options:v.options||[],
+    multiple:v.type==="select"&&v.display==="toggle-group"&&!!v.multiple,
+    display:v.type==="select"&&v.display==="toggle-group"?"toggle-group":undefined,
+    children:v.children&&v.children.length?wfSerialVars(v.children):undefined,
+    optionChildren:wfSerialOptionChildren(v),
+  }));
+}
+function wfHydVars(vars){
+  return (vars||[]).map(v=>({
+    name:v.name||"var", label:v.label||"", type:v.type||"bool", value:v.value, options:v.options||[],
+    multiple:v.type==="select"&&v.display==="toggle-group"&&!!v.multiple,
+    display:v.display==="toggle-group"?"toggle-group":"dropdown",
+    children:v.children?wfHydVars(v.children):[],
+    optionChildren:wfHydOptionChildren(v.optionChildren),
+  }));
+}
 // Project-wide node defaults — kept to the fields wfNewNode stamps, so an older
 // file just yields zeros (no defaults) instead of a broken object.
 function wfSerialNodeDefaults(d){

@@ -9,19 +9,21 @@ Internal tool suite for Android (emulator/device) automation on Windows.
 | **Macro2k Runner** | Load JSON flow & run | `python apps/workflow_runner.py [flow.json]` |
 | **DevScope** | Device inspector / crop templates | `python apps/devscope.py` |
 
-Also: `run_hub.bat`, `run_designer.bat` / `run_designer_admin.bat` (Admin needed when the game window is elevated).
+Also: `run_hub.bat`, `run_designer.bat` (launchers stay at the repo root; they prefer `.venv`).
 
 Frozen exe modes: `Macro2k.exe` (hub), `--designer [flow]`, `--runner [flow]`.
 
 ## Layout
 
 ```
-apps/           Product apps + web UI (hub / wf / runner / scope)
-src/            Library: ADB core, PP-OCRv5 Mobile, Win32, workflow engine, utils
-workflows/      Game projects: <Name>/*.json + templates/ + assets/cover.png
-data/           Runtime settings (gitignored machine-local files)
-packaging/      PyInstaller → dist/Macro2k/
-vendor/         adb / scrcpy / frida binaries
+apps/           Product apps + web UI (hub / wf / runner / scope) and the ADB CLI
+src/            Library: ADB, Win32, workflow engine, updater, utils
+workflows/      Game projects: <Name>/*.json + templates/ + assets/
+assets/         Bundled models (PP-OCRv5 Mobile)
+docs/           Product notes and design specs
+packaging/      PyInstaller, installer, app icon
+vendor/         adb / scrcpy / frida / unity bridge
+data/           Runtime settings (gitignored, machine-local)
 ```
 
 ## Setup
@@ -86,5 +88,5 @@ DevScope is **source-only** in the default packaging.
 
 ## Docs
 
-- Product / UI principles: [`PRODUCT.md`](PRODUCT.md)
+- Product / UI principles: [`docs/PRODUCT.md`](docs/PRODUCT.md)
 - Packaging details: [`packaging/README.md`](packaging/README.md)

@@ -311,6 +311,9 @@ const WF_PV_POINT_TYPES=new Set([
 const WF_PV_REGION_TYPES=new Set([
   "wait_text","if_text","read_var","parse_var","loop_until_text"
 ]);
+const WF_PV_IMAGE_TAP_TYPES=new Set([
+  "tap_image","tap_image_any","tap_all_images","sequence_tap_image"
+]);
 
 function wfPvNum(v,d=0){ const n=Number(v); return Number.isFinite(n)?n:d; }
 function wfPvRegionOf(p){
@@ -322,6 +325,17 @@ function wfPvTplRegion(path){
   const r=wfParseRegionFromName(path||""); return r?[r.x,r.y,r.w,r.h]:null;
 }
 function wfPvNodeLabel(node){ const d=WF_NODES[node.type]||{}; return d.label||node.type; }
+function wfPvImageEntries(node){
+  const p=node.params||{};
+  if(node.type==="sequence_tap_image") return (Array.isArray(p.images)?p.images:[])
+    .filter(item=>item&&item.template).map((item,i)=>({path:item.template,params:item,label:`Image ${i+1}`}));
+  return (Array.isArray(p.templates)?p.templates:[p.template]).filter(Boolean)
+    .map((path,i,all)=>({path,params:p,label:all.length>1?`Image ${i+1}`:wfPvNodeLabel(node)}));
+}
+function wfPvTapPointForRect(rect,params){
+  return [wfPvNum(rect[0])+wfPvNum(rect[2])/2+wfPvNum(params&&params.offsetX),
+          wfPvNum(rect[1])+wfPvNum(rect[3])/2+wfPvNum(params&&params.offsetY)];
+}
 
 function wfPvCanPreviewNode(node){
   if(!node) return false;
@@ -352,9 +366,9 @@ function wfPvShapesForNode(node){
   }
   if(WF_PV_POINT_TYPES.has(t)){
     if(p.where==="anywhere") return out;   // colour scan: the search region above is the shape
-    point(p.x,p.y,label);
-    if((t==="win_click"||t==="tap")&&(wfPvNum(p.offsetX)||wfPvNum(p.offsetY)))
-      point(wfPvNum(p.x)+wfPvNum(p.offsetX),wfPvNum(p.y)+wfPvNum(p.offsetY),"Tap with offset","ok",7);
+    // Preview the coordinate the task will actually use, not both its anchor and
+    // offset destination. The latter is what the controller receives.
+    point(wfPvNum(p.x)+wfPvNum(p.offsetX),wfPvNum(p.y)+wfPvNum(p.offsetY),label);
     return out;
   }
   if(WF_PV_REGION_TYPES.has(t)){ rect(p.x,p.y,p.w,p.h,label,"node"); return out; }
@@ -376,9 +390,9 @@ function wfPvShapesForNode(node){
     (Array.isArray(p.points)?p.points:[]).forEach((q,i)=>point(q.x,q.y,`Tap ${i+1}`,"node",8)); return out;
   }
   if(t==="sequence_tap_image"){
-    (Array.isArray(p.images)?p.images:[]).forEach((item,i)=>{
-      const r=wfPvTplRegion(item&&item.template);
-      if(r) rect(...r,`Image ${i+1}`,"ok");
+    wfPvImageEntries(node).forEach(entry=>{
+      const r=wfPvTplRegion(entry.path);
+      if(r) rect(...r,entry.label,"ok");
     });
     return out;
   }
@@ -460,12 +474,17 @@ async function wfPvPreviewNodes(nodes){
   wfPvOverlayMeta=null;
   if(ok&&imageNodes.length){
     for(const n of imageNodes){
-      const p=n.params||{}, paths=(Array.isArray(p.templates)?p.templates:[p.template]).filter(Boolean);
-      for(const path of paths){
+      for(const entry of wfPvImageEntries(n)){
         try{
-          const rg=wfPvRegionOf(p)||[0,0,0,0];
-          const r=await api().preview_match_template(path,wfPvNum(p.threshold,.85),n.type==="tap_all_images",...rg);
-          if(r&&!r.error) (r.rects||[]).forEach(a=>wfPvOverlay.push(a.length===5?a.concat([1,path.split(/[\\/]/).pop()]):a));
+          const ep=entry.params, rg=wfPvRegionOf(ep)||[0,0,0,0];
+          const r=await api().preview_match_template(entry.path,wfPvNum(ep.threshold,.85),n.type==="tap_all_images",...rg);
+          if(r&&!r.error) (r.rects||[]).forEach(a=>{
+            wfPvOverlay.push(a.length===5?a.concat([1,entry.path.split(/[\\/]/).pop()]):a);
+            if(WF_PV_IMAGE_TAP_TYPES.has(n.type)){
+              const [x,y]=wfPvTapPointForRect(a,ep);
+              wfPvNodeShapes.push({kind:"point",x,y,label:entry.label,color:"node",r:9});
+            }
+          });
         }catch{}
       }
     }

@@ -46,6 +46,13 @@ if not _cfg_path or not os.path.isfile(_cfg_path):
 with open(_cfg_path, "r", encoding="utf-8") as _fh:
     CFG = json.load(_fh)
 
+# A frozen Hub builds from the copy of this spec bundled inside its own exe, so
+# SPECPATH no longer sits next to the real checkout. build_runner.py passes the
+# checkout it is building from as "root"; trust it when it looks like one.
+_cfg_root = str(CFG.get("root") or "").strip()
+if os.path.isfile(os.path.join(_cfg_root, "apps", "web", "runner", "index.html")):
+    ROOT = _cfg_root
+
 APP_NAME = str(CFG.get("app_name") or "Workflow").strip() or "Workflow"
 WORKFLOW_DIR = os.path.abspath(CFG["workflow_dir"])
 if not os.path.isdir(WORKFLOW_DIR):

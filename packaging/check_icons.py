@@ -30,6 +30,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# A frozen Hub runs this from the copy bundled in its exe. The web assets to
+# guard are the checkout's, which is the working directory it launched us in.
+if not (ROOT / "apps" / "web").is_dir() and (Path.cwd() / "apps" / "web").is_dir():
+    ROOT = Path.cwd()
 WEB = ROOT / "apps" / "web"
 ICONS_JS = WEB / "shared" / "icons.js"
 ICONS_CSS = WEB / "shared" / "icons.css"

@@ -132,9 +132,10 @@ through `ExecuteEvents`-equivalent logic — mirroring uGUI's own
 (reads the legacy `Input` manager itself) are fed through the same
 breakpoint-hook technique as the Mono build instead, to avoid a double click.
 `EventSystem.isFocused` is forced the same way (its backing field, every tick).
-Keys are not implemented for IL2CPP yet (`err unknown command`; Macro2k falls
-back to window messages). Games whose IL2CPP metadata is encrypted/obfuscated
-past what stock `il2cpp_class_from_name` can resolve won't work.
+Keys use the same `key` / `keydown` / `keyup` commands as Mono: `GetKey*`
+icalls, and `InputState.Change` when the game ships the Input System. Games
+whose IL2CPP metadata is encrypted/obfuscated past what stock
+`il2cpp_class_from_name` can resolve won't work.
 
 ## Deploy / inject
 
@@ -167,21 +168,26 @@ One command per line, one reply per line. Coordinates are client-area pixels
 | `tap x y [holdMs] [refW refH]` | `ok <object path>` · `miss` · `err <message>` |
 | `swipe x1 y1 x2 y2 [ms] [refW refH]` | `ok <object path>` · `miss` · `err <message>` |
 | `probe x y [refW refH]` | `ok module=<name> hits=<n> \| <path> {down=... click=... comps=...} ...` (diagnostics) |
-| `key vk [holdMs]` | `ok key <name>` · `err <message>` (replies after the release; **Mono only**) |
-| `keydown vk` | `ok keydown <name>` — stays held until `keyup` (**Mono only**) |
-| `keyup vk` · `keyup all` | `ok keyup <name>` (**Mono only**) |
+| `key vk [holdMs]` | `ok key <name>` · `err <message>` (replies after the release) |
+| `keydown vk` | `ok keydown <name>` — stays held until `keyup` |
+| `keyup vk` · `keyup all` | `ok keyup <name>` |
 
 `miss` = no EventSystem target under the point (e.g. world objects the game
 reads from `Input` directly); Macro2k then falls back to anchored touch.
 
 `vk` is a Windows virtual-key code (letters, digits, F1–F12, numpad digits,
 arrows, Enter/Esc/Space/Tab/Backspace, Shift/Ctrl/Alt, Insert/Delete/Home/End/
-PageUp/PageDown). A held key is queued as a `KeyboardState` into the Input System
-(found by reflection; skipped when the game doesn't ship it) and reported by the
-legacy-Input hooks for `Input.GetKey/GetKeyDown/GetKeyUp` and `GetAxis(Raw)`
-`Horizontal`/`Vertical`. Keys still held are released when the bridge stops;
-Macro2k also sends `keyup` for them when a run stops. A plugin older than 1.1.0
-answers `err unknown command` and Macro2k falls back to window messages.
+PageUp/PageDown). Both builds report the key through legacy `Input.GetKey` /
+`GetKeyDown` / `GetKeyUp` (and, on Mono, `GetAxis(Raw)` `Horizontal` /
+`Vertical`). The Input System does not keep a one-shot `KeyboardState`: the
+next update reads the real keyboard, which has no scan code, and that empty
+state used to replace the simulated one before gameplay saw it. While a key is
+held the bridge drops those real keyboard events and writes the held set with
+`InputState.Change`, so `isPressed` stays true and `wasPressedThisFrame` is
+true only on the transition. Keys still held are released when the bridge
+stops; Macro2k also sends `keyup` for them when a run stops. A plugin older
+than 1.2.0 answers `err unknown command` for `key` on IL2CPP and Macro2k falls
+back to window messages.
 
 Config: `Port` comes from `%TEMP%\Macro2kBridge.port` (written by Macro2k before
 injecting); `IgnoreFocus` is always on.

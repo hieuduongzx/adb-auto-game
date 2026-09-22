@@ -11,7 +11,7 @@ namespace Macro2k.UnityBridge
     internal static class Macro2kBridgePlugin
     {
         public const string PluginGuid = "com.macro2k.unitybridge";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.2.0";
     }
 
     /// <summary>Appends log lines to the Macro2kBridge.log file in %TEMP% (no logging framework in a stripped game).</summary>

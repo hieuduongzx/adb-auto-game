@@ -36,7 +36,7 @@ function wfCmdCatalog() {
     { t: "Go to Library", s: "template library - usage, orphans, duplicates", k: "", run: () => wfSwitchView("library") },
     { t: "Add activity", s: "create a new sequence activity", k: "", run: () => (typeof wfActAddCurrent === "function") && wfActAddCurrent() },
     { t: "Add function", s: "create a reusable function", k: "", run: () => (typeof wfAddFunction === "function") && wfAddFunction() },
-    { t: "Toggle snap to grid", s: "20px grid snap when dragging nodes", k: "", run: () => (typeof wfToggleSnap === "function") && wfToggleSnap() },
+    { t: "Toggle snap to grid", s: "16px grid snap when dragging nodes", k: "", run: () => (typeof wfToggleSnap === "function") && wfToggleSnap() },
     { t: "Toggle align guides", s: "smart alignment guides while dragging", k: "", run: () => (typeof wfToggleAlign === "function") && wfToggleAlign() },
     { t: "Toggle minimap", s: "bird's-eye graph overview", k: "", run: () => (typeof wfToggleMinimap === "function") && wfToggleMinimap() },
     { t: "Cycle link style", s: "wire shape: spline → linear → straight", k: "", run: () => (typeof wfCycleLinkMode === "function") && wfCycleLinkMode() },

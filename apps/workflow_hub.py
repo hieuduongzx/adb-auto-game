@@ -19,6 +19,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from datetime import datetime
@@ -28,14 +29,12 @@ from typing import Any, Dict, List, Optional
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
-# The repo root even in a frozen build (where _PROJECT_ROOT moves to data_root):
-# packaging/build_runner.py and dist/ live here.
-_SOURCE_ROOT = _PROJECT_ROOT
 
 import webview
 
 from src.utils import (
     APP_VERSION,
+    app_dir,
     bundle_dir,
     data_root,
     file_url,
@@ -55,9 +54,69 @@ from src.utils import (
 if is_frozen():
     _PROJECT_ROOT = data_root()
 
+def _is_source_root(path: str) -> bool:
+    """Whether *path* contains the source toolchain required to build a Runner."""
+    return all(os.path.isfile(os.path.join(path, rel)) for rel in (
+        os.path.join("packaging", "build_runner.py"),
+        os.path.join("packaging", "runner_build.spec"),
+        os.path.join("packaging", "entry_runner_single.py"),
+    ))
+
+
+def _find_source_root() -> str:
+    """Find the checkout behind a development ``dist/Macro2k`` build.
+
+    ``dist/Macro2k/Macro2k.exe`` is two directories below the checkout. An
+    installed release has no checkout and therefore cannot build a Runner;
+    return an empty string so ``build_info`` can explain that explicitly.
+    ``MACRO2K_SOURCE_ROOT`` supports non-standard layouts.
+    """
+    if not is_frozen():
+        return _PROJECT_ROOT
+    exe_dir = app_dir()
+    candidates = [
+        os.environ.get("MACRO2K_SOURCE_ROOT", ""),
+        os.path.abspath(os.path.join(exe_dir, os.pardir, os.pardir)),
+        os.getcwd(),
+    ]
+    for candidate in candidates:
+        candidate = os.path.abspath(candidate) if candidate else ""
+        if candidate and _is_source_root(candidate):
+            return candidate
+    return ""
+
+
+def _build_python() -> str:
+    """Python from the source checkout, or a real interpreter on PATH."""
+    parts = ("Scripts", "python.exe") if sys.platform == "win32" else ("bin", "python")
+    if _SOURCE_ROOT:
+        project_python = os.path.join(_SOURCE_ROOT, ".venv", *parts)
+        if os.path.isfile(project_python):
+            return project_python
+    for name in ("python", "python3"):
+        found = shutil.which(name)
+        if found:
+            return found
+    return source_python()
+
+
+_SOURCE_ROOT = _find_source_root()
+
 _WEB_DIR = (os.path.join(bundle_dir(), "web") if is_frozen()
             else os.path.join(os.path.dirname(__file__), "web"))
-_WORKFLOWS_DIR = os.path.join(_PROJECT_ROOT, "workflows")
+_DEFAULT_WORKFLOWS_DIR = os.path.join(_PROJECT_ROOT, "workflows")
+
+
+def _workflows_dir() -> str:
+    """Folder the library lists and creates games in.
+
+    A custom path from Hub settings wins when it still exists; otherwise the
+    default ``workflows/`` next to the app.
+    """
+    custom = str((load_ui_settings() or {}).get("workflowsDir") or "").strip()
+    if custom and os.path.isdir(custom):
+        return os.path.abspath(custom)
+    return _DEFAULT_WORKFLOWS_DIR
 _TEMPLATES_DIRNAME = "templates"
 # Cover art and icon looked up in <project>/assets/, first match wins.
 _COVER_NAMES = ("cover.png", "cover.jpg", "cover.jpeg", "cover.webp")
@@ -248,6 +307,23 @@ def _bump_patch(version: str) -> str:
 _build_module: Any = None
 
 
+def _pyinstaller_installed(python: str) -> bool:
+    """Whether ``python`` can import PyInstaller.
+
+    Checked in a subprocess because a frozen build's own interpreter is the
+    app executable, and the build runs under the system Python instead.
+    """
+    try:
+        flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
+        proc = subprocess.run(
+            [python, "-c", "import PyInstaller"],
+            capture_output=True, timeout=30, creationflags=flags,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
+
+
 def _load_build_module() -> Any:
     """``packaging/build_runner.py`` as a module (for its vendor/name rules), or None."""
     global _build_module
@@ -433,7 +509,7 @@ class WorkflowHubAPI:
         display name for stability."""
         items: List[Dict[str, Any]] = []
         recent = _load_recent()
-        root = _WORKFLOWS_DIR
+        root = _workflows_dir()
         if os.path.isdir(root):
             try:
                 entries = sorted(os.listdir(root), key=str.lower)
@@ -491,14 +567,15 @@ class WorkflowHubAPI:
         path = (path or "").strip()
         if not path or not os.path.isfile(path):
             return {"ok": False, "error": "Workflow file not found"}
-        if is_frozen():
-            return {"ok": False, "error": "Building a Runner .exe needs Macro2k running from "
-                                          "source (python apps/workflow_hub.py)."}
+        if not _SOURCE_ROOT:
+            return {"ok": False, "error": "Source checkout not found. Run this build from dist/Macro2k, "
+                                          "or set MACRO2K_SOURCE_ROOT."}
         module = _load_build_module()
         if module is None:
-            return {"ok": False, "error": "packaging/build_runner.py is missing"}
-        if importlib.util.find_spec("PyInstaller") is None:
-            return {"ok": False, "error": f"PyInstaller is not installed for {sys.executable}. "
+            return {"ok": False, "error": "packaging/build_runner.py is missing from the source checkout"}
+        python = _build_python()
+        if not _pyinstaller_installed(python):
+            return {"ok": False, "error": f"PyInstaller is not installed for {python}. "
                                           "Run: python -m pip install pyinstaller"}
         try:
             with open(path, "r", encoding="utf-8") as fh:
@@ -551,7 +628,8 @@ class WorkflowHubAPI:
         }
 
     def build_runner(self, path: str, version: str = "", publish: bool = False,
-                     repo: str = "", dry_run: bool = False) -> dict:
+                     repo: str = "", changelog: str = "", auto_show: bool = False,
+                     dry_run: bool = False) -> dict:
         """Start building ``dist/<Name>-Runner/<Name>.exe`` in the background,
         optionally publishing it as this Runner's next GitHub Release.
 
@@ -566,6 +644,12 @@ class WorkflowHubAPI:
             return {"ok": False, "error": "Version must look like 1.0.0"}
         publish = bool(publish)
         repo = _repo_slug(repo or info["repo"])
+        if not isinstance(changelog, str):
+            return {"ok": False, "error": "Changelog must be text"}
+        if len(changelog.encode("utf-8")) > 125_000:
+            return {"ok": False, "error": "Changelog is too long (125 KB maximum)"}
+        changelog = changelog if changelog.strip() else ""
+        auto_show = bool(auto_show) if changelog else False
         if publish or dry_run:
             if not _REPO_RE.fullmatch(repo):
                 return {"ok": False, "error": "Update repo must look like owner/name"}
@@ -589,8 +673,11 @@ class WorkflowHubAPI:
             self._build_log = []
             self._build_pending = []
             state = dict(self._build)
-        threading.Thread(target=self._build_worker, args=(info, version, publish, repo, dry_run),
-                         daemon=True).start()
+        threading.Thread(
+            target=self._build_worker,
+            args=(info, version, publish, repo, dry_run, changelog, auto_show),
+            daemon=True,
+        ).start()
         return {"ok": True, **state}
 
     def build_state(self) -> dict:
@@ -648,11 +735,22 @@ class WorkflowHubAPI:
             pass
 
     def _build_worker(self, info: Dict[str, Any], version: str, publish: bool,
-                      repo: str, dry_run: bool) -> None:
+                      repo: str, dry_run: bool, changelog: str = "",
+                      auto_show: bool = False) -> None:
         script = os.path.join(_SOURCE_ROOT, "packaging", "build_runner.py")
         folder = os.path.dirname(os.path.abspath(info["path"]))
-        cmd = [source_python(), "-u", script, "--workflow", folder, "--version", version,
-               "--repo", repo, "--verbose", "--save-version"]
+        cmd = [_build_python(), "-u", script, "--workflow", folder, "--version", version,
+               "--repo", repo, "--verbose", "--save-version",
+               "--flow-path", info["path"]]
+        notes_path = ""
+        if (publish or dry_run) and changelog:
+            fd, notes_path = tempfile.mkstemp(suffix=".md", prefix="m2k-notes-")
+            os.close(fd)
+            with open(notes_path, "w", encoding="utf-8") as fh:
+                fh.write(changelog)
+            cmd.extend(["--notes-file", notes_path])
+            if auto_show:
+                cmd.append("--auto-show")
         if publish:
             cmd.append("--publish")
         elif dry_run:
@@ -697,6 +795,12 @@ class WorkflowHubAPI:
             code = proc.wait()
         except Exception as exc:
             error = str(exc)
+        finally:
+            if notes_path:
+                try:
+                    os.remove(notes_path)
+                except OSError:
+                    pass
         with self._build_lock:
             self._build_proc = None
             cancelled = bool(self._build and self._build.get("state") == "cancelling")
@@ -742,7 +846,7 @@ class WorkflowHubAPI:
     def delete_workflow(self, path: str) -> dict:
         """Delete a workflow folder (JSON + templates + assets) under ``workflows/``.
 
-        Only paths that resolve inside ``_WORKFLOWS_DIR`` are accepted.
+        Only paths that resolve inside the configured workflows folder are accepted.
         Deletes the whole project folder (e.g. ``workflows/GirlWars/``).
 
         Returns ``{ok: true, folder}`` or ``{ok: false, error}``.
@@ -752,7 +856,7 @@ class WorkflowHubAPI:
             return {"ok": False, "error": "No path"}
         try:
             abs_path = os.path.abspath(path)
-            root = os.path.abspath(_WORKFLOWS_DIR)
+            root = os.path.abspath(_workflows_dir())
             # Must live under workflows/ (and not be the root itself).
             try:
                 common = os.path.commonpath([root, abs_path])
@@ -797,7 +901,7 @@ class WorkflowHubAPI:
         if clean in _SKIP_DIRS or clean.startswith("_"):
             return {"ok": False, "error": f"Reserved name: {clean}"}
 
-        folder = os.path.join(_WORKFLOWS_DIR, clean)
+        folder = os.path.join(_workflows_dir(), clean)
         path = os.path.join(folder, "workflow.json")
         if os.path.exists(path):
             return {"ok": False, "error": f"Already exists: {clean}/workflow.json"}
@@ -828,6 +932,40 @@ class WorkflowHubAPI:
             }
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
+
+    def get_workflows_dir(self) -> dict:
+        """Current library folder and whether it is the built-in default."""
+        current = _workflows_dir()
+        return {"dir": current, "custom": os.path.abspath(current) != os.path.abspath(_DEFAULT_WORKFLOWS_DIR)}
+
+    def pick_workflows_dir(self) -> dict:
+        """Folder picker for the library. Returns the chosen path, or "" if cancelled."""
+        win = self._window
+        if win is None:
+            return {"ok": False, "error": "Window is not ready"}
+        start = _workflows_dir()
+        start_dir = start if os.path.isdir(start) else ""
+        try:
+            paths = win.create_file_dialog(webview.FOLDER_DIALOG, directory=start_dir)
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        if not paths:
+            return {"ok": False, "cancelled": True, "dir": ""}
+        path = paths[0] if isinstance(paths, (list, tuple)) else paths
+        return {"ok": True, "dir": str(path)}
+
+    def set_workflows_dir(self, path: str) -> dict:
+        """Point the library at ``path``. An empty path restores the default folder."""
+        raw = str(path or "").strip()
+        if not raw:
+            save_ui_settings({"workflowsDir": None})
+            return {"ok": True, "dir": _workflows_dir()}
+        folder = os.path.abspath(raw)
+        if not os.path.isdir(folder):
+            return {"ok": False, "error": "Folder does not exist"}
+        if not save_ui_settings({"workflowsDir": folder}):
+            return {"ok": False, "error": "Couldn't save the folder"}
+        return {"ok": True, "dir": folder}
 
 # ── Entry points ────────────────────────────────────────────────────────────
 

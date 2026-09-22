@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -675,10 +676,22 @@ _FROZEN_PREFIX = {
 
 
 def source_python() -> str:
-    """Use this checkout's virtualenv when launching sibling source apps."""
+    """A real Python interpreter for build tooling (PyInstaller).
+
+    The checkout's ``.venv`` wins. A frozen build has no checkout and its
+    ``sys.executable`` is the app itself, which cannot ``import PyInstaller``,
+    so fall back to a ``python`` on PATH and only then to this interpreter.
+    """
     parts = ("Scripts", "python.exe") if sys.platform == "win32" else ("bin", "python")
     project_python = os.path.join(_SOURCE_ROOT, ".venv", *parts)
-    return project_python if os.path.isfile(project_python) else sys.executable
+    if os.path.isfile(project_python):
+        return project_python
+    if is_frozen():
+        for name in ("python", "python3"):
+            found = shutil.which(name)
+            if found:
+                return found
+    return sys.executable
 
 
 def launch_tool(tool: str, extra_args: Optional[Sequence[str]] = None) -> None:

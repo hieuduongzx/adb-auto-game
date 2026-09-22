@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -79,6 +80,151 @@ def fetch_releases(repo: str, timeout: float = 15) -> list:
     return data if isinstance(data, list) else []
 
 
+_META_RE = re.compile(r"<!--\s*macro2k-runner:\s*(\{.*?\})\s*-->", re.DOTALL)
+_PUBLIC_FIELDS = ("version", "tag", "markdown", "page", "publishedAt", "autoShow")
+
+
+def split_release_notes(body: str) -> Tuple[str, bool]:
+    """Release body → ``(markdown, auto_show)``.
+
+    The HTML comment is metadata, not part of the notes. A missing or
+    malformed comment means automatic display stays off."""
+    text = str(body or "")
+    match = _META_RE.search(text)
+    auto = False
+    if match:
+        try:
+            data = json.loads(match.group(1))
+            auto = isinstance(data, dict) and data.get("autoShow") is True
+        except Exception:
+            auto = False
+        text = (text[:match.start()] + text[match.end():]).strip()
+    return text.strip(), auto
+
+
+def normalize_release(rel: dict, tag_prefix: str) -> Optional[dict]:
+    """One GitHub release for this Runner, or None when it is not theirs."""
+    if not isinstance(rel, dict) or rel.get("draft"):
+        return None
+    tag = str(rel.get("tag_name") or "")
+    prefix = str(tag_prefix or "")
+    if not prefix or not tag.startswith(prefix):
+        return None
+    version = tag[len(prefix):]
+    if not parse_version(version):
+        return None
+    markdown, auto_show = split_release_notes(rel.get("body") or "")
+    return {
+        "version": version,
+        "tag": tag,
+        "markdown": markdown,
+        "page": str(rel.get("html_url") or ""),
+        "publishedAt": str(rel.get("published_at") or ""),
+        "autoShow": auto_show,
+    }
+
+
+def normalize_releases(releases: list, tag_prefix: str) -> list:
+    """Matching releases, newest version first. Drafts and other games are dropped."""
+    rows = []
+    for rel in releases or []:
+        row = normalize_release(rel, tag_prefix)
+        if row:
+            rows.append(row)
+    rows.sort(key=lambda row: parse_version(row["version"]), reverse=True)
+    return rows
+
+
+def _app_key(info: dict) -> str:
+    raw = str((info or {}).get("appName") or "runner")
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", raw).strip("._") or "runner"
+    return cleaned[:80]
+
+
+def changelog_dir(info: dict) -> str:
+    from src.utils import data_root
+    return os.path.join(data_root(), "data", "runner", _app_key(info))
+
+
+def _read_json(path: str):
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return None
+
+
+def _write_json(path: str, data) -> None:
+    folder = os.path.dirname(path)
+    os.makedirs(folder, exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, ensure_ascii=False, indent=2)
+        fh.write("\n")
+    os.replace(tmp, path)
+
+
+def _public_record(record: dict) -> dict:
+    out = {key: record.get(key) for key in _PUBLIC_FIELDS}
+    out["version"] = str(out.get("version") or "")
+    out["tag"] = str(out.get("tag") or "")
+    out["markdown"] = str(out.get("markdown") or "")
+    out["page"] = str(out.get("page") or "")
+    out["publishedAt"] = str(out.get("publishedAt") or "")
+    out["autoShow"] = out.get("autoShow") is True
+    return out
+
+
+def load_history(info: dict) -> list:
+    data = _read_json(os.path.join(changelog_dir(info), "changelog-cache.json"))
+    rows = data.get("history") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        return []
+    return [_public_record(row) for row in rows if isinstance(row, dict) and row.get("version")]
+
+
+def save_history(info: dict, rows: list) -> None:
+    _write_json(os.path.join(changelog_dir(info), "changelog-cache.json"),
+                {"history": [_public_record(row) for row in rows if isinstance(row, dict)]})
+
+
+def refresh_history(info: dict) -> list:
+    """Fetch this Runner's release notes. A failed fetch keeps the last cache."""
+    cached = load_history(info)
+    try:
+        rows = normalize_releases(fetch_releases(str(info.get("repo") or "")),
+                                  str(info.get("tagPrefix") or ""))
+    except Exception as exc:
+        log_error(f"[update] changelog refresh failed: {exc}")
+        return cached
+    try:
+        save_history(info, rows)
+    except Exception as exc:
+        log_error(f"[update] changelog cache was not saved: {exc}")
+    return rows
+
+
+def write_pending(info: dict, record: dict) -> None:
+    _write_json(os.path.join(changelog_dir(info), "pending-changelog.json"),
+                _public_record(record))
+
+
+def read_pending(info: dict) -> Optional[dict]:
+    data = _read_json(os.path.join(changelog_dir(info), "pending-changelog.json"))
+    if not isinstance(data, dict) or not data.get("version"):
+        return None
+    return _public_record(data)
+
+
+def acknowledge_pending(info: dict, version: str) -> None:
+    pending = read_pending(info)
+    if pending and pending.get("version") == str(version or ""):
+        try:
+            os.remove(os.path.join(changelog_dir(info), "pending-changelog.json"))
+        except OSError:
+            pass
+
+
 def latest_release(repo: str, tag_prefix: str, releases: Optional[list] = None) -> Optional[dict]:
     """Newest published release tagged ``<tag_prefix><version>`` with a .zip asset."""
     best: Optional[dict] = None
@@ -96,11 +242,14 @@ def latest_release(repo: str, tag_prefix: str, releases: Optional[list] = None) 
                       if str(a.get("name", "")).lower().endswith(".zip")), None)
         if asset is None:
             continue
+        markdown, auto_show = split_release_notes(rel.get("body") or "")
         if best is None or numbers > best["numbers"]:
             best = {
                 "numbers": numbers, "version": version, "tag": tag,
                 "url": asset.get("browser_download_url"), "size": int(asset.get("size") or 0),
                 "notes": rel.get("body") or "", "page": rel.get("html_url") or "",
+                "markdown": markdown, "autoShow": auto_show,
+                "publishedAt": str(rel.get("published_at") or ""),
             }
     return best
 
@@ -113,7 +262,8 @@ def check(info: Optional[dict] = None, force: bool = False) -> dict:
     info = build_info() if info is None else info
     result = {
         "available": False, "current": str(info.get("version") or ""), "version": None,
-        "url": None, "page": None, "notes": "", "size": 0, "error": None,
+        "url": None, "page": None, "notes": "", "markdown": "", "autoShow": False,
+        "tag": "", "publishedAt": "", "size": 0, "error": None,
         "supported": bool(force or updates_supported(info)), "repo": str(info.get("repo") or ""),
     }
     if not result["supported"]:
@@ -122,7 +272,9 @@ def check(info: Optional[dict] = None, force: bool = False) -> dict:
         best = latest_release(result["repo"], str(info.get("tagPrefix") or ""))
         if best and best["numbers"] > parse_version(result["current"]):
             result.update(available=True, version=best["version"], url=best["url"],
-                          page=best["page"], notes=best["notes"], size=best["size"])
+                          page=best["page"], notes=best["notes"], size=best["size"],
+                          markdown=best.get("markdown") or "", autoShow=bool(best.get("autoShow")),
+                          tag=best.get("tag") or "", publishedAt=best.get("publishedAt") or "")
     except Exception as exc:
         result["error"] = str(exc)
         log_error(f"[update] check failed: {exc}")
@@ -268,6 +420,17 @@ def apply(info: Optional[dict] = None,
 
         script = write_update_script(new_dir, app_dir(), exe, os.getpid(),
                                      os.path.join(tmp, "apply-update.cmd"), version=version)
+        try:
+            write_pending(info, {
+                "version": version,
+                "tag": str(found.get("tag") or ""),
+                "markdown": str(found.get("markdown") or ""),
+                "page": str(found.get("page") or ""),
+                "publishedAt": str(found.get("publishedAt") or ""),
+                "autoShow": found.get("autoShow") is True,
+            })
+        except Exception as exc:
+            log_error(f"[update] could not remember the changelog: {exc}")
         stage(100, "Restarting")
         log_info(f"[update] installing {version} and restarting…")
         if before_exit:

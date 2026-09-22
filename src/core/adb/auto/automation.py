@@ -271,9 +271,13 @@ class ADBGameAutomation:
         Useful as a finished-state probe (e.g. arena counter showing
         ``"0/5"``). Returns ``True`` on first match, ``False`` on timeout.
         """
+        if not str(needle or "").strip():
+            log_warning("[OCR] Wait text has no text to look for")
+            return False
         start = time.time()
+        end = start + max(0.0, timeout)
         last_text = ""
-        while time.time() - start < timeout:
+        while True:
             if self._stop_event.is_set():
                 log_info(f"[OCR] Interrupted waiting for '{needle}'")
                 return False
@@ -290,7 +294,10 @@ class ADBGameAutomation:
                     f"after {elapsed:.2f}s — read: {text!r}"
                 )
                 return True
-            time.sleep(interval)
+            # A timeout of 0 still probes once, matching Wait image.
+            if time.time() >= end:
+                break
+            time.sleep(min(interval, max(0.0, end - time.time())))
         log_info(
             f"[OCR] Timeout ({timeout:g}s) waiting for '{needle}' in region "
             f"{region} — last read: {last_text!r}"

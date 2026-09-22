@@ -69,6 +69,8 @@ coverage.xml
 .DS_Store
 Thumbs.db
 desktop.ini
+# Accidental `cmd` redirect (`> nul` from a bash shell creates a real file)
+/nul
 
 # Large vendor binaries (fetch manually into vendor/)
 vendor/frida/

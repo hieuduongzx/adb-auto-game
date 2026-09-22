@@ -203,6 +203,24 @@ test('Run and the card tools are on the card at rest, not hover-gated', () => {
   assert.match(foot, /display:\s*flex/);
 });
 
+test('a card uses assets/icon as its icon, then the cover, then initials', () => {
+  const ctx = loadHub();
+  const withIcon = ctx.cardHtml(
+    { name: 'BrownDust2', path: 'p', folder: 'BrownDust2', icon: 'file:///icon.png', cover: 'file:///cover.png', controller: 'win32', activityCount: 1 }, 0);
+  assert.match(withIcon, /<img class="game-icon"[^>]*src="file:\/\/\/icon\.png"/);
+  const withCover = ctx.cardHtml(
+    { name: 'BrownDust2', path: 'p', folder: 'BrownDust2', cover: 'file:///cover.png', controller: 'win32', activityCount: 1 }, 0);
+  assert.match(withCover, /<img class="game-icon"[^>]*src="file:\/\/\/cover\.png"/);
+  const bare = ctx.cardHtml(
+    { name: 'BrownDust2', path: 'p', folder: 'BrownDust2', controller: 'win32', activityCount: 1 }, 0);
+  assert.match(bare, /class="game-icon icon-mono"[^>]*>BD</);
+  const info = rule(CSS, '.game-info');
+  assert.match(info, /grid-template-columns:\s*28px minmax\(0,\s*1fr\)/);
+  const icon = rule(CSS, '.game-icon');
+  assert.match(icon, /width:\s*28px/);
+  assert.match(icon, /height:\s*28px/);
+});
+
 test('a card keeps the cover as its run button and repeats Run in the footer', () => {
   const ctx = loadHub();
   const html = ctx.cardHtml(

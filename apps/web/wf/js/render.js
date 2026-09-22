@@ -414,10 +414,10 @@ function wfInsertNodeAtViewportCenter(type){
   if(!g||!canvas||!world){ uiToast("Open an activity or function before adding a block.","warning"); return; }
   const cr=canvas.getBoundingClientRect(), wr=world.getBoundingClientRect();
   // Screen-centre insert: keep the card visually centred, but the half-card
-  // offsets are grid multiples (100=5 cells, 40=2 cells) so the corner still
-  // lands on the grid — 90 (4.5 cells) put it dead centre of a cell.
-  const x=wfSnap((cr.left+cr.width/2-wr.left)/wfZoom-100);
-  const y=wfSnap((cr.top+cr.height/2-wr.top)/wfZoom-40);
+  // offsets are grid multiples (80=5 cells, 32=2 cells of WF_GRID) so the
+  // corner still lands on the grid — a half-cell offset put it dead centre.
+  const x=wfSnap((cr.left+cr.width/2-wr.left)/wfZoom-80);
+  const y=wfSnap((cr.top+cr.height/2-wr.top)/wfZoom-32);
   wfPushUndo();
   const node=wfNewNode(type,x,y); g.nodes.push(node);
   wfSelectOne(node.id); wfRenderCanvas(); wfRenderInspector(); wfPopNodes([node.id]);
@@ -456,7 +456,7 @@ function wfRenderCanvas(){
 // pushed during a test run. Live values override declared defaults.
 function wfDeclaredVars(){
   const out={};
-  const walk=(vars,prefix)=>{ (vars||[]).forEach(v=>{ const nm=(v.name||"").trim(); if(!nm) return; const full=prefix?prefix+"."+nm:nm; out[full]=v.value; walk(v.children,full); }); };
+  const walk=(vars,prefix)=>{ (vars||[]).forEach(v=>{ const nm=(v.name||"").trim(); if(!nm) return; const full=prefix?prefix+"."+nm:nm; out[full]=v.value; walk(v.children,full); wfActiveOptionChildren(v).forEach(([opt,kids])=>walk(kids, full+"."+opt)); }); };
   walk(WF.globals,"");
   const act=wfCurAct();
   if(act) walk(act.vars,"");
@@ -480,7 +480,7 @@ function wfGraphVarNames(g){
 }
 function wfAllVarNames(){
   const s=new Set();
-  const walk=(vars,prefix)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; s.add(full); walk(v.children,full); }); };
+  const walk=(vars,prefix)=>{ (vars||[]).forEach(v=>{ const n=(v.name||"").trim(); if(!n) return; const full=prefix?prefix+"."+n:n; s.add(full); walk(v.children,full); wfActiveOptionChildren(v).forEach(([opt,kids])=>walk(kids, full+"."+opt)); }); };
   walk(WF.globals,"");
   (WF.activities||[]).forEach(a=>{ walk(a.vars,""); });
   // Vars produced by nodes anywhere in the flow count as defaults too.
@@ -605,7 +605,8 @@ function wfRenderVarsPanel(){
       const render=()=>{document.activeElement?.blur();wfRenderVarsPanel();};
       function edit(){
         if(details.children.length>1) return;
-        const card=wfVarsScope==="global"?wfGlobRow(v,index,render):wfLocalRow(act,v,index,render);
+        const rowCtx={prefix, depth};
+        const card=wfVarsScope==="global"?wfGlobRow(v,index,render,rowCtx):wfLocalRow(act,v,index,render,rowCtx);
         const del=card.querySelector(".wf-glob-del");del.onclick=()=>{wfPushUndoDebounced();list.splice(index,1);render();};
         details.append(card);
       }
@@ -725,7 +726,8 @@ function wfRefreshVarTitle(input,v){
   if(title) title.textContent=v.label||v.name||"Variable";
   wfRenderVarsPanel();
 }
-function wfLocalRow(act,v,idx,render){
+function wfLocalRow(act,v,idx,render,ctx){
+  ctx=ctx||{};
   // Same fields as global rows, but edits write into act.vars.
   const card=document.createElement("div"); card.className="wf-glob-card";
   const r1=document.createElement("div"); r1.className="wf-var-row";
@@ -733,12 +735,16 @@ function wfLocalRow(act,v,idx,render){
   const tag=document.createElement("span"); tag.className="wf-glob-tag";
   tag.style.color="var(--cat-logic-ink,#6d28d9)";
   tag.innerHTML='<svg class="uico" viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg>LOCAL';
-  const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Child"; addChild.title="Add child variable";
-  addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
   const del=document.createElement("button"); del.className="wf-glob-del"; del.textContent="−"; del.title="Delete local variable";
   del.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); act.vars.splice(idx,1); render(); wfRenderVarsPanel(); };
   const sp=document.createElement("span"); sp.style.flex="1";
-  r1.appendChild(tag); r1.appendChild(sp); r1.appendChild(addChild); r1.appendChild(del);
+  r1.appendChild(tag); r1.appendChild(sp);
+  if(v.type!=="select"){
+    const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Child"; addChild.title="Add child variable";
+    addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
+    r1.appendChild(addChild);
+  }
+  r1.appendChild(del);
   card.appendChild(r1);
   const r1b=document.createElement("div"); r1b.className="wf-var-row";
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Title"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
@@ -764,19 +770,25 @@ function wfLocalRow(act,v,idx,render){
   card.appendChild(r2);
   if(v.type!=="select") card.appendChild(wfVarValue(v));
   if(v.type==="select"){
-    card.appendChild(wfVarOptionsEditor(v));
+    card.appendChild(wfVarOptionsEditor(v,{
+      act, depth:ctx.depth||0, prefix:ctx.prefix||"",
+      rootList:act&&act.vars,
+      rerender:()=>{ render(); if(typeof wfRenderInspector==="function") wfRenderInspector(); },
+    }));
   }
   return card;
 }
-function wfBuildLocalChildren(act,v,container,render,depth){
+function wfBuildLocalChildren(act,v,container,render,depth,prefix){
   depth=depth||0;
+  prefix=prefix||"";
   v.children=v.children||[];
+  const full=(prefix?prefix+".":"")+(v.name||"");
   v.children.forEach((cv,ci)=>{
     const childCard=wfLocalRow(act,cv,ci,()=>{
       // Deleting a child splices by index into v.children, not act.vars.
       // Re-render via the parent render() so the whole tree refreshes.
       render();
-    });
+    },{depth:depth+1, prefix:full});
     // Override delete for nested rows: remove from parent.children.
     const delBtn=childCard.querySelector(".wf-glob-del");
     if(delBtn){
@@ -784,7 +796,7 @@ function wfBuildLocalChildren(act,v,container,render,depth){
     }
     childCard.style.marginLeft=((depth+1)*WF_VAR_INDENT)+"px";
     container.appendChild(childCard);
-    if(cv.children&&cv.children.length) wfBuildLocalChildren(act,cv,container,render,depth+1);
+    if(cv.children&&cv.children.length) wfBuildLocalChildren(act,cv,container,render,depth+1,full);
   });
 }
 function wfToggleGlobsEditor(){
@@ -830,17 +842,22 @@ function wfShowGlobsEditorLegacy(){
     pop.style.left=Math.max(8, Math.min(window.innerWidth-250, left))+"px";
   }
 }
-function wfGlobRow(v,idx,render){
+function wfGlobRow(v,idx,render,ctx){
+  ctx=ctx||{};
   const card=document.createElement("div"); card.className="wf-glob-card";
   const r1=document.createElement("div"); r1.className="wf-var-row";
   r1.style.alignItems="center";
   const tag=document.createElement("span"); tag.className="wf-glob-tag"; tag.innerHTML='<svg class="uico" viewBox="0 0 24 24" width="9" height="9" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>GLOBAL';
-  const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Child"; addChild.title="Add child variable";
-  addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
   const del=document.createElement("button"); del.className="wf-glob-del"; del.textContent="−"; del.title="Delete global variable";
   del.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); WF.globals.splice(idx,1); render(); wfRenderVarsPanel(); };
   const sp=document.createElement("span"); sp.style.flex="1";
-  r1.appendChild(tag); r1.appendChild(sp); r1.appendChild(addChild); r1.appendChild(del);
+  r1.appendChild(tag); r1.appendChild(sp);
+  if(v.type!=="select"){
+    const addChild=document.createElement("button"); addChild.className="btn sm"; addChild.textContent="+ Child"; addChild.title="Add child variable";
+    addChild.onclick=(e)=>{ e.stopPropagation(); wfPushUndoDebounced(); v.children=v.children||[]; const n=v.children.length+1; v.children.push({name:v.name+"_sub"+n, label:"Sub "+n, type:"bool", value:false, children:[]}); render(); wfRenderVarsPanel(); };
+    r1.appendChild(addChild);
+  }
+  r1.appendChild(del);
   card.appendChild(r1);
   const r1b=document.createElement("div"); r1b.className="wf-var-row";
   const lbl=document.createElement("input"); lbl.type="text"; lbl.value=v.label||""; lbl.placeholder="Title"; lbl.style.flex="1"; lbl.style.minWidth="0"; lbl.style.fontWeight="600";
@@ -864,24 +881,26 @@ function wfGlobRow(v,idx,render){
   };
   r2.appendChild(ty);
   card.appendChild(r2);
-  card.appendChild(wfVarValue(v));
+  if(v.type!=="select") card.appendChild(wfVarValue(v));
   if(v.type==="select"){
-    const r3=document.createElement("div"); r3.className="wf-var-row";
-    const l=document.createElement("label"); l.textContent="options"; l.style.fontSize="10px"; r3.appendChild(l);
-    const opt=document.createElement("input"); opt.type="text"; opt.value=(v.options||[]).join(", "); opt.placeholder="A, B, C"; opt.style.flex="1"; opt.style.minWidth="0"; opt.style.fontSize="10px";
-    opt.onchange=()=>{ wfPushUndoDebounced(); v.options=opt.value.split(",").map(s=>s.trim()).filter(Boolean); if(!v.options.includes(v.value)) v.value=v.options[0]||""; render(); wfRenderVarsPanel(); };
-    r3.appendChild(opt); card.appendChild(r3);
+    card.appendChild(wfVarOptionsEditor(v,{
+      act:null, depth:ctx.depth||0, prefix:ctx.prefix||"",
+      rootList:WF.globals,
+      rerender:()=>{ render(); if(typeof wfRenderInspector==="function") wfRenderInspector(); },
+    }));
   }
   return card;
 }
-function wfBuildGlobChildren(v,container,render,depth){
+function wfBuildGlobChildren(v,container,render,depth,prefix){
   depth=depth||0;
+  prefix=prefix||"";
   v.children=v.children||[];
+  const full=(prefix?prefix+".":"")+(v.name||"");
   v.children.forEach((cv,ci)=>{
-    const childCard=wfGlobRow(cv,ci,render);
+    const childCard=wfGlobRow(cv,ci,render,{depth:depth+1, prefix:full});
     childCard.style.marginLeft=((depth+1)*WF_VAR_INDENT)+"px";
     container.appendChild(childCard);
-    if(cv.children&&cv.children.length) wfBuildGlobChildren(cv,container,render,depth+1);
+    if(cv.children&&cv.children.length) wfBuildGlobChildren(cv,container,render,depth+1,full);
   });
 }
 
@@ -995,6 +1014,125 @@ function wfWireTone(fromPort, toPort, fromNode, edge){
   if(def.kind==="end" || def.kind==="stop") return "end";
   return def.cat||"";
 }
+// One leading marker (📦, ↺, ▶…) is decoration the title already covers.
+// String prefixes, not a character class: several of these are surrogate
+// pairs, which a class without the unicode flag would split in half.
+const WF_SUM_MARKS=["↺","♻","🎲","🔔","📦","⛔","🗑","📱","🖥","💻","▶","⏹","⏰","🧊","🪟","📌","☠","⏳","📐","⚙"];
+function wfStripSumMark(s){
+  for(const m of WF_SUM_MARKS){
+    if(s.startsWith(m)) return s.slice(m.length).replace(/^\s+/,"");
+  }
+  return s;
+}
+// Tails peeled off the identity so they don't spend the only line. Longer /
+// more specific patterns first. A match is the qualifier, not the name.
+const WF_SUM_TAILS=[
+  /\s+(×\d+)$/,
+  /\s+(\/\/)$/,
+  /\s+(≤[\d.]+[×s]?)$/,
+  /\s+(\+\([^)]*\))$/,
+  /\s+(\+clear)$/,
+  /\s+(-r)$/,
+  /\s+(·\s*keep)$/,
+  /\s+(♻)$/,
+  /\s+(client)$/,
+  /\s+(·\s*center)$/,
+  /\s+(·\s*region)$/,
+  /\s+(·\s*random)$/,
+  /\s+(·\s*wait\s+[\d.]+s)$/,
+  /\s+(\+\d+)$/,
+];
+function wfSumLooksFile(s){
+  return /\.[a-z0-9]{2,5}$/i.test(String(s||"").trim());
+}
+// Identity on line 1, qualifiers on line 2. "until gone long_name.png ×2"
+// used to ellipsize the name; the name now keeps the line and "until gone"
+// / "×2" drop below, where a too-long row clips the chips first.
+function wfSumParts(raw){
+  let s=String(raw??"").replace(/\s+/g," ").trim();
+  const chips=[];
+  if(!s) return {main:"", chips};
+  s=wfStripSumMark(s);
+  const lead=s.match(/^(until gone|until closed|until running|not)\s+/i);
+  if(lead){ chips.push(lead[1]); s=s.slice(lead[0].length).trim(); }
+  // "until found" / "contains" / "tap all" repeat the block's own title.
+  // A bare "until" (loop until text) does too. The thing after it is the value.
+  s=s.replace(/^(until found|until|found|contains|tap all)\s+/i,"");
+  s=s.replace(/^→\s+/,"");
+  const arrow=s.match(/^(.*?)\s→\s*(.+)$/);
+  if(arrow){
+    const left=arrow[1].trim(), right=arrow[2].trim();
+    if(wfSumLooksFile(right) && !wfSumLooksFile(left)){
+      if(left) chips.push(left);
+      s=right;
+    } else if(left){
+      chips.push("→ "+right);
+      s=left;
+    }
+  }
+  const slash=s.split(/\s\/\s/).map(x=>x.trim()).filter(Boolean);
+  if(slash.length>1 && slash.every(wfSumLooksFile)){
+    s=slash.shift();
+    chips.push(...slash);
+  }
+  const peeled=[];
+  for(let guard=0; guard<8; guard++){
+    let hit=false;
+    for(const re of WF_SUM_TAILS){
+      const m=s.match(re);
+      if(!m) continue;
+      peeled.unshift(m[1].trim());
+      s=s.slice(0,m.index).trim();
+      hit=true;
+      break;
+    }
+    if(!hit) break;
+  }
+  chips.push(...peeled);
+  const bits=s.split(/\s*·\s*/).map(x=>x.trim()).filter(Boolean);
+  if(bits.length>1){
+    s=bits.shift();
+    chips.push(...bits);
+  }
+  // A long assignment: the name is the identity, the value is the qualifier.
+  // Short ones ("i = 0") stay one phrase — splitting them makes them harder
+  // to read than the wrap.
+  if(s.length>18){
+    const eq=s.match(/^(\S{1,32})\s=\s(.+)$/);
+    if(eq){ s=eq[1]; chips.unshift(eq[2].trim()); }
+  }
+  if(!s && chips.length) s=chips.shift();
+  return {main:s, chips:chips.map(c=>String(c).replace(/^·\s*/,"")).filter(Boolean)};
+}
+// Search region is opt-in (0,0,0,0 means "whole screen") and used to be
+// invisible on the card, so two identical image nodes couldn't be told apart.
+function wfRegionChip(n){
+  const p=(n&&n.params)||{};
+  const w=Number(p.regionW)||0, h=Number(p.regionH)||0;
+  if(w<=0 || h<=0) return "";
+  return (p.regionX||0)+","+(p.regionY||0)+" "+w+"×"+h;
+}
+function wfSumMainHtml(main){
+  const s=String(main||"");
+  // Filename: keep the size + extension (`_55_17.png`) and let the head
+  // ellipsize. The tail does not shrink — cutting it would hide the part
+  // that tells two crops apart. A name that fits stays one span.
+  if(wfSumLooksFile(s) && s.length>16){
+    const tail=s.slice(-10), head=s.slice(0,-10);
+    return `<span class="wf-sum-main wf-sum-file"><span class="wf-sum-head">${escHtml(head)}</span><span class="wf-sum-tail">${escHtml(tail)}</span></span>`;
+  }
+  return `<span class="wf-sum-main">${escHtml(s)}</span>`;
+}
+function wfNodeSumHtml(sum, dotHtml, opts){
+  const dot=dotHtml||"";
+  if(opts&&opts.plain) return dot+`<span class="wf-sum-main">${escHtml(String(sum??""))}</span>`;
+  const parts=wfSumParts(sum);
+  const chips=parts.chips.concat((opts&&opts.chips)||[]).filter(Boolean);
+  const meta=chips.length
+    ? `<span class="wf-sum-meta">${chips.map(c=>`<span class="wf-sum-chip">${escHtml(c)}</span>`).join("")}</span>`
+    : "";
+  return `<span class="wf-sum-line">${dot}${wfSumMainHtml(parts.main)}</span>`+meta;
+}
 function wfNodeEl(n){
   const def=WF_NODES[n.type]||{label:n.type,ico:"help",kind:"action",outs:["out"],fields:[]};
   const g=wfGraph();
@@ -1013,7 +1151,7 @@ function wfNodeEl(n){
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
   // Dynamic output ports — grow the card so they all sit inside it. Multi-port
   // blocks stack ports from the primary row (≈ card centre), 16px apart.
-  // Never shorter than the standard --node-h card (78px).
+  // Never shorter than the standard --node-h card.
   let dynOutCount=0;
   if(n.type==="switch") dynOutCount=((n.params&&n.params.cases)||[]).length+1;
   else if(n.type==="try_chain") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||3)+1;
@@ -1022,9 +1160,9 @@ function wfNodeEl(n){
   else if(n.type==="random_branch") dynOutCount=Math.max(1,parseInt(n.params&&n.params.count)||2);
   else if(def.kind==="loop_until") dynOutCount=3;   // body/found/fail — grow the card
   if(dynOutCount>2)
-    // Grown cards snap to the same 20px grid the base card obeys — a switch
-    // with 5 cases is exactly 6 cells tall, not 6.1.
-    el.style.minHeight=(Math.ceil(Math.max(WF_CARD_H, WF_ROW_TOP + (dynOutCount-1)*WF_PORT_GAP + WF_PORT_SZ + 12)/20)*20)+"px";
+    // Grown cards snap to the same WF_GRID the base card obeys — a switch
+    // with extra cases lands on a whole number of cells, not a fraction.
+    el.style.minHeight=(Math.ceil(Math.max(WF_CARD_H, WF_ROW_TOP + (dynOutCount-1)*WF_PORT_GAP + WF_PORT_SZ + 10)/WF_GRID)*WF_GRID)+"px";
   // A call node shows the referenced function's name as its title.
   let title=def.label, sum="";
   if(n.type==="call"){ const fn=wfFnById(n.params.fn); title=fn?fn.name:"(no function selected)";
@@ -1060,20 +1198,20 @@ function wfNodeEl(n){
   const thumbHtml = hasTpl ? (isTpls
     ? `<div class="wf-node-thumbs"></div>`
     : `<img class="wf-node-thumb">`) : "";
-  // start/end = solid round chip (icon + label under).
+  // start/end = solid square chip (icon + label under).
   const isTerminal = def.kind==="start"||def.kind==="end";
   const isNextBranch = n.type==="try_next";
   // Color nodes get a live swatch dot in front of the summary text.
-  const sumHtml = sum?`<div class="wf-node-sum" title="${escHtml(sum)}">${wfColorDotHtml(n,def)}${escHtml(sum)}</div>`:"";
+  // The title attribute keeps the full one-line summary for the hover.
+  const sumHtml = sum?`<div class="wf-node-sum" title="${escHtml(sum)}">${wfNodeSumHtml(sum, wfColorDotHtml(n,def), {plain:def.kind==="note", chips:wfRegionChip(n)?[wfRegionChip(n)]:[]})}</div>`:"";
   const topRow = hasTpl ? `<div class="wf-node-prevrow">${thumbHtml}${sumHtml}</div>` : sumHtml;
   el.classList.toggle("showing-thumb", hasRealThumb);
   el.classList.toggle("has-thumb", hasTpl);
   if(isTerminal){
-    // Start / End — a light ring token: panel face, coloured ring, small glyph.
-    // Reads as the graph's entry/exit socket rather than a heavy solid disc.
+    // Compact square, told apart by colour and glyph. The word sits under it.
     const termIco = def.kind==="end"
-      ? '<rect x="8" y="8" width="8" height="8" rx="2"/>'
-      : '<polygon points="10 7.5 16.5 12 10 16.5 10 7.5"/>';
+      ? '<rect x="8" y="8" width="8" height="8" rx="1.5"/>'
+      : '<polygon points="9 6.5 18 12 9 17.5 9 6.5"/>';
     el.title=def.label;
     el.innerHTML =
       `<span class="wf-node-tri">`+
