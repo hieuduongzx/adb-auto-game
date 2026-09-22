@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "apps/web/runner/index.html"
+        ],
+        "createdAt": "2026-09-22T05:12:47.070Z",
+        "reason": "Existing live preview slot: src is assigned when a capture frame arrives, and the empty state covers it until then."
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "apps/web/wf/js/render.js"
+        ],
+        "createdAt": "2026-09-22T06:19:58.028Z",
+        "reason": "Node thumbnail is created without src, then wfLoadThumb assigns the data URL. CSS keeps .wf-node-thumb at zero size until the preview is turned on."
+      }
+    ]
+  }
+}
