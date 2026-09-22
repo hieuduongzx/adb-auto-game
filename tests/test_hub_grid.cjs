@@ -172,6 +172,24 @@ test('the wrapped header keeps the fixed offsets in step', () => {
   assert.match(bar[1], /body\.bp-open #ui-toasts/, 'toasts stay on screen beside a full-width panel');
 });
 
+// ── Technical workbench shell ────────────────────────────────────────────────
+
+test('the Hub reads as a project switcher with shared shell landmarks', () => {
+  assert.match(HTML, /<div id="app" class="workbench-shell">/);
+  assert.match(HTML, /<header class="lib-bar workbench-bar"/);
+  assert.match(HTML, /<h1 class="lib-title">Projects<\/h1>/);
+  assert.match(HTML, /<main class="lib-main workbench-main" aria-label="Project library">/);
+  assert.match(HTML, /<footer class="lib-foot workbench-status"/);
+  assert.match(HTML, /placeholder="Search projects"/);
+});
+
+test('the header exposes exactly one primary creation action', () => {
+  const header = /<header class="lib-bar workbench-bar"[\s\S]*?<\/header>/.exec(HTML);
+  assert.ok(header, 'the workbench header exists');
+  assert.equal((header[0].match(/class="[^"]*\baccent\b/g) || []).length, 1);
+  assert.match(header[0], /id="btn-new"[^>]*>[\s\S]*?New project/);
+});
+
 // ── The card — flat, and readable at rest ────────────────────────────────────
 
 test('a card is a flat tile: hairline border, no shadow, no hover lift', () => {
@@ -186,6 +204,8 @@ test('a card is a flat tile: hairline border, no shadow, no hover lift', () => {
   assert.doesNotMatch(cover, /transform/, 'and does not lift');
   assert.doesNotMatch(CSS, /\.game:hover\s+\.game-cover/, 'no hover-lift rule may come back');
   assert.doesNotMatch(CSS, /\.game:hover\s+\.game-cover::after/, 'nor a hover scrim over the art');
+  assert.doesNotMatch(rule(CSS, '.game-icon'), /box-shadow/, 'project icons use a border, not decorative elevation');
+  assert.doesNotMatch(CSS, /(?:linear|radial)-gradient\(/, 'the project shelf stays flat and gradient-free');
 });
 
 test('Run and the card tools are on the card at rest, not hover-gated', () => {
@@ -221,6 +241,19 @@ test('a card uses assets/icon as its icon, then the cover, then initials', () =>
   assert.match(icon, /height:\s*28px/);
 });
 
+test('long names and missing artwork retain visible technical metadata', () => {
+  const ctx = loadHub();
+  const name = 'A project name long enough to require deliberate truncation & escaping';
+  const html = ctx.cardHtml(
+    { name, path: 'workflows/long-project', folder: 'long-project', controller: 'adb', activityCount: 12 }, 0);
+  assert.match(html, /class="game-art-empty"/);
+  assert.match(html, /class="art-hint">NO COVER<\/span>/);
+  assert.match(html, /class="game-name" title="A project name long enough[^>]*>/);
+  assert.match(html, /class="game-folder" title="long-project">long-project<\/span>/);
+  assert.match(html, /class="ctrl-tag adb">ADB<\/span>/);
+  assert.match(html, /12 activities/);
+});
+
 test('a card keeps the cover as its run button and repeats Run in the footer', () => {
   const ctx = loadHub();
   const html = ctx.cardHtml(
@@ -238,6 +271,14 @@ test('a card keeps the cover as its run button and repeats Run in the footer', (
     assert.match(foot, new RegExp(`data-act="${act}"`), `the ${act} tool belongs to the footer`);
   }
   assert.doesNotMatch(foot, /class="game-building"/, 'the build chip stays on the cover');
+});
+
+test('shelf entrance motion stays restrained', () => {
+  const intro = rule(CSS, '.game-grid.intro .game');
+  const duration = /animation:\s*gameIn\s*([\d.]+)(ms|s)/.exec(intro);
+  assert.ok(duration, 'the first-load entrance has an explicit duration');
+  const milliseconds = duration[2] === 's' ? Number(duration[1]) * 1000 : Number(duration[1]);
+  assert.ok(milliseconds <= 180, `entrance is ${milliseconds}ms, expected at most 180ms`);
 });
 
 test('the skeleton stands in for the whole card, footer included', () => {

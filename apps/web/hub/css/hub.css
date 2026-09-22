@@ -37,8 +37,10 @@
 }
 /* Sizes come from the shared ladder (icons.css) — no per-call-site width or
    stroke-width here. The rules below cover layout and colour only. */
-.lib-heading { display: flex; align-items: baseline; gap: var(--s3); flex-shrink: 0; }
-.lib-title { font-size: var(--t-head); font-weight: 600; letter-spacing: -.015em; color: var(--ink); }
+.lib-heading { display: flex; flex-direction: column; justify-content: center; gap: 2px; flex-shrink: 0; }
+.lib-kicker { font: 600 var(--t-micro)/1 var(--mono); letter-spacing: .08em; color: var(--muted); }
+.lib-title-row { display: flex; align-items: baseline; gap: var(--s3); }
+.lib-title { font-size: var(--t-head); font-weight: 600; line-height: 1.05; letter-spacing: -.015em; color: var(--ink); }
 .lib-count {
   font-family: var(--mono); font-size: var(--t-caption); color: var(--muted);
   font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -251,21 +253,21 @@
   grid-template-columns: 28px minmax(0, 1fr);
   align-content: center;
   column-gap: 9px;
-  row-gap: 4px;
+  row-gap: 3px;
   margin-top: 10px;
   padding: 0 2px;
 }
 /* The game's icon — assets/icon.*, the same art the Runner header and the built .exe use. */
 .game-icon {
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
   grid-column: 1;
   align-self: center;
   width: 28px;
   height: 28px;
   border-radius: var(--r-sm);
+  border: 1px solid var(--border);
   object-fit: cover;
   object-position: 50% 30%;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
 }
 .icon-mono {
   display: flex;
@@ -285,9 +287,11 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: color .15s;
 }
-.game:hover .game-name { color: var(--accent); }
+.game-folder {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--muted); font: 500 var(--t-micro)/1.2 var(--mono);
+}
 /* Both halves of the meta line are nowrap, so on the narrowest reflow steps the
    activity count has to be the one that gives: it ellipsises from the right,
    which keeps the number and the controller tag, and keeps the line inside the
@@ -326,10 +330,8 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background:
-    radial-gradient(120% 80% at 50% 0%, hsl(var(--tone) 34% 95%), transparent 70%),
-    hsl(var(--tone) 30% 90%);
-  color: hsl(var(--tone) 40% 29%);
+  background: var(--alt);
+  color: var(--dim);
 }
 .art-initials {
   font-size: clamp(28px, calc(var(--card-w) * .25), 64px);
@@ -340,15 +342,9 @@
 .art-hint {
   font-family: var(--mono);
   font-size: var(--t-micro);
-  color: hsl(var(--tone) 22% 38%);
+  color: var(--muted);
+  letter-spacing: .08em;
 }
-:root[data-theme="dark"] .game-art-empty {
-  background:
-    radial-gradient(120% 80% at 50% 0%, hsl(var(--tone) 22% 25%), transparent 70%),
-    hsl(var(--tone) 18% 18%);
-  color: hsl(var(--tone) 42% 78%);
-}
-:root[data-theme="dark"] .art-hint { color: hsl(var(--tone) 14% 66%); }
 
 /* ── Loading — two rows of placeholder cards while the list arrives ─────── */
 /* The skeleton carries the footer's boxes as well as the cover, the icon and
@@ -359,7 +355,7 @@
 .game.skeleton .game-cover { cursor: default; border-color: var(--line); background: var(--alt); }
 .game.skeleton .game-info { pointer-events: none; }
 .sk-icon {
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
   grid-column: 1;
   width: 28px;
   height: 28px;
@@ -379,10 +375,10 @@
 
 /* First load only: the shelf fills left to right, row by row. */
 .game-grid.intro .game {
-  animation: gameIn .5s var(--ease) backwards;
-  animation-delay: calc(min(var(--i), 15) * 24ms);
+  animation: gameIn .16s var(--ease) backwards;
+  animation-delay: calc(min(var(--i), 10) * 12ms);
 }
-@keyframes gameIn { from { opacity: 0; transform: translateY(8px); } }
+@keyframes gameIn { from { opacity: 0; transform: translateY(4px); } }
 
 /* ── Empty / no match ────────────────────────────────────────────────────── */
 .lib-empty {
@@ -568,7 +564,7 @@ body.bp-open #ui-toasts { right: calc(min(580px, 100vw - 24px) + 24px); }
 /* Phone width — the brand mark goes (the title already says "Games") and the
    toasts take the full column so a long message cannot run off-screen. */
 @media (max-width: 480px) {
-  .lib-brand { display: none; }
+  .lib-brand, .lib-kicker { display: none; }
   #ui-toasts { left: 8px; right: 8px; align-items: stretch; }
   .ui-toast { max-width: none; }
   .lib-empty { padding: 24px 16px; }

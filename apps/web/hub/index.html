@@ -26,17 +26,20 @@
   the covers never shrink below readable, the shelf scrolls instead, and no control leaves the screen.
   FORM: brief-pinned five-across cover shelf inside the established world (no concept roll: precise request).
 -->
-<div id="app">
+<div id="app" class="workbench-shell">
 
-<header class="lib-bar">
+<header class="lib-bar workbench-bar">
   <span class="lib-brand" aria-hidden="true">M2</span>
   <div class="lib-heading">
-    <h1 class="lib-title">Games</h1>
-    <span id="count" class="lib-count" aria-live="polite"></span>
+    <span class="lib-kicker">WORKSPACE / LIBRARY</span>
+    <div class="lib-title-row">
+      <h1 class="lib-title">Projects</h1>
+      <span id="count" class="lib-count" aria-live="polite"></span>
+    </div>
   </div>
   <div class="search-wrap">
     <i class="search-ico" data-ico="search" data-ico-size="uico-2" aria-hidden="true"></i>
-    <input type="search" id="search" placeholder="Search games" autocomplete="off" spellcheck="false" aria-label="Search games" aria-keyshortcuts="Control+F /">
+    <input type="search" id="search" placeholder="Search projects" autocomplete="off" spellcheck="false" aria-label="Search projects" aria-keyshortcuts="Control+F /">
   </div>
   <span class="lib-sp"></span>
   <div class="lib-actions">
@@ -52,24 +55,24 @@
       <i class="ico-sun"  data-ico="sun"  aria-hidden="true"></i>
       <i class="ico-moon" data-ico="moon" aria-hidden="true"></i>
     </button>
-    <button class="btn accent" id="btn-new" type="button" title="Create a new game project">
-      <i data-ico="plus" aria-hidden="true"></i>New game
+    <button class="btn accent" id="btn-new" type="button" title="Create a new workflow project">
+      <i data-ico="plus" aria-hidden="true"></i>New project
     </button>
   </div>
 </header>
 
-<main class="lib-main" aria-label="Game library">
-  <div id="grid" class="game-grid" role="list" aria-label="Games" aria-busy="true"></div>
+<main class="lib-main workbench-main" aria-label="Project library">
+  <div id="grid" class="game-grid" role="list" aria-label="Projects" aria-busy="true"></div>
   <div id="empty" class="lib-empty" hidden>
     <div class="empty-ico" aria-hidden="true">
       <i data-ico="image" data-ico-size="uico-3" aria-hidden="true"></i>
     </div>
-    <p class="empty-title">No games yet</p>
-     <p class="empty-msg">Create a project to start building its workflow.</p>
+    <p class="empty-title">No projects yet</p>
+    <p class="empty-msg">Create a project to start building its workflow.</p>
     <!-- One of the two shows: an empty library offers a new game, a search with
          no matches offers the way back out of it. -->
     <button class="btn accent" id="btn-empty-new" type="button">
-      <i data-ico="plus" aria-hidden="true"></i>New game
+      <i data-ico="plus" aria-hidden="true"></i>New project
     </button>
     <button class="btn" id="btn-empty-clear" type="button" hidden>
       <i data-ico="x" aria-hidden="true"></i>Clear search
@@ -104,7 +107,8 @@
   <footer class="bp-foot" id="bp-foot"></footer>
 </aside>
 
-<footer class="lib-foot" id="lib-foot">
+<footer class="lib-foot workbench-status" id="lib-foot">
+  <span class="workbench-state">PROJECT ROOT</span>
   <span id="footer-path" class="foot-path" title=""></span>
   <span class="foot-keys" aria-hidden="true">
     <kbd>Enter</kbd>Run<kbd>E</kbd>Edit<kbd>B</kbd>Build<kbd>Del</kbd>Delete<kbd>/</kbd>Search

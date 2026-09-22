@@ -335,7 +335,7 @@ function initialsFor(name) {
 function emptyArtHtml(name) {
   return `<span class="game-art-empty" aria-hidden="true">` +
     `<span class="art-initials">${escHtml(initialsFor(name))}</span>` +
-    `<span class="art-hint">assets/cover.png</span></span>`;
+    `<span class="art-hint">NO COVER</span></span>`;
 }
 /** The game's small icon: assets/icon.*, else the cover, else its initials. */
 function iconHtmlFor(g, cls) {
@@ -360,6 +360,7 @@ function cardHtml(g, i) {
   const name = escHtml(g.name);
   const ctrl = g.controller === "win32" ? "win32" : "adb";
   const acts = Number(g.activityCount) || 0;
+  const folder = escHtml(g.folder || "PROJECT");
   const art = g.cover
     ? `<img class="game-img" src="${escHtml(g.cover)}" alt="" decoding="async" draggable="false">`
     : emptyArtHtml(g.name);
@@ -372,6 +373,7 @@ function cardHtml(g, i) {
     `<div class="game-info">` +
       iconHtmlFor(g, "game-icon") +
       `<span class="game-name" title="${name}">${name}</span>` +
+      `<span class="game-folder" title="${folder}">${folder}</span>` +
       `<span class="game-meta">` +
         `<span class="ctrl-tag ${ctrl}">${ctrl === "win32" ? "Win32" : "ADB"}</span>` +
         `<span class="game-acts">${acts} ${acts === 1 ? "activity" : "activities"}</span>` +
@@ -413,9 +415,9 @@ function render(opts) {
 
   $("count").textContent = GAMES.length
     ? (items.length === GAMES.length
-        ? `${GAMES.length} ${GAMES.length === 1 ? "game" : "games"}`
+        ? `${GAMES.length} ${GAMES.length === 1 ? "project" : "projects"}`
         : `${items.length} of ${GAMES.length}`)
-    : "0 games";
+    : "0 projects";
 
   // Keep keyboard focus on the same game across a re-render (refresh, delete).
   const active = document.activeElement;
@@ -427,7 +429,7 @@ function render(opts) {
     grid.innerHTML = "";
     empty.hidden = false;
     const searching = GAMES.length > 0;
-    empty.querySelector(".empty-title").textContent = searching ? "No matches" : "No games yet";
+    empty.querySelector(".empty-title").textContent = searching ? "No matches" : "No projects yet";
     empty.querySelector(".empty-msg").textContent = searching
       ? `Nothing in the library matches “${FILTER.trim()}”.`
       : "Create a project to start building its workflow.";
