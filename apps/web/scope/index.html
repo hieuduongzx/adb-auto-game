@@ -12,10 +12,10 @@
 <script src="../shared/theme.js"></script>
 </head>
 <body>
-<div id="app">
+<div id="app" class="workbench-shell">
 
 <!-- ── Toolbar ──────────────────────────────────────────────────────────── -->
-<div id="toolbar" class="card">
+<header id="toolbar" class="card workbench-bar" aria-label="Capture controls">
   <div class="tb-zone tb-left">
     <div class="tb-tray tb-tray-device">
       <span class="tb-tray-label">Device</span>
@@ -57,10 +57,10 @@
     <button class="btn ok ico" onclick="onCapture()" title="Capture screen (F5)" aria-label="Capture screen">
       <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></button>
   </div>
-</div>
+</header>
 
 <!-- ── Main split ────────────────────────────────────────────────────────── -->
-<main id="main" data-pnl-stage aria-label="Device inspection workspace">
+<main id="main" class="workbench-main" data-pnl-stage aria-label="Device inspection workspace">
 
   <!-- Preview -->
   <div id="preview-card">
@@ -92,7 +92,7 @@
       <!-- Screenshot -->
       <div class="group">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
-          <span class="grp-title">Screenshot</span>
+          <span class="grp-title">Capture</span>
           <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
@@ -172,7 +172,7 @@
       <!-- Selection -->
       <div class="group">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
-          <span class="grp-title">Selection</span>
+          <span class="grp-title">Select</span>
           <span class="badge cyan" id="region-badge" style="display:none;">
             <span class="bd"></span>selected</span>
           <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
@@ -210,7 +210,7 @@
       <!-- OCR -->
       <div class="group">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
-          <span class="grp-title">Text recognition (OCR)</span>
+          <span class="grp-title">OCR</span>
           <span id="ocr-engine" style="margin-left:4px;">not loaded</span>
           <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
@@ -234,7 +234,7 @@
       <!-- Actions -->
       <div class="group">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
-          <span class="grp-title">Actions</span>
+          <span class="grp-title">Input</span>
           <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
@@ -304,7 +304,7 @@
     <div class="tab-pane" id="tab-template" role="tabpanel">
       <div class="group">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
-          <span class="grp-title">Template matching</span>
+          <span class="grp-title">Match</span>
           <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="grp-body">
@@ -398,14 +398,14 @@
 </main>
 
 <!-- ── Footer ────────────────────────────────────────────────────────────── -->
-<div id="footer">
+<footer id="footer" class="workbench-status" aria-label="Inspection status">
   <span id="footer-dot"></span>
-  <span id="status-text">Ready</span>
+  <span id="status-text" role="status">Ready</span>
   <span class="spacer"></span>
   <span id="hover-pos">—</span>
   <span style="color:var(--border);margin:0 3px;">·</span>
   <span id="footer-out">crops → ./out/</span>
-</div>
+</footer>
 
 </div><!-- /app -->
 

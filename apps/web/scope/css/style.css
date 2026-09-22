@@ -29,17 +29,18 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 ::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-thumb-hover); }
 
 /* ── Layout ─────────────────────────────────────────────────────────────── */
-#app { flex: 1; display: flex; flex-direction: column; gap: 7px;
-  padding: 8px 8px 4px; overflow: hidden; min-height: 0; }
-.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--sh-sm); }
+#app { flex: 1; display: flex; flex-direction: column; gap: 0;
+  padding: 0; overflow: hidden; min-height: 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 0; box-shadow: none; }
+#preview-card, #tools-card, #log-card { border-radius:0; box-shadow:none; }
 
 /* ── Toolbar ────────────────────────────────────────────────────────────── */
-#toolbar { padding: 6px var(--s4); display: flex; align-items: center; gap: var(--s3); flex-shrink: 0; }
+#toolbar { padding: 6px var(--s4); display: flex; align-items: center; gap: var(--s3); flex-shrink: 0; border-width:0 0 1px; }
 .tb-zone { display: flex; align-items: center; gap: var(--s3); min-width: 0; }
 
 /* Trays — matching the Macro2k tray system */
 .tb-tray { display: inline-flex; align-items: center; gap: 2px; padding: 3px;
-  border-radius: 10px; background: var(--alt); border: 1px solid var(--border); }
+  border-radius: 0; background: var(--alt); border: 1px solid var(--border); }
 .tb-tray .btn { border-color: transparent; background: transparent; height: 32px; }
 .tb-tray .btn.ico { width: 32px; }
 .tb-tray .btn:hover { background: var(--panel); border-color: var(--border2); }
@@ -76,7 +77,7 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 .btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
 .btn.accent:hover { background: var(--accent-hover); }
 .btn.ok  { background: var(--ok);  color: #fff; border-color: var(--ok);
-  box-shadow: 0 1px 2px rgba(31,146,84,.3); font-size: 12px; font-weight: 700; }
+  box-shadow: none; font-size: 12px; font-weight: 700; }
 .btn.ok:hover  { background: var(--ok-hover); }
 .btn.err { border: 1px solid var(--err-bd); background: var(--err-bg); color: var(--err); }
 .btn.err:hover { background: #fae2e0; }
@@ -111,12 +112,12 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 .spacer { flex: 1; }
 
 /* ── Main split ──────────────────────────────────────────────────────────── */
-#main { flex: 1; display: flex; gap: 7px; min-height: 0; overflow: hidden; }
+#main { flex: 1; display: flex; gap: 0; min-width: 0; min-height: 0; overflow: hidden; }
 
 /* Preview */
 #preview-card { flex: 1; display: flex; flex-direction: column;
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: var(--r-md); overflow: hidden; min-width: 0; }
+  border-radius: 0; overflow: hidden; min-width: 0; }
 .preview-hdr { display: flex; align-items: center; gap: 8px;
   padding: 7px 12px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
 #size-label  { font-size: 12.5px; font-weight: 700; color: var(--ink); }
@@ -131,7 +132,7 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 /* Tools panel */
 #tools-card { width: 410px; min-width: 320px; flex-shrink: 0;
   display: flex; flex-direction: column; background: var(--panel);
-  border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+  border: 1px solid var(--border); border-radius: 0; overflow: hidden; }
 
 /* Tabs */
 #tabs-bar { display: flex; align-items: center; gap: 1px; padding: 0 2px;
@@ -148,7 +149,7 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 .tab-pane.active { display: flex; flex-direction: column; gap: 6px; }
 
 /* ── Collapsible groups ──────────────────────────────────────────────────── */
-.group { border: 1px solid #e9ecf1; border-radius: var(--r-md); overflow: hidden; }
+.group { border-width:0 0 1px; border-style:solid; border-color:var(--border); border-radius: 0; overflow: hidden; }
 
 .grp-hdr { display: flex; align-items: center; gap: 7px; height: var(--pnl-hd-h); padding: 0 11px;
   width: 100%; cursor: pointer; user-select: none; transition: background .1s; text-align: left; }
@@ -259,7 +260,7 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 .log-warning { color: #c08a1e; } .log-error   { color: #d6483f; }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
-#footer { display: flex; align-items: center; gap: 6px; padding: 2px 5px 3px; flex-shrink: 0; }
+#footer { display: flex; align-items: center; gap: 6px; padding: 4px var(--s3); flex-shrink: 0; border-width:1px 0 0; border-style:solid; border-color:var(--border); border-radius:0; }
 #footer-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot-off);
   flex-shrink: 0; transition: background .2s; }
 #footer-dot.connected { background: var(--ok); }
@@ -284,7 +285,7 @@ select:hover { border-color: var(--border2); background-color: var(--surface); }
 }
 
 @media (max-width: 560px) {
-  #app { padding-inline: 5px; }
+  #app { padding-inline: 0; }
   .tb-left, .tb-right { width: 100%; }
   .tb-tray-device { min-width: 0; flex: 1; }
   .tb-tray-label, .tb-divider { display: none; }
