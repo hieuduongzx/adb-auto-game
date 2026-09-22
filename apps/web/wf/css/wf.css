@@ -284,6 +284,9 @@
 #wf-inspector { width:304px; flex-shrink:0; display:flex; flex-direction:column;
   overflow:hidden; background:var(--panel); border-left:1px solid var(--border2); }
 #wf-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+#wf-side .pnl { border-radius:0; box-shadow:none; }
+#wf-insp-panel { border-radius:0; box-shadow:none; }
+#log-card { border-radius:0; box-shadow:none; }
 
 /* Resizers — wide hit-area, thin visible spine on hover. */
 #wf-side-resizer, #wf-insp-resizer { width:5px; flex-shrink:0; cursor:col-resize;

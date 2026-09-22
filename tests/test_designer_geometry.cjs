@@ -4,6 +4,17 @@ const vm = require('node:vm');
 const test = require('node:test');
 const path = require('node:path');
 
+const HTML = fs.readFileSync(path.join(__dirname, '../apps/web/wf/index.html'), 'utf8');
+const CSS = fs.readFileSync(path.join(__dirname, '../apps/web/wf/css/wf.css'), 'utf8');
+const BASE_CSS = fs.readFileSync(path.join(__dirname, '../apps/web/wf/css/base.css'), 'utf8');
+
+function cssRule(source, selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`${escaped}\\s*\\{([^}]*)\\}`).exec(source);
+  assert.ok(match, `missing CSS rule for ${selector}`);
+  return match[1];
+}
+
 function load(file, extra = {}) {
   const ctx = vm.createContext({
     document: { addEventListener() {} }, window: { addEventListener() {} },
@@ -13,6 +24,29 @@ function load(file, extra = {}) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../apps/web/wf/js', file), 'utf8'), ctx);
   return ctx;
 }
+
+test('Designer uses the shared workbench shell, toolbar, workspace, and status primitives', () => {
+  assert.match(HTML, /<div id="app" class="workbench-shell">/);
+  assert.match(HTML, /<header id="toolbar" class="workbench-bar" aria-label="Designer toolbar">/);
+  assert.match(HTML, /<main id="workflow-view" class="workbench-main"[^>]*aria-label="Workflow designer workspace">/);
+  assert.match(HTML, /<footer id="footer" class="workbench-status" aria-label="Designer status">/);
+});
+
+test('Designer dock headers and surfaces follow the shared flat panel grammar', () => {
+  assert.ok((HTML.match(/class="[^"]*\bpnl-hd\b/g) || []).length >= 4,
+    'major docked work areas expose shared panel headers');
+  for (const selector of ['#wf-side .pnl', '#wf-insp-panel', '#log-card']) {
+    const rule = cssRule(CSS, selector);
+    assert.match(rule, /border-radius:\s*0/);
+    assert.match(rule, /box-shadow:\s*none/);
+  }
+});
+
+test('Designer geometry remains locked to the approved grid footprints', () => {
+  assert.match(BASE_CSS, /--node-w:\s*144px/);
+  assert.match(BASE_CSS, /--node-h:\s*64px/);
+  assert.match(BASE_CSS, /--term-size:\s*48px/);
+});
 
 test('orthogonal return wire clears both nodes even when ports are level', () => {
   const ctx = load('wires.js');

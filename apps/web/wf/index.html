@@ -15,10 +15,10 @@
 <script src="../shared/panel.js"></script>
 </head>
 <body>
-<div id="app">
+<div id="app" class="workbench-shell">
 
 <!-- ── Header: one flush bar — file ops + project · run cluster · device/view ── -->
-<div id="toolbar">
+<header id="toolbar" class="workbench-bar" aria-label="Designer toolbar">
   <div class="tb-zone tb-left">
     <div class="tb-tray tb-tray-doc">
       <button class="btn ico" onclick="wfNew()" title="New - create an empty workflow">
@@ -168,12 +168,12 @@
       <button class="wf-view-tab" data-view="library" onclick="wfSwitchView('library')" title="Template library - every image this workflow uses, and what is no longer used (Ctrl+K → Go to Library)">Library</button>
     </div>
   </div>
-</div>
+</header>
 
 <!-- data-pnl-stage: the workspace any panel takes over when it is maximized.
      shared/panel.js moves the panel node here and hides the siblings, so a
      docked column can go full-screen without an escape hatch of its own. -->
-<main id="workflow-view" data-pnl-stage aria-label="Workflow designer workspace">
+<main id="workflow-view" class="workbench-main" data-pnl-stage aria-label="Workflow designer workspace">
   <!-- Left: block library and reusable functions. Activities stay on the
        canvas as a compact, always-reachable graph switcher. -->
   <div id="wf-side">
@@ -750,14 +750,14 @@
 
 <!-- ── Status strip ──────────────────────────────────────────────────────── -->
 
-<div id="footer">
+<footer id="footer" class="workbench-status" aria-label="Designer status">
   <span id="footer-dot"></span>
   <span id="status-text">Ready</span>
   <span class="spacer"></span>
   <span id="hover-pos" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:88px;text-align:right;">-</span>
   <span style="color:var(--border);margin:0 3px;">·</span>
   <span id="footer-out" style="font-size:11px;color:var(--log-muted);font-family:var(--mono);">workflow → workflows/</span>
-</div>
+</footer>
 
 </div><!-- /app -->
 
