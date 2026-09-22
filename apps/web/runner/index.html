@@ -15,10 +15,10 @@
 </head>
 <body>
 <a class="skip-link" href="#main-split">Skip to activity lists</a>
-<div id="app">
+<div id="app" class="workbench-shell">
 
   <!-- ── Header card ─────────────────────────────────────────────────── -->
-  <div id="header-card" class="card">
+  <header id="header-card" class="card workbench-bar" aria-label="Run controls">
     <div class="header-top">
       <span class="app-icon" id="app-icon" aria-hidden="true" hidden></span>
       <div class="header-title-block">
@@ -66,16 +66,16 @@
            (F5 / Ctrl+Enter) but never a bare key — a stray keypress must not
            launch a game macro. -->
       <button class="btn btn-start" id="btn-primary" type="button" onclick="onPrimary()" disabled
-              title="Start the run (F5 or Ctrl+Enter)">
+              title="Start the run (F5 or Ctrl+Enter)" aria-label="Start workflow">
         <i data-ico="play" data-ico-size="uico-fill" aria-hidden="true"></i>Start
       </button>
       <button class="btn btn-pause" id="btn-pause" onclick="onPause()" disabled
-              title="Pause or resume the run (F6)">Pause</button>
+              title="Pause or resume the run (F6)" aria-label="Pause workflow">Pause</button>
     </div>
-  </div>
+  </header>
 
   <!-- ── Main body: split (left activities / right panels) + footer ──── -->
-  <main id="main-body" data-pnl-stage aria-label="Runner workspace">
+  <main id="main-body" class="workbench-main" data-pnl-stage aria-label="Runner workspace">
   <div id="mobile-tabs" role="tablist" aria-label="Runner views" aria-orientation="horizontal">
     <button class="mobile-tab active" type="button" role="tab" aria-selected="true" aria-controls="pane-left" data-mobile-view="activities" onclick="switchMobileView('activities')">Activities</button>
     <button class="mobile-tab" type="button" role="tab" aria-selected="false" aria-controls="r-log" data-mobile-view="log" onclick="switchMobileView('log')">Log</button>
@@ -343,7 +343,7 @@
   <div class="header-pop header-pop-settings" id="settings-pop" hidden></div>
 
   <!-- ── Footer ──────────────────────────────────────────────────────── -->
-  <div id="footer">
+  <footer id="footer" class="workbench-status" aria-label="Connection status">
     <!-- ADB footer: device select + capture backend -->
     <div class="footer-row" id="footer-adb">
       <div id="dev-dot"></div>
@@ -367,7 +367,7 @@
       <span id="win32-target" class="empty" title="">(not configured)</span>
       <span class="footer-lbl" id="win32-mode-lbl" style="display:none"></span>
     </div>
-  </div><!-- /footer -->
+  </footer><!-- /footer -->
   </main><!-- /main-body -->
 
 </div><!-- /app -->

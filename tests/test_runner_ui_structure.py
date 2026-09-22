@@ -89,6 +89,39 @@ def test_activity_settings_announces_save_state():
     assert status["attrs"].get("aria-live") == "polite"
 
 
+def test_runner_uses_operator_console_shell_and_persistent_controls():
+    doc = _document()
+    app = doc.by_id("app")
+    header = doc.by_id("header-card")
+    main = doc.by_id("main-body")
+    footer = doc.by_id("footer")
+    primary = doc.by_id("btn-primary")
+    pause = doc.by_id("btn-pause")
+
+    assert "workbench-shell" in app["attrs"].get("class", "").split()
+    assert header["tag"] == "header"
+    assert header["attrs"].get("aria-label") == "Run controls"
+    assert "workbench-bar" in header["attrs"].get("class", "").split()
+    assert "workbench-main" in main["attrs"].get("class", "").split()
+    assert footer["tag"] == "footer"
+    assert "workbench-status" in footer["attrs"].get("class", "").split()
+    assert primary["attrs"].get("aria-label") == "Start workflow"
+    assert pause["attrs"].get("aria-label") == "Pause workflow"
+
+
+def test_operator_regions_are_flat_and_only_popovers_are_elevated():
+    css = RUNNER_CSS.read_text(encoding="utf-8")
+
+    for selector in ("#header-card", "#pane-left", "#pane-right", "#preview-card", "#footer"):
+        start = css.index(selector)
+        rule = css[start:css.index("}", start)]
+        assert "border-radius: 0" in rule or "border-radius:0" in rule
+        assert "box-shadow: none" in rule or "box-shadow:none" in rule
+    pop_start = css.index(".header-pop {")
+    pop_rule = css[pop_start:css.index("}", pop_start)]
+    assert "box-shadow:" in pop_rule and "box-shadow: none" not in pop_rule
+
+
 def test_compact_pro_log_remains_a_dark_console_in_light_theme():
     css = RUNNER_CSS.read_text(encoding="utf-8")
 

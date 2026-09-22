@@ -47,31 +47,35 @@ input { caret-color: var(--accent); text-align: center; }
 
 /* ── App frame ─────────────────────────────────────────────────────────── */
 /* Compact Pro: spend the window on activities and output, not outer chrome. */
-#app { padding: var(--s3); gap: var(--s3); }
+#app { padding: 0; gap: 0; }
+#header-card, #pane-left, #pane-right, #preview-card, #footer { border-radius: 0; box-shadow: none; }
 
 /* Split body: a little more room for long activity names, while the log remains
    the larger workspace. Six-pixel gutters keep both columns visually related. */
-#main-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--s3); }
+#main-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0; }
 #mobile-tabs, #mobile-settings { display: none; }
-#main-split { flex: 1; min-height: 0; display: flex; gap: var(--s3); }
-#pane-left  { flex: 1 1 48%; min-width: 0; display: flex; flex-direction: column; gap: var(--s2); }
-#pane-right { flex: 1 1 52%; min-width: 0; display: flex; flex-direction: column; gap: var(--s2); }
+#main-split { flex: 1; min-height: 0; display: flex; gap: 0; }
+#pane-left  { flex: 1 1 48%; min-width: 0; display: flex; flex-direction: column; gap: var(--s2); padding:var(--s3); border-right:1px solid var(--border); }
+#pane-right { flex: 1 1 52%; min-width: 0; display: flex; flex-direction: column; gap: var(--s2); padding:var(--s3); }
 
 /* ── Header card ───────────────────────────────────────────────────────── */
 /* One flex column: the progress row sits between title and controls only while
    a run is live, and a column gap gives the right spacing in both states —
    margins on the rows above it left a dead 11px gap whenever it was hidden. */
 #header-card {
-  padding: 10px 12px;
+  padding: 8px 12px;
   flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s3);
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.35fr);
+  gap: var(--s3) var(--s5);
+  border-width: 0 0 1px;
+  border-color: var(--border);
 }
 .header-top {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width:0;
 }
 .header-title-block { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 /* The game's icon — the same art as its .exe and its Hub card. */
@@ -131,7 +135,7 @@ input { caret-color: var(--accent); text-align: center; }
 .status-failed #status-text { color: var(--err); }
 
 /* A calm, scannable terminal result; it stays visible until the next run. */
-.run-outcome { display:flex; align-items:center; gap:7px; min-height:28px; padding:4px 9px; border:1px solid var(--border); border-radius:var(--r-sm); font-size:var(--t-caption); }
+.run-outcome { grid-column:1 / -1; display:flex; align-items:center; gap:7px; min-height:28px; padding:4px 9px; border:1px solid var(--border); border-radius:0; font-size:var(--t-caption); }
 .run-outcome[hidden] { display:none; }
 .outcome-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; background:var(--muted); }
 .outcome-text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -145,14 +149,14 @@ input { caret-color: var(--accent); text-align: center; }
 .outcome-stopped .outcome-dot { background:var(--warn); }
 
 /* Progress bar */
-#header-progress { display: flex; align-items: center; gap: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--line); }
+#header-progress { grid-column:1 / -1; display: flex; align-items: center; gap: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--line); }
 .prog-count { font-size: var(--t-caption); font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums; min-width: 28px; flex-shrink: 0; }
 .prog-bar-track { flex: 1; height: 6px; border-radius: var(--r-xs); background: var(--track); overflow: hidden; }
 .prog-bar-fill { height: 100%; border-radius: var(--r-xs); background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
 .prog-elapsed { font-family: var(--mono); font-size: var(--t-ui); font-weight: 500; color: var(--dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
 /* Control buttons */
-.header-btns { display: flex; align-items: center; gap: var(--s2); }
+.header-btns { display: flex; align-items: center; gap: var(--s2); align-self:center; }
 .header-btns .btn { height: 36px; font-size: var(--t-body); padding: 0 18px; border-radius: var(--r-sm); }
 /* One primary button: Start is a quiet success tint; Stop becomes solid red so
    the destructive state remains unmistakable. See setPrimary() in runner.js. */
@@ -512,8 +516,8 @@ input { caret-color: var(--accent); text-align: center; }
 /* At the minimum window width, show one useful workspace instead of stacking
    two independently scrolling panes into an unusably tall page. */
 @media (max-width: 640px) {
-  #app { padding: var(--s3); gap: var(--s3); }
-  #header-card { padding: var(--s4); gap: var(--s3); }
+  #app { padding: 0; gap: 0; }
+  #header-card { display:flex; padding: var(--s3); gap: var(--s3); }
   .app-icon { width: 36px; height: 36px; border-radius: var(--r-md); }
   #mobile-tabs { display: flex; flex-shrink: 0; padding: 0; gap: var(--s3); border-bottom: 1px solid var(--border2); }
   .mobile-tab { flex: 1; min-width: 0; padding: 10px 6px; border-bottom: 2px solid transparent; color: var(--dim); font-size: var(--t-body); font-weight: 600; }
@@ -524,7 +528,7 @@ input { caret-color: var(--accent); text-align: center; }
   #main-split[data-mobile-view="settings"] { display: none; }
   #mobile-settings:not([hidden]) { display: flex; flex: 1; min-height: 0; overflow: auto; background: var(--panel); border: 1px solid var(--border); }
   #mobile-settings > .rpane-scroll { width: 100%; }
-  #pane-left, #pane-right { width: 100%; height: 100%; }
+  #pane-left, #pane-right { width: 100%; height: 100%; padding:var(--s3); border-right:0; }
   #pane-right { display: none; }
   #main-split[data-mobile-view="log"] #pane-left,
   #main-split[data-mobile-view="activity"] #pane-left { display: none; }
@@ -544,7 +548,7 @@ input { caret-color: var(--accent); text-align: center; }
 }
 
 /* ── Footer / status bar ───────────────────────────────────────────────── */
-#footer { display: flex; flex-direction: column; gap: var(--s1); padding: var(--s2) var(--s3); flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
+#footer { display: flex; flex-direction: column; gap: var(--s1); padding: var(--s2) var(--s3); flex-shrink: 0; background: var(--surface); border-width: 1px 0 0; border-style: solid; border-color: var(--border); border-radius: 0; box-shadow:none; }
 .footer-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); font-size: var(--t-caption); }
 #tabs-bar .tab-btn:focus-visible, .rtab:focus-visible { outline-offset: -3px; }
 .drag-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; color: var(--accent); }
