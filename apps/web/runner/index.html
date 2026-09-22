@@ -79,6 +79,7 @@
   <div id="mobile-tabs" role="tablist" aria-label="Runner views" aria-orientation="horizontal">
     <button class="mobile-tab active" type="button" role="tab" aria-selected="true" aria-controls="pane-left" data-mobile-view="activities" onclick="switchMobileView('activities')">Activities</button>
     <button class="mobile-tab" type="button" role="tab" aria-selected="false" aria-controls="r-log" data-mobile-view="log" onclick="switchMobileView('log')">Log</button>
+    <button class="mobile-tab" type="button" role="tab" aria-selected="false" aria-controls="mobile-settings" data-mobile-view="settings" onclick="switchMobileView('settings')">Settings</button>
   </div>
   <div id="main-split" tabindex="-1" role="region" aria-label="Activities and runner panels">
 
@@ -316,6 +317,8 @@
     </div><!-- /pane-right -->
 
   </div><!-- /main-split -->
+
+  <section id="mobile-settings" role="tabpanel" aria-label="Runner settings" tabindex="0" hidden></section>
 
   <div class="header-pop" id="notes-pop" hidden>
     <div class="header-pop-hd">

@@ -293,11 +293,14 @@ function switchRTab(tab){
 // both stay useful. This navigation makes them three predictable views while
 // preserving the desktop split above the breakpoint.
 function switchMobileView(view, syncPanel=true){
-  const allowed = ["activities", "activity", "log"];
+  const allowed = ["activities", "activity", "log", "settings"];
   if(!allowed.includes(view)) view = "activities";
   S.mobileView = view;
   const shell = $("main-split");
+  const settings = $("mobile-settings");
   if(shell) shell.dataset.mobileView = view;
+  if(settings) settings.hidden = view !== "settings";
+  syncRunnerSettingsHost();
   const publicView = view === "activity" ? "activities" : view;
   document.querySelectorAll("#mobile-tabs [data-mobile-view]").forEach(btn=>{
     const on = btn.dataset.mobileView === publicView;
@@ -1885,15 +1888,30 @@ function openHeaderPop(name){
   const open = pop.hidden;
   closeHeaderPops();
   if(!open) return;
-  if(name==="settings") ensureDiagnostics();
+  if(name==="settings"){
+    mountRunnerSettings();
+    if(_runnerSettingsRoot) pop.appendChild(_runnerSettingsRoot);
+    ensureDiagnostics();
+  }
   if(name==="notes") renderChangelog();
   pop.hidden = false;
   btn.setAttribute("aria-expanded", "true");
   placeHeaderPop(pop, btn);
 }
+let _runnerSettingsRoot = null;
 function mountRunnerSettings(){
-  const pop = $("settings-pop"), src = $("runner-settings-src");
-  if(pop && src && !pop.querySelector(".rpane-scroll")) pop.appendChild(src.content.cloneNode(true));
+  const src = $("runner-settings-src");
+  if(!_runnerSettingsRoot){
+    const fragment = src && src.content.cloneNode(true);
+    _runnerSettingsRoot = fragment && fragment.firstElementChild;
+  }
+  syncRunnerSettingsHost();
+}
+function syncRunnerSettingsHost(){
+  if(!_runnerSettingsRoot) return;
+  const narrow = window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
+  const host = narrow && S.mobileView === "settings" ? $("mobile-settings") : $("settings-pop");
+  if(host && _runnerSettingsRoot.parentElement !== host) host.appendChild(_runnerSettingsRoot);
 }
 function wireHeaderPops(){
   mountRunnerSettings();
@@ -1907,6 +1925,7 @@ function wireHeaderPops(){
     if(e.key==="Escape") closeHeaderPops();
   });
   window.addEventListener("resize", ()=>{
+    syncRunnerSettingsHost();
     ["notes", "settings"].forEach(name=>{
       const pop = $(name+"-pop"), btn = $(name+"-toggle");
       if(pop && !pop.hidden && btn) placeHeaderPop(pop, btn);

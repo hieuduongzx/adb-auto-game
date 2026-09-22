@@ -5,6 +5,7 @@ from pathlib import Path
 RUNNER_DIR = Path(__file__).parents[1] / "apps" / "web" / "runner"
 RUNNER_HTML = RUNNER_DIR / "index.html"
 RUNNER_CSS = RUNNER_DIR / "css" / "runner.css"
+RUNNER_JS = RUNNER_DIR / "js" / "runner.js"
 RUNNER_BACKEND = Path(__file__).parents[1] / "apps" / "workflow_runner.py"
 
 
@@ -53,7 +54,20 @@ def test_narrow_runner_exposes_one_primary_view_at_a_time():
     assert nav["attrs"]["role"] == "tablist"
     assert [tab["text"].strip() for tab in tabs] == ["Activities", "Log", "Settings"]
     assert [tab["attrs"].get("data-mobile-view") for tab in tabs] == ["activities", "log", "settings"]
+    assert [tab["attrs"].get("aria-controls") for tab in tabs] == ["pane-left", "r-log", "mobile-settings"]
     assert sum(tab["attrs"].get("aria-selected") == "true" for tab in tabs) == 1
+
+    settings = doc.by_id("mobile-settings")
+    assert settings["attrs"].get("role") == "tabpanel"
+
+
+def test_mobile_settings_reuses_one_mounted_settings_tree():
+    source = RUNNER_JS.read_text(encoding="utf-8")
+
+    assert 'const allowed = ["activities", "activity", "log", "settings"]' in source
+    assert "let _runnerSettingsRoot = null" in source
+    assert "if(!_runnerSettingsRoot)" in source
+    assert "host.appendChild(_runnerSettingsRoot)" in source
 
 
 def test_secondary_settings_use_progressive_disclosure_with_live_summaries():
