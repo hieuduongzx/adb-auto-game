@@ -496,22 +496,22 @@
           {
             "id": "n4id6dvk",
             "type": "start",
-            "x": -128,
-            "y": 88,
+            "x": -144,
+            "y": 96,
             "params": {}
           },
           {
             "id": "n5wclv6r",
             "type": "end",
-            "x": 1184,
-            "y": 264,
+            "x": 1152,
+            "y": 280,
             "params": {}
           },
           {
             "id": "note00lp",
             "type": "tap_image",
-            "x": 128,
-            "y": 80,
+            "x": 96,
+            "y": 88,
             "params": {
               "template": "templates/crop_20260715_063825_139_1036_55_17.png",
               "taps": "1",
@@ -526,8 +526,8 @@
           {
             "id": "ne9lulz5",
             "type": "tap_image",
-            "x": 304,
-            "y": 80,
+            "x": 272,
+            "y": 88,
             "params": {
               "template": "templates/crop_20260715_151847_283_960_148_19.png",
               "taps": "1",
@@ -542,8 +542,8 @@
           {
             "id": "ng153i3p",
             "type": "call",
-            "x": -48,
-            "y": 80,
+            "x": -80,
+            "y": 88,
             "params": {
               "fn": "fn_pmuop"
             }
@@ -551,8 +551,8 @@
           {
             "id": "na4tt0v9",
             "type": "tap_image",
-            "x": 480,
-            "y": 80,
+            "x": 448,
+            "y": 88,
             "params": {
               "template": "templates/crop_20260715_152401_999_635_95_25.png",
               "taps": "1",
@@ -567,8 +567,8 @@
           {
             "id": "na20ca0q",
             "type": "tap_image",
-            "x": 128,
-            "y": 168,
+            "x": 96,
+            "y": 184,
             "params": {
               "template": "templates/crop_20260716_151800_162_407_25_25.png",
               "taps": "1",
@@ -583,8 +583,8 @@
           {
             "id": "nfabfumd",
             "type": "tap_image",
-            "x": 304,
-            "y": 168,
+            "x": 272,
+            "y": 184,
             "params": {
               "template": "templates/crop_20260715_151847_283_960_148_19.png",
               "taps": "1",
@@ -599,8 +599,8 @@
           {
             "id": "nsv763ou",
             "type": "tap_image",
-            "x": 480,
-            "y": 168,
+            "x": 448,
+            "y": 184,
             "params": {
               "template": "templates/crop_20260715_152401_999_635_95_25.png",
               "taps": "1",
@@ -615,8 +615,8 @@
           {
             "id": "nkxtovsy",
             "type": "tap_image",
-            "x": 656,
-            "y": 80,
+            "x": 624,
+            "y": 88,
             "params": {
               "template": "templates/crop_20260716_151552_1753_48_37_23.png",
               "taps": "1",
@@ -631,8 +631,8 @@
           {
             "id": "nyblu2yv",
             "type": "tap_image",
-            "x": 656,
-            "y": 168,
+            "x": 624,
+            "y": 184,
             "params": {
               "template": "templates/crop_20260716_151552_1753_48_37_23.png",
               "taps": "1",
@@ -647,8 +647,8 @@
           {
             "id": "nfz6ltsp",
             "type": "tap_image",
-            "x": 832,
-            "y": 80,
+            "x": 800,
+            "y": 88,
             "params": {
               "template": "templates/crop_20260716_151621_162_32_19_36.png",
               "taps": "1",
@@ -663,8 +663,8 @@
           {
             "id": "n1r8erfw",
             "type": "tap_image",
-            "x": 832,
-            "y": 168,
+            "x": 800,
+            "y": 184,
             "params": {
               "template": "templates/crop_20260716_151621_162_32_19_36.png",
               "taps": "1",
@@ -679,8 +679,8 @@
           {
             "id": "nraavrix",
             "type": "tap_image",
-            "x": 832,
-            "y": 256,
+            "x": 800,
+            "y": 272,
             "params": {
               "template": "templates/crop_20260716_151621_162_32_19_36.png",
               "taps": "1",
@@ -693,8 +693,8 @@
           {
             "id": "n4xr2733",
             "type": "call",
-            "x": 1008,
-            "y": 256,
+            "x": 976,
+            "y": 272,
             "params": {
               "fn": "fn_pmuop"
             }

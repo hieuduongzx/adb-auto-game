@@ -43,6 +43,9 @@ function wfValidationIssues(){
         if(f.t==="sequence_images" && Array.isArray(v)) v.forEach((item,i)=>{ if(!item||!String(item.template||"").trim()) add("err",`${def.label}: image #${i+1} is missing`,ctx,n.id); });
         if(f.var && String(v||"").trim() && !varNames.has(String(v).trim())) add("warn",`Variable not declared yet: ${v}`,ctx,n.id);
       });
+      if(n.type==="tap_text" && !String((n.params||{}).text||"").trim()){
+        add("err","Tap text: enter text to find",ctx,n.id);
+      }
       if(n.type==="win_launch"){
         const lp=n.params||{};
         if(lp.pathSrc==="custom"){

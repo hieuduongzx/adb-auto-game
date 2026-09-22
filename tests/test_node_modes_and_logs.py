@@ -126,6 +126,31 @@ class TestNodeModesAndLogs(unittest.TestCase):
         self.assertTrue(result['ok'])
         self.assertEqual(taps, [(10, 20)])
 
+    def test_tap_text_taps_the_center_of_the_matching_ocr_region_with_offset(self):
+        self.engine.auto.region_find_text.return_value = (True, 'PLAY NOW')
+
+        result = self.engine._eval_condition('tap_text', {
+            'text': 'PLAY', 'x': 100, 'y': 200, 'w': 300, 'h': 80,
+            'timeout': 0, 'offsetX': 5, 'offsetY': -10,
+        })
+
+        self.assertTrue(result)
+        self.engine.auto.region_find_text.assert_called_once_with(
+            'PLAY', region=(100, 200, 300, 80), whitelist=None,
+        )
+        self.engine.auto.tap.assert_called_once_with(255, 230, tap_count=1)
+        self.assertEqual(self.engine._last_pos, (250, 240))
+
+    def test_tap_text_does_not_tap_when_ocr_region_does_not_match(self):
+        self.engine.auto.region_find_text.return_value = (False, 'PAUSE')
+
+        result = self.engine._eval_condition('tap_text', {
+            'text': 'PLAY', 'x': 10, 'y': 20, 'w': 100, 'h': 40, 'timeout': 0,
+        })
+
+        self.assertFalse(result)
+        self.engine.auto.tap.assert_not_called()
+
     def test_if_variable_supports_value_type_checks(self):
         cases = [
             (12, 'is_integer', True),

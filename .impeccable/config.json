@@ -20,6 +20,33 @@
         ],
         "createdAt": "2026-09-22T06:19:58.028Z",
         "reason": "Node thumbnail is created without src, then wfLoadThumb assigns the data URL. CSS keeps .wf-node-thumb at zero size until the preview is turned on."
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "apps/web/wf/js/base.js"
+        ],
+        "createdAt": "2026-09-22T12:38:46.066Z",
+        "reason": "Pre-existing tooltip shell: img src is assigned in wfThumbPopShow before the pop is shown."
+      },
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          "apps/web/wf/index.html"
+        ],
+        "createdAt": "2026-09-22T12:58:59.947Z",
+        "reason": "Existing dense Designer chrome: inline sizes are the tool scale, not a flat marketing hierarchy. First hit is the preview path label."
+      },
+      {
+        "rule": "monotonous-spacing",
+        "value": "*",
+        "files": [
+          "apps/web/wf/index.html"
+        ],
+        "createdAt": "2026-09-22T12:59:00.084Z",
+        "reason": "Existing compact tool rows reuse one gap on purpose. Not a landing page that needs section rhythm."
       }
     ]
   }

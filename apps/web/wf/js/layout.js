@@ -3,7 +3,13 @@
 // fits the result to view. Notes are excluded (they float free). Nodes keep their
 // x/y in world coords; stacks/groups are not touched (members follow their head).
 const WF_LAY_NODE_W=WF_GEOMETRY.width, WF_LAY_NODE_H=WF_GEOMETRY.height,
-  WF_LAY_GAP_X=32, WF_LAY_GAP_Y=24, WF_LAY_COMPACT_GAP=16;
+  WF_LAY_GAP_X=32, WF_LAY_GAP_Y=24, WF_LAY_COMPACT_GAP=16, WF_LAY_MARGIN=16,
+  // Main rail stops before a card would end past this x, then the chain
+  // continues down that column. 640 fits start + three cards (right edge 592)
+  // and folds the fifth block — the hand-placed Auto Perform chain.
+  WF_LAY_ROW_RIGHT=640;
+// Cross-axis center of the main rail. A 64px card sits on the grid and a 48px
+// terminal sits 8px lower, so the two share a center.
 // Approximate node height: real DOM height when available, else the default.
 function wfNodeH(n){
   const el=wfNodeElById(n.id); return el?el.offsetHeight:WF_LAY_NODE_H;
@@ -80,42 +86,146 @@ function wfTopoLayers(g){
   });
   return layers.filter(Boolean);
 }
-// Layout: vertical columns (top-to-bottom flow), one row per topo layer, each
-// layer centred on a shared axis so a linear chain forms a straight vertical
-// line and forks fan out symmetrically.
-function wfLayoutVertical(g){
-  const layers=wfTopoLayers(g);
-  // Pre-measure each layer's total width so we can centre them all on one axis.
-  const rows=layers.map(layer=>{
-    const items=layer.map(id=>g.nodes.find(n=>n.id===id)).filter(n=>n&&n.type!=="note");
-    const w=items.reduce((s,n)=>s+wfNodeW(n),0)+Math.max(0,items.length-1)*WF_LAY_GAP_X;
-    const h=items.length?Math.max(...items.map(wfNodeH)):WF_LAY_NODE_H;
-    return {items,w,h};
+// Lane of each node for a left-to-right flow. Lane 0 is the straight main rail
+// (out / true / first case). A side port drops one lane per sibling and stays
+// there, so a false branch runs as its own horizontal line instead of yanking
+// the main chain off center.
+function wfLayLanes(g, layers){
+  const edges=wfLayEdges(g), lane={};
+  const preferred=id=>{
+    const incoming=edges.filter(e=>e.to===id);
+    if(!incoming.length) return 0;
+    incoming.sort((a,b)=>wfLayPortRank(a.fromPort)-wfLayPortRank(b.fromPort));
+    const best=incoming[0], parent=lane[best.from]||0;
+    const siblings=edges.filter(e=>e.from===best.from)
+      .sort((a,b)=>wfLayPortRank(a.fromPort)-wfLayPortRank(b.fromPort));
+    const idx=siblings.findIndex(e=>e.to===id);
+    return parent+Math.max(0, idx);
+  };
+  layers.forEach(layer=>{
+    const order=layer.map(id=>[id, preferred(id)]);
+    order.sort((a,b)=>a[1]-b[1]);
+    const used=new Set();
+    order.forEach(([id,want])=>{
+      while(used.has(want)) want++;
+      lane[id]=want; used.add(want);
+    });
   });
-  const axis=Math.max(...rows.map(r=>r.w), WF_LAY_NODE_W)/2 + 40;
-  let y=40;
-  rows.forEach(row=>{
-    let x=axis-row.w/2;
-    row.items.forEach(n=>{ n.x=wfSnap(x); n.y=wfSnap(y); x+=wfNodeW(n)+WF_LAY_GAP_X; });
-    y+=row.h+WF_LAY_GAP_Y;
+  return lane;
+}
+// Every block in topo order, notes excluded. Within a rank, port order already
+// put true / out ahead of false, so a straight row or column stays readable.
+function wfLayOrder(g){
+  const byId=new Map((g.nodes||[]).map(n=>[n.id,n]));
+  const out=[];
+  wfTopoLayers(g).forEach(layer=>layer.forEach(id=>{
+    const n=byId.get(id); if(n&&n.type!=="note") out.push(n);
+  }));
+  return out;
+}
+// One horizontal line. A 48px terminal sits 8px below a 64px card so their
+// centers share a straight wire.
+function wfLayoutHorizontal(g){
+  const spine=WF_LAY_MARGIN+WF_LAY_NODE_H/2;
+  let x=WF_LAY_MARGIN;
+  wfLayOrder(g).forEach(n=>{
+    const w=wfNodeW(n), h=wfNodeH(n);
+    n.x=x; n.y=spine-h/2;
+    x+=w+WF_LAY_GAP_X;
   });
 }
-// Layout: horizontal rows (left-to-right flow), one column per topo layer, each
-// column centred vertically on a shared axis.
-function wfLayoutHorizontal(g){
-  const layers=wfTopoLayers(g);
-  const cols=layers.map(layer=>{
-    const items=layer.map(id=>g.nodes.find(n=>n.id===id)).filter(n=>n&&n.type!=="note");
-    const h=items.reduce((s,n)=>s+wfNodeH(n),0)+Math.max(0,items.length-1)*WF_LAY_GAP_Y;
-    const w=items.length?Math.max(...items.map(wfNodeW)):WF_LAY_NODE_W;
-    return {items,w,h};
+// One vertical column. 24px between edges. Different widths share one center.
+function wfLayoutVertical(g){
+  const nodes=wfLayOrder(g); if(!nodes.length) return;
+  const axis=WF_LAY_MARGIN+Math.max(...nodes.map(wfNodeW))/2;
+  let y=WF_LAY_MARGIN;
+  nodes.forEach(n=>{
+    const w=wfNodeW(n), h=wfNodeH(n);
+    n.x=axis-w/2; n.y=y;
+    y+=h+WF_LAY_GAP_Y;
   });
-  const axis=Math.max(...cols.map(c=>c.h), WF_LAY_NODE_H)/2 + 40;
-  let x=40;
-  cols.forEach(col=>{
-    let y=axis-col.h/2;
-    col.items.forEach(n=>{ n.x=wfSnap(x); n.y=wfSnap(y); y+=wfNodeH(n)+WF_LAY_GAP_Y; });
-    x+=col.w+WF_LAY_GAP_X;
+}
+// Layout: left-to-right rail, then down. Cards share a center with terminals
+// (a 48px node sits 8px lower than a 64px card). Gaps are 32px
+// horizontally and 24px down the folded column. The rail holds nodes while
+// their right edge stays within WF_LAY_ROW_RIGHT; everything after that stacks
+// under the last column, and End steps out to the right of whatever it follows.
+// Y is not grid-snapped — terminal center alignment needs the 8px half-step.
+function wfLayoutMix(g){
+  const layers=wfTopoLayers(g);
+  const byId=new Map((g.nodes||[]).map(n=>[n.id,n]));
+  const edges=wfLayEdges(g);
+  const lane=wfLayLanes(g, layers);
+  const spine=WF_LAY_MARGIN+WF_LAY_NODE_H/2;
+  const placed=new Set();
+  const parentOf=id=>{
+    const inc=edges.filter(e=>e.to===id);
+    if(!inc.length) return null;
+    inc.sort((a,b)=>wfLayPortRank(a.fromPort)-wfLayPortRank(b.fromPort));
+    return inc[0].from;
+  };
+  const siblingsOf=id=>edges.filter(e=>e.from===id)
+    .sort((a,b)=>wfLayPortRank(a.fromPort)-wfLayPortRank(b.fromPort));
+  const rail=[];
+  layers.forEach(layer=>{
+    const id=layer.find(id=>(lane[id]||0)===0);
+    const n=id&&byId.get(id);
+    if(n&&n.type!=="note") rail.push(n);
+  });
+  let cursor=WF_LAY_MARGIN, prev=null, colAnchor=null, stackY=0, folded=false;
+  rail.forEach(n=>{
+    const w=wfNodeW(n), h=wfNodeH(n);
+    if(n.type==="end"&&prev){
+      n.x=prev.x+wfNodeW(prev)+WF_LAY_GAP_X;
+      n.y=prev.y+wfNodeH(prev)/2-h/2;
+    }else if(!folded&&(!prev||cursor+w<=WF_LAY_ROW_RIGHT)){
+      n.x=cursor;
+      n.y=spine-h/2;
+      cursor+=w+WF_LAY_GAP_X;
+      colAnchor=n;
+      stackY=n.y+h+WF_LAY_GAP_Y;
+    }else{
+      folded=true;
+      const aw=wfNodeW(colAnchor);
+      n.x=colAnchor.x+(aw-w)/2;
+      n.y=stackY;
+      stackY+=h+WF_LAY_GAP_Y;
+    }
+    prev=n; placed.add(n.id);
+  });
+  let orphanY=stackY||(spine+WF_LAY_NODE_H/2+WF_LAY_GAP_Y);
+  layers.forEach(layer=>{
+    const ids=layer.slice().sort((a,b)=>{
+      const pa=parentOf(a), pb=parentOf(b);
+      const ia=pa?siblingsOf(pa).findIndex(e=>e.to===a):0;
+      const ib=pb?siblingsOf(pb).findIndex(e=>e.to===b):0;
+      return ia-ib;
+    });
+    ids.forEach(id=>{
+      if(placed.has(id)) return;
+      const n=byId.get(id); if(!n||n.type==="note") return;
+      const w=wfNodeW(n), h=wfNodeH(n);
+      const parentId=parentOf(id);
+      const parent=parentId&&placed.has(parentId)?byId.get(parentId):null;
+      const sibs=parentId?siblingsOf(parentId):[];
+      const idx=Math.max(0, sibs.findIndex(e=>e.to===id));
+      const primary=sibs.length?byId.get(sibs[0].to):null;
+      if(idx===0&&parent){
+        const right=parent.x+wfNodeW(parent)+WF_LAY_GAP_X;
+        if(right+w<=WF_LAY_ROW_RIGHT){
+          n.x=right; n.y=parent.y+wfNodeH(parent)/2-h/2;
+        }else{
+          n.x=parent.x+(wfNodeW(parent)-w)/2;
+          n.y=parent.y+wfNodeH(parent)+WF_LAY_GAP_Y;
+        }
+      }else if(primary&&placed.has(primary.id)){
+        n.x=primary.x+(wfNodeW(primary)-w)/2;
+        n.y=primary.y+wfNodeH(primary)+WF_LAY_GAP_Y+(idx-1)*(Math.max(h,WF_LAY_NODE_H)+WF_LAY_GAP_Y);
+      }else{
+        n.x=WF_LAY_MARGIN; n.y=orphanY; orphanY+=h+WF_LAY_GAP_Y;
+      }
+      placed.add(n.id);
+    });
   });
 }
 // Layout: tidy wire tree. Each node is claimed by its first forward parent;
@@ -131,7 +241,7 @@ function wfLayoutTree(g){
       .sort((a,b)=>(depth[a]-depth[b])||(order[a]-order[b]));
     kidsOf[id].forEach(t=>claimed.add(t));
   });
-  const rowY=[]; let y=40;
+  const rowY=[]; let y=WF_LAY_MARGIN;
   layers.forEach((row,d)=>{ rowY[d]=y; y+=Math.max(WF_LAY_NODE_H,...row.map(id=>wfNodeH(byId.get(id))))+WF_LAY_GAP_Y; });
   const widths={};
   function widthOf(id){
@@ -150,7 +260,7 @@ function wfLayoutTree(g){
     let childLeft=left+(span-(kids.reduce((s,k)=>s+widthOf(k),0)+Math.max(0,kids.length-1)*WF_LAY_GAP_X))/2;
     kids.forEach(k=>{ place(k,childLeft); childLeft+=widthOf(k)+WF_LAY_GAP_X; });
   }
-  let left=40;
+  let left=WF_LAY_MARGIN;
   const roots=layers.flat().filter(id=>!claimed.has(id));
   roots.forEach(id=>{ place(id,left); left+=widthOf(id)+WF_LAY_GAP_X; });
   // Defensive fallback for malformed cyclic graphs whose forced seed was claimed.
@@ -161,14 +271,14 @@ function wfLayoutTree(g){
 function wfLayoutCompact(g){
   const layers=wfTopoLayers(g);
   const cols=Math.max(1, Math.ceil(Math.sqrt(g.nodes.filter(n=>n.type!=="note").length)));
-  let y=40, col=0, x=40, rowMaxH=0;
+  let y=WF_LAY_MARGIN, col=0, x=WF_LAY_MARGIN, rowMaxH=0;
   layers.forEach(layer=>{
     layer.forEach(id=>{
       const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;
       n.x=wfSnap(x); n.y=wfSnap(y);
       const h=wfNodeH(n); if(h>rowMaxH) rowMaxH=h;
       col++;
-      if(col>=cols){ col=0; x=40; y+=rowMaxH+WF_LAY_COMPACT_GAP; rowMaxH=0; }
+      if(col>=cols){ col=0; x=WF_LAY_MARGIN; y+=rowMaxH+WF_LAY_COMPACT_GAP; rowMaxH=0; }
       else x+=wfNodeW(n)+WF_LAY_COMPACT_GAP;
     });
   });
@@ -200,6 +310,7 @@ function wfAutoLayout(kind){
   g.nodes.forEach(n=>{ from[n.id]={x:n.x,y:n.y}; });
   if(kind==="vertical")   wfLayoutVertical(g);
   else if(kind==="horizontal") wfLayoutHorizontal(g);
+  else if(kind==="mix")   wfLayoutMix(g);
   else if(kind==="tree")  wfLayoutTree(g);
   else if(kind==="compact") wfLayoutCompact(g);
   else if(kind==="zigzag") wfLayoutZigzag(g);
@@ -261,11 +372,11 @@ function wfCloseLayoutMenu(){
 // long sequential flow reads as a boustrophedon (snake) instead of one tall tower.
 function wfLayoutZigzag(g){
   const layers=wfTopoLayers(g);
-  let y=40;
+  let y=WF_LAY_MARGIN;
   const cw=WF_LAY_NODE_W;
   layers.forEach((layer,i)=>{
     // Odd layers sit one column to the right; even to the left, giving the snake.
-    const xBase=40 + (i%2?cw+WF_LAY_GAP_X:0);
+    const xBase=WF_LAY_MARGIN + (i%2?cw+WF_LAY_GAP_X:0);
     let x=xBase, rowMaxH=0;
     layer.forEach(id=>{
       const n=g.nodes.find(n=>n.id===id); if(!n||n.type==="note") return;

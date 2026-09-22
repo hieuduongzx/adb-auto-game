@@ -29,6 +29,20 @@ test('the Designer catalog and the engine registry list exactly the same node ty
   assert.deepEqual([...py].filter(t => !js.has(t)).sort(), [], 'in the engine but not the Designer');
 });
 
+test('Tap text is an OCR condition with a bounded region and true/false outputs', () => {
+  const c = load();
+  const def = node(c, 'tap_text');
+  assert.equal(def.cat, 'ocr');
+  assert.equal(def.kind, 'condition');
+  assert.deepEqual(Array.from(def.outs), ['true', 'false']);
+  assert.deepEqual(Array.from(def.fields).map(f => f.k),
+    ['text', 'x', 'y', 'w', 'h', 'timeout', 'taps', 'offsetX', 'offsetY', 'whitelist']);
+  assert.deepEqual(JSON.parse(JSON.stringify(c.wfDefaults('tap_text'))), {
+    text: '', x: 0, y: 0, w: 200, h: 80, timeout: 10,
+    taps: '1', offsetX: 0, offsetY: 0, whitelist: '',
+  });
+});
+
 test('Wait for app works on both controllers, Kill process is Win32-only', () => {
   const c = load();
   assert.equal(c.wfNodeCtrl('wait_app'), null);

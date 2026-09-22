@@ -61,6 +61,111 @@ test('standard arrange modes keep connected nodes close without overlap', () => 
   assert.equal(vertical.nodes[2].y-vertical.nodes[1].y-size[1],24);
 });
 
+test('horizontal arrange keeps a whole chain on one center line', () => {
+  const sizeOf={
+    s:[48,48], a:[144,64], b:[144,64], c:[144,64], d:[144,64], e:[144,64], z:[48,48],
+  };
+  const ctx=load('layout.js',{
+    WF_GEOMETRY:{width:144,height:64},
+    wfSnap:v=>Math.round(v/16)*16,
+    wfNodeElById:id=>({offsetWidth:sizeOf[id][0],offsetHeight:sizeOf[id][1]}),
+  });
+  const ids=['s','a','b','c','d','e','z'];
+  const g={
+    nodes:ids.map(id=>({id,type:id==='s'?'start':id==='z'?'end':'tap',x:0,y:0})),
+    edges:ids.slice(1).map((id,i)=>({from:ids[i],to:id})),
+  };
+  ctx.wfLayoutHorizontal(g);
+  const by=Object.fromEntries(g.nodes.map(n=>[n.id,n]));
+  const center=id=>by[id].y+sizeOf[id][1]/2;
+  assert.deepEqual(ids.map(id=>by[id].x), [16,96,272,448,624,800,976]);
+  ids.forEach(id=>assert.equal(center(id), center('s')));
+  assert.equal(by.a.y, by.s.y-8);
+});
+
+test('vertical arrange keeps a whole chain in one column', () => {
+  const sizeOf={ s:[48,48], a:[144,64], b:[144,64] };
+  const ctx=load('layout.js',{
+    WF_GEOMETRY:{width:144,height:64},
+    wfSnap:v=>Math.round(v/16)*16,
+    wfNodeElById:id=>({offsetWidth:sizeOf[id][0],offsetHeight:sizeOf[id][1]}),
+  });
+  const g={
+    nodes:['s','a','b'].map(id=>({id,type:id==='s'?'start':'tap',x:0,y:0})),
+    edges:[{from:'s',to:'a'},{from:'a',to:'b'}],
+  };
+  ctx.wfLayoutVertical(g);
+  const by=Object.fromEntries(g.nodes.map(n=>[n.id,n]));
+  const center=id=>by[id].x+sizeOf[id][0]/2;
+  assert.equal(center('s'), center('a'));
+  assert.equal(center('a'), center('b'));
+  assert.equal(by.a.y, by.s.y+48+24);
+  assert.equal(by.b.y, by.a.y+64+24);
+  assert.equal(by.a.x, by.b.x);
+});
+
+test('mix arrange folds a long chain down the last column', () => {
+  const sizeOf={
+    s:[48,48], a:[144,64], b:[144,64], c:[144,64], d:[144,64], e:[144,64], z:[48,48],
+  };
+  const ctx=load('layout.js',{
+    WF_GEOMETRY:{width:144,height:64},
+    wfSnap:v=>Math.round(v/16)*16,
+    wfNodeElById:id=>({offsetWidth:sizeOf[id][0],offsetHeight:sizeOf[id][1]}),
+  });
+  const ids=['s','a','b','c','d','e','z'];
+  const g={
+    nodes:ids.map(id=>({id,type:id==='s'?'start':id==='z'?'end':'tap',x:0,y:0})),
+    edges:[
+      {from:'s',fromPort:'out',to:'a'},
+      {from:'a',fromPort:'true',to:'b'},
+      {from:'b',fromPort:'true',to:'c'},
+      {from:'c',fromPort:'true',to:'d'},
+      {from:'d',fromPort:'true',to:'e'},
+      {from:'e',fromPort:'out',to:'z'},
+    ],
+  };
+  ctx.wfLayoutMix(g);
+  const by=Object.fromEntries(g.nodes.map(n=>[n.id,n]));
+  const center=id=>by[id].y+sizeOf[id][1]/2;
+  // start + three cards on the rail, the next two stacked under the last
+  // card, End stepped out to the right and center-aligned with that card.
+  assert.deepEqual(ids.map(id=>by[id].x), [16,96,272,448,448,448,624]);
+  assert.equal(by.a.y, by.s.y-8);
+  assert.equal(by.b.y, by.a.y);
+  assert.equal(by.c.y, by.a.y);
+  assert.equal(center('a'), center('s'));
+  assert.equal(by.d.y, by.c.y+64+24);
+  assert.equal(by.e.y, by.d.y+64+24);
+  assert.equal(by.z.x, by.e.x+144+32);
+  assert.equal(center('z'), center('e'));
+});
+
+test('mix arrange keeps the true rail straight and drops false below it', () => {
+  const sizeOf={ s:[144,64], t:[144,64], f:[144,64], n:[144,64] };
+  const ctx=load('layout.js',{
+    WF_GEOMETRY:{width:144,height:64},
+    wfSnap:v=>Math.round(v/16)*16,
+    wfNodeElById:id=>({offsetWidth:sizeOf[id][0],offsetHeight:sizeOf[id][1]}),
+  });
+  const g={
+    nodes:['s','t','f','n'].map(id=>({id,type:'tap',x:0,y:0})),
+    edges:[
+      {from:'s',fromPort:'true',to:'t'},
+      {from:'s',fromPort:'false',to:'f'},
+      {from:'f',fromPort:'out',to:'n'},
+    ],
+  };
+  ctx.wfLayoutMix(g);
+  const by=Object.fromEntries(g.nodes.map(n=>[n.id,n]));
+  assert.equal(by.t.y, by.s.y);
+  assert.equal(by.t.x, by.s.x+144+32);
+  assert.equal(by.f.x, by.t.x);
+  assert.equal(by.f.y, by.t.y+64+24);
+  assert.equal(by.n.y, by.f.y);
+  assert.equal(by.n.x, by.f.x+144+32);
+});
+
 test('compact arrange uses a 16px gutter in both directions', () => {
   const size=[144,64];
   const ctx=load('layout.js',{

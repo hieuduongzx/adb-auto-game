@@ -77,7 +77,12 @@ test('canvas group frames use the same square geometry as nodes', () => {
   }
 });
 
-test('the primary port row centres on a grid dot', () => {
+test('regular cards are 9x4 cells and terminals are 3x3 cells', () => {
+  assert.equal(tok(baseCss, '--node-h'), 64);
+  assert.equal(tok(baseCss, '--term-size'), 48);
+});
+
+test('the primary card port row centres on a grid line', () => {
   const h = tok(baseCss, '--node-h'), sz = tok(baseCss, '--port-sz');
   const rowTop = Math.round((h - sz) / 2);          // WF_ROW_TOP in render.js
   const center = rowTop + sz / 2;                   // dot centre in card coords

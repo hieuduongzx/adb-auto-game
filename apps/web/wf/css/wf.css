@@ -1059,8 +1059,10 @@
 .wf-node.ran-skip .ico { opacity:.55; }
 .wf-node.ran-skip .wf-node-hd { filter:saturate(.55); }
 /* Structural kinds set their own accent colour. */
-.wf-node.start { --node-accent:var(--term-start); --ntitle:var(--cat-app-ink); }
-.wf-node.end { --node-accent:var(--term-end); --ntitle:var(--term-end); }
+.wf-node.start { --node-accent:var(--term-start); --ntitle:var(--cat-app-ink); --term-ring:#047857; }
+.wf-node.end { --node-accent:var(--term-end); --ntitle:var(--term-end); --term-ring:#be123c; }
+:root[data-theme="dark"] .wf-node.start { --term-ring:#059669; }
+:root[data-theme="dark"] .wf-node.end { --term-ring:#e11d48; }
 /* Stop is not a category — it is an abort, and it says so in red. Same whisper
    strength as the category faces, so it stays a marker rather than a shout. */
 .wf-node.stop { --node-accent:var(--term-end); --ntitle:var(--err);
@@ -1190,7 +1192,6 @@
 /* ── Terminals: Start and End share the same compact square silhouette and are
    told apart by colour and glyph. ─────────────────────────────────────────────── */
 .wf-node.start, .wf-node.end {
-  --port-inset:4px;
   width:var(--term-size); height:var(--term-size); min-height:var(--term-size);
   border:none; background:transparent; overflow:visible;
   border-radius:var(--node-r);
@@ -1212,12 +1213,11 @@
 .wf-node.start.ran-ok::after, .wf-node.end.ran-ok::after { box-shadow:var(--sh-sm); }
 .wf-node.start.ran-fail::after, .wf-node.end.ran-fail::after { box-shadow:var(--sh-sm); }
 .wf-node.start.running::after, .wf-node.end.running::after { box-shadow:var(--sh-md); }
-/* Terminal body — a compact square. A light ring token: panel face, coloured
-   ring, glyph in the terminal hue; a soft wash and shadow lift it off the
-   canvas without the old solid-disc weight. */
+/* Terminal body — a compact square. Panel face, a deeper ring than the glyph
+   (--term-ring), and a soft wash so the square lifts off the canvas. */
 .wf-node-tri {
   position:absolute; inset:0; background:var(--panel); border-radius:var(--node-r);
-  border:1.75px solid var(--node-accent);
+  border:2.5px solid var(--term-ring, var(--node-accent));
   display:flex; align-items:center; justify-content:center; color:var(--node-accent);
   box-shadow:var(--sh-sm), inset 0 0 0 3px color-mix(in srgb, var(--node-accent) 12%, transparent);
 }
@@ -1367,9 +1367,9 @@
 /* Body under the title. Line 1 is the identity (name, text, point); line 2
    is the qualifiers, and that row clips first when it doesn't fit. No fixed
    height — a note, retry or log row under this must still fit the 64px card. */
-.wf-node-sum { display:flex; flex-direction:column; justify-content:center; gap:2px;
+.wf-node-sum { display:flex; flex-direction:column; justify-content:center; gap:1px;
   padding:6px 10px 5px; overflow:hidden;
-  font-family:var(--mono); font-size:11px; line-height:1.25; color:var(--ink2); }
+  font-family:var(--mono); font-size:9.5px; line-height:1.2; color:var(--ink2); }
 .wf-sum-line { display:flex; align-items:center; gap:4px; min-width:0; }
 .wf-sum-main { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   color:var(--ink); font-weight:600; }
@@ -1383,7 +1383,7 @@
 .wf-node.note .wf-node-sum .wf-sum-main {
   display:block; white-space:normal; overflow:visible; -webkit-line-clamp:unset; }
 .wf-sum-meta { display:flex; align-items:center; min-width:0; overflow:hidden;
-  font-size:var(--t-micro); line-height:1.2; font-weight:500; color:var(--muted); }
+  font-size:8px; line-height:1.15; font-weight:500; color:var(--muted); }
 .wf-sum-chip { flex:0 0 auto; white-space:nowrap; }
 .wf-sum-chip + .wf-sum-chip::before { content:"·"; margin:0 4px; color:var(--border2); }
 .wf-sum-chip:last-child { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
@@ -1407,14 +1407,14 @@
    chrome lives on the container; each .wf-delay-chip is just its half, so the
    runtime countdown can highlight one half without doubling the border. */
 .wf-node-delay { position:absolute; top:100%; left:-1px; margin-top:0;
-  display:inline-flex; align-items:center; gap:5px; pointer-events:none; z-index:1;
+  display:inline-flex; align-items:center; gap:3px; pointer-events:none; z-index:1;
    white-space:nowrap; border:1px solid var(--border); border-radius:0;
-   padding:3px 6px; background:var(--panel); }
+   padding:1px 3px; background:var(--panel); }
 .wf-delay-chip { display:inline-flex; align-items:center;
-  font-family:var(--mono); font-size:8.5px; font-weight:500; letter-spacing:.02em;
+  font-family:var(--mono); font-size:7px; font-weight:500; letter-spacing:.01em;
   line-height:1; color:var(--dim); position:relative; overflow:hidden;
    border-radius:0; transition:color .12s, background .12s; }
-.wf-delay-sep { color:var(--border2); font-size:8px; line-height:1;
+.wf-delay-sep { color:var(--border2); font-size:7px; line-height:1;
   user-select:none; }
 .wf-delay-label { font-variant-numeric:tabular-nums; }
 /* Live countdown while the engine sleeps on delayBefore / delayAfter. */
@@ -1434,10 +1434,10 @@
 .wf-node-delay-live {
   position:absolute; top:100%; left:-1px; margin-top:0; z-index:2;
   display:inline-flex; align-items:center; pointer-events:none;
-  font-family:var(--mono); font-size:9px; font-weight:700; letter-spacing:.02em;
+  font-family:var(--mono); font-size:7px; font-weight:700; letter-spacing:.01em;
   line-height:1; color:var(--run-live-ink);
   font-variant-numeric:tabular-nums; white-space:nowrap;
-  background:var(--run-live-hd); border-radius:0; padding:3px 6px; border:1px solid var(--border);
+  background:var(--run-live-hd); border-radius:0; padding:1px 3px; border:1px solid var(--border);
   overflow:hidden;
 }
 .wf-node-delay-live::before {
@@ -1448,22 +1448,25 @@
 .wf-node-delay-live > * { position:relative; z-index:1; }
 .wf-node.delaying { z-index:var(--z-node-hover); }
 
-/* Run-duration chip under the block's bottom-right corner. */
-.wf-node-time { position:absolute; top:100%; right:var(--port-inset); margin-top:2px;
-  font-family:var(--mono); font-size:9px; line-height:1.3; color:var(--dim);
+/* Run-duration chip under the block's bottom-right corner. Same measure as the
+   delay pill so the two readouts under a card share one size. */
+.wf-node-time { position:absolute; top:100%; right:var(--port-inset); margin-top:0;
+  font-family:var(--mono); font-size:7px; line-height:1; color:var(--dim);
   pointer-events:none; white-space:nowrap; z-index:1; }
 .wf-node.ran-fail .wf-node-time { color:var(--run-fail); font-weight:600; }
 
-/* Timeout corner badge — the static limit a wait-style block runs under, top-right.
-   While the block is live the same pill counts down (elapsed bar fill) until the
-   engine's node_result restores it. */
+/* Timeout corner badge — same pill measure as delay before/after. The clock is
+   a mask, not an emoji, so it stays inside that measure. While the block is
+   live the same pill counts down until node_result restores it. */
 .wf-node-timeout { position:absolute; top:-1px; right:-1px; z-index:2;
   display:inline-flex; align-items:center; pointer-events:none;
-  font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:.02em;
+  font-family:var(--mono); font-size:7px; font-weight:500; letter-spacing:.01em;
   line-height:1; color:var(--dim); font-variant-numeric:tabular-nums;
   background:var(--surface); border:1px solid var(--border); border-radius:0;
-  padding:2px 4px; white-space:nowrap; overflow:hidden; }
-.wf-node-timeout::after { content:"⏱"; font-family:inherit; margin-right:2px; opacity:.7; order:-1; }
+  padding:1px 3px; white-space:nowrap; overflow:hidden; }
+.wf-node-timeout::after { content:""; width:8px; height:8px; margin-right:2px; opacity:.7; order:-1; flex-shrink:0;
+  background:currentColor; -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='13' r='8'/><path d='M12 9v4l2 2'/><path d='M9 2h6'/><path d='M12 2v2'/></svg>") center/contain no-repeat; mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='13' r='8'/><path d='M12 9v4l2 2'/><path d='M9 2h6'/><path d='M12 2v2'/></svg>") center/contain no-repeat; }
+.wf-node-timeout:not(:has(.wf-timeout-label:not(:empty)))::after { margin-right:0; }
 .wf-node-timeout.counting {
   color:var(--run-live-ink); font-weight:700;
   background:var(--run-live-hd); border-color:var(--run-live-hd-bd);
@@ -1486,8 +1489,8 @@
 /* Generous hit-area so grab/drop still feels easy — the dot shrank visually, the
    grabbable disc did not; -8px reaches just past the card edge. */
 .wf-port::before { content:""; position:absolute; inset:-8px; border-radius:50%; }
-/* Sockets sit just inside the card edge — the wire runs under the block and
-   re-emerges at its far edge, so links read as passing behind the cards. */
+/* Sockets sit on the card rim (1px in). The wire still runs under the block
+   and re-emerges at its far edge, so links read as passing behind the cards. */
 .wf-port.in  { left:var(--port-inset); }
 .wf-port.out { right:var(--port-inset); }
 /* Unwired: a ring. Branch slots keep a hint of their hue so a block still reads
@@ -1665,9 +1668,9 @@
 .wf-color-pick::-webkit-color-swatch-wrapper { padding:2px; }
 .wf-color-pick::-webkit-color-swatch { border:none; border-radius:var(--r-xs); }
 .wf-color-pick:hover { border-color:var(--border2); }
-.wf-node-retry { padding:3px 8px; margin:0; display:flex; gap:6px; flex-wrap:wrap; color:var(--muted); font-size:10px; }
-.wf-node-retry span { display:inline-flex; align-items:center; gap:3px; background:var(--alt); border:1px solid var(--border2); border-radius:999px; padding:1px 6px; }
-.wf-node-retry svg { width:10px; height:10px; stroke-width:2.4; }
+.wf-node-retry { padding:2px 6px; margin:0; display:flex; gap:4px; flex-wrap:wrap; color:var(--muted); font-size:8px; line-height:1.2; }
+.wf-node-retry span { display:inline-flex; align-items:center; gap:2px; background:var(--alt); border:1px solid var(--border2); border-radius:999px; padding:0 4px; }
+.wf-node-retry svg { width:8px; height:8px; stroke-width:2.4; }
 .wf-field.full { flex-direction:column; align-items:stretch; gap:4px; }
 .wf-field.full > label { min-width:auto; }
 .wf-field.full > input, .wf-field.full > select { width:100%; }

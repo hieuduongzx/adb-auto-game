@@ -133,6 +133,7 @@ NODE_TYPES: Dict[str, Dict[str, Any]] = {
     # node-graph way to express "see image A or B" (an OR over several images).
     "tap_image_any":  {"label": "Chạm 1 trong ảnh", "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     "wait_image_any": {"label": "Chờ 1 trong ảnh",  "kind": "condition", "ins": 1, "outs": ["true", "false"]},
+    "tap_text":   {"label": "Chạm chữ",      "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     "wait_text":  {"label": "Chờ chữ",       "kind": "condition", "ins": 1, "outs": ["true", "false"]},
     # ── Color (pixel) nodes — match a pixel/region against a #RRGGBB colour
     # with a per-channel tolerance (same semantics as DevScope's Inspect color:
@@ -2797,6 +2798,40 @@ class WorkflowEngine:
                 self._last_pos = (res[0], res[1])
                 log_info(f"🔍 found image {os.path.basename(tpl)} at ({res[0]}, {res[1]})")
             return res is not None
+        if ntype == "tap_text":
+            needle = str(self._resolve_value(params.get("text", "")) or "").strip()
+            region = self._region(params)
+            timeout = float(params.get("timeout", 10.0))
+            if not needle:
+                log_warning("Tap text: no text to look for")
+                self._report_ocr_region(region, False, needle)
+                return False
+            end = time.time() + max(0.0, timeout)
+            last_read = ""
+            while not self._stop.is_set():
+                self._pause.wait()
+                if self._stop.is_set():
+                    return False
+                found, read = self.auto.region_find_text(
+                    needle, region=region, whitelist=self._ocr_whitelist(params))
+                if read:
+                    last_read = read
+                if found:
+                    x, y, w, h = region
+                    center = (int(x) + max(0, int(w)) // 2,
+                              int(y) + max(0, int(h)) // 2)
+                    self._last_pos = center
+                    self._report_ocr_region(region, True, needle)
+                    return self._tap_at(center[0], center[1], params, label=f"text '{needle}'")
+                if time.time() >= end:
+                    log_info(
+                        f"🔤 timeout ({timeout:g}s) waiting to tap '{needle}' "
+                        f"in {region} — last read: {last_read!r}"
+                    )
+                    self._report_ocr_region(region, False, needle)
+                    return False
+                time.sleep(min(0.5, max(0.0, end - time.time())))
+            return False
         if ntype == "wait_text":
             needle = str(self._resolve_value(params.get("text", "")) or "").strip()
             region = self._region(params)
@@ -3086,7 +3121,7 @@ class WorkflowEngine:
     # hanging for the full configured wait (often 10s).
     _QUICK_TIMEOUT_TYPES = frozenset({
         "tap_image", "wait_image", "tap_image_any", "wait_image_any",
-        "tap_color", "wait_color", "wait_text", "scroll_find",
+        "tap_color", "wait_color", "tap_text", "wait_text", "scroll_find",
         "win_wait_window", "wait_stable", "wait_app",
     })
 

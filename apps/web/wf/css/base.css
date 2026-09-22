@@ -107,23 +107,22 @@
   --canvas-grid-line:  rgba(23,32,43,.022);
   --canvas-grid-major: rgba(23,32,43,.04);
   --node-r: 0px;  /* Every canvas node uses a square silhouette. */
-  /* Card geometry is locked to whole grid cells (WF_GRID = 16px, ~20% under
-     the old 20px grid): 9×4 cells. Node x/y snapping then lands the card
-     exactly on the minor grid — edges sit on grid lines, never half a cell off. */
+  /* Card geometry is locked to whole grid cells (WF_GRID = 16px): 9×4 cells.
+     Node x/y snapping lands every edge on the minor grid. */
   --node-w: 144px; /* Canonical geometry is also read by workflow.js. */
   --node-h: 64px;
   /* Title bar. Shorter than the old 24px so the body — the value you scan —
      keeps the card. The card itself stays 4 grid cells. */
   --node-hd: 18px;
-  /* Sockets sit INSIDE the card (5px from the edge): the wire layer paints
-     under the cards, so a link runs behind the block and re-emerges at its far
-     edge — connection points read as embedded sockets, not edge nubs. Render
-     and layout read these same geometry tokens; the 16px row pitch = exactly
-     1 cell, so every slot's dot centre lands on a grid dot on-grid. */
+  /* Sockets sit 1px in from the card edge: close enough to read as the
+     rim, still inside so a link can run under the block and re-emerge at the
+     far side. Render and layout read these same geometry tokens; the 16px row
+     pitch = exactly 1 cell, so every slot's dot centre lands on a grid dot. */
   --port-sz: 6px;
-  --port-inset: 5px;
+  --port-inset: 1px;
   --port-gap: 16px;
-  /* Start / End are compact 3×3-cell square terminals. */
+  /* Start / End are compact 3×3-cell terminals. Their drag step is half-grid
+     so their 24px center can align with a regular card's 32px center. */
   --term-size: 48px;
   /* Semantic z-index scale — no arbitrary 999s. */
   --z-node: 2; --z-selbox: 1; --z-node-hover: 6;

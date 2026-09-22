@@ -1204,24 +1204,28 @@ function wfInitCanvas(){
       if(!wfGesture._moving) return;
       const rawX=lead.ox+(e.clientX-wfGesture.sx)/wfZoom;
       const rawY=lead.oy+(e.clientY-wfGesture.sy)/wfZoom;
-      // Grid is the baseline. Smart align is evaluated from the unsnapped pointer
-      // position, then overrides the grid only on an axis that actually matched.
-      // This prevents a 20px grid from skipping a nearby 6px alignment target,
-      // while the untouched axis remains cleanly on-grid.
-      let sx=e.altKey?Math.round(rawX):wfSnap(rawX);
-      let sy=e.altKey?Math.round(rawY):wfSnap(rawY);
-      // Port/edge/centre alignment belongs to Smart align. Exact alignment wins
-      // over the grid on its axis; a straight port wire is more useful than an
-      // arbitrary grid coordinate. Alt bypasses both grid and Smart align.
+      // Regular cards move by whole grid cells. A lone Start/End terminal may
+      // use half-cells so its 24px center can line up with a 64px card's 32px
+      // center. Multi-selection stays on the full grid; Alt remains free-hand.
+      const leadDef=WF_NODES[(wfNode(lead.id)||{}).type];
+      const terminalHalfStep=wfSnapOn && wfGesture.items.length===1 &&
+        (leadDef?.kind==="start" || leadDef?.kind==="end");
+      const dragSnap=v=>terminalHalfStep
+        ? Math.round(v/(WF_GRID/2))*(WF_GRID/2)
+        : wfSnap(v);
+      let sx=e.altKey?Math.round(rawX):dragSnap(rawX);
+      let sy=e.altKey?Math.round(rawY):dragSnap(rawY);
       let alignHit=null, portSnapped=false;
       if(wfGesture.items.length===1 && !e.altKey && wfAlignOn){
         const py=wfPortAlignSnapY(wfGesture.dragId, rawY);
-        portSnapped = py!==rawY;
+        portSnapped = py!==rawY && dragSnap(py)===py;
         const alignY=portSnapped?py:rawY;
         alignHit=wfAlignSnap(wfGesture.dragId, rawX, alignY, portSnapped);
-        if(alignHit.v) sx=alignHit.x;
+        if(alignHit.v && dragSnap(alignHit.x)===alignHit.x) sx=alignHit.x;
+        else if(alignHit.v) alignHit.v=null;
         if(portSnapped) sy=py;
-        else if(alignHit.h) sy=alignHit.y;
+        else if(alignHit.h && dragSnap(alignHit.y)===alignHit.y) sy=alignHit.y;
+        else if(alignHit.h) alignHit.h=null;
       }
       const dx=sx-lead.ox, dy=sy-lead.oy;
       wfGesture.items.forEach(it=>{

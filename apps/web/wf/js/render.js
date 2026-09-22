@@ -956,7 +956,7 @@ function wfDelayChipsHtml(n){
   return dp.length ? `<div class="wf-node-delay">${dp.join(`<span class="wf-delay-sep">|</span>`)}</div>` : "";
 }
 // Timeout corner badge. A block whose def declares a timeout param gets a small
-// "⏱ Ns" pill at its top-right corner; while the block runs, the same pill
+// "Ns" pill at its top-right corner (clock is CSS); while the block runs, the same pill
 // counts down against the engine's deadline (see wfStartNodeTimeout in base.js).
 // Numeric literal → show the value; anything else (blank → the field's default,
 // a {var} reference) still marks the block as timeout-bounded.
@@ -966,7 +966,7 @@ function wfTimeoutChipHtml(n){
   if(!def||!(def.fields||[]).some(f=>f.k==="timeout")) return "";
   const raw=n.params.timeout;
   const num=(typeof raw==="number")?raw:parseFloat(raw);
-  const shown=Number.isFinite(num)&&num>0?wfDelaySecs(num):"⏱";
+  const shown=Number.isFinite(num)&&num>0?wfDelaySecs(num):"";
   return `<span class="wf-node-timeout" data-secs="${Number.isFinite(num)?num:""}" title="Timeout: ${Number.isFinite(num)&&num>0?wfDelaySecs(num):"set by expression / default"}"><span class="wf-timeout-label">${shown}</span></span>`;
 }
 // Card geometry, mirroring css/base.css (--node-h, --term-size, --port-sz).

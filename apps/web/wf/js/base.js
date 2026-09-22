@@ -489,7 +489,7 @@ function wfRestoreDelayChip(chip){
     const label=chip.querySelector(".wf-timeout-label");
     const n=typeof wfNode==="function"?wfNode(chip.closest(".wf-node")?.dataset.node):null;
     const secs=n?parseFloat(n.params&&n.params.timeout):parseFloat(chip.dataset.secs);
-    const shown=(typeof wfDelaySecs==="function"&&Number.isFinite(secs)&&secs>0)?wfDelaySecs(secs):(chip.dataset.secs?chip.dataset.secs+"s":"⏱");
+    const shown=(typeof wfDelaySecs==="function"&&Number.isFinite(secs)&&secs>0)?wfDelaySecs(secs):(chip.dataset.secs?chip.dataset.secs+"s":"");
     if(label) label.textContent=shown;
     chip.title="Timeout: "+(Number.isFinite(secs)&&secs>0?wfDelaySecs(secs):"set by expression / default");
     return;
