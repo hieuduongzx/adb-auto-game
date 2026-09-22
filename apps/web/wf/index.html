@@ -173,7 +173,7 @@
 <!-- data-pnl-stage: the workspace any panel takes over when it is maximized.
      shared/panel.js moves the panel node here and hides the siblings, so a
      docked column can go full-screen without an escape hatch of its own. -->
-<div id="workflow-view" data-pnl-stage>
+<main id="workflow-view" data-pnl-stage aria-label="Workflow designer workspace">
   <!-- Left: block library and reusable functions. Activities stay on the
        canvas as a compact, always-reachable graph switcher. -->
   <div id="wf-side">
@@ -709,7 +709,7 @@
     </div><!-- /wf-scope-panel -->
     </div><!-- /wf-insp-panel -->
   </div>
-</div>
+</main>
 <div id="wf-ctxmenu" role="menu"></div>
 
 
