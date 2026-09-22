@@ -128,6 +128,18 @@ def test_shared_foundation_defines_square_shell_bar_and_status_primitives():
     assert "@media (prefers-reduced-motion: reduce)" in source
 
 
+def test_each_surface_uses_the_shared_workbench_shell_and_status_vocabulary():
+    required = {"workbench-shell", "workbench-main", "workbench-status"}
+    for name, path in APPS.items():
+        doc = _document(path)
+        classes = {
+            value
+            for node in doc.nodes
+            for value in node["attrs"].get("class", "").split()
+        }
+        assert required.issubset(classes), f"{name} is missing {required - classes}"
+
+
 def test_shared_css_has_no_gradients_or_decorative_surface_shadows():
     sources = {
         path.name: path.read_text(encoding="utf-8")
