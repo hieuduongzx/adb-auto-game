@@ -1,5 +1,6 @@
 from html.parser import HTMLParser
 from pathlib import Path
+import re
 
 
 WEB = Path(__file__).parents[1] / "apps" / "web"
@@ -106,3 +107,42 @@ def test_theme_controller_owns_both_theme_and_density_hooks():
     assert 'setAttribute("data-theme"' in source
     assert 'setAttribute("data-density"' in source
     assert "setDensity" in source
+    assert 'querySelectorAll("[data-theme-toggle]")' in source
+    assert 'setAttribute("aria-pressed"' in source
+
+
+def test_shared_tokens_expose_primitive_semantic_and_component_layers():
+    source = (WEB / "shared" / "tokens.css").read_text(encoding="utf-8")
+    assert "--primitive-neutral-0:" in source
+    assert re.search(r"--semantic-app-bg:\s*var\(--primitive-", source)
+    assert re.search(r"--component-control-radius:\s*[012]px", source)
+    assert re.search(r"--component-panel-radius:\s*0px", source)
+    assert "--bg: var(--semantic-app-bg)" in source
+
+
+def test_shared_foundation_defines_square_shell_bar_and_status_primitives():
+    source = (WEB / "shared" / "base.css").read_text(encoding="utf-8")
+    for selector in (".workbench-shell", ".workbench-bar", ".workbench-main", ".workbench-status"):
+        assert selector in source
+    assert ":focus-visible" in source
+    assert "@media (prefers-reduced-motion: reduce)" in source
+
+
+def test_shared_css_has_no_gradients_or_decorative_surface_shadows():
+    sources = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in (WEB / "shared").glob("*.css")
+    }
+    combined = "\n".join(sources.values()).lower()
+    assert "linear-gradient(" not in combined
+    assert "radial-gradient(" not in combined
+
+    shadow_selectors = []
+    for name, source in sources.items():
+        for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", source):
+            declarations = match.group(2)
+            values = re.findall(r"box-shadow\s*:\s*([^;]+)", declarations)
+            if values and any(value.strip() != "none" for value in values):
+                shadow_selectors.append(f"{name}:{match.group(1).strip()}")
+    allowed = (".skip-link", ".ui-toast", ".ui-modal", ".pnl.is-max")
+    assert all(any(token in selector for token in allowed) for selector in shadow_selectors), shadow_selectors

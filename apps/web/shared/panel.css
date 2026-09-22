@@ -142,7 +142,8 @@
 .pnl {
   display: flex; flex-direction: column; min-height: 0; min-width: 0;
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: var(--r-lg); overflow: hidden;
+  border-radius: var(--component-panel-radius); overflow: hidden;
+  box-shadow: none;
 }
 /* Docked variant — a panel filling a column already bounded by a hairline
    carries no border or corner of its own. */
@@ -211,7 +212,7 @@ button.pnl-title { cursor: pointer; }
   position: absolute !important; inset: var(--s3) !important; z-index: 30;
   margin: 0 !important; width: auto !important; height: auto !important;
   max-height: none !important; min-height: 0 !important; flex: none !important;
-  border: 1px solid var(--border2); border-radius: var(--r-lg);
+  border: 1px solid var(--border2); border-radius: var(--component-overlay-radius);
   background: var(--panel); box-shadow: var(--sh-lg); visibility: visible;
   animation: pnlMaxIn .16s var(--ease) both;
 }
@@ -247,7 +248,7 @@ button.pnl-title { cursor: pointer; }
 }
 .swx::after {
   content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px;
-  border-radius: 50%; background: var(--panel); box-shadow: var(--sh-sm);
+  border-radius: 50%; background: var(--panel); border: 1px solid var(--border2);
   transition: transform .16s var(--ease);
 }
 .swx.on { background: var(--accent); border-color: var(--accent); }

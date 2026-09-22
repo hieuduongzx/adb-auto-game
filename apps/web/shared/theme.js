@@ -21,10 +21,20 @@
   function normTheme(t) { return t === "dark" ? "dark" : "light"; }
   function normDensity(d) { return d === "compact" ? "compact" : "comfortable"; }
 
+  function syncThemeControls(theme) {
+    var dark = normTheme(theme) === "dark";
+    document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
+      button.setAttribute("aria-pressed", dark ? "true" : "false");
+      button.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+    });
+  }
+
   function apply(theme, density) {
     var root = document.documentElement;
-    root.setAttribute("data-theme", normTheme(theme));
+    var nextTheme = normTheme(theme);
+    root.setAttribute("data-theme", nextTheme);
     root.setAttribute("data-density", normDensity(density));
+    syncThemeControls(nextTheme);
   }
 
   function current() {
@@ -98,6 +108,9 @@
     // Fallback: some builds fire DOMContentLoaded before the bridge is ready.
     document.addEventListener("DOMContentLoaded", function () { setTimeout(reconcile, 0); });
   }
+  document.addEventListener("DOMContentLoaded", function () {
+    syncThemeControls(current().theme);
+  });
 
   window.uiTheme = {
     set: set,

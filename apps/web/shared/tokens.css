@@ -3,24 +3,71 @@
 @import url("fonts/fonts.css");
 
 :root {
-  --bg:        #eef1f5;
-  --panel:     #ffffff;
-  --surface:   #f6f8fb;
-  --alt:       #eef2f6;
-  --border:    #dbe2ec;
-  --border2:   #cbd7e6;
-  --line:      #dde3ea;
+  /* Layer 1 — immutable palette. App CSS must consume semantic aliases, not
+     these values directly. */
+  --primitive-neutral-0: #ffffff;
+  --primitive-neutral-25: #f6f8fb;
+  --primitive-neutral-50: #eef1f5;
+  --primitive-neutral-75: #eef2f6;
+  --primitive-neutral-100: #dde3ea;
+  --primitive-neutral-150: #dbe2ec;
+  --primitive-neutral-200: #cbd7e6;
+  --primitive-neutral-600: #5b6675;
+  --primitive-neutral-700: #4d5a69;
+  --primitive-neutral-800: #2e3a49;
+  --primitive-neutral-900: #131922;
+  --primitive-neutral-925: #232a36;
+  --primitive-neutral-950: #161a20;
+  --primitive-blue-50: #e8effe;
+  --primitive-blue-200: #c4d7ff;
+  --primitive-blue-600: #1f6feb;
+  --primitive-blue-700: #1a5ad6;
 
-  --ink:       #131922;
-  --ink2:      #2e3a49;
-  --dim:       #4d5a69;
+  /* Layer 2 — role-based values. Theme overrides happen at this layer. */
+  --semantic-app-bg: var(--primitive-neutral-50);
+  --semantic-panel-bg: var(--primitive-neutral-0);
+  --semantic-surface-bg: var(--primitive-neutral-25);
+  --semantic-surface-muted: var(--primitive-neutral-75);
+  --semantic-border: var(--primitive-neutral-150);
+  --semantic-border-strong: var(--primitive-neutral-200);
+  --semantic-divider: var(--primitive-neutral-100);
+  --semantic-text: var(--primitive-neutral-900);
+  --semantic-text-secondary: var(--primitive-neutral-800);
+  --semantic-text-dim: var(--primitive-neutral-700);
+  --semantic-text-muted: var(--primitive-neutral-600);
+  --semantic-accent: var(--primitive-blue-600);
+  --semantic-accent-hover: var(--primitive-blue-700);
+  --semantic-accent-bg: var(--primitive-blue-50);
+  --semantic-accent-border: var(--primitive-blue-200);
+
+  /* Layer 3 — shared component metrics. Docked work areas are square; only
+     transient overlays receive a slight radius. */
+  --component-control-height: 34px;
+  --component-control-height-sm: 30px;
+  --component-control-radius: 2px;
+  --component-panel-radius: 0px;
+  --component-overlay-radius: 2px;
+  --component-divider-width: 1px;
+
+  /* Compatibility aliases retained for existing app styles. */
+  --bg: var(--semantic-app-bg);
+  --panel: var(--semantic-panel-bg);
+  --surface: var(--semantic-surface-bg);
+  --alt: var(--semantic-surface-muted);
+  --border: var(--semantic-border);
+  --border2: var(--semantic-border-strong);
+  --line: var(--semantic-divider);
+
+  --ink: var(--semantic-text);
+  --ink2: var(--semantic-text-secondary);
+  --dim: var(--semantic-text-dim);
   /* At least 4.69:1 on every product surface, including --bg (WCAG AA). */
-  --muted:     #5b6675;
+  --muted: var(--semantic-text-muted);
 
-  --accent:       #1f6feb;
-  --accent-hover: #1a5ad6;
-  --accent-bg:    #e8effe;
-  --accent-bd:    #c4d7ff;
+  --accent: var(--semantic-accent);
+  --accent-hover: var(--semantic-accent-hover);
+  --accent-bg: var(--semantic-accent-bg);
+  --accent-bd: var(--semantic-accent-border);
   /* --ok remains legible under white button text (4.96:1). */
   --ok:           #1a7f4a;
   --ok-hover:     #156a3e;
@@ -78,13 +125,12 @@
   --t-head: 19px;      /* app title in a header card */
   --t-display: 22px;   /* hero numbers, empty-state headline */
 
-  /* Shape scale, one rule for the suite: xs 4 = tags and badges inside a row,
-     sm 6 = controls (buttons, inputs, checkboxes), md 10 = containers (cards,
-     panels, popovers), lg 14 = modals. 999px is for pills and status dots only. */
-  --r-xs: 4px;
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
+  /* Compatibility shape aliases resolve to the square workbench metrics.
+     Circular status dots and binary switches may still use 50%/999px. */
+  --r-xs: var(--component-control-radius);
+  --r-sm: var(--component-control-radius);
+  --r-md: var(--component-panel-radius);
+  --r-lg: var(--component-overlay-radius);
   --s1: 4px;
   --s2: 6px;
   --s3: 8px;
@@ -118,23 +164,21 @@
    badges/chips keep the same relationship as the light theme. Applied by
    setting data-theme="dark" on <html>. */
 :root[data-theme="dark"] {
-  --bg:        #161a20;
-  --panel:     #1e242e;
-  --surface:   #232a36;
-  --alt:       #2a3240;
-  --border:    #333d4c;
-  --border2:   #414c5e;
-  --line:      #272f3b;
-
-  --ink:       #e8edf4;
-  --ink2:      #c3ccd9;
-  --dim:       #9aa7b8;
-  --muted:     #7d8a9d;
-
-  --accent:       #6aa1ff;
-  --accent-hover: #8ab4ff;
-  --accent-bg:    rgba(106, 161, 255, .16);
-  --accent-bd:    rgba(106, 161, 255, .38);
+  --semantic-app-bg: var(--primitive-neutral-950);
+  --semantic-panel-bg: #1e242e;
+  --semantic-surface-bg: var(--primitive-neutral-925);
+  --semantic-surface-muted: #2a3240;
+  --semantic-border: #333d4c;
+  --semantic-border-strong: #414c5e;
+  --semantic-divider: #272f3b;
+  --semantic-text: #e8edf4;
+  --semantic-text-secondary: #c3ccd9;
+  --semantic-text-dim: #9aa7b8;
+  --semantic-text-muted: #7d8a9d;
+  --semantic-accent: #6aa1ff;
+  --semantic-accent-hover: #8ab4ff;
+  --semantic-accent-bg: rgba(106, 161, 255, .16);
+  --semantic-accent-border: rgba(106, 161, 255, .38);
   --ok:           #3fae72;
   --ok-hover:     #55c88a;
   --ok-bg:        rgba(63, 174, 114, .15);
