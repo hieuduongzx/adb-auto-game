@@ -109,6 +109,34 @@ def test_runner_uses_operator_console_shell_and_persistent_controls():
     assert pause["attrs"].get("aria-label") == "Pause workflow"
 
 
+def test_header_separates_utility_controls_above_run_controls():
+    doc = _document()
+    command = doc.by_id("header-command")
+    utility = doc.by_id("header-utility")
+    primary = doc.by_id("btn-primary")
+    pause = doc.by_id("btn-pause")
+
+    assert "header-command" in command["attrs"].get("class", "").split()
+    assert command in utility["parents"]
+    assert command in primary["parents"]
+    assert command in pause["parents"]
+    assert doc.elements.index(utility) < doc.elements.index(primary)
+    assert doc.elements.index(utility) < doc.elements.index(pause)
+
+
+def test_runner_uses_short_source_labels_and_a_quiet_green_start_action():
+    source = RUNNER_JS.read_text(encoding="utf-8")
+    css = RUNNER_CSS.read_text(encoding="utf-8")
+
+    assert '? "Window" : "Android"' in source
+    assert "Win32 · PC window" not in source
+    start = css.index(".btn-start {")
+    rule = css[start:css.index("}", start)]
+    assert "background: var(--ok-bg)" in rule
+    assert "color: var(--ok-ink)" in rule
+    assert "border-color: var(--ok-bd)" in rule
+
+
 def test_operator_regions_are_flat_and_only_popovers_are_elevated():
     css = RUNNER_CSS.read_text(encoding="utf-8")
 

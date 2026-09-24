@@ -209,7 +209,7 @@ function wfApplyTemplateToNode(node,path){
   } else {
     const list=Array.isArray(node.params[field.k])?node.params[field.k]:[];
     if(list.length) list[0]={...list[0],template:ref};
-    else list.push({template:ref,threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:.1});
+    else list.push({template:ref,threshold:.85,timeout:10,offsetX:0,offsetY:0,delayAfterFind:0,delay:.1});
     node.params[field.k]=list;
   }
   return true;

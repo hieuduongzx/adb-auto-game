@@ -25,22 +25,41 @@
         <div class="app-title empty" id="flow-name">Macro2k Runner</div>
         <div class="app-subtitle" id="flow-sub">No workflow loaded</div>
       </div>
-      <button class="update-pill" id="update-pill" type="button" onclick="showUpdates()" hidden>Update</button>
-      <div class="header-tools">
-        <button class="theme-toggle" id="notes-toggle" type="button" title="What's new" aria-label="What's new" aria-expanded="false" aria-controls="notes-pop">
-          <i data-ico="bell" data-ico-size="uico-2" aria-hidden="true"></i>
-          <span class="notes-dot" id="notes-dot" hidden></span>
-        </button>
-        <button class="theme-toggle" id="settings-toggle" type="button" title="Runner settings" aria-label="Runner settings" aria-expanded="false" aria-controls="settings-pop">
-          <i data-ico="settings" data-ico-size="uico-2" aria-hidden="true"></i>
-        </button>
-        <button class="theme-toggle" id="theme-toggle" type="button" title="Switch to dark theme" aria-label="Switch to dark theme">
-          <i data-ico="moon" data-ico-size="uico-2" aria-hidden="true"></i>
-        </button>
+    </div>
+
+    <div id="header-command" class="header-command">
+      <div id="header-utility" class="header-utility">
+        <div id="status-pill" class="status-ready">
+          <div id="status-dot"></div>
+          <div id="status-text">READY</div>
+        </div>
+        <button class="update-pill" id="update-pill" type="button" onclick="showUpdates()" hidden>Update</button>
+        <div class="header-tools" aria-label="Runner utilities">
+          <button class="theme-toggle" id="notes-toggle" type="button" title="What's new" aria-label="What's new" aria-expanded="false" aria-controls="notes-pop">
+            <i data-ico="bell" data-ico-size="uico-2" aria-hidden="true"></i>
+            <span class="notes-dot" id="notes-dot" hidden></span>
+          </button>
+          <button class="theme-toggle" id="settings-toggle" type="button" title="Runner settings" aria-label="Runner settings" aria-expanded="false" aria-controls="settings-pop">
+            <i data-ico="settings" data-ico-size="uico-2" aria-hidden="true"></i>
+          </button>
+          <button class="theme-toggle" id="theme-toggle" type="button" title="Switch to dark theme" aria-label="Switch to dark theme">
+            <i data-ico="moon" data-ico-size="uico-2" aria-hidden="true"></i>
+          </button>
+        </div>
       </div>
-      <div id="status-pill" class="status-ready">
-        <div id="status-dot"></div>
-        <div id="status-text">READY</div>
+
+      <div class="header-btns">
+        <!-- One primary button: Start while idle, Stop while running (see
+             setPrimary in runner.js). A separate icon-only Stop would be a second
+             way to do the same thing, so there isn't one. Start is a hotkey
+             (F5 / Ctrl+Enter) but never a bare key — a stray keypress must not
+             launch a game macro. -->
+        <button class="btn btn-start" id="btn-primary" type="button" onclick="onPrimary()" disabled
+                title="Start the run (F5 or Ctrl+Enter)" aria-label="Start workflow">
+          <i data-ico="play" data-ico-size="uico-fill" aria-hidden="true"></i>Start
+        </button>
+        <button class="btn btn-pause" id="btn-pause" onclick="onPause()" disabled
+                title="Pause or resume the run (F6)" aria-label="Pause workflow">Pause</button>
       </div>
     </div>
 
@@ -59,19 +78,6 @@
               title="Hide this result" aria-label="Hide this run result"><i data-ico="x" data-ico-size="uico-1" aria-hidden="true"></i></button>
     </div>
 
-    <div class="header-btns">
-      <!-- One primary button: Start while idle, Stop while running (see
-           setPrimary in runner.js). A separate icon-only Stop would be a second
-           way to do the same thing, so there isn't one. Start is a hotkey
-           (F5 / Ctrl+Enter) but never a bare key — a stray keypress must not
-           launch a game macro. -->
-      <button class="btn btn-start" id="btn-primary" type="button" onclick="onPrimary()" disabled
-              title="Start the run (F5 or Ctrl+Enter)" aria-label="Start workflow">
-        <i data-ico="play" data-ico-size="uico-fill" aria-hidden="true"></i>Start
-      </button>
-      <button class="btn btn-pause" id="btn-pause" onclick="onPause()" disabled
-              title="Pause or resume the run (F6)" aria-label="Pause workflow">Pause</button>
-    </div>
   </header>
 
   <!-- ── Main body: split (left activities / right panels) + footer ──── -->

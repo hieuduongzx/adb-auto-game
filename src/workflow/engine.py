@@ -49,6 +49,7 @@ JSON shape::
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 import re
@@ -2580,6 +2581,8 @@ class WorkflowEngine:
                         [self._rect_from_center(hit[0], hit[1], 1.0, 18, 18, 1.0, True, hex_lbl)],
                         ok=True, label=hex_lbl, region=region, conf=1.0,
                     )
+                    if not self._wait_after_find(params):
+                        return False
                     return self._tap_at(hit[0], hit[1], params, label=f"color {hex_lbl}")
                 if time.time() >= end:
                     self._report_match_rects(
@@ -2688,12 +2691,16 @@ class WorkflowEngine:
                 ok=bool(hits), threshold=threshold, label=name, region=region,
                 conf=float(hits[0][2]) if hits else 0.0,
             )
+            if hits and not self._wait_after_find(params):
+                return False
             delay = max(0.0, float(params.get("delayBetween", 0.15) or 0))
             tapped = 0
             for hx, hy, _score in hits:
                 if self._stop.is_set():
                     break
                 self._pause.wait()
+                if self._stop.is_set():
+                    break
                 if self._tap_at(int(hx), int(hy), params, label="image"):
                     tapped += 1
                 if delay:
@@ -2756,6 +2763,8 @@ class WorkflowEngine:
             if not hit:
                 return False  # no match — false branch fires; no log (tap-miss is expected)
             self._last_pos = hit
+            if not self._wait_after_find(params):
+                return False
             return self._tap_at(hit[0], hit[1], params, label="image")
         if ntype == "tap_image":
             # Find (with timeout), remember position, optionally wait, then tap.
@@ -2768,6 +2777,8 @@ class WorkflowEngine:
             if not res:
                 return False  # not found — false branch fires; no log (tap-miss is expected)
             self._last_pos = (res[0], res[1])
+            if not self._wait_after_find(params):
+                return False
             return self._tap_at(res[0], res[1], params, label=os.path.basename(tpl))
         if ntype == "wait_image":
             tpl = self._resolve_template(params.get("template", ""))
@@ -2822,6 +2833,8 @@ class WorkflowEngine:
                               int(y) + max(0, int(h)) // 2)
                     self._last_pos = center
                     self._report_ocr_region(region, True, needle)
+                    if not self._wait_after_find(params):
+                        return False
                     return self._tap_at(center[0], center[1], params, label=f"text '{needle}'")
                 if time.time() >= end:
                     log_info(
@@ -3417,6 +3430,27 @@ class WorkflowEngine:
         except (TypeError, ValueError):
             return 0.0
 
+    @staticmethod
+    def _after_find_seconds(params: Dict) -> float:
+        """Optional post-match wait; malformed values must never wait forever."""
+        try:
+            seconds = float(params.get("delayAfterFind", 0) or 0)
+            return seconds if math.isfinite(seconds) and seconds > 0 else 0.0
+        except (TypeError, ValueError, OverflowError):
+            return 0.0
+
+    def _wait_after_find(self, params: Dict) -> bool:
+        """Wait after a successful match, then gate the pending tap on pause/stop."""
+        if self._stop.is_set():
+            return False
+        delay = self._after_find_seconds(params)
+        if delay:
+            self._sleep(delay)
+        if self._stop.is_set():
+            return False
+        self._pause.wait()
+        return not self._stop.is_set()
+
     def _sleep(self, seconds: float) -> None:
         """Pause-aware, stop-aware sleep."""
         end = time.time() + max(0.0, seconds)
@@ -3609,6 +3643,17 @@ class WorkflowEngine:
             if not res:
                 return False
             self._last_pos = (res[0], res[1])
+            after_find = self._after_find_seconds(raw)
+            if after_find and self._sequence_delay(stop_event, after_find):
+                return True
+            # A sequence can be cancelled while finding, waiting, or paused.
+            while not self._pause.wait(timeout=0.05):
+                if self._stop.is_set() or stop_event.is_set():
+                    break
+            if self._stop.is_set():
+                return False
+            if stop_event.is_set():
+                return True
             if not self._tap_at(res[0], res[1], raw, label=os.path.basename(tpl)):
                 return False
             if delay and self._sequence_delay(stop_event, delay):
@@ -3628,7 +3673,9 @@ class WorkflowEngine:
         while time.time() < end and not self._stop.is_set():
             if stop_event.wait(timeout=min(0.05, max(0.0, end - time.time()))):
                 return True
-            self._pause.wait()
+            while not self._pause.wait(timeout=0.05):
+                if self._stop.is_set() or stop_event.is_set():
+                    return stop_event.is_set()
         return stop_event.is_set()
 
     def _a_stop_sequence(self, node, p) -> bool:

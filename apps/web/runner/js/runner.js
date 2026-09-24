@@ -1381,7 +1381,7 @@ function applyFlow(data){
   const nm = $("flow-name");
   nm.textContent = data.name || "(unnamed)"; nm.classList.remove("empty");
   renderAppIcon(data);
-  $("flow-sub").textContent = ((data.controller === "win32") ? "Win32 · PC window" : "ADB · Device / emulator")
+  $("flow-sub").textContent = (data.controller === "win32" ? "Window" : "Android")
     + (U.version ? ` · v${U.version}` : "");
   populateLists();
   updateProgress();

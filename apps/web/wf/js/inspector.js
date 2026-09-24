@@ -1505,8 +1505,12 @@ function wfFieldEl(node,f){
 
   const inp=document.createElement("input");
   inp.type=f.t==="num"?"number":"text"; if(f.t==="num"&&f.step) inp.step=f.step;
-  inp.value=node.params[f.k]!==undefined?node.params[f.k]:"";
-  inp.oninput=()=>{ wfPushUndoDebounced(); node.params[f.k]= f.t==="num"?(parseFloat(inp.value)||0):inp.value; wfUpdNodeSum(node); if(f.k==="timeout") wfUpdNodeTimeoutChip(node); if(f.refresh){ wfRenderCanvas(); wfRefreshNodeLogs(node); } };
+  if(f.min!==undefined) inp.min=f.min;
+  if(f.hint) inp.title=f.hint;
+  inp.value=node.params[f.k]!==undefined?node.params[f.k]:(f.k==="delayAfterFind"?(f.d!==undefined?f.d:0):"");
+  inp.oninput=()=>{ wfPushUndoDebounced(); let value=f.t==="num"?(parseFloat(inp.value)||0):inp.value;
+    if(f.t==="num"&&f.min!==undefined) value=Number.isFinite(value)?Math.max(f.min,value):f.min;
+    node.params[f.k]=value; wfUpdNodeSum(node); if(f.k==="timeout") wfUpdNodeTimeoutChip(node); if(f.refresh){ wfRenderCanvas(); wfRefreshNodeLogs(node); } };
   wfAttachCoordPaste(node, f, inp);
   row.appendChild(inp);
 
@@ -1650,7 +1654,7 @@ function wfSequenceImagesField(node,f){
   function renderList(){
     list.innerHTML="";
     arr().forEach((item,idx)=>{
-      if(!item || typeof item!=="object") item=arr()[idx]={template:"",threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:0};
+      if(!item || typeof item!=="object") item=arr()[idx]={template:"",threshold:.85,timeout:10,offsetX:0,offsetY:0,delayAfterFind:0,delay:0};
       const block=document.createElement("div"); block.className="wf-tpls-item";
       const title=document.createElement("div"); title.className="wf-tpls-hdr";
       const num=document.createElement("span"); num.className="num"; num.textContent=(idx+1)+".";
@@ -1664,8 +1668,11 @@ function wfSequenceImagesField(node,f){
       del.onclick=()=>{ wfPushUndoDebounced(); arr().splice(idx,1); renderList(); commit(); };
       title.append(num,inp,pick,del,img);
       const opts=document.createElement("div"); opts.className="wf-region-panel"; opts.style.display="grid";
-      [["threshold","Threshold",.05],["timeout","Timeout (s)",.1],["offsetX","Offset X",1],["offsetY","Offset Y",1],["delay","Delay (s)",.05]].forEach(([key,placeholder,step])=>{
-        const input=document.createElement("input"); input.type="number"; input.min="0"; input.step=step; input.placeholder=placeholder; input.title=placeholder; input.value=Number(item[key])||0; input.oninput=()=>set(key,parseFloat(input.value)||0); opts.appendChild(input);
+      [["threshold","Threshold",.05],["timeout","Timeout (s)",.1],["offsetX","Offset X",1],["offsetY","Offset Y",1],["delayAfterFind","Delay after find (s)",.1],["delay","Delay after tap (s)",.05]].forEach(([key,placeholder,step])=>{
+        const input=document.createElement("input"); input.type="number"; input.min="0"; input.step=step; input.placeholder=placeholder; input.title=placeholder; input.setAttribute("aria-label",placeholder); input.value=Number(item[key])||0;
+        input.oninput=()=>{ let value=parseFloat(input.value)||0;
+          if(key==="delayAfterFind") value=Number.isFinite(value)?Math.max(0,value):0;
+          set(key,value); }; opts.appendChild(input);
       });
       block.append(title,opts); list.appendChild(block);
     });
@@ -1673,11 +1680,11 @@ function wfSequenceImagesField(node,f){
   }
   renderList();
   const add=document.createElement("button"); add.type="button"; add.className="btn sm"; add.textContent="+ Image tap";
-  add.onclick=async()=>{ const path=await api().pick_template(); if(!path) return; wfPushUndoDebounced(); if(typeof wfRememberTemplate==="function") wfRememberTemplate(path); arr().push({template:path,threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:0}); renderList(); commit(); };
+  add.onclick=async()=>{ const path=await api().pick_template(); if(!path) return; wfPushUndoDebounced(); if(typeof wfRememberTemplate==="function") wfRememberTemplate(path); arr().push({template:path,threshold:.85,timeout:10,offsetX:0,offsetY:0,delayAfterFind:0,delay:0}); renderList(); commit(); };
   wrap.append(list,add);
   if(typeof wfLatestTemplate!=="undefined" && wfLatestTemplate){
     const latest=document.createElement("button"); latest.type="button"; latest.className="btn sm"; latest.textContent="+ Latest crop"; latest.title=wfLatestTemplate;
-    latest.onclick=()=>{ wfPushUndoDebounced(); arr().push({template:wfLatestTemplate,threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:.1}); renderList(); commit(); };
+    latest.onclick=()=>{ wfPushUndoDebounced(); arr().push({template:wfLatestTemplate,threshold:.85,timeout:10,offsetX:0,offsetY:0,delayAfterFind:0,delay:.1}); renderList(); commit(); };
     wrap.appendChild(latest);
   }
   return wrap;

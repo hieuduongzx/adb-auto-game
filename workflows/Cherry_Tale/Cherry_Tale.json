@@ -4,22 +4,22 @@
   "templatesDir": "templates",
   "buildVersion": "1.0.0",
   "package": "com.neversoft.rpg.erolabs",
-  "controller": "adb",
+  "controller": "win32",
   "ocr": "ppocr_v5_mobile",
   "capture": "scrcpy",
   "input": "adb",
   "win32": {
-    "window": "",
-    "matchBy": "title",
-    "inputMode": "background",
-    "path": ""
+    "window": "CherryTale.exe",
+    "matchBy": "exe",
+    "inputMode": "unity_bridge",
+    "path": "D:\\Games\\CherryTale\\CherryTale.exe"
   },
   "emulator": {
     "kind": "mumu",
     "path": "D:\\Programs\\MuMuPlayerGlobal\\nx_main"
   },
   "speedhack": {
-    "enabled": true,
+    "enabled": false,
     "speed": 2,
     "native": false
   },
@@ -40,79 +40,56 @@
           {
             "id": "n43hela1",
             "type": "start",
-            "x": -40,
-            "y": -265,
+            "x": 24,
+            "y": 40,
             "params": {}
           },
           {
-            "id": "njdme2qq",
+            "id": "no8t2cnv",
+            "type": "end",
+            "x": 448,
+            "y": 40,
+            "params": {}
+          },
+          {
+            "id": "nnranfuv",
             "type": "if_image",
-            "x": 680,
-            "y": -219,
+            "x": 112,
+            "y": 32,
             "params": {
-              "template": "templates/isHome_20260629_020356_32x32.png",
+              "template": "templates/crop_20260923_020620_1515_996_66_40.png",
               "threshold": 0.85,
               "negate": false
             }
           },
           {
-            "id": "nasty5ic",
+            "id": "n9t8hirz",
+            "type": "loop",
+            "x": 320,
+            "y": 160,
+            "params": {
+              "infinite": true,
+              "count": 3
+            }
+          },
+          {
+            "id": "n8n4a1g0",
             "type": "tap_image_any",
-            "x": 448,
-            "y": -219,
+            "x": 496,
+            "y": 160,
             "params": {
               "templates": [
                 "templates/isHome_20260629_020427_37x32.png",
                 "templates/isHome_20260629_020820_29x28.png",
-                "templates/isHome_20260629_022433_10x49.png",
-                "templates/crop_20260701_212343_1837_1003_31_36.png"
+                "templates/crop_20260923_014136_932_799_68_213.png",
+                "templates/back_14x37.png"
               ],
               "taps": "1",
               "threshold": 0.85,
-              "timeout": 3,
+              "timeout": 10,
+              "mode": "sequential",
               "offsetX": 0,
-              "offsetY": 0,
-              "mode": "parallel"
-            },
-            "delayBefore": 0.5
-          },
-          {
-            "id": "nb3rusi6",
-            "type": "loop",
-            "x": 260,
-            "y": -219,
-            "params": {
-              "count": 3,
-              "infinite": true
-            }
-          },
-          {
-            "id": "n25sgerm",
-            "type": "end",
-            "x": 900,
-            "y": -265,
-            "params": {}
-          },
-          {
-            "id": "ny49hsac",
-            "type": "if_image",
-            "x": 60,
-            "y": -280,
-            "params": {
-              "template": "templates/crop_20260706_070706_1783_743_85_68.png",
-              "threshold": 0.85,
-              "negate": false
-            }
-          },
-          {
-            "id": "nb62nms4",
-            "type": "if_image",
-            "x": 680,
-            "y": -140,
-            "params": {
-              "template": "templates/isHome_20260629_020356_32x32.png",
-              "threshold": 0.85,
-              "negate": false
+              "offsetY": 0
             }
           }
         ],
@@ -120,54 +97,27 @@
           {
             "from": "n43hela1",
             "fromPort": "out",
-            "to": "ny49hsac"
+            "to": "nnranfuv"
           },
           {
-            "from": "nasty5ic",
+            "from": "nnranfuv",
             "fromPort": "true",
-            "to": "njdme2qq"
+            "to": "no8t2cnv"
           },
           {
-            "from": "nb3rusi6",
+            "from": "nnranfuv",
+            "fromPort": "false",
+            "to": "n9t8hirz"
+          },
+          {
+            "from": "n9t8hirz",
             "fromPort": "body",
-            "to": "nasty5ic"
+            "to": "n8n4a1g0"
           },
           {
-            "from": "ny49hsac",
+            "from": "n8n4a1g0",
             "fromPort": "true",
-            "to": "n25sgerm"
-          },
-          {
-            "from": "ny49hsac",
-            "fromPort": "false",
-            "to": "nb3rusi6"
-          },
-          {
-            "from": "njdme2qq",
-            "fromPort": "true",
-            "to": "n25sgerm"
-          },
-          {
-            "from": "njdme2qq",
-            "fromPort": "false",
-            "to": "nb3rusi6",
-            "toPort": "loop"
-          },
-          {
-            "from": "nasty5ic",
-            "fromPort": "false",
-            "to": "nb62nms4"
-          },
-          {
-            "from": "nb62nms4",
-            "fromPort": "true",
-            "to": "n25sgerm"
-          },
-          {
-            "from": "nb62nms4",
-            "fromPort": "false",
-            "to": "nb3rusi6",
-            "toPort": "loop"
+            "to": "nnranfuv"
           }
         ],
         "groups": []
@@ -181,86 +131,159 @@
           {
             "id": "n1upjbmz",
             "type": "start",
-            "x": -100,
-            "y": 172,
+            "x": -96,
+            "y": 152,
             "params": {}
           },
           {
-            "id": "n22cp32m",
+            "id": "nig187zc",
             "type": "end",
-            "x": 1020,
-            "y": 280,
+            "x": 1464,
+            "y": -24,
             "params": {}
           },
           {
-            "id": "n04eiluy",
-            "type": "launch_emulator",
-            "x": 200,
-            "y": 268,
-            "params": {
-              "emulator": "mumu",
-              "index": 0,
-              "instance": "",
-              "path": "D:\\Programs\\MuMuPlayerGlobal\\nx_main",
-              "command": "",
-              "at": "",
-              "nextDay": true,
-              "wait": 60,
-              "port": 0,
-              "pathSrc": "project"
-            }
-          },
-          {
-            "id": "nycvq3mt",
-            "type": "launch_app",
-            "x": 400,
-            "y": 160,
-            "params": {
-              "package": "",
-              "wait": 0,
-              "pkgSrc": "project"
-            }
-          },
-          {
-            "id": "nt9ypv6y",
-            "type": "if_emulator",
-            "x": 40,
-            "y": 160,
-            "params": {
-              "emulator": "last",
-              "index": 0,
-              "port": 0,
-              "attach": true
-            }
-          },
-          {
-            "id": "nrwx4y5q",
+            "id": "n79ntixr",
             "type": "if_app",
-            "x": 200,
-            "y": 160,
+            "x": -16,
+            "y": 144,
             "params": {
-              "package": "com.neversoft.rpg.erolabs",
-              "negate": true,
-              "pkgSrc": "project"
-            }
-          },
-          {
-            "id": "nmg7oh1i",
-            "type": "wait_image",
-            "x": 600,
-            "y": 160,
-            "params": {
-              "template": "templates/crop_20260710_233810_872_990_175_33.png",
-              "threshold": 0.85,
-              "timeout": 120,
+              "pkgSrc": "project",
+              "package": "",
               "negate": false
             }
           },
           {
-            "id": "ngg946m6",
+            "id": "nmx56uev",
+            "type": "win_launch",
+            "x": 192,
+            "y": 208,
+            "params": {
+              "pathSrc": "project",
+              "path": "",
+              "args": "",
+              "unityBridge": false,
+              "window": "",
+              "wait": 30
+            }
+          },
+          {
+            "id": "nzhz5ndr",
+            "type": "win_if_window",
+            "x": 192,
+            "y": 112,
+            "params": {
+              "state": "size",
+              "width": 1920,
+              "height": 1080,
+              "tolerance": 0,
+              "negate": true
+            }
+          },
+          {
+            "id": "nwlwlnrx",
+            "type": "win_resize",
+            "x": 544,
+            "y": 128,
+            "params": {
+              "width": 1920,
+              "height": 1080,
+              "client": true,
+              "center": true
+            }
+          },
+          {
+            "id": "n5oz91bz",
+            "type": "win_if_window",
+            "x": 544,
+            "y": 208,
+            "params": {
+              "state": "size",
+              "width": 1920,
+              "height": 1080,
+              "tolerance": 0,
+              "negate": true
+            },
+            "delayBefore": 5
+          },
+          {
+            "id": "nj4arw13",
+            "type": "win_resize",
+            "x": 512,
+            "y": 304,
+            "params": {
+              "width": 1920,
+              "height": 1080,
+              "client": true,
+              "center": true
+            }
+          },
+          {
+            "id": "nfie986o",
+            "type": "win_wait_window",
+            "x": 368,
+            "y": 208,
+            "params": {
+              "state": "exists",
+              "width": 1280,
+              "height": 720,
+              "tolerance": 0,
+              "timeout": 30,
+              "negate": false
+            },
+            "delayBefore": 5
+          },
+          {
+            "id": "n9yo4ld3",
+            "type": "loop",
+            "x": 704,
+            "y": 304,
+            "params": {
+              "infinite": true,
+              "count": 3
+            }
+          },
+          {
+            "id": "nsya280z",
+            "type": "if_image",
+            "x": 880,
+            "y": 304,
+            "params": {
+              "template": "templates/crop_20260923_015816_1719_69_38_29.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "nj529p2x",
             "type": "tap_image",
-            "x": 800,
-            "y": 160,
+            "x": 1072,
+            "y": 304,
+            "params": {
+              "template": "templates/crop_20260923_015816_1719_69_38_29.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "ndo233jl",
+            "type": "if_image",
+            "x": 880,
+            "y": 400,
+            "params": {
+              "template": "templates/crop_20260710_233810_872_990_175_33.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "njj3g2s6",
+            "type": "tap_image",
+            "x": 1072,
+            "y": 400,
             "params": {
               "template": "templates/crop_20260710_233827_872_990_175_33.png",
               "taps": "1",
@@ -271,70 +294,114 @@
             }
           },
           {
-            "id": "nezaiwb0",
-            "type": "call",
-            "x": 800,
-            "y": 268,
-            "params": {
-              "fn": "fn_ppung"
-            }
+            "id": "ns3lslgv",
+            "type": "break",
+            "x": 1248,
+            "y": 400,
+            "params": {}
           }
         ],
         "edges": [
           {
-            "from": "nt9ypv6y",
+            "from": "n79ntixr",
             "fromPort": "false",
-            "to": "n04eiluy"
+            "to": "nmx56uev"
           },
           {
-            "from": "n04eiluy",
+            "from": "n79ntixr",
+            "fromPort": "true",
+            "to": "nzhz5ndr"
+          },
+          {
+            "from": "nzhz5ndr",
+            "fromPort": "false",
+            "to": "nwlwlnrx"
+          },
+          {
+            "from": "nzhz5ndr",
+            "fromPort": "true",
+            "to": "nig187zc"
+          },
+          {
+            "from": "n5oz91bz",
+            "fromPort": "true",
+            "to": "nj4arw13"
+          },
+          {
+            "from": "nwlwlnrx",
             "fromPort": "out",
-            "to": "nrwx4y5q"
-          },
-          {
-            "from": "nt9ypv6y",
-            "fromPort": "true",
-            "to": "nrwx4y5q"
-          },
-          {
-            "from": "nrwx4y5q",
-            "fromPort": "true",
-            "to": "nycvq3mt"
-          },
-          {
-            "from": "nycvq3mt",
-            "fromPort": "out",
-            "to": "nmg7oh1i"
-          },
-          {
-            "from": "nmg7oh1i",
-            "fromPort": "true",
-            "to": "ngg946m6"
-          },
-          {
-            "from": "nrwx4y5q",
-            "fromPort": "false",
-            "to": "nezaiwb0"
-          },
-          {
-            "from": "ngg946m6",
-            "fromPort": "false",
-            "to": "nezaiwb0"
-          },
-          {
-            "from": "ngg946m6",
-            "fromPort": "true",
-            "to": "nezaiwb0"
+            "to": "nig187zc"
           },
           {
             "from": "n1upjbmz",
             "fromPort": "out",
-            "to": "nt9ypv6y"
+            "to": "n79ntixr"
           },
           {
-            "from": "nezaiwb0",
+            "from": "nmx56uev",
+            "fromPort": "out",
+            "to": "nfie986o"
+          },
+          {
+            "from": "nfie986o",
             "fromPort": "true",
-            "to": "n22cp32m"
+            "to": "n5oz91bz"
+          },
+          {
+            "from": "n5oz91bz",
+            "fromPort": "false",
+            "to": "n9yo4ld3"
+          },
+          {
+            "from": "nj4arw13",
+            "fromPort": "out",
+            "to": "n9yo4ld3"
+          },
+          {
+            "from": "n9yo4ld3",
+            "fromPort": "body",
+            "to": "nsya280z"
+          },
+          {
+            "from": "nsya280z",
+            "fromPort": "true",
+            "to": "nj529p2x"
+          },
+          {
+            "from": "ndo233jl",
+            "fromPort": "true",
+            "to": "njj3g2s6"
+          },
+          {
+            "from": "nsya280z",
+            "fromPort": "false",
+            "to": "ndo233jl"
+          },
+          {
+            "from": "nj529p2x",
+            "fromPort": "false",
+            "to": "ndo233jl"
+          },
+          {
+            "from": "njj3g2s6",
+            "fromPort": "true",
+            "to": "ns3lslgv"
+          },
+          {
+            "from": "ns3lslgv",
+            "fromPort": "out",
+            "to": "nig187zc"
+          },
+          {
+            "from": "ndo233jl",
+            "fromPort": "false",
+            "to": "n9yo4ld3",
+            "toPort": "loop"
+          },
+          {
+            "from": "nj529p2x",
+            "fromPort": "true",
+            "to": "ndo233jl"
           }
         ],
         "groups": []
@@ -353,102 +420,24 @@
           {
             "id": "n6pi9wel",
             "type": "start",
-            "x": 40,
-            "y": 60,
+            "x": 192,
+            "y": 56,
             "params": {}
           },
           {
             "id": "ndi8pf0t",
             "type": "end",
-            "x": 1460,
-            "y": 60,
+            "x": 448,
+            "y": 56,
             "params": {}
           },
           {
-            "id": "nj3zqhb2",
-            "type": "launch_emulator",
-            "x": 340,
-            "y": 160,
-            "params": {
-              "emulator": "mumu",
-              "index": 2,
-              "instance": "",
-              "path": "D:\\Programs\\MuMuPlayerGlobal\\nx_main",
-              "command": "",
-              "at": "",
-              "nextDay": true,
-              "wait": 60,
-              "port": 0,
-              "pathSrc": "custom"
-            }
-          },
-          {
-            "id": "nj5xjfpu",
-            "type": "launch_app",
-            "x": 560,
-            "y": 40,
-            "params": {
-              "package": "",
-              "wait": 0,
-              "pkgSrc": "project"
-            }
-          },
-          {
-            "id": "nbra4ijc",
-            "type": "if_emulator",
-            "x": 120,
-            "y": 40,
-            "params": {
-              "emulator": "last",
-              "index": 0,
-              "port": 0,
-              "attach": true
-            }
-          },
-          {
-            "id": "ni8wav38",
-            "type": "if_app",
-            "x": 340,
-            "y": 40,
-            "params": {
-              "package": "com.neversoft.rpg.erolabs",
-              "negate": true,
-              "pkgSrc": "project"
-            }
-          },
-          {
-            "id": "n3gpedjr",
-            "type": "wait_image",
-            "x": 780,
-            "y": 40,
-            "params": {
-              "template": "templates/crop_20260710_233810_872_990_175_33.png",
-              "threshold": 0.85,
-              "timeout": 120,
-              "negate": false
-            }
-          },
-          {
-            "id": "nsz0mjsw",
-            "type": "tap_image",
-            "x": 1000,
-            "y": 40,
-            "params": {
-              "template": "templates/crop_20260710_233827_872_990_175_33.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 120,
-              "offsetX": 0,
-              "offsetY": 0
-            }
-          },
-          {
-            "id": "nfti3h6c",
+            "id": "nglvt48y",
             "type": "call",
-            "x": 1220,
-            "y": 40,
+            "x": 272,
+            "y": 48,
             "params": {
-              "fn": "fn_ppung"
+              "fn": "fn_865xf"
             }
           }
         ],
@@ -456,57 +445,208 @@
           {
             "from": "n6pi9wel",
             "fromPort": "out",
-            "to": "nbra4ijc"
+            "to": "nglvt48y"
           },
           {
-            "from": "nbra4ijc",
-            "fromPort": "false",
-            "to": "nj3zqhb2"
-          },
-          {
-            "from": "nj3zqhb2",
-            "fromPort": "out",
-            "to": "ni8wav38"
-          },
-          {
-            "from": "nbra4ijc",
-            "fromPort": "true",
-            "to": "ni8wav38"
-          },
-          {
-            "from": "ni8wav38",
-            "fromPort": "true",
-            "to": "nj5xjfpu"
-          },
-          {
-            "from": "nj5xjfpu",
-            "fromPort": "out",
-            "to": "n3gpedjr"
-          },
-          {
-            "from": "n3gpedjr",
-            "fromPort": "true",
-            "to": "nsz0mjsw"
-          },
-          {
-            "from": "ni8wav38",
-            "fromPort": "false",
-            "to": "nfti3h6c"
-          },
-          {
-            "from": "nsz0mjsw",
-            "fromPort": "false",
-            "to": "nfti3h6c"
-          },
-          {
-            "from": "nfti3h6c",
+            "from": "nglvt48y",
             "fromPort": "true",
             "to": "ndi8pf0t"
+          }
+        ],
+        "groups": []
+      },
+      "maxRetries": 1
+    },
+    {
+      "id": "sequence_2r3l",
+      "name": "Gói Đặc Biệt",
+      "type": "sequence",
+      "enabled": true,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "n9dd02qp",
+            "type": "start",
+            "x": -136,
+            "y": 72,
+            "params": {}
           },
           {
-            "from": "nsz0mjsw",
+            "id": "nn94r833",
+            "type": "end",
+            "x": 1184,
+            "y": 88,
+            "params": {}
+          },
+          {
+            "id": "nvujeve6",
+            "type": "tap",
+            "x": 128,
+            "y": 64,
+            "params": {
+              "target": "pos",
+              "x": 1629,
+              "y": 171,
+              "taps": "1"
+            }
+          },
+          {
+            "id": "nzubwf3c",
+            "type": "swipe",
+            "x": 304,
+            "y": 64,
+            "params": {
+              "mode": "coordinates",
+              "x1": 181,
+              "y1": 745,
+              "x2": 174,
+              "y2": 344,
+              "direction": "up",
+              "distance": 400,
+              "duration": 140
+            },
+            "delayBefore": 2
+          },
+          {
+            "id": "nchu2bhk",
+            "type": "sequence",
+            "x": 480,
+            "y": 32,
+            "params": {}
+          },
+          {
+            "id": "no2e2s9b",
+            "type": "tap_image",
+            "x": 656,
+            "y": 0,
+            "params": {
+              "template": "templates/crop_20260923_013951_103_519_140_40.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nia23jco",
+            "type": "tap_image",
+            "x": 832,
+            "y": 0,
+            "params": {
+              "template": "templates/crop_20260923_014016_633_466_78_44.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nro0o0qr",
+            "type": "call",
+            "x": -48,
+            "y": 64,
+            "params": {
+              "fn": "fn_ppung"
+            }
+          },
+          {
+            "id": "n8330lu2",
+            "type": "tap_image",
+            "x": 656,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260923_020909_109_652_148_34.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "n5hc0bis",
+            "type": "tap_image",
+            "x": 832,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260923_014016_633_466_78_44.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            },
+            "delayBefore": 1
+          },
+          {
+            "id": "njxptyk9",
+            "type": "tap_image",
+            "x": 1008,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20260923_014136_932_799_68_213.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "nvujeve6",
+            "fromPort": "out",
+            "to": "nzubwf3c"
+          },
+          {
+            "from": "nzubwf3c",
+            "fromPort": "out",
+            "to": "nchu2bhk"
+          },
+          {
+            "from": "nchu2bhk",
+            "fromPort": "1",
+            "to": "no2e2s9b"
+          },
+          {
+            "from": "no2e2s9b",
             "fromPort": "true",
-            "to": "nfti3h6c"
+            "to": "nia23jco"
+          },
+          {
+            "from": "n9dd02qp",
+            "fromPort": "out",
+            "to": "nro0o0qr"
+          },
+          {
+            "from": "nro0o0qr",
+            "fromPort": "true",
+            "to": "nvujeve6"
+          },
+          {
+            "from": "nchu2bhk",
+            "fromPort": "2",
+            "to": "n8330lu2"
+          },
+          {
+            "from": "n8330lu2",
+            "fromPort": "true",
+            "to": "n5hc0bis"
+          },
+          {
+            "from": "n5hc0bis",
+            "fromPort": "true",
+            "to": "njxptyk9"
+          },
+          {
+            "from": "njxptyk9",
+            "fromPort": "true",
+            "to": "nn94r833"
           }
         ],
         "groups": []
@@ -524,15 +664,15 @@
           {
             "id": "nrpzh7ma",
             "type": "start",
-            "x": 40,
-            "y": 60,
+            "x": 16,
+            "y": 24,
             "params": {}
           },
           {
             "id": "npb983wx",
             "type": "tap_image",
-            "x": 340,
-            "y": 40,
+            "x": 272,
+            "y": 16,
             "params": {
               "template": "templates/isHome_20260629_020645_36x24.png",
               "taps": "1",
@@ -545,8 +685,8 @@
           {
             "id": "npmt5tuu",
             "type": "tap_image",
-            "x": 540,
-            "y": 40,
+            "x": 448,
+            "y": 16,
             "params": {
               "template": "templates/isHome_20260629_020704_175x20.png",
               "taps": "1",
@@ -560,8 +700,8 @@
           {
             "id": "nuw5egc1",
             "type": "tap_image",
-            "x": 760,
-            "y": 40,
+            "x": 624,
+            "y": 16,
             "params": {
               "template": "templates/crop_20260715_074423_923_904_99_107.png",
               "taps": "1",
@@ -575,8 +715,8 @@
           {
             "id": "ns4utvft",
             "type": "call",
-            "x": 120,
-            "y": 40,
+            "x": 96,
+            "y": 16,
             "params": {
               "fn": "fn_ppung"
             }
@@ -584,8 +724,8 @@
           {
             "id": "n7kdjw4k",
             "type": "tap_image",
-            "x": 1200,
-            "y": 40,
+            "x": 976,
+            "y": 16,
             "params": {
               "template": "templates/crop_20260629_031440_29x29.png",
               "taps": "1",
@@ -599,15 +739,15 @@
           {
             "id": "nls0zwk9",
             "type": "end",
-            "x": 1420,
-            "y": 60,
+            "x": 1152,
+            "y": 24,
             "params": {}
           },
           {
             "id": "n13ohrpb",
             "type": "if_image",
-            "x": 980,
-            "y": 40,
+            "x": 800,
+            "y": 16,
             "params": {
               "template": "templates/isHome_20260629_020704_175x20.png",
               "threshold": 0.85,
@@ -3223,6 +3363,27 @@
       "maxRetries": 2
     },
     {
+      "id": "background_tjoy",
+      "name": "Background task 1",
+      "type": "background",
+      "enabled": false,
+      "vars": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "ncgl8lvn",
+            "type": "start",
+            "x": 60,
+            "y": 70,
+            "params": {}
+          }
+        ],
+        "edges": [],
+        "groups": []
+      },
+      "pollInterval": 1
+    },
+    {
       "id": "sequence_trsu",
       "name": "Ải Nguyên Liệu",
       "type": "sequence",
@@ -3421,27 +3582,6 @@
         "groups": []
       },
       "maxRetries": 1
-    },
-    {
-      "id": "background_tjoy",
-      "name": "Background task 1",
-      "type": "background",
-      "enabled": false,
-      "vars": [],
-      "graph": {
-        "nodes": [
-          {
-            "id": "ncgl8lvn",
-            "type": "start",
-            "x": 60,
-            "y": 70,
-            "params": {}
-          }
-        ],
-        "edges": [],
-        "groups": []
-      },
-      "pollInterval": 1
     },
     {
       "id": "sequence_vf95",

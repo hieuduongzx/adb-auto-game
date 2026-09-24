@@ -59,6 +59,62 @@ test('Space still activates a focused button (native)', () => {
   assert.equal(e.defaultPrevented, false);
 });
 
+test('F clears Preview overlays without affecting Canvas fit', () => {
+  const {handler, ctx} = loadHandler();
+  ctx.wfCurView = () => 'preview';
+  ctx.wfPvClearAllOverlays = () => { ctx.cleared = true; };
+  ctx.wfFit = () => { ctx.fitted = true; };
+  const e = makeEvent('f', { tagName:'BODY', isContentEditable:false, closest:()=>null });
+  handler(e);
+  assert.equal(ctx.cleared, true, 'F clears the Preview overlay');
+  assert.equal(ctx.fitted, undefined, 'F does not fit the Canvas from Preview');
+  assert.equal(e.defaultPrevented, true);
+});
+
+test('F keeps native behaviour while typing or with a modifier', () => {
+  const {handler, ctx} = loadHandler();
+  ctx.wfCurView = () => 'preview';
+  ctx.wfPvClearAllOverlays = () => { ctx.cleared = true; };
+  const input = { tagName:'INPUT', isContentEditable:false, closest:()=>null };
+  handler(makeEvent('f', input));
+  assert.equal(ctx.cleared, undefined);
+  for(const modifier of ['altKey', 'shiftKey', 'repeat', 'defaultPrevented']){
+    const e = makeEvent('f', { tagName:'BODY', closest:()=>null });
+    e[modifier] = true;
+    handler(e);
+    assert.equal(ctx.cleared, undefined, modifier);
+  }
+  for(const tagName of ['TEXTAREA', 'SELECT', 'DIV']){
+    handler(makeEvent('f', {tagName, isContentEditable:tagName==='DIV'}));
+    assert.equal(ctx.cleared, undefined, tagName);
+  }
+  for(const modifier of ['ctrlKey', 'metaKey']){
+    let found = false;
+    ctx.wfFindShow = () => { found = true; };
+    const e = makeEvent('f', {tagName:'BODY'});
+    e[modifier] = true;
+    handler(e);
+    assert.equal(found, true);
+    assert.equal(ctx.cleared, undefined);
+  }
+});
+
+test('F preserves Canvas fit and does nothing in Library', () => {
+  const {handler, ctx} = loadHandler();
+  let fit=0, selection=0, cleared=0;
+  ctx.wfFit=()=>fit++;
+  ctx.wfFitSelection=()=>selection++;
+  ctx.wfPvClearAllOverlays=()=>cleared++;
+  ctx.wfCurView=()=>'canvas';
+  handler(makeEvent('f', {tagName:'BODY'}));
+  handler({...makeEvent('F', {tagName:'BODY'}), shiftKey:true});
+  assert.equal(fit, 1);
+  assert.equal(selection, 1);
+  ctx.wfCurView=()=>'library';
+  handler(makeEvent('f', {tagName:'BODY'}));
+  assert.equal(cleared, 0);
+});
+
 // ── Space: hold = pan modifier, double-tap = reset zoom ─────────────────────
 function spaceHarness(view){
   const h=loadHandler();

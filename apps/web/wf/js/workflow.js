@@ -248,7 +248,7 @@ const WF_NODES = {
   tap:        {label:"Tap",      ico:"pointer",kind:"action",cat:"basic", outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`)+(p.taps=="2"?" ×2":"")},
   multi_tap:  {label:"Multi-point tap",ico:"touches",kind:"action",cat:"basic",outs:["out"],fields:[{k:"points",lbl:"Touch points",t:"points",d:[{x:0,y:0},{x:100,y:100}]},{k:"duration",lbl:"Hold duration (ms)",t:"num",d:80}],sum:p=>{const a=Array.isArray(p.points)?p.points:[];return `${a.length} points · together · ${Math.max(20,Number(p.duration)||80)}ms`; }},
   sequence_tap: {label:"Sequence tap",ico:"list_numbered",kind:"action",cat:"basic",outs:["out"],fields:[{k:"sequenceId",lbl:"Sequence ID",t:"text",d:"main"},{k:"points",lbl:"Tap sequence",t:"sequence_points",d:[{x:0,y:0,delay:0.1},{x:100,y:100,delay:0.1}]}],sum:p=>{const a=Array.isArray(p.points)?p.points:[];return `${a.length} taps · ${p.sequenceId||"main"}`; }},
-  sequence_tap_image: {label:"Sequence tap image",ico:"target",kind:"action",cat:"image",outs:["out"],fields:[{k:"sequenceId",lbl:"Sequence ID",t:"text",d:"main"},{k:"images",lbl:"Image sequence",t:"sequence_images",d:[{template:"",threshold:.85,timeout:10,offsetX:0,offsetY:0,delay:.1}]}],sum:p=>{const a=Array.isArray(p.images)?p.images:[];return `${a.length} images · ${p.sequenceId||"main"}`; }},
+  sequence_tap_image: {label:"Sequence tap image",ico:"target",kind:"action",cat:"image",outs:["out"],fields:[{k:"sequenceId",lbl:"Sequence ID",t:"text",d:"main"},{k:"images",lbl:"Image sequence",t:"sequence_images",d:[{template:"",threshold:.85,timeout:10,offsetX:0,offsetY:0,delayAfterFind:0,delay:.1}]}],sum:p=>{const a=Array.isArray(p.images)?p.images:[];return `${a.length} images · ${p.sequenceId||"main"}`; }},
   stop_sequence: {label:"Stop sequence",ico:"octagon",kind:"action",cat:"flow",outs:["out"],fields:[{k:"sequenceId",lbl:"Sequence ID",t:"text",d:"main"}],sum:p=>`stop ${p.sequenceId||"main"}`},
   // Hidden from the palette — superseded by tap(taps=2); old files still open/run fine.
   double_tap: {label:"Double tap",  ico:"hand",kind:"action",cat:"basic", hidden:true, outs:["out"], fields:[{k:"target",t:"select",opts:[{v:"pos",t:"Coordinates"},{v:"found",t:"Last found image"}],d:"pos"},{k:"x",t:"num",showWhen:{target:"pos"}},{k:"y",t:"num",showWhen:{target:"pos"}}], sum:p=>(p.target==="found"?"↳ last found image":`(${p.x}, ${p.y})`)+" ×2"},
@@ -627,6 +627,11 @@ const WF_NODES = {
     {k:"prop",lbl:"Property",t:"select",opts:[{v:"width",t:"Client width"},{v:"height",t:"Client height"},{v:"x",t:"Window X (screen)"},{v:"y",t:"Window Y (screen)"},{v:"title",t:"Title"},{v:"class",t:"Class name"},{v:"pid",t:"Process ID"},{v:"exe",t:"Executable"},{v:"hwnd",t:"Window handle"},{v:"foreground",t:"Is foreground (true/false)"},{v:"minimized",t:"Is minimized (true/false)"}],d:"width"}
   ], sum:p=>`${p.name||"?"} = ${p.prop||"width"}`},
 };
+// Only find-and-tap nodes have a wait between detection and input.
+for(const type of ["tap_image","tap_image_any","tap_all_images","tap_text","tap_color"]){
+  WF_NODES[type].fields.push({k:"delayAfterFind",lbl:"Delay after find (s)",t:"num",d:0,min:0,step:.1,
+    hint:type==="tap_all_images"?"Wait once after finding matches, before the first tap.":"Wait after finding the target, before tapping it. 0 = tap immediately."});
+}
 // `ctrl` restricts a category to one project controller: the Device/emulator
 // Device and Android Keys/Input nodes are ADB-only; Win32 window/keyboard nodes
 // are PC-only. Visual/basic/flow groups work on both. A node may override its

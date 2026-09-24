@@ -36,10 +36,10 @@ test('Tap text is an OCR condition with a bounded region and true/false outputs'
   assert.equal(def.kind, 'condition');
   assert.deepEqual(Array.from(def.outs), ['true', 'false']);
   assert.deepEqual(Array.from(def.fields).map(f => f.k),
-    ['text', 'x', 'y', 'w', 'h', 'timeout', 'taps', 'offsetX', 'offsetY', 'whitelist']);
+    ['text', 'x', 'y', 'w', 'h', 'timeout', 'taps', 'offsetX', 'offsetY', 'whitelist', 'delayAfterFind']);
   assert.deepEqual(JSON.parse(JSON.stringify(c.wfDefaults('tap_text'))), {
     text: '', x: 0, y: 0, w: 200, h: 80, timeout: 10,
-    taps: '1', offsetX: 0, offsetY: 0, whitelist: '',
+    taps: '1', offsetX: 0, offsetY: 0, whitelist: '', delayAfterFind: 0,
   });
 });
 

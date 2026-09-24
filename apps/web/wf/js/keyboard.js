@@ -30,6 +30,13 @@ window.addEventListener("keydown", e => {
 
   if(typing) return;   // below here: canvas shortcuts only (let inputs keep native Ctrl+C/V)
   if(e.defaultPrevented) return;
+  // F — clear annotations only in Preview; Canvas keeps its fit shortcut.
+  if((e.key==="f"||e.key==="F") && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey &&
+     typeof wfCurView==="function" && wfCurView()==="preview"){
+    e.preventDefault();
+    if(!e.repeat) wfPvClearAllOverlays();
+    return;
+  }
   // Space / arrows stay native on buttons (activation, tablist roving) and
   // resizers. Tab is deliberately NOT in this list: it always toggles
   // Canvas ↔ Preview, even with a button focused — otherwise focus left on e.g.
