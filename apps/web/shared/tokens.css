@@ -68,6 +68,7 @@
   --accent-hover: var(--semantic-accent-hover);
   --accent-bg: var(--semantic-accent-bg);
   --accent-bd: var(--semantic-accent-border);
+  --focus-ring: var(--semantic-accent);
   /* --ok remains legible under white button text (4.96:1). */
   --ok:           #1a7f4a;
   --ok-hover:     #156a3e;

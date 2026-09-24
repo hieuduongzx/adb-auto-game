@@ -5,12 +5,17 @@ async function init(){
     await new Promise(r=>setTimeout(r,100)),tries++;
   if(!window.pywebview||!window.pywebview.api){setStatus("⚠ pywebview is unavailable");return;}
   const state=await api().get_state();
+  if(S.connectionState==="unknown"){
+    S.connectedSerial=state.connectedSerial||null;
+    setConnected(!!S.connectedSerial);
+  }
   const capSel=$("capture-backend");
   if(capSel){
     capSel.innerHTML="";
     (state.captureBackends||["scrcpy","adb"]).forEach(b=>{const o=document.createElement("option");o.value=b;o.textContent=b==="adb"?"ADB screencap":"scrcpy (fast)";capSel.appendChild(o);});
     capSel.value=state.captureBackend||"scrcpy";
     S.captureBackend=capSel.value;
+    renderCaptureSource();
   }
   const sel=$("ocr-backend");
   const models=state.ocrModels||[];
@@ -25,6 +30,8 @@ async function init(){
   $("auto-cb").classList.toggle("on",S.autoRefresh);
   document.querySelector(".pill-wrap")?.setAttribute("aria-checked",String(S.autoRefresh));
   $("hz-spin").value=state.refreshHz;
+  S.refreshHz=Number(state.refreshHz)||5;
+  renderCaptureTelemetry();
   if(state.outDir) updateOutDir(state.outDir);
   (state.log||[]).forEach(appendLog);
   updateLogCount();

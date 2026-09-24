@@ -29,9 +29,9 @@ const S = {
 const U = { supported:false, version:"", repo:"", update:null, checking:false, applying:false };
 
 const $ = id => document.getElementById(id);
-const ACT_DOT_TITLE = { pending:"Pending", running:"Running", completed:"Completed", failed:"Failed", stopped:"Stopped", skipped:"Skipped", active:"Active" };
+const ACT_DOT_TITLE = { pending:"Waiting", enabled:"Enabled", disabled:"Disabled", running:"Running", paused:"Paused", active:"Active", completed:"Succeeded", succeeded:"Succeeded", failed:"Failed", stopped:"Stopped", skipped:"Skipped" };
 // Status word on an activity's second line (pending shows "Waiting" only mid-run).
-const ACT_ST_LABEL = { running:"Running", completed:"Done", failed:"Failed", stopped:"Stopped", skipped:"Skipped" };
+const ACT_ST_LABEL = { enabled:"Enabled", disabled:"Disabled", running:"Running", paused:"Paused", active:"Active", completed:"Succeeded", succeeded:"Succeeded", failed:"Failed", stopped:"Stopped", skipped:"Skipped", pending:"Waiting" };
 // An activity is settled once it reaches one of these — it will not change again
 // until the next run, so the progress count may include it.
 const SETTLED = ["completed","failed","skipped","stopped"];
@@ -155,11 +155,32 @@ function updateProgress(){
   const done = seq.filter(a=>SETTLED.includes(a.status)).length;
   const total = seq.length;
   $('prog-count').textContent = total ? `${done}/${total}` : "0/0";
+  const succeeded = seq.filter(a=>a.status === "completed").length;
+  const failed = seq.filter(a=>a.status === "failed").length;
+  $('prog-count').setAttribute("aria-label", `${done} settled, ${succeeded} succeeded, ${failed} failed, ${total} total`);
   $('prog-bar').style.transform = `scaleX(${total ? done/total : 0})`;
   // The bar's colour carries the result, so a full bar that ended in a failure
   // never reads as a clean finish.
   const bar = $('prog-bar');
   if(bar) bar.className = "prog-bar-fill" + (S.outcome ? " outcome-" + S.outcome : "");
+  renderQueueMonitor(seq);
+}
+
+function renderQueueMonitor(seq){
+  const sequence = S.activities.filter(a=>a.type!=="background");
+  const background = S.activities.filter(a=>a.type==="background");
+  const summary = $("queue-summary");
+  if(summary){
+    summary.textContent = S.runScope
+      ? "Single activity run"
+      : `${sequence.filter(a=>a.enabled).length} sequence · ${background.filter(a=>a.enabled).length} background enabled`;
+  }
+  const current = $("queue-current");
+  if(!current) return;
+  const running = seq.find(a=>a.status === "running");
+  const next = seq.find(a=>!SETTLED.includes(a.status));
+  current.textContent = running ? `Running: ${running.name}` : next ? `Next: ${next.name}` : (seq.length ? "Queue settled" : "Next: —");
+  current.title = current.textContent;
 }
 
 // ── Run outcome ──────────────────────────────────────────────────────────────
@@ -242,6 +263,7 @@ function setPrimary(running){
   b.classList.toggle("is-stop", running);
   b.innerHTML = uiIco(running ? "square" : "play", "uico-fill") + (running ? "Stop" : "Start");
   b.title = running ? "Stop the run" : "Start the run (F5 or Ctrl+Enter)";
+  b.setAttribute("aria-label", running ? "Stop workflow" : "Start workflow");
 }
 // The swapping handler the button's onclick points at.
 async function onPrimary(){ if(S.running) await onStop(); else await onStart(); }
@@ -253,6 +275,7 @@ function refreshButtons(){
   $("btn-primary").disabled = !S.loaded;
   $("btn-pause").disabled = !running;
   $("btn-pause").textContent = paused ? "Resume" : "Pause";
+  $("btn-pause").setAttribute("aria-label", paused ? "Resume workflow" : "Pause workflow");
   document.querySelectorAll(".runtime-setting-control").forEach(el=>el.disabled=running);
   const reqCopy = $("btn-req-copy");
   if(reqCopy) reqCopy.disabled = running || !(S.requirements && S.requirements.gameDir);
@@ -478,7 +501,12 @@ function paintRow(a, row){
   if(!row) return;
   const isBg = a.type==="background";
   const inRun = S.running && (S.runScope ? S.runScope.includes(a.id) : !!a.enabled);
-  const st = isBg ? (inRun ? "active" : "pending") : (a.status || "pending");
+  const status = a.status || "pending";
+  let st = status;
+  if(isBg && inRun && status !== "failed" && status !== "stopped") st = S.paused ? "paused" : "active";
+  else if(inRun && status === "running" && S.paused) st = "paused";
+  else if(status === "pending" && !inRun) st = a.enabled ? "enabled" : "disabled";
+  row.classList.toggle("task-paused", st === "paused");
   const dot = row.querySelector("[data-dot]");
   if(dot){
     dot.className = "act-dot act-dot-" + st;
@@ -498,10 +526,10 @@ function renderMeta(el, a, st, inRun){
   const parts = [];
   if(a.type==="background"){
     if(st==="active") parts.push('<span class="act-st st-active">Active</span>');
+    else if(ACT_ST_LABEL[st]) parts.push(`<span class="act-st st-${st}">${ACT_ST_LABEL[st]}</span>`);
     parts.push(`Every ${Number(a.pollInterval)||1}s`);
   } else {
-    if(st==="pending"){ if(inRun) parts.push('<span class="act-st st-waiting">Waiting</span>'); }
-    else if(ACT_ST_LABEL[st]) parts.push(`<span class="act-st st-${st}">${ACT_ST_LABEL[st]}</span>`);
+    if(ACT_ST_LABEL[st]) parts.push(`<span class="act-st st-${st}">${ACT_ST_LABEL[st]}</span>`);
     if(a.maxRetries > 1) parts.push(`${a.maxRetries} attempts`);
   }
   el.innerHTML = parts.join('<span class="sep" aria-hidden="true">·</span>');

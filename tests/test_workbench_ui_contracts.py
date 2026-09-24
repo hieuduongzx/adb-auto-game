@@ -128,6 +128,17 @@ def test_shared_foundation_defines_square_shell_bar_and_status_primitives():
     assert "@media (prefers-reduced-motion: reduce)" in source
 
 
+def test_shared_focus_covers_textareas_links_and_keyboard_widgets():
+    source = (WEB / "shared" / "base.css").read_text(encoding="utf-8")
+    assert re.search(r"input, select, textarea\s*\{", source)
+    assert re.search(r"textarea:focus", source)
+    assert 'a[href]:focus-visible' in source
+    assert '[tabindex]:focus-visible' in source
+    tokens = (WEB / "shared" / "tokens.css").read_text(encoding="utf-8")
+    assert '--focus-ring:' in tokens
+    assert 'var(--focus-ring)' in source
+
+
 def test_each_surface_uses_the_shared_workbench_shell_and_status_vocabulary():
     required = {"workbench-shell", "workbench-main", "workbench-status"}
     for name, path in APPS.items():

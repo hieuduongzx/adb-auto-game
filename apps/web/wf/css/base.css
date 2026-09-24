@@ -26,9 +26,9 @@
   --run-fail-hd-bd: #f0b3ad;
   --run-fail-ink:   #991b1b;
   --run-live-bd:    #ea580c;
-  --run-live-bg:    #fff3e4;
-  --run-live-hd:    #ffe1bf;
-  --run-live-hd-bd: #fb923c;
+  --run-live-bg:    color-mix(in srgb, var(--run-live-bd) 4%, var(--panel));
+  --run-live-hd:    color-mix(in srgb, var(--run-live-bd) 10%, var(--panel));
+  --run-live-hd-bd: color-mix(in srgb, var(--run-live-bd) 24%, var(--panel));
   --run-live-ink:   #7c2d12;
   /* Terminal (start/end/stop) accents — also read by minimap.js chips. */
   --term-start: #059669; /* modern emerald — start / go */
@@ -147,9 +147,9 @@
   --run-fail-hd-bd: rgba(236, 111, 102, .4);
   --run-fail-ink:   #f6a09a;
   --run-live-bd:    #fb923c;
-  --run-live-bg:    rgba(251, 146, 60, .13);
-  --run-live-hd:    rgba(251, 146, 60, .2);
-  --run-live-hd-bd: rgba(251, 146, 60, .42);
+  --run-live-bg:    color-mix(in srgb, var(--run-live-bd) 4%, var(--panel));
+  --run-live-hd:    color-mix(in srgb, var(--run-live-bd) 10%, var(--panel));
+  --run-live-hd-bd: color-mix(in srgb, var(--run-live-bd) 24%, var(--panel));
   --run-live-ink:   #fdba74;
   --term-start: #34c370;
   --term-end:   #f4557a;

@@ -63,6 +63,10 @@
 
 <main class="lib-main workbench-main" aria-label="Project library">
   <div id="grid" class="game-grid" role="list" aria-label="Projects" aria-busy="true"></div>
+  <div id="library-message" class="library-message" role="status" aria-live="polite" hidden>
+    <span id="library-message-text"></span>
+    <button id="btn-library-retry" class="btn" type="button" hidden>Retry</button>
+  </div>
   <div id="empty" class="lib-empty" hidden>
     <div class="empty-ico" aria-hidden="true">
       <i data-ico="image" data-ico-size="uico-3" aria-hidden="true"></i>

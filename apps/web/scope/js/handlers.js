@@ -1,17 +1,38 @@
 // ── Handlers ──────────────────────────────────────────────────────────────
-async function onCapture(){ await api().capture(); }
+async function onCapture(){
+  S.capturePending=true;
+  setOperation("Capture requested…","pending");
+  let accepted;
+  try{ accepted=await api().capture(); }
+  catch(err){ S.capturePending=false; setOperation(`Capture failed: ${err.message||err}`,"failed"); return; }
+  if(accepted===false){S.capturePending=false;setOperation("Capture was not started","failed");}
+}
 async function onCaptureBackendChange(backend){
   const r=await api().set_capture_backend(backend);
   S.captureBackend=(r&&r.backend)||backend;
   const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
-  setStatus("Capture source: "+(S.captureBackend==="adb"?"ADB screencap":"scrcpy (fast/headless)"));
+  renderCaptureSource();
+  setOperation("Capture source changed","success");
 }
 async function onRefreshDevices(){ await api().refresh_devices(); }
 async function onScanPorts(){ await api().scan_ports(); }
 async function onRestartAdb(){ await api().restart_adb(); }
 async function openWorkflowDesigner(){ try{ await api().open_workflow_designer(); setStatus("Opening Macro2k…"); }catch{} }
-async function onDeviceChange(serial){ if(serial){S.connectedSerial=serial;await api().select_device(serial);} }
-function onHzChange(v){ api().set_refresh_hz(parseFloat(v)||5); }
+async function onDeviceChange(serial){
+  if(!serial) return;
+  S.connectedSerial=null;
+  S.connectionState="pending";
+  $("device-dot").classList.remove("connected");
+  $("footer-dot").classList.remove("connected");
+  const label=$("device-state"); label.textContent=`Connecting · ${serial}`; label.dataset.state="pending";
+  try{
+    if(await api().select_device(serial)===false) throw Error("request declined");
+  }catch(err){
+    S.connectionState="unknown"; label.textContent="Connection unconfirmed"; label.dataset.state="unknown";
+    setOperation(`Device selection failed: ${err.message||err}`,"failed");
+  }
+}
+function onHzChange(v){ S.refreshHz=parseFloat(v)||5; api().set_refresh_hz(S.refreshHz); }
 function onToggleAuto(){
   const cb=$("auto-cb"); cb.classList.toggle("on");
   S.autoRefresh=cb.classList.contains("on");
@@ -32,7 +53,8 @@ async function onTapPoint(){ await api().tap(parseInt($("pt-x").value||"0"),pars
 async function onCheckColor(){
   const r=await api().check_color(parseInt($("cc-x").value||"0"),parseInt($("cc-y").value||"0"),$("cc-hex").value.trim(),parseInt($("cc-tol").value||"10"));
   const el=$("cc-result"); el.style.display="block";
-  if(r.error){el.className="cc-result bad";el.textContent=r.error;return;}
+  if(r.error){el.className="cc-result bad";el.textContent=r.error;setOperation(`Color check failed: ${r.error}`,"failed");return;}
+  setOperation(`Color check: ${r.match?"Match":"No match"} · actual ${r.actual} · Δ${r.dist}`,r.match?"success":"idle");
   el.className="cc-result "+(r.match?"ok":"bad");
   el.innerHTML=r.match
     ?`✓ Match &nbsp;·&nbsp; actual: <b>${escHtml(r.actual)}</b> &nbsp;·&nbsp; Δ${r.dist}`
@@ -78,7 +100,8 @@ async function onBrowseTpl(){ const p=await api().pick_template(); if(p) $("tpl-
 async function onRunMatch(all){
   const r=await api().match_template($("tpl-path").value,parseFloat($("tpl-thr").value||".85"),$("cb-gray").classList.contains("checked"),$("cb-multiscale").classList.contains("checked"),all);
   const el=$("tpl-result");
-  if(r.error){el.textContent=r.error;el.className="tpl-result empty";return;}
+  if(r.error){el.textContent=r.error;el.className="tpl-result empty";setOperation(`Match failed: ${r.error}`,"failed");return;}
+  setOperation(r.summary,"idle");
   el.textContent=r.summary;el.className="tpl-result";S.overlay=r.rects||[];draw();
 }
 async function onClearOverlay(){ await api().clear_overlay(); S.overlay=[]; draw(); }

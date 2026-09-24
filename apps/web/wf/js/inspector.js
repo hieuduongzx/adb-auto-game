@@ -5,6 +5,7 @@
 // Sticky identity header — icon chip + title + optional sublabel / count badge.
 function wfInspId(iconName,title,sub,count){
   const id=document.createElement("div"); id.className="wf-insp-id";
+  id.dataset.intent="identity"; id.id="wf-insp-intent-identity";
   let html=`<span class="ic">${wfIco(iconName||"box")}</span>`
          + `<span class="meta"><span class="title">${escHtml(title||"")}</span>`;
   if(sub) html+=`<span class="sub">${escHtml(sub)}</span>`;
@@ -19,6 +20,10 @@ function wfInspId(iconName,title,sub,count){
 // passed in; the header becomes a flex row with the action on the far right.
 function wfInspBlock(label,count,action){
   const b=document.createElement("div"); b.className="wf-insp-block";
+  const intent={"Target & capture":"target-capture",Branching:"branching",Timing:"timing",
+    "Failure handling":"advanced","Failure screenshot":"advanced",Note:"advanced",
+    "Run logs":"advanced","Debug JSON":"advanced","Advanced options":"advanced"}[label];
+  if(intent){ b.dataset.intent=intent; b.classList.add("wf-insp-intent-"+intent); }
   if(label){
     const s=document.createElement("div"); s.className="wf-insp-sec";
     s.innerHTML=`<span>${escHtml(label)}</span>`;
@@ -152,8 +157,37 @@ function wfInspJsonBlock(label, getObj, applyObj){
   return b;
 }
 
+// Only well-understood keys move out of Parameters. Unknown schema additions
+// remain editable; field objects, showWhen rules and handlers stay untouched.
+function wfInspFieldGroups(node,fields){
+  const groups=new Map();
+  for(const f of fields){
+    let label="Parameters";
+    if(node.type==="wait" || node.type==="wait_random" ||
+       ["timeout","duration","seconds","wait","settle","delayBetween","delayAfterFind","swipe_duration"].includes(f.k)) label="Timing";
+    else if(["negate","infinite","maxLoops","max_swipes"].includes(f.k) ||
+      (f.k==="count" && ["loop","parallel","random_branch"].includes(node.type))) label="Branching";
+    else if(["tpl","tpls","region","points","sequence_points","sequence_images","color"].includes(f.t) ||
+      ["target","x","y","w","h","x1","y1","x2","y2","offsetX","offsetY","threshold","tolerance","where","direction","distance","swipe_distance"].includes(f.k) ||
+      (f.k==="mode" && ["swipe","tap_image_any","wait_image_any","if_image_any"].includes(node.type))) label="Target & capture";
+    if(!groups.has(label)) groups.set(label,[]);
+    groups.get(label).push(f);
+  }
+  return ["Parameters","Target & capture","Branching","Timing"]
+    .filter(label=>groups.has(label)).map(label=>({label,fields:groups.get(label)}));
+}
+
+function wfSyncInspectorSelection(){
+  const state=$("wf-selection-state"); if(!state) return;
+  const node=wfNode(WF.selectedNode);
+  state.textContent=WF.sel.length>1 ? WF.sel.length+" blocks selected" : node ?
+    "Selected · "+(node.label||(WF_NODES[node.type]||{}).label||node.type)+" · "+node.id : "No block selected";
+  state.title=state.textContent;
+}
+
 function wfRenderInspector(){
   const body=$("wf-insp-body"); body.innerHTML="";
+  wfSyncInspectorSelection();
   wfRenderVarsPanel();
 
   // Multi-selection panel.
@@ -226,28 +260,36 @@ function wfRenderInspector(){
     }
     body.appendChild(idEl);
 
-    const pblock=wfInspBlock("Parameters");
-    if(node.type==="call"){ pblock.appendChild(wfCallPicker(node)); }
-    else if(node.type==="switch" || node.type==="try_chain" || node.type==="and" || node.type==="sequence"){ pblock.appendChild(wfBranchCountEditor(node)); }
+    if(node.type==="call"){
+      const pblock=wfInspBlock("Function target"); pblock.appendChild(wfCallPicker(node)); body.appendChild(pblock);
+    }
+    else if(node.type==="switch" || node.type==="try_chain" || node.type==="and" || node.type==="sequence"){
+      const pblock=wfInspBlock("Branching"); pblock.appendChild(wfBranchCountEditor(node)); body.appendChild(pblock);
+    }
     else {
       if(!(def.fields||[]).length){
+        const pblock=wfInspBlock("Parameters");
         const d=document.createElement("div"); d.className="wf-insp-tip"; d.textContent="This node has no parameters."; pblock.appendChild(d);
+        body.appendChild(pblock);
       }
       // Fields may declare showWhen:{key:val|[vals]} to appear only when another
       // param has a given value (e.g. Tap's x/y hide when target = found image).
       // Consecutive short coordinate-style numbers (x/y, w/h, x1/y1…) are paired
       // two-per-row so the panel stays compact instead of one tall column.
       const vis=(def.fields||[]).filter(f=>wfFieldVisible(node,f));
-      for(let i=0;i<vis.length;i++){
-        const f=vis[i], g=vis[i+1];
-        if(f.t==="num" && WF_PAIR_KEYS.has(f.k) && g && g.t==="num" && WF_PAIR_KEYS.has(g.k)){
-          pblock.appendChild(wfPairRow(node,f,g)); i++;
-        } else {
-          pblock.appendChild(wfFieldEl(node,f));
+      for(const group of wfInspFieldGroups(node,vis)){
+        const pblock=wfInspBlock(group.label);
+        for(let i=0;i<group.fields.length;i++){
+          const f=group.fields[i], g=group.fields[i+1];
+          if(f.t==="num" && WF_PAIR_KEYS.has(f.k) && g && g.t==="num" && WF_PAIR_KEYS.has(g.k)){
+            pblock.appendChild(wfPairRow(node,f,g)); i++;
+          } else {
+            pblock.appendChild(wfFieldEl(node,f));
+          }
         }
+        body.appendChild(pblock);
       }
     }
-    body.appendChild(pblock);
 
     if(node.type!=="note" && node.type!=="start" && node.type!=="try_next") body.appendChild(wfTimingField(node));
     if(node.type!=="note" && node.type!=="start" && node.type!=="try_next") body.appendChild(wfRetryField(node));

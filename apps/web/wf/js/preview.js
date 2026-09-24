@@ -52,9 +52,45 @@ function wfToggleView(){
   return wfView==="preview" ? "canvas" : "preview";
 }
 
+function wfSetViewTabState(view){
+  document.querySelectorAll(".wf-view-tab").forEach(t=>{
+    const selected=t.dataset.view===view;
+    t.classList.toggle("sel", selected);
+    t.setAttribute("aria-selected", String(selected));
+    t.tabIndex=selected ? 0 : -1;
+  });
+  // Preview and Library live inside the canvas stage: never inert their parent.
+  const panels={canvas:"wf-world", preview:"wf-preview-pane", library:"wf-library-pane"};
+  Object.entries(panels).forEach(([name,id])=>{
+    const el=document.getElementById(id); if(!el) return;
+    const hidden=name!==view;
+    el.setAttribute("aria-hidden", String(hidden));
+    el.inert=hidden;
+  });
+}
+function wfViewKeydown(e){
+  if(!e || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if(!["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) return;
+  const order=["canvas","preview","library"], current=order.indexOf(e.target?.dataset?.view);
+  if(current<0) return;
+  const index=e.key==="Home" ? 0 : e.key==="End" ? order.length-1 :
+    (current + (e.key==="ArrowRight" ? 1 : -1) + order.length) % order.length;
+  e.preventDefault(); wfSwitchView(order[index]);
+  const tab=Array.from(document.querySelectorAll(".wf-view-tab")).find(t=>t.dataset.view===order[index]);
+  if(tab && typeof tab.focus==="function") tab.focus();
+}
+function wfBindViewNavigation(){
+  const tabs=document.getElementById("wf-view-tabs");
+  if(!tabs || tabs.dataset.navBound) return;
+  tabs.dataset.navBound="1"; tabs.addEventListener("keydown",wfViewKeydown);
+}
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",wfBindViewNavigation);
+else wfBindViewNavigation();
+
 function wfSwitchView(view){
   wfView = view;
-  document.querySelectorAll(".wf-view-tab").forEach(t=>t.classList.toggle("sel", t.dataset.view===view));
+  wfSetViewTabState(view);
+  wfBindViewNavigation();
   const canvas = document.getElementById("wf-canvas");
   const preview = document.getElementById("wf-preview-pane");
   const library = document.getElementById("wf-library-pane");
@@ -70,6 +106,11 @@ function wfSwitchView(view){
   // Named `root`, not `wfView` — the module's wfView holds the *current view*
   // and a same-named local here would shadow it (and throw on the line above).
   const root = document.getElementById("workflow-view");
+  if(root){
+    root.classList.toggle("wf-preview-on",view==="preview");
+    root.classList.toggle("wf-library-on",view==="library");
+  }
+  if(library && view!=="library") library.style.display="none";
   if(view==="preview"){
     if(root) root.classList.add("wf-preview-on");   // hide the node library — editing chrome is dead weight here
     if(canvas) canvas.style.overflow = "hidden";

@@ -1,12 +1,26 @@
 // ── Helpers ───────────────────────────────────────────────────────────────
 function setStatus(msg){ $("status-text").textContent=msg; }
+function setOperation(msg, state="idle"){
+  const el=$("operation-state");
+  if(el.textContent!==msg) el.textContent=msg;
+  el.title=msg; el.dataset.state=state;
+  setStatus(msg);
+}
 function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function api(){ return window.pywebview.api; }
-function setRegionBadge(on){ $("region-badge").style.display=on?"inline-flex":"none"; }
+function setRegionBadge(on){
+  $("region-badge").style.display=on?"inline-flex":"none";
+  $("selection-state").textContent=S.region?`Region ${S.region[0]},${S.region[1]} · ${S.region[2]}×${S.region[3]}`:
+    S.point?`Point (${S.point[0]}, ${S.point[1]})`:"No selection";
+}
 function setConnected(on){ 
   const d=$("device-dot"), f=$("footer-dot");
   if(d) d.classList.toggle("connected", on);
   if(f) f.classList.toggle("connected", on);
+  S.connectionState=on?"connected":"disconnected";
+  const label=$("device-state");
+  label.textContent=on?`Connected · ${S.connectedSerial||"device"}`:"Disconnected";
+  label.dataset.state=S.connectionState;
 }
 
 function copyText(text, btn){

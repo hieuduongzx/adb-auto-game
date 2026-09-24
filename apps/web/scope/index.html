@@ -59,6 +59,19 @@
   </div>
 </header>
 
+<section id="scope-telemetry" class="scope-telemetry" aria-label="Device and capture telemetry">
+  <div class="telemetry-item"><span class="telemetry-label">Device</span>
+    <span id="device-state" role="status" aria-live="polite" aria-atomic="true" data-state="unknown">Awaiting device status</span></div>
+  <div class="telemetry-item"><span class="telemetry-label">Capture</span>
+    <span id="capture-state" role="status" aria-live="polite" aria-atomic="true" data-state="empty">No frame received</span></div>
+  <div class="telemetry-item telemetry-age"><span class="telemetry-label">Age</span>
+    <span id="capture-age" role="status" aria-live="off">—</span></div>
+  <div class="telemetry-item"><span class="telemetry-label">Source</span>
+    <span id="capture-source-state" role="status" aria-live="polite">Capture source · awaiting backend</span></div>
+  <div class="telemetry-item telemetry-operation"><span class="telemetry-label">Operation</span>
+    <span id="operation-state" role="status" aria-live="polite" aria-atomic="true" data-state="idle">Ready</span></div>
+</section>
+
 <!-- ── Main split ────────────────────────────────────────────────────────── -->
 <main id="main" class="workbench-main" data-pnl-stage aria-label="Device inspection workspace">
 
@@ -74,14 +87,16 @@
         <svg class="uico uico-1" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
       </button>
     </div>
-    <div id="preview-wrap"><canvas id="preview-canvas"></canvas></div>
+    <div id="preview-wrap"><canvas id="preview-canvas" aria-label="Screenshot preview. Click for a point, drag for a region, right-click to tap."></canvas></div>
+    <div class="selection-readout"><span class="telemetry-label">Selection</span>
+      <span id="selection-state" role="status" aria-live="polite">No selection</span></div>
   </div>
 
   <!-- Tools -->
   <div id="tools-card">
     <div id="tabs-bar" role="tablist" aria-label="DevScope tools">
       <button class="tab-btn active" data-tab="inspect"  onclick="switchTab('inspect')" role="tab" aria-selected="true" aria-controls="tab-inspect">Inspect</button>
-      <button class="tab-btn"        data-tab="template" onclick="switchTab('template')" role="tab" aria-selected="false" aria-controls="tab-template">Template</button>
+      <button class="tab-btn"        data-tab="template" onclick="switchTab('template')" role="tab" aria-selected="false" aria-controls="tab-template">Match</button>
       <button class="tab-btn"        data-tab="device"   onclick="switchTab('device')" role="tab" aria-selected="false" aria-controls="tab-device">Device</button>
       <button class="tab-btn"        data-tab="library"  onclick="switchTab('library')" role="tab" aria-selected="false" aria-controls="tab-library">Library</button>
     </div>
@@ -90,7 +105,7 @@
     <div class="tab-pane active" id="tab-inspect" role="tabpanel">
 
       <!-- Screenshot -->
-      <div class="group">
+      <div class="group" data-task="capture">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">Capture</span>
           <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
@@ -106,7 +121,7 @@
       </div>
 
       <!-- Point and color -->
-      <div class="group">
+      <div class="group" data-task="select">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">Point &amp; color</span>
           <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
@@ -141,36 +156,8 @@
         </div>
       </div>
 
-      <!-- Color check (collapsed by default) -->
-      <div class="group closed">
-        <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="false">
-          <span class="grp-title">Color check</span>
-          <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
-        </button>
-        <div class="grp-body">
-          <div class="row">
-            <span class="lbl">Point</span>
-            <input id="cc-x" type="number" min="0" value="0" style="text-align:center;" aria-label="Color check X">
-            <input id="cc-y" type="number" min="0" value="0" style="text-align:center;" aria-label="Color check Y">
-          </div>
-          <div class="row">
-            <span class="lbl">Target</span>
-            <input id="cc-hex" type="text" placeholder="#RRGGBB" oninput="$('cc-swatch').style.background=this.value" aria-label="Target HEX color">
-            <div id="cc-swatch"></div>
-          </div>
-          <div class="row">
-            <span class="lbl">Tolerance</span>
-            <input id="cc-tol" type="number" min="0" max="255" value="10" aria-label="Color tolerance"
-                   style="width:56px;flex:none;text-align:right;">
-            <span class="hz-unit">≤ max(ΔR,ΔG,ΔB)</span>
-            <button class="btn sm accent" style="margin-left:auto;" onclick="onCheckColor()">Check</button>
-          </div>
-          <div id="cc-result" class="cc-result"></div>
-        </div>
-      </div>
-
       <!-- Selection -->
-      <div class="group">
+      <div class="group" data-task="select">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">Select</span>
           <span class="badge cyan" id="region-badge" style="display:none;">
@@ -208,7 +195,7 @@
       </div>
 
       <!-- OCR -->
-      <div class="group">
+      <div class="group" data-task="ocr">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">OCR</span>
           <span id="ocr-engine" style="margin-left:4px;">not loaded</span>
@@ -232,7 +219,7 @@
       </div>
 
       <!-- Actions -->
-      <div class="group">
+      <div class="group" data-task="input">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">Input</span>
           <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
@@ -271,7 +258,7 @@
       </div>
 
       <!-- Keys and text (collapsed by default) -->
-      <div class="group closed">
+      <div class="group closed" data-task="input">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="false">
           <span class="grp-title">Keys &amp; text</span>
           <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
@@ -302,7 +289,7 @@
 
     <!-- ── Template matching ─────────────────────────────────────────── -->
     <div class="tab-pane" id="tab-template" role="tabpanel">
-      <div class="group">
+      <div class="group" data-task="match">
         <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true">
           <span class="grp-title">Match</span>
           <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
@@ -329,7 +316,35 @@
           <div style="display:flex;gap:6px;align-items:center;">
             <button class="btn sm" onclick="onClearOverlay()">Clear overlay</button>
           </div>
-          <div class="tpl-result empty" id="tpl-result">No results yet.</div>
+          <div class="tpl-result empty" id="tpl-result" role="status" aria-live="polite">No results yet.</div>
+        </div>
+      </div>
+
+      <!-- Color check (collapsed by default) -->
+      <div class="group closed" data-task="match">
+        <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="false">
+          <span class="grp-title">Color check</span>
+          <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="grp-body">
+          <div class="row">
+            <span class="lbl">Point</span>
+            <input id="cc-x" type="number" min="0" value="0" style="text-align:center;" aria-label="Color check X">
+            <input id="cc-y" type="number" min="0" value="0" style="text-align:center;" aria-label="Color check Y">
+          </div>
+          <div class="row">
+            <span class="lbl">Target</span>
+            <input id="cc-hex" type="text" placeholder="#RRGGBB" oninput="$('cc-swatch').style.background=this.value" aria-label="Target HEX color">
+            <div id="cc-swatch"></div>
+          </div>
+          <div class="row">
+            <span class="lbl">Tolerance</span>
+            <input id="cc-tol" type="number" min="0" max="255" value="10" aria-label="Color tolerance"
+                   style="width:56px;flex:none;text-align:right;">
+            <span class="hz-unit">≤ max(ΔR,ΔG,ΔB)</span>
+            <button class="btn sm accent" style="margin-left:auto;" onclick="onCheckColor()">Check</button>
+          </div>
+          <div id="cc-result" class="cc-result" role="status" aria-live="polite"></div>
         </div>
       </div>
     </div>
@@ -377,7 +392,7 @@
       </div>
     </div>
   </div><!-- /tools-card -->
-</div><!-- /main -->
+</main><!-- /main -->
 
 <!-- ── Log ──────────────────────────────────────────────────────────────── -->
 <div id="log-card" class="card pnl" data-pnl="scope-log" data-pnl-title="Log" data-pnl-tools="max" data-pnl-stage-sel="#main">
@@ -394,8 +409,6 @@
   </div>
   <div class="log-body" id="log-body" role="log" aria-live="polite"></div>
 </div>
-
-</main>
 
 <!-- ── Footer ────────────────────────────────────────────────────────────── -->
 <footer id="footer" class="workbench-status" aria-label="Inspection status">

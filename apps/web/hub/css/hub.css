@@ -89,6 +89,8 @@
   flex: 1;
   min-height: 0;
   position: relative;
+  display: flex;
+  flex-direction: column;
   padding: 20px 24px 0;
   container-type: inline-size;
 }
@@ -101,7 +103,8 @@
     calc((100cqw - var(--gutter) - var(--gap) * (var(--cols) - 1)) / var(--cols)),
     var(--card-max)
   );
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
@@ -248,13 +251,14 @@
 
 .game-info {
   min-height: 40px;
+  order: -1;
   min-width: 0;
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
   align-content: center;
   column-gap: 9px;
-  row-gap: 3px;
-  margin-top: 10px;
+  row-gap: 4px;
+  margin: 0 0 10px;
   padding: 0 2px;
 }
 /* The game's icon — assets/icon.*, the same art the Runner header and the built .exe use. */
@@ -320,6 +324,35 @@
 .ctrl-tag.adb { color: var(--accent); background: var(--accent-bg); border-color: var(--accent-bd); }
 .ctrl-tag.win32 { color: var(--win32); background: var(--win32-bg); border-color: var(--win32-bd); }
 .game-acts { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.game-state {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding-top: 6px;
+  margin-top: 3px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font: var(--t-micro)/1.4 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+/* In-flow feedback never obscures the cached shelf or its actions. */
+.library-message {
+  display: flex;
+  order: -1;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--s3);
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--err-bd);
+  background: var(--err-bg);
+  color: var(--err);
+  font-size: var(--t-caption);
+  z-index: 1;
+}
+.library-message.is-loading { border-color: var(--border); background: var(--panel); color: var(--muted); }
+#library-message-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.library-message .btn { flex-shrink: 0; }
 
 /* ── Cover slot without art — a labelled blank, tinted per game ─────────── */
 .game-art-empty {
@@ -460,7 +493,7 @@
   background: var(--panel);
   border: 1px solid var(--border2);
   border-radius: var(--r-lg);
-  box-shadow: var(--sh-lg);
+  box-shadow: none;
   opacity: 0;
   transform: translateX(18px);
   transition: opacity .2s var(--ease), transform .28s var(--ease);
@@ -578,7 +611,7 @@ body.bp-open #ui-toasts { right: calc(min(580px, 100vw - 24px) + 24px); }
 @keyframes updFade { from { opacity: 0 } to { opacity: 1 } }
 .upd-card { width: min(360px, 84vw); padding: 22px 24px; border-radius: var(--r-lg);
   background: var(--panel); border: 1px solid var(--line);
-  box-shadow: var(--sh-lg); text-align: center; }
+  box-shadow: none; text-align: center; }
 .upd-title { font-size: var(--t-head); font-weight: 800; color: var(--ink); }
 .upd-sub { margin-top: 5px; font-size: var(--t-body); color: var(--muted); }
 .upd-track { margin: 16px 0 8px; height: 8px; border-radius: 999px; overflow: hidden;

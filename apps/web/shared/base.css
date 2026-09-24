@@ -38,9 +38,10 @@ button {
   line-height: 1;
   color: inherit;
 }
-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:focus-visible, a[href]:focus-visible, summary:focus-visible,
+[tabindex]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
-input, select {
+input, select, textarea {
   font-family: var(--mono);
   font-size: var(--t-ui);
   background: var(--panel);
@@ -49,8 +50,8 @@ input, select {
   border-radius: var(--r-sm);
   padding: 5px 8px;
 }
-input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--border2); box-shadow: none; }
-input:disabled, select:disabled { background: var(--alt); color: var(--muted); cursor: not-allowed; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--border2); box-shadow: none; }
+input:disabled, select:disabled, textarea:disabled { background: var(--alt); color: var(--muted); cursor: not-allowed; }
 
 /* Selects: strip the native OS chrome and draw our own chevron so dropdowns
    read consistently across platforms and apps. */

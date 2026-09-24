@@ -153,6 +153,9 @@ input { caret-color: var(--accent); text-align: center; }
 /* Progress bar */
 #header-progress { grid-column:1 / -1; display: flex; align-items: center; gap: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--line); }
 .prog-count { font-size: var(--t-caption); font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums; min-width: 28px; flex-shrink: 0; }
+.queue-summary, .queue-current { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-caption); color: var(--muted); }
+.queue-summary { max-width: 170px; }
+.queue-current { max-width: 230px; color: var(--dim); }
 .prog-bar-track { flex: 1; height: 6px; border-radius: var(--r-xs); background: var(--track); overflow: hidden; }
 .prog-bar-fill { height: 100%; border-radius: var(--r-xs); background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
 .prog-elapsed { font-family: var(--mono); font-size: var(--t-ui); font-weight: 500; color: var(--dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
@@ -238,16 +241,19 @@ input { caret-color: var(--accent); text-align: center; }
 .task-meta:empty { display: none; }
 .task-meta .sep { color: var(--dot-off); }
 .act-st { font-weight: 600; }
-.act-st.st-running { color: var(--ok-ink); }
-.act-st.st-completed, .act-st.st-active { color: var(--ok-ink); }
+.act-st.st-enabled { color: var(--accent); }
+.act-st.st-disabled, .act-st.st-skipped, .act-st.st-waiting { color: var(--muted); }
+.act-st.st-running, .act-st.st-completed, .act-st.st-succeeded, .act-st.st-active { color: var(--ok-ink); }
+.act-st.st-paused { color: var(--warn); }
 .act-st.st-failed { color: var(--err); }
-.act-st.st-skipped, .act-st.st-waiting { color: var(--muted); }
 
 /* Status dot (per-activity) */
 .act-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--dot-off); transition: background .2s; }
-.act-dot-pending   { background: var(--dot-off); }
-.act-dot-running   { background: var(--ok); animation: actPulse 1.8s ease-in-out infinite; }
-.act-dot-completed { background: var(--ok); }
+.act-dot-pending, .act-dot-disabled { background: var(--dot-off); }
+.act-dot-enabled { background: var(--accent); }
+.act-dot-running, .act-dot-paused { background: var(--ok); animation: actPulse 1.8s ease-in-out infinite; }
+.act-dot-paused { background: var(--warn); animation: none; }
+.act-dot-completed, .act-dot-succeeded { background: var(--ok); }
 .act-dot-failed    { background: var(--err); }
 .act-dot-skipped   { background: var(--muted); }
 .act-dot-active    { background: var(--ok); }

@@ -31,6 +31,7 @@
            the amber dot on this button — without shouting all the time. -->
       <button class="btn ico" id="wf-save-btn" onclick="wfSave()" title="Save to the current file (Ctrl+S)">
         <i data-ico="save" aria-hidden="true"></i></button>
+      <span id="wf-save-state" class="wf-save-state" role="status" aria-live="polite">Not saved</span>
       <button class="btn ico" onclick="wfExport()" title="Export workflow - new JSON file">
         <i data-ico="download" aria-hidden="true"></i></button>
       <span class="tb-tray-sep"></span>
@@ -162,11 +163,13 @@
       <i data-ico="terminal" aria-hidden="true"></i></button>
     <button class="btn ico" id="wf-shortcuts-btn" onclick="uiShowShortcuts()" title="Keyboard &amp; mouse shortcuts (F1)" aria-label="Shortcuts">
       <i data-ico="circle-question-mark" aria-hidden="true"></i></button>
-    <div id="wf-view-tabs" class="wf-view-tabs" role="tablist" aria-label="View">
-      <button class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Edit mode - design the workflow graph (Tab)">Edit</button>
-      <button class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview mode - live device mirror + scope tools (Tab)">Preview</button>
-      <button class="wf-view-tab" data-view="library" onclick="wfSwitchView('library')" title="Template library - every image this workflow uses, and what is no longer used (Ctrl+K → Go to Library)">Library</button>
-    </div>
+
+    <!-- Keep view navigation at the toolbar's far right, outside the split. -->
+  <div id="wf-view-tabs" class="wf-view-tabs" role="tablist" aria-label="View">
+    <button id="wf-vtab-canvas" role="tab" aria-selected="true" aria-controls="wf-world" tabindex="0" class="wf-view-tab sel" data-view="canvas" onclick="wfSwitchView('canvas')" title="Edit mode - design the workflow graph (Tab)">Canvas</button>
+    <button id="wf-vtab-preview" role="tab" aria-selected="false" aria-controls="wf-preview-pane" tabindex="-1" class="wf-view-tab" data-view="preview" onclick="wfSwitchView('preview')" title="Preview mode - live device mirror + scope tools (Tab)">Preview</button>
+    <button id="wf-vtab-library" role="tab" aria-selected="false" aria-controls="wf-library-pane" tabindex="-1" class="wf-view-tab" data-view="library" onclick="wfSwitchView('library')">Library</button>
+  </div>
   </div>
 </header>
 
@@ -176,9 +179,9 @@
 <main id="workflow-view" class="workbench-main" data-pnl-stage aria-label="Workflow designer workspace">
   <!-- Left: block library and reusable functions. Activities stay on the
        canvas as a compact, always-reachable graph switcher. -->
-  <div id="wf-side">
+  <div id="wf-side" aria-label="Node palette">
     <div class="wf-side-sec pnl pnl-flush" data-pnl="wf-nodes" data-pnl-title="Nodes" data-pnl-tools="max" style="flex:1;min-height:0;display:flex;flex-direction:column;">
-      <div class="wf-side-hdr pnl-hd"><span class="pnl-title"><span>Nodes</span></span></div>
+      <div class="wf-side-hdr pnl-hd wf-zone-heading"><span class="pnl-title"><span>Nodes</span></span><span class="wf-zone-hint">Drag to canvas</span></div>
       <div class="wf-pal-search">
         <svg class="uico wf-pal-search-ico" aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
         <input id="wf-pal-search-inp" type="search" placeholder="Find node…" oninput="wfPaletteFilter(this.value)" spellcheck="false" autocomplete="off" aria-label="Find node">
@@ -201,7 +204,7 @@
       <div class="wf-cur-act" id="wf-cur-act" data-empty="1" title="Currently open activity / function" aria-live="polite"></div>
       <div id="wf-graph-stats" class="wf-graph-stats" aria-live="polite"></div>
       <button type="button" id="wf-zoom-badge" class="wf-zoom-badge" onclick="wfZoomReset()" title="Zoom 100% - click or double-tap Space to reset" aria-label="Canvas zoom">100%</button>
-      <div id="wf-world">
+      <div id="wf-world" role="tabpanel" aria-labelledby="wf-vtab-canvas" aria-hidden="false">
         <svg id="wf-wires"></svg>
       </div>
       <div id="wf-canvas-empty" class="wf-empty-note">
@@ -230,7 +233,7 @@
         <div id="wf-vars-body" class="wf-vars-body" hidden></div>
       </section>
       <!-- Live device mirror — only captures while this tab is active (scope-like). -->
-      <div id="wf-preview-pane" class="wf-preview-pane" style="display:none">
+      <div id="wf-preview-pane" class="wf-preview-pane" style="display:none" role="tabpanel" aria-labelledby="wf-vtab-preview" aria-hidden="true" inert>
         <div class="wf-pv-bar">
           <button class="btn sm" id="wf-pv-capture" title="Capture one frame">Capture</button>
           <button class="pill-wrap" id="wf-pv-auto" title="Auto refresh" role="switch" aria-checked="true">
@@ -258,7 +261,7 @@
       <!-- Template library — every image in the open workflow's templates/ folder
            and whether any block still uses it. Full width on purpose: the whole
            point is seeing a 269-file folder at once. -->
-      <div id="wf-library-pane" class="wf-library-pane" style="display:none">
+      <div id="wf-library-pane" class="wf-library-pane" style="display:none" role="tabpanel" aria-labelledby="wf-vtab-library" aria-hidden="true" inert>
         <div class="wf-lib-bar">
           <span class="wf-lib-heading">Templates</span>
           <span class="wf-lib-counts" id="wf-lib-counts"></span>
@@ -397,12 +400,13 @@
   </div>
   <!-- Right: node properties. Variables live on the canvas so they stay
        available even when this sidebar is collapsed. -->
-  <div id="wf-inspector">
+  <div id="wf-inspector" aria-label="Inspector">
     <!-- Properties / DevScope share one panel: same header, swapped body. The
          header keeps the panel's name in one place instead of each mode
          growing chrome of its own. -->
     <div class="pnl pnl-flush" id="wf-insp-panel" data-pnl="wf-props" data-pnl-title="Properties" data-pnl-tools="max">
-    <div class="wf-side-hdr pnl-hd" id="wf-insp-hdr"><span class="pnl-title"><span id="wf-insp-title">Properties</span></span></div>
+    <div class="wf-side-hdr pnl-hd wf-zone-heading" id="wf-insp-hdr"><span class="pnl-title"><span id="wf-insp-title">Properties</span></span></div>
+    <div id="wf-selection-state" class="wf-insp-context" role="status" aria-live="polite">No block selected</div>
     <div id="wf-insp-body"></div>
     <!-- Scope tool panel — shown only in Preview mode. -->
     <div id="wf-scope-panel" style="display:none;flex:1;min-height:0;flex-direction:column;">
@@ -752,7 +756,7 @@
 
 <footer id="footer" class="workbench-status" aria-label="Designer status">
   <span id="footer-dot"></span>
-  <span id="status-text">Ready</span>
+  <span id="status-text" role="status" aria-live="polite">Ready</span>
   <span class="spacer"></span>
   <span id="hover-pos" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:88px;text-align:right;">-</span>
   <span style="color:var(--border);margin:0 3px;">·</span>

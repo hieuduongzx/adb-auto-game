@@ -81,3 +81,43 @@ def test_scope_docked_regions_are_flat_and_page_does_not_scroll_sideways():
     assert "#preview-card, #tools-card, #log-card { border-radius:0; box-shadow:none; }" in css
     assert "#main {" in css and "min-width: 0" in css
     assert "body {" in css and "overflow: hidden" in css
+
+
+def test_scope_exposes_textual_device_capture_and_operation_telemetry():
+    doc = document()
+    for element_id in (
+        "device-state",
+        "capture-state",
+        "capture-source-state",
+        "operation-state",
+    ):
+        node = doc.by_id(element_id)
+        assert node["attrs"].get("role") == "status"
+        assert node["attrs"].get("aria-live") == "polite"
+    assert doc.by_id("capture-age")["attrs"].get("aria-live") == "off"
+    assert doc.by_id("selection-state")["text"].strip() == "No selection"
+
+
+def test_scope_task_groups_have_stable_task_hooks():
+    html = HTML_PATH.read_text(encoding="utf-8")
+    for task in ("capture", "select", "match", "ocr", "input"):
+        assert f'data-task="{task}"' in html
+
+
+def test_scope_controls_follow_task_order_and_log_is_not_inside_stage():
+    doc = document()
+    tasks = [node["attrs"]["data-task"] for node in doc.elements if "data-task" in node["attrs"]]
+    assert tasks == ["capture", "select", "select", "ocr", "input", "input", "match", "match"]
+    assert not any(parent["attrs"].get("id") == "main" for parent in doc.by_id("log-card")["parents"])
+    ids = [node["attrs"]["id"] for node in doc.elements if "id" in node["attrs"]]
+    assert len(ids) == len(set(ids))
+
+
+def test_scope_task_navigation_and_telemetry_stay_readable_in_compact_panels():
+    doc = document()
+    match_tab = next(node for node in doc.elements if node["attrs"].get("data-tab") == "template")
+    assert match_tab["text"].strip() == "Match"
+    css = CSS_PATH.read_text(encoding="utf-8")
+    assert re.search(r"\.scope-telemetry\s*\{[^}]*flex-wrap:\s*wrap", css)
+    assert re.search(r"\.group\s*\{[^}]*flex-shrink:\s*0", css)
+    assert re.search(r"\.tb-tray select:focus-visible\s*\{[^}]*outline:", css)

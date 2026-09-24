@@ -279,6 +279,8 @@ function promptNewWorkflow() {
 // ── State ────────────────────────────────────────────────────────────────────
 let GAMES = [];
 let FILTER = "";
+let LIST_LOADING = false;
+let LIST_LOADED = false;
 let BUILD = null;   // {path, name, version, state: running|cancelling|done|failed|cancelled, progress, stage, …}
 /** The shelf's widest layout — five covers across (hub.css `--cols`). It is the
     ceiling and the value used before the grid has been laid out; it is never
@@ -351,6 +353,17 @@ function filtered() {
   return GAMES.filter((g) => [g.name, g.folder, g.controller].join(" ").toLowerCase().includes(q));
 }
 
+function setLibraryMessage(text, opts) {
+  const host = $("library-message");
+  const label = $("library-message-text");
+  const retry = $("btn-library-retry");
+  if (!host || !label) return;
+  host.hidden = !text;
+  label.textContent = text || "";
+  if (retry) retry.hidden = !(text && opts && opts.retry);
+  host.classList.toggle("is-loading", !!(opts && opts.loading));
+}
+
 /** One card. The cover is its own button — clicking the art runs the game — and
     the footer under it carries the same Run as a labelled control beside the
     Edit / Build / Delete tools, so nothing on a card depends on hovering to be
@@ -361,6 +374,8 @@ function cardHtml(g, i) {
   const ctrl = g.controller === "win32" ? "win32" : "adb";
   const acts = Number(g.activityCount) || 0;
   const folder = escHtml(g.folder || "PROJECT");
+  const state = g.modified ? `Last saved ${g.modified}` : "No saved timestamp";
+
   const art = g.cover
     ? `<img class="game-img" src="${escHtml(g.cover)}" alt="" decoding="async" draggable="false">`
     : emptyArtHtml(g.name);
@@ -378,6 +393,8 @@ function cardHtml(g, i) {
         `<span class="ctrl-tag ${ctrl}">${ctrl === "win32" ? "Win32" : "ADB"}</span>` +
         `<span class="game-acts">${acts} ${acts === 1 ? "activity" : "activities"}</span>` +
       `</span>` +
+      `<span class="game-state" title="${escHtml(state)}">${escHtml(state)}</span>` +
+
     `</div>` +
     `<div class="game-foot">` +
       `<button class="game-run" type="button" data-act="run" title="Run ${name}" aria-label="Run ${name}">${svg("play", "uico-2 uico-fill")}Run</button>` +
@@ -405,9 +422,12 @@ function renderSkeleton() {
       `</span>` +
     `</div>`).join("");
   grid.setAttribute("aria-busy", "true");
+  setLibraryMessage("Loading projects…", { loading: true });
 }
 
 function render(opts) {
+  // Search must not turn a still-unknown library into "No projects yet".
+  if (!LIST_LOADED) return;
   const intro = !!(opts && opts.intro);
   const grid = $("grid");
   const empty = $("empty");
@@ -424,7 +444,7 @@ function render(opts) {
   const focusedPath = active && active.closest && active.closest(".game")
     ? active.closest(".game").dataset.path : "";
 
-  grid.setAttribute("aria-busy", "false");
+  grid.setAttribute("aria-busy", String(LIST_LOADING));
   if (!items.length) {
     grid.innerHTML = "";
     empty.hidden = false;
@@ -503,20 +523,51 @@ async function openSettings() {
 
 async function loadList(opts) {
   const a = api();
-  if (!a) return;
+  if (!a) {
+    if (!LIST_LOADED) {
+      $("grid").innerHTML = "";
+      $("empty").hidden = true;
+      $("count").textContent = "Unavailable";
+    }
+    $("grid").setAttribute("aria-busy", "false");
+    setLibraryMessage("Library unavailable — check the app bridge and retry.", { retry: true });
+    return;
+  }
+  if (LIST_LOADING) return;
+  LIST_LOADING = true;
+  const refresh = LIST_LOADED || GAMES.length > 0;
+  const refreshBtn = $("btn-refresh");
+  if (refreshBtn) refreshBtn.disabled = true;
+  $("grid").setAttribute("aria-busy", "true");
+  setLibraryMessage(refresh ? "Refreshing projects…" : "Loading projects…", { loading: true });
   try {
     const res = await a.list_workflows();
+    if (!res || !Array.isArray(res.workflows)) throw new Error("Invalid library response");
     GAMES = (res && res.workflows) || [];
+    LIST_LOADED = true;
     const pathEl = $("footer-path");
     if (pathEl && res && res.dir) {
       pathEl.textContent = res.dir;
       pathEl.title = res.dir;
     }
     render(opts);
+    setLibraryMessage("");
   } catch (e) {
-    $("grid").innerHTML = "";
+    if (!LIST_LOADED) {
+      $("grid").innerHTML = "";
+      $("empty").hidden = true;
+      $("count").textContent = "Unavailable";
+    }
     $("grid").setAttribute("aria-busy", "false");
-    toast("Could not read the game library", "error");
+    setLibraryMessage(
+      LIST_LOADED ? "Could not refresh the library — showing the last loaded projects." : "Could not load the library — check the app bridge and retry.",
+      { retry: true }
+    );
+    toast(LIST_LOADED ? "Library refresh failed" : "Could not read the game library", "error");
+  } finally {
+    LIST_LOADING = false;
+    $("grid").setAttribute("aria-busy", "false");
+    if (refreshBtn) refreshBtn.disabled = false;
   }
 }
 
@@ -928,6 +979,7 @@ function wire() {
     button.onclick = () => { if (window.uiTheme) window.uiTheme.toggle(); };
   });
   $("btn-refresh").onclick = () => loadList();
+  $("btn-library-retry").onclick = () => loadList();
   $("btn-settings").onclick = () => openSettings();
   $("btn-new").onclick = () => createWorkflow();
   $("btn-empty-new").onclick = () => createWorkflow();

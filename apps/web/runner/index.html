@@ -29,8 +29,8 @@
 
     <div id="header-command" class="header-command">
       <div id="header-utility" class="header-utility">
-        <div id="status-pill" class="status-ready">
-          <div id="status-dot"></div>
+        <div id="status-pill" class="status-ready" role="status" aria-live="polite" aria-label="Run status">
+          <div id="status-dot" aria-hidden="true"></div>
           <div id="status-text">READY</div>
         </div>
         <button class="update-pill" id="update-pill" type="button" onclick="showUpdates()" hidden>Update</button>
@@ -58,13 +58,15 @@
                 title="Start the run (F5 or Ctrl+Enter)" aria-label="Start workflow">
           <i data-ico="play" data-ico-size="uico-fill" aria-hidden="true"></i>Start
         </button>
-        <button class="btn btn-pause" id="btn-pause" onclick="onPause()" disabled
+        <button class="btn btn-pause" id="btn-pause" type="button" onclick="onPause()" disabled
                 title="Pause or resume the run (F6)" aria-label="Pause workflow">Pause</button>
       </div>
     </div>
 
     <div id="header-progress" style="display:none">
       <span class="prog-count" id="prog-count">0/0</span>
+      <span class="queue-summary" id="queue-summary">No activities queued</span>
+      <span class="queue-current" id="queue-current">Next: —</span>
       <div class="prog-bar-track"><div class="prog-bar-fill" id="prog-bar" aria-hidden="true"></div></div>
       <span class="prog-elapsed" id="elapsed">00:00:00</span>
     </div>
@@ -83,9 +85,9 @@
   <!-- ── Main body: split (left activities / right panels) + footer ──── -->
   <main id="main-body" class="workbench-main" data-pnl-stage aria-label="Runner workspace">
   <div id="mobile-tabs" role="tablist" aria-label="Runner views" aria-orientation="horizontal">
-    <button class="mobile-tab active" type="button" role="tab" aria-selected="true" aria-controls="pane-left" data-mobile-view="activities" onclick="switchMobileView('activities')">Activities</button>
-    <button class="mobile-tab" type="button" role="tab" aria-selected="false" aria-controls="r-log" data-mobile-view="log" onclick="switchMobileView('log')">Log</button>
-    <button class="mobile-tab" type="button" role="tab" aria-selected="false" aria-controls="mobile-settings" data-mobile-view="settings" onclick="switchMobileView('settings')">Settings</button>
+    <button class="mobile-tab active" id="mobile-tab-activities" type="button" role="tab" aria-selected="true" aria-controls="pane-left" data-mobile-view="activities" onclick="switchMobileView('activities')">Activities</button>
+    <button class="mobile-tab" id="mobile-tab-log" type="button" role="tab" aria-selected="false" aria-controls="r-log" data-mobile-view="log" onclick="switchMobileView('log')">Log</button>
+    <button class="mobile-tab" id="mobile-tab-settings" type="button" role="tab" aria-selected="false" aria-controls="mobile-settings" data-mobile-view="settings" onclick="switchMobileView('settings')">Settings</button>
   </div>
   <div id="main-split" tabindex="-1" role="region" aria-label="Activities and runner panels">
 
@@ -324,7 +326,7 @@
 
   </div><!-- /main-split -->
 
-  <section id="mobile-settings" role="tabpanel" aria-label="Runner settings" tabindex="0" hidden></section>
+  <section id="mobile-settings" role="tabpanel" aria-label="Runner settings" aria-labelledby="mobile-tab-settings" tabindex="0" hidden></section>
 
   <div class="header-pop" id="notes-pop" hidden>
     <div class="header-pop-hd">

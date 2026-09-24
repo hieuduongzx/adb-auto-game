@@ -328,7 +328,10 @@ let _wfAutosaveFailAt=0;    // throttle the failure toast (autosave retries ofte
 function wfSyncDirtyUI(){
   const b=$("wf-save-btn");
   if(b){ b.classList.toggle("dirty", wfDirty);
-    b.title = wfDirty ? "Save (Ctrl+S) - unsaved changes" : "Save to the current file (Ctrl+S)"; }
+    b.title = wfDirty ? "Save (Ctrl+S) - unsaved changes" : "Save to the current file (Ctrl+S)";
+    b.setAttribute("aria-label", wfDirty ? "Save workflow — unsaved changes" : "Save workflow"); }
+  const state=$("wf-save-state");
+  if(state){ state.textContent=wfDirty ? "Unsaved changes" : (wfHasFile ? "Saved" : "Not saved"); state.classList.toggle("dirty",wfDirty); }
 }
 function wfMarkDirty(){
   wfDirty=true; wfSyncDirtyUI();
@@ -368,15 +371,18 @@ async function wfSave(){
   wfSaving=true;
   const btn=$("wf-save-btn"), oldTitle=btn&&btn.title;
   if(btn){ btn.disabled=true; btn.classList.add("saving"); btn.setAttribute("aria-busy","true"); btn.title="Saving workflow…"; }
+  const state=$("wf-save-state"); if(state){ state.textContent="Saving…"; state.classList.add("saving"); }
   try{
     const r=await api().workflow_save(JSON.stringify(wfSerialize(),null,2), $("wf-name").value);
     if(r&&r.ok){ wfHasFile=true; wfMarkClean(); setStatus("Workflow saved"); uiToast("Workflow saved","success",{dur:1600}); }
-    else uiToast("Save failed - check the log for details.","error");
+    else { if(state){ state.textContent="Unsaved changes"; state.classList.add("dirty"); } uiToast("Save failed - check the log for details.","error"); }
   }catch(e){
+    if(state){ state.textContent="Unsaved changes"; state.classList.add("dirty"); }
     uiToast("Save failed - "+String(e&&e.message||e||"unknown error"),"error");
   }finally{
     wfSaving=false;
-    if(btn){ btn.disabled=false; btn.classList.remove("saving"); btn.removeAttribute("aria-busy"); btn.title=oldTitle||"Save workflow"; }
+    if(btn){ btn.disabled=false; btn.classList.remove("saving"); btn.removeAttribute("aria-busy"); wfSyncDirtyUI(); }
+    if(state) state.classList.remove("saving");
   }
 }
 async function wfImport(){
