@@ -103,6 +103,9 @@ _TEMPLATE_PARAM_KEYS = ("template",)
 # Node params whose value is a *list* of template paths (``t:"tpls"`` fields —
 # the "…_any" multi-image OR nodes; key "templates").
 _TEMPLATE_LIST_PARAM_KEYS = ("templates", "images")
+# How long Start game waits for a freshly-booted emulator's ADB before giving
+# up (a cold LDPlayer/MuMu boot can take a minute or more).
+_START_GAME_ADB_WAIT = 180.0
 
 
 def _sanitize_name(raw: str) -> str:
@@ -345,6 +348,10 @@ class WorkflowDesignerAPI:
         # it owns its own manager/retry-thread rather than riding the engine run.
         self._sh_mgr: Optional[FridaSpeedhackManager] = None
         self._sh_stop: Optional[threading.Event] = None
+
+        # "Start game" runs on its own worker (emulator boot can take minutes);
+        # the flag keeps a second click from starting a parallel boot.
+        self._game_launching = False
 
     # ── Setup ────────────────────────────────────────────────────────────────
 
@@ -1940,6 +1947,221 @@ class WorkflowDesignerAPI:
         if self._engine:
             self._engine.stop()
         self._push("workflow_state", {"running": False})
+        return True
+
+    # ── Start game ───────────────────────────────────────────────────────────
+    # The toolbar 🚀 action: boot whatever Project settings point at, without
+    # running the workflow graph. Win32 → launch the project game .exe and
+    # attach the preview window; ADB → boot the configured emulator instance,
+    # connect its ADB, then launch the project package.
+
+    def start_game(self, flow_json: str) -> dict:
+        try:
+            flow = json.loads(flow_json)
+        except Exception as exc:
+            log_error(f"Invalid workflow JSON: {exc}")
+            return {"ok": False, "error": str(exc)}
+        if self._engine is not None and self._engine.is_running():
+            msg = "A workflow test run is in progress — stop it first"
+            log_warning(msg)
+            return {"ok": False, "error": msg}
+        if self._game_launching:
+            msg = "The game is already starting"
+            log_warning(msg)
+            return {"ok": False, "error": msg}
+        self._game_launching = True
+        self._push("game_launch", {"starting": True})
+        threading.Thread(target=self._start_game_worker, args=(flow,), daemon=True).start()
+        return {"ok": True}
+
+    def _start_game_worker(self, flow: dict) -> None:
+        ok = False
+        try:
+            ok = (self._start_game_win32(flow) if self._flow_is_win32(flow)
+                  else self._start_game_adb(flow))
+        except Exception as exc:
+            log_error(f"Start game failed: {exc}")
+        self._game_launching = False
+        self._push("game_launch", {"starting": False, "ok": ok})
+
+    def _start_game_win32(self, flow: dict) -> bool:
+        """Launch the project game .exe and attach the Preview controller."""
+        cfg = flow.get("win32") if isinstance(flow, dict) else {}
+        cfg = cfg if isinstance(cfg, dict) else {}
+        path = str(cfg.get("path") or "").strip()
+        if not path:
+            log_error("No game path — set Game path (.exe) in Project settings")
+            return False
+        if not os.path.isfile(path):
+            log_error(f"Game not found at '{path}' — check Game path in Project settings")
+            return False
+        try:
+            from src.core.win32 import Win32Controller
+            if self._win32 is None:
+                self._win32 = Win32Controller(cfg)
+            else:
+                self._win32.configure(cfg)
+            ctrl = self._win32
+        except Exception as exc:
+            log_error(f"Win32 controller error: {exc}")
+            return False
+        log_info(f"▶ Starting game: {path}")
+        if not ctrl.launch_app(path):
+            return False
+        # Attach: poll the configured window pattern while the game opens — a
+        # "pid" target is stale by definition after a fresh launch, so it (and
+        # an empty target) binds the window the launched process just opened.
+        # attach() runs the exe-name fallback + bridge check on a pattern hit.
+        pattern, by, _mode = ctrl._match
+        use_pattern = bool(pattern) and by != "pid"
+        pid = getattr(ctrl, "last_launch_pid", None)
+        end = time.time() + 20.0
+        hwnd = None
+        while time.time() < end and not self._closing:
+            hwnd = (ctrl._find_hwnd(pattern, by) if use_pattern
+                    else ctrl.find_window_by_pid(pid))
+            if hwnd:
+                break
+            time.sleep(0.5)
+        if hwnd and use_pattern:
+            ctrl.attach()  # re-binds + logs the window title
+        elif hwnd:
+            ctrl.hwnd = hwnd
+            try:
+                title = ctrl._w[1].GetWindowText(hwnd) or ""
+            except Exception:
+                title = ""
+            log_success(f"🪟 Window '{title or 'game'}' opened and attached")
+        elif pattern:
+            ctrl.attach()  # one noisy attempt: warning + exe-name fallback
+            if not ctrl.device:
+                log_warning("The game may still be loading — Preview attaches when its window appears")
+        else:
+            log_success("Game started — set a Target window in Project settings so Preview can capture it")
+        # unity_bridge input needs the plugin DLL inside the new process — a
+        # plain launch leaves it out and every in-game tap silently no-ops.
+        # Inject once the window is up; the retry loop gives the runtime a
+        # moment to finish init. A failure warns but the launch still counts.
+        if ctrl.device and _mode == "unity_bridge":
+            try:
+                from src.core.win32 import unity_bridge
+                port = int(cfg.get("bridgePort") or unity_bridge.DEFAULT_PORT)
+                res = {}
+                for _try in range(4):
+                    res = unity_bridge.ensure_injected(path, port, pid)
+                    if res.get("ok"):
+                        log_success("Unity Bridge injected — in-game input is live")
+                        break
+                    if _try < 3:
+                        time.sleep(2.0)
+                if not res.get("ok"):
+                    log_warning(
+                        f"Unity Bridge not injected: {res.get('error') or 'unknown'} "
+                        "— Project settings → Unity Bridge can deploy it")
+            except Exception as exc:
+                log_warning(f"Unity Bridge inject failed: {exc}")
+        return True
+
+    def _start_game_adb(self, flow: dict) -> bool:
+        """Boot the project's emulator instance, connect it, launch the package."""
+        emu = flow.get("emulator") if isinstance(flow, dict) else {}
+        emu = emu if isinstance(emu, dict) else {}
+        package = str((flow or {}).get("package") or "").strip()
+        kind = str(emu.get("kind") or "ldplayer").strip().lower() or "ldplayer"
+        try:
+            index = max(0, int(float(emu.get("index", 0) or 0)))
+        except (TypeError, ValueError):
+            index = 0
+        path = str(emu.get("path") or "").strip()
+
+        if self._engine is None:
+            self._engine = WorkflowEngine()
+        eng = self._engine
+        # Reuse the engine's family/port tables + console helpers; load() gives
+        # it the project's emulator/package config so _emu_cfg resolves like a
+        # test run. Clear _stop/_pause so a stopped run can't cut the wait short.
+        anchor = self._wf_path or os.path.join(_PROJECT_ROOT, "flow.json")
+        eng.load(flow, flow_path=anchor)
+        eng._stop.clear()
+        eng._pause.set()
+
+        # The port is derivable for every family in EMULATOR_CONSOLES
+        # (port0 + index*step); when the console can report the real port the
+        # resolver refines it while waiting (MuMu Global deviates).
+        p = {"path": path, "index": index}
+        port = eng._emulator_adb_port(p, kind, index)
+        host = f"127.0.0.1:{port}" if port else None
+
+        if host and eng._emulator_adb_ready(host):
+            log_info(f"Emulator {kind} #{index} already running ({host})")
+        else:
+            argv = eng._emulator_launch_argv(p, kind, index)
+            if not argv:
+                log_error(
+                    f"Could not build the launch command for '{kind}' — set the "
+                    "emulator Install folder in Project settings")
+                return False
+            try:
+                log_info(f"▶ Starting emulator: {' '.join(argv)}")
+                subprocess.Popen(
+                    argv,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+                )
+            except Exception as exc:
+                log_error(f"Couldn't start the emulator: {exc}")
+                return False
+            host = eng._wait_emulator_adb(
+                port, _START_GAME_ADB_WAIT,
+                resolver=lambda: eng._emulator_adb_port(p, kind, index))
+            if not host:
+                log_error(
+                    f"Emulator {kind} #{index} didn't come up in "
+                    f"{_START_GAME_ADB_WAIT:.0f}s — try Start game again once it boots")
+                return False
+        try:
+            port = int(host.rsplit(":", 1)[1])
+        except (IndexError, ValueError):
+            pass
+
+        # Same bookkeeping a launch_emulator node does, so if_emulator's
+        # "last used" target finds this instance on the next run.
+        eng._save_emulator_state({
+            "emulator": kind,
+            "index": index,
+            "instance": "",
+            "path": path,
+            "port": port,
+            "serial": host,
+            "launched_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
+        # Hand the booted instance to the designer — the picker, Preview and the
+        # next test run all point at it.
+        self.select_device(host)
+        end = time.time() + 20.0
+        while time.time() < end and not self._closing:
+            if self.controller.device is not None and self.controller.device_id == host:
+                break
+            time.sleep(0.5)
+        if not (self.controller.device is not None and self.controller.device_id == host):
+            log_warning(
+                f"Emulator is up on {host} but the designer couldn't attach — "
+                "select it in the device picker")
+
+        if not package:
+            log_success("Emulator ready — no Package name in Project settings, nothing to launch")
+            return True
+        log_info(f"▶ Launching {package}…")
+        try:
+            if not self.controller.launch_app(package):
+                return False
+        except Exception as exc:
+            log_error(f"Couldn't launch {package}: {exc}")
+            return False
+        log_success(f"Game launched: {package} on {host}")
+        # Refresh the picker now so the new serial shows as connected without
+        # waiting for the next 5s poll.
+        self._device_worker()
         return True
 
     def _bind_workflow_callbacks(self) -> None:

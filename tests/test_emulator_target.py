@@ -213,6 +213,50 @@ class TestResolveSelectedEmulator(unittest.TestCase):
         self.assertEqual((kind, index), ("ldplayer", 1))
 
 
+class TestEmulatorIndex(unittest.TestCase):
+    """``_emulator_index`` — the shared project index vs a node's own."""
+
+    def setUp(self):
+        self.eng = _StubEngine()
+
+    def test_project_index_wins_over_the_node(self):
+        self.eng._emu_cfg = {"index": 2}
+        self.assertEqual(self.eng._emulator_index({"index": 5}), 2)
+
+    def test_custom_source_uses_the_node(self):
+        self.eng._emu_cfg = {"index": 2}
+        self.assertEqual(
+            self.eng._emulator_index({"pathSrc": "custom", "index": 5}), 5)
+
+    def test_missing_project_index_falls_back_to_the_node(self):
+        # Files saved before the project index existed keep booting the
+        # instance their launch node was built for.
+        self.assertEqual(self.eng._emulator_index({"index": 3}), 3)
+        self.eng._emu_cfg = {"index": ""}
+        self.assertEqual(self.eng._emulator_index({"index": 3}), 3)
+
+    def test_missing_everything_is_zero(self):
+        self.assertEqual(self.eng._emulator_index({}), 0)
+        self.assertEqual(self.eng._emulator_index(None), 0)
+
+    def test_bad_values_and_negatives_normalize(self):
+        self.eng._emu_cfg = {"index": "abc"}
+        self.assertEqual(self.eng._emulator_index({"index": 1}), 0)
+        self.eng._emu_cfg = {"index": -4}
+        self.assertEqual(self.eng._emulator_index({}), 0)
+
+    def test_set_emulator_config_index(self):
+        eng = _StubEngine()
+        eng.flow = {}
+        eng.set_emulator_config("mumu", r"D:\MuMu", 3)
+        self.assertEqual(eng._emu_cfg["index"], 3)
+        self.assertEqual(eng.flow["emulator"]["index"], 3)
+        # index=None keeps the stored index — a kind/path edit doesn't reset it.
+        eng.set_emulator_config("nox", r"D:\Nox")
+        self.assertEqual(eng._emu_cfg["index"], 3)
+        self.assertEqual(eng.flow["emulator"]["index"], 3)
+
+
 class TestPcTargetRouting(unittest.TestCase):
     """``_emulator_pc_target`` sends "selected" down the new path and nothing else."""
 

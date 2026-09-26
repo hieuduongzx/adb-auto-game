@@ -376,11 +376,19 @@ class ADBGameAutomation:
         multi_scale: Optional[bool] = None,
         last_screen: bool = False,
         region: Optional[Tuple[int, int, int, int]] = None,
+        screen: Optional[np.ndarray] = None,
     ) -> Optional[Tuple[int, int, float]]:
-        """Find template in screen"""
+        """Find template in screen
+
+        ``screen``: an already-captured frame to match against. Multi-template
+        callers (``_wait_any``) capture once per round and pass the same frame
+        to every probe, so each template is judged on the same pixels instead
+        of paying — and racing — a capture per template.
+        """
         threshold = self._resolve_threshold(threshold)
 
-        screen = self.get_latest_screen() if last_screen else self.capture_screen()
+        if screen is None:
+            screen = self.get_latest_screen() if last_screen else self.capture_screen()
         if screen is None:
             return None
 
@@ -441,9 +449,16 @@ class ADBGameAutomation:
         template_path: str,
         threshold: float = 0.8,
         use_grayscale: bool = False,
+        screen: Optional[np.ndarray] = None,
     ) -> List[Tuple[int, int, float]]:
-        """Find all instances of template in screen"""
-        screen = self.get_latest_screen()
+        """Find all instances of template in screen
+
+        ``screen``: explicit frame to search. Without one this reads
+        ``latest_screen`` — which is only refreshed by the continuous-capture
+        thread, so callers that need the frame *they* just captured should
+        pass it rather than relying on capture timing."""
+        if screen is None:
+            screen = self.get_latest_screen()
         if screen is None:
             return []
         

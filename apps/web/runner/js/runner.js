@@ -11,7 +11,7 @@ const S = {
   controller:      "adb",
   win32:           {},
   bridge:          null,  // unity_bridge plugin status {port, ok, reply} | null
-  emulator:        {},   // shared ADB emulator setting {kind, path}
+  emulator:        {},   // shared ADB emulator setting {kind, path, index}
   emulatorDefault: {},   // as shipped by the workflow (what "clear" falls back to)
   logCount:        0,
   logTotal:        0,      // every line received this session (the DOM keeps the newest 500)
@@ -521,17 +521,30 @@ function paintRow(a, row){
   if(meta) renderMeta(meta, a, st, inRun);
 }
 
+// How many knobs the settings gear exposes: the activity's own variables
+// (nested children and option-gated children count too), machine paths, and
+// the background schedule. Attempts is a Runner setting — not counted.
+function countActivitySettings(a){
+  let n = (a.runtimeSettings||[]).length + (a.type==="background" ? 1 : 0);
+  const walk = list => (list||[]).forEach(v=>{
+    if(!v || !v.name) return;
+    n++; walk(v.children);
+    Object.values(v.optionChildren||{}).forEach(walk);
+  });
+  walk(a.vars);
+  return n;
+}
+
 // Second line under the activity name: status word, then its settings summary.
 function renderMeta(el, a, st, inRun){
   const parts = [];
-  if(a.type==="background"){
-    if(st==="active") parts.push('<span class="act-st st-active">Active</span>');
-    else if(ACT_ST_LABEL[st]) parts.push(`<span class="act-st st-${st}">${ACT_ST_LABEL[st]}</span>`);
-    parts.push(`Every ${Number(a.pollInterval)||1}s`);
-  } else {
-    if(ACT_ST_LABEL[st]) parts.push(`<span class="act-st st-${st}">${ACT_ST_LABEL[st]}</span>`);
-    if(a.maxRetries > 1) parts.push(`${a.maxRetries} attempts`);
-  }
+  // The checkbox already carries enabled/disabled — only narrate run states.
+  const stWord = (st==="enabled" || st==="disabled") ? null : ACT_ST_LABEL[st];
+  if(stWord) parts.push(`<span class="act-st st-${st}">${stWord}</span>`);
+  const nSettings = countActivitySettings(a);
+  if(nSettings) parts.push(`${nSettings} setting${nSettings===1?"":"s"}`);
+  if(a.type==="background") parts.push(`Every ${Number(a.pollInterval)||1}s`);
+  else if(a.maxRetries > 1) parts.push(`${a.maxRetries} attempts`);
   el.innerHTML = parts.join('<span class="sep" aria-hidden="true">·</span>');
 }
 
@@ -1237,11 +1250,13 @@ async function onGamePathPick(){
 // Used by Launch / Resize / Kill / Restart emulator blocks set to "Project
 // emulator setting"; a node on "Custom" keeps its own path control.
 function renderEmulator(emu){
-  S.emulator = Object.assign({kind:"ldplayer", path:""}, emu || {});
+  S.emulator = Object.assign({kind:"ldplayer", path:"", index:0}, emu || {});
   const sel = $("emu-kind");
   if(sel && document.activeElement !== sel) sel.value = S.emulator.kind || "ldplayer";
   const inp = $("emu-path");
   if(inp && document.activeElement !== inp){ inp.value = S.emulator.path || ""; inp.title = S.emulator.path || ""; }
+  const idx = $("emu-index");
+  if(idx && document.activeElement !== idx) idx.value = Math.max(0, parseInt(S.emulator.index, 10) || 0);
   const note = $("emu-note");
   if(note){
     const def = S.emulatorDefault || {};
@@ -1256,6 +1271,13 @@ async function onEmulatorKindChange(value){
   const old = S.emulator || {};
   let res = null;
   try{ res = await api().set_emulator(value, old.path || ""); }catch(_){ }
+  renderEmulator(res && res.ok ? res.emulator : old);
+}
+async function onEmulatorIndexChange(value){
+  const old = S.emulator || {};
+  const v = Math.max(0, parseInt(value, 10) || 0);
+  let res = null;
+  try{ res = await api().set_emulator(old.kind || "ldplayer", old.path || "", v); }catch(_){ }
   renderEmulator(res && res.ok ? res.emulator : old);
 }
 async function onEmulatorPathChange(value){

@@ -10,8 +10,8 @@
   --primitive-neutral-50: #eef1f5;
   --primitive-neutral-75: #eef2f6;
   --primitive-neutral-100: #dde3ea;
-  --primitive-neutral-150: #dbe2ec;
-  --primitive-neutral-200: #cbd7e6;
+  --primitive-neutral-150: #d3dbe7;
+  --primitive-neutral-200: #c2cddc;
   --primitive-neutral-600: #5b6675;
   --primitive-neutral-700: #4d5a69;
   --primitive-neutral-800: #2e3a49;
@@ -40,13 +40,16 @@
   --semantic-accent-bg: var(--primitive-blue-50);
   --semantic-accent-border: var(--primitive-blue-200);
 
-  /* Layer 3 — shared component metrics. Docked work areas are square; only
-     transient overlays receive a slight radius. */
+  /* Layer 3 — shared component metrics. Soft but crisp: every control and
+     panel carries a gentle corner, overlays sit one step rounder, and nested
+     elements take a smaller radius than their container (concentric curves).
+     Docked chrome (header/footer bars, sidebar panes flush to the window
+     edge) still overrides to 0 locally — a radius on a flush edge opens a gap. */
   --component-control-height: 34px;
   --component-control-height-sm: 30px;
-  --component-control-radius: 2px;
-  --component-panel-radius: 0px;
-  --component-overlay-radius: 2px;
+  --component-control-radius: 6px;
+  --component-panel-radius: 10px;
+  --component-overlay-radius: 12px;
   --component-divider-width: 1px;
 
   /* Compatibility aliases retained for existing app styles. */
@@ -126,9 +129,10 @@
   --t-head: 19px;      /* app title in a header card */
   --t-display: 22px;   /* hero numbers, empty-state headline */
 
-  /* Compatibility shape aliases resolve to the square workbench metrics.
-     Circular status dots and binary switches may still use 50%/999px. */
-  --r-xs: var(--component-control-radius);
+  /* Shape ladder — micro chrome (badges, keycaps, count chips, checkboxes)
+     stays tighter than the controls it decorates; binary switches and
+     progress tracks use 999px pills, and status lamps are circular dots. */
+  --r-xs: 4px;
   --r-sm: var(--component-control-radius);
   --r-md: var(--component-panel-radius);
   --r-lg: var(--component-overlay-radius);
@@ -166,16 +170,19 @@
    setting data-theme="dark" on <html>. */
 :root[data-theme="dark"] {
   --semantic-app-bg: var(--primitive-neutral-950);
-  --semantic-panel-bg: #1e242e;
+  --semantic-panel-bg: #1f2630;
   --semantic-surface-bg: var(--primitive-neutral-925);
-  --semantic-surface-muted: #2a3240;
-  --semantic-border: #333d4c;
-  --semantic-border-strong: #414c5e;
-  --semantic-divider: #272f3b;
-  --semantic-text: #e8edf4;
-  --semantic-text-secondary: #c3ccd9;
-  --semantic-text-dim: #9aa7b8;
-  --semantic-text-muted: #7d8a9d;
+  --semantic-surface-muted: #2b3341;
+  --semantic-border: #3d4857;
+  --semantic-border-strong: #525e72;
+  --semantic-divider: #2a333f;
+  /* Text sits a notch below near-white — #e8edf4 on the near-black app bg is
+     ~16:1 and halates (glare on thin strokes); ~13:1 keeps AAA without the glow.
+     Dim/muted go the other way: they were too faint to read comfortably. */
+  --semantic-text: #d9e0ea;
+  --semantic-text-secondary: #c7cfdb;
+  --semantic-text-dim: #a4b1c1;
+  --semantic-text-muted: #8b97a9;
   --semantic-accent: #6aa1ff;
   --semantic-accent-hover: #8ab4ff;
   --semantic-accent-bg: rgba(106, 161, 255, .16);

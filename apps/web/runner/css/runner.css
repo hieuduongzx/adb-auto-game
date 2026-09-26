@@ -48,7 +48,10 @@ input { caret-color: var(--accent); text-align: center; }
 /* ── App frame ─────────────────────────────────────────────────────────── */
 /* Compact Pro: spend the window on activities and output, not outer chrome. */
 #app { padding: 0; gap: 0; }
-#header-card, #pane-left, #pane-right, #preview-card, #footer { border-radius: 0; box-shadow: none; }
+/* Flush chrome (header strip, pane shells, footer) stays square — it touches
+   the window edge, where a radius only opens a gap. #preview-card is an inset
+   card inside the pane's padding, so it keeps the shared panel radius. */
+#header-card, #pane-left, #pane-right, #footer { border-radius: 0; box-shadow: none; }
 
 /* Split body: a little more room for long activity names, while the log remains
    the larger workspace. Six-pixel gutters keep both columns visually related. */
@@ -103,7 +106,7 @@ input { caret-color: var(--accent); text-align: center; }
   text-overflow: ellipsis;
 }
 .app-title.empty { color: var(--muted); }
-.app-subtitle { font-size: var(--t-caption); color: var(--muted); margin-top: 2px; }
+.app-subtitle { font: 600 var(--t-micro)/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
 
 /* Update available (header) — opens the Updates card in Settings. */
 .update-pill {
@@ -114,7 +117,7 @@ input { caret-color: var(--accent); text-align: center; }
 .update-pill:hover { filter: brightness(1.05); }
 .update-pill[hidden] { display: none; }
 
-/* Status pill — square, semantic tint only */
+/* Status pill — rounded chip, semantic tint only */
 #status-pill {
   display: flex; align-items: center; gap: 7px;
   min-height: 26px; padding: 4px 8px; border-radius: var(--r-sm);
@@ -122,7 +125,7 @@ input { caret-color: var(--accent); text-align: center; }
   border: 1px solid var(--status-border, var(--border));
 }
 #status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; transition: background .3s; }
-#status-text { font-size: var(--t-caption); font-weight: 600; letter-spacing: .025em; white-space: nowrap; }
+#status-text { font-family: var(--mono); font-size: var(--t-micro); font-weight: 700; letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; }
 .status-ready   { background: var(--surface); }
 .status-running, .status-done { background: var(--ok-bg); --status-border: var(--ok-bd); }
 .status-paused, .status-stopped { background: var(--warn-bg); --status-border: var(--warn-bd); }
@@ -137,7 +140,7 @@ input { caret-color: var(--accent); text-align: center; }
 .status-failed #status-text { color: var(--err); }
 
 /* A calm, scannable terminal result; it stays visible until the next run. */
-.run-outcome { grid-column:1 / -1; display:flex; align-items:center; gap:7px; min-height:28px; padding:4px 9px; border:1px solid var(--border); border-radius:0; font-size:var(--t-caption); }
+.run-outcome { grid-column:1 / -1; display:flex; align-items:center; gap:7px; min-height:28px; padding:4px 9px; border:1px solid var(--border); border-radius:var(--r-sm); font-size:var(--t-caption); }
 .run-outcome[hidden] { display:none; }
 .outcome-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; background:var(--muted); }
 .outcome-text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -152,12 +155,12 @@ input { caret-color: var(--accent); text-align: center; }
 
 /* Progress bar */
 #header-progress { grid-column:1 / -1; display: flex; align-items: center; gap: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--line); }
-.prog-count { font-size: var(--t-caption); font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums; min-width: 28px; flex-shrink: 0; }
+.prog-count { font-family: var(--mono); font-size: var(--t-caption); font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums; min-width: 28px; flex-shrink: 0; }
 .queue-summary, .queue-current { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-caption); color: var(--muted); }
 .queue-summary { max-width: 170px; }
 .queue-current { max-width: 230px; color: var(--dim); }
-.prog-bar-track { flex: 1; height: 6px; border-radius: var(--r-xs); background: var(--track); overflow: hidden; }
-.prog-bar-fill { height: 100%; border-radius: var(--r-xs); background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
+.prog-bar-track { flex: 1; height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.prog-bar-fill { height: 100%; border-radius: 999px; background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
 .prog-elapsed { font-family: var(--mono); font-size: var(--t-ui); font-weight: 500; color: var(--dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
 /* Control buttons */
@@ -176,14 +179,14 @@ input { caret-color: var(--accent); text-align: center; }
 /* ── Tabs — segmented control (operator console) ───────────────────────── */
 #tabs-bar {
   display: flex; align-items: center; gap: 0; flex-shrink: 0;
-  background: var(--alt); border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--alt); border: 1px solid var(--border); border-radius: var(--r-sm);
   padding: 2px; gap: 2px; overflow: hidden;
 }
 .tab-btn {
-  flex: 1; justify-content: center; padding: 7px 9px; border-radius: var(--r-sm);
+  flex: 1; justify-content: center; padding: 7px 9px; border-radius: var(--r-xs);
   border: none; color: var(--dim);
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: var(--t-body); font-weight: 600;
+  font-size: var(--t-caption); font-weight: 700;
   transition: background .12s, color .12s;
 }
 .tab-btn::after { left: 10px; right: 10px; }
@@ -199,7 +202,7 @@ input { caret-color: var(--accent); text-align: center; }
 
 /* The tab already names the list, so the header carries "3 of 5 enabled". */
 .list-header { display: flex; align-items: center; gap: 4px; padding: 0 2px; min-height: 24px; flex-shrink: 0; }
-.list-label { font-size: var(--t-caption); font-weight: 600; letter-spacing: 0; color: var(--dim); text-transform: none; flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
+.list-label { font-family: var(--mono); font-size: var(--t-micro); font-weight: 700; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
 .btn-sel { font-size: var(--t-ui); font-weight: 600; padding: 3px 8px; border-radius: var(--r-sm); color: var(--accent); transition: background .1s; }
 .btn-sel:hover { background: var(--accent-bg); }
 .btn-sel.none { color: var(--muted); }
@@ -248,7 +251,7 @@ input { caret-color: var(--accent); text-align: center; }
 .act-st.st-failed { color: var(--err); }
 
 /* Status dot (per-activity) */
-.act-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--dot-off); transition: background .2s; }
+.act-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--dot-off); transition: background .2s; }
 .act-dot-pending, .act-dot-disabled { background: var(--dot-off); }
 .act-dot-enabled { background: var(--accent); }
 .act-dot-running, .act-dot-paused { background: var(--ok); animation: actPulse 1.8s ease-in-out infinite; }
@@ -281,14 +284,15 @@ input { caret-color: var(--accent); text-align: center; }
 /* ── Right column: 3 tabs + preview ────────────────────────────────────── */
 #r-tabs {
   display: flex; align-items: stretch; flex-shrink: 0;
-  background: var(--alt); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
+  background: var(--alt); border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden;
   padding: 2px; gap: 2px;
 }
 .rtab {
   flex: 1; justify-content: center; min-width: 0; padding: 7px 9px;
-  border: none; border-radius: var(--r-sm);
+  border: none; border-radius: var(--r-xs);
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: var(--t-body); font-weight: 600; color: var(--dim);
+  font-size: var(--t-caption); font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transition: background .12s, color .12s;
 }
@@ -312,13 +316,13 @@ input { caret-color: var(--accent); text-align: center; }
 .diag-list dt { color: var(--muted); font-size: var(--t-caption); }
 .diag-list dd { min-width: 0; overflow-wrap: anywhere; user-select: text; }
 .diag-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
-.rpane-title { font-size: var(--t-body); font-weight: 600; color: var(--ink); }
+.rpane-title { font-size: var(--t-caption); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
 .rpane-sp { flex: 1; }
 .rpane-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s3) var(--s4); display: flex; flex-direction: column; gap: var(--s2); }
 
 /* Activity settings pane */
 .act-set-hd { display: flex; align-items: center; gap: 6px; padding: 7px 7px 7px 10px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
-.act-set-title { flex: 1; min-width: 0; font-size: var(--t-body); font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.act-set-title { flex: 1; min-width: 0; font-size: var(--t-caption); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .act-set-back { display: none; align-items: center; gap: 4px; padding: 4px 6px; border-radius: var(--r-sm); color: var(--accent); font-size: var(--t-caption); font-weight: 600; }
 .activity-save-status { flex-shrink: 0; font-size: var(--t-caption); color: var(--muted); }
 .activity-save-status.ok { color: var(--ok-ink); }
@@ -339,8 +343,8 @@ input { caret-color: var(--accent); text-align: center; }
    card is absolutely positioned against #main-split (its [data-pnl-stage]). */
 #preview-card.is-max { position: absolute; inset: 0; z-index: 40; }
 .pv-hd { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 13px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
-.pv-title { font-size: var(--t-body); font-weight: 600; color: var(--ink); }
-.pv-state { font-size: var(--t-micro); color: var(--muted); }
+.pv-title { font-size: var(--t-caption); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+.pv-state { font-family: var(--mono); font-size: var(--t-micro); letter-spacing: .04em; color: var(--muted); }
 .pv-sp { flex: 1; }
 .pv-btn { width: 26px; height: 26px; border-radius: var(--r-sm); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .12s, color .12s; }
 .pv-btn:hover { background: var(--alt); color: var(--dim); }
@@ -396,7 +400,7 @@ input { caret-color: var(--accent); text-align: center; }
 .upd-status { margin: 0; font-size: var(--t-caption); color: var(--dim); line-height: 1.45; }
 .upd-bar { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .upd-bar[hidden] { display: none; }
-.upd-bar-fill { height: 100%; width: 100%; transform: scaleX(0); transform-origin: left; background: var(--ok); transition: transform .2s ease; }
+.upd-bar-fill { height: 100%; width: 100%; border-radius: 999px; transform: scaleX(0); transform-origin: left; background: var(--ok); transition: transform .2s ease; }
 .upd-bar.indet .upd-bar-fill { width: 35%; animation: updSweep 1.1s ease-in-out infinite; }
 @keyframes updSweep { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 .upd-actions { display: flex; gap: 7px; flex-wrap: wrap; }
@@ -441,16 +445,16 @@ input { caret-color: var(--accent); text-align: center; }
 .req-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* Treat the path and its picker as one composed control. */
-.setting-path-control { padding: 3px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
+.setting-path-control { padding: 3px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); }
 .setting-path-control:focus-within { border-color: var(--accent-bd); box-shadow: 0 0 0 2px var(--accent-bg); }
 .setting-path-input { border-color: transparent; background: transparent; }
 .setting-path-input:focus { outline: none; border-color: transparent; box-shadow: none; }
 .btn-path-pick { height: 30px; }
 
-/* Toggle switch (square operator-console variant) */
-.toggle { width: 38px; height: 22px; border-radius: var(--r-sm); background: var(--dot-off); flex-shrink: 0; position: relative; transition: background .2s; cursor: pointer; }
+/* Toggle switch — rounded track + round thumb, like the shared .swx. */
+.toggle { width: 38px; height: 22px; border-radius: 999px; background: var(--dot-off); flex-shrink: 0; position: relative; transition: background .2s; cursor: pointer; }
 .toggle.on { background: var(--accent); }
-.toggle::after { content: ''; position: absolute; width: 18px; height: 18px; border-radius: var(--r-xs); background: var(--on-accent); top: 2px; left: 2px; transition: transform .2s var(--ease-out); }
+.toggle::after { content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--on-accent); top: 2px; left: 2px; transition: transform .2s var(--ease-out); }
 .toggle.on::after { transform: translateX(16px); }
 .toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -477,10 +481,11 @@ input { caret-color: var(--accent); text-align: center; }
 .log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px 9px; background: var(--runner-log-bg); color: var(--runner-log-ink); user-select: text; scrollbar-color: #566170 var(--runner-log-bg); }
 .log-body:empty { display: flex; align-items: center; justify-content: center; padding: var(--s6); }
 .log-body:empty::before { content: "No output yet. Lines appear here once a run starts."; max-width: 260px; text-align: center; font-family: var(--sans); font-size: var(--t-caption); line-height: 1.5; color: var(--runner-log-muted); }
-.log-line { display: flex; gap: 7px; padding: 3px 0; border-bottom: 1px solid var(--runner-log-line); font-family: var(--mono); font-size: var(--t-ui); line-height: 1.6; white-space: nowrap; }
+.log-line { display: flex; gap: 7px; padding: 3px 0 3px 8px; border-left: 2px solid transparent; border-bottom: 1px solid var(--runner-log-line); font-family: var(--mono); font-size: var(--t-ui); line-height: 1.6; white-space: nowrap; }
 .log-line:last-child { border-bottom: 0; }
-.log-line.lv-error { background: var(--runner-log-error-bg); }
-.log-line.lv-warning { background: var(--runner-log-warning-bg); }
+.log-line.lv-error { background: var(--runner-log-error-bg); border-left-color: #ef8b84; }
+.log-line.lv-warning { background: var(--runner-log-warning-bg); border-left-color: #e2ba64; }
+.log-line.k-run, .log-line.k-activity { border-left-color: #79aaff; }
 .log-line.lv-error .log-ts { color: #ef8b84; }
 .log-line.lv-warning .log-ts { color: #e2ba64; }
 .log-line.hidden { display: none; }
@@ -531,7 +536,7 @@ input { caret-color: var(--accent); text-align: center; }
   .header-btns { order:1; }
   .app-icon { width: 36px; height: 36px; border-radius: var(--r-md); }
   #mobile-tabs { display: flex; flex-shrink: 0; padding: 0; gap: var(--s3); border-bottom: 1px solid var(--border2); }
-  .mobile-tab { flex: 1; min-width: 0; padding: 10px 6px; border-bottom: 2px solid transparent; color: var(--dim); font-size: var(--t-body); font-weight: 600; }
+  .mobile-tab { flex: 1; min-width: 0; padding: 10px 6px; border-bottom: 2px solid transparent; color: var(--dim); font-size: var(--t-caption); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
   .mobile-tab:hover { color: var(--runner-selected-ink); background: var(--accent-bg); }
   .mobile-tab.active { color: var(--runner-selected-ink); border-bottom-color: var(--accent); }
   .mobile-tab:focus-visible { outline-offset: -3px; }
@@ -581,7 +586,7 @@ input { caret-color: var(--accent); text-align: center; }
   background-position: right 6px center;
 }
 #capture-backend { max-width: 88px; }
-.footer-lbl { font-size: var(--t-micro); font-weight: 700; color: var(--muted); white-space: nowrap; }
+.footer-lbl { font-family: var(--mono); font-size: var(--t-micro); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
 #win32-target { font-size: var(--t-caption); font-family: var(--mono); color: var(--dim); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #win32-target.empty { color: var(--muted); font-style: italic; }
 .btn-refresh { width: 28px; height: 28px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--panel); color: var(--dim); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .1s; }

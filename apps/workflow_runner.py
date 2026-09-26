@@ -656,6 +656,12 @@ class WorkflowRunnerAPI:
                 break
         if not str(emu.get("kind") or "").strip():
             emu["kind"] = "ldplayer"
+        # Instance index joined the shared setting later — normalize a missing /
+        # malformed shipped value before snapshotting the workflow default.
+        try:
+            emu["index"] = max(0, int(float(emu.get("index", 0) or 0)))
+        except (TypeError, ValueError):
+            emu["index"] = 0
         self._flow_emulator = dict(emu)
         saved_emu = cfg.get("emulator")
         if isinstance(saved_emu, dict):
@@ -663,6 +669,11 @@ class WorkflowRunnerAPI:
                 emu["kind"] = str(saved_emu.get("kind")).strip()
             if str(saved_emu.get("path") or "").strip():
                 emu["path"] = str(saved_emu.get("path")).strip()
+            if saved_emu.get("index") is not None:
+                try:
+                    emu["index"] = max(0, int(float(saved_emu.get("index"))))
+                except (TypeError, ValueError):
+                    pass
 
     @staticmethod
     def _launch_uses_project_path(node: dict) -> bool:
@@ -1537,9 +1548,11 @@ class WorkflowRunnerAPI:
 
     # ── Shared emulator setting (ADB) ────────────────────────────────────────
 
-    def set_emulator(self, kind: str, path: str) -> dict:
-        """Override the shared emulator family + install folder used by emulator
-        nodes on "Project emulator setting". Returns the effective setting."""
+    def set_emulator(self, kind: str, path: str, index=None) -> dict:
+        """Override the shared emulator family + install folder + instance index
+        used by emulator nodes on "Project emulator setting". ``index=None``
+        keeps the stored index, so a kind/folder edit never resets it.
+        Returns the effective setting."""
         if self.engine.is_running() or not self.flow or self._controller() == "win32":
             return {"ok": False, "emulator": dict(self.flow.get("emulator") or {})}
         kind = str(kind or "").strip().lower()
@@ -1548,7 +1561,15 @@ class WorkflowRunnerAPI:
         if kind not in EMULATOR_KINDS:
             kind = "ldplayer"
         path = str(path or "").strip()
-        self.engine.set_emulator_config(kind, path)
+        idx = None
+        if index is not None:
+            try:
+                idx = max(0, int(float(index)))
+            except (TypeError, ValueError):
+                idx = None
+        self.engine.set_emulator_config(kind, path, idx)
+        cur = self.flow.get("emulator")
+        eff_index = cur.get("index", 0) if isinstance(cur, dict) else 0
         with self._runner_config_lock:
             emu = self._runner_config.get("emulator")
             if not isinstance(emu, dict):
@@ -1556,8 +1577,10 @@ class WorkflowRunnerAPI:
                 self._runner_config["emulator"] = emu
             emu["kind"] = kind
             emu["path"] = path
+            if idx is not None:
+                emu["index"] = idx
             self._save_runner_config()
-        return {"ok": True, "emulator": {"kind": kind, "path": path},
+        return {"ok": True, "emulator": {"kind": kind, "path": path, "index": eff_index},
                 "emulatorDefault": self._flow_emulator}
 
     def pick_emulator_path(self, start: str = "") -> dict:

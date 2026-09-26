@@ -1303,6 +1303,20 @@ class WorkflowEngine:
             log_error(f"Win32 not ready: {e}")
             return False
 
+    def _seq_thread_gone(self) -> bool:
+        """True when no previous sequence thread is still unwinding.
+
+        ``stop()`` only gives the old thread ~1s before reporting stopped; a
+        node blocked in a long ADB call can outlive that. If a new start()
+        cleared ``_stop`` while that thread was still inside a node, it would
+        wake up and keep executing alongside the new run — two walkers driving
+        one device. Give it a short grace join, then refuse."""
+        prev = self._seq_thread
+        if prev is None or prev is threading.current_thread() or not prev.is_alive():
+            return True
+        prev.join(timeout=2.0)
+        return not prev.is_alive()
+
     def start(self, background: bool = True, with_speedhack: bool = True) -> bool:
         """Run all enabled sequence activities once, then start backgrounds.
 
@@ -1312,6 +1326,10 @@ class WorkflowEngine:
         """
         if self.running:
             log_warning("Already running", kind=LOG_KIND_RUN)
+            return False
+        if not self._seq_thread_gone():
+            log_error("Previous run is still unwinding — wait a moment, then run again",
+                      kind=LOG_KIND_RUN)
             return False
         if not self._ensure_ready():
             return False
@@ -1354,6 +1372,10 @@ class WorkflowEngine:
         if self.running:
             log_warning("Already running", kind=LOG_KIND_RUN)
             return False
+        if not self._seq_thread_gone():
+            log_error("Previous run is still unwinding — wait a moment, then run again",
+                      kind=LOG_KIND_RUN)
+            return False
         if not self._ensure_ready():
             return False
         self._stop.clear()
@@ -1388,6 +1410,10 @@ class WorkflowEngine:
         """Run one graph from an arbitrary node, used by designer debug tools."""
         if self.running:
             log_warning("Already running", kind=LOG_KIND_RUN)
+            return False
+        if not self._seq_thread_gone():
+            log_error("Previous run is still unwinding — wait a moment, then run again",
+                      kind=LOG_KIND_RUN)
             return False
         if not self._ensure_ready():
             return False
@@ -2370,34 +2396,45 @@ class WorkflowEngine:
 
     def _find_any(self, templates: List[str], threshold: float, region=None):
         """(x, y) of the first listed template currently on screen, or ``None``.
-        Sequential: stops at the first match (list order is the priority order)."""
+        Sequential: stops at the first match (list order is the priority order).
+        One frame per round: every probe judges the same pixels, and we pay one
+        capture instead of one per template."""
+        if not templates:
+            return None
+        screen = self.auto.capture_screen()
+        if screen is None:
+            self._report_template_match(templates[0], None, threshold, region)
+            return None
         for tpl in templates:
             # report only the winner (or the first miss below)
-            res = self.auto.find_template(tpl, threshold=threshold, region=region)
+            res = self.auto.find_template(tpl, threshold=threshold, region=region, screen=screen)
             if res:
                 self._report_template_match(tpl, res, threshold, region)
                 return (res[0], res[1])
-        if templates:
-            self._report_template_match(templates[0], None, threshold, region)
+        self._report_template_match(templates[0], None, threshold, region)
         return None
 
     def _find_any_parallel(self, templates: List[str], threshold: float, region=None):
         """Check all templates concurrently; return position of whichever matches first.
         Unlike the sequential variant, list order does NOT determine priority —
-        the template actually visible on screen wins."""
+        the template actually visible on screen wins. All probes share one
+        captured frame, so "on screen" is measured on the same snapshot."""
         if not templates:
+            return None
+        screen = self.auto.capture_screen()
+        if screen is None:
             return None
         results: List = []
         lock = threading.Lock()
 
         def check(tpl: str) -> None:
             try:
-                res = self.auto.find_template(tpl, threshold=threshold, region=region)
+                res = self.auto.find_template(tpl, threshold=threshold, region=region, screen=screen)
                 if res:
                     with lock:
                         results.append((tpl, res[0], res[1], res[2]))
-            except Exception:
-                pass
+            except Exception as e:
+                _utils.log_debug(f"[find_any_parallel] {tpl}: {e}")
 
         threads = [threading.Thread(target=check, args=(tpl,), daemon=True)
                    for tpl in templates]
@@ -2673,8 +2710,8 @@ class WorkflowEngine:
         if ntype == "tap_all_images":
             tpl = self._resolve_template(params.get("template", ""))
             threshold = float(params.get("threshold", 0.85))
-            self.auto.capture_screen()  # find_all_templates reads the latest frame
-            hits = self.auto.find_all_templates(tpl, threshold=threshold) or []
+            screen = self.auto.capture_screen()
+            hits = self.auto.find_all_templates(tpl, threshold=threshold, screen=screen) or []
             region = self._search_region(params)
             if region:
                 rx, ry, rw, rh = region
@@ -4373,10 +4410,7 @@ class WorkflowEngine:
         # Shared project install folder (pathSrc="project") — folded into p so
         # the argv builder and saved emulator state both see the resolved path.
         p = {**(p or {}), "path": self._emulator_path(p)}
-        try:
-            index = int(float(p.get("index", 0) or 0))
-        except (TypeError, ValueError):
-            index = 0
+        index = self._emulator_index(p)
 
         argv = self._emulator_launch_argv(p, kind, index)
         if not argv:
@@ -5201,19 +5235,28 @@ class WorkflowEngine:
                 win = self.flow["win32"] = {}
             win["path"] = value
 
-    def set_emulator_config(self, kind: str, path: str) -> None:
+    def set_emulator_config(self, kind: str, path: str, index: Optional[int] = None) -> None:
         """Point the shared emulator setting (``emulator``) somewhere else — the
-        Runner's Settings override. Read by emulator nodes on ``project``."""
+        Runner's Settings override. Read by emulator nodes on ``project``.
+        ``index`` is the shared instance index; ``None`` keeps the current one."""
         kind = str(kind or "").strip().lower()
         path = str(path or "").strip()
+        try:
+            idx = max(0, int(float(index))) if index is not None else None
+        except (TypeError, ValueError):
+            idx = None
         self._emu_cfg["kind"] = kind
         self._emu_cfg["path"] = path
+        if idx is not None:
+            self._emu_cfg["index"] = idx
         if isinstance(self.flow, dict):
             emu = self.flow.get("emulator")
             if not isinstance(emu, dict):
                 emu = self.flow["emulator"] = {}
             emu["kind"] = kind
             emu["path"] = path
+            if idx is not None:
+                emu["index"] = idx
 
     def _emulator_path(self, params: Dict[str, Any]) -> str:
         """Resolve the emulator install folder for an emulator node.
@@ -5242,6 +5285,22 @@ class WorkflowEngine:
         if src == "custom":
             return custom or default
         return project or custom or default
+
+    def _emulator_index(self, params: Dict[str, Any]) -> int:
+        """Resolve the instance index for an emulator node (see ``_emulator_path``).
+
+        ``pathSrc`` == ``custom`` reads the node's own ``index``; ``project``
+        (and legacy flows with no source) read the shared emulator setting's
+        ``index``, falling back to the node's field so a file saved before the
+        project index existed still boots the instance it was built for."""
+        p = params or {}
+        src = str(p.get("pathSrc") or "").strip().lower()
+        project = (self._emu_cfg or {}).get("index")
+        raw = p.get("index") if (src == "custom" or project in (None, "")) else project
+        try:
+            return max(0, int(float(raw if raw not in (None, "") else 0)))
+        except (TypeError, ValueError):
+            return 0
 
     def _win_launch_path(self, params: Dict[str, Any]) -> str:
         """Resolve the program for win_launch.

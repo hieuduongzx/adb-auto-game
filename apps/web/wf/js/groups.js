@@ -1043,6 +1043,8 @@ function wfShowRunMenu(btn){
   if(wfMenuToggleCheck(btn,"run")) return;
   const m=$("wf-ctxmenu"); if(!m) return;
   wfMenuItems(m, [
+    {ico:"rocket", label:"Start game",                     fn:()=>wfStartGame(),            title:"Boot the configured emulator + app (ADB) or launch the game .exe (Win32) - per Project settings"},
+    {sep:true},
     {ico:"play",   label:"Run from selected block",        fn:()=>wfRunFromSelected(false), title:"Start the run at the selected block instead of Start"},
     {ico:"skip",   label:"Step debug from here",           fn:()=>wfStartStepRun(),         title:"Run one block at a time - pause after each, resume with Next step"},
     {sep:true},

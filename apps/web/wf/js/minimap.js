@@ -105,7 +105,7 @@ function wfMinimapDraw(){
     if(def.kind==="start"||def.kind==="end"){   // both terminals are discs
       ctx.ellipse(px+pw/2,py+ph/2,pw/2,ph/2,0,0,Math.PI*2);
     }else{
-      ctx.roundRect(px,py,pw,ph,n.type==="try_next"?ph/2:1.5);
+      ctx.roundRect(px,py,pw,ph,n.type==="try_next"?ph/2:3);
     }
     ctx.fill();
     if(sel){ ctx.globalAlpha=1; ctx.strokeStyle=P.accent; ctx.lineWidth=1;

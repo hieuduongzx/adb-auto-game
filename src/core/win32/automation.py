@@ -338,6 +338,10 @@ class Win32Controller:
                 "attach again; anti-cheat can also block injection. "
                 "The tool will use anchored_touch for now, which may not control the game."
             )
+        else:
+            # Success is reported too — "is the plugin actually answering?" is
+            # the question attach is supposed to settle, not only failures.
+            log_info(f"[win32] unity_bridge online at 127.0.0.1:{port} — {reply}")
         # Either way one message is enough — stop _bridge_call repeating it.
         self._bridge_warned = True
 

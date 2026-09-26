@@ -40,7 +40,7 @@
 .lib-heading { display: flex; flex-direction: column; justify-content: center; gap: 2px; flex-shrink: 0; }
 .lib-kicker { font: 600 var(--t-micro)/1 var(--mono); letter-spacing: .08em; color: var(--muted); }
 .lib-title-row { display: flex; align-items: baseline; gap: var(--s3); }
-.lib-title { font-size: var(--t-head); font-weight: 600; line-height: 1.05; letter-spacing: -.015em; color: var(--ink); }
+.lib-title { font-size: var(--t-head); font-weight: 700; line-height: 1.05; letter-spacing: -.02em; color: var(--ink); }
 .lib-count {
   font-family: var(--mono); font-size: var(--t-caption); color: var(--muted);
   font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -55,7 +55,7 @@
   position: absolute; left: 11px; pointer-events: none; color: var(--muted);
 }
 #search {
-  width: 100%; height: 36px; padding-left: 34px; border-radius: var(--r-md);
+  width: 100%; height: 36px; padding-left: 34px; border-radius: var(--r-sm);
   background: var(--surface); font-family: var(--sans); font-size: var(--t-body);
 }
 #search::placeholder { color: var(--muted); }
@@ -63,7 +63,7 @@
 .lib-actions { display: flex; align-items: center; gap: var(--s2); }
 /* The shared .btn is 30px for dense toolbars; the library bar's controls sit one
    step above it, matched to the 36px search field beside them. */
-.lib-actions .btn { height: 34px; border-radius: var(--r-md); }
+.lib-actions .btn { height: 34px; border-radius: var(--r-sm); }
 .lib-actions .btn.ico { width: 34px; }
 .lib-actions #btn-new { margin-left: var(--s2); padding: 0 14px; font-size: var(--t-body); }
 
@@ -147,7 +147,13 @@
   scroll-snap-align: start;
   transition: border-color .15s, background .15s;
 }
+.game { position: relative; }
+/* The hover accent is a short pill docked to the top edge — a full-width bar
+   would stick out past the card's rounded corners. */
+.game::before { content: ""; position: absolute; top: -1px; left: 10px; right: 10px;
+  height: 3px; border-radius: 999px; background: var(--accent); opacity: 0; transition: opacity .15s; }
 .game:hover { border-color: var(--accent-bd); }
+.game:hover::before { opacity: 1; }
 .game-cover {
   position: relative;
   display: block;
@@ -509,7 +515,8 @@ body.bp-open #ui-toasts { right: calc(min(580px, 100vw - 24px) + 24px); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: text; }
 .bp-badge { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; flex-shrink: 0;
   border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface);
-  color: var(--dim); font-size: var(--t-micro); font-weight: 700; }
+  color: var(--dim); font-size: var(--t-micro); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em; }
 .bp-badge.running, .bp-badge.cancelling { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-bd); }
 .bp-badge.done { color: var(--ok-ink); background: var(--ok-bg); border-color: var(--ok-bd); }
 .bp-badge.failed { color: var(--err); background: var(--err-bg); border-color: var(--err-bd); }

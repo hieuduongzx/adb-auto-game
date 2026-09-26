@@ -35,12 +35,19 @@ always readable at a glance from across the desk.
 ## Design Principles
 
 1. **One vocabulary across apps** — the hub, runner, designer, and DevScope share
-   tokens, controls, and component shapes (see `apps/web/wf/css/base.css`).
-2. **Density without clutter** — small window, many rows; every pixel of
+   tokens, controls, and component shapes (see `apps/web/shared/tokens.css`).
+2. **Soft corners, not sharp ones** — one radius ladder: 4px micro chrome,
+   6px controls, 10px panels/cards/nodes, 12px overlays, and nested elements
+   take a tighter radius than their container (concentric curves). Full
+   circles stay for things that *are* round: status dots, wire ports, toggle
+   thumbs, progress tracks. The exception: surfaces flush with a window edge
+   (header/footer strips, docked panes) stay square — a radius on a flush
+   edge only opens a gap.
+3. **Density without clutter** — small window, many rows; every pixel of
    chrome must earn its place.
-3. **State first** — run status, per-activity status, and device connection
+4. **State first** — run status, per-activity status, and device connection
    are visible without interaction.
-4. **English labels throughout** (unified July 2026 — previously mixed
+5. **English labels throughout** (unified July 2026 — previously mixed
    Vietnamese/English), mono for data (serials, timers, counts).
 
 ## Accessibility & Inclusion

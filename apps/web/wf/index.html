@@ -80,6 +80,8 @@
   <div class="tb-zone tb-center">
     <button class="btn ok ico tb-run-btn" id="wf-run-btn" onclick="wfToggleRun()" title="Test run"></button>
     <div class="tb-tray tb-run-aux">
+      <button class="btn ico" id="wf-start-game-btn" onclick="wfStartGame()" title="Start game - boot the configured emulator + app (ADB) or launch the game .exe (Win32), per Project settings">
+        <i data-ico="rocket" aria-hidden="true"></i></button>
       <button class="btn ico" onclick="wfValidateShow()" title="Check workflow - find broken wires, missing templates, and bad branch counts">
         <i data-ico="triangle-alert" aria-hidden="true"></i></button>
       <button class="btn ico" onclick="wfRunSingleNode()" title="Test node - run the selected node and draw its match overlay on Preview (Ctrl+Enter)">

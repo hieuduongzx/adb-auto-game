@@ -49,7 +49,8 @@
 }
 .rail-item svg { width:20px; height:20px; fill: none; stroke: currentColor;
   stroke-width:1.6; stroke-linecap: round; stroke-linejoin: round; }
-.rail-label { font-size: var(--t-micro); font-weight: 600; line-height: 1;
+.rail-label { font-size: var(--t-micro); font-weight: 700; line-height: 1;
+  text-transform: uppercase; letter-spacing: .05em;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-item:hover { background: var(--alt); color: var(--ink2); }
 .rail-item.on { background: var(--accent-bg); color: var(--accent); }
@@ -108,7 +109,8 @@
 .ctl { display: inline-flex; align-items: center; gap: var(--s3); min-width: 0; flex-shrink: 0; }
 .ctl.grow { flex: 1 1 auto; min-width: 90px; }
 .ctl-lbl {
-  font-size: var(--t-caption); font-weight: 500; color: var(--dim);
+  font: 600 var(--t-micro)/1 var(--mono); text-transform: uppercase;
+  letter-spacing: .07em; color: var(--muted);
   white-space: nowrap; flex-shrink: 0;
 }
 .ctl > select, .ctl > input { height: 32px; min-width: 0; }
@@ -159,20 +161,20 @@
    target — the reference lets you click the title, not hunt for the chevron. */
 .pnl-title {
   display: inline-flex; align-items: center; gap: var(--s2); min-width: 0;
-  font-size: var(--t-body); font-weight: 600; color: var(--ink);
-  letter-spacing: 0; text-transform: none;
+  font-size: var(--t-caption); font-weight: 700; color: var(--ink);
+  letter-spacing: .06em; text-transform: uppercase;
 }
 button.pnl-title { cursor: pointer; }
 .pnl-title > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pnl-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-xs); }
 .pnl-count {
   font-family: var(--mono); font-size: var(--t-micro); font-weight: 600; color: var(--muted);
-  background: var(--alt); border-radius: 999px; padding: 1px 6px; flex-shrink: 0;
+  background: var(--alt); border-radius: var(--r-xs); padding: 1px 6px; flex-shrink: 0;
 }
 .pnl-count:empty { display: none; }
 /* The "?" affordance beside a label — explains without spending a row. */
 .pnl-hint, .frow-hint {
-  width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0;
+  width: 15px; height: 15px; border-radius: var(--r-xs); flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 10px; font-weight: 700; color: var(--muted);
   background: var(--alt); cursor: help; transition: color .12s, background .12s;

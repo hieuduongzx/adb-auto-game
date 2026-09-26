@@ -451,7 +451,7 @@ const WF_NODES = {
   launch_emulator:{label:"Launch emulator", ico:"monitor", kind:"action", cat:"device", outs:["out"], fields:[
     {k:"pathSrc",lbl:"Emulator",t:"select",opts:[{v:"project",t:"Project emulator setting"},{v:"custom",t:"Custom…"}],d:"project"},
     {k:"emulator",lbl:"Family",t:"select",opts:[{v:"ldplayer",t:"LDPlayer"},{v:"mumu",t:"MuMu"},{v:"nox",t:"Nox"},{v:"memu",t:"MEmu"},{v:"bluestacks",t:"BlueStacks"},{v:"custom",t:"Custom command"}],d:"ldplayer",showWhen:{pathSrc:"custom"}},
-    {k:"index",lbl:"Instance index",t:"num",d:0},
+    {k:"index",lbl:"Instance index",t:"num",d:0,showWhen:{pathSrc:"custom"}},
     {k:"instance",lbl:"Instance name (BlueStacks)",t:"text",d:"",showWhen:{pathSrc:"custom",emulator:"bluestacks"}},
     {k:"path",lbl:"Install folder / console .exe (blank = auto)",t:"path",d:"",pickFolder:true,showWhen:{pathSrc:"custom"}},
     {k:"command",lbl:"Custom command ({index})",t:"text",d:"",showWhen:{pathSrc:"custom",emulator:"custom"}},
@@ -459,7 +459,11 @@ const WF_NODES = {
     {k:"nextDay",lbl:"If time passed → wait next day",t:"bool",d:true},
     {k:"wait",lbl:"Wait for ADB ready (s)",t:"num",d:60},
     {k:"port",lbl:"ADB port override (blank = auto)",t:"num"},
-  ], sum:p=>`▶ ${p.pathSrc==="project"?"project emulator":(p.emulator||"ldplayer")}${(p.index?(" #"+p.index):"")}${p.at?(" ⏰"+p.at):""}`},
+  ], sum:p=>{
+    const proj=p.pathSrc!=="custom";
+    const idx=proj?((WF.emulator||{}).index||0):(p.index||0);
+    return `▶ ${proj?"project emulator":(p.emulator||"ldplayer")}${idx?(" #"+idx):""}${p.at?(" ⏰"+p.at):""}`;
+  }},
   // Is an emulator instance booted & its ADB responding (sys.boot_completed)?
   // "Last used" re-checks the instance saved by the last successful Launch
   // emulator (data/emulator_state.json) — skip the boot when it's already up.
@@ -801,12 +805,13 @@ const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities
   // Which backend drives the flow: "adb" (device/emulator) or "win32" (PC window).
   controller:"adb",
   win32:{window:"", matchBy:"title", inputMode:"background"},
-  // Shared emulator choice for ADB projects: the family + install folder that
-  // Launch emulator (and the other emulator nodes) use by default. Edited in
-  // Project settings here and in the Runner's Settings tab; nodes can opt out
-  // per-node via their own "Emulator" source = Custom. Saved into the flow JSON
+  // Shared emulator choice for ADB projects: the family + install folder +
+  // instance index that Launch emulator (and the other emulator nodes) use by
+  // default, and that the Start game button boots. Edited in Project settings
+  // here and in the Runner's Settings tab; nodes can opt out per-node via
+  // their own "Emulator" source = Custom. Saved into the flow JSON
   // (key "emulator").
-  emulator:{kind:"ldplayer", path:""},
+  emulator:{kind:"ldplayer", path:"", index:0},
   // Recognition model for text-reading blocks (wait_text/if_text/read_var/parse_var…).
   // The registry currently exposes only PP-OCRv5 Mobile; the selected model is
   // saved into the flow JSON (key "ocr") for Runner and test runs.
@@ -1034,6 +1039,12 @@ function wfSyncBackendChrome(){
   const modeEl=$("wf-bar-win32-mode"); if(modeEl && document.activeElement!==modeEl) modeEl.value=mode;
   const bridgeRow=$("wf-unity-bridge-row"); if(bridgeRow) bridgeRow.style.display=mode==="unity_bridge"?"":"none";
   const footerDeviceDot=$("footer-dot"); if(footerDeviceDot) footerDeviceDot.style.display=isWin32?"none":"";
+  // Start game follows the project controller: boot emulator + app for ADB,
+  // launch the configured .exe for Win32.
+  const gameBtn=$("wf-start-game-btn");
+  if(gameBtn) gameBtn.title=isWin32
+    ? "Start game - launch the game .exe from Project settings"
+    : "Start game - boot the configured emulator instance + launch the package (Project settings)";
   // Preview action testers: mouse button / wheel are Win32-only; the Android
   // keycode strip only makes sense for ADB (Win32 takes VK numbers).
   const show=(id,on)=>{ const el=$(id); if(el) el.style.display=on?"flex":"none"; };
@@ -1291,19 +1302,29 @@ function wfOpenProjectSettings(){
       secAdb.appendChild(rowInput);
       // Shared emulator choice — the ADB equivalent of the Win32 game path.
       // Launch / Resize / Kill / Restart emulator blocks use this by default;
-      // a block can opt out with its own Emulator = Custom.
-      const rowEmuKind=document.createElement("div"); rowEmuKind.className="wf-proj-row";
-      rowEmuKind.innerHTML=
-        `<label for="wf-emulator-kind">Emulator</label>`+
-        `<select id="wf-emulator-kind" title="Emulator family used by emulator blocks set to “Project emulator setting”">`+
-          `<option value="ldplayer">LDPlayer</option>`+
-          `<option value="mumu">MuMu</option>`+
-          `<option value="nox">Nox</option>`+
-          `<option value="memu">MEmu</option>`+
-          `<option value="bluestacks">BlueStacks</option>`+
-        `</select>`+
-        `<div class="hint">Shared by Launch / Resize / Kill / Restart emulator blocks unless a block chooses “Custom”.</div>`;
-      secAdb.appendChild(rowEmuKind);
+      // a block can opt out with its own Emulator = Custom. Start game boots
+      // exactly this instance.
+      const rowEmu=document.createElement("div"); rowEmu.className="wf-proj-grid2";
+      rowEmu.innerHTML=
+        `<div class="wf-proj-row">`+
+          `<label for="wf-emulator-kind">Emulator</label>`+
+          `<select id="wf-emulator-kind" title="Emulator family used by emulator blocks set to “Project emulator setting”">`+
+            `<option value="ldplayer">LDPlayer</option>`+
+            `<option value="mumu">MuMu</option>`+
+            `<option value="nox">Nox</option>`+
+            `<option value="memu">MEmu</option>`+
+            `<option value="bluestacks">BlueStacks</option>`+
+          `</select>`+
+        `</div>`+
+        `<div class="wf-proj-row">`+
+          `<label for="wf-emulator-index">Instance index</label>`+
+          `<input id="wf-emulator-index" type="number" min="0" step="1" title="Emulator instance index (0 = the first/primary instance)">`+
+        `</div>`;
+      secAdb.appendChild(rowEmu);
+      const rowEmuHint=document.createElement("div"); rowEmuHint.className="wf-proj-row";
+      rowEmuHint.innerHTML=
+        `<div class="hint">Shared by Launch / Resize / Kill / Restart emulator blocks unless a block chooses “Custom”. The 🚀 Start game button boots this instance.</div>`;
+      secAdb.appendChild(rowEmuHint);
       const rowEmuPath=document.createElement("div"); rowEmuPath.className="wf-proj-row";
       rowEmuPath.innerHTML=
         `<label for="wf-emulator-path">Install folder</label>`+
@@ -1409,9 +1430,22 @@ function wfOpenProjectSettings(){
       const ocr=q("wf-ocr-select"); if(ocr){ wfFillOcrSelect(ocr); ocr.onchange=()=>wfOcrChanged(); }
       const inSel=q("wf-input-select");
       if(inSel) inSel.onchange=()=>{ if(typeof onInputBackendChange==="function") onInputBackendChange(inSel.value); };
-      const emuKind=q("wf-emulator-kind"), emuPath=q("wf-emulator-path");
-      const emuSet=(patch)=>{ WF.emulator=Object.assign({kind:"ldplayer",path:""},WF.emulator,patch); };
+      const emuKind=q("wf-emulator-kind"), emuPath=q("wf-emulator-path"), emuIdx=q("wf-emulator-index");
+      const emuSet=(patch)=>{ WF.emulator=Object.assign({kind:"ldplayer",path:"",index:0},WF.emulator,patch); };
       if(emuKind) emuKind.onchange=()=>{ emuSet({kind:emuKind.value}); if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced(); setStatus("Emulator: "+(emuKind.options[emuKind.selectedIndex]||{}).text); };
+      if(emuIdx){
+        emuIdx.addEventListener("input",()=>{
+          emuSet({index:Math.max(0,parseInt(emuIdx.value,10)||0)});
+          // Launch emulator block summaries show the shared index live.
+          if(typeof wfRenderCanvas==="function") wfRenderCanvas();
+        });
+        emuIdx.addEventListener("change",()=>{
+          const v=Math.max(0,parseInt(emuIdx.value,10)||0);
+          emuIdx.value=v; emuSet({index:v});
+          if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced();
+          setStatus("Emulator instance: #"+v);
+        });
+      }
       if(emuPath){
         emuPath.addEventListener("input",()=>emuSet({path:(emuPath.value||"").trim()}));
         emuPath.addEventListener("change",()=>{ if(typeof wfPushUndoDebounced==="function") wfPushUndoDebounced(); });
@@ -1459,6 +1493,7 @@ function wfOpenProjectSettings(){
       const emuSeed=(WF.emulator||{});
       if(emuKind) emuKind.value=emuSeed.kind||"ldplayer";
       if(emuPath) emuPath.value=emuSeed.path||"";
+      if(emuIdx) emuIdx.value=Math.max(0,parseInt(emuSeed.index,10)||0);
       const win32=(WF.controller==="win32");
       const adbSec=q("wf-proj-adb-sec"); if(adbSec) adbSec.style.display=win32?"none":"";
       const winSec=q("wf-proj-win32-sec"); if(winSec) winSec.style.display=win32?"":"none";
@@ -1476,6 +1511,9 @@ function wfOpenProjectSettings(){
 function wfToggleSnap(){ wfSnapOn=!wfSnapOn; wfSyncToggleBtns(); wfSyncGrid(); wfSaveSettings(); }
 function wfTogglePreview(){ wfPreviewAll=!wfPreviewAll; wfSyncToggleBtns(); wfRenderCanvas(); wfSaveSettings(); }
 let wfRunning=false;
+// True while the backend boots the emulator / launches the exe for Start game
+// — keeps the toolbar button spinning instead of firing twice.
+let wfGameStarting=false;
 let wfPan={x:0,y:0};
 let wfZoom=1;           // canvas zoom factor
 // The dot grid is painted on #wf-canvas (outside the transformed world), so it

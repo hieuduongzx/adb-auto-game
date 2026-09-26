@@ -235,6 +235,11 @@
                 </select>
               </div>
               <div class="setting-block">
+                <label class="form-lbl" for="emu-index">Instance index</label>
+                <input type="number" id="emu-index" class="setting-input runtime-setting-control" min="0" step="1" value="0"
+                       onchange="onEmulatorIndexChange(this.value)" title="Emulator instance index (0 = the first/primary instance)">
+              </div>
+              <div class="setting-block">
                 <label class="form-lbl" for="emu-path">Install folder</label>
                 <div class="setting-path-control">
                   <input type="text" id="emu-path" class="setting-path-input runtime-setting-control" spellcheck="false" autocomplete="off"

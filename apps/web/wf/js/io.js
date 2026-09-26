@@ -157,9 +157,13 @@ function wfSerialize(){
     input:(WF.inputBackend==="scrcpy")?"scrcpy":"adb",
     // path = the game .exe Launch program nodes use on "Project game path".
     win32:{ window:(w.window||"").trim(), matchBy:wfNormWinMatchBy(w.matchBy), inputMode:wfNormWinInputMode(w.inputMode), path:String(w.path||"").trim() },
-    // Shared emulator choice (ADB): family + install folder used by emulator
-    // blocks set to "Project emulator setting".
-    emulator:{ kind:String((WF.emulator&&WF.emulator.kind)||"ldplayer").trim()||"ldplayer", path:String((WF.emulator&&WF.emulator.path)||"").trim() },
+    // Shared emulator choice (ADB): family + install folder + instance index
+    // used by emulator blocks set to "Project emulator setting" and by Start game.
+    emulator:{
+      kind:String((WF.emulator&&WF.emulator.kind)||"ldplayer").trim()||"ldplayer",
+      path:String((WF.emulator&&WF.emulator.path)||"").trim(),
+      index:Math.max(0,parseInt(WF.emulator&&WF.emulator.index,10)||0)
+    },
     // Speed hack is ADB-only (Frida). Package lives at the top level (key "package").
     // Force speedhack off in Win32 so a stale enabled flag never starts Frida.
     speedhack:{ enabled:isWin32?false:!!sh.enabled, speed:sh.speed||2.0, native:!!sh.native },
@@ -203,6 +207,13 @@ function wfHydrateGraph(g){
     if(params && WF_EMU_NODE_TYPES.includes(n.type) && !params.pathSrc){
       params.pathSrc = (n.type==="launch_emulator" && String(params.emulator||"").trim().toLowerCase()==="custom")
         ? "custom" : "project";
+    }
+    // A project-mode Launch emulator now reads the shared index too — stamp it
+    // so the serialized node stays self-consistent (and pre-index builds still
+    // boot the same instance).
+    if(params && n.type==="launch_emulator" && params.pathSrc==="project"
+        && WF.emulator && WF.emulator.index!=null){
+      params.index=WF.emulator.index;
     }
     // Press key predates Action / Hold: it was always a quick press.
     if(params && n.type==="win_key" && !params.mode) params.mode="press";
@@ -274,23 +285,40 @@ function wfHydrate(flow){
   const w=flow.win32||{}; WF.win32={window:(w.window||"").trim(), matchBy:wfNormWinMatchBy(w.matchBy), inputMode:wfNormWinInputMode(w.inputMode), path:String(w.path||"").trim()};
   // Shared emulator choice. If the file predates it, seed from the first
   // emulator node that carried a path so switching nodes to the project default
-  // below doesn't drop an install folder the user had already set.
+  // below doesn't drop an install folder the user had already set. ``index``
+  // predates the same way: a missing field seeds from the first
+  // project-mode Launch emulator's own index.
   const e=flow.emulator||{};
-  WF.emulator={kind:String(e.kind||"ldplayer").trim()||"ldplayer", path:String(e.path||"").trim()};
-  if(!WF.emulator.path){
+  const _eIdx=parseInt(e.index,10);
+  WF.emulator={kind:String(e.kind||"ldplayer").trim()||"ldplayer", path:String(e.path||"").trim(),
+    index:Number.isFinite(_eIdx)?Math.max(0,_eIdx):null};
+  if(!WF.emulator.path || WF.emulator.index===null){
     const emuNodes=[];
     (flow.activities||[]).forEach(a=>emuNodes.push(...((a.graph||{}).nodes||[])));
     (flow.functions||[]).forEach(f=>emuNodes.push(...((f.graph||{}).nodes||[])));
-    const seed=emuNodes.find(n=>WF_EMU_NODE_TYPES.includes(n.type)&&String((n.params||{}).path||"").trim());
-    if(seed){
-      const sp=seed.params||{};
-      WF.emulator.path=String(sp.path||"").trim();
-      const k=String(sp.emulator||"").trim().toLowerCase();
-      // "selected" is a targeting mode, not a family — seeding it here would
-      // hand launch_emulator a bogus install folder to look up.
-      if(k && k!=="custom" && k!=="last" && k!=="selected") WF.emulator.kind=k;
+    if(!WF.emulator.path){
+      const seed=emuNodes.find(n=>WF_EMU_NODE_TYPES.includes(n.type)&&String((n.params||{}).path||"").trim());
+      if(seed){
+        const sp=seed.params||{};
+        WF.emulator.path=String(sp.path||"").trim();
+        const k=String(sp.emulator||"").trim().toLowerCase();
+        // "selected" is a targeting mode, not a family — seeding it here would
+        // hand launch_emulator a bogus install folder to look up.
+        if(k && k!=="custom" && k!=="last" && k!=="selected") WF.emulator.kind=k;
+      }
+    }
+    if(WF.emulator.index===null){
+      const iseed=emuNodes.find(n=>n.type==="launch_emulator"
+        && String((n.params||{}).pathSrc||"").trim().toLowerCase()!=="custom"
+        && String((n.params||{}).emulator||"").trim().toLowerCase()!=="custom"
+        && String((n.params||{}).index??"").trim()!=="");
+      if(iseed){
+        const v=parseInt(iseed.params.index,10);
+        if(Number.isFinite(v)) WF.emulator.index=Math.max(0,v);
+      }
     }
   }
+  if(WF.emulator.index===null) WF.emulator.index=0;
   WF.nodeDefaults=wfHydNodeDefaults(flow.nodeDefaults);
   WF.functions=(flow.functions||[]).map(f=>({ id:f.id||("fn_"+wfUid().slice(1,6)), name:f.name||"function", graph:wfHydrateGraph(f.graph) }));
   WF.globals = wfHydVars(flow.globals||[]);
@@ -599,6 +627,30 @@ async function wfRunGui(){
   if(!WF.activities.length){ uiToast("No activities yet.","warning"); return; }
   await api().open_runner(JSON.stringify(wfSerialize()));
   setStatus("Runner GUI opened");
+}
+// ── Start game ─────────────────────────────────────────────────────────────
+// Boots what Project settings point at WITHOUT running the workflow graph:
+// the project .exe (Win32), or the configured emulator instance + package
+// (ADB). start_game returns immediately; progress lands in the log and the
+// outcome arrives via the "game_launch" event.
+function wfSyncGameBtn(){
+  const b=$("wf-start-game-btn"); if(!b) return;
+  b.classList.toggle("busy", wfGameStarting);
+  b.disabled=wfGameStarting;
+}
+async function wfStartGame(){
+  if(wfRunning){ uiToast("Stop the test run first, then start the game.","warning"); return; }
+  if(wfGameStarting) return;
+  wfGameStarting=true; wfSyncGameBtn();
+  setStatus(WF.controller==="win32" ? "Starting game…" : "Starting emulator…");
+  let res=null;
+  try{ res=await api().start_game(JSON.stringify(wfSerialize())); }catch(_){ }
+  // A synchronous failure means the launch never started — re-arm the button.
+  // The real outcome arrives later via the "game_launch" event.
+  if(!res || res.ok!==true){
+    wfGameStarting=false; wfSyncGameBtn();
+    if(res && res.error) uiToast(String(res.error),"error");
+  }
 }
 
 

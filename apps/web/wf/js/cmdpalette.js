@@ -14,6 +14,7 @@ function wfCmdCatalog() {
   const g = (typeof wfGraph === "function") ? wfGraph() : null;
   const cmds = [
     { t: "Run / Stop test", s: "toggle the test run", k: "", run: () => wfToggleRun() },
+    { t: "Start game", s: "boot the project's emulator/game (Project settings)", k: "", run: () => (typeof wfStartGame === "function") && wfStartGame(), when: !running },
     { t: "Test selected node", s: "run the selected node, overlay on Preview", k: "Ctrl+Enter", run: () => wfRunSingleNode(), when: hasSel },
     { t: "Validate workflow", s: "find broken wires, missing templates", k: "", run: () => wfValidateShow() },
     { t: "Run from selected node", s: "start the run at the selected node", k: "", run: () => (typeof wfRunFromSelected === "function") && wfRunFromSelected(), when: hasSel },

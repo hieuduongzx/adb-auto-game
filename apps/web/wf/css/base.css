@@ -46,7 +46,7 @@
   --branch-loop-line: #d09030;
    /* Wire palette — softened, modern pastels: the rope is connective tissue,
       the branch hue is the accent. Pitched for a 1.6px line over --canvas-bg. */
-   --wire:        #a4b1c4;
+   --wire:        #8f9eb2;
    --wire-switch: #9d86e8;
    /* Named multi-outs that are not true/false — Loop body/done, loop-until
       found/fail — plus a 6-hue cycle for numbered lanes (parallel / sequence /
@@ -106,7 +106,7 @@
   --canvas-dot-minor:  #dfe4ec;
   --canvas-grid-line:  rgba(23,32,43,.022);
   --canvas-grid-major: rgba(23,32,43,.04);
-  --node-r: 0px;  /* Every canvas node uses a square silhouette. */
+  --node-r: 6px;  /* Every canvas node shares one soft-cornered silhouette. */
   /* Card geometry is locked to whole grid cells (WF_GRID = 16px): 9×4 cells.
      Node x/y snapping lands every edge on the minor grid. */
   --node-w: 144px; /* Canonical geometry is also read by workflow.js. */
@@ -163,7 +163,7 @@
   --branch-loop-bg: rgba(234, 179, 8, .16);
   --branch-loop-line: #eab308;
    /* Dark canvas needs luminous-but-muted wire hues to read cleanly. */
-   --wire:        #7d8da4;
+   --wire:        #93a1b6;
    --wire-switch: #a78bfa;
    --wire-body:  #5b9cf5;
    --wire-done:  #34c370;
@@ -219,7 +219,7 @@
 
 /* ── Inspector vocabulary — rows, groups, readouts ───────────────────────── */
 .hz-wrap { display: flex; align-items: center; gap: 4px; }
-.hz-unit  { font-size: var(--t-caption); color: var(--muted); flex-shrink: 0; }
+.hz-unit  { font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); flex-shrink: 0; }
 
 .pill-wrap { display: flex; align-items: center; gap: 7px; cursor: pointer; }
 .pill-label { font-size: var(--t-ui); font-weight: 600; color: var(--dim); }
@@ -245,10 +245,10 @@
   transition: background .1s; min-width: 0; }
 .grp-hdr:hover { background: var(--alt); }
 
-/* Sentence case at the panel-title register, one step down in size: a group is
-   a smaller instance of a panel header, not a new kind of label. */
-.grp-title { font-size: var(--t-ui); font-weight: 600; letter-spacing: 0;
-  color: var(--ink); text-transform: none; min-width: 0;
+/* Same voice as a panel header, one step down: a group is a smaller panel,
+   not a new kind of label. */
+.grp-title { font-size: var(--t-caption); font-weight: 700; letter-spacing: .06em;
+  color: var(--ink); text-transform: uppercase; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .grp-chevron { margin-left: auto; color: var(--muted); flex-shrink: 0;
@@ -261,7 +261,9 @@
 
 /* Row inside group */
 .row { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.lbl { font-size: var(--t-ui); color: var(--dim); font-weight: 500; min-width: 52px; flex-shrink: 0; }
+.lbl { font-family: var(--mono); font-size: var(--t-micro); font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+  min-width: 52px; flex-shrink: 0; }
 .lbl.n { min-width: 38px; }
 /* A flex item defaults to min-width:auto, and a bare <input>'s intrinsic width
    is its 20-character size — ~177px in the mono face. Two of those in a row
@@ -275,20 +277,21 @@
 /* Readout & swatch — the live colour preview beside a picked Point / sampled
    colour. A subtle checker underlay shows through translucent samples. */
 #color-swatch, #cc-swatch, #pv-color-swatch, #pv-cc-swatch {
-  width: 28px; height: 26px; border-radius: 6px; flex-shrink: 0;
-  border: 1px solid var(--border2);
+  width: 28px; height: 26px; flex-shrink: 0;
+  border: 1px solid var(--border2); border-radius: var(--r-xs);
   background: var(--panel) repeating-conic-gradient(var(--checker) 0% 25%, transparent 0% 50%) 50%/8px 8px;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--panel) 60%, transparent); }
 
 /* Badges */
 .badge { display: inline-flex; align-items: center; gap: 4px; font-size: var(--t-micro);
-  font-weight: 600; border-radius: 999px; padding: 2px 7px; }
+  font-weight: 600; padding: 2px 7px; }
 .badge.cyan { color: var(--run-info); background: color-mix(in srgb, var(--run-info) 12%, transparent);
   border: 1px solid var(--border); }
-.badge.cyan .bd { width: 6px; height: 6px; border-radius: 2px; background: var(--run-info); }
+.badge.cyan .bd { width: 6px; height: 6px; border-radius: 50%; background: var(--run-info); }
 
-#pv-ocr-engine { font-size: var(--t-micro); font-weight: 600; color: var(--ok-ink);
-  background: var(--ok-bg); border: 1px solid var(--ok-bd); border-radius: 999px; padding: 2px 7px; }
+#pv-ocr-engine { font-size: var(--t-micro); font-weight: 700; color: var(--ok-ink);
+  background: var(--ok-bg); border: 1px solid var(--ok-bd); padding: 2px 7px;
+  text-transform: uppercase; letter-spacing: .05em; }
 #pv-ocr-engine.unavailable { color: var(--warn); background: var(--warn-bg); border-color: var(--border); }
 
 /* Checkbox line — the box itself (.cb) comes from shared/base.css. */
@@ -311,16 +314,17 @@
 
 /* Device info */
 .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; }
-.info-grid .k { font-size: var(--t-body); color: var(--muted); font-weight: 600; white-space: nowrap; }
-.info-grid .v { font-size: var(--t-body); color: var(--ink); word-break: break-word;
+.info-grid .k { font-family: var(--mono); font-size: var(--t-micro); font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.info-grid .v { font-size: var(--t-caption); color: var(--ink); word-break: break-word;
   user-select: text; font-family: var(--mono); }
 
 /* Asset library */
 .asset-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(88px,1fr)); gap: 7px; }
 .asset-card { display: flex; flex-direction: column; cursor: pointer; text-align:left;
-  border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
-  transition: border-color .12s, box-shadow .12s; }
-.asset-card:hover, .asset-card.active { border-color: var(--border2); box-shadow: var(--sh-sm); }
+  border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden;
+  transition: border-color .12s, background .12s; }
+.asset-card:hover, .asset-card.active { border-color: var(--border2); background: var(--surface); }
 .asset-thumb { width: 100%; height: 66px; object-fit: contain; background: var(--shade2); display: block; }
 .asset-name  { font-size: var(--t-micro); color: var(--dim); padding: 3px 5px 4px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -345,7 +349,7 @@
 #log-resizer { position: absolute; left: 0; right: 0; top: -3px; height: 8px;
   cursor: row-resize; z-index: 2; }
 #log-resizer::before { content: ""; position: absolute; left: 50%; top: 2px;
-  width: 36px; height: 3px; margin-left: -18px; border-radius: 2px;
+  width: 36px; height: 3px; margin-left: -18px; border-radius: 999px;
   background: transparent; transition: background .12s; }
 #log-resizer:hover::before, #log-resizer.drag::before { background: var(--accent); }
 .log-hdr  { display: flex; align-items: center; gap: var(--s3); padding: 0 var(--s2) 0 var(--s4);
@@ -355,10 +359,10 @@
 .log-toggle { display:inline-flex; align-items:center; gap:var(--s2); min-width:0; }
 .log-chevron { color: var(--muted); display: inline-flex; transition: transform .15s var(--ease); }
 #log-card.collapsed .log-chevron { transform: rotate(-90deg); }
-.log-label { font-size: var(--t-body); font-weight: 600; letter-spacing: 0;
-  color: var(--ink); text-transform: none; }
+.log-label { font-size: var(--t-caption); font-weight: 700; letter-spacing: .06em;
+  color: var(--ink); text-transform: uppercase; }
 .log-count { font-family: var(--mono); font-size: var(--t-micro); color: var(--muted);
-  background: var(--alt); border-radius: 999px; padding: 1px 7px; min-width: 18px; text-align: center; }
+  background: var(--alt); border-radius: var(--r-xs); padding: 1px 7px; min-width: 18px; text-align: center; }
 .log-count:empty { display: none; }
 .log-count.has-err { color: var(--err); background: var(--err-bg); }
 .btn-log-clear { font-size: var(--t-caption); font-weight: 600; color: var(--muted);
@@ -378,13 +382,13 @@
 .log-line.hidden { display: none; }
 /* Source picker — which activity (or the app) a line came from. */
 .log-scope-sel { font-family: var(--mono); font-size: var(--t-micro); color: var(--dim);
-  background: var(--alt); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--alt); border: 1px solid var(--border); border-radius: var(--r-xs);
   padding: 3px 6px; max-width: 140px; }
 .log-scope-sel:hover { color: var(--ink); }
 /* Search box. Grows into leftover header width, so a narrow drawer shrinks it
    before it starts pushing the Copy/Save/Clear buttons out of reach. */
 .log-search-wrap { display: inline-flex; align-items: center; gap: 5px; flex: 1 1 120px;
-  min-width: 90px; max-width: 240px; padding: 3px 8px; border-radius: 6px;
+  min-width: 90px; max-width: 240px; padding: 3px 8px; border-radius: var(--r-xs);
   background: var(--alt); border: 1px solid var(--border); }
 .log-search-wrap:focus-within { border-color: var(--accent); }
 .log-search-icon { color: var(--muted); flex-shrink: 0; }

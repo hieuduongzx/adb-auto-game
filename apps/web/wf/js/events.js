@@ -37,6 +37,18 @@ window.__recv = function(raw){
     return;
   }
   if(type==="workflow_state"){ wfSetRunning(!!data.running); return; }
+  // Start game progress: {starting:true} marks the worker running (wfStartGame
+  // already flagged the button); {starting:false, ok} is the final outcome.
+  if(type==="game_launch"){
+    if(!data.starting){
+      wfGameStarting=false;
+      if(typeof wfSyncGameBtn==="function") wfSyncGameBtn();
+      const msg=data.ok ? "Game started" : "Couldn't start the game — see the log";
+      setStatus(msg);
+      if(typeof uiToast==="function") uiToast(msg, data.ok?"success":"error");
+    }
+    return;
+  }
   if(type==="capture_failed"){
     // From the Preview tab's live mirror — surface the error and refresh the
     // empty state. Auto-refresh can fail at 30Hz, so the toast is throttled:

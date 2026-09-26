@@ -169,23 +169,40 @@ class TemplateMatcher:
             result = cv2.matchTemplate(
                 screen_processed, template, cv2.TM_CCOEFF_NORMED
             )
-            locations = np.where(result >= threshold)
+            ys, xs = np.where(result >= threshold)
+            if not len(xs):
+                return []
 
             template_h, template_w = template.shape[:2]
-            candidates = []
-            for pt in zip(*locations[::-1]):
-                x, y = pt
-                candidates.append((x + template_w // 2, y + template_h // 2, result[y, x]))
+            # Cap raw hits before building tuples — a permissive threshold can
+            # match a large share of the screen, and sorting millions of points
+            # just to have NMS drop them is wasted work.
+            vals = result[ys, xs]
+            if len(vals) > 5000:
+                idx = np.argpartition(vals, -5000)[-5000:]
+                ys, xs, vals = ys[idx], xs[idx], vals[idx]
+            candidates = [
+                (int(x) + template_w // 2, int(y) + template_h // 2, float(v))
+                for x, y, v in zip(xs, ys, vals)
+            ]
             candidates.sort(key=lambda c: c[2], reverse=True)
 
-            # Greedy non-maximum suppression: keep the highest-confidence hit,
-            # drop any later hit within ~one template of it.
+            # Greedy non-maximum suppression on a spatial grid: keep the
+            # highest-confidence hit, drop any later hit within ~one template
+            # of it. Cells sized at the suppression radius make the "already
+            # covered?" check look at 9 cells instead of every kept match.
             min_distance = max(template_w, template_h) * 0.8
+            cell = max(1, int(min_distance))
+            occupied: Dict[Tuple[int, int], List[Tuple[int, int]]] = {}
             matches = []
             for x, y, confidence in candidates:
+                gx, gy = x // cell, y // cell
                 if any((x - ex) ** 2 + (y - ey) ** 2 < min_distance ** 2
-                       for ex, ey, _ in matches):
+                       for ix in (gx - 1, gx, gx + 1)
+                       for iy in (gy - 1, gy, gy + 1)
+                       for ex, ey in occupied.get((ix, iy), ())):
                     continue
+                occupied.setdefault((gx, gy), []).append((x, y))
                 matches.append((x, y, confidence))
 
             if len(matches) > 10:
