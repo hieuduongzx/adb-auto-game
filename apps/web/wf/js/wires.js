@@ -1,7 +1,6 @@
 // ── Wires ────────────────────────────────────────────────────────────────────
 // Wires paint below cards (they run under a block and re-emerge at its far
-// edge), with an underlay at crossings. Backward links route outside the row.
-// No mid-wire markers — direction reads
+// edge), with an underlay at crossings. No mid-wire markers — direction reads
 // from the port side. Selection highlights adjacent links without rebuilding
 // paths or changing execution-state colours.
 //
@@ -9,8 +8,6 @@
 //   spline   (default) — cubic bezier, horizontal handles ¼ of the port distance
 //   linear             — one straight run with a short stub off each port
 //   straight           — orthogonal Z: stub → vertical at the midpoint → stub
-// Backward links use an outside orthogonal lane in every mode, keeping their
-// return segment clear of intermediate cards.
 //
 // One DOM read pass per draw feeds the geometry: port centres come from
 // offsetLeft/offsetTop (already #wf-world layout coords), so it is zoom-
@@ -29,8 +26,7 @@ function wfWireIndexRebuild(){
       // block, so a link has to swing past that edge to be seen at all — the
       // router solves for it below rather than guessing a handle length.
       const pt={ x:x+p.offsetLeft+p.offsetWidth/2, y:y+p.offsetTop+p.offsetHeight/2,
-                 edge: side==="out" ? right : x, bottom:y+el.offsetHeight,
-                 card:{left:x,right,top:y,bottom:y+el.offsetHeight} };
+                 edge: side==="out" ? right : x, bottom:y+el.offsetHeight };
       ports.set(side+":"+p.dataset.port, pt);
       if(!ports.has(side)) ports.set(side, pt);   // first port of a side = fallback
     });
@@ -145,10 +141,7 @@ function wfLinearPath(a,b){
   return `M${a.x},${a.y} L${a.x+s},${a.y} L${b.x-s},${b.y} L${b.x},${b.y}`;
 }
 function wfStraightPath(a,b){
-  return wfRoundedPointsPath(wfOrthogonalPoints(a,b));
-}
-function wfRoundedPointsPath(pts){
-  const a=pts[0],b=pts[pts.length-1];
+  const pts=wfOrthogonalPoints(a,b);
   let d=`M${a.x},${a.y}`;
   for(let i=1;i<pts.length-1;i++){
     const p=pts[i-1],q=pts[i],r=pts[i+1];
@@ -171,150 +164,13 @@ function wfOrthogonalPoints(a,b){
   // cards, then approach the destination from the left (including self-links).
   const right=Math.max(a.x,a.edge??a.x)+s;
   const left=Math.min(b.x,b.edge??b.x)-s;
-  const y=a.returnY??Math.max(a.bottom??a.y,b.bottom??b.y)+28;
+  const y=Math.max(a.bottom??a.y,b.bottom??b.y)+28;
   return [a,{x:right,y:a.y},{x:right,y},{x:left,y},{x:left,y:b.y},b];
 }
 function wfWirePath(a,b){
-  if(a.routePoints) return wfRoundedPointsPath(a.routePoints);
-  if(a.returnY!=null) return wfStraightPath(a,b);
   if(wfLinkMode==="linear")   return wfLinearPath(a,b);
   if(wfLinkMode==="straight") return wfStraightPath(a,b);
   return wfSplinePath(a,b);
-}
-
-// Route a backwards connection through the nearest unobstructed horizontal
-// gap between its endpoints. If no such gap exists (e.g. ports on the same
-// row), return outside the entire intervening row instead.
-function wfRouteReturn(a,b,blocks,lane){
-  if(b.x>=a.x) return {a,b};
-  const left=Math.min(b.edge??b.x,b.x), right=Math.max(a.edge??a.x,a.x);
-  const crossed=blocks.filter(block=>block.right>=left && block.left<=right);
-  const clearance=24, low=Math.min(a.y,b.y), high=Math.max(a.y,b.y);
-  // A candidate is just past a card boundary. Testing the whole horizontal
-  // span avoids routing through another card in the same band.
-  const candidates=crossed.flatMap(block=>block.top==null ? [] :
-    [block.top-clearance,block.bottom+clearance]);
-  const open=candidates.filter(y=>y>low+clearance && y<high-clearance &&
-    crossed.every(block=>block.top!=null && (y<=block.top-clearance || y>=block.bottom+clearance)));
-  if(open.length){
-    open.sort((x,y)=>Math.abs(x-a.y)-Math.abs(y-a.y) || x-y);
-    const chosen=open[Math.min(lane,open.length-1)];
-    return {a:{...a,returnY:chosen},b};
-  }
-  const bottom=crossed.reduce((y,block)=>Math.max(y,block.bottom),
-    Math.max(a.bottom??a.y,b.bottom??b.y));
-  return {a:{...a,returnY:bottom+28+lane*18},b};
-}
-
-// Check the *actual* forward shape before replacing it. An exact line-vs-card
-// intersection for linear segments and conservative subdivision of the cubic
-// avoid the old assumption that a card only occupies its left edge.
-function wfForwardHitsCards(a,b,blocks){
-  if(!blocks.length) return false;
-  const points=[];
-  if(wfLinkMode==="linear"){
-    const s=wfStub(a,b);
-    points.push(a,{x:a.x+s,y:a.y},{x:b.x-s,y:b.y},b);
-  }else if(wfLinkMode==="straight") points.push(...wfOrthogonalPoints(a,b));
-  else{
-    const off=wfSplineOffCached(a,b),lift=wfSplineLift(b.x-a.x,b.y-a.y);
-    for(let i=0;i<=96;i++){
-      const t=i/96,u=1-t;
-      points.push({x:u*u*u*a.x+3*u*u*t*(a.x+off)+3*u*t*t*(b.x-off)+t*t*t*b.x,
-        y:u*u*u*a.y+3*u*u*t*(a.y-lift)+3*u*t*t*(b.y-lift)+t*t*t*b.y});
-    }
-  }
-  return points.slice(1).some((q,i)=>{
-    const p=points[i];
-    return blocks.some(r=>{
-      // Liang–Barsky segment clipping against a 4px-expanded card.
-      let enter=0,exit=1;
-      const dx=q.x-p.x,dy=q.y-p.y;
-      for(const [v,d,min,max] of [[p.x,dx,r.left-4,r.right+4],[p.y,dy,r.top-4,r.bottom+4]]){
-        if(d===0){if(v<=min||v>=max)return false;continue;}
-        const t1=(min-v)/d,t2=(max-v)/d;
-        enter=Math.max(enter,Math.min(t1,t2));exit=Math.min(exit,Math.max(t1,t2));
-      }
-      return enter<exit && exit>0 && enter<1;
-    });
-  });
-}
-
-// Search a rectilinear grid of clear corridors. Each obstacle contributes its
-// four offset sides; the shortest path may change rows at any of these gaps.
-// Work is capped so a huge imported graph can always fall back to the outer lane.
-function wfFindReturnPoints(a,b,blocks,lane=0){
-  return wfRouteAvoidingCards(a,b,blocks,lane);
-}
-function wfRouteAvoidingCards(a,b,blocks,lane=0){
-  if(!Number.isFinite(a.x+b.x+a.y+b.y)) return null;
-  const clearance=12;
-  const start={x:(a.edge??a.x)+WF_LINK_CLEAR,y:a.y};
-  const end={x:(b.edge??b.x)-WF_LINK_CLEAR,y:b.y};
-  const low=Math.min(a.y,b.y)-160, high=Math.max(a.y,b.y)+160;
-  const left=Math.min(end.x,start.x)-160, right=Math.max(end.x,start.x)+160;
-  const obstacles=blocks.filter(r=>r.top!=null && r.bottom>=low && r.top<=high &&
-    r.right>=left && r.left<=right).map(r=>({left:r.left-clearance,right:r.right+clearance,
-      top:r.top-clearance,bottom:r.bottom+clearance}));
-  // Endpoint bodies remain obstacles during the search. Only the two socket
-  // stubs may cross their own card; removing whole endpoint cards allowed a
-  // shortest path to cut back through a sequence or loop body.
-  const unrelated=obstacles.slice();
-  for(const card of [a.card,b.card]) if(card){
-    obstacles.push({left:card.left-clearance,right:card.right+clearance,
-      top:card.top-clearance,bottom:card.bottom+clearance});
-  }
-  const xs=[start.x,end.x],ys=[start.y,end.y];
-  // Keep parallel return edges apart without changing their endpoints.
-  if(lane>0) ys.push(Math.min(a.y,b.y)-28-lane*18,Math.max(a.y,b.y)+28+lane*18);
-  for(const r of obstacles){
-    xs.push(r.left-1,r.right+1);
-    ys.push(r.top-1-lane*18,r.bottom+1+lane*18);
-  }
-  const unique=values=>[...new Set(values)].sort((x,y)=>x-y);
-  const X=unique(xs),Y=unique(ys),width=X.length,height=Y.length;
-  if(width*height>25000) return null;
-  const xi=new Map(X.map((x,i)=>[x,i])), yi=new Map(Y.map((y,i)=>[y,i]));
-  const key=(x,y,dir)=>((y*width+x)*3+dir);
-  const origin=key(xi.get(start.x),yi.get(start.y),0);
-  const targetX=xi.get(end.x),targetY=yi.get(end.y);
-  const clear=(x1,y1,x2,y2,rects=obstacles)=>rects.every(r=>
-    x1===x2 ? !(x1>r.left && x1<r.right && Math.max(y1,y2)>r.top && Math.min(y1,y2)<r.bottom) :
-      !(y1>r.top && y1<r.bottom && Math.max(x1,x2)>r.left && Math.min(x1,x2)<r.right));
-  if(!clear(start.x,start.y,start.x,start.y)||!clear(end.x,end.y,end.x,end.y) ||
-    !clear(a.x,a.y,start.x,start.y,unrelated)||!clear(end.x,end.y,b.x,b.y,unrelated)) return null;
-  const best=new Map([[origin,0]]),previous=new Map(),heap=[];
-  const push=item=>{heap.push(item);let i=heap.length-1;while(i){const p=(i-1)>>1;if(heap[p].f<=item.f)break;heap[i]=heap[p];i=p;}heap[i]=item;};
-  const pop=()=>{const result=heap[0],last=heap.pop();if(heap.length){let i=0;while(i*2+1<heap.length){let c=i*2+1;if(c+1<heap.length&&heap[c+1].f<heap[c].f)c++;if(heap[c].f>=last.f)break;heap[i]=heap[c];i=c;}heap[i]=last;}return result;};
-  const estimate=(x,y)=>Math.abs(X[x]-end.x)+Math.abs(Y[y]-end.y);
-  push({id:origin,x:xi.get(start.x),y:yi.get(start.y),dir:0,g:0,f:estimate(xi.get(start.x),yi.get(start.y))});
-  let found=null,expanded=0;
-  while(heap.length && expanded++<18000){
-    const node=pop();if(node.g!==best.get(node.id))continue;
-    if(node.x===targetX && node.y===targetY){found=node.id;break;}
-    for(const [dx,dy,dir] of [[-1,0,1],[1,0,1],[0,-1,2],[0,1,2]]){
-      const nx=node.x+dx,ny=node.y+dy;
-      if(nx<0||ny<0||nx>=width||ny>=height||!clear(X[node.x],Y[node.y],X[nx],Y[ny]))continue;
-      const id=key(nx,ny,dir),g=node.g+Math.abs(X[nx]-X[node.x])+Math.abs(Y[ny]-Y[node.y])+
-        (node.dir && node.dir!==dir ? 18 : 0);
-      if(g>=(best.get(id)??Infinity))continue;
-      best.set(id,g);previous.set(id,node.id);push({id,x:nx,y:ny,dir,g,f:g+estimate(nx,ny)});
-    }
-  }
-  if(found==null)return null;
-  const route=[];
-  for(let id=found;id!=null;id=previous.get(id)){
-    const pos=Math.floor(id/3);route.push({x:X[pos%width],y:Y[Math.floor(pos/width)]});
-  }
-  route.reverse();
-  const points=[{x:a.x,y:a.y},...route,{x:b.x,y:b.y}];
-  // Collapse consecutive collinear waypoints; SVG corners remain rounded.
-  for(let i=1;i<points.length-1;){
-    if((points[i-1].x===points[i].x&&points[i].x===points[i+1].x)||
-       (points[i-1].y===points[i].y&&points[i].y===points[i+1].y))points.splice(i,1);
-    else i++;
-  }
-  return points;
 }
 
 // Arrow position and tangent are computed from the route rather than reading
@@ -367,11 +223,6 @@ function wfDrawWires(){
   svg.innerHTML=""; if(temp) svg.appendChild(temp);
   if(!g) return;
   wfWireIndexRebuild();
-  const blocks=[...world.querySelectorAll('.wf-node')].map(el=>({
-    id:el.dataset.node, left:el.offsetLeft, right:el.offsetLeft+el.offsetWidth,
-    top:el.offsetTop, bottom:el.offsetTop+el.offsetHeight,
-  }));
-  const returnLanes=new Map();
 
   // Resolve endpoints first, then sort shortest-first so a long run paints over
   // the local hops rather than under them. Ties break on a stable key, so paint
@@ -380,32 +231,13 @@ function wfDrawWires(){
   const routes=[];
   (g.edges||[]).forEach(ed=>{
     const toPort=ed.toPort||"in";
-    const source=wfPortPt(ed.from,ed.fromPort), target=wfPortPt(ed.to,toPort);
-    if(!source||!target) return;
-    // Share lanes only for returns spanning the same region. Stable edge order
-    // is derived from endpoint ids below, independently of the JSON edge order.
-    routes.push({ ed, a:source, b:target, toPort,
-      span:Math.abs(target.x-source.x)+Math.abs(target.y-source.y),
+    const a=wfPortPt(ed.from,ed.fromPort), b=wfPortPt(ed.to,toPort);
+    if(!a||!b) return;
+    routes.push({ ed, a, b, toPort,
+      span:Math.abs(b.x-a.x)+Math.abs(b.y-a.y),
       key:`${ed.from}\u0000${ed.fromPort||"out"}\u0000${ed.to}\u0000${toPort}` });
   });
   routes.sort((p,q)=>p.span-q.span || (p.key<q.key?-1:p.key>q.key?1:0));
-  routes.forEach(route=>{
-    if(route.b.x>=route.a.x){
-      const other=blocks.filter(block=>block.id!==route.ed.from&&block.id!==route.ed.to);
-      if(wfForwardHitsCards(route.a,route.b,other)){
-        const points=wfRouteAvoidingCards(route.a,route.b,other);
-        if(points) route.a={...route.a,routePoints:points};
-      }
-      return;
-    }
-    const region=`${Math.floor(route.b.x/160)}:${Math.floor(route.a.x/160)}`;
-    const lane=returnLanes.get(region)||0;
-    returnLanes.set(region,lane+1);
-    const points=wfFindReturnPoints(route.a,route.b,
-      blocks.filter(block=>block.id!==route.ed.from&&block.id!==route.ed.to),lane);
-    if(points) route.a={...route.a,routePoints:points};
-    else ({a:route.a,b:route.b}=wfRouteReturn(route.a,route.b,blocks,lane));
-  });
 
   const frag=document.createDocumentFragment();
   const byId=new Map((g.nodes||[]).map(n=>[n.id,n]));

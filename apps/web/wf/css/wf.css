@@ -698,19 +698,19 @@
   shape-rendering:geometricPrecision; }
 /* A fat invisible hit-path sits under each wire so it's easy to hover / right-
    click without thickening the visible line. The visible wire is click-through. */
-#wf-wires .wire-hit { fill:none; stroke:transparent; stroke-width:16; pointer-events:stroke;
+#wf-wires .wire-hit { fill:none; stroke:transparent; stroke-width:18; pointer-events:stroke;
   cursor:pointer; stroke-linecap:round; }
  /* Directional wires with a canvas-coloured underlay to separate crossings.
     Thin (1.6px) lines + softened tones read as connective tissue, not plumbing. */
- #wf-wires path.wire { fill:none; stroke:var(--wire); stroke-width:1.35; pointer-events:none;
+ #wf-wires path.wire { fill:none; stroke:var(--wire); stroke-width:1.9; pointer-events:none;
    stroke-linecap:round; stroke-linejoin:round;
    transition:stroke .12s, stroke-opacity .12s; }
-#wf-wires .wire-halo { fill:none; stroke:var(--canvas-bg); stroke-width:4;
+#wf-wires .wire-halo { fill:none; stroke:var(--canvas-bg); stroke-width:6;
   stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
 #wf-wires.has-selection .wire-grp:not(.related):not(:hover):not(:focus-within) { opacity:.28; }
 #wf-wires.has-selection .wire-grp:has(.took-wire),
 #wf-wires.has-selection .wire-grp:has(.nottook-wire) { opacity:1; }
-#wf-wires .wire-grp.related path.wire { stroke-width:1.8; }
+#wf-wires .wire-grp.related path.wire { stroke-width:2.5; }
  /* Semantic branch wires — the source port's colour flows down its own wire. */
  #wf-wires path.wire[data-fromport="true"]     { stroke:var(--branch-t); }
  #wf-wires path.wire[data-fromport="false"]    { stroke:var(--branch-f); }
@@ -753,12 +753,10 @@
 #wf-wires:hover .wire-grp:not(:hover):not(:focus-within):not(.related),
 #wf-wires:focus-within .wire-grp:not(:hover):not(:focus-within):not(.related) { opacity:.22; }
 #wf-wires .wire-grp:hover path.wire,
-#wf-wires .wire-grp:focus-within path.wire { stroke:var(--accent) !important; stroke-width:2;
-  stroke-opacity:1 !important; }
-#wf-wires .wire-grp:hover .wire-halo, #wf-wires .wire-grp:focus-within .wire-halo {
-  stroke-width:7; }
+#wf-wires .wire-grp:focus-within path.wire { stroke:var(--accent) !important; stroke-width:2.7;
+  stroke-opacity:1; }
 #wf-wires .wire-grp:hover, #wf-wires .wire-grp:focus-within {
-  filter:drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 65%, transparent)); }
+  filter:drop-shadow(0 1px 4px color-mix(in srgb, var(--accent) 45%, transparent)); }
 /* Endpoint sockets of the hovered link light up (accent ring) — wired up by
    the delegated mouseover/mouseout pair in js/wires.js. */
 .wf-port.hover-end { border-color:var(--accent) !important; background:var(--accent) !important;
@@ -767,11 +765,11 @@
 /* While wiring up a connection, wires ignore the pointer. */
 #wf-canvas.wf-connecting .wire-hit { pointer-events:none; }
 /* Palette-drag hovering a wire: dropping here splices the new block in. */
-#wf-wires .wire-grp.wire-insert path.wire { stroke:var(--accent) !important; stroke-width:2;
+#wf-wires .wire-grp.wire-insert path.wire { stroke:var(--accent) !important; stroke-width:2.7;
   stroke-opacity:1; }
 #wf-wires .wire-grp.wire-insert { filter:drop-shadow(0 1px 4px color-mix(in srgb, var(--accent) 40%, transparent)); }
 /* Run trail on wires: the path taken (bright green) vs the skipped branch (faint red). */
-#wf-wires path.wire.took-wire    { stroke:var(--run-ok) !important; stroke-width:1.8; stroke-opacity:1 !important; }
+#wf-wires path.wire.took-wire    { stroke:var(--run-ok) !important; stroke-width:2.2; stroke-opacity:1 !important; }
 #wf-wires path.wire.nottook-wire { stroke:var(--run-fail) !important; stroke-opacity:.3 !important; stroke-width:1; }
 #wf-wires path.temp { fill:none; stroke:var(--accent); stroke-width:1.7; stroke-dasharray:7 5;
   stroke-linecap:round; pointer-events:none; }
@@ -1140,21 +1138,10 @@
   border-right:2.5px solid currentColor; border-bottom:2.5px solid currentColor; border-radius:var(--r-xs); opacity:.6; }
 .wf-group-resize:hover { opacity:1; }
 #wf-canvas.wf-over-group { cursor:move; }
-/* Live execution lifts the card with a warm glow while retaining its category
-   and result colours. Active parent calls remain quieter than the current node. */
+/* Execution adds only an outer marker; category, selection and result colours
+   stay unchanged for both the live node and an active parent function. */
 .wf-node:is(.running, .running-call):not(.paused) {
   z-index:var(--z-node-hover); }
-.wf-node.running:not(.paused) {
-  border-color:var(--run-live-bd) !important;
-  box-shadow:0 0 0 2px color-mix(in srgb, var(--run-live) 48%, transparent),
-    0 0 22px 5px color-mix(in srgb, var(--run-live) 30%, transparent), var(--sh-md) !important;
-}
-.wf-node.running:not(.paused) .wf-node-hd {
-  background:var(--run-live-hd); border-bottom-color:var(--run-live-hd-bd); }
-.wf-node.running:not(.paused) .wf-node-title { color:var(--run-live-ink); }
-.wf-node.running-call:not(.running):not(.paused) {
-  box-shadow:0 0 0 1px var(--run-live-bd),
-    0 0 12px color-mix(in srgb, var(--run-live) 23%, transparent) !important; }
 .wf-node:is(.running, .running-call)::after { animation:none; box-shadow:none; }
 /* No call-only pseudo ring: leave ::before available for entry/pause markers. */
 .wf-node.running-call::before { border-radius:var(--node-r); }
@@ -1251,9 +1238,7 @@
 .wf-node.start.sel::after, .wf-node.end.sel::after { box-shadow:var(--sh-md); }
 .wf-node.start.ran-ok::after, .wf-node.end.ran-ok::after { box-shadow:var(--sh-sm); }
 .wf-node.start.ran-fail::after, .wf-node.end.ran-fail::after { box-shadow:var(--sh-sm); }
-.wf-node.start.running::after, .wf-node.end.running::after {
-  box-shadow:0 0 0 2px var(--run-live-bd),
-    0 0 20px 5px color-mix(in srgb, var(--run-live) 40%, transparent) !important; }
+.wf-node.start.running::after, .wf-node.end.running::after { box-shadow:var(--sh-md); }
 /* Terminal body — a compact square. Panel face, a deeper ring than the glyph
    (--term-ring), and a soft wash so the square lifts off the canvas. */
 .wf-node-tri {

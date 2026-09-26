@@ -71,12 +71,8 @@ def main():
                                 title:getComputedStyle(el.querySelector('.wf-node-title')).color,
                                 icon:getComputedStyle(el.querySelector('.ico')).color};
                         })""")
-                        if live:
-                            assert result[0]['shadow'] != 'none' and result[0]['shadow'] != result[1]['shadow'], result
                         for i in range(2):
                             for key, value in baseline[i].items():
-                                if i == 0 and live and key in ('border', 'header', 'title'):
-                                    continue  # live node gets an amber border/header/title, unlike parent calls
                                 assert result[i][key] == value, (theme, lod, extra, i, key, result[i], baseline[i])
                         checks += 1
         # Exiting a function drops only its live treatment, restoring its trail.
@@ -94,7 +90,7 @@ def main():
         before = page.evaluate(read)
         page.evaluate("document.getElementById('probe-1').classList.add('running-call', 'running')")
         page.wait_for_timeout(180)
-        assert page.evaluate(read) != before  # current node header identifies live execution
+        assert page.evaluate(read) == before
         page.evaluate("document.getElementById('probe-1').classList.remove('running-call', 'running')")
         page.wait_for_timeout(180)
         assert page.evaluate(read) == before
