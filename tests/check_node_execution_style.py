@@ -73,7 +73,11 @@ def main():
                         })""")
                         for i in range(2):
                             for key, value in baseline[i].items():
-                                assert result[i][key] == value, (theme, lod, extra, i, key, result[i], baseline[i])
+                                if extra not in ('paused', 'crashed') and key in ('bg', 'border'):
+                                    assert result[i][key] != value, (theme, lod, extra, key, result[i])
+                                    assert result[i]['shadow'] != 'none', result[i]
+                                else:
+                                    assert result[i][key] == value, (theme, lod, extra, i, key, result[i], baseline[i])
                         checks += 1
         # Exiting a function drops only its live treatment, restoring its trail.
         page.evaluate("""() => {
@@ -90,7 +94,7 @@ def main():
         before = page.evaluate(read)
         page.evaluate("document.getElementById('probe-1').classList.add('running-call', 'running')")
         page.wait_for_timeout(180)
-        assert page.evaluate(read) == before
+        assert page.evaluate(read) != before
         page.evaluate("document.getElementById('probe-1').classList.remove('running-call', 'running')")
         page.wait_for_timeout(180)
         assert page.evaluate(read) == before
