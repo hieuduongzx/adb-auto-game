@@ -205,11 +205,48 @@ function wfRouteReturn(a,b,blocks,lane){
   return {a:{...a,returnY:bottom+28+lane*18},b};
 }
 
+// Check the *actual* forward shape before replacing it. An exact line-vs-card
+// intersection for linear segments and conservative subdivision of the cubic
+// avoid the old assumption that a card only occupies its left edge.
+function wfForwardHitsCards(a,b,blocks){
+  if(!blocks.length) return false;
+  const points=[];
+  if(wfLinkMode==="linear"){
+    const s=wfStub(a,b);
+    points.push(a,{x:a.x+s,y:a.y},{x:b.x-s,y:b.y},b);
+  }else if(wfLinkMode==="straight") points.push(...wfOrthogonalPoints(a,b));
+  else{
+    const off=wfSplineOffCached(a,b),lift=wfSplineLift(b.x-a.x,b.y-a.y);
+    for(let i=0;i<=96;i++){
+      const t=i/96,u=1-t;
+      points.push({x:u*u*u*a.x+3*u*u*t*(a.x+off)+3*u*t*t*(b.x-off)+t*t*t*b.x,
+        y:u*u*u*a.y+3*u*u*t*(a.y-lift)+3*u*t*t*(b.y-lift)+t*t*t*b.y});
+    }
+  }
+  return points.slice(1).some((q,i)=>{
+    const p=points[i];
+    return blocks.some(r=>{
+      // Liang–Barsky segment clipping against a 4px-expanded card.
+      let enter=0,exit=1;
+      const dx=q.x-p.x,dy=q.y-p.y;
+      for(const [v,d,min,max] of [[p.x,dx,r.left-4,r.right+4],[p.y,dy,r.top-4,r.bottom+4]]){
+        if(d===0){if(v<=min||v>=max)return false;continue;}
+        const t1=(min-v)/d,t2=(max-v)/d;
+        enter=Math.max(enter,Math.min(t1,t2));exit=Math.min(exit,Math.max(t1,t2));
+      }
+      return enter<exit && exit>0 && enter<1;
+    });
+  });
+}
+
 // Search a rectilinear grid of clear corridors. Each obstacle contributes its
 // four offset sides; the shortest path may change rows at any of these gaps.
 // Work is capped so a huge imported graph can always fall back to the outer lane.
 function wfFindReturnPoints(a,b,blocks,lane=0){
-  if(b.x>=a.x) return null;
+  return wfRouteAvoidingCards(a,b,blocks,lane);
+}
+function wfRouteAvoidingCards(a,b,blocks,lane=0){
+  if(!Number.isFinite(a.x+b.x+a.y+b.y)) return null;
   const clearance=12;
   const start={x:(a.edge??a.x)+WF_LINK_CLEAR,y:a.y};
   const end={x:(b.edge??b.x)-WF_LINK_CLEAR,y:b.y};
@@ -344,7 +381,14 @@ function wfDrawWires(){
   });
   routes.sort((p,q)=>p.span-q.span || (p.key<q.key?-1:p.key>q.key?1:0));
   routes.forEach(route=>{
-    if(route.b.x>=route.a.x) return;
+    if(route.b.x>=route.a.x){
+      const other=blocks.filter(block=>block.id!==route.ed.from&&block.id!==route.ed.to);
+      if(wfForwardHitsCards(route.a,route.b,other)){
+        const points=wfRouteAvoidingCards(route.a,route.b,other);
+        if(points) route.a={...route.a,routePoints:points};
+      }
+      return;
+    }
     const region=`${Math.floor(route.b.x/160)}:${Math.floor(route.a.x/160)}`;
     const lane=returnLanes.get(region)||0;
     returnLanes.set(region,lane+1);

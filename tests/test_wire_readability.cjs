@@ -70,6 +70,109 @@ test('the two real long returns stay near the graph instead of diving below its 
   }
 });
 
+test('the router rejects an escape point already inside an unrelated card',()=>{
+  const a={x:100,y:100,edge:104,bottom:132},b={x:600,y:200,edge:596,bottom:232};
+  const blocks=[{left:95,right:125,top:85,bottom:115}];
+  assert.equal(vm.runInContext(`wfRouteAvoidingCards(${JSON.stringify(a)},${JSON.stringify(b)},${JSON.stringify(blocks)})`,ctx),null);
+});
+
+test('a diagonal forward link routes when it crosses a node, regardless of link mode',()=>{
+  const a={x:100,y:100,edge:104,bottom:132},b={x:600,y:220,edge:596,bottom:252};
+  const block={left:220,right:520,top:130,bottom:210};
+  for(const mode of ['spline','linear','straight']){
+    vm.runInContext(`wfLinkMode=${JSON.stringify(mode)}`,ctx);
+    assert.equal(vm.runInContext(`wfForwardHitsCards(${JSON.stringify(a)},${JSON.stringify(b)},[${JSON.stringify(block)}])`,ctx),true,mode);
+    const points=plain(vm.runInContext(`wfRouteAvoidingCards(${JSON.stringify(a)},${JSON.stringify(b)},[${JSON.stringify(block)}])`,ctx));
+    assert.ok(points,mode);
+  }
+  vm.runInContext('wfLinkMode="spline"',ctx);
+});
+
+test('a forward wire that collides with its own source card is not left as a piercing spline',()=>{
+  const a={x:140,y:32,edge:144,bottom:64},b={x:180,y:130,edge:176,bottom:162};
+  const source={left:0,right:144,top:0,bottom:64};
+  const target={left:176,right:320,top:98,bottom:162};
+  const points=plain(vm.runInContext(`wfRouteAvoidingCards(${JSON.stringify(a)},${JSON.stringify(b)},[])`,ctx));
+  assert.ok(points);
+  for(const block of [source,target]){
+    const segments=block===source?points.slice(1):points.slice(0,-1);
+    for(let i=1;i<segments.length;i++){
+      const p=segments[i-1],q=segments[i];
+      const hit=p.x===q.x ? p.x>block.left&&p.x<block.right&&Math.max(p.y,q.y)>block.top&&Math.min(p.y,q.y)<block.bottom
+        : p.y>block.top&&p.y<block.bottom&&Math.max(p.x,q.x)>block.left&&Math.min(p.x,q.x)<block.right;
+      assert.equal(hit,false);
+    }
+  }
+});
+
+test('linear forward links do not detour for a card merely inside the segment bounding box',()=>{
+  const a={x:100,y:100,edge:104,bottom:132},b={x:600,y:220,edge:596,bottom:252};
+  const block=[{left:220,right:250,top:190,bottom:210}];
+  vm.runInContext('wfLinkMode="linear"',ctx);
+  try{ assert.equal(vm.runInContext(`wfForwardHitsCards(${JSON.stringify(a)},${JSON.stringify(b)},${JSON.stringify(block)})`,ctx),false); }
+  finally{vm.runInContext('wfLinkMode="spline"',ctx);}
+});
+
+test('forward spline collision detector catches a wide card between the ports',()=>{
+  const a={x:100,y:100,edge:104,bottom:132},b={x:600,y:220,edge:596,bottom:252};
+  const wide=[{left:220,right:520,top:130,bottom:210}];
+  const narrow=[{left:220,right:260,top:165,bottom:210}];
+  const hit=blocks=>vm.runInContext(`wfForwardHitsCards(${JSON.stringify(a)},${JSON.stringify(b)},${JSON.stringify(blocks)})`,ctx);
+  assert.equal(hit(wide),true);
+  assert.equal(hit(narrow),false);
+});
+
+test('every forward edge in the supplied graph avoids the full node rectangles',()=>{
+  const graph=JSON.parse(fs.readFileSync(path.join(__dirname,'../workflows/GirlWars/GirlWars.json'),'utf8'))
+    .activities.find(a=>a.id==='sequence_y0b1').graph;
+  const byId=new Map(graph.nodes.map(n=>[n.id,n]));
+  const height=n=>n.type==='start'||n.type==='end'?48:n.type==='sequence'
+    ? Math.ceil(Math.max(64,Math.round((64-6)/2)+(Math.max(1,n.params.count||3))*16+6+10)/16)*16:64;
+  const blocks=graph.nodes.map(n=>({id:n.id,left:n.x,right:n.x+(n.type==='start'||n.type==='end'?48:144),top:n.y,bottom:n.y+height(n)}));
+  for(const ed of graph.edges){
+    const s=byId.get(ed.from),t=byId.get(ed.to);
+    if(t.x<=s.x)continue;
+    const outs=s.type==='sequence'?[...Array(Math.max(1,s.params.count||3))].map((_,i)=>String(i+1)).concat('end'):[];
+    const portIndex=outs.indexOf(ed.fromPort);
+    const a={x:s.x+140,y:s.y+32+(portIndex>0?portIndex*16:0),edge:s.x+144,bottom:s.y+height(s)};
+    const b={x:t.x+4,y:t.y+32,edge:t.x,bottom:t.y+height(t)};
+    const others=blocks.filter(r=>r.id!==s.id&&r.id!==t.id);
+    const collision=vm.runInContext(`wfForwardHitsCards(${JSON.stringify(a)},${JSON.stringify(b)},${JSON.stringify(others)})`,ctx);
+    if(!collision)continue;
+    const points=plain(vm.runInContext(`wfRouteAvoidingCards(${JSON.stringify(a)},${JSON.stringify(b)},${JSON.stringify(others)})`,ctx));
+    assert.ok(points,`${ed.from} → ${ed.to}: no route`);
+    for(let i=1;i<points.length;i++)for(const r of others){
+      const p=points[i-1],q=points[i];
+      const hits=p.x===q.x ? p.x>r.left&&p.x<r.right&&Math.max(p.y,q.y)>r.top&&Math.min(p.y,q.y)<r.bottom
+        : p.y>r.top&&p.y<r.bottom&&Math.max(p.x,q.x)>r.left&&Math.min(p.x,q.x)<r.right;
+      assert.ok(!hits,`${ed.from} → ${ed.to} crosses ${r.id}`);
+    }
+  }
+});
+
+test('forward links crossing cards in the supplied graph route around their real widths',()=>{
+  const workflow=JSON.parse(fs.readFileSync(path.join(__dirname,'../workflows/GirlWars/GirlWars.json'),'utf8'));
+  const graph=workflow.activities.find(a=>a.id==='sequence_y0b1').graph;
+  const nodes=new Map(graph.nodes.map(n=>[n.id,n]));
+  for(const [from,to,obstacle] of [['nmqiurm6','netukhz3','nz9ru58v'],['nkgykvzg','nxxatqvh','n7r7xv97']]){
+    const s=nodes.get(from),t=nodes.get(to),o=nodes.get(obstacle);
+    const a={x:s.x+140,y:s.y+32,edge:s.x+144,bottom:s.y+64};
+    const b={x:t.x+4,y:t.y+32,edge:t.x,bottom:t.y+64};
+    const block={left:o.x,right:o.x+144,top:o.y,bottom:o.y+64};
+    const routed=plain(vm.runInContext(`wfRouteAvoidingCards(${JSON.stringify(a)},${JSON.stringify(b)},[${JSON.stringify(block)}])`,ctx));
+    assert.ok(routed,`${from} must avoid ${obstacle}`);
+    assert.deepEqual(routed[0],{x:a.x,y:a.y});
+    assert.deepEqual(routed.at(-1),{x:b.x,y:b.y});
+    for(let i=1;i<routed.length;i++){
+      const p=routed[i-1],q=routed[i];
+      assert.ok(p.x===q.x||p.y===q.y);
+      const hits=p.x===q.x ? p.x>block.left&&p.x<block.right&&Math.max(p.y,q.y)>block.top&&Math.min(p.y,q.y)<block.bottom
+        : p.y>block.top&&p.y<block.bottom&&Math.max(p.x,q.x)>block.left&&Math.min(p.x,q.x)<block.right;
+      assert.ok(!hits,`${from} crosses ${obstacle}`);
+    }
+  }
+});
+
 test('rendered return path follows obstacle waypoints without changing ordinary link modes',()=>{
   const a={x:500,y:100,edge:504,bottom:132,routePoints:[{x:500,y:100},{x:520,y:100},{x:520,y:180},{x:80,y:180},{x:80,y:100},{x:100,y:100}]};
   const b={x:100,y:100,edge:96,bottom:132};
