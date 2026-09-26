@@ -324,15 +324,6 @@ document.addEventListener("keydown",e=>{
   wfDeleteWire(grp.__edge);
 });
 
-// Lift the active SVG group above other groups so crossings cannot paint over it.
-// The next draw restores the deterministic normal paint order.
-document.addEventListener('pointerover',e=>{
-  if(e.target?.classList?.contains('wire-hit')) e.target.parentNode.parentNode.appendChild(e.target.parentNode);
-});
-document.addEventListener('focusin',e=>{
-  if(e.target?.classList?.contains('wire-hit')) e.target.parentNode.parentNode.appendChild(e.target.parentNode);
-});
-
 // Hover a wire → light up its two endpoint sockets so the eye traces the link
 // from block to block. Delegated like the Delete handler: one listener serves
 // every wire, and leaving clears whatever is lit (one hover at a time).
