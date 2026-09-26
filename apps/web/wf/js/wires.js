@@ -144,7 +144,10 @@ function wfLinearPath(a,b){
   return `M${a.x},${a.y} L${a.x+s},${a.y} L${b.x-s},${b.y} L${b.x},${b.y}`;
 }
 function wfStraightPath(a,b){
-  const pts=wfOrthogonalPoints(a,b);
+  return wfRoundedPointsPath(wfOrthogonalPoints(a,b));
+}
+function wfRoundedPointsPath(pts){
+  const a=pts[0],b=pts[pts.length-1];
   let d=`M${a.x},${a.y}`;
   for(let i=1;i<pts.length-1;i++){
     const p=pts[i-1],q=pts[i],r=pts[i+1];
@@ -171,6 +174,7 @@ function wfOrthogonalPoints(a,b){
   return [a,{x:right,y:a.y},{x:right,y},{x:left,y},{x:left,y:b.y},b];
 }
 function wfWirePath(a,b){
+  if(a.routePoints) return wfRoundedPointsPath(a.routePoints);
   if(a.returnY!=null) return wfStraightPath(a,b);
   if(wfLinkMode==="linear")   return wfLinearPath(a,b);
   if(wfLinkMode==="straight") return wfStraightPath(a,b);
@@ -199,6 +203,72 @@ function wfRouteReturn(a,b,blocks,lane){
   const bottom=crossed.reduce((y,block)=>Math.max(y,block.bottom),
     Math.max(a.bottom??a.y,b.bottom??b.y));
   return {a:{...a,returnY:bottom+28+lane*18},b};
+}
+
+// Search a rectilinear grid of clear corridors. Each obstacle contributes its
+// four offset sides; the shortest path may change rows at any of these gaps.
+// Work is capped so a huge imported graph can always fall back to the outer lane.
+function wfFindReturnPoints(a,b,blocks,lane=0){
+  if(b.x>=a.x) return null;
+  const clearance=12;
+  const start={x:(a.edge??a.x)+WF_LINK_CLEAR,y:a.y};
+  const end={x:(b.edge??b.x)-WF_LINK_CLEAR,y:b.y};
+  const low=Math.min(a.y,b.y)-160, high=Math.max(a.y,b.y)+160;
+  const left=Math.min(end.x,start.x)-160, right=Math.max(end.x,start.x)+160;
+  const obstacles=blocks.filter(r=>r.top!=null && r.bottom>=low && r.top<=high &&
+    r.right>=left && r.left<=right).map(r=>({left:r.left-clearance,right:r.right+clearance,
+      top:r.top-clearance,bottom:r.bottom+clearance}));
+  const xs=[start.x,end.x],ys=[start.y,end.y];
+  // Keep parallel return edges apart without changing their endpoints.
+  if(lane>0) ys.push(Math.min(a.y,b.y)-28-lane*18,Math.max(a.y,b.y)+28+lane*18);
+  for(const r of obstacles){
+    xs.push(r.left-1,r.right+1);
+    ys.push(r.top-1-lane*18,r.bottom+1+lane*18);
+  }
+  const unique=values=>[...new Set(values)].sort((x,y)=>x-y);
+  const X=unique(xs),Y=unique(ys),width=X.length,height=Y.length;
+  if(width*height>25000) return null;
+  const xi=new Map(X.map((x,i)=>[x,i])), yi=new Map(Y.map((y,i)=>[y,i]));
+  const key=(x,y,dir)=>((y*width+x)*3+dir);
+  const origin=key(xi.get(start.x),yi.get(start.y),0);
+  const targetX=xi.get(end.x),targetY=yi.get(end.y);
+  const clear=(x1,y1,x2,y2)=>obstacles.every(r=>
+    x1===x2 ? !(x1>r.left && x1<r.right && Math.max(y1,y2)>r.top && Math.min(y1,y2)<r.bottom) :
+      !(y1>r.top && y1<r.bottom && Math.max(x1,x2)>r.left && Math.min(x1,x2)<r.right));
+  if(!clear(start.x,start.y,start.x,start.y)||!clear(end.x,end.y,end.x,end.y) ||
+    !clear(a.x,a.y,start.x,start.y)||!clear(end.x,end.y,b.x,b.y)) return null;
+  const best=new Map([[origin,0]]),previous=new Map(),heap=[];
+  const push=item=>{heap.push(item);let i=heap.length-1;while(i){const p=(i-1)>>1;if(heap[p].f<=item.f)break;heap[i]=heap[p];i=p;}heap[i]=item;};
+  const pop=()=>{const result=heap[0],last=heap.pop();if(heap.length){let i=0;while(i*2+1<heap.length){let c=i*2+1;if(c+1<heap.length&&heap[c+1].f<heap[c].f)c++;if(heap[c].f>=last.f)break;heap[i]=heap[c];i=c;}heap[i]=last;}return result;};
+  const estimate=(x,y)=>Math.abs(X[x]-end.x)+Math.abs(Y[y]-end.y);
+  push({id:origin,x:xi.get(start.x),y:yi.get(start.y),dir:0,g:0,f:estimate(xi.get(start.x),yi.get(start.y))});
+  let found=null,expanded=0;
+  while(heap.length && expanded++<18000){
+    const node=pop();if(node.g!==best.get(node.id))continue;
+    if(node.x===targetX && node.y===targetY){found=node.id;break;}
+    for(const [dx,dy,dir] of [[-1,0,1],[1,0,1],[0,-1,2],[0,1,2]]){
+      const nx=node.x+dx,ny=node.y+dy;
+      if(nx<0||ny<0||nx>=width||ny>=height||!clear(X[node.x],Y[node.y],X[nx],Y[ny]))continue;
+      const id=key(nx,ny,dir),g=node.g+Math.abs(X[nx]-X[node.x])+Math.abs(Y[ny]-Y[node.y])+
+        (node.dir && node.dir!==dir ? 18 : 0);
+      if(g>=(best.get(id)??Infinity))continue;
+      best.set(id,g);previous.set(id,node.id);push({id,x:nx,y:ny,dir,g,f:g+estimate(nx,ny)});
+    }
+  }
+  if(found==null)return null;
+  const route=[];
+  for(let id=found;id!=null;id=previous.get(id)){
+    const pos=Math.floor(id/3);route.push({x:X[pos%width],y:Y[Math.floor(pos/width)]});
+  }
+  route.reverse();
+  const points=[{x:a.x,y:a.y},...route,{x:b.x,y:b.y}];
+  // Collapse consecutive collinear waypoints; SVG corners remain rounded.
+  for(let i=1;i<points.length-1;){
+    if((points[i-1].x===points[i].x&&points[i].x===points[i+1].x)||
+       (points[i-1].y===points[i].y&&points[i].y===points[i+1].y))points.splice(i,1);
+    else i++;
+  }
+  return points;
 }
 
 // Arrow position and tangent are computed from the route rather than reading
@@ -252,7 +322,7 @@ function wfDrawWires(){
   if(!g) return;
   wfWireIndexRebuild();
   const blocks=[...world.querySelectorAll('.wf-node')].map(el=>({
-    left:el.offsetLeft, right:el.offsetLeft+el.offsetWidth,
+    id:el.dataset.node, left:el.offsetLeft, right:el.offsetLeft+el.offsetWidth,
     top:el.offsetTop, bottom:el.offsetTop+el.offsetHeight,
   }));
   const returnLanes=new Map();
@@ -278,7 +348,10 @@ function wfDrawWires(){
     const region=`${Math.floor(route.b.x/160)}:${Math.floor(route.a.x/160)}`;
     const lane=returnLanes.get(region)||0;
     returnLanes.set(region,lane+1);
-    ({a:route.a,b:route.b}=wfRouteReturn(route.a,route.b,blocks,lane));
+    const points=wfFindReturnPoints(route.a,route.b,
+      blocks.filter(block=>block.id!==route.ed.from&&block.id!==route.ed.to),lane);
+    if(points) route.a={...route.a,routePoints:points};
+    else ({a:route.a,b:route.b}=wfRouteReturn(route.a,route.b,blocks,lane));
   });
 
   const frag=document.createDocumentFragment();
