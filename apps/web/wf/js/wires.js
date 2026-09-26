@@ -29,7 +29,8 @@ function wfWireIndexRebuild(){
       // block, so a link has to swing past that edge to be seen at all — the
       // router solves for it below rather than guessing a handle length.
       const pt={ x:x+p.offsetLeft+p.offsetWidth/2, y:y+p.offsetTop+p.offsetHeight/2,
-                 edge: side==="out" ? right : x, bottom:y+el.offsetHeight };
+                 edge: side==="out" ? right : x, bottom:y+el.offsetHeight,
+                 card:{left:x,right,top:y,bottom:y+el.offsetHeight} };
       ports.set(side+":"+p.dataset.port, pt);
       if(!ports.has(side)) ports.set(side, pt);   // first port of a side = fallback
     });
@@ -255,6 +256,14 @@ function wfRouteAvoidingCards(a,b,blocks,lane=0){
   const obstacles=blocks.filter(r=>r.top!=null && r.bottom>=low && r.top<=high &&
     r.right>=left && r.left<=right).map(r=>({left:r.left-clearance,right:r.right+clearance,
       top:r.top-clearance,bottom:r.bottom+clearance}));
+  // Endpoint bodies remain obstacles during the search. Only the two socket
+  // stubs may cross their own card; removing whole endpoint cards allowed a
+  // shortest path to cut back through a sequence or loop body.
+  const unrelated=obstacles.slice();
+  for(const card of [a.card,b.card]) if(card){
+    obstacles.push({left:card.left-clearance,right:card.right+clearance,
+      top:card.top-clearance,bottom:card.bottom+clearance});
+  }
   const xs=[start.x,end.x],ys=[start.y,end.y];
   // Keep parallel return edges apart without changing their endpoints.
   if(lane>0) ys.push(Math.min(a.y,b.y)-28-lane*18,Math.max(a.y,b.y)+28+lane*18);
@@ -269,11 +278,11 @@ function wfRouteAvoidingCards(a,b,blocks,lane=0){
   const key=(x,y,dir)=>((y*width+x)*3+dir);
   const origin=key(xi.get(start.x),yi.get(start.y),0);
   const targetX=xi.get(end.x),targetY=yi.get(end.y);
-  const clear=(x1,y1,x2,y2)=>obstacles.every(r=>
+  const clear=(x1,y1,x2,y2,rects=obstacles)=>rects.every(r=>
     x1===x2 ? !(x1>r.left && x1<r.right && Math.max(y1,y2)>r.top && Math.min(y1,y2)<r.bottom) :
       !(y1>r.top && y1<r.bottom && Math.max(x1,x2)>r.left && Math.min(x1,x2)<r.right));
   if(!clear(start.x,start.y,start.x,start.y)||!clear(end.x,end.y,end.x,end.y) ||
-    !clear(a.x,a.y,start.x,start.y)||!clear(end.x,end.y,b.x,b.y)) return null;
+    !clear(a.x,a.y,start.x,start.y,unrelated)||!clear(end.x,end.y,b.x,b.y,unrelated)) return null;
   const best=new Map([[origin,0]]),previous=new Map(),heap=[];
   const push=item=>{heap.push(item);let i=heap.length-1;while(i){const p=(i-1)>>1;if(heap[p].f<=item.f)break;heap[i]=heap[p];i=p;}heap[i]=item;};
   const pop=()=>{const result=heap[0],last=heap.pop();if(heap.length){let i=0;while(i*2+1<heap.length){let c=i*2+1;if(c+1<heap.length&&heap[c+1].f<heap[c].f)c++;if(heap[c].f>=last.f)break;heap[i]=heap[c];i=c;}heap[i]=last;}return result;};
