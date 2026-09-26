@@ -177,13 +177,26 @@ function wfWirePath(a,b){
   return wfSplinePath(a,b);
 }
 
-// Route a backwards connection outside every card between its endpoints, not
-// just its two endpoint cards. Offset simultaneous returns into separate lanes.
+// Route a backwards connection through the nearest unobstructed horizontal
+// gap between its endpoints. If no such gap exists (e.g. ports on the same
+// row), return outside the entire intervening row instead.
 function wfRouteReturn(a,b,blocks,lane){
   if(b.x>=a.x) return {a,b};
   const left=Math.min(b.edge??b.x,b.x), right=Math.max(a.edge??a.x,a.x);
-  const bottom=blocks.reduce((y,block)=>
-    block.right>=left && block.left<=right ? Math.max(y,block.bottom) : y,
+  const crossed=blocks.filter(block=>block.right>=left && block.left<=right);
+  const clearance=24, low=Math.min(a.y,b.y), high=Math.max(a.y,b.y);
+  // A candidate is just past a card boundary. Testing the whole horizontal
+  // span avoids routing through another card in the same band.
+  const candidates=crossed.flatMap(block=>block.top==null ? [] :
+    [block.top-clearance,block.bottom+clearance]);
+  const open=candidates.filter(y=>y>low+clearance && y<high-clearance &&
+    crossed.every(block=>block.top!=null && (y<=block.top-clearance || y>=block.bottom+clearance)));
+  if(open.length){
+    open.sort((x,y)=>Math.abs(x-a.y)-Math.abs(y-a.y) || x-y);
+    const chosen=open[Math.min(lane,open.length-1)];
+    return {a:{...a,returnY:chosen},b};
+  }
+  const bottom=crossed.reduce((y,block)=>Math.max(y,block.bottom),
     Math.max(a.bottom??a.y,b.bottom??b.y));
   return {a:{...a,returnY:bottom+28+lane*18},b};
 }
@@ -240,7 +253,7 @@ function wfDrawWires(){
   wfWireIndexRebuild();
   const blocks=[...world.querySelectorAll('.wf-node')].map(el=>({
     left:el.offsetLeft, right:el.offsetLeft+el.offsetWidth,
-    bottom:el.offsetTop+el.offsetHeight,
+    top:el.offsetTop, bottom:el.offsetTop+el.offsetHeight,
   }));
   const returnLanes=new Map();
 
