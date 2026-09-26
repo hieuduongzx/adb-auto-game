@@ -1,6 +1,7 @@
 // ── Wires ────────────────────────────────────────────────────────────────────
 // Wires paint below cards (they run under a block and re-emerge at its far
-// edge), with an underlay at crossings. No mid-wire markers — direction reads
+// edge), with an underlay at crossings. Backward links route outside the row.
+// No mid-wire markers — direction reads
 // from the port side. Selection highlights adjacent links without rebuilding
 // paths or changing execution-state colours.
 //
@@ -8,6 +9,8 @@
 //   spline   (default) — cubic bezier, horizontal handles ¼ of the port distance
 //   linear             — one straight run with a short stub off each port
 //   straight           — orthogonal Z: stub → vertical at the midpoint → stub
+// Backward links use an outside orthogonal lane in every mode, keeping their
+// return segment clear of intermediate cards.
 //
 // One DOM read pass per draw feeds the geometry: port centres come from
 // offsetLeft/offsetTop (already #wf-world layout coords), so it is zoom-
@@ -164,13 +167,25 @@ function wfOrthogonalPoints(a,b){
   // cards, then approach the destination from the left (including self-links).
   const right=Math.max(a.x,a.edge??a.x)+s;
   const left=Math.min(b.x,b.edge??b.x)-s;
-  const y=Math.max(a.bottom??a.y,b.bottom??b.y)+28;
+  const y=a.returnY??Math.max(a.bottom??a.y,b.bottom??b.y)+28;
   return [a,{x:right,y:a.y},{x:right,y},{x:left,y},{x:left,y:b.y},b];
 }
 function wfWirePath(a,b){
+  if(a.returnY!=null) return wfStraightPath(a,b);
   if(wfLinkMode==="linear")   return wfLinearPath(a,b);
   if(wfLinkMode==="straight") return wfStraightPath(a,b);
   return wfSplinePath(a,b);
+}
+
+// Route a backwards connection outside every card between its endpoints, not
+// just its two endpoint cards. Offset simultaneous returns into separate lanes.
+function wfRouteReturn(a,b,blocks,lane){
+  if(b.x>=a.x) return {a,b};
+  const left=Math.min(b.edge??b.x,b.x), right=Math.max(a.edge??a.x,a.x);
+  const bottom=blocks.reduce((y,block)=>
+    block.right>=left && block.left<=right ? Math.max(y,block.bottom) : y,
+    Math.max(a.bottom??a.y,b.bottom??b.y));
+  return {a:{...a,returnY:bottom+28+lane*18},b};
 }
 
 // Arrow position and tangent are computed from the route rather than reading
@@ -223,6 +238,11 @@ function wfDrawWires(){
   svg.innerHTML=""; if(temp) svg.appendChild(temp);
   if(!g) return;
   wfWireIndexRebuild();
+  const blocks=[...world.querySelectorAll('.wf-node')].map(el=>({
+    left:el.offsetLeft, right:el.offsetLeft+el.offsetWidth,
+    bottom:el.offsetTop+el.offsetHeight,
+  }));
+  const returnLanes=new Map();
 
   // Resolve endpoints first, then sort shortest-first so a long run paints over
   // the local hops rather than under them. Ties break on a stable key, so paint
@@ -231,13 +251,22 @@ function wfDrawWires(){
   const routes=[];
   (g.edges||[]).forEach(ed=>{
     const toPort=ed.toPort||"in";
-    const a=wfPortPt(ed.from,ed.fromPort), b=wfPortPt(ed.to,toPort);
-    if(!a||!b) return;
-    routes.push({ ed, a, b, toPort,
-      span:Math.abs(b.x-a.x)+Math.abs(b.y-a.y),
+    const source=wfPortPt(ed.from,ed.fromPort), target=wfPortPt(ed.to,toPort);
+    if(!source||!target) return;
+    // Share lanes only for returns spanning the same region. Stable edge order
+    // is derived from endpoint ids below, independently of the JSON edge order.
+    routes.push({ ed, a:source, b:target, toPort,
+      span:Math.abs(target.x-source.x)+Math.abs(target.y-source.y),
       key:`${ed.from}\u0000${ed.fromPort||"out"}\u0000${ed.to}\u0000${toPort}` });
   });
   routes.sort((p,q)=>p.span-q.span || (p.key<q.key?-1:p.key>q.key?1:0));
+  routes.forEach(route=>{
+    if(route.b.x>=route.a.x) return;
+    const region=`${Math.floor(route.b.x/160)}:${Math.floor(route.a.x/160)}`;
+    const lane=returnLanes.get(region)||0;
+    returnLanes.set(region,lane+1);
+    ({a:route.a,b:route.b}=wfRouteReturn(route.a,route.b,blocks,lane));
+  });
 
   const frag=document.createDocumentFragment();
   const byId=new Map((g.nodes||[]).map(n=>[n.id,n]));
@@ -293,6 +322,15 @@ document.addEventListener("keydown",e=>{
   if(!grp||!grp.__edge) return;
   e.preventDefault(); e.stopPropagation();
   wfDeleteWire(grp.__edge);
+});
+
+// Lift the active SVG group above other groups so crossings cannot paint over it.
+// The next draw restores the deterministic normal paint order.
+document.addEventListener('pointerover',e=>{
+  if(e.target?.classList?.contains('wire-hit')) e.target.parentNode.parentNode.appendChild(e.target.parentNode);
+});
+document.addEventListener('focusin',e=>{
+  if(e.target?.classList?.contains('wire-hit')) e.target.parentNode.parentNode.appendChild(e.target.parentNode);
 });
 
 // Hover a wire → light up its two endpoint sockets so the eye traces the link
