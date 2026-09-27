@@ -55,7 +55,7 @@ function wfCopy(){
   const idset=new Set(ids);
   const nodes=ids.map(id=>{ const n=g.nodes.find(x=>x.id===id);
     return { type:n.type, x:n.x, y:n.y, note:n.note||"", log:n.log||"", outputLogs:wfOutputLogValues(n), showPreview:!!n.showPreview,
-      delayBefore:n.delayBefore||0, delayAfter:n.delayAfter||0,
+      delay:n.delay||0,
       retryCount:n.retryCount||0, retryDelay:n.retryDelay||0, screenshotOnFail:!!n.screenshotOnFail,
       params:JSON.parse(JSON.stringify(n.params||{})) }; });
   const edges=g.edges.filter(e=>idset.has(e.from)&&idset.has(e.to))
@@ -87,8 +87,8 @@ function wfPaste(opts){
     node.note=n.note||""; node.log=n.log||""; node.outputLogs=wfOutputLogValues(n); node.showPreview=!!n.showPreview;
     // A duplicate is an exact copy, not a fresh node — carry the original's
     // timing/failure handling across instead of re-stamping the project defaults.
-    if(n.delayBefore!==undefined) node.delayBefore=n.delayBefore;
-    if(n.delayAfter!==undefined) node.delayAfter=n.delayAfter;
+    if(n.delay!==undefined || n.delayBefore!==undefined) node.delay=n.delay??n.delayBefore;
+    delete node.delayBefore; delete node.delayAfter;
     if(n.retryCount!==undefined) node.retryCount=n.retryCount;
     if(n.retryDelay!==undefined) node.retryDelay=n.retryDelay;
     if(n.screenshotOnFail!==undefined) node.screenshotOnFail=n.screenshotOnFail;

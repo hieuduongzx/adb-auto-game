@@ -939,24 +939,17 @@ function wfColorDotHtml(n,def){
   return /^#[0-9a-fA-F]{6}$/.test(v) ? `<span class="wf-node-colordot" style="background:${v}"></span>` : "";
 }
 
-// Timing ticks (delayBefore / delayAfter) — ONE pill under the card's bottom
-// edge holding both waits, split by a "|" divider ("−1.5s | +0.5s"), so a wait
-// never stretches the standardized block. Shared by wfNodeEl and the
-// inspector's live update. Each half keeps its data-phase so the runtime
-// countdown can light up just the side that's actually waiting.
+// Pre-block delay pill under the card, shared with the inspector live update.
 function wfDelaySecs(n){
   const v=parseFloat(n); if(!v) return "0s";
   const s=Number.isInteger(v)?String(v):String(v);
   return s+"s";
 }
 function wfDelayChipsHtml(n){
-  const dp=[];
-  if(n.delayBefore) dp.push(`<span class="wf-delay-chip" data-phase="before" data-secs="${n.delayBefore}" title="Wait ${wfDelaySecs(n.delayBefore)} before this block"><span class="wf-delay-label">−${wfDelaySecs(n.delayBefore)}</span></span>`);
-  if(n.delayAfter)  dp.push(`<span class="wf-delay-chip" data-phase="after" data-secs="${n.delayAfter}" title="Wait ${wfDelaySecs(n.delayAfter)} after this block"><span class="wf-delay-label">+${wfDelaySecs(n.delayAfter)}</span></span>`);
-  return dp.length ? `<div class="wf-node-delay">${dp.join(`<span class="wf-delay-sep">|</span>`)}</div>` : "";
+  return n.delay ? `<div class="wf-node-delay"><span class="wf-delay-chip" data-phase="before" data-secs="${n.delay}" title="Wait ${wfDelaySecs(n.delay)} before this block"><span class="wf-delay-label">${wfDelaySecs(n.delay)}</span></span></div>` : "";
 }
-// Timeout corner badge. A block whose def declares a timeout param gets a small
-// "Ns" pill at its top-right corner (clock is CSS); while the block runs, the same pill
+// Timeout pill beside the pre-block delay below the card (clock is CSS).
+// A block whose def declares a timeout param gets a pill; while it runs, that pill
 // counts down against the engine's deadline (see wfStartNodeTimeout in base.js).
 // Numeric literal → show the value; anything else (blank → the field's default,
 // a {var} reference) still marks the block as timeout-bounded.
@@ -968,6 +961,10 @@ function wfTimeoutChipHtml(n){
   const num=(typeof raw==="number")?raw:parseFloat(raw);
   const shown=Number.isFinite(num)&&num>0?wfDelaySecs(num):"";
   return `<span class="wf-node-timeout" data-secs="${Number.isFinite(num)?num:""}" title="Timeout: ${Number.isFinite(num)&&num>0?wfDelaySecs(num):"set by expression / default"}"><span class="wf-timeout-label">${shown}</span></span>`;
+}
+function wfTimingChipsHtml(n){
+  const chips=wfDelayChipsHtml(n)+wfTimeoutChipHtml(n);
+  return `<div class="wf-node-timing">${chips}</div>`;
 }
 // Card geometry, mirroring css/base.css (--node-h, --term-size, --port-sz).
 // Port rows are computed here rather than in CSS because a block's slot count
@@ -1185,8 +1182,7 @@ function wfNodeEl(n){
   const noteHtml = n.note ? `<div class="wf-node-note">${wfIco("edit")}<span>${escHtml(n.note)}</span></div>` : "";
   const logHtml=wfNodeLogEntries(n).map(({key,tag,text})=>
     `<div class="wf-node-log wf-node-log-${key==="input"?"in":"out"}"><b>${escHtml(tag)}</b>${escHtml(text)}</div>`).join("");
-  const delayHtml = wfDelayChipsHtml(n);
-  const timeoutHtml = wfTimeoutChipHtml(n);
+  const timingHtml = wfTimingChipsHtml(n);
   const rp=[];
   if(n.retryCount) rp.push(`${wfIco("loop")}<span>Retry ${n.retryCount}×</span>`);
   if(n.screenshotOnFail) rp.push(`${wfIco("camera")}<span>Screenshot on fail</span>`);
@@ -1228,7 +1224,7 @@ function wfNodeEl(n){
     el.innerHTML=
       actBar+
       `<div class="wf-node-hd"><span class="ico">${wfIco(def.ico)}</span><span class="wf-node-title" title="${escHtml(title)}">${escHtml(title)}</span></div>`+
-      topRow+delayHtml+timeoutHtml+retryHtml+noteHtml+logHtml;
+      topRow+timingHtml+retryHtml+noteHtml+logHtml;
   }
   // Output ports are placed first; input ports mirror the output row of the
   // same index so a block's in/out wires start level. Switch builds its ports

@@ -781,7 +781,7 @@ class WorkflowEngine:
             # actually taken (a condition's "true"/"false", a loop's "body"/"done",
             # else "out"). Lets the designer paint the executed path + branch taken.
             "on_node_done": [],
-            # fired when a per-node delayBefore/delayAfter wait starts or ends:
+            # fired when a per-node delay starts or ends:
             # (node_id, phase, seconds). phase is "before" | "after" while waiting,
             # or None when the wait finishes / is cancelled. seconds is the full
             # wait length on start (0 on end). Designer shows a live countdown.
@@ -1655,10 +1655,8 @@ class WorkflowEngine:
             label = (spec or {}).get("label") or ntype
             params = node.get("params", {}) or {}
 
-            # Universal pre-block pause ("Chờ trước"): wait, THEN run the block
-            # (e.g. let the screen settle before searching for an image). The
-            # legacy single `delay` param is read here as delayBefore.
-            db = self._delay_val(node, "delayBefore", params)
+            # Universal delay: wait before running the block.
+            db = self._delay_val(node, params)
             if db > 0:
                 self._emit("on_node_delay", nid, "before", db)
                 self._sleep(db)
@@ -1723,7 +1721,7 @@ class WorkflowEngine:
                 # Lặp đến khi <điều kiện>: mỗi lần (re-)enter node, kiểm tra một
                 # lần. Thoả → "found"; break trong thân → "found" (thoát); hết
                 # maxLoops → "fail"; còn lượt → "body" (thân quay về cổng
-                # "loop"). delayBefore của node đóng vai trò poll interval.
+                # "loop"). delay của node đóng vai trò poll interval.
                 # Điều kiện tuỳ ntype: ảnh / màu / chữ / biến.
                 what = self._loop_until_label(ntype, params)
                 lu_port = None
@@ -1987,14 +1985,6 @@ class WorkflowEngine:
                     break
                 cur = self._next(adj, cur, "out")
 
-            # Universal post-block pause ("Chờ sau"): block done → wait → then on
-            # to the next block. Skipped on branches that `break` above (end /
-            # stop / parallel / join / try_chain), which already terminate here.
-            da = self._delay_val(node, "delayAfter", params)
-            if da > 0 and cur and not self._stop.is_set():
-                self._emit("on_node_delay", nid, "after", da)
-                self._sleep(da)
-                self._emit("on_node_delay", nid, None, 0)
         # Falling out with no ``cur`` means the last block's chosen port had no
         # wire — the walk ran out of graph instead of reaching an End. Every
         # `break` above leaves ``cur`` set, so this only catches real dead ends.
@@ -3455,13 +3445,9 @@ class WorkflowEngine:
         except Exception as e:
             log_warning(f"[speedhack] error while disabling: {e}")
 
-    def _delay_val(self, node: Dict, key: str, params: Dict) -> float:
-        """Per-node pause (seconds) for delayBefore / delayAfter. Falls back to
-        the legacy single ``delay`` param (read as delayBefore) so workflows
-        saved before the split keep working without a rewrite."""
-        v = node.get(key)
-        if v is None and key == "delayBefore":
-            v = params.get("delay")
+    def _delay_val(self, node: Dict, params: Dict) -> float:
+        """Pre-block delay, including workflows not yet migrated on disk."""
+        v = node.get("delay", node.get("delayBefore", params.get("delay")))
         try:
             return max(0.0, float(v or 0))
         except (TypeError, ValueError):

@@ -127,10 +127,10 @@ window.__recv = function(raw){
   if(type==="node_active"){
     // Full test run OR single-block test both light the amber node.
     if(!wfRunning && !wfNodeTesting) return;
-    // New node → any previous delayAfter countdown is done.
+    // New node → any previous countdown is done.
     if(typeof wfClearNodeDelay==="function") wfClearNodeDelay();
     if(data.id){ wfLiveNode=data.id; wfNoteNodeStart(data.id); }   // the true running node, even if in an off-screen graph
-    // Timeout-bounded blocks count down on their corner badge. delayBefore
+    // Timeout-bounded blocks count down on their corner badge. Delay
     // (node_delay "before", next event) replaces this briefly; the timeout's
     // engine clock only starts once the block runs, so we re-arm it then.
     if(data.id && typeof wfStartNodeTimeout==="function") wfStartNodeTimeout(data.id);
@@ -147,8 +147,7 @@ window.__recv = function(raw){
   }
   if(type==="node_result"){
     if(!wfRunning && !wfNodeTesting) return;
-    // delayBefore is over once the action reports a result; delayAfter may start
-    // next via node_delay — only clear a before-wait here so we don't wipe after.
+    // Clear any pre-block delay or timeout countdown.
     if(typeof wfDelayState!=="undefined" && wfDelayState && (wfDelayState.phase==="before" || wfDelayState.phase==="timeout"))
       wfClearNodeDelay();
     wfNoteNodeDone(data.id);
@@ -162,17 +161,17 @@ window.__recv = function(raw){
     if(typeof wfDebugAutoStep==="function") wfDebugAutoStep();
     return;
   }
-  // Per-node delayBefore / delayAfter: engine is sleeping; show a live countdown
+  // Per-node delay: engine is sleeping; show a live countdown
   // on the delay chip next to the block (phase null = wait finished).
   if(type==="node_delay"){
     if(!wfRunning && !wfNodeTesting) return;
     if(data.id && wfFocusOn && !wfNodeTesting) wfFocusFollow(data.id);
-    if(data.phase==="before" || data.phase==="after"){
+    if(data.phase==="before"){
       if(data.id && !wfNode(data.id)) return;
       wfStartNodeDelay(data.id, data.phase, data.seconds);
     } else {
       wfEndNodeDelay(data.id);
-      // delayBefore just ended → the block itself runs now, so its timeout
+      // Delay just ended → the block itself runs now, so its timeout
       // deadline starts here (the engine sets it after the pre-block sleep).
       if(data.id && typeof wfStartNodeTimeout==="function") wfStartNodeTimeout(data.id);
     }

@@ -71,7 +71,7 @@ test('timeout countdown: start → counts down → clear restores static value',
     classList:{ add(){}, remove(){} },
     querySelector: sel => sel==='.wf-node-timeout' ? chip : null,
     querySelectorAll: () => [] };
-  vm.runInContext(read('base.js').slice(read('base.js').indexOf('// ── Live delayBefore')), ctx);
+  vm.runInContext(read('base.js').slice(read('base.js').indexOf('// ── Live pre-block delay')), ctx);
   ctx.document.querySelector = sel => sel==='.wf-node[data-node="n1"]' ? nodeEl : null;
   // wfPaintNodeDelay resolves the block through wfNodeElById — re-point the stub.
   vm.runInContext(`wfNodeElById = id => document.querySelector('.wf-node[data-node="'+id+'"]');`, ctx);
@@ -89,10 +89,10 @@ test('timeout countdown: start → counts down → clear restores static value',
   assert.ok(!chip.classList.contains('counting'));
 });
 
-test('delayBefore end re-arms the timeout countdown', () => {
+test('delay end re-arms the timeout countdown', () => {
   const ctx = makeCtx();
   vm.runInContext(`function wfNode(id){ return {id, type:'wait_image', params:{timeout:5}}; }`, ctx);
-  vm.runInContext(read('base.js').slice(read('base.js').indexOf('// ── Live delayBefore')), ctx);
+  vm.runInContext(read('base.js').slice(read('base.js').indexOf('// ── Live pre-block delay')), ctx);
   vm.runInContext(`
     wfStartNodeTimeout('n1');                 // node_active arms the timeout
     wfStartNodeDelay('n1','before',2);        // node_delay "before" replaces it

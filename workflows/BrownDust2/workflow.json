@@ -35,8 +35,7 @@
     }
   ],
   "nodeDefaults": {
-    "delayBefore": 1,
-    "delayAfter": 0,
+    "delay": 1,
     "retryCount": 0,
     "retryDelay": 0,
     "screenshotOnFail": false
@@ -115,7 +114,7 @@
               "y": 141,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n9uo6dnv",
@@ -126,7 +125,7 @@
               "infinite": false,
               "count": 5
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nv93mcdp",
@@ -269,7 +268,7 @@
           {
             "id": "nxeeg0sp",
             "type": "end",
-            "x": 1232,
+            "x": 1416,
             "y": 408,
             "params": {}
           },
@@ -285,7 +284,7 @@
               "center": true
             },
             "log": "Resizing the game window to 1920x1080",
-            "delayBefore": 15
+            "delay": 15
           },
           {
             "id": "nlen4rj4",
@@ -347,7 +346,7 @@
               "name": "isFirstGoHome",
               "value": "true"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n6ndne8t",
@@ -360,7 +359,7 @@
               "y": 700,
               "taps": "1"
             },
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "nngyks9j",
@@ -373,7 +372,19 @@
               "timeout": 300,
               "negate": false
             },
-            "delayBefore": 1
+            "delay": 1
+          },
+          {
+            "id": "n16kvm7q",
+            "type": "if_image",
+            "x": 1360,
+            "y": 272,
+            "params": {
+              "template": "templates/crop_20260922_124530_1200_680_383_47.png",
+              "threshold": 0.85,
+              "negate": false
+            },
+            "delay": 1
           }
         ],
         "edges": [
@@ -418,11 +429,6 @@
             "to": "nan17tve"
           },
           {
-            "from": "n6ndne8t",
-            "fromPort": "out",
-            "to": "nxeeg0sp"
-          },
-          {
             "from": "n9mbkagd",
             "fromPort": "out",
             "to": "nngyks9j"
@@ -431,6 +437,21 @@
             "from": "nngyks9j",
             "fromPort": "true",
             "to": "n6ndne8t"
+          },
+          {
+            "from": "n6ndne8t",
+            "fromPort": "out",
+            "to": "n16kvm7q"
+          },
+          {
+            "from": "n16kvm7q",
+            "fromPort": "true",
+            "to": "n6ndne8t"
+          },
+          {
+            "from": "n16kvm7q",
+            "fromPort": "false",
+            "to": "nxeeg0sp"
           }
         ],
         "groups": []
@@ -466,7 +487,7 @@
               "y": 968,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [
@@ -521,8 +542,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 3,
-            "delayAfter": 1
+            "delay": 3
           },
           {
             "id": "ne9lulz5",
@@ -537,7 +557,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ng153i3p",
@@ -561,7 +581,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "na20ca0q",
@@ -576,7 +596,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nfabfumd",
@@ -591,7 +611,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nsv763ou",
@@ -606,7 +626,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nkxtovsy",
@@ -621,7 +641,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nyblu2yv",
@@ -636,7 +656,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nfz6ltsp",
@@ -651,7 +671,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n1r8erfw",
@@ -666,7 +686,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nraavrix",
@@ -835,7 +855,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nm2c8lgt",
@@ -850,7 +870,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 0.5
+            "delay": 0.5
           },
           {
             "id": "n7x1mqmv",
@@ -865,7 +885,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 0.5
+            "delay": 0.5
           },
           {
             "id": "neudu56a",
@@ -880,7 +900,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 0.5
+            "delay": 0.5
           },
           {
             "id": "ncadc977",
@@ -893,7 +913,7 @@
               "x2": 100,
               "y2": 100
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n19pe5oy",
@@ -908,7 +928,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ngnnf8oq",
@@ -923,7 +943,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 2
+            "delay": 2
           },
           {
             "id": "n4s9pjrk",
@@ -938,7 +958,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n8ifr98c",
@@ -953,7 +973,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ni838uvh",
@@ -966,7 +986,7 @@
               "x2": 100,
               "y2": 100
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nfu2vxvt",
@@ -1115,7 +1135,7 @@
               "op": "contains",
               "value": "Gold"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n0m187fs",
@@ -1130,7 +1150,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 0.5
+            "delay": 0.5
           },
           {
             "id": "n9khtdmy",
@@ -1145,7 +1165,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 0.5
+            "delay": 0.5
           },
           {
             "id": "n95safit",
@@ -1160,7 +1180,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 0.5
+            "delay": 0.5
           },
           {
             "id": "nvhki2wg",
@@ -1173,7 +1193,7 @@
               "x2": 100,
               "y2": 100
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n2oou32u",
@@ -1185,7 +1205,7 @@
               "op": "contains",
               "value": "Slime"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nuw7m75w",
@@ -1200,7 +1220,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 0.5
+            "delay": 0.5
           },
           {
             "id": "n57hynea",
@@ -1215,7 +1235,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 0.5
+            "delay": 0.5
           },
           {
             "id": "nb76lole",
@@ -1230,7 +1250,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 0.5
+            "delay": 0.5
           },
           {
             "id": "nj3j5e8j",
@@ -1245,7 +1265,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 0.5
+            "delay": 0.5
           },
           {
             "id": "nj135x2y",
@@ -1258,7 +1278,7 @@
               "x2": 100,
               "y2": 100
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nxac05wc",
@@ -1273,7 +1293,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 0.5
+            "delay": 0.5
           },
           {
             "id": "na1ghjbk",
@@ -1283,7 +1303,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n6ui6jae",
@@ -1291,7 +1311,7 @@
             "x": 2160,
             "y": 600,
             "params": {},
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n3z2wp7v",
@@ -1304,7 +1324,7 @@
               "y": 157,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [
@@ -1580,8 +1600,7 @@
               "y": 981,
               "taps": "1"
             },
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "nv9dihit",
@@ -1594,8 +1613,7 @@
               "y": 249,
               "taps": "1"
             },
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "n8kwnftq",
@@ -1608,7 +1626,7 @@
               "y": 1007,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nfupi75h",
@@ -1636,7 +1654,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ncack3fn",
@@ -1651,7 +1669,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nqkvklqu",
@@ -1666,7 +1684,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nu1az8xt",
@@ -1681,7 +1699,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "njral2vp",
@@ -1694,7 +1712,7 @@
               "y": 203,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nkxjlsin",
@@ -1819,7 +1837,7 @@
               "y": 981,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nt25cwe3",
@@ -1832,7 +1850,7 @@
               "y": 249,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n8265caa",
@@ -1842,8 +1860,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "n1pkgf0i",
@@ -1858,8 +1875,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "nxzzsrhc",
@@ -1874,7 +1890,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nbsilgcu",
@@ -1887,7 +1903,7 @@
               "y": 497,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ndo81oae",
@@ -1900,7 +1916,7 @@
               "y": 488,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nac6e9v8",
@@ -1913,7 +1929,7 @@
               "y": 489,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "noai5d1t",
@@ -1928,7 +1944,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n3oiqdxh",
@@ -1943,7 +1959,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n4bz0kdj",
@@ -1956,8 +1972,7 @@
               "y": 849,
               "taps": "1"
             },
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "nrouiph6",
@@ -1967,7 +1982,7 @@
             "params": {
               "message": "Không có gì để dismantle"
             },
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [
@@ -2093,7 +2108,7 @@
               "y": 258,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n8irom6t",
@@ -2106,7 +2121,7 @@
               "timeout": 10,
               "negate": false
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nct8yol4",
@@ -2121,7 +2136,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n2ilddit",
@@ -2134,7 +2149,7 @@
               "y": 777,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nqleypbj",
@@ -2147,7 +2162,7 @@
               "y": 283,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n9wv4wsn",
@@ -2162,7 +2177,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 5,
+            "delay": 5,
             "retryCount": 2
           },
           {
@@ -2259,7 +2274,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "negr10zf",
@@ -2272,7 +2287,7 @@
               "y": 972,
               "taps": "1"
             },
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "ndqrxtu2",
@@ -2309,7 +2324,7 @@
             "x": 1008,
             "y": 40,
             "params": {},
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nto4c266",
@@ -2328,7 +2343,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [
@@ -2398,8 +2413,7 @@
               "y": 886,
               "taps": "1"
             },
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "nwhex63x",
@@ -2415,7 +2429,7 @@
               "regionW": 0,
               "regionH": 0
             },
-            "delayBefore": 5
+            "delay": 5
           },
           {
             "id": "nslp72tj",
@@ -2425,7 +2439,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nsyzja63",
@@ -2438,7 +2452,7 @@
               "y": 978,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nx2aejhp",
@@ -2446,7 +2460,7 @@
             "x": 800,
             "y": 120,
             "params": {},
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nuzrs922",
@@ -2462,7 +2476,7 @@
               "offsetY": 0,
               "delayAfterFind": 3
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n3ma1tcn",
@@ -2472,7 +2486,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [
@@ -2544,7 +2558,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nmabn4ky",
@@ -2557,7 +2571,7 @@
               "y": 964,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ng1t5mh6",
@@ -2572,7 +2586,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "nbu1nf5x",
@@ -2584,7 +2598,7 @@
               "threshold": 0.85,
               "negate": false
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nqsej3ht",
@@ -2599,7 +2613,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "na80q7s4",
@@ -2611,7 +2625,7 @@
               "mode": "press",
               "hold": 400
             },
-            "delayBefore": 6
+            "delay": 6
           },
           {
             "id": "ne6kvbjy",
@@ -2623,7 +2637,7 @@
               "mode": "press",
               "hold": 400
             },
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "npx7h2zd",
@@ -2638,7 +2652,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "n9xk68fw",
@@ -2651,7 +2665,7 @@
               "y": 52,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nj8ys5nw",
@@ -2663,7 +2677,7 @@
               "threshold": 0.85,
               "negate": true
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "naw969hn",
@@ -2678,7 +2692,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n231q4cq",
@@ -2686,8 +2700,7 @@
             "x": 2432,
             "y": 328,
             "params": {},
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "niw1oz97",
@@ -2699,7 +2712,7 @@
               "threshold": 0.85,
               "negate": false
             },
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "nei5jsk9",
@@ -2714,7 +2727,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nhivu945",
@@ -2724,7 +2737,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nkkma7ld",
@@ -2736,7 +2749,7 @@
               "threshold": 0.85,
               "negate": false
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nqpwyu7h",
@@ -2749,8 +2762,7 @@
               "y": 839,
               "taps": "1"
             },
-            "delayBefore": 1,
-            "delayAfter": 3
+            "delay": 1
           },
           {
             "id": "nxg7isxr",
@@ -2787,7 +2799,7 @@
                 }
               ]
             },
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [
@@ -2941,7 +2953,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nk1el0l5",
@@ -2956,7 +2968,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nu7rhzzr",
@@ -2973,7 +2985,7 @@
               "direction": "up",
               "distance": 400
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nssgtef4",
@@ -2988,7 +3000,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nxekbssc",
@@ -3003,7 +3015,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nh3ht3db",
@@ -3016,7 +3028,7 @@
               "y": 795,
               "taps": "1"
             },
-            "delayBefore": 5
+            "delay": 5
           },
           {
             "id": "njhgnryu",
@@ -3027,7 +3039,7 @@
               "infinite": false,
               "count": 2
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ns3gq6f6",
@@ -3042,7 +3054,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nxrt2esd",
@@ -3055,7 +3067,7 @@
               "y": 795,
               "taps": "1"
             },
-            "delayBefore": 5
+            "delay": 5
           },
           {
             "id": "ndrup0tb",
@@ -3065,7 +3077,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ngan8yxr",
@@ -3103,7 +3115,7 @@
             "params": {
               "fn": "fn_ursje"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n4wr54se",
@@ -3115,8 +3127,7 @@
               "threshold": 0.85,
               "negate": true
             },
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "nhev9yck",
@@ -3126,7 +3137,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n2tingqj",
@@ -3138,7 +3149,7 @@
               "threshold": 0.85,
               "maxLoops": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nmln7r9s",
@@ -3155,7 +3166,7 @@
               "direction": "up",
               "distance": 400
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "noprx5fk",
@@ -3167,7 +3178,7 @@
               "threshold": 0.85,
               "maxLoops": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nuy04xfj",
@@ -3182,7 +3193,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nzu9bu0j",
@@ -3195,7 +3206,7 @@
               "y": 986,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nzwsuqvn",
@@ -3212,7 +3223,7 @@
               "direction": "up",
               "distance": 400
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nr563mx3",
@@ -3224,7 +3235,7 @@
               "threshold": 0.85,
               "maxLoops": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ndeybadg",
@@ -3237,7 +3248,7 @@
               "y": 768,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nc6l3441",
@@ -3250,7 +3261,7 @@
               "y": 611,
               "taps": "1"
             },
-            "delayBefore": 2
+            "delay": 2
           },
           {
             "id": "nfkh728t",
@@ -3263,7 +3274,7 @@
               "y": 986,
               "taps": "1"
             },
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "nuyeaht7",
@@ -3275,7 +3286,7 @@
               "threshold": 0.85,
               "maxLoops": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nw804q8k",
@@ -3290,7 +3301,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ngpluf57",
@@ -3305,7 +3316,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "neims0uq",
@@ -3320,7 +3331,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [
@@ -3607,7 +3618,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nnacflgw",
@@ -3620,7 +3631,7 @@
               "y": 787,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n6omcv7m",
@@ -3634,7 +3645,7 @@
               "taps": "1"
             },
             "log": "Normal battle start",
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n6ynqp48",
@@ -3649,7 +3660,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n0lh129b",
@@ -3664,7 +3675,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ngb39h81",
@@ -3679,7 +3690,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ngdsh2cz",
@@ -3692,7 +3703,7 @@
               "timeout": 300,
               "negate": false
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ns3k8f5s",
@@ -3707,7 +3718,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n1j8so0z",
@@ -3720,7 +3731,7 @@
               "y": 854,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nxi5zyqa",
@@ -3735,7 +3746,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n1lgyz1d",
@@ -3750,7 +3761,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nhwdbavx",
@@ -3765,7 +3776,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nnm8uotf",
@@ -3778,7 +3789,7 @@
               "timeout": 600,
               "negate": false
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n1y0i576",
@@ -3793,7 +3804,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "np0kfj9u",
@@ -3808,7 +3819,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nq35gnzn",
@@ -3823,7 +3834,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nfqak33y",
@@ -3838,7 +3849,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nwa4nvki",
@@ -3851,7 +3862,7 @@
               "y": 845,
               "taps": "1"
             },
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "n7jeatem",
@@ -3863,7 +3874,7 @@
               "op": "contains",
               "value": "Normal"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nukz6sxe",
@@ -3875,7 +3886,7 @@
               "op": "contains",
               "value": "Challenge"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nvko9bm3",
@@ -3890,7 +3901,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nzbfkp3j",
@@ -3905,7 +3916,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n1q0842a",
@@ -3920,7 +3931,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nuaacsgs",
@@ -3933,7 +3944,7 @@
               "y": 845,
               "taps": "1"
             },
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "nssid9rx",
@@ -3967,7 +3978,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "natwtesj",
@@ -3979,7 +3990,7 @@
               "op": "contains",
               "value": "Fiend Hunter"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "neie3wde",
@@ -3992,7 +4003,7 @@
               "y": 844,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nppnegg7",
@@ -4007,7 +4018,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nt6howrx",
@@ -4022,7 +4033,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ntjuja07",
@@ -4037,7 +4048,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nb62u4vs",
@@ -4050,7 +4061,7 @@
               "y": 50,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nn4xtv97",
@@ -4065,7 +4076,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nojbe449",
@@ -4081,7 +4092,7 @@
               "negate": true,
               "whitelist": ""
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n7m2mtg4",
@@ -4119,7 +4130,7 @@
               "negate": false,
               "whitelist": ""
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n309b9w8",
@@ -4134,7 +4145,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "namfbrnx",
@@ -4149,7 +4160,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ntm2wlj2",
@@ -4159,7 +4170,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [
@@ -4441,7 +4452,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nst61933",
@@ -4454,7 +4465,7 @@
               "y": 153,
               "taps": "1"
             },
-            "delayBefore": 2
+            "delay": 2
           },
           {
             "id": "nynba69l",
@@ -4462,7 +4473,7 @@
             "x": 424,
             "y": -104,
             "params": {},
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [
@@ -4516,7 +4527,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nn6u3rmt",
@@ -4529,7 +4540,7 @@
               "y": 268,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nporq6r1",
@@ -4544,8 +4555,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "nu6h932s",
@@ -4558,8 +4568,7 @@
               "y": 346,
               "taps": "1"
             },
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "ndjrisvr",
@@ -4570,7 +4579,7 @@
               "infinite": false,
               "count": 3
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n3cyy1ix",
@@ -4582,7 +4591,7 @@
               "threshold": 0.9,
               "negate": false
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n9h6hjh6",
@@ -4597,7 +4606,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "n7xerq4r",
@@ -4614,7 +4623,7 @@
               "direction": "up",
               "distance": 400
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nhessrx5",
@@ -4625,7 +4634,7 @@
               "infinite": false,
               "count": 2
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nw62dtsp",
@@ -4640,8 +4649,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "nu9rv5nc",
@@ -4654,8 +4662,7 @@
               "y": 346,
               "taps": "1"
             },
-            "delayBefore": 1,
-            "delayAfter": 1
+            "delay": 1
           },
           {
             "id": "n7a4ghcb",
@@ -4667,7 +4674,7 @@
               "threshold": 0.9,
               "negate": false
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nb8ihyxd",
@@ -4682,7 +4689,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nyak2ryh",
@@ -4695,7 +4702,7 @@
               "y": 50,
               "taps": "1"
             },
-            "delayBefore": 1.5
+            "delay": 1.5
           }
         ],
         "edges": [
@@ -4832,7 +4839,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nfk00wds",
@@ -4845,7 +4852,7 @@
               "y": 988,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nu82ivy7",
@@ -4860,7 +4867,7 @@
               "offsetX": 0,
               "offsetY": -50
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ncrr2881",
@@ -4872,7 +4879,7 @@
               "mode": "press",
               "hold": 1000
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nfsw3698",
@@ -4884,7 +4891,7 @@
               "mode": "press",
               "hold": 1000
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ntu5ig3f",
@@ -4899,7 +4906,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nzkcommu",
@@ -4913,7 +4920,7 @@
               "taps": "1"
             },
             "log": "Skip Battle",
-            "delayBefore": 8
+            "delay": 8
           },
           {
             "id": "nc4xyrf3",
@@ -4927,7 +4934,7 @@
               "taps": "1"
             },
             "log": "Exit Battle",
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "nmyayqb4",
@@ -4940,7 +4947,7 @@
               "y": 1009,
               "taps": "1"
             },
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "n761nt4b",
@@ -4950,7 +4957,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ng1kjgw5",
@@ -4963,7 +4970,7 @@
               "timeout": 10,
               "negate": false
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "njvrshq5",
@@ -4976,7 +4983,7 @@
               "y": 1009,
               "taps": "1"
             },
-            "delayBefore": 3
+            "delay": 3
           }
         ],
         "edges": [
@@ -5073,7 +5080,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nm84etjm",
@@ -5088,7 +5095,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nwt1230h",
@@ -5098,7 +5105,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nl08xyxa",
@@ -5106,7 +5113,7 @@
             "x": 624,
             "y": 24,
             "params": {},
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [
@@ -5177,7 +5184,7 @@
               "y": 1005,
               "taps": "1"
             },
-            "delayBefore": 2
+            "delay": 2
           },
           {
             "id": "ntmh1oz2",
@@ -5190,7 +5197,7 @@
               "x2": 100,
               "y2": 100
             },
-            "delayBefore": 2
+            "delay": 2
           },
           {
             "id": "nktl1fej",
@@ -5205,7 +5212,7 @@
             },
             "note": "Weekly",
             "log": "Claim weekly reward",
-            "delayBefore": 1.5
+            "delay": 1.5
           },
           {
             "id": "n9qipvmq",
@@ -5218,7 +5225,7 @@
               "y": 1005,
               "taps": "1"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nfup8gdi",
@@ -5231,7 +5238,7 @@
               "x2": 100,
               "y2": 100
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nkhvsiag",
@@ -5255,7 +5262,7 @@
               "offsetX": 0,
               "offsetY": 0
             },
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [
@@ -5367,7 +5374,7 @@
             "params": {
               "fn": "fn_ursje"
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "ny735dro",
@@ -5377,7 +5384,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 3
+            "delay": 3
           },
           {
             "id": "nohy2bdr",
@@ -5389,7 +5396,7 @@
               "threshold": 0.85,
               "negate": true
             },
-            "delayBefore": 1
+            "delay": 1
           },
           {
             "id": "nkw3ozxk",
@@ -5399,7 +5406,7 @@
             "params": {
               "fn": "fn_pmuop"
             },
-            "delayBefore": 1
+            "delay": 1
           }
         ],
         "edges": [

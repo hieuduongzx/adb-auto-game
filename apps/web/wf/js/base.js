@@ -468,8 +468,8 @@ function wfResetRunViz(){
     .forEach(p=>p.classList.remove("took","nottook"));
 }
 
-// ── Live delayBefore / delayAfter countdown on the active node ───────────────
-// Engine emits node_delay {id, phase:"before"|"after"|null, seconds} when a
+// ── Live pre-block delay countdown on the active node ───────────────
+// Engine emits node_delay {id, phase:"before"|null, seconds} when a
 // per-node wait starts or ends. We tick client-side from the start event so the
 // chip next to the block shows remaining time without flooding the WS.
 let wfDelayState=null;   // {id, phase, endAt, total} while counting; null when idle
@@ -479,7 +479,7 @@ function wfFmtRemain(sec){
   if(sec>=1)  return sec.toFixed(1)+"s";
   return Math.max(0, sec).toFixed(1)+"s";
 }
-function wfDelaySign(phase){ return phase==="after"?"+":"−"; }
+function wfDelaySign(){ return ""; }
 function wfRestoreDelayChip(chip){
   if(!chip) return;
   chip.classList.remove("counting");
@@ -499,7 +499,7 @@ function wfRestoreDelayChip(chip){
   const label=chip.querySelector(".wf-delay-label");
   const shown=typeof wfDelaySecs==="function"?wfDelaySecs(secs):secs+"s";
   if(label) label.textContent=wfDelaySign(phase)+shown;
-  chip.title=phase==="after"?"Wait "+shown+" after this block":"Wait "+shown+" before this block";
+  chip.title="Wait "+shown+" before this block";
 }
 function wfClearNodeDelay(){
   if(wfDelayTimer){ clearInterval(wfDelayTimer); wfDelayTimer=null; }
@@ -519,8 +519,8 @@ function wfPaintNodeDelay(){
   if(!el) return;
   el.classList.add("delaying");
   if(st.phase==="timeout"){
-    // Countdown against the block's own timeout deadline, painted on the corner
-    // badge. Runs purely off the local clock — the engine's node_result ends it.
+    // Countdown against the block's own timeout deadline, painted on the timing
+    // pill. Runs purely off the local clock — the engine's node_result ends it.
     const chip=el.querySelector(".wf-node-timeout");
     if(!chip) return;
     chip.classList.add("counting");
@@ -546,19 +546,21 @@ function wfPaintNodeDelay(){
     const label=chip.querySelector(".wf-delay-label");
     if(label) label.textContent=text;
     else chip.innerHTML=`<span class="wf-delay-label">${text}</span>`;
-    chip.title=(st.phase==="after"?"After":"Before")+" wait - "+left+" left";
+    chip.title="Delay - "+left+" left";
     const live=el.querySelector(".wf-node-delay-live"); if(live) live.remove();
   } else {
     let live=el.querySelector(".wf-node-delay-live");
     if(!live){
       live=document.createElement("div");
       live.className="wf-node-delay-live";
-      el.appendChild(live);
+      let row=el.querySelector(".wf-node-timing");
+      if(!row){ row=document.createElement("div"); row.className="wf-node-timing"; el.appendChild(row); }
+      row.appendChild(live);
     }
     live.dataset.phase=st.phase;
     live.style.setProperty("--pct", pct.toFixed(1));
     live.innerHTML=`<span class="wf-delay-label">${text}</span>`;
-    live.title=(st.phase==="after"?"After":"Before")+" wait - "+left+" left";
+    live.title="Delay - "+left+" left";
   }
   if(remain<=0){
     // Local clock finished; leave paint until engine's end event restores chips
@@ -569,14 +571,8 @@ function wfPaintNodeDelay(){
 function wfStartNodeDelay(id, phase, seconds){
   wfClearNodeDelay();
   const secs=parseFloat(seconds)||0;
-  if(!id || (phase!=="before" && phase!=="after" && phase!=="timeout") || secs<=0) return;
+  if(!id || (phase!=="before" && phase!=="timeout") || secs<=0) return;
   wfDelayState={id, phase, endAt:performance.now()+secs*1000, total:secs};
-  // Keep the amber "running" look during After wait (node_result already painted
-  // green trail) so the operator still sees which block is holding the graph.
-  if(phase==="after"){
-    const el=wfNodeElById(id);
-    if(el){ el.classList.add("running"); wfRunNode=id; }
-  }
   wfPaintNodeDelay();
   if(wfDelayTimer) clearInterval(wfDelayTimer);
   wfDelayTimer=setInterval(()=>{

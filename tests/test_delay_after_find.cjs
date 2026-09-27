@@ -41,7 +41,7 @@ test('new sequence image entries distinguish pre-tap and post-tap waits', () => 
   });
 });
 
-test('delay settings round-trip without changing legacy timing', () => {
+test('node delay round-trips while legacy before migrates and after is discarded', () => {
   const c = load();
   for (const type of ['tap_image', 'tap_image_any', 'tap_all_images', 'tap_text', 'tap_color', 'sequence_tap_image']) {
     const params = type === 'sequence_tap_image'
@@ -51,15 +51,20 @@ test('delay settings round-trip without changing legacy timing', () => {
     const saved = JSON.parse(JSON.stringify(c.wfSerializeNode(original)));
     const restored = c.wfHydrateGraph({nodes: [saved], edges: []}).nodes.find(n => n.id === 'n');
     assert.deepEqual(JSON.parse(JSON.stringify(restored.params)), params);
-    assert.equal(restored.delayBefore, 1);
-    assert.equal(restored.delayAfter, 3);
+    assert.equal(restored.delay, 1);
+    assert.equal(restored.delayAfter, undefined);
+    assert.equal(saved.delayAfter, undefined);
     const imported = {id: 'copy', type, params: {}};
     c.wfApplyNodeJson(imported, saved);
     assert.deepEqual(JSON.parse(JSON.stringify(imported.params)), params);
   }
   const legacy = c.wfHydrateGraph({nodes: [{id:'old',type:'tap_image',params:{delay:2}}]}).nodes.find(n => n.id === 'old');
-  assert.equal(legacy.delayBefore, 2);
+  assert.equal(legacy.delay, 2);
   assert.equal(legacy.params.delayAfterFind, undefined);
+  const defaults = c.wfHydNodeDefaults({delayBefore: 4, delayAfter: 9, retryCount: 2});
+  assert.equal(defaults.delay, 4);
+  assert.equal(defaults.delayAfter, undefined);
+  assert.equal(c.wfSerialNodeDefaults(defaults).delayAfter, undefined);
 });
 
 test('post-find delay survives clipboard copying', () => {

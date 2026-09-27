@@ -828,7 +828,7 @@ const WF = { name:"My Workflow", version:2, templatesDir:"templates", activities
   // (wfNodeDefaultsModal), saved into the flow JSON (key "nodeDefaults") so the
   // values survive a reload and carry to the Runner. Existing nodes are not
   // touched — the stamp only applies at creation time.
-  nodeDefaults:{ delayBefore:0, delayAfter:0, retryCount:0, retryDelay:0, screenshotOnFail:false },
+  nodeDefaults:{ delay:0, retryCount:0, retryDelay:0, screenshotOnFail:false },
   edit:{kind:"activity", id:null}, sel:[], selectedNode:null };
 let wfSpace=false;  // space held → pan instead of box-select
 // A Space press that never panned is a "tap"; two taps in quick succession reset

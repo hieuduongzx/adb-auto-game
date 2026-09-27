@@ -1384,6 +1384,47 @@ class WorkflowDesignerAPI:
         """Persist (or clear) the path to reopen on the next launch."""
         save_ui_settings({"lastWorkflow": str(path) if path else None})
 
+    @staticmethod
+    def _migrate_open_delay(path: str, text: str) -> str:
+        """Upgrade node timing in place on open; leave unrelated waits untouched."""
+        flow = json.loads(text)
+        changed = False
+        items = [flow.get('nodeDefaults')]
+        for coll in ('activities', 'functions'):
+            for item in flow.get(coll) or []:
+                items.extend(((item.get('graph') or {}).get('nodes') or []))
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            if item is not flow.get('nodeDefaults'):
+                params = item.get('params')
+                if isinstance(params, dict) and 'delay' in params and not isinstance(params['delay'], (dict, list)):
+                    if 'delay' not in item and 'delayBefore' not in item:
+                        item['delay'] = params['delay']
+                    del params['delay']
+                    changed = True
+            if 'delayBefore' in item:
+                if 'delay' not in item:
+                    item['delay'] = item['delayBefore']
+                del item['delayBefore']
+                changed = True
+            if 'delayAfter' in item:
+                del item['delayAfter']
+                changed = True
+        if changed:
+            import tempfile
+            folder = os.path.dirname(os.path.abspath(path))
+            fd, tmp = tempfile.mkstemp(dir=folder, suffix='.json.tmp')
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as out:
+                    out.write(json.dumps(flow, ensure_ascii=False, indent=2))
+                os.replace(tmp, path)
+            finally:
+                if os.path.exists(tmp):
+                    os.unlink(tmp)
+            return json.dumps(flow, ensure_ascii=False, indent=2)
+        return text
+
     def get_last_workflow(self) -> dict:
         """Return the workflow to open on startup.
 
@@ -1406,6 +1447,7 @@ class WorkflowDesignerAPI:
         try:
             with open(path, "r", encoding="utf-8") as fh:
                 text = fh.read()
+            text = self._migrate_open_delay(path, text)
             name = ""
             try:
                 name = (json.loads(text) or {}).get("name", "")
@@ -1873,6 +1915,7 @@ class WorkflowDesignerAPI:
         try:
             with open(str(path), "r", encoding="utf-8") as fh:
                 text = fh.read()
+            text = self._migrate_open_delay(str(path), text)
             self._wf_path = str(path)
             self._remember_dir(path)
             self._remember_last_workflow(str(path))
@@ -2178,7 +2221,7 @@ class WorkflowDesignerAPI:
         self._engine.callbacks["on_node_done"] = [
             lambda nid, st, port: self._push("node_result", {
                 "id": nid, "status": st, "port": port})]
-        # Live delayBefore / delayAfter countdown chips next to the active node.
+        # Live pre-block delay countdown chip next to the active node.
         self._engine.callbacks["on_node_delay"] = [
             lambda nid, phase, secs: self._push(
                 "node_delay", {"id": nid, "phase": phase, "seconds": secs})]

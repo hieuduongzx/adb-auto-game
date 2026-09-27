@@ -731,14 +731,12 @@ function wfCallPicker(node){
   row.appendChild(sel); return row;
 }
 
-// Universal per-node timing: a pause before the block runs and a pause after it
-// finishes (before the next block). Stored top-level like note/log, applied by
-// the engine around every block — see src/workflow/engine.py _walk.
+// Universal per-node delay before the block runs. Stored top-level like note/log.
 // The header's ⚙ opens the project-wide defaults dialog (wfNodeDefaultsModal):
 // whatever is set there becomes the seed for every NEWLY-created block, so the
 // delay/retry fields below show those values on creation.
 function wfTimingField(node){
-  const b=wfInspBlock("Timing",undefined,wfNodeDefaultsBtn());
+  const b=wfInspBlock("Delay",undefined,wfNodeDefaultsBtn());
   const mk=(key,label,hint)=>{
     const row=document.createElement("div"); row.className="wf-field";
     const l=document.createElement("label"); l.textContent=label; l.title=hint; row.appendChild(l);
@@ -750,13 +748,7 @@ function wfTimingField(node){
     const unit=document.createElement("span"); unit.className="hz-unit"; unit.textContent="s"; row.appendChild(unit);
     return row;
   };
-  const pair=document.createElement("div"); pair.className="wf-field-pair";
-  pair.appendChild(mk("delayBefore","Before","Wait this many seconds before running this block (e.g. wait for the screen to stabilize before finding an image)."));
-  pair.appendChild(mk("delayAfter","After","After this block runs, wait this many seconds before moving to the next block."));
-  b.appendChild(pair);
-  const hint=document.createElement("div"); hint.className="wf-insp-tip";
-  hint.innerHTML="Idle wait <b>before</b> / <b>after</b> this block runs (seconds).";
-  b.appendChild(hint);
+  b.appendChild(mk("delay","Delay","Seconds to wait before running this block."));
   return b;
 }
 
@@ -768,14 +760,14 @@ function wfTimingField(node){
 function wfNodeDefaultsBtn(){
   const b=document.createElement("button"); b.type="button"; b.className="btn sm ico wf-insp-sec-gear";
   b.innerHTML=wfIco("settings");
-  b.title="Set project-wide defaults for new blocks (Before/After wait, Retry, failure screenshot)";
+  b.title="Set project-wide defaults for new blocks (Delay, Retry, failure screenshot)";
   b.setAttribute("aria-label","Set project-wide node defaults");
   b.onclick=e=>{ e.stopPropagation(); wfNodeDefaultsModal(); };
   return b;
 }
 function wfGetNodeDefaults(){
   const d=(typeof WF!=="undefined"&&WF.nodeDefaults)||{};
-  return { delayBefore:parseFloat(d.delayBefore)||0, delayAfter:parseFloat(d.delayAfter)||0,
+  return { delay:parseFloat(d.delay)||0,
     retryCount:parseInt(d.retryCount,10)||0, retryDelay:parseFloat(d.retryDelay)||0,
     screenshotOnFail:!!d.screenshotOnFail };
 }
@@ -794,16 +786,14 @@ function wfNodeDefaultsModal(){
 
   const body=el=>{
     const tip=document.createElement("div"); tip.className="wf-insp-tip";
-    tip.innerHTML="These become the default <b>Before/After wait</b> &amp; <b>failure handling</b> for every <i>new</i> block you drop onto the canvas. They are stored in the workflow file.";
+    tip.innerHTML="These become the default <b>Delay</b> &amp; <b>failure handling</b> for every <i>new</i> block you drop onto the canvas. They are stored in the workflow file.";
     el.appendChild(tip);
 
     const group=document.createElement("div"); group.className="wf-insp-grid"; group.style.marginTop="8px";
-    group.appendChild(numRow("delayBefore","Before wait","Seconds to pause before a new block runs"));
-    group.appendChild(numRow("delayAfter","After wait","Seconds to pause after a new block runs"));
+    group.appendChild(numRow("delay","Delay","Seconds to pause before a new block runs"));
     group.appendChild(numRow("retryCount","Retries","Automatic retries when a new block fails"));
     group.appendChild(numRow("retryDelay","Retry wait","Seconds between retry attempts"));
-    boxes.delayBefore.value=cur.delayBefore||""; boxes.delayBefore.placeholder=cur.delayBefore?"":0;
-    boxes.delayAfter.value=cur.delayAfter||""; boxes.delayAfter.placeholder=cur.delayAfter?"":0;
+    boxes.delay.value=cur.delay||""; boxes.delay.placeholder=cur.delay?"":0;
     boxes.retryCount.value=cur.retryCount||""; boxes.retryCount.placeholder=cur.retryCount?"":0;
     boxes.retryDelay.value=cur.retryDelay||""; boxes.retryDelay.placeholder=cur.retryDelay?"":0;
     el.appendChild(group);
@@ -845,8 +835,7 @@ function wfNodeDefaultsModal(){
 }
 // Read the dialog's inputs into a WF.nodeDefaults-shaped object.
 function wfReadDefaults(boxes,shotCb){
-  return { delayBefore:parseFloat(boxes.delayBefore.value)||0,
-    delayAfter:parseFloat(boxes.delayAfter.value)||0,
+  return { delay:parseFloat(boxes.delay.value)||0,
     retryCount:parseInt(boxes.retryCount.value,10)||0,
     retryDelay:parseFloat(boxes.retryDelay.value)||0,
     screenshotOnFail:!!(shotCb&&shotCb.classList.contains("checked")) };
@@ -858,7 +847,7 @@ function wfApplyNodeDefaults(includeRetry){
   const nd=wfGetNodeDefaults();
   const apply=n=>{
     if(!n||n.type==="start") return;
-    n.delayBefore=nd.delayBefore; n.delayAfter=nd.delayAfter;
+    n.delay=nd.delay;
     if(includeRetry){ n.retryCount=nd.retryCount; n.retryDelay=nd.retryDelay; n.screenshotOnFail=nd.screenshotOnFail; }
     if(typeof wfUpdNodeTiming==="function") wfUpdNodeTiming(n);
     if(typeof wfUpdNodeRetry==="function") wfUpdNodeRetry(n);
@@ -871,13 +860,13 @@ function wfApplyNodeDefaults(includeRetry){
 
 function wfUpdNodeTiming(node){
   const el=document.querySelector(`.wf-node[data-node="${node.id}"]`); if(!el) return;
-  // The chips are absolutely positioned under the block, so placement in the
-  // DOM doesn't matter — just swap the whole badge row out.
-  const old=el.querySelector(".wf-node-delay"); if(old) old.remove();
+  // Keep the timeout element intact, including any active countdown.
+  const row=el.querySelector(".wf-node-timing"); if(!row) return;
+  const old=row.querySelector(".wf-node-delay"); if(old) old.remove();
   const html=wfDelayChipsHtml(node);
-  if(html) el.insertAdjacentHTML("beforeend", html);
+  if(html) row.insertAdjacentHTML("afterbegin", html);
 }
-// Same in-place swap for the timeout corner badge, called from every oninput
+// Same in-place swap for the timeout pill, called from every oninput
 // that can change params.timeout. A badge mid-countdown is left alone — the
 // run's own deadline is what it's showing.
 function wfUpdNodeTimeoutChip(node){
@@ -886,7 +875,8 @@ function wfUpdNodeTimeoutChip(node){
   if(old && old.classList.contains("counting")) return;
   if(old) old.remove();
   const html=wfTimeoutChipHtml(node);
-  if(html) el.insertAdjacentHTML("beforeend", html);
+  const row=el.querySelector(".wf-node-timing");
+  if(html && row) row.insertAdjacentHTML("beforeend", html);
 }
 
 function wfRetryField(node){
@@ -920,7 +910,7 @@ function wfUpdNodeRetry(node){
   if(node.screenshotOnFail) parts.push(`${wfIco("camera")}<span>Screenshot on fail</span>`);
   let n=el.querySelector(".wf-node-retry");
   if(parts.length){
-    if(!n){ n=document.createElement("div"); n.className="wf-node-retry"; const delay=el.querySelector(".wf-node-delay"), sum=el.querySelector(".wf-node-sum"); const anchor=delay||sum; if(anchor) anchor.after(n); else el.appendChild(n); el.classList.remove("collapsed"); }
+    if(!n){ n=document.createElement("div"); n.className="wf-node-retry"; const timing=el.querySelector(".wf-node-timing"), sum=el.querySelector(".wf-node-sum"); const anchor=timing||sum; if(anchor) anchor.after(n); else el.appendChild(n); el.classList.remove("collapsed"); }
     n.innerHTML=parts.join("");
   } else if(n){ n.remove(); }
 }

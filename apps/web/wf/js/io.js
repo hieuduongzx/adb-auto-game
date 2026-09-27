@@ -39,19 +39,19 @@ function wfHydVars(vars){
 // file just yields zeros (no defaults) instead of a broken object.
 function wfSerialNodeDefaults(d){
   d=d||{};
-  return { delayBefore:parseFloat(d.delayBefore)||0, delayAfter:parseFloat(d.delayAfter)||0,
+  return { delay:parseFloat(d.delay??d.delayBefore)||0,
     retryCount:parseInt(d.retryCount,10)||0, retryDelay:parseFloat(d.retryDelay)||0,
     screenshotOnFail:!!d.screenshotOnFail };
 }
 function wfHydNodeDefaults(d){
   d=d||{};
-  return { delayBefore:parseFloat(d.delayBefore)||0, delayAfter:parseFloat(d.delayAfter)||0,
+  return { delay:parseFloat(d.delay??d.delayBefore)||0,
     retryCount:parseInt(d.retryCount,10)||0, retryDelay:parseFloat(d.retryDelay)||0,
     screenshotOnFail:!!d.screenshotOnFail };
 }
 function wfCleanGraph(g){
   return {
-    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; const logs=wfOutputLogValues(n); if(Object.values(logs).some(Boolean)) o.outputLogs=logs; if(n.delayBefore) o.delayBefore=n.delayBefore; if(n.delayAfter) o.delayAfter=n.delayAfter; if(n.retryCount) o.retryCount=n.retryCount; if(n.retryDelay) o.retryDelay=n.retryDelay; if(n.screenshotOnFail) o.screenshotOnFail=true; if(n.showPreview) o.showPreview=true; return o; }),
+    nodes:(g.nodes||[]).map(n=>{ const o={id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),params:n.params}; if(n.note) o.note=n.note; if(n.log) o.log=n.log; const logs=wfOutputLogValues(n); if(Object.values(logs).some(Boolean)) o.outputLogs=logs; if(n.delay??n.delayBefore) o.delay=n.delay??n.delayBefore; if(n.retryCount) o.retryCount=n.retryCount; if(n.retryDelay) o.retryDelay=n.retryDelay; if(n.screenshotOnFail) o.screenshotOnFail=true; if(n.showPreview) o.showPreview=true; return o; }),
     edges:(g.edges||[]).map(e=>{ const o={from:e.from,fromPort:e.fromPort,to:e.to}; if(e.toPort&&e.toPort!=="in") o.toPort=e.toPort; return o; }),
     groups:(g.groups||[]).map(gr=>({id:gr.id,name:gr.name,x:Math.round(gr.x),y:Math.round(gr.y),w:Math.round(gr.w),h:Math.round(gr.h),color:gr.color||0})),
   };
@@ -126,8 +126,8 @@ function wfApplyNodeJson(node, raw){
   if(o.outputLog!==undefined) node.outputLog=o.outputLog||"";
   if(o.outputLogs!==undefined) node.outputLogs=o.outputLogs;
   else if(o.outputLog!==undefined) delete node.outputLogs;
-  if(o.delayBefore!==undefined) node.delayBefore=parseFloat(o.delayBefore)||0;
-  if(o.delayAfter!==undefined) node.delayAfter=parseFloat(o.delayAfter)||0;
+  if(o.delay!==undefined || o.delayBefore!==undefined) node.delay=parseFloat(o.delay??o.delayBefore)||0;
+  delete node.delayBefore; delete node.delayAfter;
   if(o.retryCount!==undefined) node.retryCount=parseInt(o.retryCount,10)||0;
   if(o.retryDelay!==undefined) node.retryDelay=parseFloat(o.retryDelay)||0;
   if(o.screenshotOnFail!==undefined) node.screenshotOnFail=!!o.screenshotOnFail;
@@ -183,10 +183,8 @@ function wfHydrateGraph(g){
   let nodes=(g.nodes||[]).map(raw=>{
     const n=wfNormalizeNode({...raw,params:JSON.parse(JSON.stringify(raw.params||wfDefaults(raw.type)))});
     const params=n.params||wfDefaults(n.type);
-    // Migrate the legacy single `delay` (find-then-wait) → delayBefore
-    // (wait-then-find), then drop it so it doesn't linger in params.
-    let delayBefore=n.delayBefore;
-    if(delayBefore===undefined && params && params.delay!==undefined) delayBefore=params.delay;
+    // Old before wait becomes delay; post-block wait is discarded.
+    const delay=n.delay??n.delayBefore??params.delay;
     if(params && params.delay!==undefined) delete params.delay;
     // Package-bearing app nodes: add pkgSrc if missing.
     // Had a free-text package → "custom"; empty → "project" (use Project settings).
@@ -234,7 +232,7 @@ function wfHydrateGraph(g){
       delete params.x; delete params.y; delete params.w; delete params.h;
     }
     return {id:n.id||wfUid(),type:n.type,x:n.x||40,y:n.y||40,params,note:n.note||"",log:n.log||"",outputLogs:wfOutputLogValues(n),
-      delayBefore:parseFloat(delayBefore)||0, delayAfter:parseFloat(n.delayAfter)||0,
+      delay:parseFloat(delay)||0,
       retryCount:parseInt(n.retryCount,10)||0, retryDelay:parseFloat(n.retryDelay)||0, screenshotOnFail:!!n.screenshotOnFail,
       showPreview:!!n.showPreview};
   });
@@ -527,7 +525,7 @@ function wfSetRunning(on){
   if(!on){
     if(typeof wfDebugMode!=="undefined") wfDebugMode=false;
     if(typeof wfClearDebugPause==="function") wfClearDebugPause();
-    // Drop any mid-wait delayBefore/After countdown; trail colours stay.
+    // Drop any mid-wait delay countdown; trail colours stay.
     if(typeof wfClearNodeDelay==="function") wfClearNodeDelay();
     // Keep the green/red trail so the user can see where execution stopped.
     // Only remove the amber "currently running" pulse and dim unreached blocks.

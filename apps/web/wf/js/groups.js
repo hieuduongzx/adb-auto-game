@@ -789,8 +789,7 @@ async function wfRunSingleNode(node){
   clean.outputLogs=wfOutputLogValues(node);
   // Per-node timing/retry used by the engine for real runs — include so test
   // matches production behaviour (except wait timeout which is capped).
-  if(node.delayBefore) clean.delayBefore=node.delayBefore;
-  if(node.delayAfter)  clean.delayAfter=node.delayAfter;
+  if(node.delay) clean.delay=node.delay;
   if(node.retryCount)  clean.retryCount=node.retryCount;
   if(node.retryDelay)  clean.retryDelay=node.retryDelay;
   if(node.screenshotOnFail) clean.screenshotOnFail=node.screenshotOnFail;

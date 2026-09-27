@@ -232,7 +232,7 @@ function wfNewNode(type,x,y){
   const swipe=(typeof wfPvSwipe!=="undefined"&&wfPvSwipe)?wfPvSwipe:null;
   if(swipe && type==="swipe") Object.assign(params,{mode:"coordinates",x1:swipe.x1,y1:swipe.y1,x2:swipe.x2,y2:swipe.y2,duration:swipe.duration});
   const node=wfNormalizeNode({id:wfUid(),type,x,y,params,note:"",log:"",outputLogs:{},
-    delayBefore:num("delayBefore",0), delayAfter:num("delayAfter",0),
+    delay:num("delay",0),
     retryCount:num("retryCount",0), retryDelay:num("retryDelay",0),
     screenshotOnFail:!!nd.screenshotOnFail,
     showPreview:false});
