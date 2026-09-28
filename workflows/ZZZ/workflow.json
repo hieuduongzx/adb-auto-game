@@ -16,7 +16,8 @@
   },
   "emulator": {
     "kind": "ldplayer",
-    "path": ""
+    "path": "",
+    "index": 0
   },
   "speedhack": {
     "enabled": false,
@@ -25,8 +26,7 @@
   },
   "globals": [],
   "nodeDefaults": {
-    "delayBefore": 0,
-    "delayAfter": 0,
+    "delay": 0,
     "retryCount": 0,
     "retryDelay": 0,
     "screenshotOnFail": false
@@ -51,8 +51,8 @@
           {
             "id": "ni3sjpgz",
             "type": "win_launch",
-            "x": 140,
-            "y": 50,
+            "x": 144,
+            "y": 64,
             "params": {
               "pathSrc": "project",
               "path": "",

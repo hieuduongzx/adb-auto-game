@@ -15,6 +15,20 @@ function wfSelectOne(id){ WF.sel=id?[id]:[]; WF.selectedNode=id||null; document.
 function wfToggleSel(id){ const i=WF.sel.indexOf(id); if(i>=0)WF.sel.splice(i,1); else WF.sel.push(id); WF.selectedNode=WF.sel.length?id:null; }
 function wfClearSel(){ WF.sel=[]; WF.selectedNode=null; }
 function wfDeleteNode(id){ return wfDeleteNodes([id]); }
+function wfDistributeSelected(axis){
+  const g=wfGraph();
+  if(!g || !Array.isArray(WF.sel) || WF.sel.length<3) return false;
+  const nodes=WF.sel.map(id=>g.nodes.find(n=>n.id===id)).filter(Boolean);
+  if(nodes.length<3) return false;
+  const key=axis==="y" ? "y" : "x";
+  nodes.sort((a,b)=>(Number(a[key])||0)-(Number(b[key])||0));
+  const first=Number(nodes[0][key])||0, last=Number(nodes[nodes.length-1][key])||0;
+  const step=(last-first)/(nodes.length-1);
+  wfPushUndo();
+  nodes.forEach((n,i)=>{ n[key]=first+step*i; });
+  wfRenderCanvas();
+  return true;
+}
 function wfDeleteSelected(){ if(WF.sel.length) return wfDeleteNodes(WF.sel.slice()); }
 let wfDeletePending=false;
 async function wfDeleteNodes(ids){

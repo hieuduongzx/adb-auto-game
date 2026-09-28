@@ -485,7 +485,7 @@ function wfRestoreDelayChip(chip){
   chip.classList.remove("counting");
   chip.style.removeProperty("--pct");
   if(chip.classList.contains("wf-node-timeout")){
-    // Corner badge: back to the static limit the block was rendered with.
+    // Timing pill: back to the static limit the block was rendered with.
     const label=chip.querySelector(".wf-timeout-label");
     const n=typeof wfNode==="function"?wfNode(chip.closest(".wf-node")?.dataset.node):null;
     const secs=n?parseFloat(n.params&&n.params.timeout):parseFloat(chip.dataset.secs);

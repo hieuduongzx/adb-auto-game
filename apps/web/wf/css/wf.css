@@ -1428,7 +1428,7 @@
 
 /* Delay and timeout share a content-sized row, clear of the card's border.
    Absolute placement keeps card geometry and wire anchors unchanged. */
-.wf-node-timing { position:absolute; top:calc(100% + 7px); left:-1px;
+.wf-node-timing { position:absolute; top:calc(100% + 3px); left:-1px;
   display:flex; align-items:center; gap:4px; pointer-events:none; z-index:2;
   white-space:nowrap; }
 .wf-node-timing:empty { display:none; }

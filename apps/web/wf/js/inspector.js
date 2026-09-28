@@ -220,6 +220,8 @@ function wfRenderInspector(){
     alignGrid.appendChild(mkAlign("↓ Bottom",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const maxY=Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })); selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=maxY-(el?el.offsetHeight:46); }); wfRenderCanvas(); }));
     alignGrid.appendChild(mkAlign("↔ Center X",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const cx=(Math.min(...selNodes.map(n=>n.x))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.x+(el?el.offsetWidth:158); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.x=cx-(el?el.offsetWidth:158)/2; }); wfRenderCanvas(); }));
     alignGrid.appendChild(mkAlign("↕ Center Y",()=>{ if(!g||!selNodes.length) return; wfPushUndo(); const cy=(Math.min(...selNodes.map(n=>n.y))+Math.max(...selNodes.map(n=>{ const el=wfNodeElById(n.id); return n.y+(el?el.offsetHeight:46); })))/2; selNodes.forEach(n=>{ const el=wfNodeElById(n.id); n.y=cy-(el?el.offsetHeight:46)/2; }); wfRenderCanvas(); }));
+    alignGrid.appendChild(mkAlign("↔ Distribute X",()=>wfDistributeSelected("x")));
+    alignGrid.appendChild(mkAlign("↕ Distribute Y",()=>wfDistributeSelected("y")));
     alignBlock.appendChild(alignGrid); body.appendChild(alignBlock);
 
     const actBlock=wfInspBlock("Actions");

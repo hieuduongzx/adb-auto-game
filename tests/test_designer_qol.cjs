@@ -154,6 +154,53 @@ test('switching graphs restores each graph camera instead of resetting the canva
   assert.equal(ctx.wfZoom, .8);
 });
 
+test('distribute selected nodes keeps endpoints and spaces the interior evenly', () => {
+  const calls = [];
+  const graph = { nodes: [
+    { id: 'a', type: 'tap', x: 10, y: 40 },
+    { id: 'b', type: 'tap', x: 31, y: 40 },
+    { id: 'c', type: 'tap', x: 92, y: 40 },
+    { id: 'd', type: 'tap', x: 190, y: 40 },
+  ], edges: [{ from: 'a', to: 'b' }] };
+  const ctx = loadScript('selection.js', {
+    WF: { sel: ['a', 'b', 'c', 'd'], selectedNode: 'a' },
+    wfGraph: () => graph,
+    wfPushUndo: () => calls.push('undo'),
+    wfRenderCanvas: () => calls.push('render'),
+  });
+  ctx.wfDistributeSelected('x');
+  assert.deepEqual(graph.nodes.map(n => n.x), [10, 70, 130, 190]);
+  assert.deepEqual(graph.nodes.map(n => n.y), [40, 40, 40, 40]);
+  assert.deepEqual(graph.edges, [{ from: 'a', to: 'b' }]);
+  assert.deepEqual(calls, ['undo', 'render']);
+});
+
+test('vertical distribution preserves the selected nodes and does nothing for two nodes', () => {
+  const calls = [];
+  const graph = { nodes: [
+    { id: 'a', type: 'tap', x: 10, y: 5 },
+    { id: 'b', type: 'tap', x: 10, y: 80 },
+    { id: 'c', type: 'tap', x: 10, y: 205 },
+  ], edges: [] };
+  const ctx = loadScript('selection.js', {
+    WF: { sel: ['c', 'a', 'b'], selectedNode: null },
+    wfGraph: () => graph,
+    wfPushUndo: () => calls.push('undo'),
+    wfRenderCanvas: () => calls.push('render'),
+  });
+  ctx.wfDistributeSelected('y');
+  assert.deepEqual(graph.nodes.map(n => n.y), [5, 105, 205]);
+  assert.deepEqual(calls, ['undo', 'render']);
+  WF = undefined;
+  const two = loadScript('selection.js', {
+    WF: { sel: ['a', 'b'], selectedNode: null },
+    wfGraph: () => ({ nodes: [{ id: 'a', x: 1, y: 2 }, { id: 'b', x: 9, y: 2 }], edges: [] }),
+    wfPushUndo: () => calls.push('bad-undo'), wfRenderCanvas: () => calls.push('bad-render'),
+  });
+  two.wfDistributeSelected('x');
+  assert.equal(calls.includes('bad-undo'), false);
+});
+
 test('renaming or deleting the latest crop keeps Designer context valid', () => {
   const ctx = loadEdit();
   ctx.wfRememberTemplate('templates/old.png');

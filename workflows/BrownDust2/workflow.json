@@ -2,7 +2,7 @@
   "name": "BrownDust2",
   "version": 2,
   "templatesDir": "templates",
-  "buildVersion": "1.0.35",
+  "buildVersion": "1.0.37",
   "package": "",
   "controller": "win32",
   "ocr": "ppocr_v5_mobile",
@@ -56,17 +56,18 @@
           {
             "id": "nfadsqjp",
             "type": "tap_image_any",
-            "x": 40,
-            "y": 144,
+            "x": 32,
+            "y": 160,
             "params": {
               "templates": [
-                "templates/crop_20260715_152009_155_28_43_45.png",
+                "templates/crop_20260927_092413_1784_53_30_22.png",
                 "templates/crop_20260914_100445_153_29_38_37.png",
-                "templates/crop_20260919_163646_920_991_80_26.png"
+                "templates/crop_20260919_163646_920_991_80_26.png",
+                "templates/crop_20260715_152009_155_28_43_45.png"
               ],
               "taps": "1",
               "threshold": 0.85,
-              "timeout": 1,
+              "timeout": 5,
               "mode": "sequential",
               "offsetX": 0,
               "offsetY": 0
@@ -99,8 +100,8 @@
           {
             "id": "n1j4x8v4",
             "type": "end",
-            "x": 568,
-            "y": 56,
+            "x": 432,
+            "y": 168,
             "params": {}
           },
           {
@@ -119,7 +120,7 @@
           {
             "id": "n9uo6dnv",
             "type": "loop",
-            "x": 192,
+            "x": 208,
             "y": 32,
             "params": {
               "infinite": false,
@@ -138,21 +139,10 @@
             }
           },
           {
-            "id": "n7tcsbej",
-            "type": "win_key",
-            "x": 192,
-            "y": 144,
-            "params": {
-              "keycode": "72",
-              "mode": "press",
-              "hold": 80
-            }
-          },
-          {
             "id": "nn8iiw3i",
             "type": "wait_image",
-            "x": 384,
-            "y": 144,
+            "x": 208,
+            "y": 160,
             "params": {
               "template": "templates/crop_20260715_063825_139_1036_55_17.png",
               "threshold": 0.85,
@@ -210,11 +200,6 @@
             "to": "n1j4x8v4"
           },
           {
-            "from": "nfadsqjp",
-            "fromPort": "true",
-            "to": "n7tcsbej"
-          },
-          {
             "from": "nn8iiw3i",
             "fromPort": "true",
             "to": "nfqqrgle"
@@ -223,16 +208,6 @@
             "from": "nn8iiw3i",
             "fromPort": "false",
             "to": "nfadsqjp"
-          },
-          {
-            "from": "n7tcsbej",
-            "fromPort": "out",
-            "to": "nn8iiw3i"
-          },
-          {
-            "from": "nfadsqjp",
-            "fromPort": "false",
-            "to": "n7tcsbej"
           },
           {
             "from": "nptr10t9",
@@ -248,6 +223,11 @@
             "from": "npl4vt3p",
             "fromPort": "false",
             "to": "nfadsqjp"
+          },
+          {
+            "from": "nfadsqjp",
+            "fromPort": "true",
+            "to": "nn8iiw3i"
           }
         ],
         "groups": []
@@ -1657,21 +1637,6 @@
             "delay": 1
           },
           {
-            "id": "ncack3fn",
-            "type": "tap_image",
-            "x": 624,
-            "y": 16,
-            "params": {
-              "template": "templates/crop_20260916_153919_1700_88_28_23.png",
-              "taps": "1",
-              "threshold": 0.85,
-              "timeout": 10,
-              "offsetX": 0,
-              "offsetY": 0
-            },
-            "delay": 1
-          },
-          {
             "id": "nqkvklqu",
             "type": "tap_image",
             "x": 800,
@@ -1727,6 +1692,19 @@
               "offsetX": 0,
               "offsetY": 0
             }
+          },
+          {
+            "id": "n1f79l1u",
+            "type": "tap",
+            "x": 624,
+            "y": 16,
+            "params": {
+              "target": "pos",
+              "x": 1707,
+              "y": 93,
+              "taps": "1"
+            },
+            "delay": 1
           }
         ],
         "edges": [
@@ -1761,16 +1739,6 @@
             "to": "n8kwnftq"
           },
           {
-            "from": "nv9dihit",
-            "fromPort": "out",
-            "to": "ncack3fn"
-          },
-          {
-            "from": "ncack3fn",
-            "fromPort": "true",
-            "to": "nqkvklqu"
-          },
-          {
             "from": "nu1az8xt",
             "fromPort": "true",
             "to": "njral2vp"
@@ -1789,6 +1757,16 @@
             "from": "nkxjlsin",
             "fromPort": "true",
             "to": "nu1az8xt"
+          },
+          {
+            "from": "nv9dihit",
+            "fromPort": "out",
+            "to": "n1f79l1u"
+          },
+          {
+            "from": "n1f79l1u",
+            "fromPort": "out",
+            "to": "nqkvklqu"
           }
         ],
         "groups": []
@@ -3995,8 +3973,8 @@
           {
             "id": "neie3wde",
             "type": "tap",
-            "x": 520,
-            "y": 420,
+            "x": 512,
+            "y": 400,
             "params": {
               "target": "pos",
               "x": 842,
@@ -4008,8 +3986,8 @@
           {
             "id": "nppnegg7",
             "type": "tap_image",
-            "x": 724,
-            "y": 420,
+            "x": 688,
+            "y": 400,
             "params": {
               "template": "templates/crop_20260922_130121_856_975_189_34.png",
               "taps": "1",
@@ -4023,8 +4001,8 @@
           {
             "id": "nt6howrx",
             "type": "tap_image",
-            "x": 924,
-            "y": 420,
+            "x": 864,
+            "y": 400,
             "params": {
               "template": "templates/crop_20260922_130133_1241_1010_127_20.png",
               "taps": "1",
@@ -4038,8 +4016,8 @@
           {
             "id": "ntjuja07",
             "type": "tap_image",
-            "x": 1124,
-            "y": 420,
+            "x": 1040,
+            "y": 400,
             "params": {
               "template": "templates/crop_20260922_130143_1422_372_69_79.png",
               "taps": "1",
@@ -4053,8 +4031,8 @@
           {
             "id": "nb62u4vs",
             "type": "tap",
-            "x": 1324,
-            "y": 420,
+            "x": 1216,
+            "y": 400,
             "params": {
               "target": "pos",
               "x": 176,
@@ -4081,8 +4059,8 @@
           {
             "id": "nojbe449",
             "type": "if_text",
-            "x": 1524,
-            "y": 420,
+            "x": 1392,
+            "y": 400,
             "params": {
               "text": "Lv.10",
               "x": 0.1,
@@ -4097,8 +4075,8 @@
           {
             "id": "n7m2mtg4",
             "type": "loop",
-            "x": 1724,
-            "y": 420,
+            "x": 1568,
+            "y": 400,
             "params": {
               "infinite": true,
               "count": "type.Fiend Hunter.level"
@@ -4107,8 +4085,8 @@
           {
             "id": "n44e6tr7",
             "type": "tap",
-            "x": 1924,
-            "y": 420,
+            "x": 1744,
+            "y": 400,
             "params": {
               "target": "pos",
               "x": 1538,
@@ -4119,8 +4097,8 @@
           {
             "id": "ne655f6d",
             "type": "if_text",
-            "x": 2120,
-            "y": 420,
+            "x": 1920,
+            "y": 400,
             "params": {
               "text": "Lv.10",
               "x": 1414,
@@ -5457,7 +5435,7 @@
     }
   ],
   "runnerUpdate": {
-    "lastVersion": "1.0.36",
+    "lastVersion": "1.0.37",
     "repo": "hieuduongzx/adb-auto-game"
   }
 }

@@ -46,7 +46,7 @@ def main():
                             delay:node.querySelector('.wf-node-delay') && rect(node.querySelector('.wf-node-delay'))};
                     }""")
                     gap = result["timeout"]["top"] - result["node"]["bottom"]
-                    assert 5 <= gap <= 7, ("timeout must sit below the node with a 6px gap", result)
+                    assert 1 <= gap <= 3, ("timeout must sit below the node with a 2px gap", result)
                     if result["delay"]:
                         assert abs(result["delay"]["top"] - result["timeout"]["top"]) <= 1, result
                         assert result["timeout"]["left"] - result["delay"]["right"] >= 3, result
@@ -58,8 +58,26 @@ def main():
             node.delay=8; wfUpdNodeTiming(node); wfUpdNodeTimeoutChip(node);
         }""")
         assert page.locator('.wf-node-timeout.counting .wf-timeout-label').inner_text() == '1.2s'
+        base = (JS / "base.js").read_text(encoding="utf-8")
+        page.add_script_tag(content="function wfNodeElById(){return document.querySelector('[data-node=probe]');} function wfNode(){return window.node;}")
+        page.add_script_tag(content=base[base.index("// ── Live pre-block delay"):base.index("function appendLog")])
+        page.evaluate("node=mount(0,10); wfStartNodeDelay('probe','before',3);")
+        live = page.locator('.wf-node-delay-live').bounding_box()
+        timeout = page.locator('.wf-node-timeout').bounding_box()
+        assert timeout['x'] >= live['x'] + live['width'] + 3, (live, timeout)
+        page.evaluate("wfClearNodeDelay(); wfStartNodeTimeout('probe');")
+        assert page.locator('.wf-node-timeout.counting').count() == 1
+        page.evaluate("wfClearNodeDelay();")
+        assert page.locator('.wf-node-timeout .wf-timeout-label').inner_text() == '10s'
+        assert page.locator('.wf-node-delay-live').count() == 0
+        # A new retry row must stay in the card, not inside the timing footer.
+        page.add_script_tag(content="function wfIco(){return '';}")
+        page.add_script_tag(content=inspector[inspector.index("function wfUpdNodeRetry"):inspector.index("// Failure screenshot")])
+        page.evaluate("node=mount(2,10); node.retryCount=2; wfUpdNodeRetry(node);")
+        assert page.locator('.wf-node > .wf-node-retry').count() == 1
+        assert page.locator('.wf-node-timing .wf-node-retry').count() == 0
         browser.close()
-    print(f"PASS: {checks} timing layout cases, inspector updates, active timeout preserved")
+    print(f"PASS: {checks} timing layout cases, inspector updates, countdown/fallback, retry placement")
 
 
 if __name__ == "__main__":
