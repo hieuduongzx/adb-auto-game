@@ -28,12 +28,16 @@
     </div>
 
     <div id="header-command" class="header-command">
+      <!-- Laid out by #header-card's grid (runner.css): identity + tools on the
+           first row, status + run buttons on the second; one row when wide. -->
       <div id="header-utility" class="header-utility">
-        <div id="status-pill" class="status-ready" role="status" aria-live="polite" aria-label="Run status">
-          <div id="status-dot" aria-hidden="true"></div>
-          <div id="status-text">READY</div>
+        <div class="header-status">
+          <div id="status-pill" class="status-ready" role="status" aria-live="polite" aria-label="Run status">
+            <div id="status-dot" aria-hidden="true"></div>
+            <div id="status-text">READY</div>
+          </div>
+          <button class="update-pill" id="update-pill" type="button" onclick="showUpdates()" hidden>Update</button>
         </div>
-        <button class="update-pill" id="update-pill" type="button" onclick="showUpdates()" hidden>Update</button>
         <div class="header-tools" aria-label="Runner utilities">
           <button class="theme-toggle" id="notes-toggle" type="button" title="What's new" aria-label="What's new" aria-expanded="false" aria-controls="notes-pop">
             <i data-ico="bell" data-ico-size="uico-2" aria-hidden="true"></i>
@@ -159,14 +163,9 @@
 
         <!-- Log -->
         <div class="rpane active" id="r-log" role="tabpanel" aria-labelledby="rtab-btn-log" tabindex="0">
-          <div class="rpane-hd">
-            <span class="rpane-title">Log</span>
-            <span class="log-count" id="log-count" title="Lines shown"></span>
-            <div class="rpane-sp"></div>
-            <button class="btn-log-clear" id="btn-log-export" type="button" onclick="onExportLog()"
-                    title="Save the log to a file…">Export</button>
-            <button class="btn-log-clear" type="button" onclick="onClearLog()"
-                    title="Empty the Runner's log">Clear</button>
+          <!-- The Log tab (or the narrow "Log" view) already names this pane, so
+               the header is just filters, then the line count and file actions. -->
+          <div class="rpane-hd log-hd">
             <div class="log-toolbar">
             <select id="log-level" class="log-level" aria-label="Filter log by level"
                     title="Show only lines at this level or more serious" onchange="setLogLevel(this.value)">
@@ -178,6 +177,13 @@
               <i data-ico="search" data-ico-size="uico-0" aria-hidden="true"></i>
               <input id="log-search" type="search" aria-label="Search log" placeholder="Search" oninput="filterLog(this.value)">
             </div>
+            </div>
+            <div class="log-actions">
+              <span class="log-count" id="log-count" title="Lines shown"></span>
+              <button class="btn-log-clear btn-log-icon" id="btn-log-export" type="button" onclick="onExportLog()"
+                      title="Save the log to a file…" aria-label="Export log"><i data-ico="download" data-ico-size="uico-1" aria-hidden="true"></i></button>
+              <button class="btn-log-clear" type="button" onclick="onClearLog()"
+                      title="Empty the Runner's log">Clear</button>
             </div>
           </div>
           <!-- Export / copy feedback; empty (and therefore hidden) at rest. -->
@@ -376,7 +382,7 @@
     <!-- Win32 footer: target window label -->
     <div class="footer-row" id="footer-win32" style="display:none">
       <div id="win-dot"></div>
-      <span class="footer-lbl">Window</span>
+      <span class="footer-lbl">Game window</span>
       <span id="win32-target" class="empty" title="">(not configured)</span>
       <span class="footer-lbl" id="win32-mode-lbl" style="display:none"></span>
     </div>

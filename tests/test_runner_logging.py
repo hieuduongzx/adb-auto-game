@@ -64,6 +64,7 @@ def test_successful_workflow_initialization_logs_one_useful_message():
         _icon_key = lambda self: ""
         _push_bridge_status = lambda self, force=False: None
         _kick_device_scan = lambda self: None
+        _set_window_title = lambda self, name: None
 
         def _push(self, event, payload):
             self.events.append((event, payload))

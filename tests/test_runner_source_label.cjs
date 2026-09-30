@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../apps/web/runner/js/runner.js'), 'utf8');
 const assignment = source.match(/\$\("flow-sub"\)\.textContent = [\s\S]*?;/)[0];
-for (const [controller, label] of [['win32', 'Window'], ['adb', 'Android']]) {
+for (const [controller, label] of [['win32', 'Windows'], ['adb', 'Android']]) {
   for (const version of ['', '1.2.3']) {
     test(`${controller} source label preserves version ${version || '(none)'}`, () => {
       const element = {};

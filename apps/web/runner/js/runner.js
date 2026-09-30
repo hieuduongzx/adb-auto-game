@@ -298,7 +298,7 @@ function switchTab(tab){
   syncTabIndex($("tabs-bar"));
 }
 // Right column: Activity settings | Log. Changelog and runner settings are header popovers.
-function switchRTab(tab){
+function switchRTab(tab, syncMobile=true){
   if(tab!=="act" && tab!=="log") tab="log";
   document.querySelectorAll("#r-tabs .rtab").forEach(b=>{ const on=b.dataset.rtab===tab; b.classList.toggle("active",on); b.setAttribute("aria-selected",String(on)); });
   document.querySelectorAll("#r-content .rpane").forEach(p=>p.classList.toggle("active", p.id==="r-"+tab));
@@ -307,7 +307,7 @@ function switchRTab(tab){
     const body = $("log-body"); if(body){ body.scrollTop = body.scrollHeight; }
     renderLogCount();
   }
-  if(window.matchMedia && window.matchMedia("(max-width: 640px)").matches){
+  if(syncMobile && window.matchMedia && window.matchMedia("(max-width: 640px)").matches){
     switchMobileView(tab==="log" ? "log" : "activity", false);
   }
 }
@@ -829,7 +829,8 @@ function closeActivitySettings(){
   setActivitySaveState("");
   showSettingsEmpty();
   if(S.mobileView === "activity") switchMobileView("activities");
-  else switchRTab("log");
+  // Desktop falls back to Log; a narrow window stays on the view it shows.
+  else switchRTab("log", false);
 }
 function toggleSettings(id){
   const a = S.activities.find(x=>x.id===id); if(!a) return;
@@ -1424,14 +1425,23 @@ function renderAppIcon(data){
 }
 
 // ── Flow ──────────────────────────────────────────────────────────────────────
+// "<Workflow> Runner" — the game's name as the Runner that plays it, matching
+// the window title (workflow_runner.runner_title).
+function runnerTitle(name){
+  const base = String(name || "").trim();
+  if(!base) return "Macro2k Runner";
+  return /runner$/i.test(base) ? base : `${base} Runner`;
+}
 function applyFlow(data){
   S.activities = data.activities || [];
   S.loaded = true;
   closeActivitySettings();
   const nm = $("flow-name");
-  nm.textContent = data.name || "(unnamed)"; nm.classList.remove("empty");
+  nm.textContent = runnerTitle(data.name); nm.classList.remove("empty");
+  nm.title = nm.textContent;
+  document.title = nm.textContent;
   renderAppIcon(data);
-  $("flow-sub").textContent = (data.controller === "win32" ? "Window" : "Android")
+  $("flow-sub").textContent = (data.controller === "win32" ? "Windows" : "Android")
     + (U.version ? ` · v${U.version}` : "");
   populateLists();
   updateProgress();

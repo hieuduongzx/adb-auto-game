@@ -1162,12 +1162,23 @@ class WorkflowRunnerAPI:
                  "iconKey": self._icon_key()}
         self._push("flow_loaded", state)
         workflow_name = str(flow.get("name") or os.path.basename(path))
+        self._set_window_title(workflow_name)
         log_success(f"Automation initialized successfully — {workflow_name}")
         # unity_bridge: show from the start whether the in-game plugin answers.
         self._push_bridge_status(force=True)
         # The controller just changed: start (or park) ADB device watching.
         self._kick_device_scan()
         return state
+
+    def _set_window_title(self, workflow_name: str) -> None:
+        """Title the window "<Workflow> Runner <version>" for the loaded game."""
+        if not self._window:
+            return
+        version = str(self._runner_info.get("version") or APP_VERSION or "")
+        try:
+            self._window.set_title(runner_title(workflow_name, version))
+        except Exception as exc:
+            log_warning(f"Couldn't set the window title: {exc}")
 
     # ── Controls ─────────────────────────────────────────────────────────────
 
@@ -1958,13 +1969,23 @@ class WorkflowRunnerAPI:
 
 # ── Entry points ────────────────────────────────────────────────────────────
 
+def runner_title(name: str = "", version: str = "") -> str:
+    """Window title: the game (workflow) name as a Runner, then the version —
+    "BrownDust2 Runner 1.0.39". No workflow yet → "Macro2k Runner <suite>"."""
+    name = str(name or "").strip()
+    if not name:
+        return titled("Macro2k Runner")
+    base = name if name.lower().endswith("runner") else f"{name} Runner"
+    return f"{base} {version}".strip()
+
+
 def create_workflow_runner_window(title: Optional[str] = None,
                                   auto_load: Optional[str] = None) -> webview.Window:
     if not title:
-        # A standalone Runner is titled after its game and its own version.
+        # A standalone Runner is titled after its game from the first frame;
+        # a source run is renamed once its workflow loads (_load_path).
         info = runner_update.build_info()
-        title = (f"{info.get('name') or info.get('appName')} {info['version']}"
-                 if info.get("version") else titled("Macro2k Runner"))
+        title = runner_title(info.get("name") or info.get("appName"), info.get("version") or "")
     api = WorkflowRunnerAPI()
     api._pending_load = auto_load
     html_path = os.path.join(_WEB_DIR, "runner", "index.html")

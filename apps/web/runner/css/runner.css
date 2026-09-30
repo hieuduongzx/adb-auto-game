@@ -58,31 +58,43 @@ input { caret-color: var(--accent); text-align: center; }
 #main-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0; }
 #mobile-tabs, #mobile-settings { display: none; }
 #main-split { flex: 1; min-height: 0; display: flex; gap: 0; }
-#pane-left  { flex: 1 1 48%; min-width: 0; display: flex; flex-direction: column; gap: var(--s2); padding:var(--s3); border-right:1px solid var(--border); }
-#pane-right { flex: 1 1 52%; min-width: 0; display: flex; flex-direction: column; gap: var(--s2); padding:var(--s3); }
+/* The activity list stops growing at a readable width; every extra pixel of a
+   large or maximized window goes to the log and preview instead. */
+#pane-left  { flex: 1 1 44%; min-width: 260px; max-width: 500px; display: flex; flex-direction: column; gap: var(--s2); padding:var(--s3); border-right:1px solid var(--border); }
+#pane-right { flex: 1 1 56%; min-width: 0; display: flex; flex-direction: column; gap: var(--s2); padding:var(--s3); }
 
 /* ── Header card ───────────────────────────────────────────────────────── */
 /* One flex column: the progress row sits between title and controls only while
    a run is live, and a column gap gives the right spacing in both states —
    margins on the rows above it left a dead 11px gap whenever it was hidden. */
+/* One grid for every width. The command wrappers are structural only
+   (display: contents), so status, run buttons and tools are placed directly:
+     narrow/medium   [icon  title ........ tools]
+                     [status][Start ....][Pause]
+     wide (≥960px)   [icon title ... status][Start][Pause] | [tools]
+   The progress and outcome rows span the full width underneath. */
 #header-card {
   padding: 8px 12px;
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: minmax(220px, .78fr) minmax(340px, 1.22fr);
-  gap: var(--s3) var(--s5);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "top top tools" "status btns btns";
+  align-items: center;
+  gap: var(--s3) var(--s3);
   border-width: 0 0 1px;
   border-color: var(--border);
 }
 .header-top {
+  grid-area: top;
   display: flex;
   align-items: center;
   gap: 10px;
   min-width:0;
 }
 .header-title-block { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.header-command { min-width:0; display:flex; flex-direction:column; gap:var(--s2); }
-.header-utility { min-height:30px; display:flex; align-items:center; justify-content:flex-end; gap:var(--s2); }
+.header-command, .header-utility { display: contents; }
+.header-status { grid-area: status; min-width: 0; display: flex; align-items: center; gap: var(--s2); }
+.header-tools { grid-area: tools; justify-self: end; }
 /* The game's icon — the same art as its .exe and its Hub card. */
 .app-icon {
   width: 36px; height: 36px; flex-shrink: 0; border-radius: var(--r-sm); overflow: hidden;
@@ -106,7 +118,7 @@ input { caret-color: var(--accent); text-align: center; }
   text-overflow: ellipsis;
 }
 .app-title.empty { color: var(--muted); }
-.app-subtitle { font: 600 var(--t-micro)/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+.app-subtitle { font: 500 var(--t-caption)/1.35 var(--sans); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Update available (header) — opens the Updates card in Settings. */
 .update-pill {
@@ -120,8 +132,8 @@ input { caret-color: var(--accent); text-align: center; }
 /* Status pill — rounded chip, semantic tint only */
 #status-pill {
   display: flex; align-items: center; gap: 7px;
-  min-height: 26px; padding: 4px 8px; border-radius: var(--r-sm);
-  margin-right:auto; flex-shrink: 0; transition: background .2s, border-color .2s;
+  height: 36px; padding: 0 10px; border-radius: var(--r-sm);
+  flex-shrink: 0; transition: background .2s, border-color .2s;
   border: 1px solid var(--status-border, var(--border));
 }
 #status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; transition: background .3s; }
@@ -159,22 +171,35 @@ input { caret-color: var(--accent); text-align: center; }
 .queue-summary, .queue-current { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-caption); color: var(--muted); }
 .queue-summary { max-width: 170px; }
 .queue-current { max-width: 230px; color: var(--dim); }
-.prog-bar-track { flex: 1; height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.prog-bar-track { flex: 1; min-width: 60px; height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .prog-bar-fill { height: 100%; border-radius: 999px; background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
 .prog-elapsed { font-family: var(--mono); font-size: var(--t-ui); font-weight: 500; color: var(--dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
 /* Control buttons */
-.header-btns { width:100%; display: flex; align-items: center; gap: var(--s2); }
+.header-btns { grid-area: btns; min-width: 0; display: flex; align-items: center; gap: var(--s2); }
 .header-btns .btn { height: 36px; font-size: var(--t-body); padding: 0 18px; border-radius: var(--r-sm); }
 /* One primary button: Start is a quiet success tint; Stop becomes solid red so
    the destructive state remains unmistakable. See setPrimary() in runner.js. */
-.btn-start { flex: 1 1 220px; height: 36px; background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-bd); font-size: var(--t-title); font-weight: 700; }
+.btn-start { flex: 1 1 auto; min-width: 0; height: 36px; background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-bd); font-size: var(--t-title); font-weight: 700; }
 .btn-start:hover:not(:disabled), .btn-start:active:not(:disabled) { background: color-mix(in srgb, var(--ok-bg) 76%, var(--ok) 24%); border-color: var(--ok); color: var(--ok-ink); }
 .btn-start.is-stop { background: var(--runner-stop); color: var(--on-fixed); border-color: var(--runner-stop); }
 .btn-start.is-stop:hover:not(:disabled), .btn-start.is-stop:active:not(:disabled) { background: var(--runner-stop-hover); border-color: var(--runner-stop-hover); color: var(--on-fixed); }
 .header-btns .btn:disabled { opacity: 1; background: var(--alt); border-color: var(--border); color: var(--muted); }
 .btn-pause { flex: 0 1 110px; background: var(--panel); color: var(--dim); border-color: var(--border2); }
 .btn-pause:hover:not(:disabled) { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-bd); }
+@media (min-width: 960px) {
+  #header-card {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    grid-template-areas: "top status btns tools";
+    gap: var(--s3) var(--s4);
+    padding: 10px 14px;
+  }
+  .header-tools { padding-left: var(--s4); border-left: 1px solid var(--line); }
+  .btn-start { flex: 0 0 auto; width: clamp(168px, 15vw, 220px); }
+  .btn-pause { flex: 0 0 104px; }
+  .queue-summary { max-width: 280px; }
+  .queue-current { max-width: 360px; }
+}
 
 /* ── Tabs — segmented control (operator console) ───────────────────────── */
 #tabs-bar {
@@ -304,10 +329,15 @@ input { caret-color: var(--accent); text-align: center; }
 .rpane { display: none; flex: 1; min-width: 0; min-height: 0; flex-direction: column;
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
 .rpane.active { display: flex; }
-.rpane-hd { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--s2); padding: 6px 9px; border-bottom: 1px solid var(--line); flex-shrink: 0; background: var(--surface); }
-.log-toolbar { display: flex; align-items: center; gap: var(--s2); flex: 1 1 220px; min-width: 150px; }
-.log-toolbar .log-search-wrap { flex: 1 1 120px; max-width: none; }
-.log-level { min-width: 0; max-width: 100%; height: 28px; }
+.rpane-hd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); padding: 6px 9px; border-bottom: 1px solid var(--line); flex-shrink: 0; background: var(--surface); }
+/* Log header: filters grow, count + file actions stay together on the right.
+   A pane too narrow for both wraps the actions as one group, never one button. */
+.log-toolbar { display: flex; align-items: center; gap: var(--s2); flex: 1 1 220px; min-width: 0; }
+.log-toolbar .log-search-wrap { flex: 1 1 120px; min-width: 96px; max-width: 420px; }
+.log-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
+.log-actions .log-count { margin-right: var(--s1); }
+.btn-log-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; padding: 0; }
+.log-level { flex: 0 0 auto; width: auto; min-width: 0; max-width: 100%; height: 28px; }
 .log-note:empty, .diag-status:empty { display: none; }
 .log-note, .diag-status { padding: var(--s3) var(--s4); font-size: var(--t-caption); line-height: 1.5; overflow-wrap: anywhere; color: var(--dim); background: var(--surface); }
 .log-note.ok, .diag-status.ok { color: var(--ok-ink); background: var(--ok-bg); }
@@ -351,7 +381,7 @@ input { caret-color: var(--accent); text-align: center; }
 .pv-btn.off { color: var(--accent); background: var(--accent-bg); }
 .pv-body { position: relative; flex: 1; min-height: 0; background: var(--log-bg); display: flex; align-items: center; justify-content: center; overflow: hidden; }
 /* Keep the screen useful without starving the log on short windows. */
-#preview-card:not(.is-max) .pv-body { height: clamp(90px, 22vh, 240px); flex: none; }
+#preview-card:not(.is-max) .pv-body { height: clamp(90px, 24vh, 340px); flex: none; }
 #pv-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
 /* Before the first frame the <img> has no src — hide it, or its alt text is
    drawn on top of "No preview". */
@@ -530,11 +560,9 @@ input { caret-color: var(--accent); text-align: center; }
    two independently scrolling panes into an unusably tall page. */
 @media (max-width: 640px) {
   #app { padding: 0; gap: 0; }
-  #header-card { display:flex; padding: var(--s3); gap: var(--s3); }
-  .header-command { width:100%; }
-  .header-utility { order:0; }
-  .header-btns { order:1; }
+  #header-card { padding: var(--s3); gap: var(--s3) var(--s2); }
   .app-icon { width: 36px; height: 36px; border-radius: var(--r-md); }
+  .queue-summary { display: none; }
   #mobile-tabs { display: flex; flex-shrink: 0; padding: 0; gap: var(--s3); border-bottom: 1px solid var(--border2); }
   .mobile-tab { flex: 1; min-width: 0; padding: 10px 6px; border-bottom: 2px solid transparent; color: var(--dim); font-size: var(--t-caption); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
   .mobile-tab:hover { color: var(--runner-selected-ink); background: var(--accent-bg); }
@@ -560,11 +588,10 @@ input { caret-color: var(--accent); text-align: center; }
   #main-split[data-mobile-view="activity"] .act-set-back { display: inline-flex; }
   #main-split[data-mobile-view="activity"] .act-set-x { display: none; }
   .act-set-hd { padding-left: 8px; }
-  .header-btns .btn { height: 38px; }
 }
 
 /* ── Footer / status bar ───────────────────────────────────────────────── */
-#footer { display: flex; flex-direction: column; gap: var(--s1); padding: var(--s2) var(--s3); flex-shrink: 0; background: var(--surface); border-width: 1px 0 0; border-style: solid; border-color: var(--border); border-radius: 0; box-shadow:none; }
+#footer { display: flex; flex-direction: column; align-items: stretch; gap: var(--s1); padding: var(--s2) var(--s3); flex-shrink: 0; background: var(--surface); border-width: 1px 0 0; border-style: solid; border-color: var(--border); border-radius: 0; box-shadow:none; }
 .footer-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); font-size: var(--t-caption); }
 #tabs-bar .tab-btn:focus-visible, .rtab:focus-visible { outline-offset: -3px; }
 .drag-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; color: var(--accent); }

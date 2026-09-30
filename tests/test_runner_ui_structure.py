@@ -128,7 +128,7 @@ def test_runner_uses_short_source_labels_and_a_quiet_green_start_action():
     source = RUNNER_JS.read_text(encoding="utf-8")
     css = RUNNER_CSS.read_text(encoding="utf-8")
 
-    assert '? "Window" : "Android"' in source
+    assert '? "Windows" : "Android"' in source
     assert "Win32 · PC window" not in source
     start = css.index(".btn-start {")
     rule = css[start:css.index("}", start)]
