@@ -407,8 +407,8 @@
           {
             "id": "nquxt7bp",
             "type": "end",
-            "x": 1024,
-            "y": 16,
+            "x": 1360,
+            "y": -64,
             "params": {}
           },
           {
@@ -448,7 +448,7 @@
             "id": "nmmcl4iz",
             "type": "launch_app",
             "x": 624,
-            "y": -91,
+            "y": -144,
             "params": {
               "package": "",
               "wait": 0,
@@ -482,7 +482,7 @@
             "id": "ncq3rl6e",
             "type": "tap",
             "x": 976,
-            "y": -91,
+            "y": -144,
             "params": {
               "target": "pos",
               "x": 955,
@@ -495,13 +495,25 @@
             "id": "nndpqedp",
             "type": "wait_image",
             "x": 800,
-            "y": -91,
+            "y": -144,
             "params": {
               "template": "templates/crop_20260914_235421_302_95_58_56.png",
               "threshold": 0.85,
               "timeout": 600,
               "negate": false
             }
+          },
+          {
+            "id": "ncktd97d",
+            "type": "if_image",
+            "x": 1152,
+            "y": -144,
+            "params": {
+              "template": "templates/crop_20260914_235421_302_95_58_56.png",
+              "threshold": 0.85,
+              "negate": false
+            },
+            "delay": 3
           }
         ],
         "edges": [
@@ -536,11 +548,6 @@
             "to": "nquxt7bp"
           },
           {
-            "from": "ncq3rl6e",
-            "fromPort": "out",
-            "to": "nquxt7bp"
-          },
-          {
             "from": "nmmcl4iz",
             "fromPort": "out",
             "to": "nndpqedp"
@@ -554,6 +561,21 @@
             "from": "n2fsw7ai",
             "fromPort": "true",
             "to": "n2qh1u6r"
+          },
+          {
+            "from": "ncq3rl6e",
+            "fromPort": "out",
+            "to": "ncktd97d"
+          },
+          {
+            "from": "ncktd97d",
+            "fromPort": "true",
+            "to": "ncq3rl6e"
+          },
+          {
+            "from": "ncktd97d",
+            "fromPort": "false",
+            "to": "nquxt7bp"
           }
         ],
         "groups": []
@@ -2391,6 +2413,11 @@
             "from": "n773m0dp",
             "fromPort": "false",
             "to": "ng5ox6e1"
+          },
+          {
+            "from": "nu002yw9",
+            "fromPort": "out",
+            "to": "nf7fxcbi"
           }
         ],
         "groups": []
