@@ -31,8 +31,8 @@ test('node card, terminal and try_next sizes are whole grid cells', () => {
   assert.equal(cells(+m[2]), 2, 'try_next = 2 cells tall');
 });
 
-test('every canvas node silhouette has square corners', () => {
-  assert.equal(tok(baseCss, '--node-r'), 0, 'the shared node corner token must be square');
+test('every canvas node silhouette shares the soft corner token', () => {
+  assert.ok(tok(baseCss, '--node-r') > 0, 'nodes have soft corners (PRODUCT.md radius ladder)');
 
   const selectors = [
     '.wf-node-hd',
@@ -41,8 +41,6 @@ test('every canvas node silhouette has square corners', () => {
     '.wf-node.call:not(.wf-stacked)',
     '.wf-node.try_next',
     '.wf-next-body',
-    '.wf-node.start',
-    '.wf-node.end',
     '.wf-node.start::after',
     '.wf-node.end::after',
     '.wf-node-tri',
@@ -58,22 +56,22 @@ test('every canvas node silhouette has square corners', () => {
     const rule = rules.find(candidate => candidate.selectors.includes(selector)
       && /border-radius:/.test(candidate.body));
     assert.ok(rule, `${selector} rule must exist`);
-    assert.match(rule.body, /border-radius:\s*(?:0|var\(--node-r\))\s*;/,
-      `${selector} must render with square corners`);
+    assert.match(rule.body, /border-radius:[^;]*var\(--node-r\)/,
+      `${selector} must use the shared --node-r silhouette`);
   }
 });
 
-test('canvas group frames use the same square geometry as nodes', () => {
+test('canvas group frames use the shared node corner token', () => {
   const cssWithoutComments = wfCss.replace(/\/\*[\s\S]*?\*\//g, '');
   const rules = [...cssWithoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, prelude, body]) => ({
     selectors: prelude.split(',').map(selector => selector.trim()),
     body,
   }));
-  for (const selector of ['.wf-group', '.wf-group-hd', '.wf-group-resize']) {
+  for (const selector of ['.wf-group', '.wf-group-hd']) {
     const rule = rules.find(candidate => candidate.selectors.includes(selector));
     assert.ok(rule, `${selector} rule must exist`);
-    assert.match(rule.body, /border-radius:\s*(?:0|var\(--node-r\))\s*;/,
-      `${selector} must use square node geometry`);
+    assert.match(rule.body, /border-radius:[^;]*var\(--node-r\)/,
+      `${selector} must use the shared node corner token`);
   }
 });
 

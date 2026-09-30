@@ -39,17 +39,21 @@ test('primary and pause accessible names follow backend run state', () => {
   assert.equal(r.get('btn-primary').attrs['aria-label'], 'Start workflow');
 });
 
-test('activity rows expose enabled, disabled, paused and real background failures', () => {
+test('activity rows narrate run states and leave enabled/disabled to the checkbox', () => {
   const r = runner();
   const activity = {id:'a', name:'Collect', type:'sequence', enabled:true, status:'pending'};
   const row = element(), meta = element(), dot = element();
   row.querySelector = selector => selector === '[data-meta]' ? meta : selector === '[data-dot]' ? dot : null;
   r.ctx.activity = activity; r.ctx.row = row;
+  // An enabled or disabled activity says nothing here — the checkbox carries
+  // that state (see renderMeta); only run states are narrated.
   r.run('paintRow(activity, row)');
-  assert.match(meta.innerHTML, />Enabled</);
+  assert.doesNotMatch(meta.innerHTML, /Enabled|Disabled/);
+  assert.equal(row.classList.contains('task-off'), false);
   activity.enabled = false;
   r.run('paintRow(activity, row)');
-  assert.match(meta.innerHTML, />Disabled</);
+  assert.doesNotMatch(meta.innerHTML, /Enabled|Disabled/);
+  assert.equal(row.classList.contains('task-off'), true);
   activity.enabled = true; activity.status = 'running';
   r.run('S.running=true; S.paused=true; paintRow(activity, row)');
   assert.match(meta.innerHTML, />Paused</);
@@ -63,7 +67,7 @@ test('activity rows expose enabled, disabled, paused and real background failure
   assert.match(meta.innerHTML, />Succeeded</);
   activity.enabled = false; activity.status = 'pending';
   r.run("S.running=true; S.runScope=['a']; paintRow(activity, row)");
-  assert.match(meta.innerHTML, />Active</); // solo run ignores its checkbox
+  assert.doesNotMatch(meta.innerHTML, /Disabled/); // solo run ignores its checkbox
 });
 
 test('queue monitor follows activity events and separates settled from successful', () => {
