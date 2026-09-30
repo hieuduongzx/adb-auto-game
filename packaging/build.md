@@ -154,7 +154,7 @@ needs none of this — it injects into the running game, see
 
 ```
 dist/<Name>-Runner/
-    <Name>.exe
+    <Name>-Runner.exe
     requirements/        a copy of workflows/<Name>/vendor/ (not bundled into the exe)
     REQUIREMENTS.txt     install steps for players (Vietnamese + English)
 ```

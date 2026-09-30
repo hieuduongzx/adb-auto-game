@@ -610,7 +610,7 @@ class WorkflowHubAPI:
             "ok": True,
             "path": path,
             "name": name,
-            "exeName": f"{app_name}.exe",
+            "exeName": module.runner_exe_name(app_name),
             "folder": out_folder,
             "exists": os.path.isdir(out_folder),
             "version": _bump_patch(newest) if newest else str(flow.get("buildVersion") or "1.0.0"),
@@ -630,7 +630,7 @@ class WorkflowHubAPI:
     def build_runner(self, path: str, version: str = "", publish: bool = False,
                      repo: str = "", changelog: str = "", auto_show: bool = False,
                      dry_run: bool = False) -> dict:
-        """Start building ``dist/<Name>-Runner/<Name>.exe`` in the background,
+        """Start building ``dist/<Name>-Runner/<Name>-Runner.exe`` in the background,
         optionally publishing it as this Runner's next GitHub Release.
 
         Progress, log lines and the result arrive through ``window.__buildEvent``;

@@ -6,7 +6,7 @@ Runner only — no Hub, no Designer, no DevScope. Output (after
 ``build_runner.py`` copies the trimmed vendor tree)::
 
     dist/<Name>-Runner/
-        <Name>.exe        -> Runner GUI, auto-loads the bundled workflow
+        <Name>-Runner.exe -> Runner GUI, auto-loads the bundled workflow
         _internal/        -> private runtime files
         vendor/            -> only the pieces this workflow needs (external)
         workflow/          -> workflow.json + templates/  (bundled into the exe)
@@ -88,11 +88,11 @@ version_info = VSVersionInfo(
     kids=[
         StringFileInfo([StringTable("040904B0", [
             StringStruct("CompanyName", "Macro2k"),
-            StringStruct("FileDescription", f"{APP_NAME} — automation runner"),
+            StringStruct("FileDescription", f"{APP_NAME} Runner"),
             StringStruct("FileVersion", VERSION),
-            StringStruct("InternalName", APP_NAME),
-            StringStruct("OriginalFilename", f"{APP_NAME}.exe"),
-            StringStruct("ProductName", APP_NAME),
+            StringStruct("InternalName", f"{APP_NAME}-Runner"),
+            StringStruct("OriginalFilename", f"{APP_NAME}-Runner.exe"),
+            StringStruct("ProductName", f"{APP_NAME} Runner"),
             StringStruct("ProductVersion", VERSION),
         ])]),
         VarFileInfo([VarStruct("Translation", [0x409, 1200])]),
@@ -185,7 +185,8 @@ a = Analysis(
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, [],
-    exclude_binaries=True, name=APP_NAME,
+    # <Name>-Runner.exe: the game's name alone reads like the game itself.
+    exclude_binaries=True, name=f"{APP_NAME}-Runner",
     console=False, disable_windowed_traceback=False,
     contents_directory="_internal",
     icon=ICON,

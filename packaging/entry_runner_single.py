@@ -59,6 +59,13 @@ def main() -> None:
 
     unblock_bundled_files()
 
+    # An install updated from before the exe rename relaunches <Name>.exe;
+    # hand over to <Name>-Runner.exe (which then deletes the old copy).
+    from src.runner_update import migrate_exe_name
+
+    if migrate_exe_name():
+        return
+
     from workflow_runner import run as run_runner
 
     flow = _find_bundled_workflow()

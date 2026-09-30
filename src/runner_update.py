@@ -34,6 +34,65 @@ BUILD_INFO_NAME = "runner_build.json"
 KEEP_DIRS = ("data", "out", "logs")
 
 
+def runner_exe_name(info: dict) -> str:
+    """``<AppName>-Runner.exe`` — the exe a build ships (see build_runner)."""
+    app = str((info or {}).get("appName") or "").strip()
+    return f"{app}-Runner.exe" if app else ""
+
+
+def legacy_exe_name(info: dict) -> str:
+    """``<AppName>.exe`` — what Runners built before the rename were called.
+
+    Release zips still carry a copy under this name, because a pre-rename
+    Runner refuses an update package that lacks its own exe."""
+    app = str((info or {}).get("appName") or "").strip()
+    return f"{app}.exe" if app else ""
+
+
+def migrate_exe_name(info: Optional[dict] = None) -> bool:
+    """Settle an install on the ``<AppName>-Runner.exe`` name.
+
+    Started as the legacy ``<AppName>.exe`` with the renamed exe beside it
+    (an old Runner updated itself and relaunched its own name): start the
+    renamed exe and return True — the caller exits. Started as the renamed exe:
+    delete a leftover legacy copy in the background and return False."""
+    if not is_frozen():
+        return False
+    info = build_info() if info is None else info
+    canonical, legacy = runner_exe_name(info), legacy_exe_name(info)
+    if not canonical:
+        return False
+    here = os.path.dirname(os.path.abspath(sys.executable))
+    me = os.path.basename(sys.executable).lower()
+    target = os.path.join(here, canonical)
+    if me == legacy.lower() and os.path.isfile(target):
+        try:
+            subprocess.Popen([target, *sys.argv[1:]], cwd=here, close_fds=True)
+            return True
+        except OSError as exc:
+            log_error(f"[update] could not start {canonical}: {exc}")
+            return False
+    stale = os.path.join(here, legacy)
+    if me == canonical.lower() and os.path.isfile(stale):
+        import threading
+        import time
+
+        def _remove() -> None:
+            # The legacy process that launched us may still be exiting.
+            for _ in range(20):
+                try:
+                    os.remove(stale)
+                    log_info(f"[update] removed legacy {legacy}")
+                    return
+                except FileNotFoundError:
+                    return
+                except OSError:
+                    time.sleep(0.5)
+
+        threading.Thread(target=_remove, name="legacy-exe-cleanup", daemon=True).start()
+    return False
+
+
 def parse_version(text: str) -> Tuple[int, ...]:
     """``"v1.2.3"`` / ``"1.2.3"`` → ``(1, 2, 3)`` (a non-numeric part stops it)."""
     nums = []
@@ -414,9 +473,13 @@ def apply(info: Optional[dict] = None,
         new_dir = os.path.join(tmp, "files")
         _safe_extract(zip_path, new_dir)
         os.remove(zip_path)
-        exe = os.path.abspath(sys.executable)
-        if not os.path.isfile(os.path.join(new_dir, os.path.basename(exe))):
-            raise RuntimeError(f"The update package has no {os.path.basename(exe)}")
+        # Relaunch the package's <AppName>-Runner.exe; a package from before the
+        # rename only has this Runner's own exe name.
+        names = [n for n in (runner_exe_name(info), os.path.basename(sys.executable)) if n]
+        name = next((n for n in names if os.path.isfile(os.path.join(new_dir, n))), "")
+        if not name:
+            raise RuntimeError(f"The update package has no {names[0]}")
+        exe = os.path.join(app_dir(), name)
 
         script = write_update_script(new_dir, app_dir(), exe, os.getpid(),
                                      os.path.join(tmp, "apply-update.cmd"), version=version)

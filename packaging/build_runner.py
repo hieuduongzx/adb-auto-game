@@ -211,6 +211,16 @@ def _sanitize(raw: str) -> str:
     return cleaned.strip("._-") or "Workflow"
 
 
+def runner_exe_name(app_name: str) -> str:
+    """``<AppName>-Runner.exe`` — the exe ``runner_build.spec`` names.
+
+    The game's name alone reads like the game itself; the ``-Runner`` suffix
+    says which window a player is looking at. Must stay in step with the spec's
+    ``EXE(name=f"{APP_NAME}-Runner")`` and :func:`src.runner_update.runner_exe_name`.
+    """
+    return f"{_sanitize(app_name)}-Runner.exe"
+
+
 def tag_prefix(app_name: str) -> str:
     """Release tag prefix of one Runner: ``runner-<AppName>-v``."""
     return f"runner-{app_name}-v"
@@ -812,8 +822,16 @@ def _copy_requirements(workflow_dir: str, final: str, display_name: str) -> str:
     return dst
 
 
-def _zip_runner(folder: str, zip_path: str) -> None:
-    """Zip the Runner folder's contents (not the folder itself) for an update."""
+def _zip_runner(folder: str, zip_path: str, legacy_app_name: str = "") -> None:
+    """Zip the Runner folder's contents (not the folder itself) for an update.
+
+    When *legacy_app_name* is given, also add a copy of the built exe under the
+    pre-rename ``<AppName>.exe`` name. A Runner built before the rename refuses
+    an update package that lacks its own exe name (see ``src.runner_update.apply``),
+    so every published zip carries both names.
+    """
+    canonical = runner_exe_name(legacy_app_name) if legacy_app_name else ""
+    canonical_path = os.path.join(folder, canonical) if canonical else ""
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         for root, dirs, files in os.walk(folder):
             rel_root = os.path.relpath(root, folder)
@@ -822,6 +840,8 @@ def _zip_runner(folder: str, zip_path: str) -> None:
             for name in files:
                 path = os.path.join(root, name)
                 zf.write(path, os.path.relpath(path, folder))
+        if canonical_path and os.path.isfile(canonical_path):
+            zf.write(canonical_path, f"{_sanitize(legacy_app_name)}.exe")
 
 
 def _gh(args: list[str], timeout: float = PREFLIGHT_TIMEOUT) -> subprocess.CompletedProcess:
@@ -978,7 +998,7 @@ def publish(final: str, app_name: str, display_name: str, version: str,
 
     progress(90, "Zipping the Runner")
     log(f"Zipping → {zip_path}")
-    _zip_runner(final, zip_path)
+    _zip_runner(final, zip_path, app_name)
     log(f"Update package: {os.path.getsize(zip_path) / (1024 * 1024):.0f} MB")
 
     url = f"https://github.com/{repo}/releases/tag/{tag}"
