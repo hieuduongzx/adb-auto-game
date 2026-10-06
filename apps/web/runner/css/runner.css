@@ -171,13 +171,15 @@ input { caret-color: var(--accent); text-align: center; }
 
 /* Progress bar */
 #header-progress { grid-column:1 / -1; display: flex; align-items: center; gap: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--line); }
-.prog-count { font-family: var(--mono); font-size: var(--t-caption); font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums; min-width: 28px; flex-shrink: 0; }
+/* Read from across the desk while the run is unattended: count and clock
+   are the two numbers that matter, so they get body size and full ink. */
+.prog-count { font-family: var(--mono); font-size: var(--t-body); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 28px; flex-shrink: 0; }
 .queue-summary, .queue-current { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-caption); color: var(--muted); }
 .queue-summary { max-width: 170px; }
-.queue-current { max-width: 230px; color: var(--dim); }
-.prog-bar-track { flex: 1; min-width: 60px; height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.queue-current { max-width: 230px; color: var(--ink2); font-weight: 500; }
+.prog-bar-track { flex: 1; min-width: 60px; height: 8px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .prog-bar-fill { height: 100%; border-radius: 999px; background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
-.prog-elapsed { font-family: var(--mono); font-size: var(--t-ui); font-weight: 500; color: var(--dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.prog-elapsed { font-family: var(--mono); font-size: var(--t-body); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
 /* Control buttons */
 .header-btns { grid-area: btns; min-width: 0; display: flex; align-items: center; gap: var(--s2); }
