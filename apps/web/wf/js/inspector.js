@@ -353,7 +353,7 @@ function wfRenderInspector(){
     `<div class="wf-empty">
       <div class="wf-empty-ico" aria-hidden="true"><svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg></div>
       <div class="wf-empty-t">No activity open</div>
-      <div class="wf-empty-s">Select or create an activity in the corner panel, then drag nodes from the left palette onto the canvas.</div>
+      <div class="wf-empty-s">Pick or create an activity at the top of the left column, then drag nodes from the palette below it onto the canvas.</div>
       <div class="wf-empty-keys">
         <span><b>+</b> add activity</span>
         <span><b>F1</b> shortcuts</span>

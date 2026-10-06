@@ -181,6 +181,9 @@ SCENES = [
     ("hub-narrow", "hub", (820, 760), ""),
     ("hub-focus", "hub", (1280, 800), "document.querySelectorAll('.game-cover')[1].focus()"),
     ("hub-new", "hub", (1280, 800), "createWorkflow()"),
+    ("hub-toasts", "hub", (1280, 800),
+     "toast('Opened Girl Wars in the Designer', 'success'); toast('Refreshing the library…', 'info');"
+     " toast('Build failed: PyInstaller is not installed', 'error'); toast('Cover art is missing', 'warning')"),
     ("hub-settings", "hub", (1280, 800), "openSettings()"),
     ("hub-build", "hub", (1280, 800), "buildWorkflow(GAMES[0].path)"),
     ("runner", "runner", (440, 820), ""),
@@ -216,6 +219,11 @@ SCENES = [
      "(() => { const n = document.querySelectorAll('#wf-world .wf-node')[2]; const r = n.getBoundingClientRect();"
      " n.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, clientX: r.x + 30, clientY: r.y + 20})); })()"),
     ("designer-live", "wf", (1480, 920), DESIGNER_LIVE),
+    ("designer-toasts", "wf", (1480, 920),
+     "uiToast('Saved', 'success'); uiToast('Template not found: crop_88_50.png', 'error');"
+     " uiToast('No device connected - Preview is idle', 'warning'); uiToast('Copied 3 blocks', 'info')"),
+    ("designer-empty", "wf", (1480, 920),
+     "(() => { WF.activities = []; WF.edit = {kind: 'activity', id: null}; wfRenderAll(); })()"),
     ("devscope", "scope", (1280, 800), ""),
     ("devscope-narrow", "scope", (900, 760), ""),
 ]

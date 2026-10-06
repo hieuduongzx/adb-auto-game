@@ -1998,6 +1998,7 @@
 .wf-vald-sum .e  { color:var(--err); font-weight:700; }
 .wf-vald-sum .w  { color:var(--warn); font-weight:700; }
 .wf-vald-sum .ok { color:var(--ok); font-weight:700; }
+.wf-vald-sum .z  { color:var(--muted); font-weight:600; }
 .wf-vald-bar .wf-pal-search-clr { position:static; }
 .wf-vald-sev { flex-shrink:0; font-size:8.5px; font-weight:800; letter-spacing:.03em;
   border-radius:var(--r-xs); padding:2px 5px; min-width:34px; text-align:center; }
@@ -2013,7 +2014,7 @@
 .wf-vald-item .hd { display:flex; align-items:center; gap:7px; }
 .wf-vald-item .who { font-size:11.5px; font-weight:600; flex:1; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wf-vald-item .msg { font-family:var(--mono); font-size:10px; color:var(--dim);
+.wf-vald-item .msg { font-size:var(--t-caption); color:var(--dim);
   line-height:1.45; white-space:normal; overflow-wrap:anywhere; padding-left:41px; }
 .wf-vald-item:hover .msg { color:var(--ink2); }
 

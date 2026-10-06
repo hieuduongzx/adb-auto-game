@@ -237,7 +237,7 @@ function wfNoteNodeDone(id){
   wfApplyNodeTime(id);
 }
 // Activity run-status tracker: activityId -> "running" | "done" | "errored".
-// Drives the row indicator in the bottom-right panel: blinking green while the
+// Drives the row indicator in the Activities list: blinking green while the
 // engine executes it, solid green once completed, solid red on failure. Cleared
 // at the start of a run and updated live from the engine's
 // on_activity_start / on_activity_complete callbacks.

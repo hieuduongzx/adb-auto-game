@@ -166,7 +166,7 @@ function wfRenderFunctions(){
 }
 
 // ── Activities pane sub-tabs ────────────────────────────────────────────────
-// Two sub-tabs inside the Activities pane of the bottom-right dock: "seq"
+// Two sub-tabs inside the Activities pane of the left-column dock: "seq"
 // (sequence activities) and "bg" (background activities). Functions and
 // Variables are their own top-level tabs on the same card — see wfSwitchDockTab.
 let wfActTabCur="seq";
@@ -541,7 +541,7 @@ function wfInitVarsPanel(){
     if(e.key==="Escape"&&wfVarsPanelOpen&&!e.defaultPrevented) wfToggleVarsPanel(false);
   });
 }
-// ── Bottom-right dock tabs: Activities · Functions ──────────────────────────
+// ── Left-column dock tabs: Activities · Functions ───────────────────────────
 // Variables use their own top-right canvas disclosure.
 const WF_DOCK_TABS=["act","fn"];
 let wfDockTab="act";
