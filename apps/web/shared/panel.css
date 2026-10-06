@@ -109,8 +109,8 @@
 .ctl { display: inline-flex; align-items: center; gap: var(--s3); min-width: 0; flex-shrink: 0; }
 .ctl.grow { flex: 1 1 auto; min-width: 90px; }
 .ctl-lbl {
-  font: 600 var(--t-micro)/1 var(--mono); text-transform: uppercase;
-  letter-spacing: .07em; color: var(--muted);
+  font: 500 var(--t-caption)/1 var(--sans);
+  color: var(--muted);
   white-space: nowrap; flex-shrink: 0;
 }
 .ctl > select, .ctl > input { height: 32px; min-width: 0; }
@@ -159,10 +159,12 @@
 .pnl.is-collapsed > .pnl-hd { border-bottom: none; }
 /* Title is a button whenever the panel collapses, so the whole label is a
    target — the reference lets you click the title, not hunt for the chevron. */
+/* Sentence case at body size: a panel title names the thing below it, it is
+   not an operational label — uppercase is reserved for state chips. */
 .pnl-title {
   display: inline-flex; align-items: center; gap: var(--s2); min-width: 0;
-  font-size: var(--t-caption); font-weight: 700; color: var(--ink);
-  letter-spacing: .06em; text-transform: uppercase;
+  font-size: var(--t-body); font-weight: 600; color: var(--ink);
+  letter-spacing: -.005em;
 }
 button.pnl-title { cursor: pointer; }
 .pnl-title > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

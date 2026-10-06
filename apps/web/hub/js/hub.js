@@ -334,10 +334,29 @@ function initialsFor(name) {
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
   return (words[0][0] + words[1][0]).toUpperCase();
 }
-function emptyArtHtml(name) {
-  return `<span class="game-art-empty" aria-hidden="true">` +
-    `<span class="art-initials">${escHtml(initialsFor(name))}</span>` +
-    `<span class="art-hint">NO COVER</span></span>`;
+/** A cover slot without cover art: the game's own icon on its tone when it has
+    one (still recognisable at a glance), its initials otherwise — plus where a
+    real cover goes, since that is the one thing missing. */
+function emptyArtHtml(g) {
+  const mark = g.icon
+    ? `<img class="art-icon" src="${escHtml(g.icon)}" alt="" decoding="async" draggable="false">`
+    : `<span class="art-initials">${escHtml(initialsFor(g.name))}</span>`;
+  return `<span class="game-art-empty" aria-hidden="true">` + mark +
+    `<span class="art-hint">assets/cover.png</span></span>`;
+}
+/** "2026-10-02T21:52:00" → "4 days ago"; falls back to the stored stamp. */
+function savedAgo(iso, fallback) {
+  const t = Date.parse(iso || "");
+  if (!Number.isFinite(t)) return fallback || "";
+  const min = Math.round((Date.now() - t) / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} h ago`;
+  const d = Math.round(h / 24);
+  if (d === 1) return "yesterday";
+  if (d < 30) return `${d} days ago`;
+  return fallback || new Date(t).toISOString().slice(0, 10);
 }
 /** The game's small icon: assets/icon.*, else the cover, else its initials. */
 function iconHtmlFor(g, cls) {
@@ -374,11 +393,12 @@ function cardHtml(g, i) {
   const ctrl = g.controller === "win32" ? "win32" : "adb";
   const acts = Number(g.activityCount) || 0;
   const folder = escHtml(g.folder || "PROJECT");
-  const state = g.modified ? `Last saved ${g.modified}` : "No saved timestamp";
+  const state = g.modified ? `Saved ${savedAgo(g.modifiedIso, g.modified)}` : "Never saved";
+  const stateTitle = g.modified ? `Last saved ${g.modified}` : "No saved timestamp";
 
   const art = g.cover
     ? `<img class="game-img" src="${escHtml(g.cover)}" alt="" decoding="async" draggable="false">`
-    : emptyArtHtml(g.name);
+    : emptyArtHtml(g);
   const building = !!(BUILD && BUILD.state === "running" && BUILD.path === g.path);
   return `<article class="game${building ? " is-building" : ""}" role="listitem" data-path="${escHtml(g.path)}" style="--i:${i};--tone:${toneFor(g.folder || g.name)}">` +
     `<button class="game-cover" type="button" data-act="run" title="Run ${name}" aria-label="Run ${name}">` +
@@ -393,7 +413,7 @@ function cardHtml(g, i) {
         `<span class="ctrl-tag ${ctrl}">${ctrl === "win32" ? "Win32" : "ADB"}</span>` +
         `<span class="game-acts">${acts} ${acts === 1 ? "activity" : "activities"}</span>` +
       `</span>` +
-      `<span class="game-state" title="${escHtml(state)}">${escHtml(state)}</span>` +
+      `<span class="game-state" title="${escHtml(stateTitle)}">${escHtml(state)}</span>` +
 
     `</div>` +
     `<div class="game-foot">` +

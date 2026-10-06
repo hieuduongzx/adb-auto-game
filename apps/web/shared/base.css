@@ -203,8 +203,7 @@ input[type="checkbox"]:disabled { opacity: .55; cursor: not-allowed; }
 
 /* ── Tabs — underline metaphor (shared by scope panel, runner, wf) ───────── */
 .tab-btn {
-  position: relative; padding: 8px 12px 9px; font-size: var(--t-caption); font-weight: 700;
-  text-transform: uppercase; letter-spacing: .06em;
+  position: relative; padding: 8px 12px 9px; font-size: var(--t-ui); font-weight: 600;
   color: var(--muted); transition: color .15s;
 }
 .tab-btn::after {
@@ -219,6 +218,7 @@ input[type="checkbox"]:disabled { opacity: .55; cursor: not-allowed; }
   background: var(--alt); border-radius: var(--r-xs); padding: 1px 6px; min-width: 17px; text-align: center;
 }
 .tab-btn.active .tab-count { color: var(--accent); background: var(--accent-bg); }
+.tab-count:empty { display: none; }
 .tab-pane { display: none; flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
 .tab-pane.active { display: flex; flex-direction: column; gap: 6px; }
 
@@ -289,8 +289,8 @@ input[type="checkbox"]:disabled { opacity: .55; cursor: not-allowed; }
 .ui-modal-hint { font-size: var(--t-micro); color: var(--muted); line-height: 1.4; }
 .form-field { margin-bottom: 12px; }
 .form-field > label, .form-lbl {
-  display: block; font-size: var(--t-micro); font-weight: 700; letter-spacing: .07em;
-  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+  display: block; font-size: var(--t-caption); font-weight: 600;
+  color: var(--dim); margin-bottom: 6px;
 }
 .ui-modal-bd input { width: 100%; height: 34px; font-family: var(--mono); font-size: var(--t-body); }
 /* Inline monospace run — a path or an identifier inside prose. A form control

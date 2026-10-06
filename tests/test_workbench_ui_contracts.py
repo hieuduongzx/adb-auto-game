@@ -115,8 +115,9 @@ def test_shared_tokens_expose_primitive_semantic_and_component_layers():
     source = (WEB / "shared" / "tokens.css").read_text(encoding="utf-8")
     assert "--primitive-neutral-0:" in source
     assert re.search(r"--semantic-app-bg:\s*var\(--primitive-", source)
-    assert re.search(r"--component-control-radius:\s*[012]px", source)
-    assert re.search(r"--component-panel-radius:\s*0px", source)
+    # docs/PRODUCT.md radius ladder: soft 6px controls, 10px panels.
+    assert re.search(r"--component-control-radius:\s*6px", source)
+    assert re.search(r"--component-panel-radius:\s*10px", source)
     assert "--bg: var(--semantic-app-bg)" in source
 
 

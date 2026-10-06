@@ -231,6 +231,11 @@ test('a card uses assets/icon as its icon, then the cover, then initials', () =>
   const withCover = ctx.cardHtml(
     { name: 'BrownDust2', path: 'p', folder: 'BrownDust2', cover: 'file:///cover.png', controller: 'win32', activityCount: 1 }, 0);
   assert.match(withCover, /<img class="game-icon"[^>]*src="file:\/\/\/cover\.png"/);
+  assert.match(withIcon, /<img class="game-img"[^>]*src="file:\/\/\/cover\.png"/, 'a cover fills the slot');
+  const iconOnly = ctx.cardHtml(
+    { name: 'BrownDust2', path: 'p', folder: 'BrownDust2', icon: 'file:///icon.png', controller: 'win32', activityCount: 1 }, 0);
+  assert.match(iconOnly, /class="game-art-empty"[\s\S]*<img class="art-icon"[^>]*src="file:\/\/\/icon\.png"/,
+    'without a cover the slot shows the game icon');
   const bare = ctx.cardHtml(
     { name: 'BrownDust2', path: 'p', folder: 'BrownDust2', controller: 'win32', activityCount: 1 }, 0);
   assert.match(bare, /class="game-icon icon-mono"[^>]*>BD</);
@@ -247,7 +252,7 @@ test('long names and missing artwork retain visible technical metadata', () => {
   const html = ctx.cardHtml(
     { name, path: 'workflows/long-project', folder: 'long-project', controller: 'adb', activityCount: 12 }, 0);
   assert.match(html, /class="game-art-empty"/);
-  assert.match(html, /class="art-hint">NO COVER<\/span>/);
+  assert.match(html, /class="art-hint">assets\/cover\.png<\/span>/, 'the blank cover names the file that fills it');
   assert.match(html, /class="game-name" title="A project name long enough[^>]*>/);
   assert.match(html, /class="game-folder" title="long-project">long-project<\/span>/);
   assert.match(html, /class="ctrl-tag adb">ADB<\/span>/);

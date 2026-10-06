@@ -78,7 +78,12 @@ def test_scope_keeps_every_javascript_id_hook_in_markup():
 
 def test_scope_docked_regions_are_flat_and_page_does_not_scroll_sideways():
     css = CSS_PATH.read_text(encoding="utf-8")
-    assert "#preview-card, #tools-card, #log-card { border-radius:0; box-shadow:none; }" in css
+    # Inset cards on the workspace: the panel radius from the shared ladder and
+    # no elevation (shadows are for overlays only).
+    for selector in ("#preview-card {", "#tools-card {"):
+        rule = css[css.index(selector):css.index("}", css.index(selector))]
+        assert "border-radius: var(--component-panel-radius)" in rule, selector
+        assert "box-shadow" not in rule, selector
     assert "#main {" in css and "min-width: 0" in css
     assert "body {" in css and "overflow: hidden" in css
 

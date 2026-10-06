@@ -185,6 +185,7 @@ input { caret-color: var(--accent); text-align: center; }
 .btn-start.is-stop { background: var(--runner-stop); color: var(--on-fixed); border-color: var(--runner-stop); }
 .btn-start.is-stop:hover:not(:disabled), .btn-start.is-stop:active:not(:disabled) { background: var(--runner-stop-hover); border-color: var(--runner-stop-hover); color: var(--on-fixed); }
 .header-btns .btn:disabled { opacity: 1; background: var(--alt); border-color: var(--border); color: var(--muted); }
+.header-btns .btn-pause:disabled { background: transparent; border-color: var(--border); color: var(--muted); }
 .btn-pause { flex: 0 1 110px; background: var(--panel); color: var(--dim); border-color: var(--border2); }
 .btn-pause:hover:not(:disabled) { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-bd); }
 @media (min-width: 960px) {
@@ -211,7 +212,7 @@ input { caret-color: var(--accent); text-align: center; }
   flex: 1; justify-content: center; padding: 7px 9px; border-radius: var(--r-xs);
   border: none; color: var(--dim);
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: var(--t-caption); font-weight: 700;
+  font-size: var(--t-ui); font-weight: 600;
   transition: background .12s, color .12s;
 }
 .tab-btn::after { left: 10px; right: 10px; }
@@ -227,7 +228,7 @@ input { caret-color: var(--accent); text-align: center; }
 
 /* The tab already names the list, so the header carries "3 of 5 enabled". */
 .list-header { display: flex; align-items: center; gap: 4px; padding: 0 2px; min-height: 24px; flex-shrink: 0; }
-.list-label { font-family: var(--mono); font-size: var(--t-micro); font-weight: 700; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
+.list-label { font-size: var(--t-caption); font-weight: 500; color: var(--muted); flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
 .btn-sel { font-size: var(--t-ui); font-weight: 600; padding: 3px 8px; border-radius: var(--r-sm); color: var(--accent); transition: background .1s; }
 .btn-sel:hover { background: var(--accent-bg); }
 .btn-sel.none { color: var(--muted); }
@@ -279,7 +280,9 @@ input { caret-color: var(--accent); text-align: center; }
 /* Status dot (per-activity) */
 .act-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--dot-off); transition: background .2s; }
 .act-dot-pending, .act-dot-disabled { background: var(--dot-off); }
-.act-dot-enabled { background: var(--accent); }
+/* Hollow while it is only queued; the dot fills once the activity has a state
+   to report (running, done, failed) — the checkbox already says "enabled". */
+.act-dot-enabled { background: transparent; box-shadow: inset 0 0 0 1.5px var(--dim); }
 .act-dot-running, .act-dot-paused { background: var(--ok); animation: actPulse 1.8s ease-in-out infinite; }
 .act-dot-paused { background: var(--warn); animation: none; }
 .act-dot-completed, .act-dot-succeeded { background: var(--ok); }
@@ -317,8 +320,7 @@ input { caret-color: var(--accent); text-align: center; }
   flex: 1; justify-content: center; min-width: 0; padding: 7px 9px;
   border: none; border-radius: var(--r-xs);
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: var(--t-caption); font-weight: 700; letter-spacing: .05em;
-  text-transform: uppercase; color: var(--dim);
+  font-size: var(--t-ui); font-weight: 600; color: var(--dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transition: background .12s, color .12s;
 }
@@ -347,13 +349,13 @@ input { caret-color: var(--accent); text-align: center; }
 .diag-list dt { color: var(--muted); font-size: var(--t-caption); }
 .diag-list dd { min-width: 0; overflow-wrap: anywhere; user-select: text; }
 .diag-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
-.rpane-title { font-size: var(--t-caption); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+.rpane-title { font-size: var(--t-body); font-weight: 600; color: var(--ink); }
 .rpane-sp { flex: 1; }
 .rpane-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s3) var(--s4); display: flex; flex-direction: column; gap: var(--s2); }
 
 /* Activity settings pane */
 .act-set-hd { display: flex; align-items: center; gap: 6px; padding: 7px 7px 7px 10px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
-.act-set-title { flex: 1; min-width: 0; font-size: var(--t-caption); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.act-set-title { flex: 1; min-width: 0; font-size: var(--t-body); font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .act-set-back { display: none; align-items: center; gap: 4px; padding: 4px 6px; border-radius: var(--r-sm); color: var(--accent); font-size: var(--t-caption); font-weight: 600; }
 .activity-save-status { flex-shrink: 0; font-size: var(--t-caption); color: var(--muted); }
 .activity-save-status.ok { color: var(--ok-ink); }
@@ -374,7 +376,7 @@ input { caret-color: var(--accent); text-align: center; }
    card is absolutely positioned against #main-split (its [data-pnl-stage]). */
 #preview-card.is-max { position: absolute; inset: 0; z-index: 40; }
 .pv-hd { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 13px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
-.pv-title { font-size: var(--t-caption); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+.pv-title { font-size: var(--t-body); font-weight: 600; color: var(--ink); }
 .pv-state { font-family: var(--mono); font-size: var(--t-micro); letter-spacing: .04em; color: var(--muted); }
 .pv-sp { flex: 1; }
 .pv-btn { width: 26px; height: 26px; border-radius: var(--r-sm); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .12s, color .12s; }
@@ -389,7 +391,7 @@ input { caret-color: var(--accent); text-align: center; }
 #pv-img:not([src]) { display: none; }
 .pv-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--t-caption); color: var(--log-muted); }
 .setting-group { display: flex; flex-direction: column; }
-.setting-group-title { font-size: var(--t-micro); font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 3px; }
+.setting-group-title { font-size: var(--t-caption); font-weight: 600; color: var(--dim); margin-bottom: 3px; }
 .setting-var-block + .setting-var-block { border-top: 1px solid var(--line); }
 .setting-var-nested { display: flex; flex-direction: column; }
 .setting-option-nest { display: flex; flex-direction: column; margin-left: 12px; padding-left: 10px; border-left: 2px solid var(--accent-bd); }
@@ -415,7 +417,8 @@ input { caret-color: var(--accent); text-align: center; }
 .setting-field + .setting-field { border-top: 1px solid var(--line); }
 .setting-field .setting-label { flex: none; }
 .setting-path-control { display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; }
-.setting-path-input { flex: 1; min-width: 0; width: auto; text-align: center; }
+/* A path is read from its start (the drive), never centred. */
+.setting-path-input { flex: 1; min-width: 0; width: auto; text-align: left; font-family: var(--mono); font-size: var(--t-caption); }
 .btn-path-pick { height: 28px; padding: 0 9px; flex-shrink: 0; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--accent-bg); color: var(--accent); font-size: var(--t-caption); font-weight: 700; }
 .btn-path-pick:hover:not(:disabled) { background: var(--accent-bd); }
 .btn-path-pick:disabled { opacity: .5; cursor: not-allowed; }
@@ -565,7 +568,7 @@ input { caret-color: var(--accent); text-align: center; }
   .app-icon { width: 36px; height: 36px; border-radius: var(--r-md); }
   .queue-summary { display: none; }
   #mobile-tabs { display: flex; flex-shrink: 0; padding: 0; gap: var(--s3); border-bottom: 1px solid var(--border2); }
-  .mobile-tab { flex: 1; min-width: 0; padding: 10px 6px; border-bottom: 2px solid transparent; color: var(--dim); font-size: var(--t-caption); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+  .mobile-tab { flex: 1; min-width: 0; padding: 10px 6px; border-bottom: 2px solid transparent; color: var(--dim); font-size: var(--t-ui); font-weight: 600; }
   .mobile-tab:hover { color: var(--runner-selected-ink); background: var(--accent-bg); }
   .mobile-tab.active { color: var(--runner-selected-ink); border-bottom-color: var(--accent); }
   .mobile-tab:focus-visible { outline-offset: -3px; }
@@ -614,7 +617,7 @@ input { caret-color: var(--accent); text-align: center; }
   background-position: right 6px center;
 }
 #capture-backend { max-width: 88px; }
-.footer-lbl { font-family: var(--mono); font-size: var(--t-micro); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.footer-lbl { font-size: var(--t-caption); font-weight: 500; color: var(--muted); white-space: nowrap; }
 #win32-target { font-size: var(--t-caption); font-family: var(--mono); color: var(--dim); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #win32-target.empty { color: var(--muted); font-style: italic; }
 .btn-refresh { width: 28px; height: 28px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--panel); color: var(--dim); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .1s; }
