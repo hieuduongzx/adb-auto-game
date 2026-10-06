@@ -128,13 +128,17 @@ let _elapsedTimer = null, _elapsedStart = 0;
 function startElapsedTimer(startedAt){
   _elapsedStart = startedAt ? Number(startedAt) * 1000 : Date.now();
   if(_elapsedTimer) clearInterval(_elapsedTimer);
-  _elapsedTimer = setInterval(()=>{
-    const s = Math.floor((Date.now()-_elapsedStart)/1000);
+  const tick = ()=>{
+    const s = Math.max(0, Math.floor((Date.now()-_elapsedStart)/1000));
     const h = Math.floor(s/3600).toString().padStart(2,'0');
     const m = Math.floor((s%3600)/60).toString().padStart(2,'0');
     const ss = (s%60).toString().padStart(2,'0');
     $('elapsed').textContent = `${h}:${m}:${ss}`;
-  }, 1000);
+  };
+  // Paint now, not a second from now: a Runner reopened mid-run would
+  // otherwise read 00:00:00 until the first interval fires.
+  tick();
+  _elapsedTimer = setInterval(tick, 1000);
 }
 function stopElapsedTimer(){
   if(_elapsedTimer){

@@ -161,6 +161,7 @@ RUNNER_LIVE = """(() => {
 SCENES = [
     ("hub", "hub", (1280, 800), ""),
     ("hub-narrow", "hub", (820, 760), ""),
+    ("hub-focus", "hub", (1280, 800), "document.querySelectorAll('.game-cover')[1].focus()"),
     ("runner", "runner", (440, 820), ""),
     ("runner-wide", "runner", (1100, 760), ""),
     ("runner-settings", "runner", (440, 820),
