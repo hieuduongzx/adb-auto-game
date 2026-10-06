@@ -46,7 +46,7 @@ def text_matches(
     normalize_whitespace: bool = True,
     regex: bool = False,
 ) -> bool:
-    """Whether OCR output contains ``needle``.
+    r"""Whether OCR output contains ``needle``.
 
     An empty needle never matches. Whitespace is collapsed, and a second
     comparison drops spaces entirely so ``"TOUCH TO START"`` still matches an
