@@ -2045,9 +2045,12 @@
 /* 148px columns: big enough that a crop is recognisable without opening it,
    which is the whole job of this tab — the old 104px grid fit more cards per
    row and identified none of them. */
+/* grid-auto-rows:max-content is load-bearing: a card clips its own overflow,
+   which zeroes its automatic minimum height, so once a few hundred cards
+   overfilled the scrolling grid every "auto" row collapsed to its 2px border. */
 .wf-lib-grid { flex:1; min-width:0; overflow-y:auto; padding:12px 14px;
   display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
-  gap:12px; align-content:start; }
+  grid-auto-rows:max-content; gap:12px; align-content:start; }
 /* Card: a <button>, so the app's .asset-card look needs its native chrome
    cleared before it applies. Flat in the grid — elevation is for overlays, and
    a hundred shadowed cards turned the scan into noise. */
@@ -2055,7 +2058,10 @@
   box-shadow:none; border-color:var(--border); }
 .wf-lib-card:hover, .wf-lib-card.active { box-shadow:none; }
 .wf-lib-card.active { border-color:var(--accent); }
-#wf-library-pane .asset-thumb { height:76px; }
+/* Until a lazy thumbnail decodes (or if it fails) Chromium paints its alt
+   text — the full file name at body size — across the card; the name is
+   already printed underneath, so keep the alt for screen readers only. */
+#wf-library-pane .asset-thumb { height:76px; color:transparent; font-size:0; }
 .wf-lib-card .asset-name { text-align:left; padding:4px 6px 3px; }
 /* Orphans are the reason the tab exists, so they get a marker that survives the
    scan — a small square on the meta line. It used to be a 3px left border,
