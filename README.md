@@ -65,14 +65,35 @@ JavaScript files can be syntax-checked with Node.js:
 Get-ChildItem apps/web -Recurse -Filter *.js | ForEach-Object { node --check $_.FullName }
 ```
 
-Designer geometry and keyboard regression checks:
+Every JavaScript regression suite (Designer geometry, Hub layout, Runner
+state, …):
 
 ```powershell
-node --test tests/test_designer_geometry.cjs
+Get-ChildItem tests -Filter *.cjs | ForEach-Object { node --test $_.FullName }
 ```
 
-In Designer, **F** fits the graph above the floating dock; **Shift+F** focuses
-selected nodes. **Arrange** spaces nodes automatically and can be undone with
+### Looking at the UI
+
+`tools/shoot_ui.py` opens the Hub, Runner, Designer and DevScope in headless
+Edge against their **real** Python APIs (read-only: anything that would run a
+workflow, write a file, touch a device or the network is refused) and saves a
+screenshot of every scene — main views, dialogs, popovers, menus, a live run —
+in both themes. It needs Playwright with the Edge channel, like
+`tools/verify_runner_ui.py`.
+
+```powershell
+python tools/shoot_ui.py --out out/ui                      # everything, light + dark
+python tools/shoot_ui.py --out out/ui --only designer --theme dark
+python tools/shoot_ui.py --out out/ui --only hub --scale 2 # crisp crops
+python tools/shoot_ui.py --out out/ui --flow workflows/BrownDust2/workflow.json
+```
+
+Colour changes are guarded by `tests/test_token_contrast.py`, which checks
+every text/background token pair against WCAG AA in both themes.
+
+In Designer, **F** fits the graph; **Shift+F** focuses selected nodes.
+Activities and Functions sit at the top of the left column, above the node
+palette. **Arrange** spaces nodes automatically and can be undone with
 **Ctrl+Z**. Selecting a node highlights its incoming and outgoing wires.
 
 ## Build (Macro2k only)
