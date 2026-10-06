@@ -104,7 +104,7 @@
   transition:background .15s, border-color .15s, color .15s; }
 .wf-run-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex-shrink:0;
   transition:background .15s, box-shadow .15s; }
-.wf-run-status.running { background:var(--cat-ocr-bg); border-color:transparent; color:var(--cat-ocr-ink); }
+.wf-run-status.running { background:var(--run-live-hd); border-color:transparent; color:var(--run-live-ink); }
 .wf-run-status.running .wf-run-dot { background:var(--run-live); animation:wfRunPulse 1.1s ease-in-out infinite; }
 .wf-run-status.ok { background:var(--alt); border-color:transparent; color:var(--dim); }
 .wf-run-status.ok .wf-run-dot { background:var(--ok); }
@@ -1171,10 +1171,10 @@
 /* Live nodes get a blue border, subtle wash and steady glow. Keep category
    headers intact, and leave paused/crashed state colours untouched. */
 .wf-node:is(.running, .running-call):not(.paused):not(.crashed) {
-  border-color:#3b82f6 !important;
-  background:color-mix(in srgb, #3b82f6 12%, var(--panel)) !important;
-  box-shadow:0 0 0 2px color-mix(in srgb, #3b82f6 55%, transparent),
-    0 0 20px 3px color-mix(in srgb, #3b82f6 32%, transparent);
+  border-color:var(--run-live) !important;
+  background:color-mix(in srgb, var(--run-live) 12%, var(--panel)) !important;
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--run-live) 55%, transparent),
+    0 0 20px 3px color-mix(in srgb, var(--run-live) 32%, transparent);
 }
 .wf-node:is(.running, .running-call):not(.paused) {
   z-index:var(--z-node-hover); }
@@ -1986,6 +1986,8 @@
 /* ── Command palette (Ctrl+K) — same card as the finder, docked top-centre ── */
 .wf-cmd { z-index:9; }
 .wf-cmd .wf-find-item .k { font-family:var(--mono); }
+.wf-cmd .wf-find-item .s { font-family:var(--sans); font-size:var(--t-caption); color:var(--muted); }
+.wf-cmd .wf-find-item .t { font-size:var(--t-ui); }
 
 /* ── Validation panel — reuses the finder card, docked top-centre ──────────── */
 .wf-vald { width:min(480px, calc(100% - 24px)); }

@@ -172,11 +172,11 @@ function promptNewWorkflow() {
     box.setAttribute("role", "dialog");
     box.setAttribute("aria-modal", "true");
     box.innerHTML =
-      `<div class="ui-modal-hd">New game</div>` +
+      `<div class="ui-modal-hd">New project</div>` +
       `<div class="ui-modal-bd">` +
         `<div class="form-field">` +
-          `<label for="hub-name-input">Game name</label>` +
-          `<input id="hub-name-input" type="text" spellcheck="false" autocomplete="off" value="My Game">` +
+          `<label for="hub-name-input">Project name</label>` +
+          `<input id="hub-name-input" class="name-input" type="text" spellcheck="false" autocomplete="off" value="My Game">` +
         `</div>` +
         `<div class="form-field">` +
           `<span class="form-lbl">Controller</span>` +

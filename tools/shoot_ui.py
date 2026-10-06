@@ -126,6 +126,14 @@ def _handler(apis, theme_box):
     return functools.partial(Handler, directory=str(ROOT / "apps" / "web"))
 
 
+class _Server(ThreadingHTTPServer):
+    # The Designer requests ~25 scripts at once; the socketserver default
+    # backlog of 5 refused some of them on Windows, so a page would load with
+    # base.js or groups.js missing ("$ is not defined").
+    request_queue_size = 128
+    daemon_threads = True
+
+
 BRIDGE = """(() => {
   const app = location.pathname.split('/')[1];
   const theme = %s;
@@ -157,17 +165,36 @@ RUNNER_LIVE = """(() => {
      send('log', {ts: t + i, level, kind, scope: i ? 'Girl Wars' : 'Runner', text}));
 })()"""
 
+# A test run part-way through: two blocks done, one live, one failed.
+DESIGNER_LIVE = """(() => {
+  wfSetRunning(true);
+  const ns = [...document.querySelectorAll('#wf-world .wf-node:not(.start):not(.end)')];
+  ns[0] && ns[0].classList.add('ran-ok');
+  ns[1] && ns[1].classList.add('ran-ok');
+  ns[2] && ns[2].classList.add('running');
+  ns[3] && ns[3].classList.add('ran-fail');
+})()"""
+
 # name, page, viewport, settle action (JS run after load, may be empty)
 SCENES = [
     ("hub", "hub", (1280, 800), ""),
     ("hub-narrow", "hub", (820, 760), ""),
     ("hub-focus", "hub", (1280, 800), "document.querySelectorAll('.game-cover')[1].focus()"),
+    ("hub-new", "hub", (1280, 800), "createWorkflow()"),
+    ("hub-settings", "hub", (1280, 800), "openSettings()"),
+    ("hub-build", "hub", (1280, 800), "buildWorkflow(GAMES[0].path)"),
     ("runner", "runner", (440, 820), ""),
     ("runner-wide", "runner", (1100, 760), ""),
     ("runner-settings", "runner", (440, 820),
      "typeof switchMobileView==='function' && switchMobileView('settings', false)"),
     ("runner-running", "runner", (1100, 760), RUNNER_LIVE),
     ("runner-running-narrow", "runner", (440, 820), RUNNER_LIVE),
+    ("runner-actset", "runner", (1100, 760),
+     "openActivitySettings((S.activities.find(a => (a.vars||[]).length > 2) || S.activities[0]).id)"),
+    ("runner-actset-narrow", "runner", (440, 820),
+     "openActivitySettings((S.activities.find(a => (a.vars||[]).length > 2) || S.activities[0]).id)"),
+    ("runner-pop-settings", "runner", (1100, 760), "openHeaderPop('settings')"),
+    ("runner-pop-notes", "runner", (1100, 760), "openHeaderPop('notes')"),
     ("designer", "wf", (1480, 920), ""),
     ("designer-node", "wf", (1480, 920),
      "(()=>{const n=document.querySelector('.wf-node:not(.start):not(.end)')||document.querySelector('.wf-node');"
@@ -178,6 +205,17 @@ SCENES = [
     ("designer-library", "wf", (1480, 920), "wfSwitchView('library')"),
     ("designer-project", "wf", (1480, 920), "wfOpenProjectSettings()"),
     ("designer-keys", "wf", (1480, 920), "uiShowShortcuts()"),
+    ("designer-cmd", "wf", (1480, 920), "wfCmdShow()"),
+    ("designer-find", "wf", (1480, 920), "wfFindShow()"),
+    ("designer-validate", "wf", (1480, 920), "wfValidateShow()"),
+    ("designer-runmenu", "wf", (1480, 920), "wfShowRunMenu(document.getElementById('wf-run-menu-btn'))"),
+    ("designer-qc", "wf", (1480, 920), "wfShowQuickConnectMenu(760, 380, null, null)"),
+    ("designer-vars", "wf", (1480, 920), "document.getElementById('wf-vars-toggle').click()"),
+    ("designer-layout", "wf", (1480, 920), "document.getElementById('wf-layout-toggle').click()"),
+    ("designer-ctx", "wf", (1480, 920),
+     "(() => { const n = document.querySelectorAll('#wf-world .wf-node')[2]; const r = n.getBoundingClientRect();"
+     " n.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, clientX: r.x + 30, clientY: r.y + 20})); })()"),
+    ("designer-live", "wf", (1480, 920), DESIGNER_LIVE),
     ("devscope", "scope", (1280, 800), ""),
     ("devscope-narrow", "scope", (900, 760), ""),
 ]
@@ -196,7 +234,7 @@ def main():
 
     apis = _apis(os.path.abspath(args.flow))
     theme_box = ["light"]
-    server = ThreadingHTTPServer(("127.0.0.1", 0), _handler(apis, theme_box))
+    server = _Server(("127.0.0.1", 0), _handler(apis, theme_box))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{server.server_port}"
     args.out.mkdir(parents=True, exist_ok=True)

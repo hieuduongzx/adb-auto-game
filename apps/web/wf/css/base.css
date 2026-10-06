@@ -11,7 +11,9 @@
      wire coloring, overlay strokes) instead of each spot picking its own green/red/amber. */
   --run-ok:    #1f9d57;
   --run-fail:  #d6483f;
-  --run-live:  #f97316;
+  /* Live = the one blue the running block glows in; the toolbar pill, delay
+     and timeout countdowns, marching border and minimap share it. */
+  --run-live:  #3b82f6;
   --run-info:  #06b6d4;
   --run-warn:  #eab308;
   /* Run-trail card tints — the full-card recolour a block keeps after it ran
@@ -25,11 +27,11 @@
   --run-fail-hd:    #fbe0dd;
   --run-fail-hd-bd: #f0b3ad;
   --run-fail-ink:   #991b1b;
-  --run-live-bd:    #ea580c;
+  --run-live-bd:    #2563eb;
   --run-live-bg:    color-mix(in srgb, var(--run-live-bd) 4%, var(--panel));
   --run-live-hd:    color-mix(in srgb, var(--run-live-bd) 10%, var(--panel));
   --run-live-hd-bd: color-mix(in srgb, var(--run-live-bd) 24%, var(--panel));
-  --run-live-ink:   #7c2d12;
+  --run-live-ink:   #1d4ed8;
   /* Terminal (start/end/stop) accents — also read by minimap.js chips. */
   --term-start: #059669; /* modern emerald — start / go */
   --term-end:   #e11d48; /* modern rose-red — end / stop */
@@ -135,7 +137,7 @@
 :root[data-theme="dark"] {
   --run-ok:    #34c370;
   --run-fail:  #ec6f66;
-  --run-live:  #fb923c;
+  --run-live:  #60a5fa;
   --run-info:  #22d3ee;
   --run-warn:  #fbbf24;
   --run-ok-bg:      rgba(52, 195, 112, .14);
@@ -146,11 +148,11 @@
   --run-fail-hd:    rgba(236, 111, 102, .2);
   --run-fail-hd-bd: rgba(236, 111, 102, .4);
   --run-fail-ink:   #f6a09a;
-  --run-live-bd:    #fb923c;
+  --run-live-bd:    #60a5fa;
   --run-live-bg:    color-mix(in srgb, var(--run-live-bd) 4%, var(--panel));
   --run-live-hd:    color-mix(in srgb, var(--run-live-bd) 10%, var(--panel));
   --run-live-hd-bd: color-mix(in srgb, var(--run-live-bd) 24%, var(--panel));
-  --run-live-ink:   #fdba74;
+  --run-live-ink:   #93c5fd;
   --term-start: #34c370;
   --term-end:   #f4557a;
   --branch-t:    #34c370;

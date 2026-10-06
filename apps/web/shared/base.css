@@ -293,6 +293,8 @@ input[type="checkbox"]:disabled { opacity: .55; cursor: not-allowed; }
   color: var(--dim); margin-bottom: 6px;
 }
 .ui-modal-bd input { width: 100%; height: 34px; font-family: var(--mono); font-size: var(--t-body); }
+/* A name is prose, not data: dialogs that ask for one use the UI face. */
+.ui-modal-bd input.name-input, .ui-modal-bd input.ui-modal-inp { font-family: var(--sans); font-weight: 500; }
 /* Inline monospace run — a path or an identifier inside prose. A form control
    that carries the class wants the face only, not the muted prose colour. */
 .mono { font-family: var(--mono); font-size: var(--t-caption); color: var(--dim); }

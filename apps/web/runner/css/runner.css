@@ -404,6 +404,11 @@ input { caret-color: var(--accent); text-align: center; }
 .setting-var-block + .setting-var-block { border-top: 1px solid var(--line); }
 .setting-var-nested { display: flex; flex-direction: column; }
 .setting-option-nest { display: flex; flex-direction: column; margin-left: 12px; padding-left: 10px; border-left: 2px solid var(--accent-bd); }
+/* A setting's own children hang under it, indented on a rule, so "Done" reads
+   as part of "Arena" rather than as the next setting in the list. */
+.setting-var-nested:not(:empty) { display: flex; flex-direction: column; margin: -2px 0 6px 6px; padding-left: 14px; border-left: 2px solid var(--line); }
+.setting-var-nested .setting-row { padding: 5px 0; }
+.setting-var-nested .setting-label { color: var(--muted); }
 .setting-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
 .setting-row + .setting-row { border-top: 1px solid var(--line); }
 .setting-label { font-size: var(--t-ui); color: var(--dim); font-weight: 500; flex: 1; min-width: 0; }
@@ -548,6 +553,7 @@ input { caret-color: var(--accent); text-align: center; }
 .log-error   { color: var(--runner-log-error-ink); }
 
 .changelog-layout { display: flex; flex: 1; min-height: 180px; }
+.changelog-list:empty { display: none; }
 .changelog-list { width: 108px; flex-shrink: 0; overflow: auto; border-right: 1px solid var(--line); padding: 6px; display: flex; flex-direction: column; gap: 4px; }
 .changelog-ver { text-align: left; border: 1px solid transparent; background: transparent; color: var(--ink); border-radius: var(--r-sm); padding: 6px 8px; font: inherit; font-size: var(--t-caption); cursor: pointer; }
 .changelog-ver[aria-current="true"] { background: var(--accent-bg); border-color: var(--accent-bd); color: var(--accent); font-weight: 700; }

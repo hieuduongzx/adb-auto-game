@@ -22,7 +22,7 @@ function wfMmPalette(){
     time:v("--cat-time")||"#0284c7", device:v("--cat-device")||"#64748b",
     win32:v("--cat-win32")||"#6366f1", misc:v("--cat-misc")||"#9aa6b4",
     start:v("--term-start")||"#16a34a", end:v("--term-end")||"#dc2626", note:"#e2c56d", def:"#a5b1c2",
-    run:v("--run-live")||"#f97316", accent:v("--accent")||"#2f6fed",
+    run:v("--run-live")||"#3b82f6", accent:v("--accent")||"#2f6fed",
     fail:v("--run-fail")||"#d6483f",
   };
   return wfMmColors;
