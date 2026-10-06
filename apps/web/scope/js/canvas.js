@@ -150,4 +150,6 @@ canvas.addEventListener("wheel", e => {
   draw();
 },{passive:false});
 
-canvas.addEventListener("dblclick", resetZoom);
+// resetZoom lives in keyboard.js, which loads after this file: look it up when
+// the double-click happens, not while this script is still being evaluated.
+canvas.addEventListener("dblclick", () => resetZoom());

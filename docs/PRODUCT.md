@@ -49,6 +49,9 @@ always readable at a glance from across the desk.
    are visible without interaction.
 5. **English labels throughout** (unified July 2026 — previously mixed
    Vietnamese/English), mono for data (serials, timers, counts).
+   Sentence case for panel titles, tabs, section and field labels (October
+   2026); uppercase is kept for state chips (READY, RUNNING), log level tags
+   and the telemetry strip — the things that report state, not name a region.
 
 ## Accessibility & Inclusion
 

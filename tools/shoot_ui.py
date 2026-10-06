@@ -1,4 +1,4 @@
-"""Screenshot the Hub, Runner and Designer with their real Python APIs.
+"""Screenshot the Hub, Runner, Designer and DevScope with their real Python APIs.
 
 Each app's ``*API`` class is instantiated without pywebview and served next to
 ``apps/web`` over a local HTTP server; the page's ``window.pywebview.api`` is a
@@ -29,7 +29,7 @@ SAFE = {
     "app_version", "build_state", "list_workflows", "get_state", "get_settings",
     "get_last_workflow", "get_local_vars", "list_templates", "template_thumbnail",
     "image_thumbnail", "list_trash", "unity_bridge_status", "get_diagnostics",
-    "find_duplicate_templates", "list_windows",
+    "find_duplicate_templates", "list_windows", "list_assets", "get_asset_thumbnail",
 }
 
 
@@ -63,7 +63,11 @@ def _apis(flow_path: str):
     designer._remember_dir = lambda *a, **k: None
     designer._remember_last_workflow = lambda *a, **k: None
     designer._pending_load = flow_path
-    return {"hub": hub, "runner": runner, "wf": designer}
+
+    import devscope
+    scope = devscope.DevScopeAPI()
+    scope._window = _FakeWindow()
+    return {"hub": hub, "runner": runner, "wf": designer, "scope": scope}
 
 
 def _handler(apis, theme_box):
@@ -173,6 +177,8 @@ SCENES = [
     ("designer-library", "wf", (1480, 920), "wfSwitchView('library')"),
     ("designer-project", "wf", (1480, 920), "wfOpenProjectSettings()"),
     ("designer-keys", "wf", (1480, 920), "uiShowShortcuts()"),
+    ("devscope", "scope", (1280, 800), ""),
+    ("devscope-narrow", "scope", (900, 760), ""),
 ]
 
 
