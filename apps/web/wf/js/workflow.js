@@ -878,7 +878,7 @@ function wfSaveSettings(){ try{ const lc=$("log-card"), sd=$("wf-side"), insp=$(
   const logH = lc && !lc.classList.contains("collapsed") ? lc.offsetHeight : (lc && lc.dataset.openH ? parseInt(lc.dataset.openH,10) : undefined);
   const sideW=sd?(wfSideCollapsed?(parseInt(sd.dataset.openW,10)||272):sd.offsetWidth):undefined;
   const inspW=insp?(wfInspCollapsed?(parseInt(insp.dataset.openW,10)||304):insp.offsetWidth):undefined;
-  api().save_settings({snap:wfSnapOn, snapMigrated:true, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), logH: logH||undefined, sideW, inspW, actH: wfActH||null, sideCollapsed:wfSideCollapsed, inspCollapsed:wfInspCollapsed}); }catch{} }
+  api().save_settings({snap:wfSnapOn, snapMigrated:true, previewAll:wfPreviewAll, minimap:wfMinimapOn, alignGuides:wfAlignOn, previewHz: (typeof wfPvHz!=="undefined"?wfPvHz:undefined), logOpen: !(lc&&lc.classList.contains("collapsed")), logH: logH||undefined, sideW, inspW, actH: wfActH||null, sideCollapsed:wfSideCollapsed, inspCollapsed:wfInspCollapsed, actDocked:true}); }catch{} }
 function wfSyncToggleBtns(){
   // Icon buttons: state shows as colour (.on) + tooltip, never overwrite the SVG.
   const s=$("wf-snap-btn"); if(s){ s.title="Snap to grid: "+(wfSnapOn?"On":"Off")+" - Smart align overrides the grid only on matched axes (hold Alt for free placement)"; s.classList.toggle("on",wfSnapOn); }
@@ -1748,7 +1748,7 @@ function wfToggleSidebar(which){
 function wfInitSideResizer(){
   const side=$("wf-side"), rez=$("wf-side-resizer"); if(!side||!rez||rez.__wired) return;
   rez.__wired=true; let drag=null;
-  const setW=w=>{ w=Math.max(220,Math.min(480,w)); side.style.width=w+"px"; side.dataset.openW=String(w); rez.setAttribute("aria-valuenow",String(Math.round(w))); };
+  const setW=w=>{ w=Math.max(256,Math.min(480,w)); side.style.width=w+"px"; side.dataset.openW=String(w); rez.setAttribute("aria-valuenow",String(Math.round(w))); };
   setW(side.offsetWidth);
   rez.addEventListener("mousedown",e=>{ if(e.target.closest(".wf-sidebar-toggle")||wfSideCollapsed) return; e.preventDefault(); drag={x:e.clientX, w:side.offsetWidth}; rez.classList.add("drag"); document.body.style.cursor="col-resize"; });
   rez.addEventListener("keydown",e=>{ if(!["ArrowLeft","ArrowRight"].includes(e.key)||wfSideCollapsed) return; e.preventDefault(); setW(side.offsetWidth+(e.key==="ArrowRight"?10:-10)); wfSaveSettings(); });
@@ -1797,20 +1797,21 @@ function wfInitLogResizer(){
     wfSaveSettings();
   });
 }
-// Drag-to-resize the floating Activities list; height persists in settings.
-// The card is pinned to the canvas' bottom-right corner, so the handle on its
-// top edge grows the list upwards. A drag pins an exact height (--act-h, 1:1
-// with the pointer even when the list is shorter than the card); double-click
-// clears it and the card goes back to hugging its rows up to seven.
+// Drag-to-resize the Activities list; height persists in settings. The list
+// is docked at the top of the left column, so the handle on its bottom edge
+// grows it downwards, into the node palette. A drag pins an exact height
+// (--act-h, 1:1 with the pointer even when the list is shorter); double-click
+// clears it and the list goes back to hugging its rows up to the default cap.
+const WF_PALETTE_MIN_H=160;   // the node palette below always keeps this much
 function wfInitActResizer(){
   const panel=$("wf-act-panel"), body=$("wf-act-panel-body"), rez=$("wf-act-resizer");
   if(!panel||!body||!rez||rez.__wired) return;
   rez.__wired=true; let drag=null;
-  // Room left in the canvas once the card's own chrome (header, tabs, borders)
-  // and its 14px bottom inset plus the same gap above are accounted for.
+  // Room left in the column once the panel's own chrome (header, tabs) and
+  // the palette's minimum are accounted for.
   const maxH=()=>{
-    const host=panel.offsetParent||$("wf-canvas");
-    const avail=(host?host.clientHeight:window.innerHeight)-28-(panel.offsetHeight-body.offsetHeight);
+    const host=$("wf-side");
+    const avail=(host?host.clientHeight:window.innerHeight)-WF_PALETTE_MIN_H-(panel.offsetHeight-body.offsetHeight);
     return Math.max(72, Math.min(600, avail));
   };
   const setH=h=>{
@@ -1832,14 +1833,14 @@ function wfInitActResizer(){
   rez.addEventListener("keydown",e=>{
     if(!["ArrowUp","ArrowDown"].includes(e.key)) return;
     if(panel.classList.contains("collapsed")||panel.classList.contains("is-max")) return;
-    e.preventDefault(); setH(body.offsetHeight+(e.key==="ArrowUp"?16:-16)); wfSaveSettings();
+    e.preventDefault(); setH(body.offsetHeight+(e.key==="ArrowDown"?16:-16)); wfSaveSettings();
   });
   // Double-click clears the pinned height: back to hugging the rows, capped at seven.
   rez.addEventListener("dblclick",e=>{
     e.preventDefault(); wfActH=0; panel.style.removeProperty("--act-h");
     rez.setAttribute("aria-valuenow",String(body.offsetHeight)); wfSaveSettings();
   });
-  window.addEventListener("mousemove",e=>{ if(!drag) return; setH(drag.h-(e.clientY-drag.y)); });
+  window.addEventListener("mousemove",e=>{ if(!drag) return; setH(drag.h+(e.clientY-drag.y)); });
   window.addEventListener("mouseup",()=>{
     if(!drag) return;
     drag=null; panel.classList.remove("resizing"); rez.classList.remove("drag");
@@ -1859,13 +1860,8 @@ function wfFit(animate, selectionOnly=false){
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   els.forEach(el=>{ const x=el.offsetLeft,y=el.offsetTop,w=el.offsetWidth,h=el.offsetHeight;
     if(x<minX)minX=x; if(y<minY)minY=y; if(x+w>maxX)maxX=x+w; if(y+h>maxY)maxY=y+h; });
-  // Reserve the toolbar, breadcrumb and floating dock before framing nodes.
+  // Reserve the tool rail, the graph name/stats and the Arrange button.
   const frame={left:68,top:60,right:canvas.clientWidth-24,bottom:canvas.clientHeight-64};
-  const dock=$("wf-act-panel");
-  if(dock&&dock.offsetParent!==null&&!dock.classList.contains("is-max")){
-    const cr=canvas.getBoundingClientRect(),dr=dock.getBoundingClientRect();
-    frame.bottom=Math.min(frame.bottom,dr.top-cr.top-24);
-  }
   const cw=Math.max(80,frame.right-frame.left),ch=Math.max(80,frame.bottom-frame.top);
   const z=Math.max(0.2,Math.min(cw/((maxX-minX)+40),ch/((maxY-minY)+40),1));
   const tx=frame.left+(cw-(minX+maxX)*z)/2,ty=frame.top+(ch-(minY+maxY)*z)/2;

@@ -16,7 +16,7 @@ def test_designer_chrome_names_zones_and_selection_without_replacing_runtime_ids
     doc = Chrome()
     doc.feed((ROOT / 'index.html').read_text(encoding='utf-8'))
     ids = {attrs['id']: attrs for _, attrs in doc.elements if 'id' in attrs}
-    assert ids['wf-side']['aria-label'] == 'Node palette'
+    assert ids['wf-side']['aria-label'] == 'Activities and node palette'
     assert ids['wf-inspector']['aria-label'] == 'Inspector'
     assert ids['wf-selection-state']['role'] == 'status'
     assert ids['wf-save-state']['role'] == 'status'

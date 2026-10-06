@@ -179,9 +179,60 @@
      shared/panel.js moves the panel node here and hides the siblings, so a
      docked column can go full-screen without an escape hatch of its own. -->
 <main id="workflow-view" class="workbench-main" data-pnl-stage aria-label="Workflow designer workspace">
-  <!-- Left: block library and reusable functions. Activities stay on the
-       canvas as a compact, always-reachable graph switcher. -->
-  <div id="wf-side" aria-label="Node palette">
+  <!-- Left: activities/functions (top) and the block library (below). -->
+  <div id="wf-side" aria-label="Activities and node palette">
+    <!-- Activities and Functions, docked at the top of the left column. Drag the
+         bottom edge to resize; the node palette takes the rest of the column. -->
+    <div class="pnl" id="wf-act-panel" data-dtab="act" data-pnl="wf-activities" data-pnl-title="Activities" data-pnl-tools="none">
+      <div class="wf-dock-tabs pnl-hd" role="tablist" aria-label="Activities and functions">
+        <!-- The label is its own span so the strip can ellipsize rather than
+             overflow: with min-width:0 the tabs are the only part that can
+             give, and without it they pushed the tools off the card edge. -->
+        <button type="button" class="tab-btn active" data-dtab="act" role="tab" aria-selected="true" aria-controls="wf-dock-act" id="wf-dtab-act" onclick="wfSwitchDockTab('act')"><span class="tab-lbl">Activities</span> <span class="tab-count" id="wf-act-total"></span></button>
+        <button type="button" class="tab-btn" data-dtab="fn" role="tab" aria-selected="false" aria-controls="wf-dock-fn" id="wf-dtab-fn" onclick="wfSwitchDockTab('fn')"><span class="tab-lbl">Functions</span> <span class="tab-count" id="wf-fn-count"></span></button>
+        <span class="pnl-tools">
+          <!-- Card chrome only. The per-tab buttons moved down to
+               .wf-dock-bar: three tab labels plus five buttons in one row
+               overflowed the card and clipped them off its right edge.
+               panel.js appends Maximize after this. -->
+          <button class="wf-side-mini" id="wf-act-collapse" aria-controls="wf-act-panel-body" aria-expanded="true" title="Collapse - fold the list away, keep the tabs">
+            <i data-ico="chevron-down" aria-hidden="true"></i>
+          </button>
+        </span>
+      </div>
+      <!-- Action bar — whatever the open tab needs to act on its own list,
+           plus the Sequence/Background switch that belongs to Activities
+           alone. Sits above the scrolling body so both hold still while the
+           list scrolls; the card's data-dtab picks which group is shown. -->
+      <div class="wf-dock-bar">
+        <div class="wf-act-tab-row">
+          <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequence <span class="side-count" id="wf-act-count"></span></button>
+          <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
+        </div>
+        <span class="wf-dock-tools" data-for="act">
+          <button class="wf-side-mini" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)" aria-pressed="false">
+            <i data-ico="crosshair" aria-hidden="true"></i>
+          </button>
+          <button class="wf-side-mini" id="wf-act-dbg" title="Debug overlay: Off - when on, every image/color/OCR match draws its box + confidence on Preview" aria-pressed="false">
+            <i data-ico="scan-eye" aria-hidden="true"></i>
+          </button>
+          <button class="wf-side-mini wf-side-add" id="wf-act-add" title="Add activity">+</button>
+        </span>
+        <span class="wf-dock-tools" data-for="fn">
+          <button class="wf-side-mini wf-side-add" id="wf-fn-add" title="Create new function">+</button>
+        </span>
+      </div>
+      <div id="wf-act-panel-body" class="wf-act-panel-body">
+        <div class="wf-dock-pane active" id="wf-dock-act" role="tabpanel" aria-labelledby="wf-dtab-act">
+          <div id="wf-activities" class="wf-act-list"></div>
+          <div id="wf-activities-bg" class="wf-act-list" style="display:none"></div>
+        </div>
+        <div class="wf-dock-pane" id="wf-dock-fn" role="tabpanel" aria-labelledby="wf-dtab-fn">
+          <div id="wf-functions" class="wf-act-list"></div>
+        </div>
+      </div>
+      <div id="wf-act-resizer" title="Drag the bottom edge (or use arrow keys) to resize the list - double-click to reset" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize list" aria-valuemin="72" aria-valuemax="600"></div>
+    </div>
     <div class="wf-side-sec pnl pnl-flush" data-pnl="wf-nodes" data-pnl-title="Nodes" data-pnl-tools="max" style="flex:1;min-height:0;display:flex;flex-direction:column;">
       <div class="wf-side-hdr pnl-hd wf-zone-heading"><span class="pnl-title"><span>Nodes</span></span><span class="wf-zone-hint">Drag to canvas</span></div>
       <div class="wf-pal-search">
@@ -194,7 +245,7 @@
       <div id="wf-palette" class="wf-palette"></div>
     </div>
   </div>
-  <div id="wf-side-resizer" title="Drag or use arrow keys to resize the left column" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize left column" aria-valuemin="220" aria-valuemax="480">
+  <div id="wf-side-resizer" title="Drag or use arrow keys to resize the left column" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize left column" aria-valuemin="256" aria-valuemax="480">
     <button type="button" class="wf-sidebar-toggle" id="wf-side-toggle" onclick="wfToggleSidebar('left')" title="Collapse node sidebar" aria-label="Collapse node sidebar" aria-expanded="true">
       <i data-ico="chevron-left" aria-hidden="true"></i>
     </button>
@@ -340,58 +391,6 @@
       <!-- Minimap — bird's-eye view; click/drag to jump. -->
       <div id="wf-minimap" class="wf-minimap" title="Minimap - click or drag to move the view">
         <canvas id="wf-minimap-cv"></canvas>
-      </div>
-      <!-- Bottom-right dock: Activities and Functions. Drag the top edge to
-           resize; Variables are managed in the Inspector. -->
-      <div class="pnl" id="wf-act-panel" data-dtab="act" data-pnl="wf-activities" data-pnl-title="Activities" data-pnl-tools="max">
-        <div id="wf-act-resizer" title="Drag the top edge (or use arrow keys) to resize the list - double-click to reset" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize list" aria-valuemin="72" aria-valuemax="600"></div>
-        <div class="wf-dock-tabs pnl-hd" role="tablist" aria-label="Activities and functions">
-          <!-- The label is its own span so the strip can ellipsize rather than
-               overflow: with min-width:0 the tabs are the only part that can
-               give, and without it they pushed the tools off the card edge. -->
-          <button type="button" class="tab-btn active" data-dtab="act" role="tab" aria-selected="true" aria-controls="wf-dock-act" id="wf-dtab-act" onclick="wfSwitchDockTab('act')"><span class="tab-lbl">Activities</span> <span class="tab-count" id="wf-act-total"></span></button>
-          <button type="button" class="tab-btn" data-dtab="fn" role="tab" aria-selected="false" aria-controls="wf-dock-fn" id="wf-dtab-fn" onclick="wfSwitchDockTab('fn')"><span class="tab-lbl">Functions</span> <span class="tab-count" id="wf-fn-count"></span></button>
-          <span class="pnl-tools">
-            <!-- Card chrome only. The per-tab buttons moved down to
-                 .wf-dock-bar: three tab labels plus five buttons in one row
-                 overflowed the card and clipped them off its right edge.
-                 panel.js appends Maximize after this. -->
-            <button class="wf-side-mini" id="wf-act-collapse" aria-controls="wf-act-panel-body" aria-expanded="true" title="Collapse - fold the list away, keep the tabs">
-              <i data-ico="chevron-down" aria-hidden="true"></i>
-            </button>
-          </span>
-        </div>
-        <!-- Action bar — whatever the open tab needs to act on its own list,
-             plus the Sequence/Background switch that belongs to Activities
-             alone. Sits above the scrolling body so both hold still while the
-             list scrolls; the card's data-dtab picks which group is shown. -->
-        <div class="wf-dock-bar">
-          <div class="wf-act-tab-row">
-            <button class="wf-act-tab sel" data-tab="seq" id="wf-tab-seq">Sequence <span class="side-count" id="wf-act-count"></span></button>
-            <button class="wf-act-tab" data-tab="bg" id="wf-tab-bg">Background <span class="side-count" id="wf-bg-count"></span></button>
-          </div>
-          <span class="wf-dock-tools" data-for="act">
-            <button class="wf-side-mini" id="wf-act-focus" title="Focus: follow the running block (auto-centre, and follow into/out of functions)" aria-pressed="false">
-              <i data-ico="crosshair" aria-hidden="true"></i>
-            </button>
-            <button class="wf-side-mini" id="wf-act-dbg" title="Debug overlay: Off - when on, every image/color/OCR match draws its box + confidence on Preview" aria-pressed="false">
-              <i data-ico="scan-eye" aria-hidden="true"></i>
-            </button>
-            <button class="wf-side-mini wf-side-add" id="wf-act-add" title="Add activity">+</button>
-          </span>
-          <span class="wf-dock-tools" data-for="fn">
-            <button class="wf-side-mini wf-side-add" id="wf-fn-add" title="Create new function">+</button>
-          </span>
-        </div>
-        <div id="wf-act-panel-body" class="wf-act-panel-body">
-          <div class="wf-dock-pane active" id="wf-dock-act" role="tabpanel" aria-labelledby="wf-dtab-act">
-            <div id="wf-activities" class="wf-act-list"></div>
-            <div id="wf-activities-bg" class="wf-act-list" style="display:none"></div>
-          </div>
-          <div class="wf-dock-pane" id="wf-dock-fn" role="tabpanel" aria-labelledby="wf-dtab-fn">
-            <div id="wf-functions" class="wf-act-list"></div>
-          </div>
-        </div>
       </div>
     </div>
   </div>

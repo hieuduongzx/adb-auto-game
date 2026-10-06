@@ -662,6 +662,7 @@ async function wfStartGame(){
 
 
 // ── Init ──────────────────────────────────────────────────────────────────
+let wfNeedsSettingsSave=false;
 async function init(){
   let tries=0;
   while(!(window.pywebview&&window.pywebview.api)&&tries<40){ await new Promise(r=>setTimeout(r,100)); tries++; }
@@ -690,12 +691,19 @@ async function init(){
     if(st.logOpen===false){ const lc=$("log-card"); if(lc) lc.classList.add("collapsed"); const t=$("log-toggle"); if(t) t.setAttribute("aria-expanded","false"); }
     if(st.logH){ const lc=$("log-card"); if(lc){ const h=Math.max(80, Math.min(480, parseInt(st.logH,10)||140)); lc.style.height=h+"px"; lc.dataset.openH=String(h); } }
     const sd=$("wf-side"), insp=$("wf-inspector");
-    if(sd){ const w=st.sideW?Math.max(220,Math.min(480,st.sideW)):sd.offsetWidth; sd.style.width=w+"px"; sd.dataset.openW=String(w); }
+    // 256px floor: the column now carries the Activities list as well, whose
+    // tab strip and Sequence/Background switch need it (a saved 220 widens).
+    if(sd){ const w=st.sideW?Math.max(256,Math.min(480,st.sideW)):sd.offsetWidth; sd.style.width=w+"px"; sd.dataset.openW=String(w); }
     if(insp){ const w=st.inspW?Math.max(240,Math.min(520,st.inspW)):insp.offsetWidth; insp.style.width=w+"px"; insp.dataset.openW=String(w); }
     if(st.actH){ wfActH=Math.max(72, Math.min(600, parseInt(st.actH,10)||0)); }
     wfSideCollapsed=st.sideCollapsed===true; wfInspCollapsed=st.inspCollapsed===true;
+    // One-time migration: Activities moved from a canvas card into the left
+    // column (October 2026). A column saved as collapsed before that hid only
+    // the palette — reopen it once so the activity list is not hidden too.
+    if(st.actDocked!==true && wfSideCollapsed){ wfSideCollapsed=false; wfNeedsSettingsSave=true; }
   }catch{}
   wfApplySidebarState(false);
+  if(wfNeedsSettingsSave){ wfNeedsSettingsSave=false; wfSaveSettings(); }
   wfInitSideResizer();
   wfInitInspResizer();
   if(typeof wfInitLogResizer==="function") wfInitLogResizer();

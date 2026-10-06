@@ -302,7 +302,7 @@
 /* Fixed default widths but resizable (the resizer handles live on either side).
    16px inspector gutters + a 92px label column need the extra 8px, and the
    palette rows now run to the panel edge instead of wrapping into two columns. */
-#wf-side { width:248px; flex-shrink:0; display:flex; flex-direction:column;
+#wf-side { width:264px; flex-shrink:0; display:flex; flex-direction:column;
   overflow:hidden; background:var(--panel); border-right:1px solid var(--border2); }
 #wf-inspector { width:304px; flex-shrink:0; display:flex; flex-direction:column;
   overflow:hidden; background:var(--panel); border-left:1px solid var(--border2); }
@@ -387,19 +387,14 @@
 /* Debug overlay on = teal tint so it reads apart from Focus (blue accent). */
 #wf-act-dbg.on { color:var(--cat-image); background:var(--cat-image-bg); }
 
-/* ── Bottom-right dock: Activities · Functions in one card ───────────────── */
-/* Flat: no drop shadow. The dock sits on a canvas, not above it — a hairline
-   border and the panel fill already separate it, and the shadow only muddied
-   the plane it is pinned to. */
-/* max-height leaves the top-right corner to the Variables disclosure (12px
-   inset + 36px trigger + a gap): on a short canvas the list scrolls instead of
-   growing up underneath it. */
-#wf-act-panel { position:absolute; right:14px; bottom:14px; z-index:7;
-  width:320px; max-width:calc(100% - 28px); max-height:calc(100% - 76px); display:flex; flex-direction:column;
-  min-height:0; overflow:hidden; background:var(--panel); border:1px solid var(--border);
-  border-radius:var(--r-md); box-shadow:none; }
-#workflow-view.wf-preview-on #wf-act-panel,
-#workflow-view.wf-library-on #wf-act-panel { display:none; }
+/* ── Left column, top: Activities · Functions ────────────────────────────── */
+/* Docked, flush with the column: the canvas is never covered. The list hugs
+   its rows up to the default cap (or the height the bottom edge was dragged
+   to) and the node palette below takes the rest of the column. */
+#wf-act-panel { position:relative; flex:0 1 auto; display:flex; flex-direction:column; container-type:inline-size;
+  min-height:var(--pnl-hd-h); max-height:calc(100% - 160px); overflow:hidden;
+  background:var(--panel); border:none; border-bottom:1px solid var(--border2);
+  border-radius:0; box-shadow:none; }
 /* Collapsed folds the body away but keeps the tab strip: it is the card's only
    remaining affordance, and clicking a tab is how you get the list back. */
 #wf-act-panel.collapsed .wf-act-panel-body,
@@ -408,13 +403,11 @@
 /* The Sequence/Background switcher belongs to the Activities tab alone. */
 #wf-act-panel:not([data-dtab="act"]) .wf-act-tab-row { display:none; }
 #wf-act-panel.collapsed #wf-act-collapse svg { transform:rotate(-90deg); }
-/* Drag handle along the panel's top edge: the card is pinned to the canvas'
-   bottom-right corner, so growing the list pushes the top edge up. Sits inside
-   the panel (which clips to its radius) rather than 3px above it like the log
-   drawer's. Hidden when there is no list to size — collapsed or maximized. */
-#wf-act-resizer { position:absolute; left:0; right:0; top:0; height:7px;
+/* Drag handle along the panel's bottom edge — the boundary with the node
+   palette. Hidden when there is no list to size — collapsed or maximized. */
+#wf-act-resizer { position:absolute; left:0; right:0; bottom:0; height:7px;
   cursor:row-resize; z-index:9; }
-#wf-act-resizer::before { content:""; position:absolute; left:50%; top:2px;
+#wf-act-resizer::before { content:""; position:absolute; left:50%; bottom:2px;
   width:36px; height:3px; margin-left:-18px; border-radius:999px;
   background:transparent; transition:background .12s; }
 #wf-act-resizer:hover::before, #wf-act-resizer.drag::before { background:var(--accent); }
@@ -426,8 +419,8 @@
    It carries the three tab names and nothing else — the per-tab buttons live in
    .wf-dock-bar below, because labels + five buttons in one 340px row overflowed
    and the card's overflow:hidden clipped them off its right edge. */
-.wf-dock-tabs { gap:var(--s1); padding:0 var(--s2) 0 var(--s3); min-width:0; }
-.wf-dock-tabs .tab-btn { padding:0 8px; height:100%; display:inline-flex; align-items:center; gap:4px;
+.wf-dock-tabs { gap:var(--s1); padding:0 var(--s2) 0 var(--s2); min-width:0; }
+.wf-dock-tabs .tab-btn { padding:0 7px; height:100%; display:inline-flex; align-items:center; gap:5px;
   background:none; border:none; min-width:0; }
 .wf-dock-tabs .tab-btn:focus-visible { outline:2px solid var(--accent); outline-offset:-3px; }
 /* The label is the only part allowed to give: it ellipsizes while the badge and
@@ -438,7 +431,7 @@
 /* Action bar — one row under the strip holding whatever the open tab needs to
    act on its own list. Hidden on the collapsed card, like the body it acts on. */
 .wf-dock-bar { display:flex; align-items:center; gap:var(--s2);
-  padding:7px 11px; flex-shrink:0; }
+  padding:7px 8px; flex-shrink:0; }
 /* The switch takes the slack, so the buttons sit on the right edge whether or
    not it is there (on Functions/Variables its group is display:none). */
 .wf-dock-bar .wf-act-tab-row { flex:1 1 auto; min-width:0; margin:0; }
@@ -486,7 +479,7 @@
 .wf-variable-item .wf-var-row input { min-width:0; }
 .wf-variable-item summary:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 /* Tab bar — a segmented control on a tinted track. */
-.wf-act-tab-row { display:flex; align-items:stretch; gap:2px; margin:8px 11px 9px; padding:2px;
+.wf-act-tab-row { display:flex; align-items:stretch; gap:2px; margin:0; padding:2px;
   background:var(--alt); border:1px solid var(--border); border-radius:var(--r-sm); flex-shrink:0; }
 .wf-act-tab { flex:1 1 0; font-size:var(--t-caption); font-weight:600;
   color:var(--muted); background:none; border:none;
@@ -497,6 +490,9 @@
 .wf-act-tab .side-count { margin-left:2px; padding:0 5px; font-size:9px; border-radius:var(--r-xs);
   background:var(--alt); color:var(--muted); }
 .wf-act-tab.sel .side-count { background:var(--accent-bg); color:var(--accent); }
+/* In a narrow column the switch keeps its words and drops the per-list counts
+   (the Activities tab already shows the total) so the tools still fit beside it. */
+@container (max-width: 300px) { .wf-act-tab .side-count { display:none; } }
 /* Seven 31px rows plus six 4px gaps — the default ceiling, overridden by
    --act-h once the top edge is dragged (see #wf-act-resizer). The card still
    hugs a short list; the ceiling only caps how far it may grow. Additional
@@ -506,8 +502,8 @@
    height is exact: short lists stop hugging their rows and stand at the height
    the user chose, long ones scroll inside it. Unset, the 0% basis restores the
    hug-then-cap-at-241px default. */
-.wf-act-panel-body { flex:1 1 var(--act-h, 0%); min-height:0; max-height:var(--act-h, 241px);
-  overflow-y:auto; overscroll-behavior:contain; padding:0 10px 9px; }
+.wf-act-panel-body { flex:1 1 var(--act-h, 0%); min-height:0; max-height:var(--act-h, 280px);
+  overflow-y:auto; overscroll-behavior:contain; padding:0 8px 9px; }
 .wf-act-list { display:flex; flex-direction:column; gap:1px; }
 #wf-activities, #wf-activities-bg, #wf-functions { padding:0; }
 /* Activity rows */

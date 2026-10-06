@@ -268,7 +268,7 @@ test('return wire has finite geometry for self-links, vertical and close ports',
   }
 });
 
-test('fit frames real bounds above the activity dock and focuses only selected nodes', () => {
+test('fit frames real bounds clear of the canvas chrome and focuses only selected nodes', () => {
   const source=fs.readFileSync(path.join(__dirname,'../apps/web/wf/js/workflow.js'),'utf8');
   const nodes=[{dataset:{node:'a'},offsetLeft:10,offsetTop:0,offsetWidth:200,offsetHeight:88},
     {dataset:{node:'b'},offsetLeft:700,offsetTop:240,offsetWidth:200,offsetHeight:160}];
@@ -285,7 +285,9 @@ test('fit frames real bounds above the activity dock and focuses only selected n
     assert.ok(ctx.wfPan.x+n.offsetLeft*ctx.wfZoom>=68);
     assert.ok(ctx.wfPan.y+n.offsetTop*ctx.wfZoom>=60);
     assert.ok(ctx.wfPan.x+(n.offsetLeft+n.offsetWidth)*ctx.wfZoom<=976);
-    assert.ok(ctx.wfPan.y+(n.offsetTop+n.offsetHeight)*ctx.wfZoom<=456);
+    // Activities are docked in the left column now: only Arrange's 64px strip
+    // at the bottom of the 700px canvas is reserved.
+    assert.ok(ctx.wfPan.y+(n.offsetTop+n.offsetHeight)*ctx.wfZoom<=636);
   }
   ctx.wfFit(false,true);
   assert.equal(ctx.wfZoom,1);
