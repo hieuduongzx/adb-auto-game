@@ -1641,11 +1641,18 @@
 
 .wf-insp-block { display:flex; flex-direction:column; gap:8px; padding:12px 16px; }
 .wf-insp-block + .wf-insp-block { border-top:1px solid var(--line); }
-.wf-insp-block[data-intent] { border-left:2px solid var(--border2); padding-left:14px; }
-.wf-insp-block[data-intent="target-capture"] { border-left-color:var(--cat-image); }
-.wf-insp-block[data-intent="branching"] { border-left-color:var(--cat-logic); }
-.wf-insp-block[data-intent="timing"] { border-left-color:var(--cat-time); }
-.wf-insp-block[data-intent="advanced"] { border-left-color:var(--muted); }
+/* Section intent is a small dot in its category hue before the title — the
+   same mark the palette uses — rather than a 2px stripe on the column edge,
+   which read as a rendering seam against the resizer. Advanced sections get
+   no dot and a quieter title: they are the ones you rarely need. */
+.wf-insp-block[data-intent] > .wf-insp-sec::before { content:""; width:7px; height:7px;
+  border-radius:50%; flex-shrink:0; background:var(--intent-c, var(--border2)); }
+.wf-insp-block[data-intent="target-capture"] { --intent-c:var(--cat-image); }
+.wf-insp-block[data-intent="branching"] { --intent-c:var(--cat-logic); }
+.wf-insp-block[data-intent="timing"] { --intent-c:var(--cat-time); }
+.wf-insp-block[data-intent="advanced"] > .wf-insp-sec { color:var(--dim); }
+.wf-insp-block[data-intent="advanced"] > .wf-insp-sec::before,
+.wf-insp-block[data-intent="identity"] > .wf-insp-sec::before { display:none; }
 .wf-insp-sec { display:flex; align-items:center; gap:6px; margin:0 0 2px;
   font-size:var(--t-ui); font-weight:600; color:var(--ink); }
 .wf-insp-sec-spacer { flex:1; min-width:0; }

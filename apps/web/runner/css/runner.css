@@ -62,8 +62,10 @@ input { caret-color: var(--accent); text-align: center; }
 #main-split { flex: 1; min-height: 0; display: flex; gap: 0; }
 /* The activity list stops growing at a readable width; every extra pixel of a
    large or maximized window goes to the log and preview instead. */
-#pane-left  { flex: 1 1 44%; min-width: 260px; max-width: 500px; display: flex; flex-direction: column; gap: var(--s2); padding:var(--s3); border-right:1px solid var(--border); }
-#pane-right { flex: 1 1 56%; min-width: 0; display: flex; flex-direction: column; gap: var(--s2); padding:var(--s3); }
+#pane-left  { flex: 1 1 44%; min-width: 260px; max-width: 500px; display: flex; flex-direction: column; gap: 0; padding:var(--s3); border-right:1px solid var(--border); }
+#pane-right { flex: 1 1 56%; min-width: 0; display: flex; flex-direction: column; gap: var(--s3); padding:var(--s3); }
+/* The tabs and the pane below them are one card: no gap between the two. */
+#pane-right > #r-tabs { margin-bottom: calc(var(--s3) * -1); }
 
 /* ── Header card ───────────────────────────────────────────────────────── */
 /* One flex column: the progress row sits between title and controls only while
@@ -204,42 +206,49 @@ input { caret-color: var(--accent); text-align: center; }
   .queue-current { max-width: 360px; }
 }
 
-/* ── Tabs — segmented control (operator console) ───────────────────────── */
-#tabs-bar {
-  display: flex; align-items: center; gap: 0; flex-shrink: 0;
-  background: var(--alt); border: 1px solid var(--border); border-radius: var(--r-sm);
-  padding: 2px; gap: 2px; overflow: hidden;
+/* ── Tabs — the head of the list card ──────────────────────────────────────
+   Sequence / Background are underline tabs on the top edge of one card that
+   continues with the "n of m enabled" row and the list itself, instead of a
+   free-standing segmented track above it: one block, one less band of chrome.
+   The right column's Activity / Log tabs head their pane the same way. */
+#tabs-bar, #r-tabs {
+  display: flex; align-items: stretch; flex-shrink: 0; gap: 2px;
+  padding: 0 6px; min-height: 40px; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--border); border-bottom-color: var(--line);
+  border-radius: var(--r-md) var(--r-md) 0 0;
 }
 .tab-btn {
-  flex: 1; justify-content: center; padding: 7px 9px; border-radius: var(--r-xs);
+  flex: 0 0 auto; justify-content: center; padding: 0 10px; border-radius: 0;
   border: none; color: var(--dim);
-  display: inline-flex; align-items: center; gap: 5px;
+  display: inline-flex; align-items: center; gap: 6px;
   font-size: var(--t-ui); font-weight: 600;
-  transition: background .12s, color .12s;
+  transition: color .12s;
 }
-.tab-btn::after { left: 10px; right: 10px; }
-.tab-btn.active { background: var(--panel); color: var(--runner-selected-ink); box-shadow: var(--sh-sm); }
-.tab-btn.active::after { display: none; }
-.tab-btn:hover:not(.active) { background: var(--alt); color: var(--ink2); }
+.tab-btn::after { left: 8px; right: 8px; bottom: 0; border-radius: 2px 2px 0 0; }
+.tab-btn.active { color: var(--runner-selected-ink); }
+.tab-btn.active::after { background: var(--accent); }
+.tab-btn:hover:not(.active) { color: var(--ink); }
 
 /* ── Tab content ───────────────────────────────────────────────────────── */
 .tab-pane { display: none; flex-direction: column; min-height: 0; overflow: hidden; padding: 0; }
 .tab-pane.active { display: flex; flex: 1; }
 #tab-wrapper { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.pane-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; gap: var(--s2); overflow: hidden; }
+.pane-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; gap: 0; overflow: hidden; }
 
 /* The tab already names the list, so the header carries "3 of 5 enabled". */
-.list-header { display: flex; align-items: center; gap: 4px; padding: 0 2px; min-height: 24px; flex-shrink: 0; }
+.list-header { display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 12px; min-height: 36px; flex-shrink: 0;
+  background: var(--surface); border: 1px solid var(--border); border-width: 0 1px 1px; border-bottom-color: var(--line); }
 .list-label { font-size: var(--t-caption); font-weight: 500; color: var(--muted); flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
 .btn-sel { font-size: var(--t-ui); font-weight: 600; padding: 3px 8px; border-radius: var(--r-sm); color: var(--accent); transition: background .1s; }
 .btn-sel:hover { background: var(--accent-bg); }
 .btn-sel.none { color: var(--muted); }
 .btn-sel:disabled { opacity:.4; cursor:default; }
 .btn-sel.none:hover { background: var(--line); color: var(--dim); }
-.list-hint { font-size: var(--t-caption); color: var(--dim); padding: 0 2px; flex-shrink: 0; margin-top: -2px; }
+.list-hint { font-size: var(--t-caption); color: var(--dim); padding: 7px 12px; flex-shrink: 0;
+  background: var(--surface); border: 1px solid var(--border); border-width: 0 1px 1px; border-bottom-color: var(--line); }
 
 /* scrollable task list */
-.task-list { flex: 1; min-height: 0; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); }
+.task-list { flex: 1; min-height: 0; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--r-md) var(--r-md); }
 
 /* Selection uses a blue outline; execution uses semantic tint + status text.
    Both remain legible when the selected activity is also running or failed. */
@@ -313,26 +322,24 @@ input { caret-color: var(--accent); text-align: center; }
 .btn-run-one.is-stop:hover:not(:disabled) { background: var(--err-bg); color: var(--err); }
 
 /* ── Right column: 3 tabs + preview ────────────────────────────────────── */
-#r-tabs {
-  display: flex; align-items: stretch; flex-shrink: 0;
-  background: var(--alt); border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden;
-  padding: 2px; gap: 2px;
-}
 .rtab {
-  flex: 1; justify-content: center; min-width: 0; padding: 7px 9px;
-  border: none; border-radius: var(--r-xs);
-  display: inline-flex; align-items: center; gap: 5px;
+  position: relative; flex: 0 0 auto; justify-content: center; min-width: 0; padding: 0 10px;
+  border: none; border-radius: 0;
+  display: inline-flex; align-items: center; gap: 6px;
   font-size: var(--t-ui); font-weight: 600; color: var(--dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  transition: background .12s, color .12s;
+  transition: color .12s;
 }
-.rtab:hover { background: var(--alt); color: var(--ink2); }
-.rtab.active { color: var(--runner-selected-ink); background: var(--panel); box-shadow: var(--sh-sm); }
+.rtab::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px;
+  border-radius: 2px 2px 0 0; background: transparent; transition: background .15s; }
+.rtab:hover { color: var(--ink); }
+.rtab.active { color: var(--runner-selected-ink); }
+.rtab.active::after { background: var(--accent); }
 .rtab.active .tab-count { color: var(--runner-selected-ink); background: var(--accent-bg); }
 
 #r-content { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .rpane { display: none; flex: 1; min-width: 0; min-height: 0; flex-direction: column;
-  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+  background: var(--panel); border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--r-md) var(--r-md); overflow: hidden; }
 .rpane.active { display: flex; }
 .rpane-hd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); padding: 6px 9px; border-bottom: 1px solid var(--line); flex-shrink: 0; background: var(--surface); }
 /* Log header: filters grow, count + file actions stay together on the right.
@@ -585,6 +592,8 @@ input { caret-color: var(--accent); text-align: center; }
   #main-split[data-mobile-view="log"] #pane-right,
   #main-split[data-mobile-view="activity"] #pane-right { display: flex; }
   #r-tabs { display: none; }
+  /* Without its tab head the pane is a whole card again. */
+  .rpane { border-top: 1px solid var(--border); border-radius: var(--r-md); }
   #r-content { flex: 1; }
   #main-split[data-mobile-view="log"] #r-log,
   #main-split[data-mobile-view="activity"] #r-act { display: flex; }
