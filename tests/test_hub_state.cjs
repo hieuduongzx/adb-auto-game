@@ -82,8 +82,15 @@ test('initial load failure is not an empty library; Retry recovers through the w
 test('cards expose truthful saved metadata without inventing a connection state', () => {
   const { context } = loadHub({});
   const markup = context.cardHtml({ ...game, modified: '2026-09-24 17:42' }, 0);
-  assert.match(markup, /class="game-state"[^>]*>Last saved 2026-09-24 17:42</);
+  // The exact stamp is always available on hover; without an ISO time to
+  // measure from, the card shows it as-is rather than guessing an age.
+  assert.match(markup, /class="game-state" title="Last saved 2026-09-24 17:42">Saved 2026-09-24 17:42</);
   assert.doesNotMatch(markup, /Connected|Online|Ready/);
+  const twoDaysAgo = new Date(Date.now() - 2 * 864e5).toISOString();
+  const recent = context.cardHtml({ ...game, modified: '2026-10-04 09:00', modifiedIso: twoDaysAgo }, 0);
+  assert.match(recent, /class="game-state" title="Last saved 2026-10-04 09:00">Saved 2 days ago</);
+  const unsaved = context.cardHtml({ ...game, modified: '' }, 0);
+  assert.match(unsaved, /class="game-state"[^>]*>Never saved</);
 });
 
 test('refresh announces loading without replacing cached cards and keeps busy during search', async () => {

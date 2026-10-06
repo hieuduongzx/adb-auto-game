@@ -169,6 +169,10 @@ SCENES = [
      "if(n){n.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,clientX:n.getBoundingClientRect().x+20,clientY:n.getBoundingClientRect().y+20}));"
      "document.dispatchEvent(new MouseEvent('mouseup',{bubbles:true,button:0}));}})()"),
     ("designer-small", "wf", (1100, 720), ""),
+    ("designer-preview", "wf", (1480, 920), "wfSwitchView('preview')"),
+    ("designer-library", "wf", (1480, 920), "wfSwitchView('library')"),
+    ("designer-project", "wf", (1480, 920), "wfOpenProjectSettings()"),
+    ("designer-keys", "wf", (1480, 920), "uiShowShortcuts()"),
 ]
 
 
@@ -206,7 +210,8 @@ def main():
                     page.goto(f"{base}/{page_dir}/index.html")
                     time.sleep(args.wait)
                     if settle:
-                        page.evaluate(settle)
+                        # Fire and forget: a dialog's promise only settles on close.
+                        page.evaluate("s => setTimeout(() => (0, eval)(s), 0)", settle)
                         time.sleep(0.5)
                     path = args.out / f"{name}-{theme}.png"
                     page.screenshot(path=str(path))

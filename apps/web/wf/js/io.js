@@ -327,7 +327,8 @@ function wfHydrate(flow){
     vars: wfHydVars(a.vars||[]),
     graph:wfHydrateGraph(a.graph),
   }));
-  WF.edit={kind:"activity", id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel(); wfPan={x:0,y:0}; wfZoom=1;
+  WF.edit={kind:"activity", id:WF.activities[0]?WF.activities[0].id:null}; wfClearSel();
+  wfPan=wfHomePan(WF.activities[0]&&WF.activities[0].graph); wfZoom=1;
   // A different flow just loaded — drop the previous run's trail/results so
   // they can't leak onto this file's nodes (wfMarkUnreached would dim blocks
   // that never ran in a graph the old run never touched).

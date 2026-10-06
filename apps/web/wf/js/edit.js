@@ -181,10 +181,22 @@ function wfSaveGraphCamera(){
   const key=wfCameraKey(WF.edit); if(!key) return;
   wfGraphCameras.set(key,{pan:{x:wfPan.x,y:wfPan.y},zoom:wfZoom});
 }
+// First visit to a graph: 100% zoom, panned just far enough that its top-left
+// block clears the floating chrome (the graph name + stats above, the tool rail
+// on the left). A graph that already starts further in is left where it is.
+const WF_HOME_LEFT=80, WF_HOME_TOP=80;
+function wfHomePan(graph){
+  const nodes=(graph&&graph.nodes)||[];
+  if(!nodes.length) return {x:0,y:0};
+  let minX=Infinity, minY=Infinity;
+  nodes.forEach(n=>{ const x=+n.x||0, y=+n.y||0; if(x<minX) minX=x; if(y<minY) minY=y; });
+  return {x:Math.max(0, WF_HOME_LEFT-minX), y:Math.max(0, WF_HOME_TOP-minY)};
+}
 function wfRestoreGraphCamera(kind,id){
   if(typeof wfPan==="undefined"||typeof wfZoom==="undefined") return;
   const saved=wfGraphCameras.get(wfCameraKey({kind,id}));
-  wfPan=saved?{x:saved.pan.x,y:saved.pan.y}:{x:0,y:0};
+  const target=kind==="function"?WF.functions.find(f=>f.id===id):WF.activities.find(a=>a.id===id);
+  wfPan=saved?{x:saved.pan.x,y:saved.pan.y}:wfHomePan(target&&target.graph);
   wfZoom=saved?saved.zoom:1;
 }
 function wfResetGraphCameras(){ wfGraphCameras.clear(); }

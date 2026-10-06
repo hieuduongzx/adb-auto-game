@@ -39,8 +39,7 @@
 .tb-tray .btn.ok:hover { background:var(--ok-hover); box-shadow:none; }
 .tb-tray-sep { width:1px; height:18px; margin:0 3px; background:var(--border2); flex-shrink:0; }
 .wf-save-state { max-width:104px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  font:700 var(--t-micro)/1 var(--mono); letter-spacing:.05em; text-transform:uppercase;
-  color:var(--muted); }
+  padding:0 4px; font:500 var(--t-caption)/1 var(--sans); color:var(--muted); }
 .wf-save-state.dirty { color:var(--warn); }
 .wf-save-state.saving { color:var(--accent); }
 
@@ -199,9 +198,8 @@
 .wf-zone-hint { font-size:var(--t-caption); font-weight:400; color:var(--muted); }
 .wf-view-tabs { display:flex; gap:2px; height:36px; align-items:center; background:var(--surface);
   border:1px solid var(--border); border-radius:var(--r-sm); padding:2px; flex-shrink:0; }
-.wf-view-tab { position:relative; height:100%; padding:0 12px; border-radius:var(--r-xs); font-size:var(--t-caption);
-  font-weight:700; letter-spacing:.05em; text-transform:uppercase;
-  color:var(--dim); background:none; border:none; cursor:pointer;
+.wf-view-tab { position:relative; height:100%; padding:0 11px; border-radius:var(--r-xs); font-size:var(--t-ui);
+  font-weight:600; color:var(--dim); background:none; border:none; cursor:pointer;
   transition:background .15s, color .15s; }
 .wf-view-tab:hover:not(.sel) { color:var(--ink); }
 .wf-view-tab.sel { background:var(--panel); color:var(--accent); box-shadow:none; }
@@ -213,8 +211,13 @@
 .tb-right > .btn.ico { width:38px; }
 .tb-right > .btn svg { width:17px; height:17px; stroke-width:1.8; }
 
-/* Reserve a whole row before side controls could collide with Run. */
-@media (max-width: 1500px){
+/* Reserve a whole row before side controls could collide with Run — but only
+   when the three zones really cannot share one. Measured natural widths (side
+   zones at the trims below): ADB left ~483 / right ~480 / center ~374, so one
+   row holds down to 1440px; a Win32 project's left zone carries the target
+   window, match and input-mode controls (~880px), so it takes two rows below
+   2200px instead of wrapping inside its own track. */
+@media (max-width: 1440px){
   /* 2 x 32 row + 4 row-gap + 2 x 6 padding + 1 border — the real wrapped
      height, because --hdr-h also offsets the toasts. A var that understates
      the bar lets the first toast land on top of it. */
@@ -225,9 +228,17 @@
   #toolbar { grid-template-columns:minmax(0,1fr) auto;
     grid-template-areas:"left right" "center center"; align-content:center; row-gap:4px;
     padding:6px var(--s4); height:auto; min-height:var(--hdr-h); }
-  .tb-left, .tb-right { min-height:32px; }
-  .tb-left { flex-wrap:wrap; }
-  .tb-center { min-height:32px; justify-content:center; }
+}
+@media (max-width: 2200px){
+  :root:has(#toolbar.is-win32) { --hdr-h:81px; }
+  #toolbar.is-win32 { grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"left right" "center center"; align-content:center; row-gap:4px;
+    padding:6px var(--s4); height:auto; min-height:var(--hdr-h); }
+}
+.tb-left, .tb-right { min-height:32px; }
+.tb-left { flex-wrap:wrap; }
+.tb-center { min-height:32px; justify-content:center; }
+@media (max-width: 1500px){
   .wf-title-tray { max-width:200px; }
   .wf-title-tray #wf-name { width:118px; max-width:140px; }
   .wf-win-target { max-width:150px; }
@@ -235,12 +246,14 @@
   .tb-tray-device { flex-basis:230px; }
 }
 @media (max-width: 560px){
-  #toolbar { grid-template-columns:minmax(0,1fr); grid-template-areas:"left" "right" "center"; }
+  #toolbar, #toolbar.is-win32 { grid-template-columns:minmax(0,1fr); grid-template-areas:"left" "right" "center"; }
   .tb-right { justify-content:flex-end; }
 }
-@media (max-width: 1500px){
-  /* capture source remains in Project settings */
-  .tb-tray-source, #tb-lbl-source, #tb-adb-tools > .ctl-sep { display:none; }
+@media (max-width: 1860px){
+  /* The capture source stays in Project settings, and the device dropdown
+     names itself ("No devices", the serial) — the written labels are the
+     first thing to go when the right zone would outgrow its track. */
+  .tb-tray-source, #tb-lbl-source, #tb-adb-tools > .ctl-sep, #tb-lbl-device { display:none; }
 }
 @media (max-width: 1280px){
   /* Speed hack is root-only and niche; it is the first whole control to go.
@@ -378,8 +391,11 @@
 /* Flat: no drop shadow. The dock sits on a canvas, not above it — a hairline
    border and the panel fill already separate it, and the shadow only muddied
    the plane it is pinned to. */
+/* max-height leaves the top-right corner to the Variables disclosure (12px
+   inset + 36px trigger + a gap): on a short canvas the list scrolls instead of
+   growing up underneath it. */
 #wf-act-panel { position:absolute; right:14px; bottom:14px; z-index:7;
-  width:320px; max-width:calc(100% - 28px); display:flex; flex-direction:column;
+  width:320px; max-width:calc(100% - 28px); max-height:calc(100% - 76px); display:flex; flex-direction:column;
   min-height:0; overflow:hidden; background:var(--panel); border:1px solid var(--border);
   border-radius:var(--r-md); box-shadow:none; }
 #workflow-view.wf-preview-on #wf-act-panel,
@@ -472,8 +488,8 @@
 /* Tab bar — a segmented control on a tinted track. */
 .wf-act-tab-row { display:flex; align-items:stretch; gap:2px; margin:8px 11px 9px; padding:2px;
   background:var(--alt); border:1px solid var(--border); border-radius:var(--r-sm); flex-shrink:0; }
-.wf-act-tab { flex:1 1 0; font-size:var(--t-micro); font-weight:700; letter-spacing:.05em;
-  text-transform:uppercase; color:var(--muted); background:none; border:none;
+.wf-act-tab { flex:1 1 0; font-size:var(--t-caption); font-weight:600;
+  color:var(--muted); background:none; border:none;
   cursor:pointer; padding:5px 4px; display:flex; align-items:center; justify-content:center; gap:5px;
   position:relative; border-radius:var(--r-xs); transition:color .12s, background .12s, box-shadow .12s; }
 .wf-act-tab.sel { color:var(--accent); background:var(--panel); box-shadow:var(--sh-sm); }
@@ -492,16 +508,17 @@
    hug-then-cap-at-241px default. */
 .wf-act-panel-body { flex:1 1 var(--act-h, 0%); min-height:0; max-height:var(--act-h, 241px);
   overflow-y:auto; overscroll-behavior:contain; padding:0 10px 9px; }
-.wf-act-list { display:flex; flex-direction:column; gap:4px; }
+.wf-act-list { display:flex; flex-direction:column; gap:1px; }
 #wf-activities, #wf-activities-bg, #wf-functions { padding:0; }
 /* Activity rows */
-.wf-act { display:flex; align-items:center; gap:6px; padding:6px 8px 6px 7px; border:1px solid var(--border);
-  border-radius:var(--r-md); cursor:pointer; position:relative; background:var(--panel);
+.wf-act { display:flex; align-items:center; gap:7px; min-height:30px; padding:4px 8px 4px 7px; border:1px solid transparent;
+  border-radius:var(--r-sm); cursor:pointer; position:relative; background:transparent;
   transition:border-color .1s, background .1s, box-shadow .1s, opacity .12s; }
 .wf-act:hover { background:var(--alt); }
 /* Selected = the open activity: accent border + tinted face, and its run-order
    number lights up. */
-.wf-act.sel { border-color:var(--accent-bd, var(--accent)); background:var(--accent-bg); box-shadow:none; }
+.wf-act.sel { border-color:transparent; background:var(--accent-bg); box-shadow:none; }
+.wf-act.sel .wf-act-name { color:var(--accent-hover); }
 .wf-act.sel::before { content:""; position:absolute; left:-1px; top:5px; bottom:5px; width:3px;
   border-radius:var(--r-xs); background:var(--accent); }
 /* Explorer-style Ctrl+click multi-selection: rows stay highlighted until the
@@ -517,10 +534,10 @@
 .wf-badge { font-size:8.5px; font-weight:700; letter-spacing:.03em; border-radius:var(--r-xs); padding:2px 4px; flex-shrink:0; }
 .wf-badge.seq { color:var(--accent-hover); background:var(--cat-basic-bg); border:1px solid var(--accent-bd); }
 .wf-badge.bg  { color:var(--warn); background:var(--warn-bg); border:1px solid var(--warn-bd); }
-.wf-act-name { font-size:11.5px; font-weight:600; color:var(--ink); flex:1; min-width:0;
+.wf-act-name { font-size:var(--t-ui); font-weight:500; color:var(--ink); flex:1; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Inline-rename input (double-click a row name): same footprint as the label. */
-.wf-act-rename { flex:1; min-width:0; font-family:var(--sans); font-size:11.5px; font-weight:600;
+.wf-act-rename { flex:1; min-width:0; font-family:var(--sans); font-size:var(--t-ui); font-weight:500;
   color:var(--ink); padding:1px 4px; border-radius:var(--r-xs); border:1px solid var(--accent);
   background:var(--panel); }
 .wf-act-rename:focus { outline:2px solid var(--accent); outline-offset:0; box-shadow:none; }
@@ -554,7 +571,7 @@
 .wf-act.running .wf-act-runbar { background:var(--run-ok); animation:wfActBlink 1s ease-in-out infinite; }
 .wf-act.done .wf-act-runbar { background:var(--run-ok); }
 .wf-act.errored .wf-act-runbar { background:var(--run-fail); }
-.wf-act.running, .wf-act.done, .wf-act.errored { border-color:var(--border); }
+.wf-act.running, .wf-act.done, .wf-act.errored { border-color:transparent; }
 @keyframes wfActBlink { 0%,100%{opacity:1} 50%{opacity:.3} }
 
 /* ── Node palette ─────────────────────────────────────────────────────────── */
@@ -589,8 +606,8 @@
 .cat-win32 { --cat-c:var(--cat-win32); } .cat-window{ --cat-c:var(--cat-window); }
 .cat-misc  { --cat-c:var(--cat-misc); }
 /* Category label — small uppercase + colour chip + count + chevron, leader rule. */
-.wf-pal-cat { display:flex; align-items:center; gap:9px; font-size:10.5px; font-weight:700;
-  letter-spacing:.05em; text-transform:uppercase; margin:var(--s4) 0 var(--s2); padding:5px 7px;
+.wf-pal-cat { display:flex; align-items:center; gap:9px; font-size:var(--t-caption); font-weight:600;
+  margin:var(--s4) 0 var(--s1); padding:5px 7px;
   border-radius:var(--r-sm); color:var(--ink); cursor:pointer; user-select:none;
   transition:background .1s; }
 .wf-pal-cat::before { content:""; flex-shrink:0; width:8px; height:8px;
@@ -620,7 +637,7 @@
   padding:5px 6px; border:1px solid var(--border); border-radius:var(--r-md);
   background:var(--panel); }
 .wf-pal-pair-hd { display:flex; align-items:center; padding:0 3px; min-width:0; }
-.wf-pal-pair-lbl { font-size:9.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+.wf-pal-pair-lbl { font-size:var(--t-micro); font-weight:600;
   color:var(--accent); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* The pair stacks like everything else now, so the connector points down the
    page instead of across it. */
@@ -632,9 +649,9 @@
 /* Palette row — a flat list item, not a chip: transparent until hover, so a
    category reads as one list with one icon column instead of as a tray of
    bordered tiles. */
-.wf-chip { display:flex; align-items:center; gap:10px; padding:7px 8px; border:1px solid transparent;
+.wf-chip { display:flex; align-items:center; gap:10px; padding:5px 8px; border:1px solid transparent;
   border-radius:var(--r-sm); background:transparent; cursor:grab;
-  font-size:13.5px; font-weight:600; color:var(--ink);
+  font-size:var(--t-ui); font-weight:500; color:var(--ink);
   transition:background .1s, border-color .1s, color .1s; user-select:none; min-width:0; }
 .wf-chip:hover { border-color:var(--border); background:var(--alt); }
 .wf-chip:active { cursor:grabbing; }
@@ -643,7 +660,7 @@
 /* Icon tile — tinted by the chip's own category so the column scans by colour,
    the same hue the block's spine and header carry on the canvas. */
 .wf-chip .ico { display:flex; align-items:center; justify-content:center; flex-shrink:0;
-  width:24px; height:24px; border-radius:var(--r-sm);
+  width:22px; height:22px; border-radius:var(--r-xs);
   background:color-mix(in srgb, var(--cat-c, var(--accent)) 13%, var(--panel));
   color:var(--cat-c, var(--accent)); transition:background .1s; }
 .wf-chip .ico svg { width:13px; height:13px; stroke-width:2; display:block; }
@@ -655,8 +672,9 @@
   background:var(--cat-logic-ink); border:none; font-size:9.5px; font-weight:800;
   padding:2px 5px; letter-spacing:.02em; border-radius:var(--r-xs); min-width:16px; }
 /* Function rows: purple tint + subtle hover */
-.wf-act.wf-fn { border:1px solid var(--border); background:var(--cat-logic-bg); }
-.wf-act.wf-fn:hover, .wf-act.wf-fn.sel { background:var(--cat-logic-bg); border-color:var(--border2); box-shadow:none; }
+.wf-act.wf-fn { border:1px solid transparent; background:transparent; }
+.wf-act.wf-fn:hover { background:var(--alt); }
+.wf-act.wf-fn.sel { background:var(--cat-logic-bg); border-color:transparent; box-shadow:none; }
 
 /* ── Canvas — a dotted "stage". Two layered dot grids give depth without lines. */
 #wf-canvas { flex:1; min-height:0; position:relative; overflow:hidden; cursor:grab;
@@ -675,18 +693,18 @@
 
 #wf-canvas.panning { cursor:grabbing; }
 /* Soft activity/function name watermark — top-left of the graph canvas. */
-.wf-cur-act { position:absolute; left:20px; top:16px; z-index:4; pointer-events:none;
+.wf-cur-act { position:absolute; left:20px; top:14px; z-index:4; pointer-events:none;
   max-width:min(48%, 380px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  font:700 var(--t-caption)/1.2 var(--mono); letter-spacing:.07em; text-transform:uppercase;
-  color:var(--muted); user-select:none; }
-.wf-graph-stats { position:absolute; top:38px; left:20px; z-index:4;
+  font:600 var(--t-title)/1.2 var(--sans); letter-spacing:-.01em;
+  color:var(--ink2); user-select:none; }
+.wf-graph-stats { position:absolute; top:36px; left:20px; z-index:4;
   max-width:calc(100% - 40px); font-size:var(--t-micro); color:var(--muted);
   pointer-events:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #workflow-view.wf-preview-on .wf-graph-stats,
 #workflow-view.wf-library-on .wf-graph-stats { display:none; }
 #workflow-view.wf-preview-on #wf-fit-selection { display:none; }
 .wf-cur-act:empty, .wf-cur-act[data-empty="1"] { display:none; }
-.wf-cur-act.is-fn { opacity:.48; font-family:var(--mono); }
+.wf-cur-act.is-fn { opacity:.62; }
 /* While a FUNCTION is open, the watermark breadcrumb becomes a back button —
    click it to return to the activity you came from. */
 .wf-cur-act.is-fn { pointer-events:auto; cursor:pointer; }
@@ -834,6 +852,14 @@
 #wf-rail button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 /* Link-style button — three glyphs stacked, only the live one is shown, so the
    rail says which wire shape is in force without a second label. */
+/* A short canvas (laptop height, tall log) cannot centre a ~355px rail without
+   it riding over the graph name above and Arrange below: anchor it under the
+   name and tighten its buttons instead (~315px). */
+@media (max-height: 860px){
+  #wf-rail { top:60px; transform:none; }
+  #wf-rail .btn { width:28px; height:26px; }
+  #wf-rail .btn svg { width:15px; height:15px; }
+}
 #wf-link-btn .wf-link-ico { display:none; }
 #wf-link-btn[data-mode="spline"]   .wf-link-ico[data-for="spline"],
 #wf-link-btn[data-mode="linear"]   .wf-link-ico[data-for="linear"],
@@ -842,6 +868,11 @@
 #wf-zoom-lbl { font-family:var(--mono); font-size:9.5px; color:var(--dim); height:20px;
   min-width:28px; text-align:center; cursor:pointer; user-select:none; border-radius:var(--r-sm); }
 #wf-zoom-lbl:hover { color:var(--accent); background:var(--alt); }
+#wf-zoom-lbl.zoomed { color:var(--accent); background:var(--accent-bg); font-weight:600; }
+/* On the graph the rail readout above is the zoom display: the corner badge
+   sat under the Variables disclosure and could never be seen. The mirror keeps
+   its own badge (.wf-pv-zoom-badge), which has no rail beside it. */
+#wf-zoom-badge { display:none; }
 
 /* Zoom readout — top-right corner of the graph and of the mirror. Quiet at 100%,
    accent-coloured once the view is zoomed so "why is everything tiny" is answered
@@ -1589,7 +1620,7 @@
 
 /* ═══ Inspector ═══════════════════════════════════════════════════════════ */
 #wf-insp-body { flex:1; min-height:0; overflow-y:auto; padding:0; display:flex; flex-direction:column; gap:0; }
-.wf-insp-context { flex-shrink:0; padding:7px 16px; background:var(--accent-bg); color:var(--accent);
+.wf-insp-context { flex-shrink:0; padding:7px 16px; background:var(--surface); color:var(--muted);
   font-size:var(--t-caption); border-bottom:1px solid var(--line); }
 #wf-selection-state { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #workflow-view.wf-preview-on #wf-selection-state { display:none; }
@@ -1620,7 +1651,7 @@
 .wf-insp-block[data-intent="timing"] { border-left-color:var(--cat-time); }
 .wf-insp-block[data-intent="advanced"] { border-left-color:var(--muted); }
 .wf-insp-sec { display:flex; align-items:center; gap:6px; margin:0 0 2px;
-  font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink); }
+  font-size:var(--t-ui); font-weight:600; color:var(--ink); }
 .wf-insp-sec-spacer { flex:1; min-width:0; }
 /* Gear that opens the project-wide node-defaults dialog (Timing / Failure handling). */
 .wf-insp-sec-gear { margin-left:auto; flex-shrink:0; width:20px; height:20px; padding:0;
@@ -1682,7 +1713,7 @@
 .wf-field-pair { display:flex; align-items:center; gap:10px; }
 .wf-field-pair > .wf-field { flex:1; min-width:0; gap:6px; }
 .wf-field-pair > .wf-field > label { width:auto; max-width:none; min-width:0; flex-shrink:0;
-  text-transform:uppercase; letter-spacing:.02em; color:var(--muted); font-size:var(--t-micro); }
+  color:var(--muted); font-size:var(--t-caption); font-weight:500; }
 .wf-field-pair > .wf-field > input { flex:1; min-width:0; text-align:center; }
 .wf-field > input[type=text], .wf-field > input[type=number], .wf-field > input[type=time], .wf-field > select {
   flex:1; min-width:0; font-size:var(--t-ui); padding:5px 8px; border-radius:var(--r-sm); }
@@ -1756,7 +1787,7 @@
 .wf-varmenu-search:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--border2); box-shadow:none; }
 .wf-varmenu-list { flex:1; overflow-y:auto; padding:2px 4px; }
 .wf-varmenu-empty { font-size:10.5px; color:var(--muted); padding:8px 6px; }
-.wf-varmenu-sep { font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+.wf-varmenu-sep { font-size:var(--t-micro); font-weight:600;
   color:var(--muted); padding:6px 6px 2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .wf-varmenu-item { display:flex; align-items:baseline; gap:7px; width:100%; text-align:left;
   border:none; background:none; cursor:pointer; padding:4px 7px; border-radius:var(--r-xs); color:var(--ink); }
@@ -1867,8 +1898,7 @@
 .wf-panel-toggle { display:inline-flex; align-items:center; gap:7px; min-width:0; color:inherit; flex:1; }
 .wf-act-hdr-chevron { color:var(--muted); display:flex; align-items:center; flex-shrink:0;
   transition:transform .15s var(--ease); }
-.wf-vars-title { font-size:var(--t-caption); font-weight:700; letter-spacing:.06em; text-transform:uppercase;
-  color:var(--ink); }
+.wf-vars-title { font-size:var(--t-body); font-weight:600; color:var(--ink); }
 .wf-vars-count { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted); background:var(--alt);
   border-radius:var(--r-xs); padding:1px 6px; letter-spacing:0; }
 .wf-vars-count:empty { display:none; }
@@ -1885,7 +1915,7 @@
 @keyframes wfPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
 .wf-vars-empty { color:var(--muted); padding:10px 8px; font-size:11px; line-height:1.45;
   border:1px dashed var(--border); border-radius:var(--r-sm); background:var(--surface); margin:2px 0; }
-.wf-vars-sep { font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+.wf-vars-sep { font-size:var(--t-micro); font-weight:600;
   color:var(--muted); padding:5px 5px 2px; display:block; }
 .wf-vars-sep:first-child { padding-top:2px; }
 .wf-var-row-live { display:flex; align-items:baseline; gap:6px; padding:3px 5px; border-radius:var(--r-sm); }
@@ -2063,8 +2093,7 @@
 .wf-lib-side-name { font-family:var(--mono); font-size:var(--t-ui); color:var(--ink);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wf-lib-side-sub { font-family:var(--mono); font-size:var(--t-micro); color:var(--muted); }
-.wf-lib-side-lbl { font-size:var(--t-micro); font-weight:700; text-transform:uppercase;
-  letter-spacing:.04em; color:var(--muted); margin-bottom:5px; }
+.wf-lib-side-lbl { font-size:var(--t-caption); font-weight:600; color:var(--dim); margin-bottom:5px; }
 .wf-lib-uses { display:flex; flex-direction:column; gap:2px; }
 .wf-lib-use { display:flex; flex-direction:column; align-items:flex-start; gap:1px;
   width:100%; text-align:left; padding:5px 7px; border-radius:var(--r-sm);
@@ -2151,12 +2180,14 @@
   color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* ── Project settings modal — stacked labeled rows ─────────────────────────── */
-.wf-proj-form { display:flex; flex-direction:column; gap:12px; padding-bottom:4px; }
-.wf-proj-sec { display:flex; flex-direction:column; gap:6px; }
-.wf-proj-sec-lbl { font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
-  color:var(--muted); }
+.wf-proj-form { display:flex; flex-direction:column; gap:14px; padding-bottom:4px; }
+.wf-proj-sec { display:flex; flex-direction:column; gap:7px; }
+/* Sections are separated by a hairline, so a section title reads as the head
+   of a group rather than as one more field label. */
+.wf-proj-sec + .wf-proj-sec { padding-top:14px; border-top:1px solid var(--line); }
+.wf-proj-sec-lbl { font-size:var(--t-body); font-weight:600; color:var(--ink); }
 .wf-proj-row { display:flex; flex-direction:column; gap:4px; }
-.wf-proj-row > label { font-size:11.5px; font-weight:600; color:var(--dim); }
+.wf-proj-row > label { font-size:var(--t-caption); font-weight:500; color:var(--dim); }
 .wf-proj-row > .hint { font-size:10.5px; color:var(--muted); line-height:1.4; }
 .wf-proj-row input[type=text], .wf-proj-row input[type=number], .wf-proj-row select {
   width:100%; font-size:12.5px; padding:6px 9px; border-radius:var(--r-sm); }

@@ -778,8 +778,9 @@ function wfPvDrawEmpty(){
   const hasSrc = isWin32 ? !!((WF.win32||{}).window) : !!S.connectedSerial;
   const err=!!wfPvErr, busy=!err && hasSrc;
   const accent = err ? "#e0736b" : busy ? "#5aa9e6" : "#5b6675";
-  // Phone-outline glyph, centred just above the text.
-  const iw=44, ih=72, ix=cx-iw/2, iy=cy-ih/2-26;
+  // Phone-outline glyph, centred above the text with a clear 14px gap: its
+  // bottom edge sits at cy-4 and the 15px title's cap height starts near cy+10.
+  const iw=40, ih=64, ix=cx-iw/2, iy=cy-ih-4;
   ctx.save();
   ctx.strokeStyle=accent; ctx.lineWidth=2.4; ctx.lineJoin="round"; ctx.globalAlpha=err?.9:.55;
   const rr=(x,y,w,h,r)=>{ ctx.beginPath();
@@ -797,10 +798,10 @@ function wfPvDrawEmpty(){
                : "Connect a device or emulator, then press Capture");
   ctx.fillStyle = err ? "#eab3ad" : "#c2cad4";
   ctx.font="600 15px IBM Plex Sans,Segoe UI,sans-serif";
-  ctx.fillText(title, cx, cy+18);
-  ctx.fillStyle="#7c8795";
+  ctx.fillText(title, cx, cy+24);
+  ctx.fillStyle="#8a95a3";
   ctx.font="12px IBM Plex Sans,Segoe UI,sans-serif";
-  ctx.fillText(sub.length>70?sub.slice(0,67)+"…":sub, cx, cy+40);
+  ctx.fillText(sub.length>70?sub.slice(0,67)+"…":sub, cx, cy+46);
 }
 
 function wfPvResetZoom(){

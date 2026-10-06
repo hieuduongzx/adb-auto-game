@@ -1049,6 +1049,9 @@ function wfSyncBackendChrome(){
   const adbTools=$("tb-adb-tools"), barTools=$("wf-bar-win32");
   if(adbTools) adbTools.style.display=isWin32?"none":"flex";
   if(barTools) barTools.style.display=isWin32?"inline-flex":"none";
+  // The Win32 target controls make the left zone ~900px wide; the toolbar CSS
+  // keys its one-row/two-row switch off this class (see #toolbar.is-win32).
+  const toolbar=$("toolbar"); if(toolbar) toolbar.classList.toggle("is-win32", isWin32);
   const cfg=WF.win32||{};
   const target=String(cfg.window||"").trim();
   const targetEl=$("wf-bar-win32-label");
@@ -1634,6 +1637,8 @@ function wfSyncZoomBadge(){
   b.textContent=pct+"%";
   b.classList.toggle("zoomed",pct!==100);
   b.title=pct===100?"Zoom 100%":`Zoom ${pct}% - click or double-tap Space to reset to 100%`;
+  // The rail's own readout carries the same "not at 100%" signal on the canvas.
+  const lbl=$("wf-zoom-lbl"); if(lbl) lbl.classList.toggle("zoomed",pct!==100);
 }
 // Level of detail. Zoomed out far enough, 9px slot labels, flow markers and
 // timing chips stop being information and turn into speckle — the same call
