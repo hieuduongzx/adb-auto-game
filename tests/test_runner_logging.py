@@ -84,8 +84,9 @@ def test_successful_workflow_initialization_logs_one_useful_message():
 
 def test_activity_toggle_logs_the_activity_name_and_new_state():
     messages = []
-    namespace = {"log_info": lambda message: messages.append(message)}
-    exec(compile(ast.Module(body=_runner_methods("toggle_activity"), type_ignores=[]),
+    import copy
+    namespace = {"log_info": lambda message: messages.append(message), "copy": copy}
+    exec(compile(ast.Module(body=_runner_methods("toggle_activity", "_persist_runner_config"), type_ignores=[]),
                  str(RUNNER_PATH), "exec"), namespace)
 
     class Engine:
@@ -94,17 +95,19 @@ def test_activity_toggle_logs_the_activity_name_and_new_state():
 
     class Runner:
         toggle_activity = namespace["toggle_activity"]
+        _persist_runner_config = namespace["_persist_runner_config"]
 
         def _activity_runner_config(self, activity_id):
             return self.config.setdefault(activity_id, {})
 
         def _save_runner_config(self):
-            pass
+            return True
 
     runner = Runner()
     runner.flow = {"activities": [{"id": "farm", "name": "Daily Farm", "enabled": True}]}
     runner.engine = Engine()
     runner.config = {}
+    runner._runner_config = {}
     runner._runner_config_lock = threading.RLock()
 
     assert runner.toggle_activity("farm", False) is True

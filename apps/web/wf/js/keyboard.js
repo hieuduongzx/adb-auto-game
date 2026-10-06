@@ -83,7 +83,14 @@ window.addEventListener("keydown", e => {
       const dx=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0;
       const dy=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0;
       const step=e.shiftKey?10:1;
-      const g=wfGraph(); if(g){ WF.sel.forEach(id=>{ const n=g.nodes.find(x=>x.id===id); if(n){ n.x+=dx*step; n.y+=dy*step; } }); wfRenderCanvas(); }
+      const g=wfGraph(); if(g){
+        const byId=new Map(g.nodes.map(n=>[n.id,n]));
+        WF.sel.forEach(id=>{ const n=byId.get(id); if(!n) return;
+          n.x+=dx*step; n.y+=dy*step;
+          const el=wfNodeElById(id); if(el){ el.style.left=n.x+"px"; el.style.top=n.y+"px"; }
+        });
+        wfDrawWires(WF.sel);
+      }
     }
     return;
   }

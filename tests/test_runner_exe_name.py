@@ -46,6 +46,14 @@ class TestRunnerExeName(unittest.TestCase):
         self.assertIn("Brown_Dust_2-Runner.exe", names)
         self.assertIn("Brown_Dust_2.exe", names)
 
+    def test_build_verifies_the_renamed_exe(self):
+        # Regression: build() checked for "<Name>.exe" while the spec emits
+        # "<Name>-Runner.exe", so every build failed its own output check.
+        src = (__import__("pathlib").Path(__file__).parents[1]
+               / "packaging" / "build_runner.py").read_text(encoding="utf-8")
+        self.assertNotIn('app_name + ".exe"', src)
+        self.assertIn("runner_exe_name(app_name)", src)
+
     def test_legacy_exe_hands_over_to_the_renamed_one(self):
         tmp = tempfile.mkdtemp(prefix="m2k_exe_")
         self.addCleanup(__import__("shutil").rmtree, tmp, True)

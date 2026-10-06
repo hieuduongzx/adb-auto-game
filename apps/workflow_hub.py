@@ -226,7 +226,8 @@ def _find_workflow_json(folder: str) -> Optional[str]:
     """
     if not os.path.isdir(folder):
         return None
-    names = [n for n in os.listdir(folder) if n.lower().endswith(".json")]
+    names = [n for n in os.listdir(folder) if n.lower().endswith(".json")
+             and n.lower() != "local_vars.json"]
     if not names:
         return None
     lower = {n.lower(): n for n in names}

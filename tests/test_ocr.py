@@ -88,6 +88,33 @@ class OCRTextMatchTests(unittest.TestCase):
     def test_missing_word_does_not_match(self):
         self.assertFalse(text_matches("TOUCH TO", "TOUCH TO START"))
 
+    def test_regex_pattern_matches_part_of_the_recognised_text(self):
+        self.assertTrue(text_matches("ROUND 5/10", r"\d+/\d+", regex=True))
+        self.assertFalse(text_matches("ROUND FIVE", r"\d+/\d+", regex=True))
+
+    def test_regex_is_case_insensitive_by_default(self):
+        self.assertTrue(text_matches("STAGE 3", r"stage \d", regex=True))
+        self.assertFalse(text_matches("STAGE 3", r"stage \d", regex=True, case_sensitive=True))
+
+    def test_regex_retries_against_collapsed_whitespace_in_the_haystack(self):
+        # \s+ in the pattern still matches OCR line breaks / runs of spaces.
+        self.assertTrue(text_matches("STAGE\n\n  3", r"stage\s+3", regex=True))
+        self.assertTrue(text_matches("ROUND 5", r"round\s*\d", regex=True))
+        # A literal space in the pattern means a real space on screen.
+        self.assertFalse(text_matches("ROUND5", r"round \d", regex=True))
+
+    def test_regex_keeps_whitespace_metacharacters_meaningful(self):
+        # Collapsing whitespace must never rewrite the pattern itself.
+        self.assertTrue(text_matches("A B", r"A\sB", regex=True))
+        self.assertTrue(text_matches("A   B", r"A\s+B", regex=True))
+        self.assertFalse(text_matches("AB", r"A\sB", regex=True))
+
+    def test_regex_supports_quantifier_braces(self):
+        self.assertTrue(text_matches("AB12CD", r"[A-Z]{2}\d{2}", regex=True))
+
+    def test_invalid_regex_never_matches(self):
+        self.assertFalse(text_matches("anything", "(", regex=True))
+
 
 class OCRONNXIntegrationTests(unittest.TestCase):
     def test_official_model_matches_paddle_on_the_golden_crop(self):

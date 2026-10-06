@@ -84,6 +84,10 @@ vendor/unity_bridge/src/Macro2kBridge.Il2Cpp/*.obj
 # Runtime / machine-local state (may embed absolute paths)
 data/
 
+# Designer-local variable overrides (test values, never shipped/built)
+workflows/*/local_vars.json
+**/local_vars.json
+
 # Designer → runner temp handoff (not user content)
 workflows/_run/
 

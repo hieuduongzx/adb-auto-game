@@ -391,7 +391,15 @@ function wfVarBadgeInfo(name){
   const nm=String(name||"").trim(); if(!nm) return null;
   const map=wfVarInfoMap(); const info=map[nm]; if(!info) return null;
   const live=wfLiveVars[nm];
-  const val=(live!==undefined)?live:info.value;
+  // A declared value shown to the user is the effective one: local test value
+  // (local_vars.json) when set, else the default.
+  let declared=info.value;
+  if(typeof wfLocalHas==="function"){
+    const scopeKey=(info.scope==="global")?"global":(info.scope==="activity")?"activity":null;
+    const actId=(info.scope==="activity"&&typeof wfCurAct==="function"&&wfCurAct())?wfCurAct().id:"";
+    if(scopeKey&&wfLocalHas(scopeKey,actId,nm)) declared=wfLocalGet(scopeKey,actId,nm);
+  }
+  const val=(live!==undefined)?live:declared;
   return {type:info.type, scope:info.scope, value:val, live:live!==undefined};
 }
 const WF_VAR_SCOPE_LBL={global:"Global", activity:"Activity", node:"Node", live:"Live"};
@@ -1162,6 +1170,11 @@ function wfVarRow(act,v,idx,depth,ctx){
       rerender:ctx.rerender||wfRefreshVarViews,
     }));
   }
+  // Local (test-only) value — overrides the default for Test run, never built.
+  if(typeof wfLocalValueCtl==="function"){
+    const full=(ctx.prefix?ctx.prefix+".":"")+(v.name||"");
+    card.appendChild(wfLocalValueCtl(v,"activity",act&&act.id,full));
+  }
   item.appendChild(card);
   ["input","change","click"].forEach(event=>card.addEventListener(event,updateSummary));
   return item;
@@ -1897,15 +1910,16 @@ function wfTplOf(node){ const f=wfTplField(node.type); if(!f) return ""; const v
 function wfUpdNodePreview(node){
   const el=document.querySelector(`.wf-node[data-node="${node.id}"]`);
   if(!el) return;
+  const show=wfPreviewAll || node.showPreview;
   const strip=el.querySelector(".wf-node-thumbs");
   if(strip){
     const f=wfTplField(node.type);
     const arr=Array.isArray(node.params[f.k])?node.params[f.k].filter(p=>String(p||"").trim()):[];
     strip.innerHTML="";
     if(!arr.length){ const e=document.createElement("span"); e.className="wf-tpl-empty"; e.textContent="(no image)"; strip.appendChild(e); return; }
-    arr.forEach(p=>{ const im=document.createElement("img"); im.className="wf-node-thumb-sm"; strip.appendChild(im); wfLoadThumb(im,p); });
+    arr.forEach(p=>{ const im=document.createElement("img"); im.className="wf-node-thumb-sm"; im.dataset.path=p; strip.appendChild(im); if(show) wfLoadThumb(im,p); });
     return;
   }
   const img=el.querySelector(".wf-node-thumb");
-  if(img) wfLoadThumb(img, wfTplOf(node));
+  if(img){ img.dataset.path=wfTplOf(node); if(show) wfLoadThumb(img,wfTplOf(node)); }
 }

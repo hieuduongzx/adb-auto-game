@@ -295,14 +295,18 @@ test('fit frames real bounds above the activity dock and focuses only selected n
 
 test('held arrow nudges snapshot the original position once, before moving', () => {
   const handlers={},node={id:'a',x:100,y:100},snapshots=[];
+  const el={style:{}}, moved=[];
   const ctx=load('keyboard.js',{
     window:{addEventListener:(type,fn)=>handlers[type]=fn},
-    WF:{sel:['a']},wfGraph:()=>({nodes:[node]}),wfRenderCanvas(){},
+    WF:{sel:['a']},wfGraph:()=>({nodes:[node]}),wfRenderCanvas(){assert.fail('nudge must preserve node DOM');},
+    wfNodeElById:()=>el,wfDrawWires:ids=>moved.push(Array.from(ids)),
     wfPushUndo:()=>snapshots.push({...node}),
   });
   const event={key:'ArrowRight',target:{tagName:'BODY'},preventDefault(){}};
   handlers.keydown(event);handlers.keydown(event);
   assert.equal(node.x,102);assert.equal(snapshots.length,1);assert.equal(snapshots[0].x,100);
+  assert.equal(el.style.left,'102px');assert.equal(el.style.top,'100px');
+  assert.deepEqual(moved,[['a'],['a']]);
   handlers.keyup(event);handlers.keydown(event);
   assert.equal(snapshots.length,2);assert.equal(snapshots[1].x,102);
 });

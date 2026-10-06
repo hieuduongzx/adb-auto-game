@@ -413,8 +413,16 @@ async function wfSave(){
 }
 async function wfImport(){
   const txt=await api().workflow_import(); if(!txt)return;
-  try{ wfHydrate(JSON.parse(txt)); wfHasFile=true; wfMarkClean(); setStatus("Workflow imported"); uiToast("Opened workflow \""+(WF.name||"")+"\"","success"); }
+  try{ wfHydrate(JSON.parse(txt)); wfHasFile=true; wfMarkClean();
+    if(typeof wfLoadLocalVars==="function"){ await wfLoadLocalVars(); wfRenderVarsPanel(); }
+    setStatus("Workflow imported"); uiToast("Opened workflow \""+(WF.name||"")+"\"","success"); }
   catch(e){ uiToast("Invalid JSON file: "+e,"error"); }
+}
+
+// Test values belong to the file they were set against — a new document starts
+// with none so a stale override can't silently apply to a different workflow.
+function wfResetLocalVars(){
+  if(typeof wfLocalVars!=="undefined") wfLocalVars={globals:{},activities:{}};
 }
 
 // ── Build EXE — package this workflow into a standalone Runner .exe ────────────
@@ -706,8 +714,12 @@ async function init(){
   wfInitCanvas();
   // Reopen the workflow that was open when the designer last closed.
   let reopened="", didRender=false;
+  let lw=null;
+  try{ lw=await api().get_last_workflow(); }catch(e){}
+  // Load the design-test values for the file just resolved (its folder is now
+  // the backend's current path), before hydrating so the panel shows them.
+  if(typeof wfLoadLocalVars==="function"){ try{ await wfLoadLocalVars(); }catch(e){} }
   try{
-    const lw=await api().get_last_workflow();
     if(lw && lw.text){ wfHydrate(JSON.parse(lw.text)); reopened=lw.name||"previous workflow"; didRender=true;
       wfHasFile=true; wfMarkClean(); }
   }catch(e){}

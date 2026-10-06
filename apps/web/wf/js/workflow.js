@@ -242,6 +242,18 @@ function wfEmuTargetLabel(p){
 
 // Node catalog: UI source of truth (icon, kind, output ports, param fields).
 // Mirrors src/workflow/engine.py NODE_TYPES. kind: start|end|action|condition|loop.
+// OCR text match: literal text in quotes, or /pattern/ when Matching = Regex pattern.
+function wfTextNeedle(p){
+  return (p.match==="pattern") ? "/"+(p.pattern||"")+"/" : '"'+(p.text||"")+'"';
+}
+// Optional extraction suffix shown on text-reading nodes that have a pattern.
+function wfPatternSuffix(p){
+  return String(p.pattern||"").trim() ? ` · /${p.pattern}/g${p.group||1}` : "";
+}
+// Match field shared by Tap/Wait/If/Loop-until text. "text" is the default so
+// saved nodes (which predate `match`) keep matching literally.
+const WF_TEXT_MATCH_FIELD={k:"match",lbl:"Match",t:"select",opts:[{v:"text",t:"Text (contains)"},{v:"pattern",t:"Regex pattern"}],d:"text"};
+const WF_TEXT_PATTERN_FIELD={k:"pattern",lbl:"Pattern (regex)",t:"text",varRef:true,showWhen:{match:"pattern"}};
 const WF_NODES = {
   start:      {label:"Start",   ico:"play", kind:"start", cat:null,    outs:["out"], fields:[]},
   end:        {label:"End",  ico:"square", kind:"end",   cat:"flow",  outs:[],      fields:[]},
@@ -284,10 +296,10 @@ const WF_NODES = {
   tap_image_any: {label:"Tap any image", ico:"target",kind:"condition",cat:"image", outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBaseAny(p.templates)+(p.taps=="2"?" ×2":"")+(p.mode==="parallel"?" //":"")},
   wait_image_any:{label:"Wait any image",  ico:"timer",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"timeout",t:"num",d:10},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>wfBaseAny(p.templates)+(p.mode==="parallel"?" //":"")},
   if_image_any:  {label:"If any image",  ico:"layers",kind:"condition",cat:"image",outs:["true","false"], fields:[{k:"templates",t:"tpls"},{k:"threshold",t:"num",d:.85,step:.05},{k:"negate",t:"bool",d:false},{k:"mode",lbl:"Search mode",t:"select",opts:[{v:"sequential",t:"Sequential"},{v:"parallel",t:"Parallel"}],d:"sequential"},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`${p.negate?"not ":""}found ${wfBaseAny(p.templates)}${p.mode==="parallel"?" //":""}`},
-  tap_text:   {label:"Tap text", ico:"scan_text",kind:"condition",cat:"ocr", outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`"${p.text||""}"`+(p.taps==="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")},
-  wait_text:  {label:"Wait text",   ico:"scan_text",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate - wait until it DISAPPEARS",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>(p.negate?"until gone ":"")+`"${p.text||""}"`},
-  if_text:    {label:"If text",   ico:"type",kind:"condition",cat:"ocr",outs:["true","false"], fields:[{k:"text",t:"text",varRef:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`${p.negate?"not ":""}contains "${p.text||""}"`},
-  read_var:   {label:"Read text to variable",ico:"search",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`→ ${p.name||"?"}`},
+  tap_text:   {label:"Tap text", ico:"scan_text",kind:"condition",cat:"ocr", outs:["true","false"], fields:[WF_TEXT_MATCH_FIELD,{k:"text",t:"text",varRef:true,showWhen:{match:"text"}},WF_TEXT_PATTERN_FIELD,{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>wfTextNeedle(p)+(p.taps==="2"?" ×2":"")+((p.offsetX||p.offsetY)?` +(${p.offsetX||0},${p.offsetY||0})`:"")},
+  wait_text:  {label:"Wait text",   ico:"scan_text",kind:"condition",cat:"ocr",  outs:["true","false"], fields:[WF_TEXT_MATCH_FIELD,{k:"text",t:"text",varRef:true,showWhen:{match:"text"}},WF_TEXT_PATTERN_FIELD,{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"timeout",t:"num",d:10},{k:"negate",lbl:"Negate - wait until it DISAPPEARS",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>(p.negate?"until gone ":"")+wfTextNeedle(p)},
+  if_text:    {label:"If text",   ico:"type",kind:"condition",cat:"ocr",outs:["true","false"], fields:[WF_TEXT_MATCH_FIELD,{k:"text",t:"text",varRef:true,showWhen:{match:"text"}},WF_TEXT_PATTERN_FIELD,{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"negate",t:"bool",d:false},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`${p.negate?"not ":""}`+(p.match==="pattern"?`matches /${p.pattern||""}/`:`contains "${p.text||""}"`)},
+  read_var:   {label:"Read text to variable",ico:"search",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"val",var:true},{k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},{k:"pattern",lbl:"Pattern (regex, optional)",t:"text",d:"",hint:"Leave empty to store the whole recognised text. Set it to store one capture group."},{k:"group",lbl:"Capture group",t:"num",d:1},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}], sum:p=>`→ ${p.name||"?"}`+wfPatternSuffix(p)},
   parse_var:  {label:"Parse text to variable",ico:"scissors",kind:"action",cat:"ocr",  outs:["out"], fields:[{k:"name",t:"text",d:"out",var:true},{k:"source",t:"select",opts:[{v:"region",t:"OCR region"},{v:"var",t:"From variable"}],d:"region"},{k:"fromVar",lbl:"Source variable",t:"text",d:"",var:true,showWhen:{source:"var"}},{k:"pattern",t:"text",d:"(\\d+)/(\\d+)"},{k:"group",t:"num",d:1},{k:"x",t:"num",showWhen:{source:"region"}},{k:"y",t:"num",showWhen:{source:"region"}},{k:"w",t:"num",d:200,showWhen:{source:"region"}},{k:"h",t:"num",d:80,showWhen:{source:"region"}},{k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:"",showWhen:{source:"region"}}], sum:p=>`${p.name||"?"} = /${p.pattern||""}/g${p.group||1}`},
   // ── Color (pixel) nodes — compare screen pixels against a #RRGGBB colour.
   // Tolerance = max per-channel difference (same rule as DevScope's Inspect color).
@@ -393,11 +405,13 @@ const WF_NODES = {
     {k:"_region",lbl:"Search region",t:"region"}
   ], sum:p=>`↺ until ${p.color||"?"} ±${p.tolerance??10}`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
   loop_until_text: {label:"Loop until text", ico:"loop", kind:"loop_until", cat:"ocr", ins:["in","loop"], outs:["body","found","fail"], fields:[
-    {k:"text",t:"text",varRef:true},
+    WF_TEXT_MATCH_FIELD,
+    {k:"text",t:"text",varRef:true,showWhen:{match:"text"}},
+    WF_TEXT_PATTERN_FIELD,
     {k:"x",t:"num"},{k:"y",t:"num"},{k:"w",t:"num",d:200},{k:"h",t:"num",d:80},
     {k:"maxLoops",lbl:"Max loops (0 = ∞)",t:"num",varRef:true,d:0},
     {k:"whitelist",lbl:"OCR whitelist (allowed characters)",t:"text",d:""}
-  ], sum:p=>`↺ until "${p.text||""}"`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
+  ], sum:p=>`↺ until ${wfTextNeedle(p)}`+((parseInt(p.maxLoops)||0)>0?` ≤${p.maxLoops}×`:"")},
   loop_until_var: {label:"Loop until variable", ico:"loop", kind:"loop_until", cat:"logic", ins:["in","loop"], outs:["body","found","fail"], fields:[
     {k:"name",t:"text",d:"i",var:true},
     {k:"op",t:"select",opts:WF_CMP_OPS,d:">="},
@@ -424,7 +438,7 @@ const WF_NODES = {
   // Tap EVERY position matching the template on the current frame (loot-collection sweeps).
   tap_all_images: {label:"Tap all images", ico:"layers", kind:"condition", cat:"image", outs:["true","false"], fields:[{k:"template",t:"tpl"},{k:"taps",t:"select",opts:[{v:"1",t:"Tap"},{v:"2",t:"Double tap"}],d:"1"},{k:"threshold",t:"num",d:.85,step:.05},{k:"maxTaps",lbl:"Max taps (0 = all)",t:"num",varRef:true,d:0},{k:"delayBetween",lbl:"Delay between taps (s)",t:"num",d:.15,step:.05},{k:"offsetX",lbl:"Offset X",t:"num",d:0},{k:"offsetY",lbl:"Offset Y",t:"num",d:0},{k:"_region",lbl:"Search region",t:"region"}], sum:p=>`tap all ${wfBase(p.template)}`+((parseInt(p.maxTaps)||0)>0?` ≤${p.maxTaps}`:"")+(p.taps=="2"?" ×2":"")},
   random_branch: {label:"Random branch",ico:"dice",   kind:"random",    cat:"flow",   outs:[],              fields:[{k:"count",lbl:"Branch count",t:"num",d:2,refresh:true}], sum:p=>`🎲 ${p.count||2} even branches`},
-  format_var:    {label:"Format text to variable",ico:"type",   kind:"action",    cat:"logic",  outs:["out"],         fields:[{k:"name",lbl:"Target variable",t:"text",d:"text",var:true},{k:"template",lbl:"Template string",t:"text",insertVar:true,d:"Round {round}/{total}"}], sum:p=>`${p.name||"?"} = "${p.template||""}"`},
+  format_var:    {label:"Format text to variable",ico:"type",   kind:"action",    cat:"logic",  outs:["out"],         fields:[{k:"name",lbl:"Target variable",t:"text",d:"text",var:true},{k:"template",lbl:"Template string",t:"text",insertVar:true,d:"Round {round}/{total}"},{k:"pattern",lbl:"Pattern (regex, optional)",t:"text",d:"",hint:"Leave empty to store the whole string. Set it to store one capture group."},{k:"group",lbl:"Capture group",t:"num",d:1}], sum:p=>`${p.name||"?"} = "${p.template||""}"`+wfPatternSuffix(p)},
   // ── Time ───────────────────────────────────────────────────────────────────
   get_time:      {label:"Read time to variable", ico:"clock", kind:"action", cat:"time", outs:["out"], fields:[{k:"name",lbl:"Target variable",t:"text",d:"now",var:true},{k:"part",lbl:"Value",t:"select",opts:[{v:"hm",t:"HH:MM"},{v:"hms",t:"HH:MM:SS"},{v:"hour",t:"Hour (0-23)"},{v:"minute",t:"Minute"},{v:"second",t:"Second"},{v:"date",t:"Date YYYY-MM-DD"},{v:"datetime",t:"Date & time"},{v:"weekday",t:"Weekday (1=Mon…7=Sun)"},{v:"timestamp",t:"Unix timestamp"},{v:"custom",t:"Custom (strftime)"}],d:"hm"},{k:"format",lbl:"strftime format",t:"text",d:"%H:%M",showWhen:{part:"custom"}}], sum:p=>`${p.name||"?"} = ${({hm:"HH:MM",hms:"HH:MM:SS",hour:"hour",minute:"minute",second:"second",date:"date",datetime:"datetime",weekday:"weekday",timestamp:"timestamp",custom:p.format||"?"})[p.part||"hm"]}`},
   wait_until:    {label:"Wait until time", ico:"alarm", kind:"action", cat:"time", outs:["out"], fields:[{k:"time",lbl:"Time",t:"time",d:"08:00"},{k:"nextDay",lbl:"If passed → wait next day",t:"bool",d:true}], sum:p=>`⏰ ${p.time||"08:00"}`},
@@ -444,8 +458,10 @@ const WF_NODES = {
   adb_shell:     {label:"Run shell to variable", ico:"log", kind:"action", cat:"device", outs:["out"], fields:[
     {k:"command",lbl:"Shell command",t:"text",insertVar:true,d:"getprop ro.product.model"},
     {k:"name",lbl:"Output → variable",t:"text",d:"out",var:true},
+    {k:"pattern",lbl:"Pattern (regex, optional)",t:"text",d:"",hint:"Leave empty to store all stdout. Set it to store one capture group."},
+    {k:"group",lbl:"Capture group",t:"num",d:1},
     {k:"failIfEmpty",lbl:"Treat empty output as failure",t:"bool",d:false}
-  ], sum:p=>`💻 ${String(p.command||"").slice(0,28)||"(command)"} → ${p.name||"?"}`},
+  ], sum:p=>`💻 ${String(p.command||"").slice(0,28)||"(command)"} → ${p.name||"?"}`+wfPatternSuffix(p)},
   // Launch the emulator PROCESS on the PC (not an app inside it). Optional "at"
   // waits until a clock time first → "sit idle until 07:00, then boot LDPlayer".
   launch_emulator:{label:"Launch emulator", ico:"monitor", kind:"action", cat:"device", outs:["out"], fields:[
@@ -628,8 +644,10 @@ const WF_NODES = {
   // Win32's answer to Device info → variable.
   win_info:     {label:"Read window to variable", ico:"monitor", kind:"action", cat:"window", outs:["out"], fields:[
     {k:"name",lbl:"Target variable",t:"text",d:"info",var:true},
-    {k:"prop",lbl:"Property",t:"select",opts:[{v:"width",t:"Client width"},{v:"height",t:"Client height"},{v:"x",t:"Window X (screen)"},{v:"y",t:"Window Y (screen)"},{v:"title",t:"Title"},{v:"class",t:"Class name"},{v:"pid",t:"Process ID"},{v:"exe",t:"Executable"},{v:"hwnd",t:"Window handle"},{v:"foreground",t:"Is foreground (true/false)"},{v:"minimized",t:"Is minimized (true/false)"}],d:"width"}
-  ], sum:p=>`${p.name||"?"} = ${p.prop||"width"}`},
+    {k:"prop",lbl:"Property",t:"select",opts:[{v:"width",t:"Client width"},{v:"height",t:"Client height"},{v:"x",t:"Window X (screen)"},{v:"y",t:"Window Y (screen)"},{v:"title",t:"Title"},{v:"class",t:"Class name"},{v:"pid",t:"Process ID"},{v:"exe",t:"Executable"},{v:"hwnd",t:"Window handle"},{v:"foreground",t:"Is foreground (true/false)"},{v:"minimized",t:"Is minimized (true/false)"}],d:"width"},
+    {k:"pattern",lbl:"Pattern (regex, optional)",t:"text",d:"",hint:"Leave empty to store the whole property. Set it to store one capture group."},
+    {k:"group",lbl:"Capture group",t:"num",d:1}
+  ], sum:p=>`${p.name||"?"} = ${p.prop||"width"}`+wfPatternSuffix(p)},
 };
 // Only find-and-tap nodes have a wait between detection and input.
 for(const type of ["tap_image","tap_image_any","tap_all_images","tap_text","tap_color"]){
@@ -784,6 +802,9 @@ function wfNormalizeNode(node){
   }
   if(node.type==="key") p.keycode=wfAdbKeyValue(p.keycode);
   if((node.type==="if_color"||node.type==="wait_color") && p.where===undefined) p.where="point";
+  // OCR text nodes gained a Match mode; default legacy nodes to literal text so
+  // the `text` field (gated on match==="text") stays editable.
+  if(["tap_text","wait_text","if_text","loop_until_text"].includes(node.type) && p.match===undefined) p.match="text";
   node.outputLogs=wfOutputLogValues(node);
   delete node.outputLog;
   return node;

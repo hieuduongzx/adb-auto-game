@@ -11,6 +11,7 @@ Activities run in one of two modes:
 Produced by Macro2k Designer (``apps/workflow_designer.py``) and consumed
 by the Runner (``apps/workflow_runner.py``).
 """
+from . import local_vars
 from .engine import WorkflowEngine, NODE_TYPES
 
-__all__ = ["WorkflowEngine", "NODE_TYPES"]
+__all__ = ["WorkflowEngine", "NODE_TYPES", "local_vars"]

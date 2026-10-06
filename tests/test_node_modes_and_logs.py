@@ -136,7 +136,7 @@ class TestNodeModesAndLogs(unittest.TestCase):
 
         self.assertTrue(result)
         self.engine.auto.region_find_text.assert_called_once_with(
-            'PLAY', region=(100, 200, 300, 80), whitelist=None,
+            'PLAY', region=(100, 200, 300, 80), whitelist=None, regex=False,
         )
         self.engine.auto.tap.assert_called_once_with(255, 230, tap_count=1)
         self.assertEqual(self.engine._last_pos, (250, 240))

@@ -16,7 +16,7 @@
 let wfWireIdx = { ports:new Map() };
 
 function wfWireIndexRebuild(){
-  const portsByNode=new Map();
+  const portsByNode=new Map(), positions=new Map();
   document.querySelectorAll("#wf-world .wf-node").forEach(el=>{
     const x=el.offsetLeft, y=el.offsetTop, ports=new Map();
     const right=x+el.offsetWidth;
@@ -31,8 +31,23 @@ function wfWireIndexRebuild(){
       if(!ports.has(side)) ports.set(side, pt);   // first port of a side = fallback
     });
     portsByNode.set(el.dataset.node, ports);
+    positions.set(el.dataset.node,{x,y});
   });
-  wfWireIdx={ ports:portsByNode };
+  wfWireIdx={ ports:portsByNode, positions };
+}
+
+// Card sizes and port offsets stay fixed during a drag. Translate the cached
+// endpoints for its members without measuring every other card again.
+function wfWireIndexMove(ids){
+  if(!wfWireIdx.positions) return false;
+  for(const id of ids){
+    const el=wfNodeElById(id), prev=wfWireIdx.positions.get(id), ports=wfWireIdx.ports.get(id);
+    if(!el||!prev||!ports) return false;
+    const x=el.offsetLeft,y=el.offsetTop,dx=x-prev.x,dy=y-prev.y;
+    for(const p of new Set(ports.values())){ p.x+=dx; p.y+=dy; p.edge+=dx; p.bottom+=dy; }
+    prev.x=x; prev.y=y;
+  }
+  return true;
 }
 
 function wfPortPt(nodeId,port){
@@ -208,20 +223,55 @@ function wfLinkMid(a,b){
 // canvas is visible again.
 let wfWiresStale=false;
 const WF_NS="http://www.w3.org/2000/svg";
+const wfWireGroups=new Map(), wfWireGroupsByFrom=new Map();
+let wfWireRoutes=[], wfWireGraph=null;
+const wfWireRoutesByNode=new Map();
+function wfWireRouteCompare(p,q){ return p.span-q.span || (p.key<q.key?-1:p.key>q.key?1:0); }
+function wfOrderWireGroups(svg,routes){
+  let cursor=svg.firstChild;
+  for(const {ed} of routes){
+    const grp=wfWireGroups.get(ed);
+    if(grp!==cursor) svg.insertBefore(grp,cursor);
+    cursor=grp.nextSibling;
+  }
+}
+function wfDrawMovedWires(svg,g,ids){
+  if(wfWireGraph!==g || !wfWireIndexMove(ids)) return false;
+  const changed=new Set();
+  for(const id of ids) for(const route of wfWireRoutesByNode.get(id)||[]) changed.add(route);
+  for(const route of changed){
+    const {ed,a,b}=route,grp=wfWireGroups.get(ed);
+    if(!grp||grp.parentNode!==svg) return false;
+    const d=wfWirePath(a,b);
+    if(grp.__path!==d){
+      const {halo,hit,p}=grp.__parts;
+      halo.setAttribute("d",d); hit.setAttribute("d",d); p.setAttribute("d",d); grp.__path=d;
+    }
+    route.span=Math.abs(b.x-a.x)+Math.abs(b.y-a.y);
+  }
+  // Preserve shortest-first paint order even when a drag changes link spans.
+  if(changed.size){ wfWireRoutes.sort(wfWireRouteCompare); wfOrderWireGroups(svg,wfWireRoutes); }
+  return true;
+}
 
-function wfDrawWires(){
+function wfDrawWires(movedIds){
   if(typeof wfMinimapQueue==="function") wfMinimapQueue();   // node moves redraw wires → keep the map live
   const svg=$("wf-wires"), g=wfGraph();
   const world=$("wf-world");
+  if(!g){
+    svg.innerHTML=""; wfWireGroups.clear(); wfWireGroupsByFrom.clear();
+    wfWireRoutes=[]; wfWireGraph=null; wfWireRoutesByNode.clear();
+    wfWireIdx={ports:new Map()}; wfWiresStale=false; return;
+  }
   if(world && world.offsetParent===null){ wfWiresStale=true; return; }   // canvas hidden — measurements would be 0
-  wfWiresStale=false;
+  const wasStale=wfWiresStale; wfWiresStale=false;
+  if(g && !wasStale && movedIds && wfDrawMovedWires(svg,g,movedIds)) return;
   // Keep the dashed preview only while a connect drag is still in progress.
   // A finished drop used to redraw the canvas before clearing the gesture, so
   // this pass glued the preview back on top of the real wire.
   const connecting=wfGesture?.mode==="connect" || wfGesture?.connection?.mode==="connect";
   const temp=connecting ? svg.querySelector(".temp") : null;
-  svg.innerHTML=""; if(temp) svg.appendChild(temp);
-  if(!g) return;
+  if(!connecting) wfClearTemp();
   wfWireIndexRebuild();
 
   // Resolve endpoints first, then sort shortest-first so a long run paints over
@@ -237,37 +287,74 @@ function wfDrawWires(){
       span:Math.abs(b.x-a.x)+Math.abs(b.y-a.y),
       key:`${ed.from}\u0000${ed.fromPort||"out"}\u0000${ed.to}\u0000${toPort}` });
   });
-  routes.sort((p,q)=>p.span-q.span || (p.key<q.key?-1:p.key>q.key?1:0));
+  routes.sort(wfWireRouteCompare);
+  wfWireRoutes=routes; wfWireGraph=g; wfWireRoutesByNode.clear();
+  for(const route of routes){
+    for(const id of new Set([route.ed.from,route.ed.to])){
+      let adjacent=wfWireRoutesByNode.get(id);
+      if(!adjacent) wfWireRoutesByNode.set(id,adjacent=[]);
+      adjacent.push(route);
+    }
+  }
 
-  const frag=document.createDocumentFragment();
-  const byId=new Map((g.nodes||[]).map(n=>[n.id,n]));
+  const index=typeof wfBuildRenderIndex==="function" ? wfBuildRenderIndex(g) : null;
+  const byId=index ? index.byId : new Map((g.nodes||[]).map(n=>[n.id,n]));
+  const live=new Set(); wfWireGroupsByFrom.clear();
+  // Keep path elements, focus and execution colours alive during node moves.
+  // Only changed paths need attributes written; untouched links do no DOM work.
+  let cursor=svg.firstChild;
   routes.forEach(({ed,a,b,toPort})=>{
     const d=wfWirePath(a,b);
-    const grp=document.createElementNS(WF_NS,"g");
-    grp.setAttribute("class","wire-grp"); grp.__edge=ed;
-    const hit=document.createElementNS(WF_NS,"path");
-    hit.setAttribute("class","wire-hit"); hit.setAttribute("d",d);
-    hit.setAttribute("tabindex","0"); hit.setAttribute("role","button");
+    let grp=wfWireGroups.get(ed);
+    if(!grp || grp.parentNode!==svg){
+      grp=document.createElementNS(WF_NS,"g");
+      grp.setAttribute("class","wire-grp"); grp.__edge=ed;
+      const halo=document.createElementNS(WF_NS,"path"); halo.setAttribute("class","wire-halo");
+      const hit=document.createElementNS(WF_NS,"path"); hit.setAttribute("class","wire-hit");
+      hit.setAttribute("tabindex","0"); hit.setAttribute("role","button");
+      const tt=document.createElementNS(WF_NS,"title"); hit.appendChild(tt);
+      const p=document.createElementNS(WF_NS,"path");
+      grp.appendChild(halo); grp.appendChild(hit); grp.appendChild(p);
+      grp.__parts={halo,hit,tt,p}; wfWireGroups.set(ed,grp);
+    }
+    live.add(ed);
+    let fromGroups=wfWireGroupsByFrom.get(ed.from);
+    if(!fromGroups) wfWireGroupsByFrom.set(ed.from,fromGroups=[]);
+    fromGroups.push(grp);
+    const {halo,hit,tt,p}=grp.__parts;
+    if(grp.__path!==d){
+      halo.setAttribute("d",d); hit.setAttribute("d",d); p.setAttribute("d",d); grp.__path=d;
+    }
     const fromLabel=WF_PORT_LBL[ed.fromPort]||ed.fromPort||"out";
     const nodeLabel=id=>{ const n=byId.get(id); return n&&(WF_NODES[n.type]?.label||n.type)||id; };
     const description=`${nodeLabel(ed.from)} → ${nodeLabel(ed.to)} (${fromLabel})`;
-    hit.setAttribute("aria-label",description+"; press Delete to remove");
-    const tt=document.createElementNS(WF_NS,"title");
-    tt.textContent=description+" · Right-click or Delete to remove"; hit.appendChild(tt);
+    if(grp.__description!==description){
+      hit.setAttribute("aria-label",description+"; press Delete to remove");
+      tt.textContent=description+" · Right-click or Delete to remove";
+      grp.__description=description;
+    }
     const src=byId.get(ed.from);
-    const tone=typeof wfWireTone==="function" ? wfWireTone(ed.fromPort, toPort, src, ed) : "";
-    const p=document.createElementNS(WF_NS,"path");
-    p.setAttribute("class","wire"+(toPort==="loop"?" loopback":"")+(tone?" tone-"+tone:""));
-    p.dataset.from=ed.from; p.dataset.fromport=ed.fromPort; p.dataset.to=ed.to;
-    p.setAttribute("d",d);
+    const tone=typeof wfWireTone==="function" ? wfWireTone(ed.fromPort, toPort, src, ed, index) : "";
+    const wireClass="wire"+(toPort==="loop"?" loopback":"")+(tone?" tone-"+tone:"");
+    if(grp.__wireClass!==wireClass){
+      p.setAttribute("class",wireClass); grp.__wireClass=wireClass;
+    }
+    if(p.dataset.from!==ed.from) p.dataset.from=ed.from;
+    if(p.dataset.fromport!==(ed.fromPort||"out")) p.dataset.fromport=ed.fromPort||"out";
+    if(p.dataset.to!==ed.to) p.dataset.to=ed.to;
+    const taken=typeof wfRanPort!=="undefined" ? wfRanPort[ed.from] : null;
+    p.classList.toggle("took-wire",taken!=null && String(taken)===(ed.fromPort||"out"));
+    p.classList.toggle("nottook-wire",taken!=null && String(taken)!==(ed.fromPort||"out") &&
+      typeof wfIsBranchPort==="function" && wfIsBranchPort(ed.fromPort));
     // No mid-wire direction marker: the flow reads from the port side and the
     // run-trail dash animation — a floating arrowhead was just visual noise.
-    const halo=document.createElementNS(WF_NS,"path");
-    halo.setAttribute("class","wire-halo"); halo.setAttribute("d",d);
-    grp.appendChild(halo); grp.appendChild(hit); grp.appendChild(p);
-    frag.appendChild(grp);
+    if(grp!==cursor) svg.insertBefore(grp,cursor);
+    cursor=grp.nextSibling;
   });
-  svg.appendChild(frag);
+  for(const [ed,grp] of wfWireGroups){
+    if(!live.has(ed)){ grp.remove(); wfWireGroups.delete(ed); }
+  }
+  if(temp) svg.appendChild(temp);
   wfSyncWireSelection();
 }
 function wfSyncWireSelection(){

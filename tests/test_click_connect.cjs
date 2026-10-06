@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const test=require('node:test');
 const path=require('node:path');
-function setup({ snap = x => x, align = false } = {}){
+function setup({ snap = x => x, align = false, frames = null } = {}){
   const handlers={}, canvasHandlers={}, classes=new Set(), graph={nodes:[],edges:[]}, groups=[], undo=[], nodeElements=new Map();
   const canvas={classList:{add:x=>classes.add(x),remove:(...xs)=>xs.forEach(x=>classes.delete(x)),toggle(x,on){on?classes.add(x):classes.delete(x);}},addEventListener:(n,f,capture)=>{ if(!canvasHandlers[n] || capture) canvasHandlers[n]=f; },getBoundingClientRect:()=>({left:0,top:0})};
   const world={getBoundingClientRect:()=>({left:0,top:0}),appendChild(){}};
@@ -14,6 +14,11 @@ function setup({ snap = x => x, align = false } = {}){
     wfSelectOne(id){ctx.WF.sel=id?[id]:[];},wfMarkSel(){},wfRenderInspector(){},
     wfPushUndo:()=>{const state=JSON.parse(JSON.stringify(graph));state.groups=JSON.parse(JSON.stringify(groups));undo.push(state);},wfClearTemp(){},wfDrawTempWire(){},wfDrawWires(){},wfRenderCanvas(){},wfCancelCamAnim(){},wfWorldMotionHint(){},wfApplyTransform(){},wfSetZoom(){},
   });
+  if(frames){
+    let next=0;
+    ctx.requestAnimationFrame=fn=>{ const id=++next; frames.set(id,fn); return id; };
+    ctx.cancelAnimationFrame=id=>frames.delete(id);
+  }
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../apps/web/wf/js/groups.js'),'utf8'),ctx);
   ctx.wfGroups=()=>groups;
   ctx.wfInitCanvas();
@@ -21,6 +26,35 @@ function setup({ snap = x => x, align = false } = {}){
   const event=(x=10,y=20,button=0)=>({clientX:x,clientY:y,button,target:{closest:()=>null},preventDefault(){},stopPropagation(){},stopImmediatePropagation(){}});
   return {ctx,handlers,canvasHandlers,graph,groups,undo,classes,event,nodeElements,setPointElement:el=>{pointElement=el;}};
 }
+
+test('drag events coalesce per frame and mouseup flushes the last move with correct undo',()=>{
+ const frames=new Map();
+ const {ctx,handlers,event,graph,undo,nodeElements}=setup({frames});
+ graph.nodes.push({id:'a',type:'tap',x:0,y:0});
+ nodeElements.set('a',{style:{},classList:{add(){},remove(){}}});
+ let draws=0; ctx.wfDrawWires=()=>draws++;
+ ctx.wfStartMove(event(0,0),graph.nodes[0]);
+ handlers.mousemove(event(10,20)); handlers.mousemove(event(30,40));
+ assert.equal(frames.size,1); assert.equal(draws,0); assert.equal(graph.nodes[0].x,0);
+ const first=[...frames.values()][0]; frames.clear(); first();
+ assert.deepEqual([graph.nodes[0].x,graph.nodes[0].y],[30,40]);
+ assert.equal(draws,1); assert.equal(undo.length,1);
+ assert.deepEqual([undo[0].nodes[0].x,undo[0].nodes[0].y],[0,0]);
+ handlers.mousemove(event(50,60)); handlers.mousemove(event(70,80));
+ handlers.mouseup(event(70,80));
+ assert.deepEqual([graph.nodes[0].x,graph.nodes[0].y],[70,80]);
+ assert.equal(draws,2); assert.equal(frames.size,0); assert.equal(undo.length,1);
+ assert.equal(ctx.wfGesture,null);
+});
+
+test('cancelled connections discard a pending frame instead of repainting the preview',()=>{
+ const frames=new Map(); const {ctx,handlers,event}=setup({frames});
+ let draws=0; ctx.wfDrawTempWire=()=>draws++;
+ ctx.wfStartConnect(event(),'a','out'); handlers.mousemove(event(90,100));
+ ctx.wfCancelConnect();
+ const frame=[...frames.values()][0]; frames.clear(); frame();
+ assert.equal(draws,1); assert.equal(ctx.wfGesture,null);
+});
 test('grid mode keeps dragged nodes on whole cells even when smart align finds a half-cell target',()=>{
  const snap=v=>Math.round(v/16)*16;
  const {ctx,handlers,event,graph,nodeElements}=setup({snap,align:true});

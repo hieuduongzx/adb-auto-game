@@ -32,11 +32,12 @@ function setConnected(on){ const a=$("device-dot"),b=$("footer-dot"); if(a)a.cla
 // preview without walking back through the node params.
 async function wfLoadThumb(img, path){
   if(!img) return;
+  const seq=(img.__thumbSeq||0)+1; img.__thumbSeq=seq;
   img.dataset.path = path || "";
   img.removeAttribute("src");
   if(!path){ img.style.display="none"; return; }
   img.style.display="";  // let CSS show checkerboard while loading
-  try{ const d=await api().image_thumbnail(path); if(d){ img.src=d; img.style.display="block"; } }catch{}
+  try{ const d=await api().image_thumbnail(path); if(d && img.__thumbSeq===seq){ img.src=d; img.style.display="block"; } }catch{}
 }
 
 // ── Thumbnail hover zoom ────────────────────────────────────────────────────
@@ -312,7 +313,17 @@ function wfJumpToCrash(actId){
   setStatus("Stopped at: "+wfCrashWhy(info));
   return true;
 }
-function wfNodeElById(id){ return id ? document.querySelector(`.wf-node[data-node="${id}"]`) : null; }
+// Rebuilt with the canvas; hot paths (snapping, minimap, run trail) must not
+// search thousands of DOM descendants separately for every node.
+const wfNodeEls=new Map();
+function wfNodeElById(id){
+  if(!id) return null;
+  const cached=wfNodeEls.get(id);
+  if(cached && cached.isConnected) return cached;
+  const el=document.querySelector(`.wf-node[data-node="${id}"]`);
+  if(el) wfNodeEls.set(id,el); else wfNodeEls.delete(id);
+  return el;
+}
 
 // ── Call stack ───────────────────────────────────────────────────────────────
 // While a function runs, the live node lives in the FUNCTION's graph, so the
@@ -381,7 +392,9 @@ function wfSetRunningNode(id){
 function wfColorBranch(id, takenPort){
   // The wire and its flow marker are siblings inside one .wire-grp — paint both
   // so the marker never keeps its idle colour on a branch the run dimmed.
-  document.querySelectorAll("#wf-wires .wire-grp").forEach(grp=>{
+  const groups=typeof wfWireGroupsByFrom!=="undefined"
+    ? (wfWireGroupsByFrom.get(id)||[]) : document.querySelectorAll("#wf-wires .wire-grp");
+  groups.forEach(grp=>{
     const p=grp.querySelector("path.wire");
     if(!p || p.dataset.from!==id) return;
     const cls = p.dataset.fromport===takenPort ? "took-wire"

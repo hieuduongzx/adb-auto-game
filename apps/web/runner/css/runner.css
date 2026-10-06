@@ -231,6 +231,7 @@ input { caret-color: var(--accent); text-align: center; }
 .btn-sel { font-size: var(--t-ui); font-weight: 600; padding: 3px 8px; border-radius: var(--r-sm); color: var(--accent); transition: background .1s; }
 .btn-sel:hover { background: var(--accent-bg); }
 .btn-sel.none { color: var(--muted); }
+.btn-sel:disabled { opacity:.4; cursor:default; }
 .btn-sel.none:hover { background: var(--line); color: var(--dim); }
 .list-hint { font-size: var(--t-caption); color: var(--dim); padding: 0 2px; flex-shrink: 0; margin-top: -2px; }
 

@@ -21,6 +21,8 @@ const S = {
   diagnostics:     null,
   elapsedText:     "",
   speedhack: { enabled:false, speed:2.0, package:"", active:false },
+  starting:        false,
+  ordering:        false,
   runScope:        null,   // activity ids of a single-activity run; null = full Start
   mobileView:      "activities",
 };
@@ -123,8 +125,8 @@ let _dialogSeq = 0;
 
 // ── Elapsed timer ──────────────────────────────────────────────────────────
 let _elapsedTimer = null, _elapsedStart = 0;
-function startElapsedTimer(){
-  _elapsedStart = Date.now();
+function startElapsedTimer(startedAt){
+  _elapsedStart = startedAt ? Number(startedAt) * 1000 : Date.now();
   if(_elapsedTimer) clearInterval(_elapsedTimer);
   _elapsedTimer = setInterval(()=>{
     const s = Math.floor((Date.now()-_elapsedStart)/1000);
@@ -272,7 +274,7 @@ async function onPrimary(){ if(S.running) await onStop(); else await onStart(); 
 function refreshButtons(){
   const running = S.running, paused = S.paused;
   setPrimary(running);
-  $("btn-primary").disabled = !S.loaded;
+  $("btn-primary").disabled = !S.loaded || (S.starting && !running);
   $("btn-pause").disabled = !running;
   $("btn-pause").textContent = paused ? "Resume" : "Pause";
   $("btn-pause").setAttribute("aria-label", paused ? "Resume workflow" : "Pause workflow");
@@ -382,13 +384,7 @@ function buildRow(a){
   cb.title = "Enable or disable activity"; cb.innerHTML = CHECK;
   cb.setAttribute("aria-label", `Enable ${a.name}`);
   cb.setAttribute("aria-pressed", String(!!a.enabled));
-  cb.onclick = ()=>{
-    a.enabled = !a.enabled;
-    cb.classList.toggle("checked", a.enabled);
-    cb.setAttribute("aria-pressed", String(!!a.enabled));
-    paintRow(a, row); updateListSummary(); updateProgress();
-    api().toggle_activity(a.id, a.enabled);
-  };
+  cb.onclick = ()=>setActivityEnabled(a, !a.enabled, row);
 
   const dot = document.createElement("span");
   dot.className = "act-dot";
@@ -439,7 +435,7 @@ function attachDragHandle(row, handle, listId){
   handle.addEventListener("mouseup",   ()=>{ row.draggable = false; });
 
   row.addEventListener("dragstart", e=>{
-    if(S.running){ e.preventDefault(); return; }
+    if(S.running || S.starting || S.ordering){ e.preventDefault(); return; }
     if(S.expandedId){ toggleSettings(S.expandedId); }
     row.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
@@ -451,7 +447,7 @@ function attachDragHandle(row, handle, listId){
     commitOrder();
   });
   handle.addEventListener("keydown", e=>{
-    if(S.running || !["ArrowUp","ArrowDown"].includes(e.key)) return;
+    if(S.running || S.starting || S.ordering || !["ArrowUp","ArrowDown"].includes(e.key)) return;
     e.preventDefault();
     const sibling = e.key==="ArrowUp" ? row.previousElementSibling : row.nextElementSibling;
     if(!sibling || !sibling.classList.contains("task-row")) return;
@@ -485,12 +481,21 @@ function setupListDnD(list){
   });
 }
 
-function commitOrder(){
+async function commitOrder(){
+  if(S.ordering) return;
+  S.ordering = true;
+  const previous = [...S.activities];
   const ids = [];
   $("seq-list").querySelectorAll(".task-row").forEach(r=>ids.push(r.dataset.id));
   $("bg-list").querySelectorAll(".task-row").forEach(r=>ids.push(r.dataset.id));
   S.activities.sort((a,b)=> ids.indexOf(a.id) - ids.indexOf(b.id));
-  try{ api().reorder_activities(ids); }catch(_){}
+  try{
+    if(!await api().reorder_activities(ids)) throw new Error("Order wasn't saved");
+  }catch(_){
+    S.activities = previous;
+    populateLists(); updateProgress();
+    setActivitySaveState("Couldn't save order", "error");
+  }finally{ S.ordering = false; }
 }
 
 // Dot, status line and row tint from an activity's state. Background activities
@@ -943,11 +948,15 @@ function scheduleLogCount(){
   if(_logCountTimer) return;
   _logCountTimer = setTimeout(()=>{ _logCountTimer = null; renderLogCount(); }, 150);
 }
+const _pendingLog = [];
+let _logFrame = null;
 function appendLog(e){
-  const body = $("log-body");
-  // Follow new lines only when already at the bottom — scrolling up to read an
-  // earlier error must not be yanked away by the next line.
-  const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+  S.logTotal++;
+  _pendingLog.push(e);
+  if(_pendingLog.length > 500) _pendingLog.splice(0, _pendingLog.length - 500);
+  if(_logFrame === null) _logFrame = requestAnimationFrame(flushLog);
+}
+function buildLogLine(e){
   const level = e.level || "info";
   const line = document.createElement("div");
   line.className = `log-line fade-in lv-${level} k-${e.kind||"app"}`;
@@ -963,8 +972,19 @@ function appendLog(e){
     `<span class="log-msg">${scope}${escHtml(text)}</span>`;
   line.hiddenByFilter = !logLineVisible(line);
   line.classList.toggle("hidden", line.hiddenByFilter);
-  body.appendChild(line);
-  S.logTotal++;
+  return line;
+}
+function flushLog(){
+  _logFrame = null;
+  if(!_pendingLog.length) return;
+  const body = $("log-body");
+  // Follow new lines only when already at the bottom — scrolling up to read an
+  // earlier error must not be yanked away by the next batch.
+  const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+  const entries = _pendingLog.splice(0);
+  const fragment = document.createDocumentFragment();
+  entries.forEach(e=>fragment.appendChild(buildLogLine(e)));
+  body.appendChild(fragment);
   while(body.children.length>500) body.removeChild(body.firstChild);
   S.logCount = body.children.length;
   scheduleLogCount();
@@ -992,6 +1012,8 @@ function setLogLevel(level){
   applyLogFilter();
 }
 function clearLog(){
+  if(_logFrame !== null){ cancelAnimationFrame(_logFrame); _logFrame = null; }
+  _pendingLog.length = 0;
   $("log-body").innerHTML = "";
   S.logCount = 0; S.logTotal = 0;
   renderLogCount();
@@ -1468,6 +1490,22 @@ function applyFlow(data){
 }
 
 // ── Python events ────────────────────────────────────────────────────────────
+function applyRunState(data){
+  const wasRunning = S.running;
+  S.running=!!data.running; S.paused=!!data.paused;
+  if("runScope" in data) S.runScope = data.runScope || null;
+  if(S.running){
+    setOutcome("");
+    $('header-progress').style.display='flex';
+    if(data.startedAt || !_elapsedTimer) startElapsedTimer(data.startedAt);
+  } else {
+    stopElapsedTimer();
+    if("outcome" in data) setOutcome(data.outcome, data);
+    else if(wasRunning) setOutcome(derivedOutcome(), data);
+  }
+  refreshButtons();
+}
+
 window.__recv = function(raw){
   let ev; try{ ev=JSON.parse(raw); }catch{ return; }
   const { type, data } = ev;
@@ -1491,19 +1529,7 @@ window.__recv = function(raw){
   if(type==="bridge_status"){ S.bridge=data; renderBridge(); return; }
   if(type==="launch_blocked"){ onLaunchBlocked(data); return; }
   if(type==="running_state"){
-    const wasRunning = S.running;
-    S.running=!!data.running; S.paused=!!data.paused;
-    if(S.running){
-      setOutcome("");   // a new run clears the previous run's result
-      $('header-progress').style.display='flex'; if(!_elapsedTimer) startElapsedTimer();
-    } else {
-      stopElapsedTimer();
-      // New backends name the outcome; older ones send none, so fall back to
-      // what the activities' own statuses say happened.
-      if("outcome" in data) setOutcome(data.outcome, data);
-      else if(wasRunning) setOutcome(derivedOutcome(), data);
-    }
-    refreshButtons(); return;
+    applyRunState(data); return;
   }
   if(type==="activity_update"){
     if(data.status==="pending"){ $('header-progress').style.display='flex'; }
@@ -1763,14 +1789,16 @@ async function onUpdateApply(){
 // ── Handlers ───────────────────────────────────────────────────────────────
 const api = () => window.pywebview.api;
 async function onStart(){
-  if(!S.loaded || S.running) return;
+  if(!S.loaded || S.running || S.starting || S.ordering) return;
+  S.starting = true; refreshButtons();
   S.runScope = null;
   setOutcome("");   // the previous run's result no longer applies
   S.activities.filter(a=>a.type!=="background").forEach(a=>setActStatus(a.id,"pending"));
   $('header-progress').style.display='flex'; startElapsedTimer(); updateProgress();
   let ok = false;
   try{ ok = await api().start(); }catch(_){ }
-  if(!ok){ stopElapsedTimer(); updateProgress(); }   // e.g. blocked by a missing game path
+  finally{ S.starting = false; refreshButtons(); }
+  if(!ok && !S.running){ stopElapsedTimer(); updateProgress(); }
 }
 // Which single activity is running on its own, if any.
 function soloRunningId(){
@@ -1786,7 +1814,7 @@ function updateRowRunButtons(){
     const isThisRunning = !!id && id === solo;
     const blocked = S.running && !isThisRunning;
     btn.classList.toggle("is-stop", isThisRunning);
-    btn.disabled = !S.loaded || blocked;
+    btn.disabled = !S.loaded || blocked || (S.starting && !isThisRunning);
     if(isThisRunning){
       btn.innerHTML = STOP_SM;
       btn.title = "Stop this activity";
@@ -1803,15 +1831,17 @@ async function onRunToggle(id){
   await onRunActivity(id);
 }
 async function onRunActivity(id){
-  if(!S.loaded || S.running || S.exporting) return;
+  if(!S.loaded || S.running || S.starting || S.ordering || S.exporting) return;
   if(!S.activities.some(a=>a.id===id)) return;
+  S.starting = true; refreshButtons();
   S.runScope = [id];
   setOutcome("");
   setActStatus(id, "pending");
   $('header-progress').style.display='flex'; startElapsedTimer(); updateProgress();
   let ok = false;
   try{ ok = await api().run_activity(id); }catch(_){ }
-  if(!ok){ stopElapsedTimer(); S.runScope = null; updateProgress(); }
+  finally{ S.starting = false; refreshButtons(); }
+  if(!ok && !S.running){ stopElapsedTimer(); S.runScope = null; updateProgress(); }
 }
 async function onStop(){ await api().stop(); }
 async function onPause(){ const r=await api().pause(); S.paused=!!(r&&r.paused); refreshButtons(); }
@@ -1829,13 +1859,13 @@ function isTypingTarget(el){
 }
 function onGlobalKey(e){
   if(document.querySelector(".ui-modal-wrap")) return;   // a dialog owns the keyboard
+  if(e.repeat || isTypingTarget(document.activeElement)) return;
   if(e.ctrlKey && e.key === "Enter" && !e.altKey && !e.shiftKey){
     e.preventDefault();
     if(S.running) onStop(); else onStart();
     return;
   }
   if(e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
-  if(isTypingTarget(document.activeElement)) return;
   if(e.key === "F5"){
     // Start only, never a stop: F5 is the key people jab out of habit, and a run
     // half an hour in must not die to a reflex. Stopping stays a deliberate act
@@ -1850,24 +1880,44 @@ function onGlobalKey(e){
 async function onClearLog(){ await api().clear_log(); }
 async function onDeviceChange(serial){ if(serial){ S.connectedSerial=serial; await api().select_device(serial); } }
 async function onCaptureBackendChange(backend){
-  const r=await api().set_capture_backend(backend);
-  S.captureBackend=(r&&r.backend)||backend;
-  const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
+  try{
+    const r=await api().set_capture_backend(backend);
+    if(r && r.backend) S.captureBackend=r.backend;
+  }catch(_){
+    setActivitySaveState("Couldn't save capture source", "error");
+  }finally{
+    const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
+  }
 }
 async function onRefresh(){ $("btn-refresh").classList.add("spinning"); await api().refresh_devices(); }
 
-function selectAll(type, enabled){
-  S.activities.filter(a=> type==="sequence" ? a.type!=="background" : a.type==="background").forEach(a=>{
+async function setActivityEnabled(a, enabled, row){
+  if(a.savingEnabled) return false;
+  a.savingEnabled = true;
+  row = row || document.querySelector(`.task-row[data-id="${a.id}"]`);
+  const cb = row && row.querySelector(".cb");
+  if(cb) cb.disabled = true;
+  try{
+    if(!await api().toggle_activity(a.id, enabled)) throw new Error("Activity wasn't saved");
     a.enabled = enabled;
-    const row = document.querySelector(`.task-row[data-id="${a.id}"]`);
-    if(row){
-      const cb = row.querySelector(".cb");
-      cb.classList.toggle("checked", enabled); cb.setAttribute("aria-pressed", String(enabled));
-      paintRow(a, row);
+    return true;
+  }catch(_){
+    setActivitySaveState("Couldn't save activity", "error");
+    return false;
+  }finally{
+    a.savingEnabled = false;
+    if(cb){
+      cb.disabled = false;
+      cb.classList.toggle("checked", a.enabled);
+      cb.setAttribute("aria-pressed", String(!!a.enabled));
     }
-    api().toggle_activity(a.id, enabled);
-  });
-  updateListSummary(); updateProgress();
+    paintRow(a, row); updateListSummary(); updateProgress();
+  }
+}
+async function selectAll(type, enabled){
+  for(const a of S.activities.filter(a=> type==="sequence" ? a.type!=="background" : a.type==="background")){
+    await setActivityEnabled(a, enabled);
+  }
 }
 
 // ── Live preview ─────────────────────────────────────────────────────────────
@@ -2012,8 +2062,6 @@ async function init(){
   if(!window.pywebview||!window.pywebview.api){ $("dev-label").textContent="PyWebView unavailable"; return; }
   const st = await api().get_state();
   applyRunnerInfo(st.runner);
-  await maybeShowPendingChangelog();
-  await maybePromptUpdate();
   S.connectedSerial = st.connectedSerial||null;
   S.captureBackend = st.captureBackend||"scrcpy";
   const capSel=$("capture-backend");
@@ -2028,9 +2076,12 @@ async function init(){
                            emulator:st.emulator, emulatorDefault:st.emulatorDefault,
                            icon:st.icon, iconKey:st.iconKey});
   else applyController(st.controller, st.win32);
-  S.running=!!st.running; S.paused=!!st.paused;
-  refreshButtons();
+  applyRunState(st);
   (st.log||[]).forEach(appendLog);
   pvApply();
+  // Apply the snapshot before awaiting modal interaction. Live events received
+  // while a dialog is open must remain the latest state.
+  await maybeShowPendingChangelog();
+  await maybePromptUpdate();
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();

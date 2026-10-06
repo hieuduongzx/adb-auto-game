@@ -90,13 +90,14 @@ function wfMinimapDraw(){
     ctx.fill(); ctx.stroke(); ctx.globalAlpha=1;
   });
   // Node chips.
+  const selected=new Set(WF.sel||[]);
   rects.forEach(({n,w,h})=>{
     const running = typeof wfRunNode!=="undefined" && n.id===wfRunNode;
     // Last-run outcome wins over the category tint: a failed block (or one that
     // took its false branch) reads red at a glance from the bird's-eye view.
     const ranFail = typeof wfRan!=="undefined"
       && (wfRan[n.id]==="fail" || wfRanPort[n.id]==="false");
-    const sel = WF.sel.includes(n.id);
+    const sel = selected.has(n.id);
     ctx.fillStyle = running ? P.run : (ranFail ? P.fail : wfMmColorFor(n));
     ctx.globalAlpha = running||sel||ranFail ? 1 : .82;
     const px=X(n.x), py=Y(n.y), pw=Math.max(2.5,w*scale), ph=Math.max(2,h*scale);

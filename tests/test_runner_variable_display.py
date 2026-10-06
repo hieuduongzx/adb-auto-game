@@ -8,10 +8,10 @@ from pathlib import Path
 
 source = ast.parse((Path(__file__).parents[1] / "apps/workflow_runner.py").read_text(encoding="utf-8"))
 names = {"_apply_runner_config", "_activities_payload", "set_activity_var",
-         "_each_activity_var", "_var_payload"}
+         "_each_activity_var", "_var_payload", "_persist_runner_config"}
 methods = [node for cls in source.body if isinstance(cls, ast.ClassDef)
            for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in names]
-namespace = {"List": list, "CAPTURE_BACKENDS": ()}
+namespace = {"List": list, "CAPTURE_BACKENDS": (), "copy": copy}
 exec(compile(ast.Module(body=methods, type_ignores=[]), "workflow_runner.py", "exec"), namespace)
 
 
@@ -23,6 +23,7 @@ class RunnerVariableDisplayTests(unittest.TestCase):
             set_activity_var = namespace["set_activity_var"]
             _each_activity_var = namespace["_each_activity_var"]
             _var_payload = namespace["_var_payload"]
+            _persist_runner_config = namespace["_persist_runner_config"]
 
             def _runtime_settings_for_activity(self, activity):
                 return []
@@ -35,12 +36,14 @@ class RunnerVariableDisplayTests(unittest.TestCase):
 
             def _save_runner_config(self):
                 self.saved = copy.deepcopy(self._runner_config)
+                return True
 
         runner = Runner()
         runner.flow = {"activities": [{"id": "act", "vars": [{"name": "difficulty", "type": "select",
             "display": "toggle-group", "value": value, "options": ["Easy", "Normal", "Hard"]}]}]}
         runner._runner_config = saved or {}
         runner._runner_config_lock = threading.RLock()
+        runner._act_status = {}
         return runner
 
     def test_payload_carries_display_and_selected_value(self):

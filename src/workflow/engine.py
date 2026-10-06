@@ -49,6 +49,7 @@ JSON shape::
 from __future__ import annotations
 
 import json
+from functools import wraps
 import math
 import os
 import random
@@ -685,6 +686,19 @@ SWITCH_CASE_TYPES = ("if_image", "if_image_any", "if_text", "if_var", "if_time",
                      "win_if_window")
 
 
+def _serialize_run_start(method):
+    """Reserve readiness and worker creation across every run entry point."""
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        if not self._run_start_lock.acquire(blocking=False):
+            return False
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            self._run_start_lock.release()
+    return guarded
+
+
 class WorkflowEngine:
     """Run a JSON workflow, honouring pause/stop and the sequence/background split."""
 
@@ -757,6 +771,7 @@ class WorkflowEngine:
         self.report_matches = False
 
         self.running = False
+        self._run_start_lock = threading.Lock()
         # Last block an activity died on, shared across branch threads — see
         # _note_crash. Reset at the start of every activity.
         self._crash: Optional[Dict[str, Any]] = None
@@ -768,6 +783,8 @@ class WorkflowEngine:
         self._seq_thread: Optional[threading.Thread] = None
         self._bg_threads: Dict[str, threading.Thread] = {}
         self._bg_stop: Dict[str, threading.Event] = {}
+        self._bg_lock = threading.RLock()
+        self._retired_bg_threads: Dict[str, threading.Thread] = {}
         self._sequence_stops: Dict[str, threading.Event] = {}
         self._sequence_stops_lock = threading.Lock()
 
@@ -1304,7 +1321,7 @@ class WorkflowEngine:
             return False
 
     def _seq_thread_gone(self) -> bool:
-        """True when no previous sequence thread is still unwinding.
+        """True when no previous sequence/background worker is still unwinding.
 
         ``stop()`` only gives the old thread ~1s before reporting stopped; a
         node blocked in a long ADB call can outlive that. If a new start()
@@ -1312,11 +1329,18 @@ class WorkflowEngine:
         wake up and keep executing alongside the new run — two walkers driving
         one device. Give it a short grace join, then refuse."""
         prev = self._seq_thread
-        if prev is None or prev is threading.current_thread() or not prev.is_alive():
-            return True
-        prev.join(timeout=2.0)
-        return not prev.is_alive()
+        with self._bg_lock:
+            retired = list(self._retired_bg_threads.values())
+        deadline = time.monotonic() + 2.0
+        for worker in ([prev] if prev else []) + retired:
+            if worker is threading.current_thread() or not worker.is_alive():
+                continue
+            worker.join(timeout=max(0.0, deadline - time.monotonic()))
+            if worker.is_alive():
+                return False
+        return True
 
+    @_serialize_run_start
     def start(self, background: bool = True, with_speedhack: bool = True) -> bool:
         """Run all enabled sequence activities once, then start backgrounds.
 
@@ -1354,6 +1378,7 @@ class WorkflowEngine:
         self._seq_thread.start()
         return True
 
+    @_serialize_run_start
     def start_activity(self, activity_id: str, with_speedhack: bool = True) -> bool:
         """Run one activity on its own, whatever its ``enabled`` flag says.
 
@@ -1402,10 +1427,11 @@ class WorkflowEngine:
             with log_activity(act.get("name") or act.get("id")):
                 log_error(f"✖ Crashed: {e}", kind=LOG_KIND_ACTIVITY)
         finally:
-            if not self._bg_threads:
+            if not self._bg_threads and not self._retired_bg_threads:
                 self.running = False
                 self._emit("on_stop")
 
+    @_serialize_run_start
     def start_graph(self, graph: Dict[str, Any], start_id: str, seed_act: Optional[Dict[str, Any]] = None, step: bool = False) -> bool:
         """Run one graph from an arbitrary node, used by designer debug tools."""
         if self.running:
@@ -1485,7 +1511,7 @@ class WorkflowEngine:
         except Exception as e:
             log_error(f"Sequence error: {e}", kind=LOG_KIND_RUN)
         finally:
-            if not self._bg_threads:
+            if not self._bg_threads and not self._retired_bg_threads:
                 self.running = False
                 self._emit("on_stop")
 
@@ -1498,6 +1524,12 @@ class WorkflowEngine:
             set_log_node(None)
             try:
                 return self._run_activity_attempts(act)
+            except Exception as exc:
+                # The Runner classifies outcomes from completion callbacks.
+                # Logging alone would make a crashed activity look completed.
+                log_error(f"✖ Crashed: {exc}", kind=LOG_KIND_ACTIVITY)
+                self._emit("on_activity_complete", act, False)
+                return False
             finally:
                 set_log_node(None)
 
@@ -1618,8 +1650,9 @@ class WorkflowEngine:
         """
         steps = 0
         last_nid = None          # last block actually entered — see dead-end below
-        while cur and not self._stop.is_set():
-            self._pause.wait()
+        while cur and not self._stop.is_set() and not self._background_cancelled():
+            if not self._wait_to_run():
+                break
             if self._debug_step:
                 self._debug_gate.wait()
                 self._debug_gate.clear()
@@ -1661,6 +1694,8 @@ class WorkflowEngine:
                 self._emit("on_node_delay", nid, "before", db)
                 self._sleep(db)
                 self._emit("on_node_delay", nid, None, 0)
+                if self._stop.is_set() or self._background_cancelled():
+                    break
 
             if kind == "start":
                 self._node_done(node, nid, "ok", "out")
@@ -2034,7 +2069,8 @@ class WorkflowEngine:
             self._node_done(nodes[node_id], node_id, "ok", _p)
             t = threading.Thread(
                 target=self._walk_branch,
-                args=(nodes, adj, tgt, depth, vars0, pos0, join_ctx, get_log_activity()),
+                args=(nodes, adj, tgt, depth, vars0, pos0, join_ctx, get_log_activity(),
+                      getattr(self._ctx, "background_stop", None)),
                 daemon=True)
             threads.append(t)
             t.start()
@@ -2077,7 +2113,8 @@ class WorkflowEngine:
             ok = not state["failed"]
         return is_last, ok
 
-    def _walk_branch(self, nodes, adj, tgt, depth, vars0, pos0, join_ctx=None, activity=None):
+    def _walk_branch(self, nodes, adj, tgt, depth, vars0, pos0, join_ctx=None, activity=None,
+                     background_stop=None):
         """Entry point for a parallel branch thread: seed this thread's context
         from the fork snapshot, then walk. Isolated from siblings + the parent."""
         set_log_activity(activity)     # a branch logs under its activity's name
@@ -2085,6 +2122,7 @@ class WorkflowEngine:
         self._last_pos = pos0
         self._break_loop = False
         self._ctx.join_ctx = join_ctx   # thread-local; cleared when thread exits
+        self._ctx.background_stop = background_stop
         self._branch_failed = False
         self._reached_end = False
         try:
@@ -2131,6 +2169,44 @@ class WorkflowEngine:
         return re.sub(r"\{([^{}]+)\}",
                       lambda m: str(self._vars.get(m.group(1).strip(), m.group(0))),
                       s)
+
+    def _apply_pattern(self, text: Any, pattern: Any, group: Any = 1) -> Optional[str]:
+        """Extract capture ``group`` of regex ``pattern`` from ``text``.
+
+        The same mechanism Parse text to variable uses, shared with every node
+        that produces text (Read text / Run shell / Read window / Format text).
+        No pattern → the whole text, stripped (existing behaviour). No match →
+        "". An invalid regex → ``None`` so the caller can fail the node instead
+        of silently writing junk into a variable.
+        """
+        raw = str(text or "")
+        pat = str(pattern or "").strip()
+        if not pat:
+            return raw.strip()
+        try:
+            m = re.search(pat, raw, re.MULTILINE)
+        except re.error as exc:
+            log_error(f"pattern error /{pat}/: {exc}")
+            return None
+        if not m:
+            return ""
+        try:
+            grp = int(group or 1)
+        except (TypeError, ValueError):
+            grp = 1
+        if 0 <= grp <= len(m.groups()):
+            return (m.group(grp) or "").strip()
+        return (m.group(0) or "").strip()
+
+    def _ocr_needle(self, params: Dict) -> tuple:
+        """The string OCR match nodes look for, plus whether it is a regex.
+
+        ``match`` = "pattern" reads ``pattern`` and matches it as a regex
+        (parse_var style); anything else keeps the literal ``text`` substring.
+        """
+        if str(params.get("match", "text")).strip().lower() == "pattern":
+            return str(self._resolve_value(params.get("pattern", "")) or ""), True
+        return str(self._resolve_value(params.get("text", "")) or ""), False
 
     @staticmethod
     def _label(obj: Dict[str, Any]) -> str:
@@ -2645,6 +2721,8 @@ class WorkflowEngine:
         if ntype == "loop_until_color":
             return f"found color {params.get('color') or '?'}"
         if ntype == "loop_until_text":
+            if str(params.get("match", "text")).strip().lower() == "pattern":
+                return f"found text /{params.get('pattern') or ''}/"
             return f"found text \"{params.get('text') or ''}\""
         if ntype == "loop_until_var":
             return (f"variable {params.get('name') or '?'} "
@@ -2672,10 +2750,11 @@ class WorkflowEngine:
             )
             return ok
         if ntype == "loop_until_text":
-            needle = str(self._resolve_value(params.get("text", "")))
+            needle, regex = self._ocr_needle(params)
             region = self._region(params)
             found, _read = self.auto.region_find_text(
-                needle, region=region, whitelist=self._ocr_whitelist(params))
+                needle, region=region, whitelist=self._ocr_whitelist(params),
+                regex=regex)
             self._report_ocr_region(region, bool(found), needle)
             return bool(found)
         if ntype == "loop_until_var":
@@ -2837,7 +2916,8 @@ class WorkflowEngine:
                 log_info(f"🔍 found image {os.path.basename(tpl)} at ({res[0]}, {res[1]})")
             return res is not None
         if ntype == "tap_text":
-            needle = str(self._resolve_value(params.get("text", "")) or "").strip()
+            needle, regex = self._ocr_needle(params)
+            needle = needle.strip()
             region = self._region(params)
             timeout = float(params.get("timeout", 10.0))
             if not needle:
@@ -2851,7 +2931,8 @@ class WorkflowEngine:
                 if self._stop.is_set():
                     return False
                 found, read = self.auto.region_find_text(
-                    needle, region=region, whitelist=self._ocr_whitelist(params))
+                    needle, region=region, whitelist=self._ocr_whitelist(params),
+                    regex=regex)
                 if read:
                     last_read = read
                 if found:
@@ -2873,7 +2954,8 @@ class WorkflowEngine:
                 time.sleep(min(0.5, max(0.0, end - time.time())))
             return False
         if ntype == "wait_text":
-            needle = str(self._resolve_value(params.get("text", "")) or "").strip()
+            needle, regex = self._ocr_needle(params)
+            needle = needle.strip()
             region = self._region(params)
             wl = self._ocr_whitelist(params)
             timeout = float(params.get("timeout", 10.0))
@@ -2893,7 +2975,8 @@ class WorkflowEngine:
                 self._pause.wait()
                 if self._stop.is_set():
                     return False
-                found, read = self.auto.region_find_text(needle, region=region, whitelist=wl)
+                found, read = self.auto.region_find_text(needle, region=region, whitelist=wl,
+                                                          regex=regex)
                 if read:
                     last_read = read
                 if negate:
@@ -2926,10 +3009,11 @@ class WorkflowEngine:
         if ntype == "if_text":
             negate = bool(params.get("negate", False))
             # needle nhận biến — đồng bộ với if_app.package.
-            needle = str(self._resolve_value(params.get("text", "")) or "")
+            needle, regex = self._ocr_needle(params)
             region = self._region(params)
             found, read = self.auto.region_find_text(
-                needle, region=region, whitelist=self._ocr_whitelist(params))
+                needle, region=region, whitelist=self._ocr_whitelist(params),
+                regex=regex)
             log_info(
                 f"🔤 if_text region {region}: read {read!r} → "
                 f"{'found' if found else 'not found'} '{needle}'"
@@ -3069,25 +3153,44 @@ class WorkflowEngine:
             if act.get("type") == "background" and act.get("enabled", True):
                 self.start_background(act)
 
-    def start_background(self, act: Dict[str, Any]) -> None:
+    def background_stopping(self, aid: str) -> bool:
+        """A cancelled worker still owns a pending controller call."""
+        with self._bg_lock:
+            worker = self._retired_bg_threads.get(aid)
+            return bool(worker is not None and worker.is_alive())
+
+    def start_background(self, act: Dict[str, Any]) -> bool:
         aid = act.get("id") or act.get("name")
-        if not aid or aid in self._bg_threads:
-            return
-        stop_ev = threading.Event()
-        self._bg_stop[aid] = stop_ev
-        t = threading.Thread(target=self._bg_loop, args=(act, stop_ev), daemon=True)
-        self._bg_threads[aid] = t
-        t.start()
+        if not aid:
+            return False
+        with self._bg_lock:
+            if self.background_stopping(aid):
+                log_warning("Background is still stopping — wait for its current action",
+                            kind=LOG_KIND_ACTIVITY)
+                return False
+            existing = self._bg_threads.get(aid)
+            if existing is not None and existing.is_alive():
+                return True
+            self._retired_bg_threads.pop(aid, None)
+            stop_ev = threading.Event()
+            self._bg_stop[aid] = stop_ev
+            t = threading.Thread(target=self._bg_loop, args=(act, stop_ev), daemon=True)
+            self._bg_threads[aid] = t
+            t.start()
         interval = max(0.05, float(act.get("pollInterval", 1.0) or 1.0))
         with log_activity(act.get("name") or aid):
             log_info(f"▶ Background started — every {interval:g}s", kind=LOG_KIND_ACTIVITY)
+        return True
 
     def stop_background(self, aid: str) -> None:
-        ev = self._bg_stop.get(aid)
-        if ev:
-            ev.set()
-        t = self._bg_threads.pop(aid, None)
-        self._bg_stop.pop(aid, None)
+        with self._bg_lock:
+            ev = self._bg_stop.get(aid)
+            if ev:
+                ev.set()
+            t = self._bg_threads.pop(aid, None)
+            self._bg_stop.pop(aid, None)
+            if t is not None:
+                self._retired_bg_threads[aid] = t
         if t and t.is_alive() and t is not threading.current_thread():
             t.join(timeout=0.5)
         if t is not None:
@@ -3097,19 +3200,53 @@ class WorkflowEngine:
                 log_info("■ Background stopped", kind=LOG_KIND_ACTIVITY)
 
     def _bg_loop(self, act: Dict[str, Any], stop_ev: threading.Event) -> None:
+        self._ctx.background_stop = stop_ev
+        try:
+            self._bg_loop_iterations(act, stop_ev)
+        except Exception as exc:
+            log_error(f"✖ Background crashed: {exc}", kind=LOG_KIND_ACTIVITY)
+            self._emit("on_activity_complete", act, False)
+        finally:
+            self._ctx.background_stop = None
+            aid = act.get("id") or act.get("name")
+            current = threading.current_thread()
+            with self._bg_lock:
+                if self._bg_threads.get(aid) is current:
+                    self._bg_threads.pop(aid, None)
+                    self._bg_stop.pop(aid, None)
+                if self._retired_bg_threads.get(aid) is current:
+                    self._retired_bg_threads.pop(aid, None)
+                ended = (self.running and not self._bg_threads
+                         and not self._retired_bg_threads
+                         and (self._seq_thread is None or not self._seq_thread.is_alive()))
+                if ended:
+                    self.running = False
+            if ended:
+                self._emit("on_stop")
+
+    def _bg_loop_iterations(self, act: Dict[str, Any], stop_ev: threading.Event) -> None:
         name = act.get("name") or act.get("id")
         set_log_activity(name)     # dedicated worker thread — every line is this activity's
         while not stop_ev.is_set() and not self._stop.is_set():
-            self._pause.wait()
+            if not self._wait_to_run():
+                break
             self._vars = self._seed_vars(act)
             self._last_pos = None
             self._break_loop = False
+            self._branch_failed = False
+            self._try_chain_mode = False
+            self._reached_end = False
             self._emit("on_activity_start", act)
             try:
                 ok = self._run_graph(act.get("graph", {}) or {})
+                if not self._stop.is_set():
+                    ok = bool(ok and self._reached_end)
             except Exception as e:
                 ok = False
                 log_error(f"✖ Crashed: {e}", kind=LOG_KIND_ACTIVITY)
+            if stop_ev.is_set() and not self._stop.is_set():
+                # Disabling a watcher is cancellation, not an activity failure.
+                break
             self._emit("on_activity_complete", act, ok)
             interval = max(0.05, float(act.get("pollInterval", 1.0) or 1.0))
             end = time.time() + interval
@@ -3474,11 +3611,22 @@ class WorkflowEngine:
         self._pause.wait()
         return not self._stop.is_set()
 
+    def _background_cancelled(self) -> bool:
+        event = getattr(self._ctx, "background_stop", None)
+        return bool(event is not None and event.is_set())
+
+    def _wait_to_run(self) -> bool:
+        while not self._stop.is_set() and not self._background_cancelled():
+            if self._pause.wait(timeout=0.05):
+                return not self._stop.is_set() and not self._background_cancelled()
+        return False
+
     def _sleep(self, seconds: float) -> None:
         """Pause-aware, stop-aware sleep."""
         end = time.time() + max(0.0, seconds)
-        while time.time() < end and not self._stop.is_set():
-            self._pause.wait()
+        while time.time() < end and not self._stop.is_set() and not self._background_cancelled():
+            if not self._wait_to_run():
+                break
             time.sleep(0.05)
 
     def debug_next(self) -> None:
@@ -3851,7 +3999,11 @@ class WorkflowEngine:
         region = self._region(p)
         text = self.auto.read_text(region=region, whitelist=self._ocr_whitelist(p)) or ""
         if name:
-            self._set_var(name, self._coerce(text.strip()))
+            value = self._apply_pattern(
+                text, self._resolve_value(p.get("pattern", "")), p.get("group", 1))
+            if value is None:
+                value = ""
+            self._set_var(name, self._coerce(value))
             log_info(
                 f"🔤 read {name} = {self._vars[name]!r} "
                 f"(OCR region {region}: {text!r})"
@@ -3887,25 +4039,13 @@ class WorkflowEngine:
                 self._set_var(name, self._coerce(text.strip()))
                 log_info(f"parse {name} = {self._vars[name]!r} (no pattern)")
             return True
-        try:
-            m = re.search(pattern, text, re.MULTILINE)
-        except re.error as exc:
-            log_error(f"parse_var regex error: {exc}")
+        value = self._apply_pattern(text, pattern, p.get("group", 1))
+        if value is None:
             if name:
                 self._set_var(name, "")
             return False
-        value = ""
-        if m:
-            try:
-                grp = int(p.get("group", 1) or 1)
-            except (TypeError, ValueError):
-                grp = 1
-            if 0 <= grp <= len(m.groups()):
-                value = m.group(grp) or ""
-            else:
-                value = m.group(0) or ""
         if name:
-            self._set_var(name, self._coerce(value.strip()))
+            self._set_var(name, self._coerce(value))
             log_info(f"parse {name} = {self._vars[name]!r} (from {text!r})")
         return True
 
@@ -4104,7 +4244,11 @@ class WorkflowEngine:
             return False
         name = str(p.get("name", "") or "").strip()
         if name:
-            self._set_var(name, self._coerce(out))
+            pat = str(self._resolve_value(p.get("pattern", "")) or "").strip()
+            value = self._apply_pattern(out, pat, p.get("group", 1)) if pat else out
+            if value is None:
+                value = ""
+            self._set_var(name, self._coerce(value))
         log_info(f"💻 {cmd} → {out[:160]!r}"
                  + (f" (→ {name})" if name else ""))
         return not (self._truthy(p.get("failIfEmpty", False)) and not out)
@@ -4214,6 +4358,10 @@ class WorkflowEngine:
         result   = template
         for k, v in list(self._vars.items()):
             result = result.replace(f"{{{k}}}", str(v))
+        pat = str(self._resolve_value(p.get("pattern", "")) or "").strip()
+        if pat:
+            extracted = self._apply_pattern(result, pat, p.get("group", 1))
+            result = "" if extracted is None else extracted
         if name:
             self._set_var(name, result)
             log_info(f"📝 {name} = \"{result}\"")
@@ -5593,6 +5741,10 @@ class WorkflowEngine:
         val: Any = info.get(prop, "")
         if isinstance(val, bool):
             val = "true" if val else "false"
+        pat = str(self._resolve_value(p.get("pattern", "")) or "").strip()
+        if pat:
+            extracted = self._apply_pattern(val, pat, p.get("group", 1))
+            val = "" if extracted is None else extracted
         if name:
             self._set_var(name, val)
             log_info(f"🪟 {name} = {self._vars[name]!r} ({prop})")

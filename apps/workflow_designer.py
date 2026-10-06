@@ -54,7 +54,7 @@ from src.core.adb.input import (
 from src.core.adb.auto.ocr import KNOWN_BACKENDS, OCR_MODEL_LABELS, OCRReader
 from src.core.adb.auto.template_matcher import TemplateMatcher
 from src.core.frida_speedhack import FridaSpeedhackManager
-from src.workflow import NODE_TYPES, WorkflowEngine
+from src.workflow import NODE_TYPES, WorkflowEngine, local_vars
 from src.utils import (
     add_log_subscriber,
     bundle_dir,
@@ -1824,6 +1824,33 @@ class WorkflowDesignerAPI:
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(text)
 
+    # ── Local (design/test) variable overrides ────────────────────────────────
+    # workflow.json holds the build defaults; local_vars.json (a sibling file)
+    # holds design-test values that a test run overlays but a build never ships.
+
+    def get_local_vars(self) -> dict:
+        return local_vars.load(self._wf_path)
+
+    def save_local_vars(self, vars_json: str) -> dict:
+        if not self._wf_path:
+            return {"ok": False, "error": "Save the workflow once before using test values."}
+        try:
+            data = json.loads(vars_json) if vars_json else {}
+        except Exception as exc:
+            return {"ok": False, "error": f"Invalid local variables: {exc}"}
+        ok = local_vars.save(self._wf_path, data)
+        return {"ok": ok, "path": local_vars.sidecar_path(self._wf_path)}
+
+    def _apply_local_vars(self, flow: dict) -> dict:
+        """Overlay local_vars.json test values onto *flow* in place (test runs)."""
+        try:
+            n = local_vars.apply(flow, local_vars.load(self._wf_path))
+            if n:
+                log_info(f"Applied {n} local test value(s) from {local_vars.LOCAL_VARS_FILENAME}")
+        except Exception as exc:
+            log_warning(f"Couldn't apply local variables: {exc}")
+        return flow
+
     # ── Workflow file ops ──────────────────────────────────────────────────────
 
     def workflow_new(self, name: str = "") -> bool:
@@ -1950,6 +1977,8 @@ class WorkflowDesignerAPI:
         except Exception as exc:
             log_error(f"Invalid workflow JSON: {exc}")
             return False
+        # Overlay design-test values (local_vars.json) for this test run.
+        self._apply_local_vars(flow)
         # Win32 flows target a native window — no ADB device needed; the engine
         # attaches to the window itself in _ensure_ready_win32().
         is_win32 = self._flow_is_win32(flow)
@@ -2305,6 +2334,7 @@ class WorkflowDesignerAPI:
         except Exception as exc:
             log_error(f"Invalid workflow JSON: {exc}")
             return False
+        self._apply_local_vars(flow)
         is_win32 = self._flow_is_win32(flow)
         if not is_win32 and self.controller.device is None:
             if self._flow_has_launch_emulator(flow):
@@ -2374,6 +2404,8 @@ class WorkflowDesignerAPI:
         except Exception as exc:
             log_error(f"Invalid JSON: {exc}")
             return {"ok": False, "status": "error", "port": None}
+        if flow:
+            self._apply_local_vars(flow)
         is_win32 = self._flow_is_win32(flow)
         if (not is_win32 and self.controller.device is None
                 and node.get("type") not in ("launch_emulator", "if_emulator", "wait_emulator")):
@@ -2568,6 +2600,14 @@ class WorkflowDesignerAPI:
         try:
             os.makedirs(_RUN_TMP_DIR, exist_ok=True)
             tmp = os.path.join(_RUN_TMP_DIR, "_designer_run.json")
+            # A Runner opened from the Designer is a test run: overlay the
+            # design-test values so it behaves exactly like the in-app Test run.
+            try:
+                flow = json.loads(flow_json)
+                self._apply_local_vars(flow)
+                flow_json = json.dumps(flow, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
             self._write_flow(flow_json, tmp)
             launch_tool("runner", [tmp])
             log_success("Runner GUI opened with the current workflow")

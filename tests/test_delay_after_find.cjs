@@ -47,16 +47,18 @@ test('node delay round-trips while legacy before migrates and after is discarded
     const params = type === 'sequence_tap_image'
       ? {images: [{template: 'a.png', delayAfterFind: 2.5, delay: .1}]}
       : {delayAfterFind: 2.5};
+    // Legacy OCR text nodes gain match:'text' on load so the text field stays visible.
+    const expected = type === 'tap_text' ? {...params, match: 'text'} : params;
     const original = {id: 'n', type, x: 10, y: 20, params, delayBefore: 1, delayAfter: 3};
     const saved = JSON.parse(JSON.stringify(c.wfSerializeNode(original)));
     const restored = c.wfHydrateGraph({nodes: [saved], edges: []}).nodes.find(n => n.id === 'n');
-    assert.deepEqual(JSON.parse(JSON.stringify(restored.params)), params);
+    assert.deepEqual(JSON.parse(JSON.stringify(restored.params)), expected);
     assert.equal(restored.delay, 1);
     assert.equal(restored.delayAfter, undefined);
     assert.equal(saved.delayAfter, undefined);
     const imported = {id: 'copy', type, params: {}};
     c.wfApplyNodeJson(imported, saved);
-    assert.deepEqual(JSON.parse(JSON.stringify(imported.params)), params);
+    assert.deepEqual(JSON.parse(JSON.stringify(imported.params)), expected);
   }
   const legacy = c.wfHydrateGraph({nodes: [{id:'old',type:'tap_image',params:{delay:2}}]}).nodes.find(n => n.id === 'old');
   assert.equal(legacy.delay, 2);

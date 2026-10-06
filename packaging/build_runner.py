@@ -240,7 +240,8 @@ def find_workflow_json(folder: str) -> str | None:
     """Pick the primary JSON in a workflow folder (workflow.json preferred)."""
     if not os.path.isdir(folder):
         return None
-    names = [n for n in os.listdir(folder) if n.lower().endswith(".json")]
+    names = [n for n in os.listdir(folder) if n.lower().endswith(".json")
+             and n.lower() != "local_vars.json"]
     if not names:
         return None
     lower = {n.lower(): n for n in names}
@@ -1106,7 +1107,7 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
     needs = set(report["vendor"])
 
     log(f"Workflow : {display_name}")
-    log(f"Exe name : {app_name}.exe   (version {version})")
+    log(f"Exe name : {runner_exe_name(app_name)}   (version {version})")
     log(f"Vendor   : {', '.join(sorted(needs)) or '(none)'}")
     log(f"Icon     : {report['iconSource']}")
     log(f"Game req : {describe_requirements(workflow_dir)}")
@@ -1155,7 +1156,9 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
         "icon": icon_ico,
         "icon_png": icon_png,
         # Ships beside the exe as requirements/, so keep it out of the bundle.
-        "workflow_excludes": [REQUIREMENTS_SRC],
+        # local_vars.json holds design-test variable overrides and must never
+        # reach a shipped .exe.
+        "workflow_excludes": [REQUIREMENTS_SRC, "local_vars.json"],
     }
     cfg_path = os.path.join(tmp_dir, "build_cfg.json")
     with open(cfg_path, "w", encoding="utf-8") as fh:
@@ -1202,7 +1205,7 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
         staged = os.path.join(stage, f"{app_name}-Runner")
         if not os.path.isdir(staged):
             raise RuntimeError(f"PyInstaller did not produce {staged}")
-        staged_exe = os.path.join(staged, app_name + ".exe")
+        staged_exe = os.path.join(staged, runner_exe_name(app_name))
         if not os.path.isfile(staged_exe):
             raise RuntimeError(
                 f"PyInstaller output is incomplete: {staged_exe} is missing. "
@@ -1221,11 +1224,11 @@ def build(workflow_dir: str, name: str = "", version: str = "1.0.0",
             except OSError as exc:
                 raise RuntimeError(
                     f"Couldn't clear the previous build at {final} ({exc}). "
-                    f"Close {app_name}.exe if it's still running, then rebuild."
+                    f"Close {runner_exe_name(app_name)} if it's still running, then rebuild."
                 )
         os.makedirs(out_root, exist_ok=True)
         shutil.move(staged, final)
-        final_exe = os.path.join(final, app_name + ".exe")
+        final_exe = os.path.join(final, runner_exe_name(app_name))
         if not os.path.isfile(final_exe):
             raise RuntimeError(f"Runner assembly failed: {final_exe} is missing")
 

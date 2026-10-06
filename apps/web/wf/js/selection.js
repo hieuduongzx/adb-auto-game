@@ -1,5 +1,6 @@
 // ── Selection ────────────────────────────────────────────────────────────────
-function wfMarkSel(){ document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("sel",WF.sel.includes(el.dataset.node)));
+function wfMarkSel(){ const selected=new Set(WF.sel);
+  document.querySelectorAll(".wf-node").forEach(el=>el.classList.toggle("sel",selected.has(el.dataset.node)));
   if(typeof wfSyncWireSelection==="function") wfSyncWireSelection();
   if(typeof wfMinimapQueue==="function") wfMinimapQueue(); }
 // Brief arrival fade on freshly created blocks (palette drop / paste) so new

@@ -15,12 +15,16 @@ function element() {
 }
 function runner() {
   const elements = new Map();
+  const frames = new Map();
+  let nextFrame = 0;
   const get = id => { if(!elements.has(id)) elements.set(id, element()); return elements.get(id); };
   const ctx = vm.createContext({ document: { readyState: 'loading', addEventListener() {},
     getElementById: get, querySelectorAll: () => [], querySelector: () => null },
-    window: {}, uiIco: () => '', setInterval: () => 1, clearInterval() {}, setTimeout, clearTimeout, console });
+    window: {}, uiIco: () => '', setInterval: () => 1, clearInterval() {}, setTimeout, clearTimeout, console,
+    requestAnimationFrame: cb => { frames.set(++nextFrame, cb); return nextFrame; },
+    cancelAnimationFrame: id => frames.delete(id) });
   vm.runInContext(source, ctx);
-  return { ctx, get, run: text => vm.runInContext(text, ctx) };
+  return { ctx, get, frames, run: text => vm.runInContext(text, ctx) };
 }
 
 test('primary and pause accessible names follow backend run state', () => {
@@ -89,4 +93,92 @@ test('queue monitor follows activity events and separates settled from successfu
   r.run("S.runScope=['c']; updateProgress()");
   assert.equal(r.get('queue-summary').textContent, 'Single activity run');
   assert.equal(r.get('queue-current').textContent, 'Next: Disabled task');
+});
+
+test('pending start blocks duplicate full and solo requests while allowing Stop once running', async () => {
+  const r = runner();
+  let release, starts=0, solos=0;
+  r.ctx.window.pywebview = {api:{start:()=>{ starts++; return new Promise(resolve=>release=resolve); },
+    run_activity:async()=>{ solos++; return true; }}};
+  r.run("S.loaded=true; S.activities=[{id:'a', name:'A', enabled:true}]");
+  const first = r.run('onStart()');
+  await r.run('onStart()');
+  await r.run("onRunActivity('a')");
+  assert.equal(starts, 1); assert.equal(solos, 0);
+  assert.equal(r.get('btn-primary').disabled, true);
+  r.ctx.window.__recv(JSON.stringify({type:'running_state',data:{running:true}}));
+  assert.equal(r.get('btn-primary').disabled, false);
+  release(true); await first;
+  assert.equal(r.run('S.starting'), false);
+});
+
+test('rejected solo run clears its pending guard and restores Start', async () => {
+  const r = runner();
+  r.ctx.window.pywebview = {api:{run_activity:async()=>{throw new Error('bridge unavailable');}}};
+  r.run("S.loaded=true; S.activities=[{id:'a', name:'A'}]");
+  await r.run("onRunActivity('a')");
+  assert.equal(r.run('S.starting'), false);
+  assert.equal(r.run('S.runScope'), null);
+  assert.equal(r.get('btn-primary').disabled, false);
+});
+
+test('run shortcuts ignore text fields, contenteditable, and repeat events', () => {
+  const r = runner();
+  let starts=0, stops=0, prevented=0;
+  r.ctx.startProbe=()=>starts++; r.ctx.stopProbe=()=>stops++;
+  r.run('onStart=startProbe; onStop=stopProbe');
+  for(const el of [{tagName:'INPUT'}, {tagName:'TEXTAREA'}, {tagName:'SELECT'}, {isContentEditable:true}]){
+    r.ctx.document.activeElement=el;
+    r.ctx.event={key:'Enter',ctrlKey:true,preventDefault:()=>prevented++};
+    r.run('onGlobalKey(event)');
+  }
+  r.ctx.document.activeElement=null;
+  r.ctx.event={key:'Enter',ctrlKey:true,repeat:true,preventDefault:()=>prevented++};
+  r.run('S.running=true; onGlobalKey(event)');
+  assert.equal(starts+stops+prevented, 0);
+  r.ctx.event.repeat=false;
+  r.run('onGlobalKey(event)');
+  assert.equal(stops, 1);
+});
+
+test('initial state restores terminal outcomes and a live solo run scope', () => {
+  const r=runner();
+  r.run("S.loaded=true; S.activities=[{id:'a',name:'A',enabled:false,status:'failed'}]");
+  r.ctx.snapshot={running:false,paused:false,outcome:'failed',outcomeReason:'Missing image',runScope:['a']};
+  r.run('applyRunState(snapshot)');
+  assert.equal(r.get('status-text').textContent, 'FAILED');
+  assert.equal(r.run('S.runScope[0]'), 'a');
+  r.ctx.snapshot={running:true,paused:true,runScope:['a'],startedAt:123};
+  r.run('applyRunState(snapshot)');
+  assert.equal(r.get('status-text').textContent, 'PAUSED');
+  assert.equal(r.run('_elapsedStart'), 123000);
+});
+
+test('failed checkbox save retains the previous enabled state', async () => {
+  const r=runner();
+  r.ctx.window.pywebview={api:{toggle_activity:async()=>false}};
+  r.run("S.activities=[{id:'a',name:'A',enabled:true}]");
+  assert.equal(await r.run('setActivityEnabled(S.activities[0],false)'),false);
+  assert.equal(r.run('S.activities[0].enabled'),true);
+  assert.equal(r.run('S.activities[0].savingEnabled'),false);
+});
+
+test('init applies state before waiting on changelog and update modals', () => {
+  const init=source.slice(source.indexOf('async function init(){'));
+  assert.ok(init.indexOf('applyRunState(st)') < init.indexOf('await maybeShowPendingChangelog()'));
+  assert.ok(init.indexOf('applyRunState(st)') < init.indexOf('await maybePromptUpdate()'));
+});
+
+test('a log burst queues one frame, retains the newest 500, and Clear cancels pending lines', () => {
+  const r=runner();
+  r.run('for(let i=0;i<1000;i++) appendLog({text:"Line "+i,level:"info"})');
+  assert.equal(r.frames.size, 1);
+  assert.equal(r.run('S.logTotal'), 1000);
+  assert.equal(r.run('_pendingLog.length'), 500);
+  assert.equal(r.run('_pendingLog[0].text'), 'Line 500');
+  r.get('log-body').children=[];
+  r.run('clearLog()');
+  assert.equal(r.frames.size, 0);
+  assert.equal(r.run('_pendingLog.length'), 0);
+  assert.equal(r.run('S.logTotal'), 0);
 });

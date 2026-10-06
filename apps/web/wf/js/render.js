@@ -436,14 +436,39 @@ function wfChip(ico,label,dragType,catKey){
   return chip;
 }
 
+// A fresh index belongs to one render pass. Rebuild it after graph edits rather
+// than keeping a cache that could miss in-place edge/port changes.
+function wfBuildRenderIndex(g){
+  const byId=new Map((g.nodes||[]).map(n=>[n.id,n]));
+  const incoming=new Map(), outgoing=new Map(), incomingCount=new Map(), lanes=new Map();
+  for(const e of g.edges||[]){
+    let ins=incoming.get(e.to); if(!ins) incoming.set(e.to,ins=new Map());
+    const port=e.toPort||"in";
+    let arrivals=ins.get(port); if(!arrivals) ins.set(port,arrivals=[]);
+    arrivals.push(e);
+    incomingCount.set(e.to,(incomingCount.get(e.to)||0)+1);
+    let outs=outgoing.get(e.from); if(!outs) outgoing.set(e.from,outs=new Map());
+    if(!outs.has(e.fromPort)) outs.set(e.fromPort,e);
+  }
+  for(const ins of incoming.values()) for(const arrivals of ins.values()){
+    if(arrivals.length>1) arrivals.forEach((e,i)=>lanes.set(e,"lane"+((i%6)+1)));
+  }
+  return {byId,incoming,outgoing,incomingCount,lanes,selected:new Set(WF.sel||[])};
+}
 function wfRenderCanvas(){
   const world=$("wf-world"), empty=$("wf-canvas-empty"), g=wfGraph();
+  if(typeof wfNodeEls!=="undefined") wfNodeEls.clear();
   [...world.querySelectorAll(".wf-node,.wf-group")].forEach(n=>n.remove());
   wfApplyTransform();
-  if(!g){ empty.style.display="flex"; $("wf-wires").innerHTML=""; wfSyncWireSelection(); return; }
+  if(!g){ empty.style.display="flex"; wfDrawWires(); wfSyncWireSelection(); return; }
   empty.style.display="none";
   wfRenderGroups();   // frames behind the nodes
-  g.nodes.forEach(n=>world.appendChild(wfNodeEl(n)));
+  const index=wfBuildRenderIndex(g), frag=document.createDocumentFragment();
+  g.nodes.forEach(n=>{
+    const el=wfNodeEl(n,index); frag.appendChild(el);
+    if(typeof wfNodeEls!=="undefined") wfNodeEls.set(n.id,el);
+  });
+  world.appendChild(frag);
   wfDrawWires();
   wfMarkDefaultEntry();  // pill above the block that start.out points to
   wfReapplyRunViz();   // keep the run-trail across redraws (maps are empty before any run — always safe)
@@ -469,7 +494,7 @@ function wfDeclaredVars(){
 //   3. Vars produced by nodes — set_var / calc_var / read_var / parse_var each
 //      write a var via their "name" field, so we treat those names as known
 //      defaults every other block can reference. Sort alphabetically.
-const WF_VAR_PRODUCERS = {"set_var":"name","calc_var":"name","read_var":"name","parse_var":"name"};
+const WF_VAR_PRODUCERS = {"set_var":"name","calc_var":"name","read_var":"name","parse_var":"name","format_var":"name","adb_shell":"name","win_info":"name"};
 function wfGraphVarNames(g){
   const s=new Set();
   (g && g.nodes || []).forEach(n=>{
@@ -599,8 +624,13 @@ function wfRenderVarsPanel(){
       const type=document.createElement("span");type.className="wf-variable-type";type.textContent=v.type||"bool";
       const value=document.createElement("span");value.className="wf-variable-value";
       const full=prefix?prefix+"."+v.name:v.name;
-      const current=Object.hasOwn(wfLiveVars,full)?wfLiveVars[full]:v.value;
+      const scopeKey=wfVarsScope==="global"?"global":"activity";
+      const actId=(wfVarsScope==="global"||!act)?"":act.id;
+      const localEff=(typeof wfLocalEffective==="function")?wfLocalEffective(v,scopeKey,actId,full):v.value;
+      const current=Object.hasOwn(wfLiveVars,full)?wfLiveVars[full]:localEff;
+      const isLocal=(typeof wfLocalHas==="function")&&wfLocalHas(scopeKey,actId,full);
       value.textContent=Array.isArray(current)?current.join(", ")||"None":String(current??"");value.title=value.textContent;
+      if(isLocal) value.classList.add("wf-var-value-local");
       summary.append(name,type,value);details.append(summary);
       const render=()=>{document.activeElement?.blur();wfRenderVarsPanel();};
       function edit(){
@@ -776,6 +806,10 @@ function wfLocalRow(act,v,idx,render,ctx){
       rerender:()=>{ render(); if(typeof wfRenderInspector==="function") wfRenderInspector(); },
     }));
   }
+  if(typeof wfLocalValueCtl==="function"){
+    const full=(ctx.prefix?ctx.prefix+".":"")+(v.name||"");
+    card.appendChild(wfLocalValueCtl(v,"activity",act&&act.id,full));
+  }
   return card;
 }
 function wfBuildLocalChildren(act,v,container,render,depth,prefix){
@@ -889,6 +923,10 @@ function wfGlobRow(v,idx,render,ctx){
       rerender:()=>{ render(); if(typeof wfRenderInspector==="function") wfRenderInspector(); },
     }));
   }
+  if(typeof wfLocalValueCtl==="function"){
+    const full=(ctx.prefix?ctx.prefix+".":"")+(v.name||"");
+    card.appendChild(wfLocalValueCtl(v,"global","",full));
+  }
   return card;
 }
 function wfBuildGlobChildren(v,container,render,depth,prefix){
@@ -907,7 +945,7 @@ function wfBuildGlobChildren(v,container,render,depth,prefix){
 // Lightweight static checks surfaced as a "!" badge on the node — catches the two
 // mistakes that silently break a flow: an image node with no template picked, and
 // a block that has no incoming wire (so the run never reaches it).
-function wfNodeWarnings(n, def, g){
+function wfNodeWarnings(n, def, g, index){
   const w=[];
   for(const f of (def.fields||[])){
     if(f.t==="tpl" && !String(n.params[f.k]||"").trim()) w.push("No template image selected");
@@ -922,11 +960,12 @@ function wfNodeWarnings(n, def, g){
   }
   if(n.type==="and" && g){
     const expected=Math.max(1,parseInt(n.params&&n.params.count)||2);
-    const incoming=(g.edges||[]).filter(ed=>ed.to===n.id).length;
+    const incoming=index ? (index.incomingCount.get(n.id)||0) : (g.edges||[]).filter(ed=>ed.to===n.id).length;
     if(!incoming) w.push("No incoming wire - this block will never run");
     else if(incoming!==expected) w.push(`Expected ${expected} incoming branches, found ${incoming}`);
   }
-  if(def.kind!=="start" && def.kind!=="note" && n.type!=="and" && g && !(g.edges||[]).some(ed=>ed.to===n.id))
+  if(def.kind!=="start" && def.kind!=="note" && n.type!=="and" && g &&
+    !(index ? index.incomingCount.has(n.id) : (g.edges||[]).some(ed=>ed.to===n.id)))
     w.push("No incoming wire - this block will never run");
   return w;
 }
@@ -984,13 +1023,15 @@ const WF_ROW_TOP=Math.round((WF_CARD_H-WF_PORT_SZ)/2);   // primary in/out row
 function wfSlotGutter(text){
   return Math.ceil(WF_PORT_INSET + WF_PORT_SZ + 4 + text.length*5.9 + 3);
 }
-function wfWireTone(fromPort, toPort, fromNode, edge){
+function wfWireTone(fromPort, toPort, fromNode, edge, index){
   if(toPort==="loop") return "loop";
   // Fan-in: when several links converge on the same input of one block, each
   // gets its own lane hue (assigned in edge-array order, so it's stable across
   // redraws) — converging runs read as N coloured arrivals at the shared dot,
   // not N identical lines. The input dot picks up the same lane via the edge.
-  if(edge){
+  if(edge && index){
+    const lane=index.lanes.get(edge); if(lane) return lane;
+  } else if(edge){
     const edges=(wfGraph()&&wfGraph().edges)||[];
     const ins=edges.filter(e=>e.to===edge.to && (e.toPort||"in")===(edge.toPort||"in"));
     if(ins.length>1){ const i=ins.indexOf(edge); if(i>=0) return "lane"+((i%6)+1); }
@@ -1130,7 +1171,7 @@ function wfNodeSumHtml(sum, dotHtml, opts){
     : "";
   return `<span class="wf-sum-line">${dot}${wfSumMainHtml(parts.main)}</span>`+meta;
 }
-function wfNodeEl(n){
+function wfNodeEl(n, index){
   const def=WF_NODES[n.type]||{label:n.type,ico:"help",kind:"action",outs:["out"],fields:[]};
   const g=wfGraph();
   const el=document.createElement("div");
@@ -1141,7 +1182,7 @@ function wfNodeEl(n){
   // flag them so the header reserves room and the title can't slide under the labels.
   const tfCls = ((def.outs||[]).includes("true") || n.type==="switch") ? " has-tf" : "";
   const typeCls=" type-"+String(n.type||"unknown").replace(/[^a-zA-Z0-9_-]/g,"-");
-  el.className="wf-node "+def.kind+typeCls+catCls+tfCls+(WF.sel.includes(n.id)?" sel":"")+(n.id===wfRunNode?" running":"")
+  el.className="wf-node "+def.kind+typeCls+catCls+tfCls+((index?index.selected.has(n.id):WF.sel.includes(n.id))?" sel":"")+(n.id===wfRunNode?" running":"")
     +(typeof wfCallStack!=="undefined" && wfCallStack.includes(n.id)?" running-call":"")
     // Survives the run-trail reset, so re-apply it on every canvas rebuild.
     +(typeof wfIsCrashNode==="function" && wfIsCrashNode(n.id)?" crashed":"");
@@ -1251,9 +1292,10 @@ function wfNodeEl(n){
       const strip=el.querySelector(".wf-node-thumbs");
       const arr=Array.isArray(n.params[tplField.k])?n.params[tplField.k].filter(p=>String(p||"").trim()):[];
       if(!arr.length){ const e=document.createElement("span"); e.className="wf-tpl-empty"; e.textContent="(no image)"; strip.appendChild(e); }
-      arr.forEach(p=>{ const im=document.createElement("img"); im.className="wf-node-thumb-sm"; strip.appendChild(im); wfLoadThumb(im,p); });
+      arr.forEach(p=>{ const im=document.createElement("img"); im.className="wf-node-thumb-sm"; im.dataset.path=p; strip.appendChild(im); if(showThumb) wfLoadThumb(im,p); });
     } else {
-      wfLoadThumb(el.querySelector(".wf-node-thumb"), wfTplOf(n));
+      const img=el.querySelector(".wf-node-thumb"); img.dataset.path=wfTplOf(n);
+      if(showThumb) wfLoadThumb(img,wfTplOf(n));
     }
   }
   // input ports (start has none; note floats).
@@ -1265,10 +1307,11 @@ function wfNodeEl(n){
       const top = inTop(i);
       const ip=document.createElement("span");
       // Color the destination input to match the source port's semantic colour.
-      const incoming = g && (g.edges||[]).find(e=>e.to===n.id && (e.toPort||"in")===port);
-      const src = incoming && g.nodes.find(x=>x.id===incoming.from);
+      const incoming = index ? index.incoming.get(n.id)?.get(port)?.[0]
+        : g && (g.edges||[]).find(e=>e.to===n.id && (e.toPort||"in")===port);
+      const src = incoming && (index ? index.byId.get(incoming.from) : g.nodes.find(x=>x.id===incoming.from));
       const tone = port==="loop" ? "loop"
-                 : incoming ? wfWireTone(incoming.fromPort, port, src, incoming) : "";
+                 : incoming ? wfWireTone(incoming.fromPort, port, src, incoming, index) : "";
       ip.className="wf-port in"+(tone?" "+tone:"")+(incoming?" connected":"");
       ip.dataset.node=n.id; ip.dataset.port=port; ip.style.top=top+"px";
       ip.title=port==="loop"?"Loop return - drop a wire here":"Input - drop a wire here";
@@ -1283,10 +1326,11 @@ function wfNodeEl(n){
   outs.forEach((port,i)=>{
     const top = outTop(i);
     const op=document.createElement("span");
-    const outgoing = g && (g.edges||[]).find(e=>e.from===n.id && e.fromPort===port);
+    const outgoing = index ? index.outgoing.get(n.id)?.get(port)
+      : g && (g.edges||[]).find(e=>e.from===n.id && e.fromPort===port);
     // Unwired branch slots still show their own hue; a wired one follows its link
     // (a back-run into a loop port turns the whole thread amber, both ends).
-    const tone = outgoing ? wfWireTone(port, outgoing.toPort||"in", n, outgoing) : wfWireTone(port,"in", n);
+    const tone = outgoing ? wfWireTone(port, outgoing.toPort||"in", n, outgoing, index) : wfWireTone(port,"in", n);
     op.className="wf-port out"+(tone?" "+tone:"")+(outgoing?" connected":"");
     op.dataset.node=n.id; op.dataset.port=port; op.style.top=top+"px";
     op.title=(WF_PORT_LBL[port]||port)+" - drag to connect; drop on empty canvas to add a node";
@@ -1304,7 +1348,7 @@ function wfNodeEl(n){
   if(widestOut) el.style.setProperty("--slot-out", wfSlotGutter(widestOut)+"px");
   if(widestIn)  el.style.setProperty("--slot-in",  wfSlotGutter(widestIn)+"px");
   // Validation badge (missing template / not wired in) so broken flows show before a run.
-  const warns=wfNodeWarnings(n,def,wfGraph());
+  const warns=wfNodeWarnings(n,def,g,index);
   if(warns.length){ el.classList.add("has-warn");
     const b=document.createElement("span"); b.className="wf-node-warn"; b.textContent="!"; b.title=warns.join("\n"); el.appendChild(b); }
   // interactions — the whole node body is a drag handle (ports excluded inside wfStartMove).

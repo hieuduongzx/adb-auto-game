@@ -203,6 +203,7 @@ class ADBGameAutomation:
         last_screen: bool = False,
         case_sensitive: bool = False,
         normalize_whitespace: bool = True,
+        regex: bool = False,
         **kwargs,
     ) -> bool:
         """Return ``True`` if ``needle`` is present in the OCR output of
@@ -210,7 +211,8 @@ class ADBGameAutomation:
 
         Whitespace inside both haystack and needle is collapsed before the
         check by default, so spaces/newlines from the OCR output don't
-        break ``"0/5"`` matches.
+        break ``"0/5"`` matches. ``regex=True`` treats ``needle`` as a
+        regular expression instead (see :func:`text_matches`).
 
         Extra ``kwargs`` are forwarded to :meth:`read_text` (``lang``,
         ``config``, ``whitelist``, ``preprocess``, ``psm``).
@@ -219,6 +221,7 @@ class ADBGameAutomation:
             needle, region=region, last_screen=last_screen,
             case_sensitive=case_sensitive,
             normalize_whitespace=normalize_whitespace,
+            regex=regex,
             **kwargs,
         )[0]
 
@@ -229,6 +232,7 @@ class ADBGameAutomation:
         last_screen: bool = False,
         case_sensitive: bool = False,
         normalize_whitespace: bool = True,
+        regex: bool = False,
         **kwargs,
     ) -> Tuple[bool, str]:
         """Like :meth:`region_contains_text`, but also return the raw OCR
@@ -243,6 +247,7 @@ class ADBGameAutomation:
             screen, needle, region=region,
             case_sensitive=case_sensitive,
             normalize_whitespace=normalize_whitespace,
+            regex=regex,
             **kwargs,
         )
 

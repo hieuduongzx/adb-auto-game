@@ -29,7 +29,7 @@ const WF_GROUP_HD  = 24;   // var(--s6) — clears the group's title tab
 function wfNodesInGroup(gr){
   const g=wfGraph(); if(!g) return [];
   return g.nodes.filter(n=>{
-    const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
+    const el=wfNodeElById(n.id);
     const w=el?el.offsetWidth:156, h=el?el.offsetHeight:48;
     const cx=n.x+w/2, cy=n.y+h/2;
     return cx>=gr.x && cx<=gr.x+gr.w && cy>=gr.y && cy<=gr.y+gr.h;
@@ -53,7 +53,7 @@ function wfGroupSelection(){
   wfPushUndo();
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
   ids.forEach(id=>{ const n=wfNode(id); if(!n) return;
-    const el=document.querySelector(`.wf-node[data-node="${id}"]`);
+    const el=wfNodeElById(id);
     const w=el?el.offsetWidth:158, h=el?el.offsetHeight:52;
     x0=Math.min(x0,n.x); y0=Math.min(y0,n.y); x1=Math.max(x1,n.x+w); y1=Math.max(y1,n.y+h);
   });
@@ -68,7 +68,7 @@ function wfFitGroup(gr){
   if(!members.length){ setStatus('Group "'+gr.name+'" contains no blocks'); return; }
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
   members.forEach(n=>{
-    const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
+    const el=wfNodeElById(n.id);
     const w=el?el.offsetWidth:158, h=el?el.offsetHeight:52;
     x0=Math.min(x0,n.x); y0=Math.min(y0,n.y); x1=Math.max(x1,n.x+w); y1=Math.max(y1,n.y+h);
   });
@@ -103,7 +103,7 @@ function wfStartGroupMove(e,gr){
   if(wfGesture?.mode==="connect") return;
   if(e.button!==0 || e.target.closest(".wf-group-del")) return;
   e.stopPropagation();
-  const members=wfNodesInGroup(gr).map(n=>({id:n.id, ox:n.x, oy:n.y}));
+  const members=wfNodesInGroup(gr).map(n=>({id:n.id, ox:n.x, oy:n.y,node:n,el:wfNodeElById(n.id)}));
   wfGesture={mode:"groupmove", gr, gx:gr.x, gy:gr.y, sx:e.clientX, sy:e.clientY, members, undoPushed:false};
 }
 // Group frames deliberately have pointer-events:none so they never cover their
@@ -139,14 +139,17 @@ let wfPortSnapHit=null;   // {otherId, y} of the port line last snapped to (for 
 function wfPortAlignSnapY(dragId, topY){
   wfPortSnapHit=null;
   const dEl=wfNodeElById(dragId); if(!dEl) return topY;
-  const dOff=[...dEl.querySelectorAll(".wf-port")].map(p=>p.offsetTop+p.offsetHeight/2);
+  const dOff=wfGesture?.geometry?.get(dragId)?.portYs ||
+    [...dEl.querySelectorAll(".wf-port")].map(p=>p.offsetTop+p.offsetHeight/2);
   if(!dOff.length) return topY;
   const g=wfGraph(); if(!g) return topY;
   let bestTop=topY, bestDist=WF_PORT_SNAP+0.001, found=false;
   for(const other of g.nodes){
     if(other.id===dragId) continue;
     const oEl=wfNodeElById(other.id); if(!oEl) continue;
-    const oAbs=[...oEl.querySelectorAll(".wf-port")].map(p=>other.y+p.offsetTop+p.offsetHeight/2);
+    const offsets=wfGesture?.geometry?.get(other.id)?.portYs ||
+      [...oEl.querySelectorAll(".wf-port")].map(p=>p.offsetTop+p.offsetHeight/2);
+    const oAbs=offsets.map(y=>other.y+y);
     for(const off of dOff){
       for(const oy of oAbs){
         const need=oy-off;                 // the top that would align this pair
@@ -170,12 +173,14 @@ function wfAlignSnap(dragId, x, y, skipY){
   const out={x, y, v:null, h:null};
   const dEl=wfNodeElById(dragId), g=wfGraph();
   if(!dEl||!g) return out;
-  const dw=dEl.offsetWidth, dh=dEl.offsetHeight;
+  const dg=wfGesture?.geometry?.get(dragId);
+  const dw=dg?dg.w:dEl.offsetWidth, dh=dg?dg.h:dEl.offsetHeight;
   let bx=WF_ALIGN_SNAP+.001, by=WF_ALIGN_SNAP+.001;
   for(const o of g.nodes){
     if(o.id===dragId) continue;
     const oEl=wfNodeElById(o.id); if(!oEl) continue;
-    const ow=oEl.offsetWidth, oh=oEl.offsetHeight;
+    const og=wfGesture?.geometry?.get(o.id);
+    const ow=og?og.w:oEl.offsetWidth, oh=og?og.h:oEl.offsetHeight;
     const oxs=[o.x, o.x+ow/2, o.x+ow], dxs=[0, dw/2, dw];
     for(const ox of oxs) for(const dxo of dxs){
       const d=Math.abs((x+dxo)-ox);
@@ -235,7 +240,8 @@ function wfStartMove(e,n){
   }
   wfMarkSel(); wfRenderInspector();
   const g=wfGraph(); if(!g) return;
-  const items=ids.map(id=>{ const nn=g.nodes.find(x=>x.id===id); return nn?{id,ox:nn.x,oy:nn.y}:null; }).filter(Boolean);
+  const byId=new Map(g.nodes.map(n=>[n.id,n]));
+  const items=ids.map(id=>{ const nn=byId.get(id); return nn?{id,ox:nn.x,oy:nn.y,node:nn,el:wfNodeElById(id)}:null; }).filter(Boolean);
   wfGesture={mode:"move",items,sx:e.clientX,sy:e.clientY,dragId:n.id};
 }
 function wfCancelConnect(){
@@ -1063,6 +1069,30 @@ function wfShowDeviceMenu(btn){
   ]);
   wfMenuShowUnder(m, btn, "device");
 }
+// Pointer events can arrive much faster than the display refreshes. Keep the
+// latest position, paint once per frame, and flush before processing mouseup.
+let wfCanvasMoveFrame=null, wfCanvasMovePending=null;
+function wfFlushCanvasMove(){
+  if(wfCanvasMoveFrame!==null && typeof cancelAnimationFrame==="function") cancelAnimationFrame(wfCanvasMoveFrame);
+  wfCanvasMoveFrame=null;
+  const pending=wfCanvasMovePending; wfCanvasMovePending=null;
+  if(pending && pending.gesture===wfGesture) pending.move(pending.event);
+}
+function wfQueueCanvasMove(event,move){
+  if(!wfGesture) return;
+  if(typeof requestAnimationFrame!=="function"){ move(event); return; }
+  wfCanvasMovePending={event,move,gesture:wfGesture};
+  if(wfCanvasMoveFrame===null) wfCanvasMoveFrame=requestAnimationFrame(wfFlushCanvasMove);
+}
+function wfCaptureDragGeometry(){
+  const geometry=new Map(),g=wfGraph();
+  for(const n of g?.nodes||[]){
+    const el=wfNodeElById(n.id); if(!el) continue;
+    geometry.set(n.id,{w:el.offsetWidth,h:el.offsetHeight,
+      portYs:[...el.querySelectorAll(".wf-port")].map(p=>p.offsetTop+p.offsetHeight/2)});
+  }
+  return geometry;
+}
 function wfInitCanvas(){
   if(wfCanvasReady) return; wfCanvasReady=true;
   const canvas=$("wf-canvas");
@@ -1190,7 +1220,7 @@ function wfInitCanvas(){
     wfRenderCanvas(); wfRenderInspector();
     wfPopNodes([node.id]);   // brief arrival fade on the fresh block
   });
-  document.addEventListener("mousemove",e=>{
+  const move=e=>{
     if(!wfGesture) return;
     if(wfGesture.mode==="move"){
       // Snap the lead node, then shift the whole selection by the SAME delta.
@@ -1199,8 +1229,10 @@ function wfInitCanvas(){
       const dx0=(e.clientX-wfGesture.sx)/wfZoom, dy0=(e.clientY-wfGesture.sy)/wfZoom;
       // Only flag as dragging after a real move (not just a click).
       if(!wfGesture._moving && (Math.abs(dx0)>1||Math.abs(dy0)>1)){
+        wfPushUndo();  // snapshot the original positions, before the first move
         wfGesture._moving=true;
-        wfGesture.items.forEach(it=>{ const el=document.querySelector(`.wf-node[data-node="${it.id}"]`); if(el) el.classList.add("wf-dragging"); });
+        if(wfGesture.items.length===1 && wfAlignOn) wfGesture.geometry=wfCaptureDragGeometry();
+        wfGesture.items.forEach(it=>{ if(it.el) it.el.classList.add("wf-dragging"); });
       }
       if(!wfGesture._moving) return;
       const rawX=lead.ox+(e.clientX-wfGesture.sx)/wfZoom;
@@ -1230,14 +1262,14 @@ function wfInitCanvas(){
       }
       const dx=sx-lead.ox, dy=sy-lead.oy;
       wfGesture.items.forEach(it=>{
-        const n=wfNode(it.id); if(!n) return;
+        const n=it.node||wfNode(it.id); if(!n) return;
         n.x=it.ox+dx; n.y=it.oy+dy;
-        const el=document.querySelector(`.wf-node[data-node="${n.id}"]`);
+        const el=it.el||wfNodeElById(n.id);
         if(el){ el.style.left=n.x+"px"; el.style.top=n.y+"px"; }
       });
       if(wfGesture.items.length===1 && !e.altKey && wfAlignOn) wfShowAlignGuides(wfGesture.dragId, alignHit, portSnapped);
       else wfHideAlignGuides();
-      wfDrawWires();
+      wfDrawWires(wfGesture.items.map(it=>it.id));
     } else if(wfGesture.mode==="groupmove"){
       // Move the frame + every node that was inside it when the drag began.
       // Snap the group frame first, then apply the same snapped delta to members
@@ -1252,9 +1284,9 @@ function wfInitCanvas(){
       const sdx=gr.x-wfGesture.gx, sdy=gr.y-wfGesture.gy;
       const gel=document.querySelector(`.wf-group[data-group="${gr.id}"]`);
       if(gel){ gel.style.left=gr.x+"px"; gel.style.top=gr.y+"px"; }
-      wfGesture.members.forEach(m=>{ const n=wfNode(m.id); if(!n) return; n.x=m.ox+sdx; n.y=m.oy+sdy;
-        const el=document.querySelector(`.wf-node[data-node="${m.id}"]`); if(el){ el.style.left=n.x+"px"; el.style.top=n.y+"px"; } });
-      wfDrawWires();
+      wfGesture.members.forEach(m=>{ const n=m.node||wfNode(m.id); if(!n) return; n.x=m.ox+sdx; n.y=m.oy+sdy;
+        const el=m.el||wfNodeElById(m.id); if(el){ el.style.left=n.x+"px"; el.style.top=n.y+"px"; } });
+      wfDrawWires(wfGesture.members.map(m=>m.id));
     } else if(wfGesture.mode==="groupresize"){
       const gr=wfGesture.gr;
       gr.w=Math.max(80, wfSnap(wfGesture.ow+(e.clientX-wfGesture.sx)/wfZoom));
@@ -1282,8 +1314,10 @@ function wfInitCanvas(){
       const tid=wfNodeUnderPointer(e.clientX,e.clientY);
       wfHighlightTarget(tid && tid!==wfGesture.from ? tid : null);
     }
-  });
+  };
+  document.addEventListener("mousemove",e=>wfQueueCanvasMove(e,move));
   document.addEventListener("mouseup",e=>{
+    wfFlushCanvasMove();
     if(!wfGesture) return;
     if(wfGesture.mode==="connect"){
       if(e.button!==0) return;
@@ -1341,8 +1375,7 @@ function wfInitCanvas(){
       const moved=Math.abs(e.clientX-wfGesture.sx)+Math.abs(e.clientY-wfGesture.sy)>3;
       // Only a real drag suppresses the action bar (wf-dragdone). A plain click
       // must leave the bar visible on the freshly selected block.
-      if(moved) wfGesture.items.forEach(it=>{ const el=document.querySelector(`.wf-node[data-node="${it.id}"]`); if(el) el.classList.add("wf-dragdone"); });
-      if(moved) wfPushUndo();  // plain move — push before the final render
+      if(moved) wfGesture.items.forEach(it=>{ const el=it.el||wfNodeElById(it.id); if(el) el.classList.add("wf-dragdone"); });
     } else if(wfGesture.mode==="pan"){
       $("wf-canvas").classList.remove("panning");
       if(wfGesture.connection){
@@ -1365,10 +1398,11 @@ function wfBoxSelectMove(e){
   const g=wfGraph(); if(!g) return;
   const hit=[];
   g.nodes.forEach(n=>{
-    const el=document.querySelector(`.wf-node[data-node="${n.id}"]`); if(!el) return;
+    const el=wfNodeElById(n.id); if(!el) return;
     const nw=el.offsetWidth, nh=el.offsetHeight;
     if(n.x < x+w && n.x+nw > x && n.y < y+h && n.y+nh > y) hit.push(n.id);
   });
-  WF.sel = wfGesture.base.concat(hit.filter(id=>!wfGesture.base.includes(id)));
+  const base=new Set(wfGesture.base);
+  WF.sel = wfGesture.base.concat(hit.filter(id=>!base.has(id)));
   wfMarkSel();
 }

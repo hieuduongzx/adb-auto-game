@@ -44,6 +44,7 @@ def text_matches(
     *,
     case_sensitive: bool = False,
     normalize_whitespace: bool = True,
+    regex: bool = False,
 ) -> bool:
     """Whether OCR output contains ``needle``.
 
@@ -51,6 +52,12 @@ def text_matches(
     comparison drops spaces entirely so ``"TOUCH TO START"`` still matches an
     OCR line that glued the words together. Punctuation stays, so a short
     token is not invented by deleting letters.
+
+    With ``regex=True`` the needle is a regular expression searched anywhere in
+    the text (like ``parse_var``), case-insensitive unless ``case_sensitive``.
+    A second pass collapses whitespace in the haystack only, so ``r"STAGE \d"``
+    still matches an OCR line that read ``STAGE\n\n 3``; the pattern itself is
+    never rewritten, so ``\s`` and character classes keep their meaning.
     """
     def norm(value: str, drop_spaces: bool) -> str:
         text = str(value or "")
@@ -59,6 +66,21 @@ def text_matches(
         if normalize_whitespace:
             text = re.sub(r"\s+", "" if drop_spaces else " ", text).strip()
         return text
+
+    if regex:
+        raw = str(haystack or "")
+        pattern = str(needle or "")
+        if not pattern.strip() or not raw:
+            return False
+        flags = 0 if case_sensitive else re.IGNORECASE
+        for candidate in ({raw} if not normalize_whitespace
+                          else {raw, re.sub(r"\s+", " ", raw).strip()}):
+            try:
+                if re.search(pattern, candidate, flags):
+                    return True
+            except re.error:
+                return False
+        return False
 
     target = norm(needle, False)
     if not target:
@@ -242,6 +264,7 @@ class OCRReader:
         region: Optional[Region] = None,
         case_sensitive: bool = False,
         normalize_whitespace: bool = True,
+        regex: bool = False,
         **kwargs,
     ) -> Tuple[bool, str]:
         text = self.read_text(screen, region=region, **kwargs)
@@ -253,6 +276,7 @@ class OCRReader:
             text, needle,
             case_sensitive=case_sensitive,
             normalize_whitespace=normalize_whitespace,
+            regex=regex,
         ), text
 
     def contains_text(self, screen, needle, region=None, **kwargs) -> bool:

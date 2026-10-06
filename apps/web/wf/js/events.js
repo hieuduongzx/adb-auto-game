@@ -442,6 +442,7 @@ async function wfNew(){
   wfSyncSpeedUI();
   if(typeof wfSyncControllerUI==="function") wfSyncControllerUI();
   try{ await api().workflow_new(WF.name); }catch{}
+  if(typeof wfResetLocalVars==="function") wfResetLocalVars();
   wfAddActivity("sequence");   // seed one activity so the canvas isn't empty
   await wfSave();              // auto-create workflow.json inside the named folder
   const tag = controller==="win32" ? ("Win32 · "+inputMode) : ("ADB · "+capture);

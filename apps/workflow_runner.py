@@ -17,8 +17,10 @@ Run::
 from __future__ import annotations
 
 import base64
+import copy
 import datetime
 import json
+import math
 import os
 import shutil
 import sys
@@ -68,7 +70,7 @@ from src.utils import (
     webview_storage_path,
 )
 from src.version import APP_VERSION
-from src.workflow import WorkflowEngine
+from src.workflow import WorkflowEngine, NODE_TYPES
 
 # In a frozen build, writable resources (data/) live under data_root() — next to
 # the app when writable, else %LOCALAPPDATA% (read-only Program Files install).
@@ -183,6 +185,7 @@ class WorkflowRunnerAPI:
         self._runner_config: Dict[str, Any] = {}
         self._runner_config_path: Optional[str] = None
         self._runner_config_lock = threading.RLock()
+        self._run_request_lock = threading.Lock()
         # win32.path as the workflow ships it — what a cleared override falls back to.
         self._flow_game_path = ""
         # emulator.{kind,path} as the workflow ships it — default for the
@@ -199,6 +202,8 @@ class WorkflowRunnerAPI:
         # tracked here, per run, and reset by every run entry point.
         self._run_id = 0
         self._run_active = False
+        self._run_scope: Optional[List[str]] = None
+        self._run_started_at = 0.0
         self._stop_intent = False
         self._run_failed = False
         self._run_counts: Dict[str, int] = {"completed": 0, "failed": 0, "stopped": 0}
@@ -220,6 +225,7 @@ class WorkflowRunnerAPI:
         self._refresh_hz = 6.0
         self._refresh_thread: Optional[threading.Thread] = None
         self._capture_lock = threading.Lock()
+        self._capture_request_lock = threading.Lock()
         # Last time the preview tried to (re)attach the Win32 window — see
         # _grab_frame; a missing window is retried at most every 2 s.
         self._win32_attach_at = 0.0
@@ -326,13 +332,20 @@ class WorkflowRunnerAPI:
 
     def _running_payload(self) -> dict:
         payload = {"running": self.engine.is_running(), "paused": self.engine.is_paused()}
+        payload["runScope"] = self._run_scope
+        payload["startedAt"] = self._run_started_at
         payload.update(self._outcome_fields())
         return payload
 
     def _on_engine_start(self) -> None:
         self._run_id += 1
         self._run_active = True
-        self._act_status = {}
+        self._run_started_at = time.time()
+        activities = self.flow.get("activities", []) or []
+        ids = self._run_scope if self._run_scope is not None else [str(a.get("id")) for a in activities]
+        for activity_id in ids:
+            self._act_status[activity_id] = "pending"
+            self._push("activity_update", {"id": activity_id, "status": "pending"})
         self._reset_run_tracking()
         self._outcome = None
         self._push("running_state", self._running_payload())
@@ -531,7 +544,7 @@ class WorkflowRunnerAPI:
                     prefix="config.", suffix=".tmp", dir=folder,
                 )
                 with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                    json.dump(cfg, fh, ensure_ascii=False, indent=2)
+                    json.dump(cfg, fh, ensure_ascii=False, indent=2, allow_nan=False)
                 os.replace(tmp, self._runner_config_path)
                 return True
             except Exception as exc:
@@ -542,6 +555,29 @@ class WorkflowRunnerAPI:
                         pass
                 log_warning(f"Couldn't save Runner config: {exc}")
                 return False
+
+    def _persist_runner_config(self, changes: dict, remove=()) -> bool:
+        """Commit overrides before applying them to the live workflow.
+
+        Keys are paths into the config, e.g. ("activities", id, "enabled").
+        A failed atomic write restores the previous config too, so a later
+        successful edit cannot accidentally save an earlier refused edit.
+        """
+        with self._runner_config_lock:
+            previous = copy.deepcopy(self._runner_config)
+            for path, value in changes.items():
+                target = self._runner_config
+                for key in path[:-1]:
+                    if not isinstance(target.get(key), dict):
+                        target[key] = {}
+                    target = target[key]
+                target[path[-1]] = copy.deepcopy(value)
+            for key in remove:
+                self._runner_config.pop(key, None)
+            if self._save_runner_config():
+                return True
+            self._runner_config = previous
+            return False
 
     def _apply_runner_config(self) -> None:
         """Overlay only values explicitly edited in Runner onto workflow data."""
@@ -698,10 +734,15 @@ class WorkflowRunnerAPI:
         params = node.get("params") or {}
         return str(params.get("pathSrc") or "").strip().lower() != "custom"
 
-    def _graph_nodes(self, activity_ids: Optional[List[str]] = None) -> List[dict]:
-        """Every node a run of these activities (all when ``None``) can reach,
-        following function calls."""
-        functions = {f.get("id"): f for f in (self.flow.get("functions") or []) if f.get("id")}
+    def _graph_nodes(self, activity_ids: Optional[List[str]] = None,
+                     *, reachable_only: bool = False) -> List[dict]:
+        """Scan activity graphs and called functions without recursive calls.
+
+        Settings include all nodes. Preflight uses only paths from Start,
+        respecting terminal nodes and the engine's first-wire-per-port rule.
+        Branch conditions are evaluated at runtime, so all possible exits count.
+        """
+        functions = {str(f.get("id")): f for f in (self.flow.get("functions") or []) if f.get("id")}
         acts = list(self.flow.get("activities") or [])
         if activity_ids is not None:
             wanted = {str(a) for a in activity_ids}
@@ -709,17 +750,37 @@ class WorkflowRunnerAPI:
         found: List[dict] = []
         seen_functions: set = set()
 
-        def scan(graph: dict) -> None:
-            for node in (graph or {}).get("nodes", []) or []:
+        pending = [act.get("graph") or {} for act in reversed(acts)]
+        while pending:
+            graph = pending.pop()
+            graph_nodes = graph.get("nodes", []) or []
+            if reachable_only:
+                by_id = {n.get("id"): n for n in graph_nodes}
+                start = next((n for n in by_id.values() if n.get("type") == "start"), None)
+                edges = WorkflowEngine._build_adjacency(graph.get("edges", []) or [])
+                outgoing = {}
+                for (source, port), targets in edges.items():
+                    if targets:
+                        outgoing.setdefault(source, []).append(targets[0])
+                reachable, queue = set(), [start.get("id")] if start else []
+                while queue:
+                    nid = queue.pop()
+                    if nid in reachable or nid not in by_id:
+                        continue
+                    reachable.add(nid)
+                    node = by_id[nid]
+                    kind = NODE_TYPES.get(node.get("type"), {}).get("kind")
+                    if kind in ("end", "stop"):
+                        continue
+                    queue.extend(outgoing.get(nid, []))
+                graph_nodes = [n for n in by_id.values() if n.get("id") in reachable]
+            for node in graph_nodes:
                 found.append(node)
                 if node.get("type") == "call":
                     fn_id = str((node.get("params") or {}).get("fn") or "")
                     if fn_id in functions and fn_id not in seen_functions:
                         seen_functions.add(fn_id)
-                        scan(functions[fn_id].get("graph") or {})
-
-        for act in acts:
-            scan(act.get("graph") or {})
+                        pending.append(functions[fn_id].get("graph") or {})
         return found
 
     def _game_path_status(self) -> dict:
@@ -749,7 +810,7 @@ class WorkflowRunnerAPI:
         game = str((self.flow.get("win32") or {}).get("path") or "").strip()
         problems: List[dict] = []
         seen: set = set()
-        for node in self._graph_nodes(activity_ids):
+        for node in self._graph_nodes(activity_ids, reachable_only=True):
             if node.get("type") != "win_launch" or node.get("id") in seen:
                 continue
             seen.add(node.get("id"))
@@ -1032,13 +1093,15 @@ class WorkflowRunnerAPI:
         return "win32" if raw == "win32" else "adb"
 
     def set_capture_backend(self, backend: str) -> dict:
-        selected = set_capture_backend(backend)
-        if self.flow:
-            with self._runner_config_lock:
-                self._runner_config["capture"] = selected
-                self._save_runner_config()
+        selected = str(backend or "").strip().lower()
+        if selected not in CAPTURE_BACKENDS:
+            selected = get_capture_backend()
+        with self._runner_config_lock:
+            if self.flow and not self._persist_runner_config({("capture",): selected}):
+                return {"ok": False, "backend": get_capture_backend(), "backends": list(CAPTURE_BACKENDS)}
+            selected = set_capture_backend(selected)
         self._push("capture_backend", {"backend": selected})
-        return {"backend": selected, "backends": list(CAPTURE_BACKENDS)}
+        return {"ok": True, "backend": selected, "backends": list(CAPTURE_BACKENDS)}
 
     def _find_node(self, node_id: str) -> Optional[dict]:
         """Find a node across activity and function graphs by its stable id."""
@@ -1115,6 +1178,7 @@ class WorkflowRunnerAPI:
                 "name": a.get("name") or a.get("id"),
                 "type": a.get("type", "sequence"),
                 "enabled": a.get("enabled", True),
+                "status": self._act_status.get(str(a.get("id")), "pending"),
                 "pollInterval": a.get("pollInterval", 1.0),
                 "maxRetries": a.get("maxRetries", 1),
                 "nodeCount": len(graph.get("nodes", []) or []),
@@ -1196,39 +1260,40 @@ class WorkflowRunnerAPI:
                 log_warning(f"Couldn't select device: {exc}")
 
     def start(self) -> bool:
-        # Cleared even when this Start is refused below, so a blocked run can't
-        # leave the previous run's outcome flags behind (see _begin_run).
-        self._begin_run()
-        if not self.flow:
-            log_warning("No workflow loaded — open this Runner from the Macro2k Hub")
-            return False
-        if self._blocked_by_launch_paths(None):
-            return False
-        self._select_run_device()
-        # Reset UI activity statuses.
-        for a in self._activities_payload():
-            self._push("activity_update", {"id": a["id"], "status": "pending"})
-        # Re-check the Unity Bridge now: the operator usually starts the game
-        # right before pressing Start, so this is when it matters.
-        self._push_bridge_status(force=True)
-        return self.engine.start(background=True)
+        return self._request_run(None)
 
     def run_activity(self, activity_id: str) -> bool:
         """Run a single activity on its own, whether or not it is enabled.
 
         A sequence activity runs once; a background activity loops until Stop."""
-        self._begin_run()
-        if not self.flow:
-            log_warning("No workflow loaded — open this Runner from the Macro2k Hub")
+        return self._request_run([str(activity_id or "")])
+
+    def _request_run(self, scope: Optional[List[str]]) -> bool:
+        # pywebview dispatches API calls on separate threads. Reserve the entire
+        # preflight/readiness interval, before engine.running becomes True.
+        if not self._run_request_lock.acquire(blocking=False):
             return False
-        if self.engine.is_running():
-            log_warning("Stop the current run before running a single activity")
-            return False
-        if self._blocked_by_launch_paths([str(activity_id or "")]):
-            return False
-        self._select_run_device()
-        self._push("activity_update", {"id": str(activity_id), "status": "pending"})
-        return self.engine.start_activity(str(activity_id or ""))
+        try:
+            if self._run_live():
+                log_warning("Stop the current run before starting another")
+                return False
+            self._begin_run()
+            if not self.flow:
+                log_warning("No workflow loaded — open this Runner from the Macro2k Hub")
+                return False
+            if scope and not any(str(a.get("id")) == scope[0]
+                                 for a in self.flow.get("activities", []) or []):
+                return False
+            if self._blocked_by_launch_paths(scope):
+                return False
+            self._select_run_device()
+            self._run_scope = scope
+            if scope is None:
+                self._push_bridge_status(force=True)
+                return self.engine.start(background=True)
+            return self.engine.start_activity(scope[0])
+        finally:
+            self._run_request_lock.release()
 
     def stop(self) -> bool:
         """Stop the run — recorded as a Stop, not a failure.
@@ -1253,16 +1318,22 @@ class WorkflowRunnerAPI:
     def toggle_activity(self, activity_id: str, enabled: bool) -> bool:
         for a in self.flow.get("activities", []) or []:
             if a.get("id") == activity_id:
-                a["enabled"] = bool(enabled)
+                if (enabled and a.get("type") == "background" and self.engine.is_running()
+                        and self.engine.background_stopping(activity_id)):
+                    log_warning("Background is still stopping — wait for its current action")
+                    return False
                 with self._runner_config_lock:
-                    self._activity_runner_config(activity_id)["enabled"] = bool(enabled)
-                    self._save_runner_config()
+                    if not self._persist_runner_config({("activities", str(activity_id), "enabled"): bool(enabled)}):
+                        return False
+                    a["enabled"] = bool(enabled)
                 # Background workers can be toggled live while running.
                 if a.get("type") == "background" and self.engine.is_running():
                     if enabled:
                         self.engine.start_background(a)
                     else:
                         self.engine.stop_background(activity_id)
+                        self._act_status[str(activity_id)] = "stopped"
+                        self._push("activity_update", {"id": activity_id, "status": "stopped"})
                 state = "enabled" if enabled else "disabled"
                 activity_name = str(a.get("name") or activity_id)
                 log_info(f"Activity {state} — {activity_name}")
@@ -1271,15 +1342,18 @@ class WorkflowRunnerAPI:
 
     def set_interval(self, activity_id: str, interval: float) -> bool:
         try:
-            value = max(0.05, float(interval))
+            value = float(interval)
+            if not math.isfinite(value):
+                return False
+            value = max(0.05, value)
         except (TypeError, ValueError):
             return False
         for a in self.flow.get("activities", []) or []:
             if a.get("id") == activity_id:
-                a["pollInterval"] = value
                 with self._runner_config_lock:
-                    self._activity_runner_config(activity_id)["pollInterval"] = value
-                    self._save_runner_config()
+                    if not self._persist_runner_config({("activities", str(activity_id), "pollInterval"): value}):
+                        return False
+                    a["pollInterval"] = value
                 return True
         return False
 
@@ -1291,14 +1365,14 @@ class WorkflowRunnerAPI:
         touched. Returns ``{"ok", "retries"}``."""
         try:
             retries = max(1, int(float(value)))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return {"ok": False, "retries": 1}
         for a in self.flow.get("activities", []) or []:
             if a.get("id") == activity_id:
-                a["maxRetries"] = retries
                 with self._runner_config_lock:
-                    self._activity_runner_config(activity_id)["retries"] = retries
-                    self._save_runner_config()
+                    if not self._persist_runner_config({("activities", str(activity_id), "retries"): retries}):
+                        return {"ok": False, "retries": a.get("maxRetries", 1)}
+                    a["maxRetries"] = retries
                 return {"ok": True, "retries": retries}
         return {"ok": False, "retries": 1}
 
@@ -1357,15 +1431,10 @@ class WorkflowRunnerAPI:
                                 value = [o for o in options if o in value]
                             elif isinstance(value, list) or value not in options:
                                 return False
-                        v["value"] = value
                         with self._runner_config_lock:
-                            act_cfg = self._activity_runner_config(activity_id)
-                            saved_vars = act_cfg.get("vars")
-                            if not isinstance(saved_vars, dict):
-                                saved_vars = {}
-                                act_cfg["vars"] = saved_vars
-                            saved_vars[str(full)] = value
-                            self._save_runner_config()
+                            if not self._persist_runner_config({("activities", str(activity_id), "vars", str(full)): value}):
+                                return False
+                            v["value"] = value
                         return True
         return False
 
@@ -1379,18 +1448,11 @@ class WorkflowRunnerAPI:
         params = node.setdefault("params", {})
         if param not in params:
             return False
-        params[param] = str(value or "").strip()
         with self._runner_config_lock:
-            nodes = self._runner_config.get("nodes")
-            if not isinstance(nodes, dict):
-                nodes = {}
-                self._runner_config["nodes"] = nodes
-            saved = nodes.get(str(node_id))
-            if not isinstance(saved, dict):
-                saved = {}
-                nodes[str(node_id)] = saved
-            saved[param] = params[param]
-            self._save_runner_config()
+            value = str(value or "").strip()
+            if not self._persist_runner_config({("nodes", str(node_id), param): value}):
+                return False
+            params[param] = value
         return True
 
     def pick_node_runtime_path(self, node_id: str, param: str,
@@ -1442,13 +1504,11 @@ class WorkflowRunnerAPI:
             return {"ok": False, "path": str((self.flow.get("win32") or {}).get("path") or "")}
         override = str(value or "").strip()
         effective = override or self._flow_game_path
-        self.engine.set_win32_path(effective)   # also writes self.flow["win32"]["path"]
         with self._runner_config_lock:
-            if override:
-                self._runner_config["win32Path"] = override
-            else:
-                self._runner_config.pop("win32Path", None)
-            self._save_runner_config()
+            if not self._persist_runner_config({("win32Path",): override} if override else {},
+                                               remove=() if override else ("win32Path",)):
+                return {"ok": False, "path": str((self.flow.get("win32") or {}).get("path") or "")}
+            self.engine.set_win32_path(effective)  # also writes self.flow["win32"]["path"]
         return {"ok": True, "path": effective, "requirements": self._requirements_payload(),
                 "gamePath": self._game_path_status()}
 
@@ -1576,21 +1636,17 @@ class WorkflowRunnerAPI:
         if index is not None:
             try:
                 idx = max(0, int(float(index)))
-            except (TypeError, ValueError):
-                idx = None
-        self.engine.set_emulator_config(kind, path, idx)
-        cur = self.flow.get("emulator")
-        eff_index = cur.get("index", 0) if isinstance(cur, dict) else 0
+            except (TypeError, ValueError, OverflowError):
+                return {"ok": False, "emulator": dict(self.flow.get("emulator") or {})}
         with self._runner_config_lock:
-            emu = self._runner_config.get("emulator")
-            if not isinstance(emu, dict):
-                emu = {}
-                self._runner_config["emulator"] = emu
-            emu["kind"] = kind
-            emu["path"] = path
+            changes = {("emulator", "kind"): kind, ("emulator", "path"): path}
             if idx is not None:
-                emu["index"] = idx
-            self._save_runner_config()
+                changes[("emulator", "index")] = idx
+            if not self._persist_runner_config(changes):
+                return {"ok": False, "emulator": dict(self.flow.get("emulator") or {})}
+            self.engine.set_emulator_config(kind, path, idx)
+            cur = self.flow.get("emulator")
+            eff_index = cur.get("index", 0) if isinstance(cur, dict) else 0
         return {"ok": True, "emulator": {"kind": kind, "path": path, "index": eff_index},
                 "emulatorDefault": self._flow_emulator}
 
@@ -1613,20 +1669,25 @@ class WorkflowRunnerAPI:
         the new sequence order on the next run. Ignored while a run is in
         progress to avoid mutating the list mid-iteration.
         """
-        if self.engine.is_running():
+        if self._run_live():
             log_warning("Activities can't be reordered while running")
             return False
         acts = self.flow.get("activities") or []
         by_id = {a.get("id"): a for a in acts}
-        new_order = [by_id[i] for i in ordered_ids if i in by_id]
+        new_order, seen = [], set()
+        for activity_id in ordered_ids:
+            if activity_id in by_id and activity_id not in seen:
+                seen.add(activity_id)
+                new_order.append(by_id[activity_id])
         # Append any activity not mentioned (defensive), keeping its relative order.
         for a in acts:
             if a not in new_order:
                 new_order.append(a)
-        acts[:] = new_order
         with self._runner_config_lock:
-            self._runner_config["order"] = [str(a.get("id")) for a in acts if a.get("id")]
-            self._save_runner_config()
+            order = [str(a.get("id")) for a in new_order if a.get("id")]
+            if not self._persist_runner_config({("order",): order}):
+                return False
+            acts[:] = new_order
         return True
 
     # ── Speedhack (live scale slider) ─────────────────────────────────────────
@@ -1639,43 +1700,41 @@ class WorkflowRunnerAPI:
         config so the next Start picks it up.
         """
         try:
+            changes = {("speedhack", "enabled"): bool(enabled)}
+            if speed is not None:
+                speed = float(speed)
+                if not math.isfinite(speed) or speed <= 0:
+                    return {**self.engine.speedhack_info(), "ok": False}
+                changes[("speedhack", "speed")] = speed
+            if not self._persist_runner_config(changes):
+                return {**self.engine.speedhack_info(), "ok": False}
             self.engine.configure_speedhack(
                 enabled=bool(enabled),
                 speed=speed,
                 package=package,
             )
-            with self._runner_config_lock:
-                saved = self._runner_config.get("speedhack")
-                if not isinstance(saved, dict):
-                    saved = {}
-                    self._runner_config["speedhack"] = saved
-                saved["enabled"] = bool(enabled)
-                if speed is not None:
-                    saved["speed"] = float(speed)
-                self._save_runner_config()
         except Exception as exc:
             log_error(f"Speed hack failed: {exc}")
+            return {**self.engine.speedhack_info(), "ok": False}
         info = self.engine.speedhack_info()
         self._push("speedhack_update", info)
-        return info
+        return {**info, "ok": True}
 
     def set_speed_scale(self, scale: float) -> dict:
         """Change the live time scale while a run is in progress."""
         try:
             value = float(scale)
+            if not math.isfinite(value) or value <= 0:
+                return {**self.engine.speedhack_info(), "ok": False}
+            if not self._persist_runner_config({("speedhack", "speed"): value}):
+                return {**self.engine.speedhack_info(), "ok": False}
             self.engine.set_speed_scale(value)
-            with self._runner_config_lock:
-                saved = self._runner_config.get("speedhack")
-                if not isinstance(saved, dict):
-                    saved = {}
-                    self._runner_config["speedhack"] = saved
-                saved["speed"] = value
-                self._save_runner_config()
         except Exception as exc:
             log_error(f"Speed hack failed: {exc}")
+            return {**self.engine.speedhack_info(), "ok": False}
         info = self.engine.speedhack_info()
         self._push("speedhack_update", info)
-        return info
+        return {**info, "ok": True}
 
     def clear_log(self) -> bool:
         self._log_buffer.clear()
@@ -1788,7 +1847,19 @@ class WorkflowRunnerAPI:
         """Fire-and-forget frame push, so the page never blocks on a capture."""
         if self._window is None or self._closing:
             return False
-        threading.Thread(target=self._capture_once, daemon=True).start()
+        # A slow capture must not queue a new thread for every repeated click.
+        if not self._capture_request_lock.acquire(blocking=False):
+            return False
+        def capture_pending():
+            try:
+                self._capture_once()
+            finally:
+                self._capture_request_lock.release()
+        try:
+            threading.Thread(target=capture_pending, daemon=True).start()
+        except Exception:
+            self._capture_request_lock.release()
+            raise
         return True
 
     def _capture_once(self) -> None:
