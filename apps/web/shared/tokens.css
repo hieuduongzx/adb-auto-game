@@ -24,8 +24,8 @@
   --primitive-neutral-950: #121417;
   --primitive-teal-50: #e3f2f3;
   --primitive-teal-200: #a9d6da;
-  --primitive-teal-600: #0e7c86;
-  --primitive-teal-700: #0a6770;
+  --primitive-teal-600: #0b737c;
+  --primitive-teal-700: #095f67;
 
   /* Layer 2 — role-based values. Theme overrides happen at this layer. */
   --semantic-app-bg: var(--primitive-neutral-50);
@@ -87,8 +87,8 @@
   --warn:         #9a6414;
   --warn-bg:      #fbf3e4;
   --warn-bd:      #e8d2a6;
-  --err:          #c2412d;
-  --err-hover:    #a8361f;
+  --err:          #b83a26;
+  --err-hover:    #9f311f;
   --err-bg:       #fbece9;
   --err-bd:       #f0c6be;
 

@@ -24,9 +24,10 @@ unattended.
 
 Compact, calm, utilitarian. IBM Plex Sans/Mono, light theme, dense but tidy.
 Colour is "Graphite + Teal" (October 2026): true neutral greys, one deep teal
-signal accent (#0e7c86 light / #3cc4cf dark) for selection, focus and the
+signal accent (#0b737c light / #3cc4cf dark) for selection, focus and the
 primary non-run action; green stays reserved for Run/success, indigo for
-Win32. Every text use of a state hue clears 4.5:1.
+Win32. Every text use of a state hue clears 4.5:1 on the surfaces it sits on
+(checked against the rendered tokens in both themes, October 2026).
 The tool disappears into the task; state (running / paused / connected) is
 always readable at a glance from across the desk.
 
