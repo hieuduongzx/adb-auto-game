@@ -489,7 +489,7 @@
               "y": 846,
               "taps": "1"
             },
-            "delay": 10
+            "delay": 5
           },
           {
             "id": "nndpqedp",
@@ -5632,6 +5632,24 @@
               "multiple": false
             }
           ]
+        },
+        {
+          "name": "jewel_designer",
+          "label": "Jewel Designer",
+          "type": "bool",
+          "value": false,
+          "options": [],
+          "multiple": false,
+          "children": [
+            {
+              "name": "done",
+              "label": "Done",
+              "type": "bool",
+              "value": false,
+              "options": [],
+              "multiple": false
+            }
+          ]
         }
       ],
       "graph": {
@@ -5639,22 +5657,22 @@
           {
             "id": "nl1tx6km",
             "type": "start",
-            "x": -48,
-            "y": -40,
+            "x": -960,
+            "y": -776,
             "params": {}
           },
           {
             "id": "nl0eghcs",
             "type": "end",
-            "x": 736,
-            "y": 136,
+            "x": -176,
+            "y": -600,
             "params": {}
           },
           {
             "id": "nij39omx",
             "type": "call",
-            "x": 32,
-            "y": -48,
+            "x": -880,
+            "y": -784,
             "params": {
               "fn": "fn_yt9m6"
             },
@@ -5663,8 +5681,8 @@
           {
             "id": "nt1m0dej",
             "type": "tap",
-            "x": 208,
-            "y": -45,
+            "x": -704,
+            "y": -781,
             "params": {
               "target": "pos",
               "x": 260,
@@ -5676,8 +5694,8 @@
           {
             "id": "nbrs6gpm",
             "type": "swipe",
-            "x": 560,
-            "y": -45,
+            "x": -352,
+            "y": -781,
             "params": {
               "x1": 1158,
               "y1": 140,
@@ -5693,8 +5711,8 @@
           {
             "id": "nxuysbnn",
             "type": "loop",
-            "x": 384,
-            "y": -45,
+            "x": -528,
+            "y": -781,
             "params": {
               "infinite": false,
               "count": 3
@@ -5704,8 +5722,8 @@
           {
             "id": "nwr52ryq",
             "type": "swipe",
-            "x": 736,
-            "y": 44,
+            "x": -176,
+            "y": -692,
             "params": {
               "x1": 1314,
               "y1": 339,
@@ -5721,8 +5739,8 @@
           {
             "id": "n99nlha8",
             "type": "loop",
-            "x": 560,
-            "y": 44,
+            "x": -352,
+            "y": -692,
             "params": {
               "infinite": false,
               "count": 8
@@ -5771,8 +5789,8 @@
           {
             "id": "n7qp5aqb",
             "type": "sequence",
-            "x": 912,
-            "y": 44,
+            "x": 40,
+            "y": -692,
             "params": {
               "count": 10
             }
@@ -6168,8 +6186,8 @@
           {
             "id": "nheckez7",
             "type": "if_var",
-            "x": -160,
-            "y": 704,
+            "x": -496,
+            "y": -160,
             "params": {
               "name": "big_bang",
               "op": "==",
@@ -6179,8 +6197,8 @@
           {
             "id": "n1ts4dw7",
             "type": "if_var",
-            "x": 16,
-            "y": 704,
+            "x": -320,
+            "y": -160,
             "params": {
               "name": "big_bang.done",
               "op": "==",
@@ -6190,8 +6208,8 @@
           {
             "id": "n8h0ctet",
             "type": "if_image",
-            "x": 192,
-            "y": 704,
+            "x": -144,
+            "y": -160,
             "params": {
               "template": "templates/crop_20260919_225112_1268_458_244_129.png",
               "threshold": 0.85,
@@ -6201,8 +6219,8 @@
           {
             "id": "n9oe6f51",
             "type": "tap_image",
-            "x": 368,
-            "y": 704,
+            "x": 32,
+            "y": -160,
             "params": {
               "template": "templates/crop_20260919_225112_1268_458_244_129.png",
               "taps": "1",
@@ -6215,8 +6233,8 @@
           {
             "id": "npp6icrh",
             "type": "sequence_tap",
-            "x": 720,
-            "y": 704,
+            "x": 384,
+            "y": -160,
             "params": {
               "points": [
                 {
@@ -6255,8 +6273,8 @@
           {
             "id": "nwxzz0n0",
             "type": "sequence_tap",
-            "x": 896,
-            "y": 704,
+            "x": 560,
+            "y": -160,
             "params": {
               "points": [
                 {
@@ -6285,8 +6303,8 @@
           {
             "id": "n147x57n",
             "type": "call",
-            "x": 1072,
-            "y": 704,
+            "x": 736,
+            "y": -160,
             "params": {
               "fn": "fn_yt9m6"
             }
@@ -6710,8 +6728,8 @@
           {
             "id": "npjw7o1d",
             "type": "if_image",
-            "x": 544,
-            "y": 704,
+            "x": 208,
+            "y": -160,
             "params": {
               "template": "templates/crop_20260921_014105_1615_860_145_51.png",
               "threshold": 0.85,
@@ -6757,6 +6775,167 @@
             "y": -176,
             "params": {
               "fn": "fn_n3evu"
+            },
+            "delay": 1
+          },
+          {
+            "id": "n3nzmojq",
+            "type": "if_var",
+            "x": -496,
+            "y": -16,
+            "params": {
+              "name": "jewel_designer",
+              "op": "==",
+              "value": "true"
+            }
+          },
+          {
+            "id": "njg8tzwr",
+            "type": "if_var",
+            "x": -320,
+            "y": -16,
+            "params": {
+              "name": "jewel_designer.done",
+              "op": "==",
+              "value": "false"
+            }
+          },
+          {
+            "id": "nwwjgny2",
+            "type": "if_image",
+            "x": -144,
+            "y": -16,
+            "params": {
+              "template": "templates/crop_20261002_213405_1088_657_561_90.png",
+              "threshold": 0.85,
+              "negate": false
+            }
+          },
+          {
+            "id": "n38psnj7",
+            "type": "tap_image",
+            "x": 32,
+            "y": -16,
+            "params": {
+              "template": "templates/crop_20261002_213405_1088_657_561_90.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0
+            }
+          },
+          {
+            "id": "nenls77z",
+            "type": "tap_image",
+            "x": 208,
+            "y": -16,
+            "params": {
+              "template": "templates/crop_20261002_213548_202_343_34_94.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0,
+              "delayAfterFind": 0
+            },
+            "delay": 1
+          },
+          {
+            "id": "ni4by1eq",
+            "type": "tap_image",
+            "x": 384,
+            "y": -16,
+            "params": {
+              "template": "templates/crop_20261002_213600_1497_281_99_30.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0,
+              "delayAfterFind": 0
+            },
+            "delay": 1
+          },
+          {
+            "id": "nk7wx35h",
+            "type": "call",
+            "x": 560,
+            "y": -16,
+            "params": {
+              "fn": "fn_hh4kj"
+            },
+            "delay": 1
+          },
+          {
+            "id": "n7cwnirb",
+            "type": "call",
+            "x": 736,
+            "y": -16,
+            "params": {
+              "fn": "fn_n3evu"
+            },
+            "delay": 1
+          },
+          {
+            "id": "nza1jbdd",
+            "type": "loop",
+            "x": -496,
+            "y": 80,
+            "params": {
+              "infinite": true,
+              "count": 3
+            },
+            "delay": 1
+          },
+          {
+            "id": "nitlz1x2",
+            "type": "tap_image",
+            "x": -320,
+            "y": 80,
+            "params": {
+              "template": "templates/crop_20261002_214204_557_164_16_65.png",
+              "taps": "1",
+              "threshold": 0.85,
+              "timeout": 10,
+              "offsetX": 0,
+              "offsetY": 0,
+              "delayAfterFind": 0
+            },
+            "delay": 1
+          },
+          {
+            "id": "nouwb8xm",
+            "type": "if_text",
+            "x": -144,
+            "y": 80,
+            "params": {
+              "text": "",
+              "x": 695,
+              "y": 581,
+              "w": 47,
+              "h": 27,
+              "negate": false,
+              "whitelist": ""
+            },
+            "delay": 1
+          },
+          {
+            "id": "n6nknbsz",
+            "type": "parse_var",
+            "x": -160,
+            "y": 256,
+            "params": {
+              "name": "out",
+              "source": "region",
+              "fromVar": "",
+              "pattern": "(\\d+)/(\\d+)",
+              "group": 1,
+              "x": 0,
+              "y": 0,
+              "w": 200,
+              "h": 80,
+              "whitelist": ""
             },
             "delay": 1
           }
@@ -7239,6 +7418,56 @@
             "from": "ncv1uohk",
             "fromPort": "out",
             "to": "n0erxw00"
+          },
+          {
+            "from": "n3nzmojq",
+            "fromPort": "true",
+            "to": "njg8tzwr"
+          },
+          {
+            "from": "njg8tzwr",
+            "fromPort": "true",
+            "to": "nwwjgny2"
+          },
+          {
+            "from": "nwwjgny2",
+            "fromPort": "true",
+            "to": "n38psnj7"
+          },
+          {
+            "from": "n38psnj7",
+            "fromPort": "true",
+            "to": "nenls77z"
+          },
+          {
+            "from": "nenls77z",
+            "fromPort": "true",
+            "to": "ni4by1eq"
+          },
+          {
+            "from": "ni4by1eq",
+            "fromPort": "true",
+            "to": "nk7wx35h"
+          },
+          {
+            "from": "nk7wx35h",
+            "fromPort": "true",
+            "to": "n7cwnirb"
+          },
+          {
+            "from": "n7cwnirb",
+            "fromPort": "true",
+            "to": "nza1jbdd"
+          },
+          {
+            "from": "nza1jbdd",
+            "fromPort": "body",
+            "to": "nitlz1x2"
+          },
+          {
+            "from": "nitlz1x2",
+            "fromPort": "true",
+            "to": "nouwb8xm"
           }
         ],
         "groups": [
@@ -7254,8 +7483,8 @@
           {
             "id": "gltk2801",
             "name": "Big Bang",
-            "x": -176,
-            "y": 656,
+            "x": -512,
+            "y": -208,
             "w": 1424,
             "h": 144,
             "color": 1
