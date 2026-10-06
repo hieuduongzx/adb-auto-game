@@ -80,12 +80,12 @@
 .app-upd[hidden] { display: none; }
 
 /* ── Library — the shelf ──────────────────────────────────────────────────
-   Five covers across, and the width of the shelf is what sizes them: a cover
-   never shrinks to make a row fit the window's height. A window too short for
-   the rows simply scrolls (they snap to row starts), and a window too narrow
-   for five readable covers reflows to fewer columns (the `--cols` steps below)
-   rather than turning them into thumbnails. hub.js reads the laid-out column
-   count back for arrow-key navigation. */
+   Three landscape cards across: a portrait cover on the left (still the button
+   that runs the game) and the project's name, facts and actions beside it. A
+   card is ~180px tall, so a typical library is visible without scrolling.
+   The shelf's width is what sizes the cards (container query on .lib-main);
+   a window too narrow for three readable cards reflows to two, then one. hub.js
+   reads the laid-out column count back for arrow-key navigation. */
 .lib-main {
   flex: 1;
   min-height: 0;
@@ -96,10 +96,11 @@
   container-type: inline-size;
 }
 .game-grid {
-  --gap: 16px;
+  --gap: 14px;
   --gutter: 8px;        /* the scrollbar's reserved gutter */
-  --cols: 5;            /* the widest shelf — five covers across */
-  --card-max: 320px;    /* a cover stops growing once it is this wide */
+  --cols: 3;            /* the widest shelf — three cards across */
+  --card-max: 560px;    /* a card stops growing once it is this wide */
+  --cover-w: 120px;     /* 3:4 cover → 160px tall */
   --card-w: min(
     calc((100cqw - var(--gutter) - var(--gap) * (var(--cols) - 1)) / var(--cols)),
     var(--card-max)
@@ -118,45 +119,41 @@
   scroll-snap-type: y proximity;
 }
 
-/* Reflow steps — each width is the point where that many covers, the gaps
-   between them and the side padding stop leaving a cover wide enough to show
-   its name, controller and activity count without truncating them (~175px).
-   Five columns therefore survive down to 1020px — which is just under the
-   desktop window's 1040px minimum, so the shipped window is always the five
-   across shelf; a dragged-narrow, restored-smaller, touch or browser window
-   reflows. The meta line is allowed to ellipsise rather than overflow (see
-   .game-acts), which is what keeps the narrowest steps inside their card. */
-@media (max-width: 1020px) { .game-grid { --cols: 4; } }
-@media (max-width: 800px)  { .game-grid { --cols: 3; } }
-@media (max-width: 600px)  { .game-grid { --cols: 2; --gap: 12px; } }
-@media (max-width: 420px)  { .game-grid { --cols: 1; } }
+/* Reflow steps — each width is where that many cards stop leaving the text
+   column (card − cover − padding) room for a name, the controller tag and the
+   footer's Run + three tools (~200px). The desktop window's 1040px minimum
+   therefore shows two columns; a maximised 1280px+ window shows three. */
+@media (max-width: 1160px) { .game-grid { --cols: 2; } }
+@media (max-width: 760px)  { .game-grid { --cols: 1; --cover-w: 104px; } }
 
 /* ── Game card ─────────────────────────────────────────────────────────────
-   One flat white tile per game: hairline border, no shadow, no hover lift and
-   no scrim. The cover is still the button that runs the game, and under it a
-   footer shows Run and the card's tools at rest — nothing on a card has to be
-   hovered into existence to be found. */
+   One flat tile per game: hairline border, no shadow, no hover lift and no
+   scrim. Cover left (spanning the card), facts top-right, Run + tools
+   bottom-right — nothing on a card has to be hovered into existence. */
 .game {
   position: relative;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 10px;
+  display: grid;
+  grid-template-columns: var(--cover-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: 16px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: var(--panel);
   scroll-snap-align: start;
   transition: border-color .15s, background .15s;
 }
-.game { position: relative; }
 /* The hover accent is a short pill docked to the top edge — a full-width bar
    would stick out past the card's rounded corners. */
-.game::before { content: ""; position: absolute; top: -1px; left: 10px; right: 10px;
+.game::before { content: ""; position: absolute; top: -1px; left: 12px; right: 12px;
   height: 3px; border-radius: 999px; background: var(--accent); opacity: 0; transition: opacity .15s; }
 .game:hover { border-color: var(--accent-bd); }
 .game:hover::before { opacity: 1; }
 .game-cover {
   position: relative;
+  grid-column: 1;
+  grid-row: 1 / -1;
   display: block;
   width: 100%;
   aspect-ratio: 3 / 4;
@@ -178,20 +175,22 @@
 }
 
 /* ── The card's footer — Run plus the tools, on the card at all times ─────
-   Flat, one hairline each: Run is the card's primary action and reads as one
-   at rest without filling five tiles with accent. It takes the space the tools
-   do not, so it stays a comfortable target at every reflow step. */
+   Run is the card's primary action and reads as one at rest without filling
+   every card with accent; the tools sit quietly at the far end. */
 .game-foot {
+  grid-column: 2;
+  grid-row: 2;
   display: flex;
   align-items: center;
   gap: var(--s2);
-  margin-top: 10px;
-  padding: 0 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
 .game-run {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
-  height: 34px;
+  height: 32px;
+  padding: 0 16px 0 13px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -199,7 +198,7 @@
   border-radius: var(--r-sm);
   border: 1px solid var(--accent-bd);
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-hover);
   font-size: var(--t-ui);
   font-weight: 700;
   transition: background .14s, border-color .14s, color .14s;
@@ -213,6 +212,7 @@
   display: flex;
   align-items: center;
   gap: var(--s1);
+  margin-left: auto;
   flex-shrink: 0;
 }
 .game-tool {
@@ -235,15 +235,15 @@
    the cover, and the one thing on a card that reopens the build panel. */
 .game-building {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 1;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
   display: none;
   align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 9px;
-  border-radius: var(--r-sm);
+  gap: 5px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: var(--r-xs);
   border: 1px solid var(--border2);
   background: var(--panel);
   color: var(--ink2);
@@ -252,27 +252,24 @@
 }
 .game.is-building .game-building { display: inline-flex; cursor: pointer; }
 .game.is-building .game-building:hover { border-color: var(--border2); color: var(--ink); }
-.chip-pct { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+.chip-pct { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink2); }
 .build-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--warn); animation: buildPulse 1.2s ease-in-out infinite; }
 @keyframes buildPulse { 50% { opacity: .3; } }
 
+/* Facts: name + controller on one line, then activities · folder, then when
+   it was last saved. */
 .game-info {
-  min-height: 40px;
-  order: -1;
+  grid-column: 2;
+  grid-row: 1;
   min-width: 0;
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-content: center;
-  column-gap: 9px;
-  row-gap: 4px;
-  margin: 0 0 10px;
-  padding: 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 2px 0 10px;
 }
-/* The game's icon — assets/icon.*, the same art the Runner header and the built .exe use. */
+.game-title { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+/* The small icon is still drawn by iconHtmlFor() for other surfaces. */
 .game-icon {
-  grid-row: 1 / span 3;
-  grid-column: 1;
-  align-self: center;
   width: 28px;
   height: 28px;
   border-radius: var(--r-sm);
@@ -291,36 +288,37 @@
   letter-spacing: -.02em;
 }
 .game-name {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: var(--t-title);
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.25;
+  letter-spacing: -.01em;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.game-folder {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: var(--muted); font: 500 var(--t-micro)/1.2 var(--mono);
-}
-/* Both halves of the meta line are nowrap, so on the narrowest reflow steps the
-   activity count has to be the one that gives: it ellipsises from the right,
-   which keeps the number and the controller tag, and keeps the line inside the
-   card instead of running over its neighbour. At full width nothing truncates. */
 .game-meta {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--s2);
   min-width: 0;
   overflow: hidden;
   font-size: var(--t-caption);
-  color: var(--muted);
+  color: var(--dim);
 }
+.game-acts { flex-shrink: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.game-folder {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--muted); font: 500 var(--t-micro)/1.2 var(--mono);
+}
+.game-folder::before { content: "/"; margin-right: 1px; opacity: .6; }
 .ctrl-tag {
   display: inline-flex;
   align-items: center;
-  height: 17px;
-  padding: 0 5px;
+  height: 18px;
+  padding: 0 6px;
   border-radius: var(--r-xs);
   border: 1px solid transparent;
   font-size: var(--t-micro);
@@ -328,15 +326,11 @@
   letter-spacing: .02em;
   flex-shrink: 0;
 }
-.ctrl-tag.adb { color: var(--accent); background: var(--accent-bg); border-color: var(--accent-bd); }
+.ctrl-tag.adb { color: var(--ok-ink); background: var(--ok-bg); border-color: var(--ok-bd); }
 .ctrl-tag.win32 { color: var(--win32); background: var(--win32-bg); border-color: var(--win32-bd); }
-.game-acts { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .game-state {
-  grid-column: 1 / -1;
+  margin-top: auto;
   min-width: 0;
-  padding-top: 7px;
-  margin-top: 4px;
-  border-top: 1px solid var(--line);
   color: var(--muted);
   font: 500 var(--t-caption)/1.3 var(--sans);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -361,9 +355,9 @@
 #library-message-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .library-message .btn { flex-shrink: 0; }
 
-/* ── Cover slot without art — a labelled blank, tinted per game ─────────── */
+/* ── Cover slot without art — tinted per game ──────────────────────────── */
 /* Tinted with the game's own tone (--tone, the same hue as its monogram icon)
-   so a shelf of games without art still reads as different games, not as five
+   so a shelf of games without art still reads as different games, not as
    identical grey slabs. The hint names the file that would replace it. */
 .game-art-empty {
   position: absolute;
@@ -372,34 +366,38 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  background: hsl(var(--tone) 30% 93%);
-  color: hsl(var(--tone) 32% 36%);
+  gap: 10px;
+  background: hsl(var(--tone) 28% 92%);
+  color: hsl(var(--tone) 34% 34%);
 }
 :root[data-theme="dark"] .game-art-empty {
-  background: hsl(var(--tone) 18% 19%);
+  background: hsl(var(--tone) 16% 19%);
   color: hsl(var(--tone) 34% 72%);
 }
 .art-initials {
-  font-size: clamp(30px, calc(var(--card-w) * .26), 68px);
+  font-size: calc(var(--cover-w) * .3);
   font-weight: 600;
   line-height: 1;
   letter-spacing: -.04em;
 }
 .art-icon {
-  width: 42%;
+  width: 56%;
   aspect-ratio: 1;
   object-fit: cover;
   object-position: 50% 30%;
-  border-radius: var(--r-lg);
+  border-radius: var(--r-md);
   border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
   -webkit-user-drag: none;
 }
 .art-hint {
+  max-width: calc(100% - 8px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--mono);
   font-size: var(--t-micro);
   color: currentColor;
-  opacity: .72;
+  opacity: .7;
 }
 /* The cover runs the game; on hover (or keyboard focus) it says so with a play
    disc in its centre — an affordance, not a scrim: the art stays untouched. */
@@ -407,8 +405,8 @@
   content: "";
   position: absolute;
   left: 50%; top: 50%;
-  width: 52px; height: 52px;
-  margin: -26px 0 0 -26px;
+  width: 44px; height: 44px;
+  margin: -22px 0 0 -22px;
   border-radius: 50%;
   background: var(--accent);
   opacity: 0;
@@ -421,8 +419,8 @@
   position: absolute;
   left: 50%; top: 50%;
   z-index: 1;
-  width: 20px; height: 20px;
-  margin: -10px 0 0 -8px;
+  width: 18px; height: 18px;
+  margin: -9px 0 0 -7px;
   background: var(--on-accent);
   -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L7.5 3.64A1 1 0 0 0 6 4.5z'/></svg>") center / contain no-repeat;
   mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L7.5 3.64A1 1 0 0 0 6 4.5z'/></svg>") center / contain no-repeat;
@@ -435,28 +433,19 @@
 .game.skeleton .game-cover::after, .game.skeleton .game-cover::before { display: none; }
 
 /* ── Loading — two rows of placeholder cards while the list arrives ─────── */
-/* The skeleton carries the footer's boxes as well as the cover, the icon and
-   the name lines, so a row does not change height under the reader when the
-   real cards land in it. */
+/* The skeleton carries the footer's boxes as well as the cover and the text
+   lines, so a row does not change height when the real cards land in it. */
 .game.skeleton { background: var(--panel); }
 .game.skeleton:hover { border-color: var(--line); }
+.game.skeleton:hover::before { opacity: 0; }
 .game.skeleton .game-cover { cursor: default; border-color: var(--line); background: var(--alt); }
-.game.skeleton .game-info { pointer-events: none; }
-.sk-icon {
-  grid-row: 1 / span 3;
-  grid-column: 1;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--r-sm);
-  background: var(--alt);
-}
-.sk-line { display: block; width: 68%; height: 9px; border-radius: var(--r-xs); background: var(--alt); }
+.game.skeleton .game-info { pointer-events: none; gap: 9px; padding-top: 4px; }
+.sk-line { display: block; width: 68%; height: 10px; border-radius: var(--r-xs); background: var(--alt); }
 .sk-line.short { width: 40%; }
-.sk-line.run { width: auto; flex: 1 1 auto; height: 34px; border-radius: var(--r-sm); }
-.sk-dots { display: flex; gap: var(--s1); flex-shrink: 0; }
+.sk-line.run { width: 84px; flex: 0 0 auto; height: 32px; border-radius: var(--r-sm); }
+.sk-dots { display: flex; gap: var(--s1); flex-shrink: 0; margin-left: auto; }
 .sk-dot { width: 30px; height: 30px; border-radius: var(--r-sm); background: var(--alt); }
 .game.skeleton .game-cover,
-.game.skeleton .sk-icon,
 .game.skeleton .sk-line,
 .game.skeleton .sk-dot { animation: skPulse 1.4s ease-in-out infinite; }
 @keyframes skPulse { 50% { opacity: .5; } }
@@ -622,7 +611,7 @@ body.bp-open #ui-toasts { right: calc(min(580px, 100vw - 24px) + 24px); }
 /* Touch — nothing on a card is hover-gated any more, so a touch screen only
    needs bigger hit areas for the footer's controls. */
 @media (hover: none) {
-  .game-run { height: 38px; }
+  .game-run { height: 36px; }
   .game-tool { width: 34px; height: 34px; }
   .bp-x { width: 32px; height: 32px; }
 }

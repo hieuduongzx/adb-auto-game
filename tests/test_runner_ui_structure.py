@@ -153,7 +153,7 @@ def test_operator_regions_are_flat_and_only_popovers_are_elevated():
 def test_compact_pro_log_remains_a_dark_console_in_light_theme():
     css = RUNNER_CSS.read_text(encoding="utf-8")
 
-    assert "--runner-log-bg: #202730" in css
+    assert "--runner-log-bg: #1c1f23" in css
     assert ".log-body" in css and "background: var(--runner-log-bg)" in css
     assert ".log-msg" in css and "color: var(--runner-log-ink)" in css
 

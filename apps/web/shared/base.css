@@ -60,17 +60,17 @@ select {
   font-family: var(--sans); font-weight: 500; cursor: pointer;
   -webkit-appearance: none; -moz-appearance: none; appearance: none;
   padding-right: 26px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237c8795' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23818891' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
   background-repeat: no-repeat; background-position: right 8px center; background-size: 12px; }
 select:hover:not(:disabled) { border-color: var(--border2); background-color: var(--surface); }
-/* Dark theme needs its own chevron: the light-theme stroke (#7c8795) is too
+/* Dark theme needs its own chevron: the light-theme stroke (#818891) is too
    dark against dark surfaces and reads as a smudge. Same geometry, lighter ink.
    :where() keeps this at element specificity: without it the rule outranks an
    app's `background-image: none` on bare selects (DevScope's tray selects) and
    the chevron re-appears — tiled across the whole control, since their
    `background: transparent` shorthand also resets repeat/size/position. */
 :where(:root[data-theme="dark"]) select {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa7b8' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3ac' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
 }
 option { font-family: var(--sans); font-size: var(--t-body); color: var(--ink); background: var(--panel); padding: 6px; }
 

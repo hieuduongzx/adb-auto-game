@@ -6,26 +6,28 @@
 :root {
   --runner-stop: #b33332;
   --runner-stop-hover: #942827;
-  --runner-selected-ink: #2459a5;
-  /* Compact Pro keeps execution output visually separate from the form UI. */
-  --runner-log-bg: #202730;
-  --runner-log-ink: #c7d0db;
-  --runner-log-muted: #8491a1;
-  --runner-log-line: #303946;
-  --runner-log-error-bg: #3a2528;
-  --runner-log-error-ink: #ff9f97;
-  --runner-log-warning-bg: #393225;
+  --runner-selected-ink: #0b6a73;
+  /* Compact Pro keeps execution output visually separate from the form UI:
+     a graphite console with its own light inks (teal for scope/milestones). */
+  --runner-log-bg: #1c1f23;
+  --runner-log-ink: #cdd2d8;
+  --runner-log-muted: #8a929b;
+  --runner-log-line: #2b2f34;
+  --runner-log-error-bg: #3a2524;
+  --runner-log-error-ink: #ff9f91;
+  --runner-log-warning-bg: #383124;
+  --runner-log-signal: #5fd3dc;
 }
 :root[data-theme="dark"] {
-  --runner-selected-ink: #a9caff;
-  --muted: #a0adbf;
-  --log-muted: #a0adbf;
-  --runner-log-bg: #171c23;
-  --runner-log-ink: #cbd4df;
-  --runner-log-muted: #8e9bad;
-  --runner-log-line: #29313d;
-  --runner-log-error-bg: #382326;
-  --runner-log-warning-bg: #373024;
+  --runner-selected-ink: #8fdce3;
+  --muted: #a0a7b0;
+  --log-muted: #a0a7b0;
+  --runner-log-bg: #141619;
+  --runner-log-ink: #cdd2d8;
+  --runner-log-muted: #8d959e;
+  --runner-log-line: #25292e;
+  --runner-log-error-bg: #382322;
+  --runner-log-warning-bg: #363023;
 }
 ::selection { background: var(--accent-bd); color: var(--ink); }
 input { caret-color: var(--accent); text-align: center; }
@@ -512,14 +514,14 @@ input { caret-color: var(--accent); text-align: center; }
 /* The Runner log is the operator's feed (milestones, the workflow's own notes,
    errors — see WorkflowRunnerAPI._on_log), so it reads a step larger than the
    Designer's step-by-step log. */
-.log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px 9px; background: var(--runner-log-bg); color: var(--runner-log-ink); user-select: text; scrollbar-color: #566170 var(--runner-log-bg); }
+.log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px 9px; background: var(--runner-log-bg); color: var(--runner-log-ink); user-select: text; scrollbar-color: #50565e var(--runner-log-bg); }
 .log-body:empty { display: flex; align-items: center; justify-content: center; padding: var(--s6); }
 .log-body:empty::before { content: "No output yet. Lines appear here once a run starts."; max-width: 260px; text-align: center; font-family: var(--sans); font-size: var(--t-caption); line-height: 1.5; color: var(--runner-log-muted); }
 .log-line { display: flex; gap: 7px; padding: 3px 0 3px 8px; border-left: 2px solid transparent; border-bottom: 1px solid var(--runner-log-line); font-family: var(--mono); font-size: var(--t-ui); line-height: 1.6; white-space: nowrap; }
 .log-line:last-child { border-bottom: 0; }
 .log-line.lv-error { background: var(--runner-log-error-bg); border-left-color: #ef8b84; }
 .log-line.lv-warning { background: var(--runner-log-warning-bg); border-left-color: #e2ba64; }
-.log-line.k-run, .log-line.k-activity { border-left-color: #79aaff; }
+.log-line.k-run, .log-line.k-activity { border-left-color: var(--runner-log-signal); }
 .log-line.lv-error .log-ts { color: #ef8b84; }
 .log-line.lv-warning .log-ts { color: #e2ba64; }
 .log-line.hidden { display: none; }
@@ -527,13 +529,13 @@ input { caret-color: var(--accent); text-align: center; }
 .log-tag { font-weight: 700; flex-shrink: 0; }
 .log-msg { min-width: 0; color: var(--runner-log-ink); white-space: normal; overflow-wrap: anywhere; }
 /* "[Activity]" prefix; lines that belong to no activity say [Runner], quietly. */
-.log-scope { font-weight: 600; color: #79aaff; }
+.log-scope { font-weight: 600; color: var(--runner-log-signal); }
 .log-scope.is-app { color: var(--runner-log-muted); }
-.log-line.k-run .log-msg, .log-line.k-activity .log-msg { font-weight: 600; color: #edf2f7; }
+.log-line.k-run .log-msg, .log-line.k-activity .log-msg { font-weight: 600; color: #eef0f2; }
 .log-line.lv-error .log-msg { color: var(--runner-log-error-ink); }
 /* The log is a dark surface in both themes, so its tags use their own light
    inks (the semantic tokens are tuned for the light panels: ~2-3:1 here). */
-.log-info    { color: #86b4ff; }
+.log-info    { color: var(--runner-log-signal); }
 .log-success { color: #57d590; }
 .log-warning { color: #e8bf68; }
 .log-error   { color: var(--runner-log-error-ink); }

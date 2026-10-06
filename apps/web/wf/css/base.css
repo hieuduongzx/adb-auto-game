@@ -46,7 +46,7 @@
   --branch-loop-line: #d09030;
    /* Wire palette — softened, modern pastels: the rope is connective tissue,
       the branch hue is the accent. Pitched for a 1.6px line over --canvas-bg. */
-   --wire:        #8f9eb2;
+   --wire:        #8f969f;
    --wire-switch: #9d86e8;
    /* Named multi-outs that are not true/false — Loop body/done, loop-until
       found/fail — plus a 6-hue cycle for numbered lanes (parallel / sequence /
@@ -101,11 +101,11 @@
      the workbench is a plane, not a background image — a white card, a coloured
      wire and the dot grid should not all be competing for the same attention.
      Still a step below --panel so a node face lifts off it on its own. */
-  --canvas-bg:         #f3f5f8;
-  --canvas-dot:        rgba(23,32,43,.09);
-  --canvas-dot-minor:  #dfe4ec;
-  --canvas-grid-line:  rgba(23,32,43,.022);
-  --canvas-grid-major: rgba(23,32,43,.04);
+  --canvas-bg:         #f4f5f6;
+  --canvas-dot:        rgba(23,25,28,.10);
+  --canvas-dot-minor:  #e0e3e6;
+  --canvas-grid-line:  rgba(23,25,28,.022);
+  --canvas-grid-major: rgba(23,25,28,.04);
   --node-r: 6px;  /* Every canvas node shares one soft-cornered silhouette. */
   /* Card geometry is locked to whole grid cells (WF_GRID = 16px): 9×4 cells.
      Node x/y snapping lands every edge on the minor grid. */
@@ -163,7 +163,7 @@
   --branch-loop-bg: rgba(234, 179, 8, .16);
   --branch-loop-line: #eab308;
    /* Dark canvas needs luminous-but-muted wire hues to read cleanly. */
-   --wire:        #93a1b6;
+   --wire:        #949ba4;
    --wire-switch: #a78bfa;
    --wire-body:  #5b9cf5;
    --wire-done:  #34c370;
@@ -205,11 +205,11 @@
   --note-ink:  #e7c25a;
   --amber:     #fbbf24;
   --speed-on:  #f5d76b;
-  --canvas-bg:         #191e26;
-  --canvas-dot:        rgba(220,230,242,.085);
-  --canvas-dot-minor:  #252d38;
-  --canvas-grid-line:  rgba(220,230,242,.018);
-  --canvas-grid-major: rgba(220,230,242,.035);
+  --canvas-bg:         #151719;
+  --canvas-dot:        rgba(226,230,235,.085);
+  --canvas-dot-minor:  #24282d;
+  --canvas-grid-line:  rgba(226,230,235,.018);
+  --canvas-grid-major: rgba(226,230,235,.035);
 }
 
 /* ── Shared-primitive overrides ──────────────────────────────────────────── */

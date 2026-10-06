@@ -219,9 +219,9 @@ input, select { font-size: var(--t-caption); padding: 4px 7px; }
 .log-ts  { color: var(--log-muted); flex-shrink: 0; }
 .log-tag { font-weight: 700; flex-shrink: 0; }
 .log-msg { color: var(--log-ink); white-space: normal; }
-.log-info    { color: #5b86c9; } .log-success { color: #1f9d57; }
+.log-info    { color: var(--accent); } .log-success { color: #1f9d57; }
 .log-warning { color: #c08a1e; } .log-error   { color: #d6483f; }
-:root[data-theme="dark"] .log-info    { color: #86b4ff; }
+:root[data-theme="dark"] .log-info    { color: #5fd3dc; }
 :root[data-theme="dark"] .log-success { color: #57d590; }
 :root[data-theme="dark"] .log-warning { color: #e8bf68; }
 :root[data-theme="dark"] .log-error   { color: #ef8b84; }

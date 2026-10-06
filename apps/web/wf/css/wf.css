@@ -2132,7 +2132,7 @@
    chip as the template strip rather than the theme panel colour. */
 .wf-pv-zoom-badge { z-index:3; background:rgba(15,18,22,.88); border-color:rgba(255,255,255,.16); color:#c2cad4; }
 .wf-pv-zoom-badge:hover { color:#fff; border-color:rgba(255,255,255,.4); }
-.wf-pv-zoom-badge.zoomed { color:#7fc0ff; background:rgba(15,18,22,.88); border-color:#4f8df0; }
+.wf-pv-zoom-badge.zoomed { color:#62d3dc; background:rgba(15,18,22,.88); border-color:#3cc4cf; }
 .wf-pv-tpl-item { display:flex; align-items:center; gap:7px; flex:0 0 auto; min-width:0; color:#d5e2ee; }
 .wf-pv-tpl-item + .wf-pv-tpl-item { padding-left:7px; border-left:1px solid rgba(255,255,255,.14); }
 .wf-pv-tpl-item img { display:block; max-width:110px; max-height:64px; object-fit:contain; image-rendering:auto; }

@@ -4,24 +4,28 @@
 
 :root {
   /* Layer 1 — immutable palette. App CSS must consume semantic aliases, not
-     these values directly. */
+     these values directly.
+     Graphite + Teal (October 2026): true neutral greys — no blue cast — so the
+     one teal signal colour, the semantic state hues and each game's own art
+     are the only colour on screen. Teal reads as an instrument's indicator
+     (scope, crosshair, match box), distinct from success green. */
   --primitive-neutral-0: #ffffff;
-  --primitive-neutral-25: #f6f8fb;
-  --primitive-neutral-50: #eef1f5;
-  --primitive-neutral-75: #eef2f6;
-  --primitive-neutral-100: #dde3ea;
-  --primitive-neutral-150: #d3dbe7;
-  --primitive-neutral-200: #c2cddc;
-  --primitive-neutral-600: #5b6675;
-  --primitive-neutral-700: #4d5a69;
-  --primitive-neutral-800: #2e3a49;
-  --primitive-neutral-900: #131922;
-  --primitive-neutral-925: #232a36;
-  --primitive-neutral-950: #161a20;
-  --primitive-blue-50: #e8effe;
-  --primitive-blue-200: #c4d7ff;
-  --primitive-blue-600: #1f6feb;
-  --primitive-blue-700: #1a5ad6;
+  --primitive-neutral-25: #f7f8f8;
+  --primitive-neutral-50: #f2f3f4;
+  --primitive-neutral-75: #eceef0;
+  --primitive-neutral-100: #e4e6e9;
+  --primitive-neutral-150: #d9dce0;
+  --primitive-neutral-200: #c4c8ce;
+  --primitive-neutral-600: #5e646d;
+  --primitive-neutral-700: #4a5059;
+  --primitive-neutral-800: #2b2f35;
+  --primitive-neutral-900: #17191c;
+  --primitive-neutral-925: #16191c;
+  --primitive-neutral-950: #121417;
+  --primitive-teal-50: #e3f2f3;
+  --primitive-teal-200: #a9d6da;
+  --primitive-teal-600: #0e7c86;
+  --primitive-teal-700: #0a6770;
 
   /* Layer 2 — role-based values. Theme overrides happen at this layer. */
   --semantic-app-bg: var(--primitive-neutral-50);
@@ -35,10 +39,10 @@
   --semantic-text-secondary: var(--primitive-neutral-800);
   --semantic-text-dim: var(--primitive-neutral-700);
   --semantic-text-muted: var(--primitive-neutral-600);
-  --semantic-accent: var(--primitive-blue-600);
-  --semantic-accent-hover: var(--primitive-blue-700);
-  --semantic-accent-bg: var(--primitive-blue-50);
-  --semantic-accent-border: var(--primitive-blue-200);
+  --semantic-accent: var(--primitive-teal-600);
+  --semantic-accent-hover: var(--primitive-teal-700);
+  --semantic-accent-bg: var(--primitive-teal-50);
+  --semantic-accent-border: var(--primitive-teal-200);
 
   /* Layer 3 — shared component metrics. Soft but crisp: every control and
      panel carries a gentle corner, overlays sit one step rounder, and nested
@@ -72,42 +76,43 @@
   --accent-bg: var(--semantic-accent-bg);
   --accent-bd: var(--semantic-accent-border);
   --focus-ring: var(--semantic-accent);
-  /* --ok remains legible under white button text (4.96:1). */
-  --ok:           #1a7f4a;
-  --ok-hover:     #156a3e;
-  --ok-bg:        #e6f4ec;
-  --ok-bd:        #b8dfc7;
+  /* --ok remains legible under white button text (4.97:1). */
+  --ok:           #2a7f46;
+  --ok-hover:     #236b3b;
+  --ok-bg:        #e5f3ea;
+  --ok-bd:        #b5dcc2;
   /* Foreground for success text/badges that sit on --ok-bg. */
-  --ok-ink:       #157a40;
-  --warn:         #9c6c12;
-  --warn-bg:      #fdf6e9;
-  --warn-bd:      #e7d5a4;
-  --err:          #bb3a33;
-  --err-hover:    #a8322c;
-  --err-bg:       #fcefee;
-  --err-bd:       #eecdca;
+  --ok-ink:       #24753f;
+  /* Amber stepped dark enough to be text on white (~5:1). */
+  --warn:         #9a6414;
+  --warn-bg:      #fbf3e4;
+  --warn-bd:      #e8d2a6;
+  --err:          #c2412d;
+  --err-hover:    #a8361f;
+  --err-bg:       #fbece9;
+  --err-bd:       #f0c6be;
 
   /* Sub-text sitting on --accent-bg (chooser subtitles, selected rows): the
      accent stepped back far enough to read as secondary but stay in family. */
-  --accent-soft:  #5a8af0;
+  --accent-soft:  #2f7f87;
   /* Inert fill for a track a value runs along (progress bar, slider rail). */
-  --track:        #e2e7ee;
+  --track:        #e3e5e8;
   /* Transparency checkerboard behind a colour swatch. */
-  --checker:      #e6e9ee;
+  --checker:      #e7e9eb;
 
-  --log-bg:    #f6f8fa;
-  --log-ink:   #344150;
-  --log-muted: #606c7a;
+  --log-bg:    #f7f8f8;
+  --log-ink:   #2f343b;
+  --log-muted: #646a73;
   /* Win32 controller accent (Hub badge, Designer category). */
   --win32:     #4f46e5;
   --win32-bg:  #eef2ff;
   --win32-bd:  #c7d2fe;
-  --shade:     #121316;
+  --shade:     #111316;
   --shade2:    #1a1d21;
-  --scroll-thumb:       #b9c3cf;
-  --scroll-thumb-hover: #8795a6;
-  --dot-off:   #b9c2cd;
-  --cb-bd:     #b8c2ce;
+  --scroll-thumb:       #c0c4ca;
+  --scroll-thumb-hover: #8d939b;
+  --dot-off:   #bcc1c7;
+  --cb-bd:     #b5bac1;
 
   --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --mono: "IBM Plex Mono", "Cascadia Code", "Consolas", monospace;
@@ -142,9 +147,9 @@
   --s4: 12px;
   --s5: 16px;
   --s6: 24px;
-  --sh-sm: 0 1px 1px rgba(20, 30, 45, .04);
-  --sh-md: 0 4px 12px rgba(20, 30, 45, .09);
-  --sh-lg: 0 14px 32px rgba(20, 30, 45, .18);
+  --sh-sm: 0 1px 1px rgba(18, 20, 24, .05);
+  --sh-md: 0 4px 12px rgba(18, 20, 24, .09);
+  --sh-lg: 0 14px 32px rgba(18, 20, 24, .18);
   --z-menu: 50;
   --z-dropdown: 55;
   --z-modal: 70;
@@ -170,57 +175,57 @@
    setting data-theme="dark" on <html>. */
 :root[data-theme="dark"] {
   --semantic-app-bg: var(--primitive-neutral-950);
-  --semantic-panel-bg: #1f2630;
+  --semantic-panel-bg: #1a1d21;
   --semantic-surface-bg: var(--primitive-neutral-925);
-  --semantic-surface-muted: #2b3341;
-  --semantic-border: #3d4857;
-  --semantic-border-strong: #525e72;
-  --semantic-divider: #2a333f;
-  /* Text sits a notch below near-white — #e8edf4 on the near-black app bg is
-     ~16:1 and halates (glare on thin strokes); ~13:1 keeps AAA without the glow.
+  --semantic-surface-muted: #23272c;
+  --semantic-border: #2f343a;
+  --semantic-border-strong: #3e444c;
+  --semantic-divider: #262a30;
+  /* Text sits a notch below near-white — pure white on the near-black app bg
+     halates (glare on thin strokes); ~13:1 keeps AAA without the glow.
      Dim/muted go the other way: they were too faint to read comfortably. */
-  --semantic-text: #d9e0ea;
-  --semantic-text-secondary: #c7cfdb;
-  --semantic-text-dim: #a4b1c1;
-  --semantic-text-muted: #8b97a9;
-  --semantic-accent: #6aa1ff;
-  --semantic-accent-hover: #8ab4ff;
-  --semantic-accent-bg: rgba(106, 161, 255, .16);
-  --semantic-accent-border: rgba(106, 161, 255, .38);
-  --ok:           #3fae72;
-  --ok-hover:     #55c88a;
-  --ok-bg:        rgba(63, 174, 114, .15);
-  --ok-bd:        rgba(63, 174, 114, .36);
-  --ok-ink:       #6fe3a4;
-  --warn:         #d9a83c;
-  --warn-bg:      rgba(217, 168, 60, .14);
-  --warn-bd:      rgba(217, 168, 60, .34);
-  --err:          #e06c64;
-  --err-hover:    #ec857e;
-  --err-bg:       rgba(224, 108, 100, .14);
-  --err-bd:       rgba(224, 108, 100, .36);
+  --semantic-text: #dde1e6;
+  --semantic-text-secondary: #c9ced5;
+  --semantic-text-dim: #a5acb5;
+  --semantic-text-muted: #8a929c;
+  --semantic-accent: #3cc4cf;
+  --semantic-accent-hover: #62d3dc;
+  --semantic-accent-bg: rgba(60, 196, 207, .14);
+  --semantic-accent-border: rgba(60, 196, 207, .36);
+  --ok:           #46b36d;
+  --ok-hover:     #5cc683;
+  --ok-bg:        rgba(70, 179, 109, .15);
+  --ok-bd:        rgba(70, 179, 109, .36);
+  --ok-ink:       #74dc98;
+  --warn:         #d9a441;
+  --warn-bg:      rgba(217, 164, 65, .14);
+  --warn-bd:      rgba(217, 164, 65, .34);
+  --err:          #e8705f;
+  --err-hover:    #f08a7b;
+  --err-bg:       rgba(232, 112, 95, .14);
+  --err-bd:       rgba(232, 112, 95, .36);
 
-  --accent-soft:  #93b4f3;
-  /* The dark-theme fills are light, so the ink on them goes dark (white on
-     #6aa1ff is 2.6:1; these are all above 7:1). */
-  --on-accent: #0a1424;
+  --accent-soft:  #8fd6dc;
+  /* The dark-theme fills are light, so the ink on them goes dark (all above
+     7:1 on their fill). */
+  --on-accent: #04191b;
   --on-ok:     #04140b;
   --on-err:    #1c0806;
-  --track:        #2e3746;
-  --checker:      #2a3240;
+  --track:        #2a2e34;
+  --checker:      #2a2e33;
 
-  --log-bg:    #1a1f27;
-  --log-ink:   #c3ccd9;
-  --log-muted: #7d8a9d;
+  --log-bg:    #16191c;
+  --log-ink:   #c6cbd2;
+  --log-muted: #848c96;
   --win32:     #9aa1f8;
   --win32-bg:  rgba(129, 140, 248, .16);
   --win32-bd:  rgba(129, 140, 248, .4);
-  --shade:     #05070a;
-  --shade2:    #0b0e12;
-  --scroll-thumb:       #3a4453;
-  --scroll-thumb-hover: #4d5a6d;
-  --dot-off:   #414c5e;
-  --cb-bd:     #4d5a6d;
+  --shade:     #060708;
+  --shade2:    #0c0d0f;
+  --scroll-thumb:       #3a3f46;
+  --scroll-thumb-hover: #50565f;
+  --dot-off:   #464c54;
+  --cb-bd:     #545b64;
 
   --sh-sm: 0 1px 1px rgba(0, 0, 0, .3);
   --sh-md: 0 4px 12px rgba(0, 0, 0, .42);

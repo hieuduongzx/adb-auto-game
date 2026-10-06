@@ -769,7 +769,7 @@ function wfPvDrawEmpty(){
   ctx.clearRect(0,0,cw,ch);
   // Soft radial vignette instead of a flat void — reads as a "screen off" panel.
   const g=ctx.createRadialGradient(cx,cy*0.9,0,cx,cy,Math.max(cw,ch)*0.7);
-  g.addColorStop(0,"#1c2027"); g.addColorStop(1,"#0e1013");
+  g.addColorStop(0,"#1c1f22"); g.addColorStop(1,"#0e0f11");
   ctx.fillStyle=g; ctx.fillRect(0,0,cw,ch);
 
   // Win32 projects capture a native window — no ADB device required, so the
@@ -777,7 +777,7 @@ function wfPvDrawEmpty(){
   const isWin32 = (typeof WF!=="undefined" && WF.controller==="win32");
   const hasSrc = isWin32 ? !!((WF.win32||{}).window) : !!S.connectedSerial;
   const err=!!wfPvErr, busy=!err && hasSrc;
-  const accent = err ? "#e0736b" : busy ? "#5aa9e6" : "#5b6675";
+  const accent = err ? "#e0736b" : busy ? "#3cc4cf" : "#5e646d";
   // Phone-outline glyph, centred above the text with a clear 14px gap: its
   // bottom edge sits at cy-4 and the 15px title's cap height starts near cy+10.
   const iw=40, ih=64, ix=cx-iw/2, iy=cy-ih-4;

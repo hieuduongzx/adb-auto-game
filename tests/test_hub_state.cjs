@@ -36,8 +36,9 @@ const game = { path: 'workflows/Example/workflow.json', folder: 'Example', name:
 test('scan-first hierarchy and feedback use flat, non-overlapping workbench surfaces', () => {
   assert.match(css, /\.library-message\s*\{[^}]*display:\s*flex/);
   assert.doesNotMatch(/\.library-message\s*\{([^}]*)\}/.exec(css)[1], /position:\s*absolute/);
-  assert.match(css, /\.game-state\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/);
-  assert.match(css, /\.game-info\s*\{[^}]*order:\s*-1/);
+  // Facts sit beside the cover, above the footer: no grid area is shared.
+  assert.match(css, /\.game-info\s*\{[^}]*grid-row:\s*1;/);
+  assert.match(css, /\.game-foot\s*\{[^}]*grid-row:\s*2;/);
   assert.doesNotMatch(css, /box-shadow:\s*var\(--sh-/);
 });
 

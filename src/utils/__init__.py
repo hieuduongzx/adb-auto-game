@@ -584,7 +584,7 @@ _UI_SETTINGS_LOCK = threading.Lock()
 # Window chrome painted before the first frame, per theme. Keep in step with
 # ``--bg`` in ``apps/web/shared/tokens.css`` — otherwise a dark-theme window
 # flashes light while the WebView boots.
-_THEME_BACKGROUNDS = {"light": "#e9edf2", "dark": "#161a20"}
+_THEME_BACKGROUNDS = {"light": "#f2f3f4", "dark": "#121417"}
 
 
 def ui_settings_path() -> str:

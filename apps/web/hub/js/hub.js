@@ -285,7 +285,7 @@ let BUILD = null;   // {path, name, version, state: running|cancelling|done|fail
 /** The shelf's widest layout — five covers across (hub.css `--cols`). It is the
     ceiling and the value used before the grid has been laid out; it is never
     the arrow-key step, because the grid reflows on a narrow window. */
-const GRID_COLS = 5;
+const GRID_COLS = 3;
 
 // ── Grid geometry ────────────────────────────────────────────────────────────
 /** How many tracks a computed `grid-template-columns` describes. Chromium
@@ -400,21 +400,23 @@ function cardHtml(g, i) {
     ? `<img class="game-img" src="${escHtml(g.cover)}" alt="" decoding="async" draggable="false">`
     : emptyArtHtml(g);
   const building = !!(BUILD && BUILD.state === "running" && BUILD.path === g.path);
+  // A landscape card: the cover (the Run button) on the left, the project's
+  // name, facts and actions on the right.
   return `<article class="game${building ? " is-building" : ""}" role="listitem" data-path="${escHtml(g.path)}" style="--i:${i};--tone:${toneFor(g.folder || g.name)}">` +
     `<button class="game-cover" type="button" data-act="run" title="Run ${name}" aria-label="Run ${name}">` +
       art +
-      `<span class="game-building" title="Show build progress"><span class="build-dot"></span>Building <span class="chip-pct">${building ? (BUILD.progress || 0) : 0}%</span></span>` +
+      `<span class="game-building" title="Show build progress"><span class="build-dot"></span><span class="chip-pct">${building ? (BUILD.progress || 0) : 0}%</span></span>` +
     `</button>` +
     `<div class="game-info">` +
-      iconHtmlFor(g, "game-icon") +
-      `<span class="game-name" title="${name}">${name}</span>` +
-      `<span class="game-folder" title="${folder}">${folder}</span>` +
-      `<span class="game-meta">` +
+      `<span class="game-title">` +
+        `<span class="game-name" title="${name}">${name}</span>` +
         `<span class="ctrl-tag ${ctrl}">${ctrl === "win32" ? "Win32" : "ADB"}</span>` +
+      `</span>` +
+      `<span class="game-meta">` +
         `<span class="game-acts">${acts} ${acts === 1 ? "activity" : "activities"}</span>` +
+        `<span class="game-folder" title="${folder}">${folder}</span>` +
       `</span>` +
       `<span class="game-state" title="${escHtml(stateTitle)}">${escHtml(state)}</span>` +
-
     `</div>` +
     `<div class="game-foot">` +
       `<button class="game-run" type="button" data-act="run" title="Run ${name}" aria-label="Run ${name}">${svg("play", "uico-2 uico-fill")}Run</button>` +
@@ -435,7 +437,7 @@ function renderSkeleton() {
   grid.innerHTML = Array.from({ length: gridColumns() * 2 }, (_, i) =>
     `<div class="game skeleton" aria-hidden="true" style="--i:${i}">` +
       `<span class="game-cover"></span>` +
-      `<span class="game-info"><span class="sk-icon"></span><span class="sk-line"></span><span class="sk-line short"></span></span>` +
+      `<span class="game-info"><span class="sk-line"></span><span class="sk-line short"></span><span class="sk-line short"></span></span>` +
       `<span class="game-foot">` +
         `<span class="sk-line run"></span>` +
         `<span class="sk-dots"><span class="sk-dot"></span><span class="sk-dot"></span><span class="sk-dot"></span></span>` +
@@ -1066,8 +1068,11 @@ function wire() {
     const name = meta ? meta.name : "";
     if (img.classList.contains("game-icon")) {
       img.insertAdjacentHTML("afterend", `<span class="game-icon icon-mono" aria-hidden="true">${escHtml(initialsFor(name))}</span>`);
+    } else if (img.classList.contains("art-icon")) {
+      img.insertAdjacentHTML("afterend", `<span class="art-initials">${escHtml(initialsFor(name))}</span>`);
     } else if (img.classList.contains("game-img")) {
-      img.insertAdjacentHTML("afterend", emptyArtHtml(name));
+      // The icon may be the very file that failed; fall back to initials only.
+      img.insertAdjacentHTML("afterend", emptyArtHtml({ name }));
     } else {
       return;
     }

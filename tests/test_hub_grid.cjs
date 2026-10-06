@@ -88,9 +88,9 @@ test('gridColumns follows the grid it is looking at', () => {
 });
 
 test('gridColumns never returns 0 or NaN for an unlaid-out grid', () => {
-  assert.equal(loadHub({ tracks: 'none' }).gridColumns(), 5);
-  assert.equal(loadHub({ hasGrid: false }).gridColumns(), 5);
-  assert.equal(loadHub({ tracks: '' }).gridColumns(), 5);
+  assert.equal(loadHub({ tracks: 'none' }).gridColumns(), 3);
+  assert.equal(loadHub({ hasGrid: false }).gridColumns(), 3);
+  assert.equal(loadHub({ tracks: '' }).gridColumns(), 3);
 });
 
 // ── hub.js ↔ hub.css: one number, two files ──────────────────────────────────
@@ -102,11 +102,11 @@ test('navigation uses the laid-out columns, never a constant', () => {
   assert.match(JS, /gridColumns\(\)\s*\*\s*2/, 'the skeleton fills two measured rows');
 });
 
-test('hub.css lays the shelf out from --cols, 5 by default', () => {
+test('hub.css lays the shelf out from --cols, 3 landscape cards by default', () => {
   const grid = rule(CSS, '.game-grid');
-  assert.match(grid, /--cols:\s*5;/, 'the default shelf is five covers wide');
+  assert.match(grid, /--cols:\s*3;/, 'the default shelf is three cards wide');
   assert.match(grid, /grid-template-columns:\s*repeat\(var\(--cols\),\s*var\(--card-w\)\)/);
-  assert.doesNotMatch(grid, /repeat\(5,/, 'a hard-coded 5 would ignore the reflow');
+  assert.doesNotMatch(grid, /repeat\(3,/, 'a hard-coded 3 would ignore the reflow');
 
   const fallback = /const GRID_COLS = (\d+)/.exec(JS);
   assert.ok(fallback, 'hub.js needs a GRID_COLS fallback');
@@ -147,7 +147,7 @@ test('the reflow steps descend in width and in columns, down to one', () => {
     assert.ok(steps[i][0] < steps[i - 1][0], 'breakpoints must descend in width');
     assert.ok(steps[i][1] < steps[i - 1][1], 'columns must descend with them');
   }
-  assert.equal(steps[0][1], 4, 'the first step reflows off five columns');
+  assert.equal(steps[0][1], 2, 'the first step reflows off three columns');
   assert.equal(steps[steps.length - 1][1], 1, 'the narrowest shelf is a single column');
 });
 
@@ -223,27 +223,25 @@ test('Run and the card tools are on the card at rest, not hover-gated', () => {
   assert.match(foot, /display:\s*flex/);
 });
 
-test('a card uses assets/icon as its icon, then the cover, then initials', () => {
+test('the cover slot shows the cover, else the game icon, else its initials', () => {
   const ctx = loadHub();
   const withIcon = ctx.cardHtml(
     { name: 'BrownDust2', path: 'p', folder: 'BrownDust2', icon: 'file:///icon.png', cover: 'file:///cover.png', controller: 'win32', activityCount: 1 }, 0);
-  assert.match(withIcon, /<img class="game-icon"[^>]*src="file:\/\/\/icon\.png"/);
-  const withCover = ctx.cardHtml(
-    { name: 'BrownDust2', path: 'p', folder: 'BrownDust2', cover: 'file:///cover.png', controller: 'win32', activityCount: 1 }, 0);
-  assert.match(withCover, /<img class="game-icon"[^>]*src="file:\/\/\/cover\.png"/);
   assert.match(withIcon, /<img class="game-img"[^>]*src="file:\/\/\/cover\.png"/, 'a cover fills the slot');
+  assert.doesNotMatch(withIcon, /art-icon/, 'and wins over the icon');
   const iconOnly = ctx.cardHtml(
     { name: 'BrownDust2', path: 'p', folder: 'BrownDust2', icon: 'file:///icon.png', controller: 'win32', activityCount: 1 }, 0);
   assert.match(iconOnly, /class="game-art-empty"[\s\S]*<img class="art-icon"[^>]*src="file:\/\/\/icon\.png"/,
     'without a cover the slot shows the game icon');
   const bare = ctx.cardHtml(
     { name: 'BrownDust2', path: 'p', folder: 'BrownDust2', controller: 'win32', activityCount: 1 }, 0);
-  assert.match(bare, /class="game-icon icon-mono"[^>]*>BD</);
-  const info = rule(CSS, '.game-info');
-  assert.match(info, /grid-template-columns:\s*28px minmax\(0,\s*1fr\)/);
-  const icon = rule(CSS, '.game-icon');
-  assert.match(icon, /width:\s*28px/);
-  assert.match(icon, /height:\s*28px/);
+  assert.match(bare, /class="art-initials">BD</);
+  // Landscape card: cover in the first column spanning both rows, facts and
+  // the footer beside it.
+  const card = rule(CSS, '.game');
+  assert.match(card, /grid-template-columns:\s*var\(--cover-w\) minmax\(0,\s*1fr\)/);
+  assert.match(rule(CSS, '.game-cover'), /grid-row:\s*1 \/ -1/);
+  assert.match(rule(CSS, '.game-foot'), /grid-column:\s*2/);
 });
 
 test('long names and missing artwork retain visible technical metadata', () => {
@@ -288,14 +286,14 @@ test('shelf entrance motion stays restrained', () => {
 
 test('the skeleton stands in for the whole card, footer included', () => {
   assert.match(JS, /class="game-foot"[\s\S]*?sk-dots/, 'the loading card has a footer too');
-  assert.match(rule(CSS, '.sk-line.run'), /height:\s*34px/, '…with the footer Run boxed');
+  assert.match(rule(CSS, '.sk-line.run'), /height:\s*32px/, '…with the footer Run boxed');
   assert.match(rule(CSS, '.sk-dot'), /background:\s*var\(--alt\)/, 'and a box per tool');
 });
 
 test('a touch screen only enlarges what is already on the card', () => {
   const touch = /@media \(hover: none\) \{([\s\S]*?)\n\}/.exec(CSS);
   assert.ok(touch, 'a hover:none block must exist');
-  assert.match(touch[1], /\.game-run\s*\{[^}]*height:\s*38px/);
+  assert.match(touch[1], /\.game-run\s*\{[^}]*height:\s*36px/);
   assert.match(touch[1], /\.game-tool\s*\{[^}]*width:\s*34px/);
 });
 
