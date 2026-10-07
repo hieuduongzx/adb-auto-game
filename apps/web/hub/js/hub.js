@@ -239,9 +239,8 @@ function promptNewWorkflow() {
           `</div>` +
           `<p class="ui-modal-hint">How clicks and swipes are delivered to the PC window.</p>` +
         `</div>` +
-        `<p class="ui-modal-hint">Creates <span class="mono">workflows/&lt;Name&gt;/workflow.json</span> and opens the Designer. ` +
-          `Put the cover art at <span class="mono">workflows/&lt;Name&gt;/assets/cover.png</span> (3:4) ` +
-          `and the icon at <span class="mono">assets/icon.png</span> (square).</p>` +
+        `<p class="ui-modal-hint">Cover art goes in <span class="mono">assets/cover.png</span> (3:4), ` +
+          `the icon in <span class="mono">assets/icon.png</span> (square).</p>` +
       `</div>` +
       `<div class="ui-modal-ft">` +
         `<button type="button" class="btn" data-v="cancel">Cancel</button>` +
@@ -335,14 +334,13 @@ function initialsFor(name) {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 /** A cover slot without cover art: the game's own icon on its tone when it has
-    one (still recognisable at a glance), its initials otherwise — plus where a
-    real cover goes, since that is the one thing missing. */
+    one (still recognisable at a glance), its initials otherwise. Where a real
+    cover goes is said once, in the New project dialog, not on every card. */
 function emptyArtHtml(g) {
   const mark = g.icon
     ? `<img class="art-icon" src="${escHtml(g.icon)}" alt="" decoding="async" draggable="false">`
     : `<span class="art-initials">${escHtml(initialsFor(g.name))}</span>`;
-  return `<span class="game-art-empty" aria-hidden="true">` + mark +
-    `<span class="art-hint">assets/cover.png</span></span>`;
+  return `<span class="game-art-empty" aria-hidden="true">` + mark + `</span>`;
 }
 /** "2026-10-02T21:52:00" → "4 days ago"; falls back to the stored stamp. */
 function savedAgo(iso, fallback) {
@@ -352,7 +350,7 @@ function savedAgo(iso, fallback) {
   if (min < 1) return "just now";
   if (min < 60) return `${min} min ago`;
   const h = Math.round(min / 60);
-  if (h < 24) return `${h} h ago`;
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
   const d = Math.round(h / 24);
   if (d === 1) return "yesterday";
   if (d < 30) return `${d} days ago`;

@@ -76,7 +76,7 @@ canvas.onmousemove = e => {
   const[cx,cy]=canvasPos(e);
   if(S.panning){S.panX=S.panBase[0]+cx-S.panStart[0];S.panY=S.panBase[1]+cy-S.panStart[1];recomputeLayout();draw();return;}
   const p=canvasToImg(cx,cy);
-  $("hover-pos").textContent=p?`${p[0]}, ${p[1]}`:"—";
+  $("hover-pos").textContent=p?`${p[0]}, ${p[1]}`:"";
   if(S.dragging){S.dragEnd=[cx,cy];draw();}
 };
 canvas.onmouseup = async e => {
@@ -125,7 +125,7 @@ canvas.onmouseup = async e => {
 canvas.onmouseleave = () => {
   if(S.dragging){S.dragging=false;draw();}
   if(S.panning){S.panning=false;canvas.style.cursor="crosshair";}
-  $("hover-pos").textContent="—";
+  $("hover-pos").textContent="";
 };
 
 // Right-click → tap

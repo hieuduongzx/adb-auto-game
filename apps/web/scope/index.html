@@ -54,7 +54,7 @@
       <span class="pill-label">Auto</span>
     </button>
     <span class="tb-divider"></span>
-    <button class="btn ok ico" onclick="onCapture()" title="Capture screen (F5)" aria-label="Capture screen">
+    <button class="btn accent ico" onclick="onCapture()" title="Capture screen (F5)" aria-label="Capture screen">
       <svg class="uico" aria-hidden="true" viewBox="0 0 24 24"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></button>
   </div>
 </header>
@@ -88,7 +88,7 @@
       </button>
     </div>
     <div id="preview-wrap"><canvas id="preview-canvas" aria-label="Screenshot preview. Click for a point, drag for a region, right-click to tap."></canvas></div>
-    <div class="selection-readout"><span class="telemetry-label">Selection</span>
+    <div class="selection-readout"><span class="selection-label">Selection</span>
       <span id="selection-state" role="status" aria-live="polite">No selection</span></div>
   </div>
 
@@ -151,7 +151,7 @@
             </button>
           </div>
           <div class="row" style="justify-content:flex-end;">
-            <button class="btn sm accent" onclick="onTapPoint()">Tap point</button>
+            <button class="btn sm" onclick="onTapPoint()">Tap point</button>
           </div>
         </div>
       </div>
@@ -177,6 +177,7 @@
             <span class="lbl">Size</span>
             <input id="rg-w" type="number" min="0" value="0" style="text-align:center;" aria-label="Region width">
             <input id="rg-h" type="number" min="0" value="0" style="text-align:center;" aria-label="Region height">
+            <span class="icon-btn-spacer" aria-hidden="true"></span>
           </div>
           <div class="row"><span class="lbl">Name</span>
             <input id="crop-name" type="text" placeholder="optional region name" aria-label="Region filename"></div>
@@ -188,8 +189,8 @@
           <div class="btns">
             <button class="btn sm" onclick="onApplyRegion()">Apply</button>
             <button class="btn sm" onclick="onSaveCropDialog()">Save region…</button>
-            <button class="btn sm ok" onclick="onQuickCrop()">Quick crop</button>
-            <button class="btn sm err" onclick="onClearRegion()">Clear</button>
+            <button class="btn sm accent" onclick="onQuickCrop()">Quick crop</button>
+            <button class="btn sm" onclick="onClearRegion()">Clear</button>
           </div>
         </div>
       </div>
@@ -213,7 +214,7 @@
           </div>
           <div class="row" style="gap:5px;">
             <input id="ocr-wl" type="text" placeholder="Whitelist, e.g. 0-9/" style="flex:1;min-width:0;font-size:11px;" aria-label="OCR character whitelist">
-            <button class="btn h30 accent" onclick="onReadText()">Read</button>
+            <button class="btn h30" onclick="onReadText()">Read</button>
           </div>
         </div>
       </div>
@@ -415,7 +416,7 @@
   <span id="footer-dot"></span>
   <span id="status-text" role="status">Ready</span>
   <span class="spacer"></span>
-  <span id="hover-pos">—</span>
+  <span id="hover-pos"></span>
   <span style="color:var(--border);margin:0 3px;">·</span>
   <span id="footer-out">crops → ./out/</span>
 </footer>

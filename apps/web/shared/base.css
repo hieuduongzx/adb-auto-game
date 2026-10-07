@@ -41,8 +41,11 @@ button {
 button:focus-visible, a[href]:focus-visible, summary:focus-visible,
 [tabindex]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
+/* Fields take the UI face: most of what is typed here is a name, a note or a
+   label. Data keeps mono — numbers, read-only readouts (points, colours, OCR
+   results) and anything marked .mono (paths, package ids, JSON). */
 input, select, textarea {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: var(--t-ui);
   background: var(--panel);
   color: var(--ink);
@@ -50,6 +53,7 @@ input, select, textarea {
   border-radius: var(--r-sm);
   padding: 5px 8px;
 }
+input[type="number"], input[readonly], input.mono, textarea.mono { font-family: var(--mono); }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--border2); box-shadow: none; }
 input:disabled, select:disabled, textarea:disabled { background: var(--alt); color: var(--muted); cursor: not-allowed; }
 input::placeholder, textarea::placeholder { color: var(--muted); opacity: .7; }
@@ -101,7 +105,7 @@ kbd {
   min-height: var(--ftr-h); display: flex; align-items: center; gap: var(--s2);
   flex-shrink: 0; padding: 0 var(--s3); color: var(--muted);
   background: var(--panel); border-top: var(--component-divider-width) solid var(--border);
-  font: 500 var(--t-caption)/1 var(--mono); letter-spacing: .02em;
+  font: 500 var(--t-caption)/1 var(--sans);
 }
 .workbench-divider { flex: 0 0 var(--component-divider-width); background: var(--border); }
 .workbench-state { display: inline-flex; align-items: center; gap: var(--s2); }
@@ -157,6 +161,9 @@ kbd {
   justify-content: center; flex-shrink: 0; transition: background .1s, color .1s;
 }
 .icon-btn:hover { background: var(--alt); color: var(--ink); }
+/* Holds an .icon-btn's place in a row that has no button, so its fields line
+   up with the row above (Position has Copy, Size does not). */
+.icon-btn-spacer { width: 26px; flex-shrink: 0; }
 .icon-btn.flash { color: var(--ok) !important; }
 
 /* Skip link — keyboard users jump straight to the main region instead of
@@ -287,6 +294,8 @@ input[type="checkbox"]:disabled { opacity: .55; cursor: not-allowed; }
 .ui-modal-lbl { font-size: var(--t-ui); font-weight: 600; color: var(--dim); }
 .ui-modal-inp { width: 100%; font-family: var(--sans); font-size: var(--t-body); padding: 7px 10px; }
 .ui-modal-hint { font-size: var(--t-micro); color: var(--muted); line-height: 1.4; }
+/* A hint under a row of choice tiles needs the same breathing room as a field. */
+.choice-seg + .ui-modal-hint { margin-top: 8px; }
 .form-field { margin-bottom: 12px; }
 .form-field > label, .form-lbl {
   display: block; font-size: var(--t-caption); font-weight: 600;

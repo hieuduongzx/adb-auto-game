@@ -205,7 +205,7 @@ async function pvOcrBackendChange(name){
   const r=await api().set_ocr_backend(name);
   const el=$("pv-ocr-engine");
   el.textContent=(r.label||wfOcrModelLabel(r.engine))+(r.available?" · ready":" · unavailable");
-  el.className=r.available?"":"unavailable";
+  el.className=r.available?"ready":"unavailable";
 }
 async function pvReadText(){ $("pv-ocr-result").value=await api().read_text($("pv-ocr-wl").value); }
 

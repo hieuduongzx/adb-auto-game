@@ -24,7 +24,7 @@ async function init(){
     const r=await api().set_ocr_backend(sel.value);
     const el=$("ocr-engine");
     el.textContent=(r.label||r.engine)+(r.available?" · ready":" · unavailable");
-    el.className=r.available?"":"unavailable";
+    el.className=r.available?"ready":"unavailable";
   }
   S.autoRefresh=!!state.autoRefresh;
   $("auto-cb").classList.toggle("on",S.autoRefresh);

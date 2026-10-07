@@ -234,7 +234,7 @@
       <div id="wf-act-resizer" title="Drag the bottom edge (or use arrow keys) to resize the list - double-click to reset" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize list" aria-valuemin="72" aria-valuemax="600"></div>
     </div>
     <div class="wf-side-sec pnl pnl-flush" data-pnl="wf-nodes" data-pnl-title="Nodes" data-pnl-tools="max" style="flex:1;min-height:0;display:flex;flex-direction:column;">
-      <div class="wf-side-hdr pnl-hd wf-zone-heading"><span class="pnl-title"><span>Nodes</span></span><span class="wf-zone-hint">Drag to canvas</span></div>
+      <div class="wf-side-hdr pnl-hd wf-zone-heading"><span class="pnl-title"><span>Nodes</span></span></div>
       <div class="wf-pal-search">
         <svg class="uico wf-pal-search-ico" aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
         <input id="wf-pal-search-inp" type="search" placeholder="Find node…" oninput="wfPaletteFilter(this.value)" spellcheck="false" autocomplete="off" aria-label="Find node">
@@ -433,7 +433,7 @@
         </div>
 
         <div class="group">
-          <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true"><span class="grp-title">Point &amp; Color</span>
+          <button type="button" class="grp-hdr" onclick="toggleGrp(this)" aria-expanded="true"><span class="grp-title">Point &amp; color</span>
             <svg class="grp-chevron uico uico-0" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
           <div class="grp-body">
             <div class="row">
@@ -460,7 +460,7 @@
               </button>
             </div>
             <div class="row" style="justify-content:flex-end;">
-              <button class="btn sm accent" onclick="pvTapPoint()">Tap point</button>
+              <button class="btn sm" onclick="pvTapPoint()">Tap point</button>
             </div>
           </div>
         </div>
@@ -483,7 +483,7 @@
               <span class="lbl">Tolerance</span>
               <input id="pv-cc-tol" type="number" min="0" max="255" value="10" style="width:56px;flex:none;text-align:right;" aria-label="Color tolerance">
               <span class="hz-unit">≤ max(ΔR,ΔG,ΔB)</span>
-              <button class="btn sm accent" style="margin-left:auto;" onclick="pvCheckColor()">Inspect</button>
+              <button class="btn sm" style="margin-left:auto;" onclick="pvCheckColor()">Inspect</button>
             </div>
             <div id="pv-cc-result" class="cc-result"></div>
           </div>
@@ -506,6 +506,7 @@
               <span class="lbl">Size</span>
               <input id="pv-rg-w" type="number" min="0" value="0" style="text-align:center;" aria-label="Region width">
               <input id="pv-rg-h" type="number" min="0" value="0" style="text-align:center;" aria-label="Region height">
+              <span class="icon-btn-spacer" aria-hidden="true"></span>
             </div>
             <div class="row"><span class="lbl">Name</span>
               <input id="pv-crop-name" type="text" placeholder="region name (optional)" aria-label="Region filename"></div>
@@ -514,8 +515,8 @@
               <span id="pv-out-dir-label" style="flex:1;min-width:0;font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);" title=""></span>
             </div>
             <div class="btns">
-              <button class="btn sm ok" onclick="pvQuickCrop()" title="Save region to templates/ (Ctrl+S)">Capture region</button>
-              <button class="btn sm err" onclick="pvClearRegion()">Delete</button>
+              <button class="btn sm accent" onclick="pvQuickCrop()" title="Save region to templates/ (Ctrl+S)">Capture region</button>
+              <button class="btn sm" onclick="pvClearRegion()">Delete</button>
             </div>
           </div>
         </div>
@@ -535,7 +536,7 @@
             </div>
             <div class="row" style="gap:5px;">
               <input id="pv-ocr-wl" type="text" placeholder="Whitelist e.g. 0-9/" style="flex:1;min-width:0;font-size:11px;" aria-label="OCR character whitelist">
-              <button class="btn h30 accent" onclick="pvReadText()">Read</button>
+              <button class="btn h30" onclick="pvReadText()">Read</button>
             </div>
           </div>
         </div>
@@ -759,7 +760,7 @@
   <span id="footer-dot"></span>
   <span id="status-text" role="status" aria-live="polite">Ready</span>
   <span class="spacer"></span>
-  <span id="hover-pos" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:88px;text-align:right;">-</span>
+  <span id="hover-pos" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:88px;text-align:right;"></span>
   <span style="color:var(--border);margin:0 3px;">·</span>
   <span id="footer-out" style="font-size:11px;color:var(--log-muted);font-family:var(--mono);">workflow → workflows/</span>
 </footer>

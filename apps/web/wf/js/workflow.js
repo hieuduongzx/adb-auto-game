@@ -751,13 +751,15 @@ function wfNodeOutputPorts(node){
 function wfNodeLogFields(node){
   const kind=(WF_NODES[node.type]||{}).kind;
   if(kind==="note") return [];
-  const fields=[{key:"input",label:"Log Input",tag:"IN"}];
+  // Labels name *when* the line is logged, in sentence case: "On input",
+  // "On true", "On case 2" — the section is already titled Run logs.
+  const fields=[{key:"input",label:"On input",tag:"IN"}];
   const labels={out:"Output",true:"True",false:"False",body:"Body",done:"Done",found:"Found",fail:"Fail",end:"End",default:"Default"};
   for(const port of wfNodeOutputPorts(node)){
     const label=labels[port]||(/^c\d+$/.test(port)?"Case "+(Number(port.slice(1))+1):"Branch "+port);
-    fields.push({key:port,label:"Log "+label,tag:label.toUpperCase()});
+    fields.push({key:port,label:"On "+label.toLowerCase(),tag:label.toUpperCase()});
   }
-  if(["end","stop","try_next"].includes(kind)) fields.push({key:"$done",label:"Log Done",tag:"DONE"});
+  if(["end","stop","try_next"].includes(kind)) fields.push({key:"$done",label:"On done",tag:"DONE"});
   if(kind==="action"||kind==="and") fields.push({key:"$error",label:"Log Error",tag:"ERROR"});
   return fields;
 }
@@ -1347,7 +1349,7 @@ function wfOpenProjectSettings(){
       secAdb.appendChild(rowEmu);
       const rowEmuHint=document.createElement("div"); rowEmuHint.className="wf-proj-row";
       rowEmuHint.innerHTML=
-        `<div class="hint">Shared by Launch / Resize / Kill / Restart emulator blocks unless a block chooses “Custom”. The 🚀 Start game button boots this instance.</div>`;
+        `<div class="hint">Shared by Launch / Resize / Kill / Restart emulator blocks unless a block chooses “Custom”. Start game boots this instance.</div>`;
       secAdb.appendChild(rowEmuHint);
       const rowEmuPath=document.createElement("div"); rowEmuPath.className="wf-proj-row";
       rowEmuPath.innerHTML=

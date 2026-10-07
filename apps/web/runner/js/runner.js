@@ -1196,7 +1196,7 @@ function applyController(ctrl, win32){
     el.classList.toggle("empty", !target);
     el.title = target;
   }
-  const mode = (cfg.inputMode || "background").replace(/_/g, " ");
+  const mode = inputModeLabel(cfg.inputMode);
   const modeEl = $("win32-mode-lbl");
   if(modeEl){
     modeEl.textContent = mode;
@@ -1211,13 +1211,18 @@ function applyController(ctrl, win32){
   renderBridge();
 }
 
+// "unity_bridge" -> "Unity bridge": sentence case, as Designer spells the mode.
+function inputModeLabel(raw){
+  const text = String(raw || "background").replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 // unity_bridge: the in-game plugin not answering is why "the window is there
 // but nothing happens", so surface it in the footer instead of the log only.
 function renderBridge(){
   const modeEl = $("win32-mode-lbl");
   if(!modeEl) return;
   const cfg = S.win32 || {};
-  const mode = (cfg.inputMode || "background").replace(/_/g, " ");
+  const mode = inputModeLabel(cfg.inputMode);
   if(S.controller !== "win32" || (cfg.inputMode || "") !== "unity_bridge"){
     modeEl.textContent = mode; modeEl.style.color = ""; return;
   }

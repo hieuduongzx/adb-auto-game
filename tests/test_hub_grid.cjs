@@ -250,7 +250,7 @@ test('long names and missing artwork retain visible technical metadata', () => {
   const html = ctx.cardHtml(
     { name, path: 'workflows/long-project', folder: 'long-project', controller: 'adb', activityCount: 12 }, 0);
   assert.match(html, /class="game-art-empty"/);
-  assert.match(html, /class="art-hint">assets\/cover\.png<\/span>/, 'the blank cover names the file that fills it');
+  assert.doesNotMatch(html, /art-hint/, 'the cover path is told once, in the New project dialog');
   assert.match(html, /class="game-name" title="A project name long enough[^>]*>/);
   assert.match(html, /class="game-folder" title="long-project">long-project<\/span>/);
   assert.match(html, /class="ctrl-tag adb">ADB<\/span>/);

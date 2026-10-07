@@ -175,7 +175,10 @@ input { caret-color: var(--accent); text-align: center; }
    are the two numbers that matter, so they get body size and full ink. */
 .prog-count { font-family: var(--mono); font-size: var(--t-body); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 28px; flex-shrink: 0; }
 .queue-summary, .queue-current { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-caption); color: var(--muted); }
-.queue-summary { max-width: 170px; }
+/* "12 sequence · 0 background enabled" repeated the list's own counts; the
+   row keeps count, current activity, bar and clock. The element stays for
+   screen readers and the narrow view already hid it. */
+.queue-summary { display: none; }
 .queue-current { max-width: 230px; color: var(--ink2); font-weight: 500; }
 .prog-bar-track { flex: 1; min-width: 60px; height: 8px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .prog-bar-fill { height: 100%; border-radius: 999px; background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
@@ -191,7 +194,8 @@ input { caret-color: var(--accent); text-align: center; }
 .btn-start.is-stop { background: var(--runner-stop); color: var(--on-fixed); border-color: var(--runner-stop); }
 .btn-start.is-stop:hover:not(:disabled), .btn-start.is-stop:active:not(:disabled) { background: var(--runner-stop-hover); border-color: var(--runner-stop-hover); color: var(--on-fixed); }
 .header-btns .btn:disabled { opacity: 1; background: var(--alt); border-color: var(--border); color: var(--muted); }
-.header-btns .btn-pause:disabled { background: transparent; border-color: var(--border); color: var(--muted); }
+/* Idle Pause has nothing to pause: it must not look like a live control. */
+.header-btns .btn-pause:disabled { background: transparent; border-color: var(--border); color: var(--muted); opacity: .5; }
 .btn-pause { flex: 0 1 110px; background: var(--panel); color: var(--dim); border-color: var(--border2); }
 .btn-pause:hover:not(:disabled) { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-bd); }
 @media (min-width: 960px) {
@@ -349,7 +353,8 @@ input { caret-color: var(--accent); text-align: center; }
 .log-toolbar { display: flex; align-items: center; gap: var(--s2); flex: 1 1 220px; min-width: 0; }
 .log-toolbar .log-search-wrap { flex: 1 1 120px; min-width: 96px; max-width: 420px; }
 .log-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
-.log-actions .log-count { margin-right: var(--s1); }
+/* The Log tab already carries the line count. */
+.log-actions .log-count { display: none; }
 .btn-log-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; padding: 0; }
 .log-level { flex: 0 0 auto; width: auto; min-width: 0; max-width: 100%; height: 28px; }
 .log-note:empty, .diag-status:empty { display: none; }
@@ -392,7 +397,7 @@ input { caret-color: var(--accent); text-align: center; }
 .pv-sp { flex: 1; }
 .pv-btn { width: 26px; height: 26px; border-radius: var(--r-sm); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .12s, color .12s; }
 .pv-btn:hover { background: var(--alt); color: var(--dim); }
-.pv-btn.off { color: var(--accent); background: var(--accent-bg); }
+.pv-btn.off { color: var(--dim); }
 .pv-body { position: relative; flex: 1; min-height: 0; background: var(--log-bg); display: flex; align-items: center; justify-content: center; overflow: hidden; }
 /* Keep the screen useful without starving the log on short windows. */
 #preview-card:not(.is-max) .pv-body { height: clamp(90px, 24vh, 340px); flex: none; }
@@ -520,7 +525,7 @@ input { caret-color: var(--accent); text-align: center; }
 .log-count:empty { display: none; }
 .log-search-wrap { display: flex; align-items: center; gap: var(--s2); min-height: 28px; padding: 3px 8px; border: 1px solid var(--border2); border-radius: var(--r-sm); background: var(--panel); flex: 1 1 160px; min-width: 120px; max-width: 240px; color: var(--muted); }
 .log-search-wrap:focus-within { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px; }
-#log-search { flex: 1; min-width: 0; width: auto; font-family: var(--sans); font-size: var(--t-caption); background: transparent; border: none; color: var(--ink2); padding: 0; }
+#log-search { flex: 1; min-width: 0; width: auto; font-family: var(--sans); font-size: var(--t-caption); background: transparent; border: none; color: var(--ink2); padding: 0; text-align: left; }
 #log-search::placeholder { color: var(--muted); }
 #log-search:focus { outline: none; }
 .btn-log-clear { font-size: var(--t-caption); font-weight: 600; color: var(--muted); padding: 3px 7px; border-radius: var(--r-sm); transition: color .1s, background .1s; }
@@ -530,7 +535,7 @@ input { caret-color: var(--accent); text-align: center; }
    Designer's step-by-step log. */
 .log-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 10px 9px; background: var(--runner-log-bg); color: var(--runner-log-ink); user-select: text; scrollbar-color: #50565e var(--runner-log-bg); }
 .log-body:empty { display: flex; align-items: center; justify-content: center; padding: var(--s6); }
-.log-body:empty::before { content: "No output yet. Lines appear here once a run starts."; max-width: 260px; text-align: center; font-family: var(--sans); font-size: var(--t-caption); line-height: 1.5; color: var(--runner-log-muted); }
+.log-body:empty::before { content: "No output yet."; max-width: 260px; text-align: center; font-family: var(--sans); font-size: var(--t-caption); line-height: 1.5; color: var(--runner-log-muted); }
 .log-line { display: flex; gap: 7px; padding: 3px 0 3px 8px; border-left: 2px solid transparent; border-bottom: 1px solid var(--runner-log-line); font-family: var(--mono); font-size: var(--t-ui); line-height: 1.6; white-space: nowrap; }
 .log-line:last-child { border-bottom: 0; }
 .log-line.lv-error { background: var(--runner-log-error-bg); border-left-color: #ef8b84; }
@@ -555,6 +560,8 @@ input { caret-color: var(--accent); text-align: center; }
 .log-error   { color: var(--runner-log-error-ink); }
 
 .changelog-layout { display: flex; flex: 1; min-height: 180px; }
+/* Nothing published yet: one line, not a 180px empty frame. */
+.changelog-layout:has(.changelog-list:empty) { min-height: 0; }
 .changelog-list:empty { display: none; }
 .changelog-list { width: 108px; flex-shrink: 0; overflow: auto; border-right: 1px solid var(--line); padding: 6px; display: flex; flex-direction: column; gap: 4px; }
 .changelog-ver { text-align: left; border: 1px solid transparent; background: transparent; color: var(--ink); border-radius: var(--r-sm); padding: 6px 8px; font: inherit; font-size: var(--t-caption); cursor: pointer; }

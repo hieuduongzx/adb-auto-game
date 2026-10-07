@@ -16,7 +16,7 @@ function wfValidationIssues(){
     // marked failed (red) after a run. Background tasks poll forever — skip.
     if(!nodes.some(n=>n.type==="end")){
       if(ctx.kind==="function") add("warn","Function has no End node - calls will always return F (false)",ctx,null);
-      else if(ctx.owner.type!=="background") add("warn","Activity has no End node - it will always be marked failed (red)",ctx,null);
+      else if(ctx.owner.type!=="background") add("warn","Activity has no End node - it will always be marked failed",ctx,null);
     }
     edges.forEach(e=>{
       if(!byId.has(e.from)) add("err",`Wire starts from missing node ${e.from}`,ctx,null);
@@ -137,7 +137,7 @@ function wfValidatePanelShow(issues){
   issues.forEach(i=>{
     // Two-line rows: owner on top, full message below (wraps — never clipped).
     const row=document.createElement("button"); row.type="button"; row.className="wf-vald-item";
-    row.innerHTML=`<span class="hd"><span class="wf-vald-sev ${i.sev}">${i.sev==="err"?"ERROR":"WARN"}</span>`+
+    row.innerHTML=`<span class="hd"><span class="wf-vald-sev ${i.sev}">${i.sev==="err"?"ERR":"WRN"}</span>`+
       `<span class="who">${escHtml(i.ctx.name)}</span></span>`+
       `<span class="msg">${escHtml(i.msg)}</span>`;
     row.onclick=()=>wfFocusIssue(i);

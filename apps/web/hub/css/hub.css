@@ -40,7 +40,10 @@
 .lib-heading { display: flex; flex-direction: column; justify-content: center; gap: 2px; flex-shrink: 0; }
 .lib-title-row { display: flex; align-items: baseline; gap: var(--s3); }
 .lib-title { font-size: var(--t-head); font-weight: 700; line-height: 1.05; letter-spacing: -.02em; color: var(--ink); }
+/* A fixed measure, so "6 projects" turning into "0 of 6" while searching
+   does not slide the search field sideways under the cursor. */
 .lib-count {
+  min-width: 11ch;
   font-family: var(--mono); font-size: var(--t-caption); color: var(--muted);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
@@ -69,7 +72,7 @@
 .lib-actions #btn-new { margin-left: var(--s2); padding: 0 14px; font-size: var(--t-body); }
 
 .app-ver { padding: 3px 7px; border-radius: var(--r-sm); margin-right: var(--s2);
-  border: 1px solid var(--accent-bd); background: var(--accent-bg); color: var(--accent);
+  border: 1px solid var(--border); background: var(--alt); color: var(--dim);
   font-family: var(--mono); font-size: var(--t-micro); font-weight: 600; }
 .app-ver:empty { display: none; }
 .app-upd { height: 28px; padding: 0 11px; margin-right: var(--s2); border-radius: var(--r-sm);
@@ -196,14 +199,16 @@
   justify-content: center;
   gap: 6px;
   border-radius: var(--r-sm);
-  border: 1px solid var(--accent-bd);
-  background: var(--accent-bg);
-  color: var(--accent-hover);
+  border: 1px solid var(--ok-bd);
+  background: var(--ok-bg);
+  color: var(--ok-ink);
   font-size: var(--t-ui);
   font-weight: 700;
   transition: background .14s, border-color .14s, color .14s;
 }
-.game-run:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+/* Run is the suite's one green action — the same quiet tint as the Runner's
+   Start, filling on hover. */
+.game-run:hover { background: var(--ok); border-color: var(--ok); color: var(--on-ok); }
 .game-run:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Edit / Build / Delete — secondary, and icon-only, so they stay quiet
@@ -329,7 +334,7 @@
 .ctrl-tag.adb { color: var(--ok-ink); background: var(--ok-bg); border-color: var(--ok-bd); }
 .ctrl-tag.win32 { color: var(--win32); background: var(--win32-bg); border-color: var(--win32-bd); }
 .game-state {
-  margin-top: auto;
+  margin-top: 2px;
   min-width: 0;
   color: var(--muted);
   font: 500 var(--t-caption)/1.3 var(--sans);
@@ -408,7 +413,7 @@
   width: 44px; height: 44px;
   margin: -22px 0 0 -22px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--ok);
   opacity: 0;
   transform: scale(.88);
   transition: opacity .14s var(--ease), transform .14s var(--ease);
@@ -421,7 +426,7 @@
   z-index: 1;
   width: 18px; height: 18px;
   margin: -9px 0 0 -7px;
-  background: var(--on-accent);
+  background: var(--on-ok);
   -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L7.5 3.64A1 1 0 0 0 6 4.5z'/></svg>") center / contain no-repeat;
   mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L7.5 3.64A1 1 0 0 0 6 4.5z'/></svg>") center / contain no-repeat;
   opacity: 0;

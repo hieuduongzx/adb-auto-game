@@ -612,7 +612,8 @@ function wfRenderVarsPanel(){
     b.onclick=()=>{wfVarsScope=scope;wfRenderVarsPanel();};tabs.append(b);});
   body.append(tabs);
   const context=document.createElement("div");context.className="wf-vars-context";
-  context.textContent=wfVarsScope==="global"?"Shared across all activities":act?(act.name||"Activity"):"Select an activity to edit local variables";body.append(context);
+  // Global needs no caption (the switch says it); Local names whose variables these are.
+  context.textContent=wfVarsScope==="global"?"":act?(act.name||"Activity"):"Select an activity to edit local variables";body.append(context);
   const vars=wfVarsScope==="global"?(WF.globals||[]):(act&&act.vars||[]);
   $("wf-vars-count").textContent=String(vars.length);
   function rows(list,depth=0,prefix=""){
@@ -646,7 +647,6 @@ function wfRenderVarsPanel(){
     });
   }
   rows(vars);
-  if(!vars.length){const empty=document.createElement("div");empty.className="wf-vars-empty";empty.textContent="No variables yet. Add one to configure this workflow.";body.append(empty);}
   const add=document.createElement("button");add.type="button";add.className="btn sm";add.textContent="+ Add variable";
   add.disabled=wfVarsScope==="local"&&!act;add.onclick=()=>wfVarsScope==="global"?wfAddQuickGlobal():wfAddQuickLocal();body.append(add);
   const extra=Object.entries(wfLiveVars).filter(([name])=>!vars.some(v=>v.name===name));

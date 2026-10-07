@@ -338,8 +338,6 @@ function wfRenderInspector(){
     const tipBlock=wfInspBlock();
     tipBlock.innerHTML=
       `<div class="wf-empty">
-        <div class="wf-empty-t">Select a block to edit</div>
-        <div class="wf-empty-s">Click a node on the canvas to see that block's parameters, note and log.</div>
         <div class="wf-empty-keys">
           <span><b>Ctrl+F</b> find block</span>
           <span><b>Del</b> delete</span>

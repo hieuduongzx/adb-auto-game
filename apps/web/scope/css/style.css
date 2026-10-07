@@ -88,6 +88,7 @@ input, select { font-size: var(--t-caption); padding: 4px 7px; }
 .telemetry-item > span:last-child[data-state="stale"], .telemetry-item > span:last-child[data-state="warning"] { color:var(--warn); }
 .telemetry-operation { flex:1 1 280px; border-right:0; }
 .selection-readout { display:flex; flex-shrink:0; gap:7px; align-items:center; padding:5px 10px; border-top:1px solid var(--border); background:var(--surface); }
+.selection-label { color:var(--muted); font:500 var(--t-caption)/1.4 var(--sans); }
 #selection-state { font:var(--t-caption)/1.4 var(--mono); overflow-wrap:anywhere; user-select:text; }
 
 /* Preview */
@@ -153,9 +154,10 @@ input, select { font-size: var(--t-caption); padding: 4px 7px; }
 .badge.cyan .bd { width: 6px; height: 6px; border-radius: 50%; background: #06b6d4; }
 :root[data-theme="dark"] .badge.cyan { color: #67d8ef; background: rgba(103,216,239,.12); border-color: rgba(103,216,239,.3); }
 
-#ocr-engine { font-size: var(--t-micro); font-weight: 700; color: var(--ok-ink);
-  background: var(--ok-bg); border: 1px solid var(--ok-bd); padding: 2px 7px;
+#ocr-engine { font-size: var(--t-micro); font-weight: 700; color: var(--dim);
+  background: var(--alt); border: 1px solid var(--border); padding: 2px 7px;
   border-radius: var(--r-xs); }
+#ocr-engine.ready { color: var(--ok-ink); background: var(--ok-bg); border-color: var(--ok-bd); }
 #ocr-engine.unavailable { color: var(--warn); background: var(--warn-bg); border-color: var(--border); }
 
 /* Checkbox rows — the box itself is shared/base.css. */
@@ -234,6 +236,8 @@ input, select { font-size: var(--t-caption); padding: 4px 7px; }
 #status-text { font-size: var(--t-caption); color: var(--dim); font-weight: 500;
   flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #hover-pos  { font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); min-width: 88px; text-align: right; }
+/* The pointer readout and its separator only exist while hovering the frame. */
+#hover-pos:empty, #hover-pos:empty + span { display: none; }
 #footer-out { font-size: var(--t-caption); color: var(--log-muted); font-family: var(--mono); }
 
 @media (max-width: 900px) {

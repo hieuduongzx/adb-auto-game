@@ -916,7 +916,7 @@ function wfPvAttachCanvas(){
     if(wfPvPanning){ wfPvPanning=false; c.style.cursor="crosshair"; }
     wfPvHover=null; wfPvHoverHex="";
     if(wfPvImg) wfPvDraw();
-    const hp=document.getElementById("hover-pos"); if(hp) hp.textContent="-";
+    const hp=document.getElementById("hover-pos"); if(hp) hp.textContent="";
   });
 
   // The tap/swipe now happens on right-mouseup (short = tap, drag = swipe);
