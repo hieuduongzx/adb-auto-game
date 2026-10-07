@@ -475,7 +475,7 @@ function wfRenderCanvas(){
   wfRenderVarsPanel();
 }
 
-// ── Variables panel (top-right of canvas) ─────────────────────────────────────
+// ── Variables panel (bottom-right of canvas) ──────────────────────────────────
 // Collect every variable the user can reference: declared on the current
 // activity (with their declared default), plus any live values the engine has
 // pushed during a test run. Live values override declared defaults.
@@ -542,7 +542,7 @@ function wfInitVarsPanel(){
   });
 }
 // ── Left-column dock tabs: Activities · Functions ───────────────────────────
-// Variables use their own top-right canvas disclosure.
+// Variables use their own bottom-right canvas disclosure.
 const WF_DOCK_TABS=["act","fn"];
 let wfDockTab="act";
 try{ const t=localStorage.getItem("wfDockTab"); if(WF_DOCK_TABS.includes(t)) wfDockTab=t; }catch{}
@@ -867,12 +867,14 @@ function wfShowGlobsEditorLegacy(){
   render();
   pop.appendChild(body);
   document.body.appendChild(pop);
-  // Anchor below the "+" button (vars panel is now top-right).
+  // Anchor below the "+" button, or above it when the window has no room
+  // underneath (the Variables panel sits at the bottom-right of the canvas).
   const btn=$("wf-vars-add");
   if(btn){
-    const r=btn.getBoundingClientRect();
+    const r=btn.getBoundingClientRect(), h=pop.offsetHeight;
     let left=r.right-250, top=r.bottom+6;
-    pop.style.top=Math.max(8, top)+"px";
+    if(top+h>window.innerHeight-8) top=r.top-6-h;
+    pop.style.top=Math.max(8, Math.min(window.innerHeight-8-h, top))+"px";
     pop.style.left=Math.max(8, Math.min(window.innerWidth-250, left))+"px";
   }
 }

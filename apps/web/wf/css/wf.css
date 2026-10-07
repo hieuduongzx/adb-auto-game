@@ -445,11 +445,15 @@
 /* Panes share the one scrolling body, so --act-h sizes whichever tab is open. */
 .wf-dock-pane { display:none; flex-direction:column; min-height:0; }
 .wf-dock-pane.active { display:flex; }
-/* Variables are a top-right disclosure on the canvas: the compact labelled
-   trigger is always findable, while the editor only consumes space on demand. */
-.wf-vars-panel { position:absolute; top:12px; right:12px; z-index:8; width:320px;
+/* Variables are a bottom-right disclosure on the canvas: the compact labelled
+   trigger is always findable, and the editor unfolds upwards only on demand.
+   Bottom-right, not top-right: graphs open at the top-left and long chains
+   run along the top, where the trigger used to sit on top of a block; the
+   bottom-right corner is the one a graph reaches last (and it mirrors Arrange
+   bottom-left). column-reverse keeps the trigger at the bottom edge. */
+.wf-vars-panel { position:absolute; bottom:12px; right:12px; z-index:8; width:320px;
   max-width:calc(100% - 24px); max-height:calc(100% - 24px); display:flex;
-  flex-direction:column; overflow:hidden; background:var(--panel); border:1px solid var(--border);
+  flex-direction:column-reverse; overflow:hidden; background:var(--panel); border:1px solid var(--border);
   border-radius:var(--r-md); box-shadow:var(--sh-sm); }
 #workflow-view.wf-preview-on .wf-vars-panel,
 #workflow-view.wf-library-on .wf-vars-panel { display:none; }
@@ -461,10 +465,11 @@
 .wf-vars-chevron { width:14px; height:14px; margin-left:auto; color:var(--muted);
   fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
   transition:transform .15s var(--ease); }
-.wf-vars-panel:not(.collapsed) .wf-vars-chevron { transform:rotate(180deg); }
+/* Collapsed it points up (it opens upwards); open it points down to close. */
+.wf-vars-panel.collapsed .wf-vars-chevron { transform:rotate(180deg); }
 .wf-vars-panel.collapsed { width:auto; }
 .wf-vars-panel.collapsed .wf-vars-body { display:none; }
-.wf-vars-panel:not(.collapsed) .wf-vars-toggle { border-bottom:1px solid var(--line); }
+.wf-vars-panel:not(.collapsed) .wf-vars-toggle { border-top:1px solid var(--line); }
 .wf-vars-panel.live .wf-vars-live { display:inline; color:var(--run-ok); }
 .wf-vars-body { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:var(--s3); }
 .wf-vars-tabs { display:flex; gap:4px; margin-bottom:8px; }
