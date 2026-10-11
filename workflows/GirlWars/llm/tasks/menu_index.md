@@ -8,7 +8,7 @@ Lobby đã kiểm tra. Các task theo icon có chấm đỏ (tọa độ 1920x10
 | 2 | Mail | Thư (6) | (378,150) | Nhận đính kèm miễn phí |
 | 3 | Celebration | Trống | (920,150) | Sự kiện lễ hội |
 | 4 | Event | Quạt | (1070,150) | Sự kiện chung |
-| 5 | Arena | Trống Arena | (1745,415) | 5 mode, xem `arena.md` — lần chạy 11/10 đã dọn |
+| 5 | Arena | Trống Arena | (1745,415) | 5 mode, xem `arena.md` — lần chạy 11/10 đã dọn sạch; còn chấm đỏ tổng không tắt |
 | 6 | Adventure | Torii | (1345,400) | Phiêu lưu, nhận thưởng |
 | 7 | Bond Festival | Đang diễn ra | (1745,700) | Sự kiện — xem `bondfestival.md` |
 | 8 | Guild | Guild | (1795,940) | Nhiệm vụ/điểm guild |
@@ -29,9 +29,12 @@ miễn phí của event. Cấu trúc màn hình, kinh tế Festival Popularity, 
 tắc an toàn tiền tệ nằm hết trong `bondfestival.md`.
 
 ## Trạng thái mới nhất (11/10/2026)
-- [x] **Arena** — dọn xong cả 5 mode, chi tiết trong `arena.md`: Dawnstar Cup Path of Champions
-  Claim All (35/60), Martial Arts Cup Achiv + 5 trận thắng (rank 29), Spa Battle Exclusive SPA.
-  Còn dở: Dimensional Arena còn 9 lượt nhưng nút Challenge không phản hồi; Arena thường hết lượt.
+- [x] **Arena** — dọn xong cả 5 mode, chi tiết trong `arena.md`. Dimensional Arena **9 trận
+  toàn thắng**, Silver **505 → 721/750**, hạng **168 → 88** (hết lượt 0/10, không mua lượt).
+  Dawnstar Cup Path of Champions Claim All (35/60), Martial Arts Cup Achiv + 5 trận thắng
+  (rank 29), Spa Battle Exclusive SPA Claim ×46080 + ×1824. Nút Challenge Dimensional Arena
+  ở **`(1602,984)`** — note cũ ghi `(1330,958)` là sai.
+  Còn chờ hồi lượt: Arena thường 0/5 (reset ~3 h), Martial Arts 0/5.
 - [x] Quest: Claim All daily, Rewards Standard Lv.3 (battle pass). Tránh gói Fantasy Skin $14.99.
 - [x] Mail: Read All (không Delete All). System Mail: Claim All (gem x300 + rương).
 - [ ] Event, Adventure, Guild, Hero, Bag, Mansion, Shikigami, Rune, Downtown, World: CHƯA làm.
