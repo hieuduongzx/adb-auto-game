@@ -80,6 +80,39 @@ The Trapped Actress Destined Return → Sorceress of Avalon… (các banner còn
 - **Mansion › Marriage (My Room)**: Auto Date dùng vitality; hết vitality thì dừng, **không bấm Restore**.
 - **Quest**: milestone Daily 100 vẫn còn chấm đỏ (bấm không nhận), tab **Rewards** `(88,352)` còn chấm đỏ — chưa rõ nội dung, cần soi lại lần sau.
 
+### Lượt 2 — quét lại toàn bộ danh sách
+Thứ tự sau khi cuộn lên hết: Harvest Food Carnival → Liu bang UR·EX → Li Bai-Destined Bride →
+**Blossom Bonding Bond Festival Now Open!** → **Departure! To Starchaser Isle!** → **The Trapped Actress**
+→ Float Marching → **UR·EX Sorceress of Avalon Returns (Morgan)** → 1ST TOP-UP → Harvest Festival Top-up
+→ Resurrection Pack → Construction Pack…
+
+- **Departure! To Starchaser Isle!** (banner chính, còn nợ từ phiên trước — đã làm):
+  - **Bundle Shop** `(1660,745)` → ô đầu **Free ×500 Investment Funds** → nút xanh `(517,652)` ✓ (dot tắt).
+  - **Island Holiday** `(1360,293)`: mốc **Lv.20 (bills ×900)** + **Lv.21 (chest ×1500)** bấm để nhận ✓.
+  - **Island Mission** `(395,640)`: 5 dòng đều chưa đạt (12/15, 89/100, 21550/30000, 4/30, 0/1) → không Claim.
+    Tab **Guild** khoá hết (cần Personal Points 50000, đang 21550).
+  - **Calendar** `(853,837)`: dot vẫn treo, bấm mãi không mở (dải chữ chạy che) — **còn nợ**.
+  - **Transport Route** `(1660,492)`: **Plunder 4/4 thắng** — Jared SR 48M ×2, Cjad SSR 55M ×2 (BP mình 78M).
+    Ngoaho SSR 147M / MrB00 SSR 296M quá khoẻ → bỏ. Kết quả: gem ×6, pha lê ×2×2, trăng ×2 (mỗi trận).
+    **Refresh** `(1780,537)` reroll miễn phí (MrB00 296M, Cjad 55M sau reroll).
+  - **The Gold Escort** `(1760,228)`: 2 rương order cũ đã thu ✓; dispatch 2 order mới
+    (SSR Golden Beach + UR Natural Museum, mỗi order 3h). Điền đội: mở ô gear `(1432,676)` →
+    tap 6 tướng dưới đáy → back `(85,45)` → **Dispatch** `(960,845)`.
+- **Blossom Bonding Bond Festival**: landing mới có Ranking / Ranking Rewards / Quests / Rewards / Stamps Book / Exchange / Pack.
+  - **Quests** `(150,438)`: **Warm-Up Challenge** Claim ✓, **Joyful Rewards** Claim ✓ — sau khi đăng request ở Post Exchange.
+  - **Post Exchange** `(1268,60)`: Post `(865,293)` → chọn tem Obtain `(950,382)` → Confirm `(960,845)`
+    → chọn tem Use `(550,538)` → **Exchange** `(960,873)`. Request treo 24h.
+  - *Bond Parade-2* vẫn 49/50 — cần thêm 1 lần wander (⚡ đang 0).
+- **The Trapped Actress** (Nero Claudius): splash → Confirm → hub; **Summon the Bride** chỉ có Draw 1x/10x **tốn vé, không có Free**.
+  Icon **Exchange** `(110,265)` thật ra mở **My Room**: **Auto Date** `(1250,947)` dùng Vitality
+  (đã dùng tiếp 2 điểm, về 0/10) — hết thì hiện **Restore x1 Vitality**, **không bấm**.
+  Nút **Evolve** ở thẻ bride mở **Ring Advance** cần token hồng `1/2` → chưa đủ, bỏ qua.
+- **UR·EX Sorceress of Avalon Returns (Morgan)**: hub **Goddess Return** có Reunion Encounter / Return Discount /
+  **Sweet Fantasy** (Challenge chỉ deploy Morgan UR-EX, Challenge Reward). Không thấy mục Free nào.
+- **Harvest Food Carnival › Food Arcade**: **Dessert Battle** là mini-game gộp bánh (Suika).
+  Nút **Battle Tasks** đòi *Reach 500 / 800 / 1500 points* (thưởng dice ×1). Thả bánh = **swipe**, không phải tap.
+  Chơi tự động (`dessertbattle.py`) chỉ đạt ~330–460 điểm, chưa qua mốc 500. **Còn nợ.**
+
 ### Bẫy mới
 - Từ màn Summon, nút **Claim Reward** `(1800,990)` mở một HUB event khác (Event/Bag…) chứ không phải popup nhận quà.
 - Trên map Bond Festival, sân khấu Kagura trôi theo camera: sau khi cuộn map phải quét lại chỗ có bong bóng sake (lần này ở `(820,400)` rồi `(610,370)`).
