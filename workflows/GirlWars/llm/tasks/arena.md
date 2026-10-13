@@ -130,10 +130,18 @@ match 2 times` vẫn 1/2, thanh vẫn 35/60. **1 lượt tính cho 1 round**, kh
 3. → **Battle Preparation**: `Total BP` 2 bên, `Deployed Heroes: 12/12`, hint
    *"Drag heroes to adjust their positions"*. Không cần chỉnh gì.
 4. **Bắt đầu trận**: tap **quả cầu lửa / chữ `Battle` giữa sân `(960,490)`**. (Tap `(960,515)`
-   trượt — nhắm vào tâm quả cầu cao hơn một chút.)
-5. Trận chạy → có nút **Skip `(1830,490)`** ở cột icon phải (`buff / Skip / x2 SPD / Open`).
+   trượt — nhắm vào tâm quả cầu cao hơn một chút.) **BẪY THỜI ĐIỂM:** sau khi tap cột đối thủ,
+   game chạy **~24 s VS splash** rồi mới sang Preparation; tap orb **trong lúc splash bị ăn mất**,
+   nên vòng lặp cứ tap mà trận không bắt đầu. Phải **chờ tới khi `is_prep(img)` True** (orb lửa
+   ~11–13k px cam bão hoà ở `img[430:575, 780:1140]`, nơi khác ≤1.7k) **rồi mới** tap `(960,490)`.
+5. Trận chạy → cột icon phải **cố định** trong mọi trận, thứ tự `buff / Skip / x2 SPD / Open`,
+   x≈1825. Toạ độ đo bằng white-glyph run trên `img[:, 1790:1875]`: buff 345–395,
+   **Skip tâm `y≈508`** (495–525), x2/SPD 630–662, Open 760–825 → **`SKIP = (1825, 508)`**.
    **Bấm Skip liên tục** để tua animation (animation kỹ năng chèn giữa trận nên đôi khi phải
    bấm 8–10 lần trong ~10 giây).
+   **TRƯỚC ĐÂY GHI SAI** `Skip (1830,490)` — `y=490` rơi vào nút **buff**, mở overlay buff.
+   Vàng cam của ô `x2 SPD` **chỉ cam khi đang ×2**; về ×1 nó nhạt đi, nên **không** neo Skip
+   theo ô đó — neo theo glyph trắng cố định `y≈508`.
 6. **Victory** → `Battle Result`: `Winning Streak` + điểm streak, dải hạng (Points +N, thanh
    Silver). `Tap to continue` `(960,1045)`.
 7. Popup **Pts Change**: `Points 527 (+22)`, `Ranking 150 (+17)`. `Tap to continue` `(960,1045)`
