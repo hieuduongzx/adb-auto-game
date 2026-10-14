@@ -451,7 +451,7 @@ function wfShowVarMenu(anchor,onPick,opts){
   const addGlobal=document.createElement("button"); addGlobal.type="button"; addGlobal.className="wf-varmenu-add";
   addGlobal.innerHTML=`${wfIco("pin")}<span>New global variable…</span>`;
   addGlobal.onclick=()=>{
-    uiPrompt({title:"New global variable", label:"Title", placeholder:"e.g. Đọc email"}).then(v=>{
+    uiPrompt({title:"New global variable", label:"Title", placeholder:"e.g. Read mail"}).then(v=>{
       const title=(v||"").trim();
       if(!title) return;
       wfPushUndoDebounced();
@@ -467,7 +467,7 @@ function wfShowVarMenu(anchor,onPick,opts){
     const addLocal=document.createElement("button"); addLocal.type="button"; addLocal.className="wf-varmenu-add";
     addLocal.innerHTML=`${wfIco("pin")}<span>New local variable…</span>`;
     addLocal.onclick=()=>{
-      uiPrompt({title:"New local variable", label:`Title (activity «${act.name||"activity"}»)`, placeholder:"e.g. Đọc email"}).then(v=>{
+      uiPrompt({title:"New local variable", label:`Title (activity «${act.name||"activity"}»)`, placeholder:"e.g. Read mail"}).then(v=>{
         const title=(v||"").trim();
         if(!title) return;
         wfPushUndoDebounced();
@@ -1686,7 +1686,7 @@ function wfSequencePointsField(node,f){
   const add=document.createElement("button"); add.type="button"; add.className="btn sm"; add.textContent="+ Tap";
   add.onclick=()=>{ wfPushUndoDebounced(); const picked=(typeof wfPvPoint!=="undefined"&&Array.isArray(wfPvPoint))?wfPvPoint:null; arr().push({x:picked?picked[0]:0,y:picked?picked[1]:0,delay:0}); wfUpdNodeSum(node); renderList(); };
   actions.appendChild(add);
-  const hint=document.createElement("div"); hint.className="wf-insp-tip"; hint.textContent="Tap theo thứ tự; delay được chờ sau mỗi tap, kể cả tap cuối.";
+  const hint=document.createElement("div"); hint.className="wf-insp-tip"; hint.textContent="Taps run in order; each delay is waited after its tap, the last one included.";
   wrap.append(list,actions,hint); return wrap;
 }
 

@@ -117,7 +117,7 @@ def _import_win32():
         return ctypes, win32gui, win32ui, win32con, win32api, win32process
     except Exception as exc:  # pragma: no cover
         raise RuntimeError(
-            "Win32 backend cần gói 'pywin32' (pip install pywin32). Chi tiết: %s" % exc
+            "The Win32 backend needs the 'pywin32' package (pip install pywin32). Details: %s" % exc
         ) from exc
 
 

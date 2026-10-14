@@ -1236,49 +1236,49 @@ async function wfOfferUnityBridgeDeploy(opts){
     let st=null;
     try{ st=await api().unity_bridge_status(cfg, ""); }catch{}
     if(!opts.force && st && st.bridgeRunning){
-      uiToast("Unity Bridge đang chạy trong game ("+st.bridge+")","success"); return;
+      uiToast("Unity Bridge is running in the game ("+st.bridge+")","success"); return;
     }
     if(!st || !st.exe){
       const pick=await uiConfirm({title:"Unity Bridge",
-        message:"Chưa xác định được game từ cửa sổ mục tiêu (chưa chọn cửa sổ hoặc game chưa mở). Chọn file .exe của game Unity để triển khai plugin?",
-        ok:"Chọn file exe…", cancel:"Để sau"});
+        message:"Couldn't tell which game this is from the target window (no window chosen, or the game isn't open). Choose the Unity game's .exe to deploy the plugin?",
+        ok:"Choose .exe…", cancel:"Later"});
       if(!pick) return;
       let exe="";
       try{ exe=await api().pick_file("")||""; }catch{}
       if(!exe) return;
       try{ st=await api().unity_bridge_status(cfg, exe); }catch{ st=null; }
-      if(!st){ uiToast("Không kiểm tra được game","error"); return; }
+      if(!st){ uiToast("Couldn't check the game","error"); return; }
     }
     const list=items=>`<ul style="margin:8px 0 8px 18px">${items.map(s=>`<li>${escHtml(s)}</li>`).join("")}</ul>`;
     if(st.problems && st.problems.length){
-      await uiModal({title:"Không thể triển khai Unity Bridge",
+      await uiModal({title:"Can't deploy Unity Bridge",
         body:`<div class="ui-modal-msg">${escHtml(st.exe||"")}</div>`+list(st.problems),
         buttons:[{label:"OK", value:true, kind:"accent"}]});
       return;
     }
     const steps=[
-      "Không copy file nào vào thư mục game - Macro2k nạp Macro2kBridge thẳng vào tiến trình game đang chạy"
-      +(st.backend==="IL2CPP" ? " (DLL native, LoadLibrary)" : " (DLL managed, qua Mono runtime)"),
-      "Tự nạp lại mỗi khi workflow gắn vào game (không cần thao tác lại sau khi restart game)",
+      "Nothing is copied into the game folder - Macro2k loads Macro2kBridge straight into the running game"
+      +(st.backend==="IL2CPP" ? " (native DLL, LoadLibrary)" : " (managed DLL, through the Mono runtime)"),
+      "Loaded again whenever the workflow attaches to the game - nothing to redo after a game restart",
     ];
-    if(st.legacyBepinex) steps.push("Dọn các file BepInEx cũ còn sót trong thư mục game (từ bản Macro2k trước)");
-    if(st.bridgeRunning) steps.push("Bridge đang chạy: "+st.bridge);
-    const ok=await uiModal({title:"Triển khai Unity Bridge?",
+    if(st.legacyBepinex) steps.push("Removes BepInEx files an older Macro2k left in the game folder");
+    if(st.bridgeRunning) steps.push("Bridge running: "+st.bridge);
+    const ok=await uiModal({title:"Deploy Unity Bridge?",
       body:`<div class="ui-modal-msg">Game: <b>${escHtml(st.gameDir||"")}</b><br>Unity ${escHtml(st.backend||"")} · ${escHtml(st.arch||"?")}</div>`+
         list(steps)+
-        `<div class="ui-modal-msg" style="opacity:.75">Plugin chạy trong game và nhận lệnh tap/swipe qua 127.0.0.1:${escHtml(String(st.port||17820))}. `+
-        `Cần game đang mở để nạp được ngay; nếu chưa mở, Macro2k sẽ tự nạp khi workflow gắn vào game. `+
-        `Game online có anti-cheat có thể phát hiện việc nạp DLL - tự cân nhắc rủi ro.</div>`,
-      buttons:[{label:"Để sau", value:false}, {label:"Triển khai", value:true, kind:"accent"}]});
+        `<div class="ui-modal-msg" style="opacity:.75">The plugin runs inside the game and takes tap/swipe commands on 127.0.0.1:${escHtml(String(st.port||17820))}. `+
+        `The game must be open to load it now; if it isn't, Macro2k loads it when the workflow attaches to the game. `+
+        `Online games with anti-cheat may detect the injected DLL - weigh that risk yourself.</div>`,
+      buttons:[{label:"Later", value:false}, {label:"Deploy", value:true, kind:"accent"}]});
     if(!ok) return;
     let res=null;
     try{ res=await api().unity_bridge_deploy(st.exe); }catch(e){ res={ok:false, error:String(e)}; }
     if(res && res.ok){
-      uiToast(res.injected ? "Đã nạp Unity Bridge vào game đang chạy"
-                           : "Unity Bridge sẽ được nạp khi workflow gắn vào game - hãy mở game trước","success",{dur:6000});
+      uiToast(res.injected ? "Unity Bridge loaded into the running game"
+                           : "Unity Bridge loads when the workflow attaches to the game - open the game first","success",{dur:6000});
       setStatus("Unity Bridge: "+(res.actions||[]).join(" · "));
     }else{
-      uiToast("Triển khai thất bại: "+((res&&res.error)||"unknown"),"error",{dur:8000});
+      uiToast("Deploy failed: "+((res&&res.error)||"unknown"),"error",{dur:8000});
     }
   }finally{
     wfUnityBridgeBusy=false;
@@ -1405,7 +1405,7 @@ function wfOpenProjectSettings(){
         `</div>`+
         `<div class="wf-proj-row" id="wf-unity-bridge-row" style="display:none">`+
           `<label for="wf-unity-bridge-deploy">Unity Bridge</label>`+
-          `<button type="button" class="btn" id="wf-unity-bridge-deploy" title="Check the in-game plugin and deploy BepInEx + Macro2kBridge into the game folder">Kiểm tra / triển khai…</button>`+
+          `<button type="button" class="btn" id="wf-unity-bridge-deploy" title="Check the in-game plugin and deploy BepInEx + Macro2kBridge into the game folder">Check / deploy…</button>`+
         `</div>`;
       secWin.appendChild(rowWinOpts);
       form.appendChild(secWin);
@@ -1417,7 +1417,7 @@ function wfOpenProjectSettings(){
       rowOcr.innerHTML=
         `<label for="wf-ocr-select">Text model</label>`+
         `<select id="wf-ocr-select" title="Recognition model for Wait text / If text / Read → variable / Parse"></select>`+
-        `<div class="hint">Auto = first available backend. Saved into the workflow JSON.</div>`;
+        `<div class="hint">Reads text for Tap / Wait / If text and Read text. Saved into the workflow JSON.</div>`;
       secOcr.appendChild(rowOcr);
       form.appendChild(secOcr);
 
