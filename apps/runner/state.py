@@ -475,6 +475,7 @@ class StateMixin:
             **self._running_payload(),
             "speedhack": self.engine.speedhack_info(),
             "rounds": self._rounds_payload(),
+            "schedule": self._schedule_payload(),
             "connectedSerial": self._connected_serial,
             "selectedSerial": self._selected_serial,
             "captureBackend": get_capture_backend(),

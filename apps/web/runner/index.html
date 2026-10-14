@@ -232,6 +232,27 @@
               <p class="settings-note" id="rounds-note"></p>
             </section>
 
+            <!-- Scheduled starts (apps/runner/schedule.py): Start by itself at set
+                 times, every day. Saved with this workflow's Runner config. -->
+            <section class="settings-section" id="schedule-card">
+              <h2 class="settings-section-title">Schedule</h2>
+              <div class="toggle-row">
+                <button type="button" class="toggle" id="schedule-toggle" onclick="onScheduleToggle()" role="switch" aria-label="Start automatically" aria-checked="false"></button>
+                <div class="toggle-text">
+                  <div class="toggle-name">Start automatically</div>
+                  <div class="toggle-hint">Every day at these times, while this Runner is open.</div>
+                </div>
+              </div>
+              <div class="setting-block">
+                <label class="form-lbl" for="schedule-times">Start times</label>
+                <div class="setting-path-control">
+                  <input type="text" id="schedule-times" class="setting-path-input" spellcheck="false" autocomplete="off"
+                         placeholder="05:05, 17:05" onchange="onScheduleTimes(this.value)">
+                </div>
+              </div>
+              <p class="settings-note" id="schedule-note" role="status" aria-live="polite"></p>
+            </section>
+
             <!-- Machine-wide: every Runner on this PC shares it (src/notify.py). -->
             <section class="settings-section" id="notify-card">
               <h2 class="settings-section-title">Notifications</h2>

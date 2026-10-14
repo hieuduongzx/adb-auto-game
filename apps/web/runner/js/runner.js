@@ -27,6 +27,7 @@ const S = {
   rounds:          { count:1, rest:0 },  // passes a full Start makes (0 = until stopped), rest in s
   round:           null,   // live round of a repeating Start: {round, total, phase, restUntil}
   notify:          { when:"failed", desktop:true, discord:"" },  // machine-wide run notifications
+  schedule:        { enabled:false, times:[], next:null },        // scheduled daily starts
   mobileView:      "activities",
 };
 
@@ -330,6 +331,7 @@ function refreshButtons(){
   S.activities.forEach(a=>paintRow(a));   // "Waiting" / "Active" follow the run state
   renderUpdate();
   paintStatusPill();
+  renderFlowSub();   // "next start" shows only while idle
 }
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
@@ -1505,14 +1507,14 @@ function applyFlow(data){
   H.loaded = false; H.items = []; H.open = null;
   if($("r-hist") && $("r-hist").classList.contains("active")) ensureHistory();
   S.loaded = true;
+  S.controller = data.controller || S.controller;
   closeActivitySettings();
   const nm = $("flow-name");
   nm.textContent = runnerTitle(data.name); nm.classList.remove("empty");
   nm.title = nm.textContent;
   document.title = nm.textContent;
   renderAppIcon(data);
-  $("flow-sub").textContent = (data.controller === "win32" ? "Windows" : "Android")
-    + (U.version ? ` · v${U.version}` : "");
+  renderFlowSub();
   populateLists();
   updateProgress();
   const seq = S.activities.filter(a=>a.type!=="background").length;
@@ -1521,6 +1523,7 @@ function applyFlow(data){
   document.querySelector('[data-tab="bg"]').innerHTML  = `Background <span class="tab-count">${bg}</span>`;
   if(data.speedhack) applySpeedhack(data.speedhack);
   if(data.rounds) applyRounds(data.rounds);
+  if(data.schedule) applySchedule(data.schedule);
   if(data.captureBackend){
     S.captureBackend=data.captureBackend;
     const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
@@ -1579,6 +1582,7 @@ window.__recv = function(raw){
   if(type==="bridge_status"){ S.bridge=data; renderBridge(); return; }
   if(type==="launch_blocked"){ onLaunchBlocked(data); return; }
   if(type==="history_added"){ onHistoryAdded(data); return; }
+  if(type==="schedule_state"){ applySchedule(data); return; }
   if(type==="running_state"){
     applyRunState(data); return;
   }
@@ -1996,6 +2000,58 @@ function wireHistory(){
   });
 }
 
+// ── Schedule ──────────────────────────────────────────────────────────────────
+// Start presses itself at set times of day (apps/runner/schedule.py). The next
+// start shows in the header's subtitle while the Runner is idle.
+function fmtNextStart(epoch){
+  if(!epoch) return "";
+  const d = new Date(epoch * 1000), now = new Date();
+  const hm = d.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", hour12:false });
+  const mins = Math.max(0, Math.round((d - now) / 60000));
+  const left = mins < 60 ? `${mins}m` : `${Math.floor(mins/60)}h ${String(mins%60).padStart(2,"0")}m`;
+  const sameDay = d.toDateString() === now.toDateString();
+  return `${sameDay ? "today" : "tomorrow"} ${hm} · in ${left}`;
+}
+function applySchedule(sc){
+  S.schedule = Object.assign({ enabled:false, times:[], next:null }, sc || {});
+  renderSchedule();
+}
+function renderSchedule(){
+  const sc = S.schedule;
+  const t = $("schedule-toggle");
+  if(t){ t.classList.toggle("on", !!sc.enabled); t.setAttribute("aria-checked", String(!!sc.enabled)); }
+  const inp = $("schedule-times");
+  if(inp && document.activeElement !== inp) inp.value = (sc.times || []).join(", ");
+  const note = $("schedule-note");
+  if(note && note.dataset.kind !== "error"){
+    note.textContent = sc.enabled && sc.next ? `Next start ${fmtNextStart(sc.next)}.`
+      : (sc.times || []).length ? "Off - turn on to start at these times." : "Add times like 05:05, 17:05 and turn it on.";
+  }
+  renderFlowSub();
+}
+function renderFlowSub(){
+  const sub = $("flow-sub"); if(!sub || !S.loaded) return;
+  let text = (S.controller === "win32" ? "Windows" : "Android") + (U.version ? ` · v${U.version}` : "");
+  if(S.schedule.enabled && S.schedule.next && !S.running) text += ` · next start ${fmtNextStart(S.schedule.next)}`;
+  sub.textContent = text; sub.title = text;
+}
+async function saveSchedule(enabled, times){
+  const note = $("schedule-note");
+  let r = null;
+  try{ r = await api().set_schedule(enabled, times); }catch(_){ }
+  if(note) note.dataset.kind = "";
+  if(r && r.schedule) applySchedule(r.schedule);
+  if(!r || r.error){
+    if(note){ note.dataset.kind = "error"; note.textContent = (r && r.error) || "Couldn't save the schedule"; }
+  }
+}
+function onScheduleToggle(){
+  const inp = $("schedule-times");
+  saveSchedule(!S.schedule.enabled, inp ? inp.value : (S.schedule.times || []).join(","));
+}
+function onScheduleTimes(value){ saveSchedule(S.schedule.enabled || !!String(value).trim(), value); }
+setInterval(()=>{ if(S.schedule.enabled) renderSchedule(); }, 30000);
+
 // ── Run notifications ───────────────────────────────────────────────────────
 // When a full run ends: a Windows balloon and/or a Discord message. One
 // preference for every Runner on this PC (shared UI settings).
@@ -2269,7 +2325,7 @@ function mountRunnerSettings(){
   if(!_runnerSettingsRoot){
     const fragment = src && src.content.cloneNode(true);
     _runnerSettingsRoot = fragment && fragment.firstElementChild;
-    if(_runnerSettingsRoot) queueMicrotask(()=>{ renderRounds(); loadNotify(); });
+    if(_runnerSettingsRoot) queueMicrotask(()=>{ renderRounds(); renderSchedule(); loadNotify(); });
   }
   syncRunnerSettingsHost();
 }
@@ -2331,7 +2387,7 @@ async function init(){
                            captureBackend:st.captureBackend, controller:st.controller, win32:st.win32,
                            gamePathDefault:st.gamePathDefault, requirements:st.requirements, gamePath:st.gamePath,
                            emulator:st.emulator, emulatorDefault:st.emulatorDefault,
-                           rounds:st.rounds, icon:st.icon, iconKey:st.iconKey});
+                           rounds:st.rounds, schedule:st.schedule, icon:st.icon, iconKey:st.iconKey});
   else applyController(st.controller, st.win32);
   applyRunState(st);
   (st.log||[]).forEach(appendLog);

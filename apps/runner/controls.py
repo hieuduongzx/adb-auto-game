@@ -56,6 +56,7 @@ class ControlMixin:
                  "activities": self._activities_payload(),
                  "speedhack": self.engine.speedhack_info(),
                  "rounds": self._rounds_payload(),
+                 "schedule": self._schedule_payload(),
                  "captureBackend": backend,
                  "controller": ctrl,
                  "win32": dict(flow.get("win32") or {}),

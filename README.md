@@ -106,9 +106,12 @@ palette. **Arrange** spaces nodes automatically and can be undone with
 **Ctrl+Z**. Selecting a node highlights its incoming and outgoing wires.
 
 In the Runner, **Settings → Repeat** runs the sequence several rounds or
-until stopped, with a rest between rounds. Every finished run is recorded in
+until stopped, with a rest between rounds; **Schedule** presses Start by
+itself every day at set times (05:05, 17:05…); **Notifications** sends a
+Windows balloon and/or a Discord webhook message when a run ends. Every finished run is recorded in
 `data/runner/<workflow>/history.jsonl`: the **History** tab lists them and
-the Hub shows the newest one on each game's card.
+the Hub shows the newest one on each game's card, plus a Recent runs strip
+across every game.
 
 ## Build (Macro2k only)
 

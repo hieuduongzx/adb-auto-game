@@ -67,13 +67,14 @@ from runner.controls import ControlMixin
 from runner.devices import DeviceMixin
 from runner.outcome import OutcomeMixin
 from runner.preview import PreviewMixin
+from runner.schedule import ScheduleMixin
 from runner.settings import SettingsMixin
 from runner.state import StateMixin
 from runner.updates import UpdateMixin
 
 
 class WorkflowRunnerAPI(OutcomeMixin, StateMixin, UpdateMixin, ControlMixin, SettingsMixin,
-                        PreviewMixin, DeviceMixin):
+                        PreviewMixin, DeviceMixin, ScheduleMixin):
     """Methods exposed to JavaScript via ``pywebview.api.*``."""
 
     def __init__(self) -> None:
@@ -172,6 +173,7 @@ class WorkflowRunnerAPI(OutcomeMixin, StateMixin, UpdateMixin, ControlMixin, Set
         self._kick_device_scan()
         if runner_update.updates_supported(self._runner_info):
             threading.Thread(target=self._auto_check_update, daemon=True).start()
+        self._start_schedule_watch()
 
     # ── Log subscriber ───────────────────────────────────────────────────────
 

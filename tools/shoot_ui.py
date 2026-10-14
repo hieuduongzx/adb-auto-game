@@ -30,7 +30,7 @@ SAFE = {
     "get_last_workflow", "get_local_vars", "list_templates", "template_thumbnail",
     "image_thumbnail", "list_trash", "unity_bridge_status", "get_diagnostics",
     "find_duplicate_templates", "list_windows", "list_assets", "get_asset_thumbnail",
-    "get_history", "get_notify", "recent_runs",
+    "get_history", "get_notify", "recent_runs", "get_schedule",
 }
 
 
@@ -261,6 +261,10 @@ SCENES = [
     ("runner-rounds-idle", "runner", (1100, 760),
      "applyRounds({count: 5, rest: 600}); openHeaderPop('settings')"),
     ("runner-rounds-live", "runner", (1100, 760), RUNNER_ROUNDS),
+    ("runner-schedule", "runner", (1100, 760),
+     "applySchedule({enabled: true, times: ['05:05', '17:05'], next: Date.now() / 1000 + 3 * 3600 + 600});"
+     " openHeaderPop('settings');"
+     " const pop = document.querySelector('#settings-pop .rpane-scroll'); pop && (pop.scrollTop = 200);"),
     ("runner-notify", "runner", (1100, 760),
      "S.notify = {when: 'all', desktop: true, discord: 'https://discord.com/api/webhooks/1/x'};"
      " openHeaderPop('settings'); renderNotify();"
