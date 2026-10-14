@@ -30,6 +30,7 @@ SAFE = {
     "get_last_workflow", "get_local_vars", "list_templates", "template_thumbnail",
     "image_thumbnail", "list_trash", "unity_bridge_status", "get_diagnostics",
     "find_duplicate_templates", "list_windows", "list_assets", "get_asset_thumbnail",
+    "get_history",
 }
 
 
@@ -175,6 +176,36 @@ RUNNER_ROUNDS = """(() => {
   ids.forEach(id => send('activity_update', {id, status: 'completed'}));
 })()"""
 
+# Run history: a week of finished runs, one expanded.
+RUNNER_HISTORY = """(() => {
+  const now = Date.now() / 1000, acts = S.activities.filter(a => a.type !== 'background').slice(0, 6);
+  const tally = (bad) => acts.map((a, i) => ({id: a.id, name: a.name, completed: i === bad ? 0 : 3,
+    failed: i === bad ? 2 : 0, stopped: 0, seconds: 40 + i * 23}));
+  H.items = [
+    {start: now - 3900, end: now - 120, seconds: 3780, outcome: 'completed', rounds: 3,
+     reason: '3 rounds · 36 activities completed', activities: tally(-1)},
+    {start: now - 30000, end: now - 27000, seconds: 3000, outcome: 'failed', rounds: 3,
+     reason: '3 rounds · 2 of 36 activities failed', activities: tally(2)},
+    {start: now - 90000, end: now - 89000, seconds: 1000, outcome: 'stopped', rounds: 0,
+     reason: 'Stopped by you', activities: tally(-1).slice(0, 2)},
+    {start: now - 180000, end: now - 179200, seconds: 812, outcome: 'completed', rounds: 0,
+     reason: '12 activities completed', activities: tally(-1)},
+    {start: now - 260000, end: now - 259950, seconds: 50, outcome: 'completed', rounds: 0, scope: 'Arena',
+     reason: '1 activity completed', activities: tally(-1).slice(4, 5)},
+  ];
+  H.loaded = true; H.open = String(H.items[1].end);
+  switchRTab('hist');
+})()"""
+
+# A finished run that failed: the header keeps the result.
+RUNNER_DONE = """(() => {
+  const send = (type, data) => window.__recv(JSON.stringify({type, data}));
+  const ids = S.activities.filter(a => a.type !== 'background' && a.enabled).map(a => a.id);
+  send('running_state', {running: true, paused: false, startedAt: Date.now() / 1000 - 812, runScope: null});
+  ids.forEach((id, i) => send('activity_update', {id, status: i === 2 ? 'failed' : 'completed'}));
+  send('running_state', {running: false, paused: false, outcome: 'failed', runScope: null});
+})()"""
+
 # A test run part-way through: two blocks done, one live, one failed.
 DESIGNER_LIVE = """(() => {
   wfSetRunning(true);
@@ -189,6 +220,12 @@ DESIGNER_LIVE = """(() => {
 SCENES = [
     ("hub", "hub", (1280, 800), ""),
     ("hub-narrow", "hub", (820, 760), ""),
+    ("hub-lastrun", "hub", (1280, 800),
+     "(() => { const now = Date.now() / 1000;"
+     " const runs = [{outcome: 'completed', end: now - 7300, seconds: 3790, rounds: 3, reason: '3 rounds'},"
+     " {outcome: 'failed', end: now - 90000, seconds: 812, rounds: 0, reason: '1 of 16 failed'},"
+     " {outcome: 'stopped', end: now - 400, seconds: 95, rounds: 0, reason: 'Stopped by you', scope: 'Arena'}];"
+     " GAMES.slice(0, 3).forEach((g, i) => { g.lastRun = runs[i]; }); render(); })()"),
     ("hub-focus", "hub", (1280, 800), "document.querySelectorAll('.game-cover')[1].focus()"),
     ("hub-new", "hub", (1280, 800), "createWorkflow()"),
     ("hub-nomatch", "hub", (1280, 800),
@@ -209,6 +246,9 @@ SCENES = [
     ("runner-actset-narrow", "runner", (440, 820),
      "openActivitySettings((S.activities.find(a => (a.vars||[]).length > 2) || S.activities[0]).id)"),
     ("runner-pop-settings", "runner", (1100, 760), "openHeaderPop('settings')"),
+    ("runner-history", "runner", (1100, 760), RUNNER_HISTORY),
+    ("runner-history-narrow", "runner", (440, 820), RUNNER_HISTORY),
+    ("runner-done", "runner", (1100, 760), RUNNER_DONE),
     ("runner-rounds-idle", "runner", (1100, 760),
      "applyRounds({count: 5, rest: 600}); openHeaderPop('settings')"),
     ("runner-rounds-live", "runner", (1100, 760), RUNNER_ROUNDS),

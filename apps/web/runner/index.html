@@ -91,6 +91,7 @@
   <div id="mobile-tabs" role="tablist" aria-label="Runner views" aria-orientation="horizontal">
     <button class="mobile-tab active" id="mobile-tab-activities" type="button" role="tab" aria-selected="true" aria-controls="pane-left" data-mobile-view="activities" onclick="switchMobileView('activities')">Activities</button>
     <button class="mobile-tab" id="mobile-tab-log" type="button" role="tab" aria-selected="false" aria-controls="r-log" data-mobile-view="log" onclick="switchMobileView('log')">Log</button>
+    <button class="mobile-tab" id="mobile-tab-history" type="button" role="tab" aria-selected="false" aria-controls="r-hist" data-mobile-view="history" onclick="switchMobileView('history')">History</button>
     <button class="mobile-tab" id="mobile-tab-settings" type="button" role="tab" aria-selected="false" aria-controls="mobile-settings" data-mobile-view="settings" onclick="switchMobileView('settings')">Settings</button>
   </div>
   <div id="main-split" tabindex="-1" role="region" aria-label="Activities and runner panels">
@@ -143,6 +144,8 @@
                 role="tab" aria-selected="false" aria-controls="r-act" tabindex="-1">Activity</button>
         <button class="rtab active" id="rtab-btn-log" data-rtab="log" onclick="switchRTab('log')"
                 role="tab" aria-selected="true" aria-controls="r-log" tabindex="0">Log<span class="tab-count" id="rtab-log-count"></span></button>
+        <button class="rtab" id="rtab-btn-hist" data-rtab="hist" onclick="switchRTab('hist')"
+                role="tab" aria-selected="false" aria-controls="r-hist" tabindex="-1">History</button>
       </div>
 
       <div id="r-content">
@@ -189,6 +192,17 @@
           <!-- Export / copy feedback; empty (and therefore hidden) at rest. -->
           <div class="log-note" id="log-note" role="status" aria-live="polite"></div>
           <div class="log-body" id="log-body" role="log" aria-live="polite" aria-relevant="additions"></div>
+        </div>
+
+        <!-- Run history: one row per finished run, newest first (src/run_history.py). -->
+        <div class="rpane" id="r-hist" role="tabpanel" aria-labelledby="rtab-btn-hist" tabindex="0">
+          <div class="rpane-hd hist-hd">
+            <span class="hist-summary" id="hist-summary">No runs yet</span>
+            <div class="rpane-sp"></div>
+            <button class="btn-log-clear" id="btn-hist-clear" type="button" onclick="onClearHistory()"
+                    title="Forget this workflow's run history">Clear</button>
+          </div>
+          <div class="hist-body" id="hist-body" role="list" aria-label="Finished runs"></div>
         </div>
 
         <template id="runner-settings-src">

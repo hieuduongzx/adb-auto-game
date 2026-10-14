@@ -32,6 +32,7 @@ if _PROJECT_ROOT not in sys.path:
 
 import webview
 
+from src import run_history
 from src.utils import (
     APP_VERSION,
     app_dir,
@@ -341,6 +342,7 @@ def _load_build_module() -> Any:
 
 def _read_meta(path: str, folder_name: str) -> Dict[str, Any]:
     name = folder_name
+    flow_name = ""          # the workflow's own name, "" when it has none
     controller = "adb"
     capture = "scrcpy"
     activity_count = 0
@@ -350,7 +352,7 @@ def _read_meta(path: str, folder_name: str) -> Dict[str, Any]:
         if isinstance(data, dict):
             raw_name = (data.get("name") or "").strip()
             if raw_name:
-                name = raw_name
+                name = flow_name = raw_name
             controller = _norm_controller(data.get("controller"))
             raw_cap = data.get("capture")
             if raw_cap is None:
@@ -379,6 +381,14 @@ def _read_meta(path: str, folder_name: str) -> Dict[str, Any]:
 
     file_name = os.path.basename(path)
     rel = os.path.join(folder_name, file_name).replace("\\", "/")
+    # The newest Runner run of this workflow (src/run_history.py) — the card's
+    # "how did it go last time" line. Keyed by the same name the Runner uses.
+    last = run_history.last(run_history.history_path(flow_name, path))
+    last_run = None
+    if isinstance(last, dict) and last.get("end"):
+        last_run = {"outcome": str(last.get("outcome") or ""), "end": last.get("end"),
+                    "seconds": last.get("seconds") or 0, "rounds": int(last.get("rounds") or 0),
+                    "reason": str(last.get("reason") or ""), "scope": str(last.get("scope") or "")}
     return {
         "name": name,
         "folder": folder_name,
@@ -393,6 +403,7 @@ def _read_meta(path: str, folder_name: str) -> Dict[str, Any]:
         "modified": modified,
         "modifiedIso": modified_iso,
         "mtime": mtime,
+        "lastRun": last_run,
     }
 
 

@@ -264,3 +264,25 @@ def test_new_round_resets_rows_and_outcome_names_the_rounds(tmp_path):
     assert api._outcome["kind"] == "completed"
     assert api._outcome["reason"].startswith("2 rounds · ")
     assert api._running_payload()["round"] is None
+
+
+def test_finished_run_appends_one_history_record(tmp_path, monkeypatch):
+    from src import run_history
+    path = tmp_path / "history.jsonl"
+    monkeypatch.setattr("apps.workflow_runner.run_history.history_path", lambda *a: str(path))
+    api = runner(tmp_path)
+    api.engine._fatal = ""
+    api.engine._stop = threading.Event()
+    api._on_engine_start()
+    api._on_activity_start({"id": "a", "name": "A"})
+    api._on_activity_complete({"id": "a", "name": "A"}, False)
+    api._on_engine_stop()
+    api._on_engine_stop()            # stop() and the sequence thread both emit on_stop
+    records = run_history.load(str(path))
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["outcome"] == "failed" and rec["scope"] == ""
+    assert rec["activities"] == [{"id": "a", "name": "A", "completed": 0, "failed": 1,
+                                  "stopped": 0, "seconds": rec["activities"][0]["seconds"]}]
+    assert ("history_added", rec) in [c.args for c in api._push.call_args_list]
+    assert api.get_history() == records

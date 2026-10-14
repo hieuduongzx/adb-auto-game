@@ -251,7 +251,7 @@ function setOutcome(outcome, data){
   if(!spec){ row.hidden = true; text.textContent = ""; paintStatusPill(); updateProgress(); return; }
   const msg = (data && typeof data.message === "string" && data.message.trim()) || outcomeMessage(outcome, data);
   row.hidden = false;
-  row.className = "run-outcome outcome-" + spec.cls;
+  row.className = "run-outcome outcome-" + outcome;   // runner.css: .run-outcome.outcome-<kind>
   text.textContent = msg ? `${spec.word}: ${msg}` : spec.word;
   paintStatusPill(); updateProgress();
 }
@@ -339,7 +339,7 @@ function switchTab(tab){
 }
 // Right column: Activity settings | Log. Changelog and runner settings are header popovers.
 function switchRTab(tab, syncMobile=true){
-  if(tab!=="act" && tab!=="log") tab="log";
+  if(tab!=="act" && tab!=="log" && tab!=="hist") tab="log";
   document.querySelectorAll("#r-tabs .rtab").forEach(b=>{ const on=b.dataset.rtab===tab; b.classList.toggle("active",on); b.setAttribute("aria-selected",String(on)); });
   document.querySelectorAll("#r-content .rpane").forEach(p=>p.classList.toggle("active", p.id==="r-"+tab));
   syncTabIndex($("r-tabs"));
@@ -347,8 +347,9 @@ function switchRTab(tab, syncMobile=true){
     const body = $("log-body"); if(body){ body.scrollTop = body.scrollHeight; }
     renderLogCount();
   }
+  if(tab==="hist") ensureHistory();
   if(syncMobile && window.matchMedia && window.matchMedia("(max-width: 640px)").matches){
-    switchMobileView(tab==="log" ? "log" : "activity", false);
+    switchMobileView(tab==="log" ? "log" : tab==="hist" ? "history" : "activity", false);
   }
 }
 
@@ -356,7 +357,7 @@ function switchRTab(tab, syncMobile=true){
 // both stay useful. This navigation makes them three predictable views while
 // preserving the desktop split above the breakpoint.
 function switchMobileView(view, syncPanel=true){
-  const allowed = ["activities", "activity", "log", "settings"];
+  const allowed = ["activities", "activity", "log", "history", "settings"];
   if(!allowed.includes(view)) view = "activities";
   S.mobileView = view;
   const shell = $("main-split");
@@ -372,6 +373,7 @@ function switchMobileView(view, syncPanel=true){
     btn.tabIndex = on ? 0 : -1;
   });
   if(syncPanel && view === "log") switchRTab(view);
+  if(syncPanel && view === "history") switchRTab("hist", false);
 }
 
 // Roving tabindex: the selected tab is the one Tab reaches; the arrows move
@@ -1499,6 +1501,8 @@ function runnerTitle(name){
 }
 function applyFlow(data){
   S.activities = data.activities || [];
+  H.loaded = false; H.items = []; H.open = null;
+  if($("r-hist") && $("r-hist").classList.contains("active")) ensureHistory();
   S.loaded = true;
   closeActivitySettings();
   const nm = $("flow-name");
@@ -1573,6 +1577,7 @@ window.__recv = function(raw){
   if(type==="flow_loaded"){ applyFlow(data); return; }
   if(type==="bridge_status"){ S.bridge=data; renderBridge(); return; }
   if(type==="launch_blocked"){ onLaunchBlocked(data); return; }
+  if(type==="history_added"){ onHistoryAdded(data); return; }
   if(type==="running_state"){
     applyRunState(data); return;
   }
@@ -1877,6 +1882,119 @@ function onRoundsCommit(){
   saveRounds(count, ($("rounds-rest") || {}).value);
 }
 
+// ── Run history ──────────────────────────────────────────────────────────────
+// One row per finished run, newest first: how it ended, when, how long, how
+// many rounds, and — expanded — how each activity fared. Records come from
+// get_history() and grow live through the "history_added" event.
+const H = { items: [], loaded: false, loading: false, open: null };
+const HIST_LIMIT = 50;
+function fmtDuration(sec){
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  if(s < 60) return `${s}s`;
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), r = s%60;
+  if(h) return `${h}h ${String(m).padStart(2,"0")}m`;
+  return `${m}m ${String(r).padStart(2,"0")}s`;
+}
+function fmtWhen(epoch){
+  const d = new Date((Number(epoch) || 0) * 1000);
+  if(!Number.isFinite(d.getTime()) || !epoch) return "";
+  const time = d.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", hour12:false });
+  const day = new Date(d); day.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diff = Math.round((today - day) / 86400000);
+  if(diff === 0) return `Today ${time}`;
+  if(diff === 1) return `Yesterday ${time}`;
+  return d.toLocaleDateString([], { weekday:"short", day:"numeric", month:"short" }) + " " + time;
+}
+async function ensureHistory(force){
+  if((H.loaded && !force) || H.loading || !hasApi("get_history")) { renderHistory(); return; }
+  H.loading = true;
+  try{ H.items = (await api().get_history(HIST_LIMIT)) || []; }catch(_){ H.items = []; }
+  H.loading = false; H.loaded = true;
+  renderHistory();
+}
+function onHistoryAdded(record){
+  if(!record) return;
+  H.items.unshift(record);
+  if(H.items.length > HIST_LIMIT) H.items.length = HIST_LIMIT;
+  renderHistory();
+}
+async function onClearHistory(){
+  if(!H.items.length) return;
+  const ok = await uiDialog({ title:"Clear run history?", message:"This forgets every recorded run of this workflow. The log is not affected.",
+    buttons:[{label:"Cancel", value:false}, {label:"Clear history", value:true, kind:"err"}] });
+  if(!ok) return;
+  let done = false;
+  try{ done = await api().clear_history(); }catch(_){ }
+  if(done){ H.items = []; H.open = null; renderHistory(); }
+}
+function histSummary(items){
+  if(!items.length) return "No runs yet";
+  const done = items.filter(r=>r.outcome === "completed").length;
+  const pct = Math.round(done * 100 / items.length);
+  const avg = items.reduce((t, r)=>t + (Number(r.seconds) || 0), 0) / items.length;
+  return `${items.length} run${items.length === 1 ? "" : "s"} · ${pct}% completed · avg ${fmtDuration(avg)}`;
+}
+function histActivityRows(r){
+  const acts = Array.isArray(r.activities) ? r.activities : [];
+  if(!acts.length) return `<div class="hist-acts-empty">No activity finished in this run.</div>`;
+  return `<div class="hist-acts" role="table" aria-label="Activities in this run">` + acts.map(a=>{
+    const ran = (a.completed||0) + (a.failed||0) + (a.stopped||0);
+    const avg = ran ? fmtDuration((Number(a.seconds)||0) / ran) : "–";
+    const tone = a.failed ? "err" : a.stopped && !a.completed ? "warn" : "ok";
+    const tally = [
+      a.completed ? `<span class="hist-ok">${a.completed} ✓</span>` : "",
+      a.failed ? `<span class="hist-bad">${a.failed} ✗</span>` : "",
+      a.stopped ? `<span class="hist-stop">${a.stopped} ■</span>` : "",
+    ].join("");
+    return `<div class="hist-act" role="row"><span class="hist-act-dot ${tone}" aria-hidden="true"></span>`
+      + `<span class="hist-act-name" role="cell">${escHtml(a.name || a.id || "")}</span>`
+      + `<span class="hist-act-tally" role="cell">${tally}</span>`
+      + `<span class="hist-act-time" role="cell" title="Average time per run">${avg}</span></div>`;
+  }).join("") + `</div>`;
+}
+function renderHistory(){
+  const body = $("hist-body"), sum = $("hist-summary"), clear = $("btn-hist-clear");
+  if(!body) return;
+  if(sum) sum.textContent = H.loaded ? histSummary(H.items) : "Loading…";
+  if(clear) clear.disabled = !H.items.length;
+  if(!H.loaded){ body.innerHTML = ""; return; }
+  if(!H.items.length){
+    body.innerHTML = `<div class="hist-empty">Finished runs appear here — how each ended, how long it took and which activity failed.</div>`;
+    return;
+  }
+  body.innerHTML = H.items.map((r, i)=>{
+    const spec = OUTCOME[r.outcome] || OUTCOME.stopped;
+    const key = String(r.end || i);
+    const open = H.open === key;
+    const rounds = Number(r.rounds) || 0;
+    const tags = (rounds > 1 ? `<span class="hist-tag mono">×${rounds}</span>` : "")
+      + (r.scope ? `<span class="hist-tag" title="Single activity run">${escHtml(r.scope)}</span>` : "");
+    return `<div class="hist-item${open ? " open" : ""}" role="listitem">`
+      + `<button type="button" class="hist-row hist-${OUTCOME[r.outcome] ? r.outcome : "stopped"}" data-hist="${escHtml(key)}" aria-expanded="${open}">`
+      +   `<span class="hist-dot" aria-hidden="true"></span>`
+      +   `<span class="hist-main"><span class="hist-line"><span class="hist-word">${spec.word}</span>${tags}`
+      +     `<span class="hist-when">${escHtml(fmtWhen(r.start))}</span></span>`
+      +     `<span class="hist-reason">${escHtml(r.reason || "")}</span></span>`
+      +   `<span class="hist-dur mono">${fmtDuration(r.seconds)}</span>`
+      + `</button>`
+      + (open ? histActivityRows(r) : "")
+      + `</div>`;
+  }).join("");
+}
+function wireHistory(){
+  const body = $("hist-body");
+  if(!body) return;
+  body.addEventListener("click", e=>{
+    const row = e.target.closest(".hist-row");
+    if(!row) return;
+    H.open = H.open === row.dataset.hist ? null : row.dataset.hist;
+    renderHistory();
+    const again = body.querySelector(`.hist-row[data-hist="${CSS.escape(row.dataset.hist)}"]`);
+    if(again) again.focus();
+  });
+}
+
 // ── Handlers ───────────────────────────────────────────────────────────────
 const api = () => window.pywebview.api;
 async function onStart(){
@@ -2149,6 +2267,7 @@ async function init(){
   document.addEventListener("keydown", onGlobalKey, true);
   setupListDnD($("seq-list"));
   setupListDnD($("bg-list"));
+  wireHistory();
   let tries=0;
   while(!(window.pywebview&&window.pywebview.api)&&tries<40){ await new Promise(r=>setTimeout(r,100)); tries++; }
   if(!window.pywebview||!window.pywebview.api){ $("dev-label").textContent="PyWebView unavailable"; return; }

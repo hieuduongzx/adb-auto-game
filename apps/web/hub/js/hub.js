@@ -356,6 +356,30 @@ function savedAgo(iso, fallback) {
   if (d < 30) return `${d} days ago`;
   return fallback || new Date(t).toISOString().slice(0, 10);
 }
+/** 41s / 12m / 1h 03m — a run's length on a card. */
+function runLength(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  if (s < 60) return `${s}s`;
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+}
+const RUN_WORD = { completed: "Completed", failed: "Failed", stopped: "Stopped" };
+/** The card's last-run line: outcome, when, how long — or that it never ran. */
+function lastRunHtml(g) {
+  const r = g.lastRun;
+  if (!r || !RUN_WORD[r.outcome]) {
+    return `<span class="game-run-state never">Not run yet</span>`;
+  }
+  const when = savedAgo(new Date(Number(r.end) * 1000).toISOString(), "");
+  const rounds = r.rounds > 1 ? ` · ×${r.rounds}` : "";
+  const scope = r.scope ? ` · ${escHtml(r.scope)} only` : "";
+  const title = `Last run ${RUN_WORD[r.outcome].toLowerCase()} ${when} — ${r.reason || ""}`.trim();
+  return `<span class="game-run-state ${escHtml(r.outcome)}" title="${escHtml(title)}">` +
+    `<span class="run-dot" aria-hidden="true"></span>` +
+    `<span class="run-word">${RUN_WORD[r.outcome]}</span>` +
+    `<span class="run-when">${escHtml(when)} · ${runLength(r.seconds)}${rounds}${scope}</span>` +
+  `</span>`;
+}
 /** The game's small icon: assets/icon.*, else the cover, else its initials. */
 function iconHtmlFor(g, cls) {
   const src = g.icon || g.cover;
@@ -415,6 +439,7 @@ function cardHtml(g, i) {
         `<span class="game-folder" title="${folder}">${folder}</span>` +
       `</span>` +
       `<span class="game-state" title="${escHtml(stateTitle)}">${escHtml(state)}</span>` +
+      lastRunHtml(g) +
     `</div>` +
     `<div class="game-foot">` +
       `<button class="game-run" type="button" data-act="run" title="Run ${name}" aria-label="Run ${name}">${svg("play", "uico-2 uico-fill")}Run</button>` +

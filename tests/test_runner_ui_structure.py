@@ -52,9 +52,9 @@ def test_narrow_runner_exposes_one_primary_view_at_a_time():
     tabs = [node for node in doc.elements if nav in node["parents"] and node["attrs"].get("role") == "tab"]
 
     assert nav["attrs"]["role"] == "tablist"
-    assert [tab["text"].strip() for tab in tabs] == ["Activities", "Log", "Settings"]
-    assert [tab["attrs"].get("data-mobile-view") for tab in tabs] == ["activities", "log", "settings"]
-    assert [tab["attrs"].get("aria-controls") for tab in tabs] == ["pane-left", "r-log", "mobile-settings"]
+    assert [tab["text"].strip() for tab in tabs] == ["Activities", "Log", "History", "Settings"]
+    assert [tab["attrs"].get("data-mobile-view") for tab in tabs] == ["activities", "log", "history", "settings"]
+    assert [tab["attrs"].get("aria-controls") for tab in tabs] == ["pane-left", "r-log", "r-hist", "mobile-settings"]
     assert sum(tab["attrs"].get("aria-selected") == "true" for tab in tabs) == 1
 
     settings = doc.by_id("mobile-settings")
@@ -64,7 +64,7 @@ def test_narrow_runner_exposes_one_primary_view_at_a_time():
 def test_mobile_settings_reuses_one_mounted_settings_tree():
     source = RUNNER_JS.read_text(encoding="utf-8")
 
-    assert 'const allowed = ["activities", "activity", "log", "settings"]' in source
+    assert 'const allowed = ["activities", "activity", "log", "history", "settings"]' in source
     assert "let _runnerSettingsRoot = null" in source
     assert "if(!_runnerSettingsRoot)" in source
     assert "host.appendChild(_runnerSettingsRoot)" in source

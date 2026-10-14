@@ -36,7 +36,7 @@ if _PROJECT_ROOT not in sys.path:
 
 import webview
 
-from src import runner_update
+from src import run_history, runner_update
 from src.core.adb import lifecycle
 from src.core.adb.auto.scrcpy_capture import (
     CAPTURE_BACKENDS,
@@ -63,7 +63,6 @@ from src.utils import (
     push_webview_event,
     remove_log_subscriber,
     save_ui_settings,
-    slugify_workflow_name,
     theme_background,
     titled,
     webview_storage_path,
@@ -210,6 +209,10 @@ class WorkflowRunnerAPI:
         # The round a repeating Start is on ({round, total, phase, restUntil});
         # None for a single pass and between runs. See configure_rounds.
         self._round: Optional[Dict[str, Any]] = None
+        # Per-activity tallies for the run's history record: id → {name, ok,
+        # failed, stopped, seconds}; plus when each running activity began.
+        self._run_acts: Dict[str, Dict[str, Any]] = {}
+        self._act_t0: Dict[str, float] = {}
         # Last status pushed per activity id — used to settle rows that a Stop
         # cancelled before they could report back (background activities).
         self._act_status: Dict[str, str] = {}
@@ -353,6 +356,8 @@ class WorkflowRunnerAPI:
         self._reset_run_tracking()
         self._outcome = None
         self._round = None
+        self._run_acts = {}
+        self._act_t0 = {}
         self._push("running_state", self._running_payload())
 
     def _on_engine_stop(self) -> None:
@@ -365,6 +370,7 @@ class WorkflowRunnerAPI:
                 # back (the engine just ends its loop), so settle its row.
                 self._settle_stopped_activities()
             self._log_outcome(self._outcome)
+            self._record_history(self._outcome)
             self._round = None
         self._push("running_state", self._running_payload())
 
@@ -447,6 +453,7 @@ class WorkflowRunnerAPI:
         act_id = (act or {}).get("id")
         if act_id is not None:
             self._act_status[str(act_id)] = "running"
+            self._act_t0[str(act_id)] = time.time()
         self._push("activity_update", {"id": act_id, "status": "running"})
 
     def _on_activity_complete(self, act: dict, ok: bool) -> None:
@@ -455,10 +462,63 @@ class WorkflowRunnerAPI:
         act_id = (act or {}).get("id")
         if act_id is not None:
             self._act_status[str(act_id)] = status
+            self._tally_activity(act, status)
         self._run_counts[status] = self._run_counts.get(status, 0) + 1
         if status == "failed":
             self._run_failed = True
         self._push("activity_update", {"id": act_id, "status": status})
+
+    def _tally_activity(self, act: dict, status: str) -> None:
+        act_id = str(act.get("id"))
+        row = self._run_acts.setdefault(act_id, {
+            "id": act_id, "name": str(act.get("name") or act_id),
+            "completed": 0, "failed": 0, "stopped": 0, "seconds": 0.0})
+        row[status] = row.get(status, 0) + 1
+        started = self._act_t0.pop(act_id, None)
+        if started:
+            row["seconds"] = round(row["seconds"] + max(0.0, time.time() - started), 1)
+
+    # ── Run history ──────────────────────────────────────────────────────────
+    # One record per finished run (src/run_history.py): what an operator wants
+    # to know the morning after — did it finish, how long, which activity broke.
+
+    def _history_path(self) -> str:
+        if not self.flow:
+            return ""
+        return run_history.history_path(str(self.flow.get("name") or ""), self.flow_path or "")
+
+    def _record_history(self, outcome: dict) -> None:
+        path = self._history_path()
+        if not path:
+            return
+        end = time.time()
+        start = float(self._run_started_at or end)
+        scope = self._run_scope
+        names = {str(a.get("id")): str(a.get("name") or a.get("id"))
+                 for a in self.flow.get("activities", []) or []}
+        round_info = self._round or {}
+        record = {
+            "v": 1, "start": round(start, 1), "end": round(end, 1),
+            "seconds": round(max(0.0, end - start), 1),
+            "outcome": outcome.get("kind"), "reason": outcome.get("reason", ""),
+            "counts": dict(outcome.get("counts") or {}),
+            "rounds": int(round_info.get("round") or 0),
+            "scope": names.get(scope[0], scope[0]) if scope else "",
+            "activities": list(self._run_acts.values()),
+        }
+        if run_history.append(path, record):
+            self._push("history_added", record)
+
+    def get_history(self, limit: int = 50) -> List[dict]:
+        path = self._history_path()
+        return run_history.load(path, limit) if path else []
+
+    def clear_history(self) -> bool:
+        path = self._history_path()
+        ok = run_history.clear(path) if path else False
+        if ok:
+            log_info("Run history cleared")
+        return ok
 
     def _on_activity_crash(self, act: dict, crash: Optional[dict]) -> None:
         """The engine emits this only for a genuine failure — a user Stop and a
@@ -539,11 +599,8 @@ class WorkflowRunnerAPI:
         The slug comes from ``slugify_workflow_name`` — it appends a short hash
         of the original name so distinct names ("A B" vs "A_B") can never
         collide on one config folder."""
-        raw = str(flow.get("name") or "").strip()
-        if not raw:
-            raw = os.path.splitext(os.path.basename(flow_path or "workflow"))[0]
-        slug = slugify_workflow_name(raw)
-        return os.path.join(data_root(), "data", "runner", slug, "config.json")
+        return os.path.join(run_history.runner_dir(str(flow.get("name") or ""), flow_path),
+                            "config.json")
 
     def _load_runner_config(self, flow: dict, flow_path: str) -> None:
         with self._runner_config_lock:
