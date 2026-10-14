@@ -26,6 +26,7 @@ const S = {
   runScope:        null,   // activity ids of a single-activity run; null = full Start
   rounds:          { count:1, rest:0 },  // passes a full Start makes (0 = until stopped), rest in s
   round:           null,   // live round of a repeating Start: {round, total, phase, restUntil}
+  notify:          { when:"failed", desktop:true, discord:"" },  // machine-wide run notifications
   mobileView:      "activities",
 };
 
@@ -1995,6 +1996,51 @@ function wireHistory(){
   });
 }
 
+// ── Run notifications ───────────────────────────────────────────────────────
+// When a full run ends: a Windows balloon and/or a Discord message. One
+// preference for every Runner on this PC (shared UI settings).
+let _notifyNoteTimer = null;
+function setNotifyNote(text, kind){
+  const el = $("notify-note"); if(!el) return;
+  el.textContent = text || ""; el.dataset.kind = kind || "";
+  clearTimeout(_notifyNoteTimer);
+  if(kind === "ok") _notifyNoteTimer = setTimeout(()=>{ if(el.dataset.kind === "ok") renderNotify(); }, 4000);
+}
+function renderNotify(){
+  const n = S.notify;
+  document.querySelectorAll('input[name="notify-when"]').forEach(el=>{ el.checked = el.value === n.when; });
+  const fields = $("notify-fields"); if(fields) fields.hidden = n.when === "off";
+  const t = $("notify-desktop");
+  if(t){ t.classList.toggle("on", !!n.desktop); t.setAttribute("aria-checked", String(!!n.desktop)); }
+  const d = $("notify-discord"); if(d && document.activeElement !== d) d.value = n.discord || "";
+  const how = [n.desktop ? "Windows" : "", n.discord ? "Discord" : ""].filter(Boolean).join(" and ");
+  const note = n.when === "off" ? "No notifications when a run ends."
+    : !how ? "Pick Windows or add a Discord webhook to get notified."
+    : `${n.when === "all" ? "Every finished run" : "A failed run"} notifies you on ${how}. Applies to every Runner on this PC.`;
+  setNotifyNote(note, "");
+}
+async function loadNotify(){
+  if(!hasApi("get_notify")) return;
+  try{ const r = await api().get_notify(); if(r) S.notify = r; }catch(_){ }
+  renderNotify();
+}
+async function onNotifyChange(patch){
+  let r = null;
+  try{ r = await api().set_notify(patch); }catch(_){ }
+  if(r && r.notify) S.notify = r.notify;
+  renderNotify();
+  if(r && !r.ok) setNotifyNote(r.error || "Couldn't save", "error");
+}
+async function onNotifyTest(){
+  const b = $("notify-test"); if(b) b.disabled = true;
+  setNotifyNote("Sending…", "");
+  let r = null;
+  try{ r = await api().test_notify(); }catch(_){ }
+  if(b) b.disabled = false;
+  if(r && r.ok) setNotifyNote("Sent - check Windows / Discord.", "ok");
+  else setNotifyNote((r && r.error) || "Couldn't send", "error");
+}
+
 // ── Handlers ───────────────────────────────────────────────────────────────
 const api = () => window.pywebview.api;
 async function onStart(){
@@ -2223,7 +2269,7 @@ function mountRunnerSettings(){
   if(!_runnerSettingsRoot){
     const fragment = src && src.content.cloneNode(true);
     _runnerSettingsRoot = fragment && fragment.firstElementChild;
-    if(_runnerSettingsRoot) queueMicrotask(renderRounds);
+    if(_runnerSettingsRoot) queueMicrotask(()=>{ renderRounds(); loadNotify(); });
   }
   syncRunnerSettingsHost();
 }

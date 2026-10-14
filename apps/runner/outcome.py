@@ -5,12 +5,14 @@ import datetime
 import time
 from typing import List, Optional
 
-from src import run_history
+from src import notify, run_history
 from src.utils import (
     LOG_KIND_RUN,
+    load_ui_settings,
     log_error,
     log_info,
     log_success,
+    save_ui_settings,
 )
 
 
@@ -120,6 +122,7 @@ class OutcomeMixin:
                 self._settle_stopped_activities()
             self._log_outcome(self._outcome)
             self._record_history(self._outcome)
+            self._notify_outcome(self._outcome)
             self._round = None
         self._push("running_state", self._running_payload())
 
@@ -257,6 +260,94 @@ class OutcomeMixin:
         }
         if run_history.append(path, record):
             self._push("history_added", record)
+
+    # ── Run notifications ────────────────────────────────────────────────────
+    # A desktop balloon and/or a Discord message when a full run ends — the
+    # operator is usually not at the desk. One machine-wide preference in the
+    # shared UI settings (key ``runNotify``), so every Runner on this PC uses
+    # the same webhook. Single-activity runs are interactive and never notify.
+
+    NOTIFY_WHEN = ("off", "failed", "all")
+    NOTIFY_DEFAULT = {"when": "failed", "desktop": True, "discord": ""}
+
+    def get_notify(self) -> dict:
+        saved = load_ui_settings().get("runNotify")
+        cfg = dict(self.NOTIFY_DEFAULT)
+        if isinstance(saved, dict):
+            if saved.get("when") in self.NOTIFY_WHEN:
+                cfg["when"] = saved["when"]
+            cfg["desktop"] = bool(saved.get("desktop", cfg["desktop"]))
+            cfg["discord"] = str(saved.get("discord") or "").strip()
+        return cfg
+
+    def set_notify(self, patch: dict) -> dict:
+        """Change when / how run notifications go out. Returns ``{ok, error,
+        notify}``; a webhook that is not a Discord webhook URL is refused."""
+        cfg = self.get_notify()
+        patch = patch if isinstance(patch, dict) else {}
+        if patch.get("when") in self.NOTIFY_WHEN:
+            cfg["when"] = patch["when"]
+        if "desktop" in patch:
+            cfg["desktop"] = bool(patch["desktop"])
+        if "discord" in patch:
+            url = str(patch.get("discord") or "").strip()
+            if url and not notify.is_webhook_url(url):
+                return {"ok": False, "error": "That is not a Discord webhook URL "
+                        "(https://discord.com/api/webhooks/…)", "notify": self.get_notify()}
+            cfg["discord"] = url
+        ok = save_ui_settings({"runNotify": cfg})
+        return {"ok": ok, "error": "" if ok else "Couldn't save the setting", "notify": cfg}
+
+    def test_notify(self) -> dict:
+        """Send a sample through every configured channel, now."""
+        cfg = self.get_notify()
+        name = str(self.flow.get("name") or "Macro2k")
+        title, message = f"{name} — test", "Run notifications reach you here."
+        if cfg["desktop"]:
+            notify.desktop(title, message)
+        if cfg["discord"]:
+            error = notify.send_discord(cfg["discord"], title, message, "info")
+            if error:
+                return {"ok": False, "error": f"Discord: {error}"}
+        if not cfg["desktop"] and not cfg["discord"]:
+            return {"ok": False, "error": "Turn on Windows notifications or add a Discord webhook first"}
+        return {"ok": True, "error": ""}
+
+    @staticmethod
+    def _notify_text(name: str, outcome: dict, record: dict) -> tuple:
+        """``(title, message, fields)`` for one finished run (pure)."""
+        kind = str(outcome.get("kind") or "")
+        title = f"{name} — {outcome.get('label') or kind.title()}"
+        secs = int(round(float(record.get("seconds") or 0)))
+        h, rem = divmod(secs, 3600)
+        length = f"{h}h {rem // 60:02d}m" if h else f"{rem // 60}m {rem % 60:02d}s"
+        message = str(outcome.get("reason") or "")
+        failed = [a.get("name") for a in record.get("activities") or [] if a.get("failed")]
+        fields = {"Duration": length}
+        if record.get("rounds"):
+            fields["Rounds"] = record["rounds"]
+        counts = outcome.get("counts") or {}
+        fields["Activities"] = f"{counts.get('completed', 0)} ✓ · {counts.get('failed', 0)} ✗"
+        if failed:
+            fields["Failed"] = ", ".join(str(n) for n in failed[:8]) + ("…" if len(failed) > 8 else "")
+        return title, f"{message} · {length}" if message else length, fields
+
+    def _notify_outcome(self, outcome: dict) -> None:
+        if self._run_scope or not self.flow:
+            return
+        cfg = self.get_notify()
+        kind = outcome.get("kind")
+        if cfg["when"] == "off" or (cfg["when"] == "failed" and kind != "failed"):
+            return
+        record = {"seconds": max(0.0, time.time() - float(self._run_started_at or time.time())),
+                  "rounds": int((self._round or {}).get("round") or 0),
+                  "activities": list(self._run_acts.values())}
+        title, message, fields = self._notify_text(str(self.flow.get("name") or "Macro2k"),
+                                                   outcome, record)
+        if cfg["desktop"]:
+            notify.desktop(title, message)
+        if cfg["discord"]:
+            notify.discord_async(cfg["discord"], title, message, str(kind or "info"), fields)
 
     def get_history(self, limit: int = 50) -> List[dict]:
         path = self._history_path()

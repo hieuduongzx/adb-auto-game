@@ -232,6 +232,34 @@
               <p class="settings-note" id="rounds-note"></p>
             </section>
 
+            <!-- Machine-wide: every Runner on this PC shares it (src/notify.py). -->
+            <section class="settings-section" id="notify-card">
+              <h2 class="settings-section-title">Notifications</h2>
+              <div class="setting-toggle-group" role="radiogroup" aria-label="Notify when a run ends">
+                <label class="setting-choice"><input type="radio" name="notify-when" value="off" onchange="onNotifyChange({when:this.value})"><span>Never</span></label>
+                <label class="setting-choice"><input type="radio" name="notify-when" value="failed" onchange="onNotifyChange({when:this.value})"><span>When a run fails</span></label>
+                <label class="setting-choice"><input type="radio" name="notify-when" value="all" onchange="onNotifyChange({when:this.value})"><span>Every run</span></label>
+              </div>
+              <div class="notify-fields" id="notify-fields">
+                <div class="toggle-row">
+                  <button type="button" class="toggle" id="notify-desktop" onclick="onNotifyChange({desktop:!S.notify.desktop})" role="switch" aria-label="Windows notification" aria-checked="true"></button>
+                  <div class="toggle-text">
+                    <div class="toggle-name">Windows notification</div>
+                    <div class="toggle-hint">A balloon from the taskbar.</div>
+                  </div>
+                </div>
+                <div class="setting-block">
+                  <label class="form-lbl" for="notify-discord">Discord webhook</label>
+                  <div class="setting-path-control">
+                    <input type="text" id="notify-discord" class="setting-path-input" spellcheck="false" autocomplete="off"
+                           placeholder="https://discord.com/api/webhooks/…" onchange="onNotifyChange({discord:this.value.trim()})">
+                    <button type="button" class="btn-path-pick" id="notify-test" onclick="onNotifyTest()" title="Send a test notification now">Test</button>
+                  </div>
+                </div>
+              </div>
+              <p class="settings-note" id="notify-note" role="status" aria-live="polite"></p>
+            </section>
+
             <section class="settings-section" id="game-card" style="display:none">
               <h2 class="settings-section-title">Game</h2>
               <div class="setting-block">

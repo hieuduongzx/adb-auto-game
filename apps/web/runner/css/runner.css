@@ -718,3 +718,9 @@ input { caret-color: var(--accent); text-align: center; }
 .hist-bad { color: var(--err); font-weight: 600; }
 .hist-stop { color: var(--warn); }
 .hist-act-time { min-width: 54px; text-align: right; font-family: var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ── Notifications — Settings ─────────────────────────────────────────────── */
+.notify-fields { display: flex; flex-direction: column; gap: var(--s3); }
+.notify-fields[hidden] { display: none; }
+#notify-note[data-kind="error"] { color: var(--err); }
+#notify-note[data-kind="ok"] { color: var(--ok-ink); }

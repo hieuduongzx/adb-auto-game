@@ -15,6 +15,7 @@ from src.core.keynames import (
 from src.utils import (
     LOG_KIND_USER,
 )
+from src import notify
 from src.workflow.logs import log_info, log_success, log_warning
 
 
@@ -697,38 +698,13 @@ class ActionNodes:
         return True
 
     def _a_notify(self, node, p) -> bool:
-        # Title cũng điền {var} như message (designer đánh dấu insertVar cả hai).
+        # The title fills {var} like the message (the Designer marks both insertVar).
         title   = self._format_msg(str(p.get("title", "Workflow"))).strip() or "Workflow"
         message = self._format_msg(str(p.get("message", "Completed!")))
-        sound   = bool(p.get("sound", True))
         log_info(f"🔔 {title}: {message}", kind=LOG_KIND_USER)
-        if sound:
-            try:
-                import winsound
-                winsound.MessageBeep(winsound.MB_ICONASTERISK)
-            except Exception:
-                pass
-        try:
-            import subprocess
-            # Title/message travel in the environment: they may carry OCR text or
-            # {var} values, and interpolating those into the PowerShell source
-            # broke on quotes and let $(...) run as code.
-            ps = (
-                "Add-Type -AssemblyName System.Windows.Forms;"
-                "$n=New-Object System.Windows.Forms.NotifyIcon;"
-                "$n.Icon=[System.Drawing.SystemIcons]::Information;"
-                "$n.Visible=$true;"
-                "$n.ShowBalloonTip(6000,$env:M2K_NOTIFY_TITLE,$env:M2K_NOTIFY_MSG,"
-                "[System.Windows.Forms.ToolTipIcon]::Info);"
-                "Start-Sleep 7;$n.Dispose()"
-            )
-            subprocess.Popen(
-                ["powershell", "-WindowStyle", "Hidden", "-NonInteractive", "-Command", ps],
-                env={**os.environ, "M2K_NOTIFY_TITLE": title, "M2K_NOTIFY_MSG": message},
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
-            )
-        except Exception:
-            pass
+        if bool(p.get("sound", True)):
+            notify.beep()
+        notify.desktop(title, message)
         return True
 
     # ── Device / time handlers ────────────────────────────────────────────────

@@ -286,3 +286,47 @@ def test_finished_run_appends_one_history_record(tmp_path, monkeypatch):
                                   "stopped": 0, "seconds": rec["activities"][0]["seconds"]}]
     assert ("history_added", rec) in [c.args for c in api._push.call_args_list]
     assert api.get_history() == records
+
+
+def _notify_runner(tmp_path, monkeypatch, cfg):
+    sent = []
+    monkeypatch.setattr("src.notify.desktop", lambda t, m: sent.append(("desktop", t, m)))
+    monkeypatch.setattr("src.notify.discord_async", lambda url, t, m, kind, fields: sent.append(("discord", t, kind, fields)))
+    api = runner(tmp_path)
+    api.get_notify = lambda: dict(cfg)
+    api._run_started_at = 0
+    api._round = None
+    api._run_acts = {"a": {"id": "a", "name": "A", "completed": 0, "failed": 1, "stopped": 0, "seconds": 3}}
+    return api, sent
+
+
+def test_failed_run_notifies_desktop_and_discord(tmp_path, monkeypatch):
+    api, sent = _notify_runner(tmp_path, monkeypatch, {"when": "failed", "desktop": True,
+                                                       "discord": "https://discord.com/api/webhooks/1/x"})
+    api._notify_outcome({"kind": "failed", "label": "Failed", "reason": "1 of 1 activities failed",
+                         "counts": {"completed": 0, "failed": 1}})
+    assert [s[0] for s in sent] == ["desktop", "discord"]
+    assert sent[0][1] == "Audit — Failed"
+    assert sent[1][2] == "failed" and sent[1][3]["Failed"] == "A"
+
+
+def test_completed_run_is_quiet_on_failures_only_and_solo_runs_never_notify(tmp_path, monkeypatch):
+    api, sent = _notify_runner(tmp_path, monkeypatch, {"when": "failed", "desktop": True, "discord": ""})
+    api._notify_outcome({"kind": "completed", "label": "Completed", "reason": "", "counts": {}})
+    assert sent == []
+    api.get_notify = lambda: {"when": "all", "desktop": True, "discord": ""}
+    api._run_scope = ["a"]
+    api._notify_outcome({"kind": "failed", "label": "Failed", "reason": "", "counts": {}})
+    assert sent == []
+
+
+def test_set_notify_refuses_a_non_discord_webhook(tmp_path, monkeypatch):
+    saved = {}
+    monkeypatch.setattr("runner.outcome.load_ui_settings", lambda: dict(saved))
+    monkeypatch.setattr("runner.outcome.save_ui_settings", lambda patch: saved.update(patch) or True)
+    api = runner(tmp_path)
+    assert api.set_notify({"discord": "https://evil.example/hook"})["ok"] is False
+    assert "runNotify" not in saved
+    r = api.set_notify({"when": "all", "discord": "https://discord.com/api/webhooks/1/x"})
+    assert r["ok"] and saved["runNotify"]["when"] == "all"
+    assert api.get_notify()["discord"] == "https://discord.com/api/webhooks/1/x"
