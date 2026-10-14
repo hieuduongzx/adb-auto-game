@@ -143,6 +143,23 @@ function wfLibRenderGrid(){
   wfLibRenderSide();
 }
 
+let wfLibThumbObserver=null;
+function wfLibLoadThumb(img){
+  const path=img.dataset.thumbPath; if(!path || img.dataset.thumbLoading) return;
+  img.dataset.thumbLoading="1";
+  api().template_thumbnail(path).then(src=>{
+    if(src){ img.src=src; img.alt=img.dataset.thumbAlt||""; }
+  }).catch(()=>{});
+}
+function wfLibObserveThumb(img){
+  if(typeof IntersectionObserver!=="function"){ wfLibLoadThumb(img); return; }
+  if(!wfLibThumbObserver){
+    wfLibThumbObserver=new IntersectionObserver(entries=>{
+      entries.forEach(e=>{ if(e.isIntersecting){ wfLibThumbObserver.unobserve(e.target); wfLibLoadThumb(e.target); } });
+    }, {rootMargin:"300px 0px"});
+  }
+  wfLibThumbObserver.observe(img);
+}
 function wfLibCard(t){
   const card=document.createElement("button");
   card.type="button";
@@ -153,10 +170,14 @@ function wfLibCard(t){
     ? `${t.name}\n${t.usedCount} node(s) use this file`
     : `${t.name}\nNo nodes use this file`;
   const thumb=document.createElement("img");
-  thumb.className="asset-thumb"; thumb.alt=t.name; thumb.loading="lazy";
-  // Fetch per card, bound to this element: a querySelector pass would re-scan
-  // 269 cards for every thumbnail, which is O(n²) on the stress-case flow.
-  api().template_thumbnail(t.path).then(src=>{ if(src) thumb.src=src; });
+  // alt stays empty until the image arrives: an <img> with alt text and no src
+  // paints Chromium's broken-image glyph on every card still loading.
+  thumb.className="asset-thumb"; thumb.alt="";
+  // Fetched when the card nears the viewport (wfLibObserveThumb), bound to this
+  // element: a querySelector pass would re-scan every card per thumbnail, and
+  // fetching all 300+ up front queued them all on the Python side at once.
+  thumb.dataset.thumbPath=t.path; thumb.dataset.thumbAlt=t.name;
+  wfLibObserveThumb(thumb);
   const name=document.createElement("div");
   name.className="asset-name"; name.textContent=t.name;
   const meta=document.createElement("div");

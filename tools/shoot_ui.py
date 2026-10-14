@@ -216,6 +216,10 @@ DESIGNER_LIVE = """(() => {
   ns[3] && ns[3].classList.add('ran-fail');
 })()"""
 
+# Scenes whose content arrives slowly (a folder scan, thumbnails): extra
+# seconds after the settle action before the shot.
+EXTRA_WAIT = {"designer-library": 3.0}
+
 # name, page, viewport, settle action (JS run after load, may be empty)
 SCENES = [
     ("hub", "hub", (1280, 800), ""),
@@ -347,6 +351,7 @@ def main():
                         # Fire and forget: a dialog's promise only settles on close.
                         page.evaluate("s => setTimeout(() => (0, eval)(s), 0)", settle)
                         time.sleep(0.5)
+                    time.sleep(EXTRA_WAIT.get(name, 0.0))
                     path = args.out / f"{name}-{theme}.png"
                     page.screenshot(path=str(path))
                     print(f"{path.name}" + (f"  errors: {errors}" if errors else ""))
