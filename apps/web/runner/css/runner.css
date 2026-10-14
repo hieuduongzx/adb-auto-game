@@ -724,3 +724,14 @@ input { caret-color: var(--accent); text-align: center; }
 .notify-fields[hidden] { display: none; }
 #notify-note[data-kind="error"] { color: var(--err); }
 #notify-note[data-kind="ok"] { color: var(--ok-ink); }
+
+/* ── Activity settings: recent results ──────────────────────────────────────── */
+.act-results { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.act-results:empty { display: none; }
+.act-results-row { display: flex; align-items: center; gap: var(--s3); min-height: 24px; }
+.res-dots { display: inline-flex; gap: 4px; }
+.res-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--warn); }
+.res-dot.completed { background: var(--ok); }
+.res-dot.failed { background: var(--err); }
+.act-results-sum { font-size: var(--t-caption); color: var(--dim); font-variant-numeric: tabular-nums; }
+.act-results-empty { font-size: var(--t-caption); color: var(--muted); }

@@ -894,6 +894,10 @@ function toggleSettings(id){
   S.expandedId = id;
   host.innerHTML = "";
   host.appendChild(buildSettingsPanel(a));
+  const results = document.createElement("div"); results.id = "act-results"; results.className = "act-results";
+  host.appendChild(results);
+  renderActivityResults();
+  ensureHistory();
   const title = $("act-set-title"); if(title) title.textContent = a.name || "Activity settings";
   switchRTab("act");
   switchMobileView("activity", false);
@@ -1959,6 +1963,7 @@ function histActivityRows(r){
   }).join("") + `</div>`;
 }
 function renderHistory(){
+  renderActivityResults();
   const body = $("hist-body"), sum = $("hist-summary"), clear = $("btn-hist-clear");
   if(!body) return;
   if(sum) sum.textContent = H.loaded ? histSummary(H.items) : "Loading…";
@@ -1986,6 +1991,34 @@ function renderHistory(){
       + (open ? histActivityRows(r) : "")
       + `</div>`;
   }).join("");
+}
+// How the open activity fared in recent runs: one dot per run that reached
+// it (newest right), plus its success rate and average time.
+const ACT_RESULTS_MAX = 12;
+function activityResults(id){
+  const out = [];
+  for(const r of H.items){
+    const row = (r.activities || []).find(a=>a.id === id);
+    if(!row) continue;
+    const ran = (row.completed||0) + (row.failed||0) + (row.stopped||0);
+    out.push({ status: row.failed ? "failed" : row.completed ? "completed" : "stopped",
+               seconds: ran ? (Number(row.seconds)||0) / ran : 0, when: r.start, rounds: ran });
+    if(out.length >= ACT_RESULTS_MAX) break;
+  }
+  return out.reverse();
+}
+function renderActivityResults(){
+  const box = $("act-results"); if(!box) return;
+  if(!S.expandedId || !H.loaded){ box.innerHTML = ""; return; }
+  const runs = activityResults(S.expandedId);
+  if(!runs.length){ box.innerHTML = `<div class="setting-group-title">Recent results</div><div class="act-results-empty">No finished run has reached this activity yet.</div>`; return; }
+  const ok = runs.filter(r=>r.status === "completed").length;
+  const timed = runs.filter(r=>r.seconds > 0);
+  const avg = timed.length ? timed.reduce((t, r)=>t + r.seconds, 0) / timed.length : 0;
+  box.innerHTML = `<div class="setting-group-title">Recent results</div>`
+    + `<div class="act-results-row"><span class="res-dots" role="img" aria-label="${ok} of ${runs.length} recent runs succeeded">`
+    + runs.map(r=>`<span class="res-dot ${r.status}" title="${escHtml(fmtWhen(r.when))} · ${OUTCOME[r.status] ? OUTCOME[r.status].word : r.status}${r.seconds ? " · " + fmtDuration(r.seconds) : ""}"></span>`).join("")
+    + `</span><span class="act-results-sum">${ok}/${runs.length} succeeded${avg ? ` · avg ${fmtDuration(avg)}` : ""}</span></div>`;
 }
 function wireHistory(){
   const body = $("hist-body");

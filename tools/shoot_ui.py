@@ -258,6 +258,8 @@ SCENES = [
     ("runner-history", "runner", (1100, 760), RUNNER_HISTORY),
     ("runner-history-narrow", "runner", (440, 820), RUNNER_HISTORY),
     ("runner-done", "runner", (1100, 760), RUNNER_DONE),
+    ("runner-actset-results", "runner", (1100, 760),
+     RUNNER_HISTORY + "; openActivitySettings(S.activities.filter(a => a.type !== 'background')[2].id)"),
     ("runner-rounds-idle", "runner", (1100, 760),
      "applyRounds({count: 5, rest: 600}); openHeaderPop('settings')"),
     ("runner-rounds-live", "runner", (1100, 760), RUNNER_ROUNDS),
