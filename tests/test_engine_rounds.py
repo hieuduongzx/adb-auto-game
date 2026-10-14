@@ -107,3 +107,33 @@ class RestBetweenRoundsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ResumeTests(unittest.TestCase):
+    def setUp(self):
+        with mock.patch.object(E, "ADBGameAutomation"):
+            self.engine = E.WorkflowEngine()
+        self.runs = []
+        self.engine.on("on_activity_complete", lambda act, ok: self.runs.append(act["id"]))
+        sleep = mock.patch.object(E.time, "sleep")
+        sleep.start()
+        self.addCleanup(sleep.stop)
+
+    def run_from(self, start_from, rounds=1):
+        self.engine.load(_flow("a", "b", "c"))
+        self.engine.configure_rounds(rounds, 0)
+        self.engine.running = True
+        self.engine._start_from = start_from
+        self.engine._run_sequence()
+
+    def test_resume_skips_the_activities_before_it(self):
+        self.run_from("b")
+        self.assertEqual(self.runs, ["b", "c"])
+
+    def test_resume_applies_to_the_first_round_only(self):
+        self.run_from("c", rounds=2)
+        self.assertEqual(self.runs, ["c", "a", "b", "c"])
+
+    def test_unknown_resume_point_runs_everything(self):
+        self.run_from("zzz")
+        self.assertEqual(self.runs, ["a", "b", "c"])

@@ -160,6 +160,14 @@ input { caret-color: var(--accent); text-align: center; }
 .run-outcome[hidden] { display:none; }
 .outcome-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; background:var(--muted); }
 .outcome-text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.outcome-resume {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 2px 9px; min-height: 22px;
+  border: 1px solid currentColor; border-radius: var(--r-xs); background: var(--panel); color: inherit;
+  font: 600 var(--t-caption)/1 var(--sans); cursor: pointer; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.outcome-resume[hidden] { display: none; }
+.outcome-resume:hover { background: var(--err-bd); }
+.outcome-resume:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .outcome-x { border:0; background:transparent; color:var(--muted); cursor:pointer; padding:4px 5px; border-radius:var(--r-xs); display:inline-flex; align-items:center; }
 .outcome-x:hover { background: var(--alt); color: var(--ink); }
 .run-outcome.outcome-completed { background:var(--ok-bg); border-color:var(--ok-bd); color:var(--ok-ink); }

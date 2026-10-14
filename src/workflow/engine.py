@@ -772,12 +772,15 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         return True
 
     @_serialize_run_start
-    def start(self, background: bool = True, with_speedhack: bool = True) -> bool:
+    def start(self, background: bool = True, with_speedhack: bool = True,
+              start_from: Optional[str] = None) -> bool:
         """Run all enabled sequence activities once, then start backgrounds.
 
         ``with_speedhack`` lets a caller run the flow *without* auto-applying its
         speedhack config — the designer's "Run test" passes ``False`` so testing a
         flow never injects Frida; speedhack there is a separate, manual action.
+        ``start_from`` (an activity id) resumes the sequence there: the enabled
+        activities before it are skipped in the first round only.
         """
         if self.running:
             log_warning("Already running", kind=LOG_KIND_RUN)
@@ -794,6 +797,7 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         # A breakpoint left the last run in step mode; a new run starts free.
         self._debug_step = False
         self._debug_gate.set()
+        self._start_from = str(start_from) if start_from else None
         self.running = True
         enabled = [a for a in self.activities() if a.get("enabled", True)]
         n_seq = sum(1 for a in enabled if a.get("type") != "background")
@@ -956,12 +960,22 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
             left -= now - last
             last = now
 
-    def _run_sequence_pass(self) -> tuple:
-        """One pass over the enabled sequence activities → ``(ran, completed, failed)``."""
+    def _run_sequence_pass(self, start_from: Optional[str] = None) -> tuple:
+        """One pass over the enabled sequence activities → ``(ran, completed, failed)``.
+
+        With *start_from*, the activities before that one are skipped (a
+        resume); an id that is not in the list runs the whole pass."""
         ran = completed = failed = 0
+        ids = [str(a.get("id")) for a in self.activities()]
+        skipping = bool(start_from) and str(start_from) in ids
         for act in self.activities():
             if self._stop.is_set():
                 break
+            if skipping:
+                if str(act.get("id")) != str(start_from):
+                    continue
+                skipping = False
+                log_info(f"⏭ Resuming from {self._label(act)}", kind=LOG_KIND_RUN)
             if act.get("type") == "background" or not act.get("enabled", True):
                 continue
             ran += 1
@@ -988,7 +1002,8 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
                     log_info(f"↻ Round {round_no}{of}", kind=LOG_KIND_RUN)
                     self._emit("on_round", {"round": round_no, "total": total,
                                             "phase": "running", "restUntil": 0})
-                ran, ok, bad = self._run_sequence_pass()
+                resume, self._start_from = getattr(self, "_start_from", None), None
+                ran, ok, bad = self._run_sequence_pass(resume)
                 completed += ok
                 failed += bad
                 if self._stop.is_set() or not ran:

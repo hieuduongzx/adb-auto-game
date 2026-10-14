@@ -116,6 +116,8 @@ class WorkflowRunnerAPI(OutcomeMixin, StateMixin, UpdateMixin, ControlMixin, Set
         # The round a repeating Start is on ({round, total, phase, restUntil});
         # None for a single pass and between runs. See configure_rounds.
         self._round: Optional[Dict[str, Any]] = None
+        # Activity a "Resume from" run starts at (consumed by _on_engine_start).
+        self._resume_from: Optional[str] = None
         # Per-activity tallies for the run's history record: id → {name, ok,
         # failed, stopped, seconds}; plus when each running activity began.
         self._run_acts: Dict[str, Dict[str, Any]] = {}

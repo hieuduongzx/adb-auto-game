@@ -253,9 +253,37 @@ function setOutcome(outcome, data){
   if(!spec){ row.hidden = true; text.textContent = ""; paintStatusPill(); updateProgress(); return; }
   const msg = (data && typeof data.message === "string" && data.message.trim()) || outcomeMessage(outcome, data);
   row.hidden = false;
+  renderResume(outcome);
   row.className = "run-outcome outcome-" + outcome;   // runner.css: .run-outcome.outcome-<kind>
   text.textContent = msg ? `${spec.word}: ${msg}` : spec.word;
   paintStatusPill(); updateProgress();
+}
+// The first failed activity of the last full run: where "Resume" picks up.
+function resumePoint(outcome){
+  if(outcome !== "failed" || S.runScope) return null;
+  return S.activities.find(a=>a.type!=="background" && a.enabled && a.status === "failed") || null;
+}
+function renderResume(outcome){
+  const b = $("outcome-resume"); if(!b) return;
+  const a = resumePoint(outcome);
+  b.hidden = !a;
+  if(!a) return;
+  b.dataset.id = a.id;
+  b.innerHTML = uiIco("play", "uico-0 uico-fill") + "Resume from " + escHtml(a.name);
+  b.title = `Run again from “${a.name}” - the activities before it are skipped`;
+  b.setAttribute("aria-label", `Resume from ${a.name}`);
+}
+async function onResume(){
+  const b = $("outcome-resume"); const id = b && b.dataset.id;
+  if(!id || !S.loaded || S.running || S.starting) return;
+  S.starting = true; refreshButtons();
+  S.runScope = null;
+  setOutcome("");
+  $('header-progress').style.display='flex'; startElapsedTimer(); updateProgress();
+  let ok = false;
+  try{ ok = await api().resume_from(id); }catch(_){ }
+  finally{ S.starting = false; refreshButtons(); }
+  if(!ok && !S.running){ stopElapsedTimer(); updateProgress(); }
 }
 function dismissOutcome(){
   const row = $("run-outcome");

@@ -112,7 +112,13 @@ class ControlMixin:
         A sequence activity runs once; a background activity loops until Stop."""
         return self._request_run([str(activity_id or "")])
 
-    def _request_run(self, scope: Optional[List[str]]) -> bool:
+    def resume_from(self, activity_id: str) -> bool:
+        """Start a full run that picks up at *activity_id* — the "Resume from"
+        on a failed run's result: the activities before it are skipped (this
+        round only), everything from it on runs as usual."""
+        return self._request_run(None, start_from=str(activity_id or "") or None)
+
+    def _request_run(self, scope: Optional[List[str]], start_from: Optional[str] = None) -> bool:
         # pywebview dispatches API calls on separate threads. Reserve the entire
         # preflight/readiness interval, before engine.running becomes True.
         if not self._run_request_lock.acquire(blocking=False):
@@ -134,6 +140,11 @@ class ControlMixin:
             self._run_scope = scope
             if scope is None:
                 self._push_bridge_status(force=True)
+                acts = self.flow.get("activities", []) or []
+                self._resume_from = (start_from if any(str(a.get("id")) == start_from for a in acts)
+                                     else None)
+                if self._resume_from:
+                    return self.engine.start(background=True, start_from=self._resume_from)
                 return self.engine.start(background=True)
             return self.engine.start_activity(scope[0])
         finally:

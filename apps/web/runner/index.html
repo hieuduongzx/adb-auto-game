@@ -80,6 +80,8 @@
     <div id="run-outcome" class="run-outcome" role="status" aria-live="polite" hidden>
       <span class="outcome-dot" aria-hidden="true"></span>
       <span class="outcome-text" id="outcome-text"></span>
+      <!-- A failed run offers to pick up where it broke (runner.js setOutcome). -->
+      <button type="button" class="outcome-resume" id="outcome-resume" onclick="onResume()" title="Resume the run from the activity that failed" aria-label="Resume from the failed activity" hidden></button>
       <button type="button" class="outcome-x" id="outcome-x" onclick="dismissOutcome()"
               title="Hide this result" aria-label="Hide this run result"><i data-ico="x" data-ico-size="uico-1" aria-hidden="true"></i></button>
     </div>

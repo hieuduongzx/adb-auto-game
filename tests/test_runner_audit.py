@@ -384,3 +384,24 @@ def test_failure_shots_are_pruned_to_the_newest(tmp_path):
     api._prune_failure_shots(str(folder))
     left = sorted(p.name for p in folder.iterdir())
     assert len(left) == api.FAILURE_SHOTS_KEEP and left[0] == "005.jpg"
+
+
+def test_resume_from_starts_there_and_marks_earlier_activities_skipped(tmp_path):
+    api = runner(tmp_path)
+    api.flow["activities"] = [{"id": "x", "name": "X"}, {"id": "a", "name": "A"}, {"id": "b", "name": "B"}]
+    api._resume_from = None
+    api.engine.start.side_effect = lambda **kw: api._on_engine_start() or True
+    assert api.resume_from("a") is True
+    assert api.engine.start.call_args.kwargs == {"background": True, "start_from": "a"}
+    pushed = [c.args[1] for c in api._push.call_args_list if c.args[0] == "activity_update"]
+    assert pushed[:3] == [{"id": "x", "status": "skipped"}, {"id": "a", "status": "pending"},
+                          {"id": "b", "status": "pending"}]
+    assert api._resume_from is None                      # consumed by this run only
+
+
+def test_resume_from_an_unknown_activity_is_a_plain_start(tmp_path):
+    api = runner(tmp_path)
+    api._resume_from = None
+    api.engine.start.return_value = True
+    assert api.resume_from("nope") is True
+    assert api.engine.start.call_args.kwargs == {"background": True}

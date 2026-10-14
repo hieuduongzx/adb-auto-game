@@ -105,9 +105,16 @@ class OutcomeMixin:
         self._run_started_at = time.time()
         activities = self.flow.get("activities", []) or []
         ids = self._run_scope if self._run_scope is not None else [str(a.get("id")) for a in activities]
+        # A resumed run skips what came before its starting activity.
+        resume = getattr(self, "_resume_from", None) if self._run_scope is None else None
+        skipping = bool(resume) and resume in ids
         for activity_id in ids:
-            self._act_status[activity_id] = "pending"
-            self._push("activity_update", {"id": activity_id, "status": "pending"})
+            if skipping and activity_id == resume:
+                skipping = False
+            status = "skipped" if skipping else "pending"
+            self._act_status[activity_id] = status
+            self._push("activity_update", {"id": activity_id, "status": status})
+        self._resume_from = None
         self._reset_run_tracking()
         self._outcome = None
         self._round = None
