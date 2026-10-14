@@ -32,6 +32,7 @@ def runner(tmp_path, controller="adb"):
     api._stop_intent = False
     api._run_failed = False
     api._outcome = None
+    api._round = None
     api._flow_game_path = "old.exe"
     api.flow_path = None
     api._flow_emulator = dict(api.flow["emulator"])
@@ -214,3 +215,52 @@ def test_runner_refuses_enabling_background_until_previous_worker_returns(tmp_pa
     assert act["enabled"] is False
     assert api._runner_config == before
     api.engine.start_background.assert_not_called()
+
+
+def _real_rounds(api):
+    """Give the mocked engine the real configure_rounds bookkeeping."""
+    from src.workflow.engine import WorkflowEngine
+
+    def configure(count=1, rest=0):
+        return WorkflowEngine.configure_rounds(api.engine, count, rest)
+    api.engine.configure_rounds.side_effect = configure
+    api.engine.rounds, api.engine.round_rest = 1, 0.0
+
+
+def test_rounds_are_saved_per_workflow_and_restored(tmp_path):
+    import json
+    api = runner(tmp_path)
+    _real_rounds(api)
+    assert api.set_rounds(3, 600) == {"ok": True, "count": 3, "rest": 600.0}
+    saved = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    assert saved["rounds"] == {"count": 3, "rest": 600.0}
+    api.engine.rounds, api.engine.round_rest = 1, 0.0
+    api._runner_config = saved
+    api._apply_runner_config()
+    assert (api.engine.rounds, api.engine.round_rest) == (3, 600.0)
+
+
+def test_rounds_cannot_change_under_a_live_run(tmp_path):
+    api = runner(tmp_path)
+    _real_rounds(api)
+    api._run_active = True
+    assert api.set_rounds(0, 0)["ok"] is False
+    assert api.engine.rounds == 1
+
+
+def test_new_round_resets_rows_and_outcome_names_the_rounds(tmp_path):
+    api = runner(tmp_path)
+    api.engine._fatal = ""
+    api.engine._stop = threading.Event()
+    api._on_engine_start()
+    api._on_round({"round": 1, "total": 3, "phase": "running", "restUntil": 0})
+    api._on_activity_complete({"id": "a"}, True)
+    api._push.reset_mock()
+    api._on_round({"round": 2, "total": 3, "phase": "running", "restUntil": 0})
+    assert ("activity_update", {"id": "a", "status": "pending"}) in [c.args for c in api._push.call_args_list]
+    assert api._running_payload()["round"]["round"] == 2
+    api._on_activity_complete({"id": "a"}, True)
+    api._on_engine_stop()
+    assert api._outcome["kind"] == "completed"
+    assert api._outcome["reason"].startswith("2 rounds · ")
+    assert api._running_payload()["round"] is None

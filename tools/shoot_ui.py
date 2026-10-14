@@ -165,6 +165,16 @@ RUNNER_LIVE = """(() => {
      send('log', {ts: t + i, level, kind, scope: i ? 'Girl Wars' : 'Runner', text}));
 })()"""
 
+# A repeating Start resting between rounds 2 and 3 of 5.
+RUNNER_ROUNDS = """(() => {
+  applyRounds({count: 5, rest: 600});
+  const send = (type, data) => window.__recv(JSON.stringify({type, data}));
+  const ids = S.activities.filter(a => a.type !== 'background' && a.enabled).map(a => a.id);
+  send('running_state', {running: true, paused: false, startedAt: Date.now() / 1000 - 3754, runScope: null,
+                         round: {round: 2, total: 5, phase: 'resting', restUntil: Date.now() / 1000 + 272}});
+  ids.forEach(id => send('activity_update', {id, status: 'completed'}));
+})()"""
+
 # A test run part-way through: two blocks done, one live, one failed.
 DESIGNER_LIVE = """(() => {
   wfSetRunning(true);
@@ -199,6 +209,10 @@ SCENES = [
     ("runner-actset-narrow", "runner", (440, 820),
      "openActivitySettings((S.activities.find(a => (a.vars||[]).length > 2) || S.activities[0]).id)"),
     ("runner-pop-settings", "runner", (1100, 760), "openHeaderPop('settings')"),
+    ("runner-rounds-idle", "runner", (1100, 760),
+     "applyRounds({count: 5, rest: 600}); openHeaderPop('settings')"),
+    ("runner-rounds-live", "runner", (1100, 760), RUNNER_ROUNDS),
+    ("runner-rounds-narrow", "runner", (440, 820), RUNNER_ROUNDS),
     ("runner-pop-notes", "runner", (1100, 760), "openHeaderPop('notes')"),
     ("designer", "wf", (1480, 920), ""),
     ("designer-node", "wf", (1480, 920),

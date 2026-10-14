@@ -34,6 +34,11 @@ class RunnerVariableDisplayTests(unittest.TestCase):
             _var_payload = namespace["_var_payload"]
             _persist_runner_config = namespace["_persist_runner_config"]
 
+            class engine:  # noqa: N801 - stands in for the Runner's engine attribute
+                @staticmethod
+                def configure_rounds(count=1, rest=0):
+                    return {"rounds": count, "rest": rest}
+
             def _runtime_settings_for_activity(self, activity):
                 return []
 

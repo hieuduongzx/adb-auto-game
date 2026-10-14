@@ -180,6 +180,13 @@ input { caret-color: var(--accent); text-align: center; }
    screen readers and the narrow view already hid it. */
 .queue-summary { display: none; }
 .queue-current { max-width: 230px; color: var(--ink2); font-weight: 500; }
+/* A repeating Start names its round — the one summary that is not a repeat of
+   the list, so it stays visible (as a chip) at every width. */
+.queue-summary.is-round {
+  display: inline-flex; flex-shrink: 0; align-items: center; padding: 1px 7px;
+  border-radius: var(--r-xs); background: var(--accent-bg); color: var(--accent);
+  font-family: var(--mono); font-weight: 600; font-variant-numeric: tabular-nums;
+}
 .prog-bar-track { flex: 1; min-width: 60px; height: 8px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .prog-bar-fill { height: 100%; border-radius: 999px; background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
 .prog-elapsed { font-family: var(--mono); font-size: var(--t-body); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; flex-shrink: 0; }
@@ -191,6 +198,13 @@ input { caret-color: var(--accent); text-align: center; }
    the destructive state remains unmistakable. See setPrimary() in runner.js. */
 .btn-start { flex: 1 1 auto; min-width: 0; height: 36px; background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-bd); font-size: var(--t-title); font-weight: 700; }
 .btn-start:hover:not(:disabled), .btn-start:active:not(:disabled) { background: color-mix(in srgb, var(--ok-bg) 76%, var(--ok) 24%); border-color: var(--ok); color: var(--ok-ink); }
+/* "×3" / "∞" on Start: what this Start will do when Repeat is on. */
+.start-rounds {
+  margin-left: 6px; padding: 0 6px; border-radius: var(--r-xs);
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  font-family: var(--mono); font-size: var(--t-ui); font-weight: 700; line-height: 18px;
+}
+.btn-start:disabled .start-rounds { background: transparent; }
 .btn-start.is-stop { background: var(--runner-stop); color: var(--on-fixed); border-color: var(--runner-stop); }
 .btn-start.is-stop:hover:not(:disabled), .btn-start.is-stop:active:not(:disabled) { background: var(--runner-stop-hover); border-color: var(--runner-stop-hover); color: var(--on-fixed); }
 .header-btns .btn:disabled { opacity: 1; background: var(--alt); border-color: var(--border); color: var(--muted); }
@@ -650,3 +664,7 @@ input { caret-color: var(--accent); text-align: center; }
 .btn-refresh:hover { background: var(--alt); }
 .btn-refresh.spinning svg { animation: spin .6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Repeat (rounds) — Settings ───────────────────────────────────────────── */
+.rounds-fields { display: flex; flex-direction: column; }
+.rounds-fields[hidden], .rounds-fields .setting-row[hidden] { display: none; }

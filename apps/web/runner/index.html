@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -193,6 +193,31 @@
 
         <template id="runner-settings-src">
           <div class="rpane-scroll">
+            <!-- How many passes Start makes over the sequence. Locked while a run
+                 is live (runtime-setting-control): it applies from the next Start. -->
+            <section class="settings-section" id="rounds-card">
+              <h2 class="settings-section-title">Repeat</h2>
+              <div class="setting-toggle-group rounds-mode" role="radiogroup" aria-label="Repeat the sequence">
+                <label class="setting-choice"><input type="radio" name="rounds-mode" value="once" class="runtime-setting-control" onchange="onRoundsModeChange(this.value)"><span>Once</span></label>
+                <label class="setting-choice"><input type="radio" name="rounds-mode" value="count" class="runtime-setting-control" onchange="onRoundsModeChange(this.value)"><span>Several rounds</span></label>
+                <label class="setting-choice"><input type="radio" name="rounds-mode" value="forever" class="runtime-setting-control" onchange="onRoundsModeChange(this.value)"><span>Until stopped</span></label>
+              </div>
+              <div class="rounds-fields" id="rounds-fields">
+                <div class="setting-row" id="rounds-count-row">
+                  <label class="setting-label" for="rounds-count">Rounds</label>
+                  <input type="number" id="rounds-count" class="setting-input runtime-setting-control" min="2" step="1" value="2"
+                         onchange="onRoundsCommit()">
+                </div>
+                <div class="setting-row">
+                  <label class="setting-label" for="rounds-rest">Rest between rounds</label>
+                  <input type="number" id="rounds-rest" class="setting-input runtime-setting-control" min="0" step="1" value="0"
+                         onchange="onRoundsCommit()">
+                  <span class="setting-unit">min</span>
+                </div>
+              </div>
+              <p class="settings-note" id="rounds-note"></p>
+            </section>
+
             <section class="settings-section" id="game-card" style="display:none">
               <h2 class="settings-section-title">Game</h2>
               <div class="setting-block">

@@ -181,6 +181,10 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         # Off in the standalone runner — no UI to paint and no need for the
         # best-score-below-threshold extra match work on every miss.
         self.report_matches = False
+        # Passes a full Start makes over the sequence (configure_rounds):
+        # 1 = once, N = N times, 0 = until stopped; rest = seconds between.
+        self.rounds = 1
+        self.round_rest = 0.0
 
         self.running = False
         self._run_start_lock = threading.Lock()
@@ -231,6 +235,10 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
             # block (e.g. an empty graph). Lets the designer keep a "last crash
             # point" marker you can jump straight back to.
             "on_activity_crash": [],
+            # fired by a repeating full Start: one dict {round, total (0 = until
+            # stopped), phase "running" | "resting", restUntil (epoch, resting
+            # only)}. Not fired for a single pass, the default.
+            "on_round": [],
         }
 
         # Dispatch table for action nodes: type -> handler(node, params) -> bool.
@@ -896,26 +904,91 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
             self._emit("on_stop")
             set_log_activity(None)
 
+    def configure_rounds(self, count: Any = 1, rest: Any = 0) -> Dict[str, Any]:
+        """How many passes a full Start makes over the sequence activities.
+
+        ``count`` 1 runs the sequence once (the default); N > 1 runs it N times;
+        0 repeats it until stopped. ``rest`` is the pause between two passes, in
+        seconds. Background activities are unaffected — they keep looping on
+        their own schedule throughout. Takes effect from the next Start.
+        """
+        try:
+            rounds = max(0, int(float(count)))
+        except (TypeError, ValueError, OverflowError):
+            rounds = 1
+        try:
+            pause = float(rest)
+            pause = max(0.0, pause) if math.isfinite(pause) else 0.0
+        except (TypeError, ValueError):
+            pause = 0.0
+        self.rounds, self.round_rest = rounds, pause
+        return {"rounds": self.rounds, "rest": self.round_rest}
+
+    def _rest_between_rounds(self, seconds: float) -> None:
+        """Wait out the rest between passes; a Stop ends it at once and a pause
+        holds the countdown where it is."""
+        left = max(0.0, float(seconds))
+        last = time.monotonic()
+        while left > 0 and not self._stop.is_set():
+            if not self._pause.is_set():
+                self._pause.wait(timeout=0.1)
+                last = time.monotonic()
+                continue
+            time.sleep(min(0.1, left))
+            now = time.monotonic()
+            left -= now - last
+            last = now
+
+    def _run_sequence_pass(self) -> tuple:
+        """One pass over the enabled sequence activities → ``(ran, completed, failed)``."""
+        ran = completed = failed = 0
+        for act in self.activities():
+            if self._stop.is_set():
+                break
+            if act.get("type") == "background" or not act.get("enabled", True):
+                continue
+            ran += 1
+            if self._run_activity(act):
+                completed += 1
+            else:
+                failed += 1
+            if self._stop.is_set():
+                break
+            time.sleep(0.3)
+        return ran, completed, failed
+
     def _run_sequence(self) -> None:
         completed = failed = 0
+        total = int(getattr(self, "rounds", 1))
+        rest = float(getattr(self, "round_rest", 0.0))
+        repeating = total != 1
+        round_no = 0
         try:
-            for act in self.activities():
-                if self._stop.is_set():
+            while not self._stop.is_set():
+                round_no += 1
+                if repeating:
+                    of = f"/{total}" if total else ""
+                    log_info(f"↻ Round {round_no}{of}", kind=LOG_KIND_RUN)
+                    self._emit("on_round", {"round": round_no, "total": total,
+                                            "phase": "running", "restUntil": 0})
+                ran, ok, bad = self._run_sequence_pass()
+                completed += ok
+                failed += bad
+                if self._stop.is_set() or not ran:
+                    break       # nothing enabled: repeating would only spin
+                if total and round_no >= total:
                     break
-                if act.get("type") == "background":
-                    continue
-                if not act.get("enabled", True):
-                    continue
-                if self._run_activity(act):
-                    completed += 1
-                else:
-                    failed += 1
-                if self._stop.is_set():
-                    break
-                time.sleep(0.3)
+                if rest > 0:
+                    log_info(f"☾ Resting {self._duration(rest)} before round {round_no + 1}",
+                             kind=LOG_KIND_RUN)
+                    self._emit("on_round", {"round": round_no, "total": total, "phase": "resting",
+                                            "restUntil": time.time() + rest})
+                    self._rest_between_rounds(rest)
             # A stopped run already said "Stopped" — only summarise a full pass.
             if not self._stop.is_set():
                 summary = f"{completed} completed" + (f", {failed} failed" if failed else "")
+                if repeating:
+                    summary = f"{round_no} round{'s' if round_no != 1 else ''}, {summary}"
                 if failed:
                     log_warning(f"■ Sequence finished — {summary}", kind=LOG_KIND_RUN)
                 else:
@@ -926,6 +999,18 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
             if not self._bg_threads and not self._retired_bg_threads:
                 self.running = False
                 self._emit("on_stop")
+
+    @staticmethod
+    def _duration(seconds: float) -> str:
+        """``45s`` / ``12m`` / ``1h 30m`` — rest lengths in a log line."""
+        s = int(round(seconds))
+        if s < 60:
+            return f"{s}s"
+        h, m = divmod(s // 60, 60)
+        rem = s % 60
+        if h:
+            return f"{h}h {m}m" if m else f"{h}h"
+        return f"{m}m {rem}s" if rem else f"{m}m"
 
     def _run_activity(self, act: Dict[str, Any]) -> bool:
         # Every line logged on this thread while the activity runs — the engine,

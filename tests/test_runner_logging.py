@@ -65,6 +65,7 @@ def test_successful_workflow_initialization_logs_one_useful_message():
         _push_bridge_status = lambda self, force=False: None
         _kick_device_scan = lambda self: None
         _set_window_title = lambda self, name: None
+        _rounds_payload = lambda self: {"count": 1, "rest": 0}
 
         def _push(self, event, payload):
             self.events.append((event, payload))

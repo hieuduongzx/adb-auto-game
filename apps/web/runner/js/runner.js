@@ -24,6 +24,8 @@ const S = {
   starting:        false,
   ordering:        false,
   runScope:        null,   // activity ids of a single-activity run; null = full Start
+  rounds:          { count:1, rest:0 },  // passes a full Start makes (0 = until stopped), rest in s
+  round:           null,   // live round of a repeating Start: {round, total, phase, restUntil}
   mobileView:      "activities",
 };
 
@@ -134,6 +136,7 @@ function startElapsedTimer(startedAt){
     const m = Math.floor((s%3600)/60).toString().padStart(2,'0');
     const ss = (s%60).toString().padStart(2,'0');
     $('elapsed').textContent = `${h}:${m}:${ss}`;
+    if(S.round && S.round.phase === "resting") renderQueueMonitor(scopedActivities());
   };
   // Paint now, not a second from now: a Runner reopened mid-run would
   // otherwise read 00:00:00 until the first interval fires.
@@ -172,17 +175,37 @@ function updateProgress(){
   renderQueueMonitor(seq);
 }
 
+// "Round 2/5" / "Round 3/∞" while a repeating Start runs; "" otherwise.
+function roundLabel(){
+  const r = S.round;
+  if(!r || !r.round) return "";
+  return `Round ${r.round}/${r.total ? r.total : "∞"}`;
+}
+// m:ss (or h:mm:ss) left of a rest between rounds.
+function restLeft(){
+  const left = Math.max(0, Math.round((Number(S.round && S.round.restUntil) || 0) - Date.now()/1000));
+  const h = Math.floor(left/3600), m = Math.floor((left%3600)/60), sec = left%60;
+  const mm = String(m).padStart(h ? 2 : 1, "0"), ss = String(sec).padStart(2, "0");
+  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
 function renderQueueMonitor(seq){
   const sequence = S.activities.filter(a=>a.type!=="background");
   const background = S.activities.filter(a=>a.type==="background");
   const summary = $("queue-summary");
   if(summary){
+    const round = S.runScope ? "" : roundLabel();
     summary.textContent = S.runScope
       ? "Single activity run"
-      : `${sequence.filter(a=>a.enabled).length} sequence · ${background.filter(a=>a.enabled).length} background enabled`;
+      : round || `${sequence.filter(a=>a.enabled).length} sequence · ${background.filter(a=>a.enabled).length} background enabled`;
+    summary.classList.toggle("is-round", !!round);
   }
   const current = $("queue-current");
   if(!current) return;
+  if(S.running && S.round && S.round.phase === "resting"){
+    current.textContent = `Next round in ${restLeft()}`;
+    current.title = current.textContent;
+    return;
+  }
   const running = seq.find(a=>a.status === "running");
   const next = seq.find(a=>!SETTLED.includes(a.status));
   current.textContent = running ? `Running: ${running.name}` : next ? `Next: ${next.name}` : (seq.length ? "Queue settled" : "Next: —");
@@ -262,13 +285,24 @@ function setStatusPill(key, label){
 // label and icon are rebuilt only on an actual state change: rewriting innerHTML
 // every refresh would drop focus from the button mid-run.
 let _primaryRunning = null;
+// What Start will do, as a badge on the button: nothing for a single pass,
+// "×3" for three rounds, "∞" until stopped.
+function roundsBadge(){
+  const n = Number(S.rounds && S.rounds.count);
+  if(n === 1 || !Number.isFinite(n)) return "";
+  return n === 0 ? "∞" : `×${n}`;
+}
 function setPrimary(running){
-  if(_primaryRunning === running) return;
-  _primaryRunning = running;
+  const badge = running ? "" : roundsBadge();
+  const key = running + "|" + badge;
+  if(_primaryRunning === key) return;
+  _primaryRunning = key;
   const b = $("btn-primary");
   b.classList.toggle("is-stop", running);
-  b.innerHTML = uiIco(running ? "square" : "play", "uico-fill") + (running ? "Stop" : "Start");
-  b.title = running ? "Stop the run" : "Start the run (F5 or Ctrl+Enter)";
+  b.innerHTML = uiIco(running ? "square" : "play", "uico-fill") + (running ? "Stop" : "Start")
+    + (badge ? `<span class="start-rounds" aria-hidden="true">${badge}</span>` : "");
+  const what = !badge ? "" : badge === "∞" ? " — repeats until stopped" : ` — ${S.rounds.count} rounds`;
+  b.title = running ? "Stop the run" : `Start the run${what} (F5 or Ctrl+Enter)`;
   b.setAttribute("aria-label", running ? "Stop workflow" : "Start workflow");
 }
 // The swapping handler the button's onclick points at.
@@ -1481,6 +1515,7 @@ function applyFlow(data){
   document.querySelector('[data-tab="seq"]').innerHTML = `Sequence <span class="tab-count">${seq}</span>`;
   document.querySelector('[data-tab="bg"]').innerHTML  = `Background <span class="tab-count">${bg}</span>`;
   if(data.speedhack) applySpeedhack(data.speedhack);
+  if(data.rounds) applyRounds(data.rounds);
   if(data.captureBackend){
     S.captureBackend=data.captureBackend;
     const sel=$("capture-backend"); if(sel) sel.value=S.captureBackend;
@@ -1503,6 +1538,7 @@ function applyRunState(data){
   const wasRunning = S.running;
   S.running=!!data.running; S.paused=!!data.paused;
   if("runScope" in data) S.runScope = data.runScope || null;
+  if("round" in data) S.round = data.round || null;
   if(S.running){
     setOutcome("");
     $('header-progress').style.display='flex';
@@ -1795,6 +1831,52 @@ async function onUpdateApply(){
   if(res && res.error) $("upd-status").textContent = `Update failed: ${res.error}`;
 }
 
+// ── Repeat (rounds) ──────────────────────────────────────────────────────────
+// Runner setting: how many passes Start makes over the sequence and how long
+// it rests between them. Saved per workflow; applies from the next Start.
+function roundsMode(count){ return count === 0 ? "forever" : count > 1 ? "count" : "once"; }
+function applyRounds(r){
+  const count = parseInt(r && r.count, 10);
+  S.rounds = { count: Number.isFinite(count) ? Math.max(0, count) : 1, rest: Math.max(0, Number(r && r.rest) || 0) };
+  renderRounds();
+  refreshButtons();
+}
+function renderRounds(){
+  const mode = roundsMode(S.rounds.count);
+  document.querySelectorAll('input[name="rounds-mode"]').forEach(el=>{ el.checked = el.value === mode; });
+  const fields = $("rounds-fields"); if(fields) fields.hidden = mode === "once";
+  const countRow = $("rounds-count-row"); if(countRow) countRow.hidden = mode !== "count";
+  const count = $("rounds-count"); if(count && mode === "count") count.value = S.rounds.count;
+  const rest = $("rounds-rest"); if(rest) rest.value = +(S.rounds.rest / 60).toFixed(2);
+  const note = $("rounds-note");
+  if(note){
+    const mins = +(S.rounds.rest/60).toFixed(2);
+    const restTxt = S.rounds.rest > 0 ? `, resting ${mins} min between rounds` : "";
+    note.textContent = (mode === "once" ? "Start runs the enabled sequence activities once."
+      : mode === "forever" ? `Start repeats the sequence until you stop it${restTxt}.`
+      : `Start runs the sequence ${S.rounds.count} times${restTxt}.`)
+      + " Background activities keep their own schedule.";
+  }
+}
+async function saveRounds(count, restMin){
+  const rest = Math.max(0, Number(restMin) || 0) * 60;
+  let r = null;
+  try{ r = await api().set_rounds(count, rest); }catch(_){ }
+  if(r) applyRounds({count:r.count, rest:r.rest});
+  else renderRounds();
+}
+function onRoundsModeChange(mode){
+  const typed = parseInt(($("rounds-count") || {}).value, 10);
+  const count = mode === "once" ? 1 : mode === "forever" ? 0 : Math.max(2, Number.isFinite(typed) ? typed : 2);
+  saveRounds(count, ($("rounds-rest") || {}).value);
+}
+function onRoundsCommit(){
+  const mode = roundsMode(S.rounds.count);
+  const typed = parseInt(($("rounds-count") || {}).value, 10);
+  const count = mode === "count" ? Math.max(2, Number.isFinite(typed) ? typed : 2) : S.rounds.count;
+  saveRounds(count, ($("rounds-rest") || {}).value);
+}
+
 // ── Handlers ───────────────────────────────────────────────────────────────
 const api = () => window.pywebview.api;
 async function onStart(){
@@ -2023,6 +2105,7 @@ function mountRunnerSettings(){
   if(!_runnerSettingsRoot){
     const fragment = src && src.content.cloneNode(true);
     _runnerSettingsRoot = fragment && fragment.firstElementChild;
+    if(_runnerSettingsRoot) queueMicrotask(renderRounds);
   }
   syncRunnerSettingsHost();
 }
@@ -2083,7 +2166,7 @@ async function init(){
                            captureBackend:st.captureBackend, controller:st.controller, win32:st.win32,
                            gamePathDefault:st.gamePathDefault, requirements:st.requirements, gamePath:st.gamePath,
                            emulator:st.emulator, emulatorDefault:st.emulatorDefault,
-                           icon:st.icon, iconKey:st.iconKey});
+                           rounds:st.rounds, icon:st.icon, iconKey:st.iconKey});
   else applyController(st.controller, st.win32);
   applyRunState(st);
   (st.log||[]).forEach(appendLog);

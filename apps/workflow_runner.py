@@ -207,6 +207,9 @@ class WorkflowRunnerAPI:
         self._run_failed = False
         self._run_counts: Dict[str, int] = {"completed": 0, "failed": 0, "stopped": 0}
         self._outcome: Optional[Dict[str, Any]] = None
+        # The round a repeating Start is on ({round, total, phase, restUntil});
+        # None for a single pass and between runs. See configure_rounds.
+        self._round: Optional[Dict[str, Any]] = None
         # Last status pushed per activity id — used to settle rows that a Stop
         # cancelled before they could report back (background activities).
         self._act_status: Dict[str, str] = {}
@@ -242,6 +245,7 @@ class WorkflowRunnerAPI:
         self.engine.on("on_activity_start", self._on_activity_start)
         self.engine.on("on_activity_complete", self._on_activity_complete)
         self.engine.on("on_activity_crash", self._on_activity_crash)
+        self.engine.on("on_round", self._on_round)
 
     # ── Setup ────────────────────────────────────────────────────────────────
 
@@ -333,6 +337,7 @@ class WorkflowRunnerAPI:
         payload = {"running": self.engine.is_running(), "paused": self.engine.is_paused()}
         payload["runScope"] = self._run_scope
         payload["startedAt"] = self._run_started_at
+        payload["round"] = dict(self._round) if self._round else None
         payload.update(self._outcome_fields())
         return payload
 
@@ -347,6 +352,7 @@ class WorkflowRunnerAPI:
             self._push("activity_update", {"id": activity_id, "status": "pending"})
         self._reset_run_tracking()
         self._outcome = None
+        self._round = None
         self._push("running_state", self._running_payload())
 
     def _on_engine_stop(self) -> None:
@@ -359,6 +365,7 @@ class WorkflowRunnerAPI:
                 # back (the engine just ends its loop), so settle its row.
                 self._settle_stopped_activities()
             self._log_outcome(self._outcome)
+            self._round = None
         self._push("running_state", self._running_payload())
 
     def _classify_outcome(self) -> dict:
@@ -388,6 +395,9 @@ class WorkflowRunnerAPI:
             done = counts.get("completed", 0)
             reason = (f"{done} activit{'y' if done == 1 else 'ies'} completed"
                       if done else "Run finished")
+        rounds = int((self._round or {}).get("round") or 0)
+        if rounds > 1 or (self._round and self._round.get("total") != 1):
+            reason = f"{rounds} round{'s' if rounds != 1 else ''} · {reason}"
         return {"kind": kind, "label": self._OUTCOME_LABELS[kind], "reason": reason,
                 "at": datetime.datetime.now().strftime("%H:%M:%S"),
                 "epoch": time.time(), "runId": self._run_id, "counts": counts}
@@ -415,6 +425,23 @@ class WorkflowRunnerAPI:
                 continue
             self._act_status[act_id] = "stopped"
             self._push("activity_update", {"id": act_id, "status": "stopped"})
+
+    def _on_round(self, info: dict) -> None:
+        """A repeating Start began a round or is resting before the next one.
+
+        Every new round after the first puts the sequence rows back to
+        "waiting", so the list reads as this round's progress rather than a
+        mix of the last round's results and this one's."""
+        info = dict(info or {})
+        self._round = info
+        if info.get("phase") == "running" and int(info.get("round") or 0) > 1:
+            for act in self.flow.get("activities", []) or []:
+                if act.get("type") == "background" or not act.get("enabled", True):
+                    continue
+                act_id = str(act.get("id"))
+                self._act_status[act_id] = "pending"
+                self._push("activity_update", {"id": act_id, "status": "pending"})
+        self._push("running_state", self._running_payload())
 
     def _on_activity_start(self, act: dict) -> None:
         act_id = (act or {}).get("id")
@@ -660,6 +687,8 @@ class WorkflowRunnerAPI:
             self.flow["speedhack"] = merged
         if cfg.get("capture") in CAPTURE_BACKENDS:
             self.flow["capture"] = cfg["capture"]
+        rounds = cfg.get("rounds") if isinstance(cfg.get("rounds"), dict) else {}
+        self.engine.configure_rounds(rounds.get("count", 1), rounds.get("rest", 0))
         # Project game path (Win32): the Settings tab override beats the path
         # chosen in the Designer; an empty override keeps the workflow's own.
         win = self.flow.get("win32")
@@ -942,6 +971,7 @@ class WorkflowRunnerAPI:
             "log": self._log_buffer[-300:],
             **self._running_payload(),
             "speedhack": self.engine.speedhack_info(),
+            "rounds": self._rounds_payload(),
             "connectedSerial": self._connected_serial,
             "selectedSerial": self._selected_serial,
             "captureBackend": get_capture_backend(),
@@ -1212,6 +1242,7 @@ class WorkflowRunnerAPI:
         state = {"ok": True, "name": flow.get("name", ""),
                  "activities": self._activities_payload(),
                  "speedhack": self.engine.speedhack_info(),
+                 "rounds": self._rounds_payload(),
                  "captureBackend": backend,
                  "controller": ctrl,
                  "win32": dict(flow.get("win32") or {}),
@@ -1718,6 +1749,25 @@ class WorkflowRunnerAPI:
         info = self.engine.speedhack_info()
         self._push("speedhack_update", info)
         return {**info, "ok": True}
+
+    def _rounds_payload(self) -> dict:
+        return {"count": int(getattr(self.engine, "rounds", 1)),
+                "rest": float(getattr(self.engine, "round_rest", 0.0))}
+
+    def set_rounds(self, count, rest=0) -> dict:
+        """How many times Start runs the sequence (0 = until stopped) and the
+        rest between rounds in seconds. A Runner setting, saved per workflow;
+        it applies from the next Start, so it can't change under a live run."""
+        if self._run_live():
+            return {"ok": False, **self._rounds_payload()}
+        wanted = self.engine.configure_rounds(count, rest)
+        with self._runner_config_lock:
+            ok = self._persist_runner_config({("rounds",): {"count": wanted["rounds"],
+                                                            "rest": wanted["rest"]}})
+        if not ok:
+            saved = self._runner_config.get("rounds") or {}
+            self.engine.configure_rounds(saved.get("count", 1), saved.get("rest", 0))
+        return {"ok": ok, **self._rounds_payload()}
 
     def set_speed_scale(self, scale: float) -> dict:
         """Change the live time scale while a run is in progress."""
