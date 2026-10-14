@@ -17,7 +17,9 @@ Frozen exe modes: `Macro2k.exe` (hub), `--designer [flow]`, `--runner [flow]`.
 
 ```
 apps/           Product apps + web UI (hub / wf / runner / scope) and the ADB CLI
+  designer/     The Designer's Python API, one mixin per area (preview, library…)
 src/            Library: ADB, Win32, workflow engine, updater, utils
+  workflow/     engine.py (load, run, graph walk) + catalog.py + nodes/ handlers
 workflows/      Game projects: <Name>/*.json + templates/ + assets/
 assets/         Bundled models (PP-OCRv5 Mobile)
 docs/           Product notes and design specs
