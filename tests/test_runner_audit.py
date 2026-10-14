@@ -41,6 +41,11 @@ def runner(tmp_path, controller="adb"):
     api._push = Mock()
     api._start_hotkeys = Mock()       # never grab the real keyboard in tests
     api._stop_hotkeys = Mock()
+    # Nor write the real data folder or pop real notifications: history,
+    # failure shots and run notifications all stay inside tmp_path.
+    api._history_path = lambda: str(tmp_path / "history.jsonl")
+    api._failure_dir = lambda: str(tmp_path / "failures")
+    api._notify_outcome = Mock()
     api._requirements_payload = Mock(return_value=None)
     api._select_run_device = Mock()
     api._push_bridge_status = Mock()
@@ -295,6 +300,7 @@ def _notify_runner(tmp_path, monkeypatch, cfg):
     monkeypatch.setattr("src.notify.desktop", lambda t, m: sent.append(("desktop", t, m)))
     monkeypatch.setattr("src.notify.discord_async", lambda url, t, m, kind, fields: sent.append(("discord", t, kind, fields)))
     api = runner(tmp_path)
+    api._notify_outcome = WorkflowRunnerAPI._notify_outcome.__get__(api)   # the real one here
     api.get_notify = lambda: dict(cfg)
     api._run_started_at = 0
     api._round = None
@@ -363,7 +369,7 @@ def test_failed_activity_saves_a_screenshot_and_history_links_it(tmp_path, monke
     api._on_activity_crash({"id": "a", "name": "Claim VIP"}, None)
     api._on_activity_complete({"id": "a", "name": "Claim VIP"}, False)
     shot = api._run_acts["a"]["shot"]
-    assert shot.endswith("_Claim_VIP.jpg") and (tmp_path / "runner" / "failures").exists()
+    assert shot.endswith("_Claim_VIP.jpg") and (tmp_path / "failures").exists()
     import os
     assert os.path.isfile(shot)
     opened = []
