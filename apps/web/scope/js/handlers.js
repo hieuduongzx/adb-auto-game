@@ -84,11 +84,15 @@ async function onClearRegion(){
   $("rg-x").value=$("rg-y").value=$("rg-w").value=$("rg-h").value=0;
   await api().clear_selection(); setRegionBadge(false); draw();
 }
-async function onOcrBackendChange(name){
-  const r=await api().set_ocr_backend(name);
-  const el=$("ocr-engine");
+function setOcrEngine(r,err){
+  const el=$("ocr-engine"); if(!el) return;
+  if(!r){el.textContent="OCR · unavailable";el.className="unavailable";el.title=err?String(err.message||err):"";return;}
   el.textContent=(r.label||r.engine)+(r.available?" · ready":" · unavailable");
   el.className=r.available?"ready":"unavailable";
+  el.title="";
+}
+async function onOcrBackendChange(name){
+  setOcrEngine(await api().set_ocr_backend(name));
 }
 async function onReadText(){ $("ocr-result").value=await api().read_text($("ocr-wl").value); }
 async function onSendTap(){ await api().tap(parseInt($("tap-x").value||"0"),parseInt($("tap-y").value||"0")); }

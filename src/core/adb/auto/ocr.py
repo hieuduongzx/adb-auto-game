@@ -18,7 +18,7 @@ from typing import Dict, Optional, Tuple, Type
 import numpy as np
 
 from src.core.adb.auto.ppocr_onnx import PPOCRv5Recognizer
-from src.utils import log_error, log_warning
+from src.utils import log_error, log_info, log_warning
 
 
 Region = Tuple[int, int, int, int]

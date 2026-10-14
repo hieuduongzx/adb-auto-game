@@ -20,12 +20,9 @@ async function init(){
   const sel=$("ocr-backend");
   const models=state.ocrModels||[];
   models.forEach(model=>{const o=document.createElement("option");o.value=model.id;o.textContent=model.label||model.id;sel.appendChild(o);});
-  if(sel.options.length){
-    const r=await api().set_ocr_backend(sel.value);
-    const el=$("ocr-engine");
-    el.textContent=(r.label||r.engine)+(r.available?" · ready":" · unavailable");
-    el.className=r.available?"ready":"unavailable";
-  }
+  // The OCR model loads lazily and may fail (missing runtime); that must not
+  // stop the rest of init — refresh rate, auto-capture and the log below.
+  if(sel.options.length) onOcrBackendChange(sel.value).catch(err=>setOcrEngine(null,err));
   S.autoRefresh=!!state.autoRefresh;
   $("auto-cb").classList.toggle("on",S.autoRefresh);
   document.querySelector(".pill-wrap")?.setAttribute("aria-checked",String(S.autoRefresh));
