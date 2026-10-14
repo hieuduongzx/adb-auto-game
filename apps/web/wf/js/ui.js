@@ -162,6 +162,7 @@ const UI_SHORTCUTS = [
     ["F10 / F8","Paused run: run the next block / continue to the next breakpoint"],
     ["Debug overlay","Button beside Focus on the Activities panel - on = every match draws on Preview during a run"],
     ["Esc","Stop the run · close panel / clear selection"],
+    ["Ctrl+Shift+F12","Stop a test run from any window (while it runs)"],
     ["Drop a chip onto a wire","Splice the block into that wire"],
   ]],
 ];

@@ -39,6 +39,8 @@ def runner(tmp_path, controller="adb"):
     api._window = None
     api._closing = False
     api._push = Mock()
+    api._start_hotkeys = Mock()       # never grab the real keyboard in tests
+    api._stop_hotkeys = Mock()
     api._requirements_payload = Mock(return_value=None)
     api._select_run_device = Mock()
     api._push_bridge_status = Mock()

@@ -39,12 +39,16 @@ class GlobalHotkeys:
         return self
 
     def stop(self) -> None:
-        if self._thread is None or not self._thread_id:
+        """Unregister and end the loop. Safe from a binding itself (a Stop
+        hotkey that stops the run lands here on the hotkey thread)."""
+        thread = self._thread
+        if thread is None or not self._thread_id:
             return
+        self._thread = None
         import ctypes
         ctypes.windll.user32.PostThreadMessageW(self._thread_id, WM_QUIT, 0, 0)
-        self._thread.join(timeout=2.0)
-        self._thread = None
+        if thread is not threading.current_thread():
+            thread.join(timeout=2.0)
 
     def _loop(self) -> None:
         import ctypes

@@ -178,7 +178,6 @@ class WorkflowRunnerAPI(OutcomeMixin, StateMixin, UpdateMixin, ControlMixin, Set
         if runner_update.updates_supported(self._runner_info):
             threading.Thread(target=self._auto_check_update, daemon=True).start()
         self._start_schedule_watch()
-        self._start_hotkeys()
 
     # ── Log subscriber ───────────────────────────────────────────────────────
 
@@ -234,19 +233,28 @@ class WorkflowRunnerAPI(OutcomeMixin, StateMixin, UpdateMixin, ControlMixin, Set
 
     # ── Global hotkeys ───────────────────────────────────────────────────────
     # Stop / pause from any window — a foreground-mode macro owns the mouse
-    # and the game hides the Runner (src/hotkeys.py).
+    # and the game hides the Runner (src/hotkeys.py). Held only while a run is
+    # live, so several Runners (and the Designer) can each have them in turn.
 
     def _start_hotkeys(self) -> None:
+        if getattr(self, "_hotkeys", None) is not None:
+            return
         self._hotkeys = hotkeys.GlobalHotkeys([
             (*hotkeys.STOP[:2], hotkeys.STOP[2], self._hotkey_stop),
             (*hotkeys.PAUSE[:2], hotkeys.PAUSE[2], self._hotkey_pause),
         ]).start()
-        if self._hotkeys.registered:
-            log_info("Hotkeys from any window: " + hotkeys.STOP[2] + " stops, "
+        if self._hotkeys.registered and not getattr(self, "_hotkeys_told", False):
+            self._hotkeys_told = True
+            log_info("Hotkeys from any window while running: " + hotkeys.STOP[2] + " stops, "
                      + hotkeys.PAUSE[2] + " pauses / resumes")
         if self._hotkeys.failed:
-            log_warning(f"Hotkeys {', '.join(self._hotkeys.failed)} are taken by another program "
-                        "(another Runner?) — use the buttons here instead")
+            log_warning(f"Hotkeys {', '.join(self._hotkeys.failed)} are held by another program "
+                        "(another running Runner?) — use the buttons here instead")
+
+    def _stop_hotkeys(self) -> None:
+        hk, self._hotkeys = getattr(self, "_hotkeys", None), None
+        if hk is not None:
+            hk.stop()
 
     def _hotkey_stop(self) -> None:
         if self._run_live():
@@ -259,8 +267,7 @@ class WorkflowRunnerAPI(OutcomeMixin, StateMixin, UpdateMixin, ControlMixin, Set
 
     def _close(self) -> None:
         self._closing = True
-        if getattr(self, "_hotkeys", None) is not None:
-            self._hotkeys.stop()
+        self._stop_hotkeys()
         self._auto_refresh_enabled = False
         remove_log_subscriber(self._on_log)
         try:

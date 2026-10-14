@@ -100,6 +100,8 @@ class OutcomeMixin:
         return payload
 
     def _on_engine_start(self) -> None:
+        if hasattr(self, "_start_hotkeys"):
+            self._start_hotkeys()
         self._run_id += 1
         self._run_active = True
         self._run_started_at = time.time()
@@ -124,6 +126,8 @@ class OutcomeMixin:
 
     def _on_engine_stop(self) -> None:
         """Every terminal path lands here — classify the run once."""
+        if hasattr(self, "_stop_hotkeys"):
+            self._stop_hotkeys()
         if self._run_active:
             self._run_active = False
             self._outcome = self._classify_outcome()

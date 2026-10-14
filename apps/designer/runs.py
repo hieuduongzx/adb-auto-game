@@ -9,6 +9,7 @@ import time
 from typing import List, Optional
 
 from src.workflow import WorkflowEngine
+from src import hotkeys
 from src.utils import (
     log_error,
     log_info,
@@ -309,6 +310,24 @@ class RunMixin:
         self._device_worker()
         return True
 
+    # Ctrl+Shift+F12 stops a test run from any window (src/hotkeys.py) — held
+    # only while the run is live, so a Runner can own it the rest of the time.
+    def _start_test_hotkeys(self) -> None:
+        if getattr(self, "_hotkeys", None) is not None:
+            return
+        self._hotkeys = hotkeys.GlobalHotkeys(
+            [(*hotkeys.STOP[:2], hotkeys.STOP[2], self._hotkey_stop_test)]).start()
+
+    def _stop_test_hotkeys(self) -> None:
+        hk, self._hotkeys = getattr(self, "_hotkeys", None), None
+        if hk is not None:
+            hk.stop()
+
+    def _hotkey_stop_test(self) -> None:
+        if self._engine is not None and self._engine.is_running():
+            log_info(f"⌨ {hotkeys.STOP[2]} — stopping the test run")
+            self.workflow_stop()
+
     def _bind_workflow_callbacks(self) -> None:
         if self._engine is None:
             return
@@ -318,7 +337,9 @@ class RunMixin:
         self._engine.capture_failures_always = True
         # Live match boxes on Preview during test run / Test-one-block.
         self._engine.report_matches = True
-        self._engine.callbacks["on_stop"] = [lambda: self._push("workflow_state", {"running": False})]
+        self._engine.callbacks["on_start"] = [self._start_test_hotkeys]
+        self._engine.callbacks["on_stop"] = [lambda: self._push("workflow_state", {"running": False}),
+                                             self._stop_test_hotkeys]
         self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
         self._engine.callbacks["on_breakpoint"] = [lambda nid: self._push("breakpoint_hit", {"id": nid})]
         self._engine.callbacks["on_node_done"] = [

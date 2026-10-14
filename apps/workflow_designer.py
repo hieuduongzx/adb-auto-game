@@ -235,6 +235,7 @@ class WorkflowDesignerAPI(PreviewMixin, DeviceMixin, LibraryMixin, ProjectMixin,
 
     def _close(self) -> None:
         self._closing = True
+        self._stop_test_hotkeys()
         # Remember whatever file is open so the next launch reopens it.
         self._remember_last_workflow(self._wf_path)
         if self._engine and self._engine.is_running():

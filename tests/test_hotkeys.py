@@ -43,3 +43,32 @@ class GlobalHotkeyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(sys.platform == "win32", "Win32 RegisterHotKey")
+class StopFromBindingTests(unittest.TestCase):
+    def test_a_binding_may_stop_its_own_hotkeys(self):
+        import ctypes
+        done = threading.Event()
+        holder = {}
+
+        def stop_self():
+            holder["hk"].stop()          # runs on the hotkey thread
+            done.set()
+        mods = H.MOD_CONTROL | H.MOD_ALT | H.MOD_SHIFT
+        holder["hk"] = H.GlobalHotkeys([(mods, VK_F24, "self-stop", stop_self)]).start()
+        tid = holder["hk"]._thread_id
+        ctypes.windll.user32.PostThreadMessageW(tid, H.WM_HOTKEY, 1, 0)
+        self.assertTrue(done.wait(2))
+        again = H.GlobalHotkeys([(mods, VK_F24, "again", lambda: None)]).start()
+        try:
+            import time
+            for _ in range(20):          # the loop unregisters as it exits
+                if again.registered:
+                    break
+                again.stop()
+                time.sleep(0.05)
+                again = H.GlobalHotkeys([(mods, VK_F24, "again", lambda: None)]).start()
+            self.assertEqual(again.registered, ["again"])
+        finally:
+            again.stop()
