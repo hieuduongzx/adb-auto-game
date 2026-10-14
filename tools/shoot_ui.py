@@ -275,6 +275,11 @@ SCENES = [
      "(() => { const n = document.querySelectorAll('#wf-world .wf-node')[2]; const r = n.getBoundingClientRect();"
      " n.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, clientX: r.x + 30, clientY: r.y + 20})); })()"),
     ("designer-live", "wf", (1480, 920), DESIGNER_LIVE),
+    ("designer-breakpoint", "wf", (1480, 920),
+     "(() => { const ns = wfGraph().nodes.filter(n => n.type !== 'start');"
+     " ns[1].breakpoint = true; ns[3] && (ns[3].breakpoint = true); wfRenderCanvas(); wfSetRunning(true);"
+     " const el = wfNodeElById(ns[0].id); el && el.classList.add('ran-ok');"
+     " wfOnBreakpointHit(ns[1].id); })()"),
     ("designer-palette-filter", "wf", (1480, 920), "wfPaletteFilter('image')"),
     ("designer-toasts", "wf", (1480, 920),
      "uiToast('Saved', 'success'); uiToast('Template not found: crop_88_50.png', 'error');"

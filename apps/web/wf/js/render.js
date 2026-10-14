@@ -1187,7 +1187,8 @@ function wfNodeEl(n, index){
   el.className="wf-node "+def.kind+typeCls+catCls+tfCls+((index?index.selected.has(n.id):WF.sel.includes(n.id))?" sel":"")+(n.id===wfRunNode?" running":"")
     +(typeof wfCallStack!=="undefined" && wfCallStack.includes(n.id)?" running-call":"")
     // Survives the run-trail reset, so re-apply it on every canvas rebuild.
-    +(typeof wfIsCrashNode==="function" && wfIsCrashNode(n.id)?" crashed":"");
+    +(typeof wfIsCrashNode==="function" && wfIsCrashNode(n.id)?" crashed":"")
+    +(n.breakpoint?" has-bp":"");
   el.style.left=n.x+"px"; el.style.top=n.y+"px"; el.dataset.node=n.id;
   // Dynamic output ports — grow the card so they all sit inside it. Multi-port
   // blocks stack ports from the primary row (≈ card centre), 16px apart.

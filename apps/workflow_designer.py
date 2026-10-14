@@ -2004,6 +2004,8 @@ class WorkflowDesignerAPI:
         anchor = self._wf_path or os.path.join(_PROJECT_ROOT, "flow.json")
         self._engine.load(flow, flow_path=anchor)
         self._engine.failure_screenshot_dir = os.path.join(_PROJECT_ROOT, "out", "workflow_failures")
+        # Test runs stop at breakpoints; the Runner's engine never does.
+        self._engine.honor_breakpoints = True
         self._bind_workflow_callbacks()
         # Test runs never auto-apply speedhack — that's a separate ▶ action.
         ok = self._engine.start(background=True, with_speedhack=False)
@@ -2247,6 +2249,7 @@ class WorkflowDesignerAPI:
         self._engine.report_matches = True
         self._engine.callbacks["on_stop"] = [lambda: self._push("workflow_state", {"running": False})]
         self._engine.callbacks["on_node"] = [lambda nid: self._push("node_active", {"id": nid})]
+        self._engine.callbacks["on_breakpoint"] = [lambda nid: self._push("breakpoint_hit", {"id": nid})]
         self._engine.callbacks["on_node_done"] = [
             lambda nid, st, port: self._push("node_result", {
                 "id": nid, "status": st, "port": port})]
@@ -2358,6 +2361,8 @@ class WorkflowDesignerAPI:
         anchor = self._wf_path or os.path.join(_PROJECT_ROOT, "flow.json")
         self._engine.load(flow, flow_path=anchor)
         self._engine.failure_screenshot_dir = os.path.join(_PROJECT_ROOT, "out", "workflow_failures")
+        # Test runs stop at breakpoints; the Runner's engine never does.
+        self._engine.honor_breakpoints = True
         self._bind_workflow_callbacks()
         graph = None
         seed_act = {"vars": []}
@@ -2385,6 +2390,13 @@ class WorkflowDesignerAPI:
     def workflow_debug_step(self) -> bool:
         if self._engine:
             self._engine.debug_next()
+            return True
+        return False
+
+    def workflow_debug_continue(self) -> bool:
+        """Resume a run held at a breakpoint (or stepping) until the next one."""
+        if self._engine:
+            self._engine.debug_continue()
             return True
         return False
 
@@ -2436,6 +2448,8 @@ class WorkflowDesignerAPI:
             log_warning(f"Couldn't load the flow for the block: {exc}")
         # Re-bind the same GUI callbacks a full test run uses.
         self._engine.failure_screenshot_dir = os.path.join(_PROJECT_ROOT, "out", "workflow_failures")
+        # Test runs stop at breakpoints; the Runner's engine never does.
+        self._engine.honor_breakpoints = True
         self._bind_workflow_callbacks()
         try:
             result = self._engine.run_single_node(node) or {}

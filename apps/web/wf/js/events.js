@@ -145,6 +145,11 @@ window.__recv = function(raw){
     wfSetRunningNode(data.id);
     return;
   }
+  if(type==="breakpoint_hit"){
+    if(!wfRunning) return;
+    wfOnBreakpointHit(data && data.id);
+    return;
+  }
   if(type==="node_result"){
     if(!wfRunning && !wfNodeTesting) return;
     // Clear any pre-block delay or timeout countdown.

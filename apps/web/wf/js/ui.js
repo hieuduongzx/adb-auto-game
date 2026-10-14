@@ -158,6 +158,8 @@ const UI_SHORTCUTS = [
   ]],
   ["Test runs", [
     ["Ctrl+Enter","Test one block (match overlay on Preview)"],
+    ["F9 / Shift+F9","Toggle a breakpoint on the selected blocks / clear them all"],
+    ["F10 / F8","Paused run: run the next block / continue to the next breakpoint"],
     ["Debug overlay","Button beside Focus on the Activities panel - on = every match draws on Preview during a run"],
     ["Esc","Stop the run · close panel / clear selection"],
     ["Drop a chip onto a wire","Splice the block into that wire"],

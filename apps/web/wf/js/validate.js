@@ -173,14 +173,55 @@ async function wfStartStepRun(){ wfDebugMode=true; await wfRunFromSelected(true)
 function wfClearDebugPause(){
   document.querySelectorAll(".wf-node.paused").forEach(el=>el.classList.remove("paused"));
   const nb=$("wf-step-next-btn"); if(nb) nb.classList.remove("paused");
+  const cb=$("wf-continue-btn"); if(cb) cb.classList.remove("paused");
 }
 function wfDebugAutoStep(){
   if(!wfDebugMode) return;
-  setStatus("Paused - click Next step");
+  setStatus("Paused - Next step (F10) · Continue (F8)");
   const el=wfNodeElById(wfRunNode); if(el) el.classList.add("paused");
   const nb=$("wf-step-next-btn"); if(nb) nb.classList.add("paused");
+  const cb=$("wf-continue-btn"); if(cb) cb.classList.add("paused");
 }
 async function wfDebugStep(){
   wfClearDebugPause();
   try{ await api().workflow_debug_step(); setStatus("Step"); }catch{ setStatus("No paused debug run"); }
+}
+// ── Breakpoints ──────────────────────────────────────────────────────────────
+// A breakpoint (F9) holds a test run *before* the block runs; the run is then
+// in step mode: Next step (F10) runs that block, Continue (F8) runs on to the
+// next breakpoint. Saved on the node; the Runner never stops on one.
+function wfBreakpointable(n){ return !!n && n.type!=="start" && n.type!=="note"; }
+function wfToggleBreakpoint(ids){
+  const nodes=(ids||WF.sel||[]).map(wfNode).filter(wfBreakpointable);
+  if(!nodes.length){ setStatus("Select a block to set a breakpoint"); return; }
+  const on=!nodes.every(n=>n.breakpoint);
+  wfPushUndo();
+  nodes.forEach(n=>{ if(on) n.breakpoint=true; else delete n.breakpoint;
+    const el=wfNodeElById(n.id); if(el) el.classList.toggle("has-bp", on); });
+  setStatus(on ? `Breakpoint set${nodes.length>1?` on ${nodes.length} blocks`:""} - a test run pauses before it`
+               : `Breakpoint cleared${nodes.length>1?` on ${nodes.length} blocks`:""}`);
+}
+function wfClearAllBreakpoints(){
+  const all=[...(WF.activities||[]),...(WF.functions||[])].flatMap(o=>(o.graph&&o.graph.nodes)||[]).filter(n=>n.breakpoint);
+  if(!all.length){ setStatus("No breakpoints"); return; }
+  wfPushUndo();
+  all.forEach(n=>{ delete n.breakpoint; });
+  document.querySelectorAll(".wf-node.has-bp").forEach(el=>el.classList.remove("has-bp"));
+  setStatus(`Cleared ${all.length} breakpoint${all.length===1?"":"s"}`);
+}
+function wfOnBreakpointHit(id){
+  wfDebugMode=true;
+  if(id && wfFocusOn && typeof wfFocusFollow==="function") wfFocusFollow(id);
+  const el=id && wfNodeElById(id);
+  if(el){ el.classList.add("paused"); if(!wfFocusOn) wfCenterOnNode(wfNode(id)); }
+  const nb=$("wf-step-next-btn"); if(nb) nb.classList.add("paused");
+  const cb=$("wf-continue-btn"); if(cb) cb.classList.add("paused");
+  const n=id && wfNode(id);
+  const name=n ? ((n.name||"").trim() || (WF_NODES[n.type]||{}).label || n.type) : "a block";
+  setStatus(`Paused at breakpoint - ${name} · F10 step · F8 continue`);
+}
+async function wfDebugContinue(){
+  wfClearDebugPause();
+  wfDebugMode=false;
+  try{ await api().workflow_debug_continue(); setStatus("Continue"); }catch{ setStatus("No paused debug run"); }
 }

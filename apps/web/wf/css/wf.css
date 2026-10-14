@@ -69,9 +69,9 @@
 
 /* Next step — hidden until a step-debug session actually pauses (the engine
    toggles .paused), so the header isn't spent on a control that's usually dead. */
-#wf-step-next-btn { display:none; }
-#wf-step-next-btn.paused { display:inline-flex; color:var(--accent); }
-#wf-step-next-btn.paused:hover { background:var(--accent-bg); }
+#wf-step-next-btn, #wf-continue-btn { display:none; }
+#wf-step-next-btn.paused, #wf-continue-btn.paused { display:inline-flex; color:var(--accent); }
+#wf-step-next-btn.paused:hover, #wf-continue-btn.paused:hover { background:var(--accent-bg); }
 
 /* Dirty marker — an amber dot on the Save button while there are unsaved changes. */
 #wf-save-btn { position:relative; }
@@ -281,7 +281,7 @@
 @media (max-width: 1040px){
   /* Check and Test-block are both in the ▾ run menu already, so the tray keeps
      only the menu itself. Run stays, always — it is the point of the bar. */
-  .tb-run-aux .btn:not(#wf-run-menu-btn):not(#wf-step-next-btn) { display:none; }
+  .tb-run-aux .btn:not(#wf-run-menu-btn):not(#wf-step-next-btn):not(#wf-continue-btn) { display:none; }
   .wf-run-status .wf-run-txt { display:inline; } /* State must not depend on colour alone. */
   .wf-run-status { padding:0 11px; }
   #wf-shortcuts-btn { display:none; }            /* F1 still opens it */
@@ -1241,6 +1241,13 @@
   display:flex; align-items:center; justify-content:center; font-size:10px; line-height:1;
   color:var(--on-accent); background:var(--accent); border-radius:var(--r-xs);
   box-shadow:var(--sh-md); z-index:4; transform:none; }
+/* Breakpoint (F9): the debugger's red dot, pinned to the header's left edge
+   so it reads at any zoom without covering the title. */
+.wf-node.has-bp .wf-node-hd { position:relative; padding-left:15px; }
+.wf-node.has-bp .wf-node-hd::before { content:""; position:absolute; left:4px; top:50%;
+  width:8px; height:8px; margin-top:-4px; border-radius:50%; background:var(--run-fail);
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--run-fail) 25%, transparent); }
+.wf-node.has-bp:not(.paused) { border-color:color-mix(in srgb, var(--run-fail) 55%, var(--border2)); }
 /* Pulse the Next-step header button while a step-run is paused. */
 #wf-step-next-btn.paused { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 @media (prefers-reduced-motion: no-preference){

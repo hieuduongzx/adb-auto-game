@@ -94,9 +94,18 @@ Colour changes are guarded by `tests/test_token_contrast.py`, which checks
 every text/background token pair against WCAG AA in both themes.
 
 In Designer, **F** fits the graph; **Shift+F** focuses selected nodes.
+**F9** sets a breakpoint on the selected blocks (Shift+F9 clears all): a test
+run holds *before* that block, then **F10** runs one block and **F8** continues
+to the next breakpoint. Breakpoints are saved on the node; the Runner ignores
+them.
 Activities and Functions sit at the top of the left column, above the node
 palette. **Arrange** spaces nodes automatically and can be undone with
 **Ctrl+Z**. Selecting a node highlights its incoming and outgoing wires.
+
+In the Runner, **Settings → Repeat** runs the sequence several rounds or
+until stopped, with a rest between rounds. Every finished run is recorded in
+`data/runner/<workflow>/history.jsonl`: the **History** tab lists them and
+the Hub shows the newest one on each game's card.
 
 ## Build (Macro2k only)
 

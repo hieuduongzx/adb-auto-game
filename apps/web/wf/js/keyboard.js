@@ -22,6 +22,10 @@ window.addEventListener("keydown", e => {
     if(typeof wfRunSingleNode==="function") wfRunSingleNode();
     return;
   }
+  // F8 / F10 — resume a paused debug run (breakpoint or step): global so they
+  // work wherever focus is, like any debugger.
+  if(e.key==="F8" && !e.ctrlKey && !e.altKey){ if(wfRunning){ e.preventDefault(); wfDebugContinue(); } return; }
+  if(e.key==="F10" && !e.ctrlKey && !e.altKey){ if(wfRunning){ e.preventDefault(); wfDebugStep(); } return; }
   const canvasView=typeof wfCurView!=="function"||wfCurView()==="canvas";
   // Keep native text undo/redo while editing a field. Workflow history is a
   // Canvas action, so Preview/Library can never mutate a graph hidden behind it.
@@ -67,6 +71,7 @@ window.addEventListener("keydown", e => {
     if(e.key==="Escape" && typeof wfClearSel==="function"){ wfClearSel(); if(typeof wfMarkSel==="function") wfMarkSel(); }
     return;
   }
+  if(e.key==="F9" && !e.ctrlKey && !e.altKey){ e.preventDefault(); if(e.shiftKey) wfClearAllBreakpoints(); else wfToggleBreakpoint(); return; }
   if((e.key==="c"||e.key==="C") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCopy(); } return; }
   if((e.key==="x"||e.key==="X") && (e.ctrlKey||e.metaKey)){ if(WF.sel.length){ e.preventDefault(); wfCut(); } return; }
   if((e.key==="v"||e.key==="V") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); wfPaste(wfPointer.inside?{clientX:wfPointer.x,clientY:wfPointer.y}:null); return; }

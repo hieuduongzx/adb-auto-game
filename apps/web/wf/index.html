@@ -88,8 +88,10 @@
         <i data-ico="target" aria-hidden="true"></i></button>
       <button class="btn ico" id="wf-run-menu-btn" onclick="wfShowRunMenu(this)" aria-label="Run and debug actions" title="More run & debug actions - run from selected, step debug, Runner, Build EXE" aria-haspopup="menu" aria-expanded="false">
         <i data-ico="bug-play" aria-hidden="true"></i></button>
-      <button class="btn ico" id="wf-step-next-btn" onclick="wfDebugStep()" title="Next step - resume the paused debug run">
+      <button class="btn ico" id="wf-step-next-btn" onclick="wfDebugStep()" title="Next step - run the held block, then pause again (F10)">
         <i data-ico="arrow-right" aria-hidden="true"></i></button>
+      <button class="btn ico" id="wf-continue-btn" onclick="wfDebugContinue()" title="Continue - run on to the next breakpoint (F8)">
+        <i data-ico="skip-forward" aria-hidden="true"></i></button>
     </div>
     <div id="wf-run-status" class="wf-run-status ok" title="Run status">
       <span class="wf-run-dot"></span>

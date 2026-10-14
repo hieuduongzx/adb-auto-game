@@ -871,6 +871,10 @@ function wfShowMenu(clientX, clientY){
     if(_n && typeof wfPvCanPreviewNode==="function" && wfPvCanPreviewNode(_n)){
       items.push({ico:"eye",label:"Show on Preview", fn:()=>wfPvPreviewNodes([_n])});
     }
+    if(typeof wfBreakpointable==="function" && wfBreakpointable(_n)){
+      items.push({ico:"octagon",label:(_n.breakpoint?"Remove breakpoint":"Add breakpoint")+" (F9)",
+        title:"A test run pauses before this block - then Next step (F10) or Continue (F8)", fn:()=>wfToggleBreakpoint([_n.id])});
+    }
     // Test one block: runs on device, paints match overlay on Preview.
     if(_n && wfCanTestNode(_n)){
       items.push({ico:"target",label:"Test block (Ctrl+Enter)", fn:()=>wfRunSingleNode(_n)});

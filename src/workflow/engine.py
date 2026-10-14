@@ -181,6 +181,9 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         # Off in the standalone runner — no UI to paint and no need for the
         # best-score-below-threshold extra match work on every miss.
         self.report_matches = False
+        # Designer test runs pause *before* any block flagged ``breakpoint``
+        # (see _hit_breakpoint). Off by default, so the Runner never does.
+        self.honor_breakpoints = False
         # Passes a full Start makes over the sequence (configure_rounds):
         # 1 = once, N = N times, 0 = until stopped; rest = seconds between.
         self.rounds = 1
@@ -239,6 +242,9 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
             # stopped), phase "running" | "resting", restUntil (epoch, resting
             # only)}. Not fired for a single pass, the default.
             "on_round": [],
+            # fired when a run holds at a breakpoint block: (node_id). The run
+            # is then in step mode — debug_next() / debug_continue() resume it.
+            "on_breakpoint": [],
         }
 
         # Dispatch table for action nodes: type -> handler(node, params) -> bool.
@@ -780,6 +786,9 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         self._stop.clear()
         self.auto._stop_event.clear()
         self._pause.set()
+        # A breakpoint left the last run in step mode; a new run starts free.
+        self._debug_step = False
+        self._debug_gate.set()
         self.running = True
         enabled = [a for a in self.activities() if a.get("enabled", True)]
         n_seq = sum(1 for a in enabled if a.get("type") != "background")
@@ -826,6 +835,9 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         self._stop.clear()
         self.auto._stop_event.clear()
         self._pause.set()
+        # A breakpoint left the last run in step mode; a new run starts free.
+        self._debug_step = False
+        self._debug_gate.set()
         self.running = True
         self._emit("on_start")
 
@@ -1150,9 +1162,14 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         while cur and not self._stop.is_set() and not self._background_cancelled():
             if not self._wait_to_run():
                 break
+            if (getattr(self, "honor_breakpoints", False) and not self._debug_step
+                    and (nodes.get(cur) or {}).get("breakpoint")):
+                self._hit_breakpoint(nodes[cur], cur)
             if self._debug_step:
                 self._debug_gate.wait()
                 self._debug_gate.clear()
+                if self._stop.is_set():
+                    break           # Stop releases the gate; it must not run the block
             steps += 1
             if steps > MAX_STEPS:
                 log_warning("Step cap reached — stopping graph (cycle?)", kind=LOG_KIND_ACTIVITY)
@@ -1884,6 +1901,7 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         self._stop.set()
         self.auto._stop_event.set()
         self._pause.set()
+        self._debug_step = False
         self._debug_gate.set()
         self._stop_speedhack()
         # A Press key → Hold down left held must not keep the character walking.
@@ -2033,6 +2051,23 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
     def debug_next(self) -> None:
         """Release one node when running in step-debug mode."""
         self._debug_gate.set()
+
+    def debug_continue(self) -> None:
+        """Leave step mode and run on until the next breakpoint (or the end)."""
+        self._debug_step = False
+        self._debug_gate.set()
+
+    def _hit_breakpoint(self, node: Dict[str, Any], nid: str) -> None:
+        """Hold the walk *before* a breakpoint block runs: switch to step mode so
+        Next step runs it and Continue runs on. Only Designer test runs honour
+        breakpoints (``honor_breakpoints``); the Runner never stops on one."""
+        spec = NODE_TYPES.get(node.get("type") or "", {})
+        what = str(node.get("name") or "").strip() or spec.get("label") or node.get("type") or "block"
+        log_info(f"⏸ Breakpoint — {what}", kind=LOG_KIND_ACTIVITY)
+        self._debug_step = True
+        self._debug_gate.clear()
+        self._emit("on_node", nid)
+        self._emit("on_breakpoint", nid)
 
     def _run_action_with_retry(self, node: Dict, params: Dict, handler: Callable[[Dict, Dict], bool]) -> bool:
         attempts = max(1, int(node.get("retryCount", 0) or 0) + 1)
