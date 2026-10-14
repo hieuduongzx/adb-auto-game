@@ -19,6 +19,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.workflow import engine as E  # noqa: E402
+from src.workflow.nodes import emulator as EM  # noqa: E402
 from src.workflow.engine import WorkflowEngine  # noqa: E402
 
 
@@ -158,7 +159,7 @@ class TestPickPlayerWindow(unittest.TestCase):
 
     def test_find_emulator_window_is_unchanged_for_legacy_callers(self):
         recs = {"ldplayer": [rec(11, 100, area=5), rec(22, 200, area=9)]}
-        with mock.patch.object(E, "_enum_player_windows", return_value=recs):
+        with mock.patch.object(EM, "_enum_player_windows", return_value=recs):
             self.assertEqual(E._find_emulator_window("ldplayer"), 22)
             self.assertIsNone(E._find_emulator_window("mumu"))
 
@@ -170,7 +171,7 @@ class TestResolveSelectedEmulator(unittest.TestCase):
         self.eng = _StubEngine()
 
     def _resolve(self, serial, running=None, verb="Resize"):
-        with mock.patch.object(E, "_enum_player_windows", return_value=running or {}):
+        with mock.patch.object(EM, "_enum_player_windows", return_value=running or {}):
             self.eng.set_selected_device(serial)
             return self.eng._resolve_selected_emulator({"emulator": "selected"}, verb)
 
@@ -265,7 +266,7 @@ class TestPcTargetRouting(unittest.TestCase):
 
     def test_selected_routes_to_the_resolver(self):
         self.eng.set_selected_device("127.0.0.1:16384")
-        with mock.patch.object(E, "_enum_player_windows", return_value={}):
+        with mock.patch.object(EM, "_enum_player_windows", return_value={}):
             self.assertEqual(self.eng._emulator_pc_target({"emulator": "selected"}, "Resize")[:2],
                              ("mumu", 0))
 
@@ -293,7 +294,7 @@ class TestSelectedInstanceHints(unittest.TestCase):
 
     def test_selected_node_is_strict_and_asks_for_the_ports_owner(self):
         self.eng.set_selected_device("127.0.0.1:16384")
-        with mock.patch.object(E, "_tcp_listener_pids", return_value=[4242]) as tp:
+        with mock.patch.object(EM, "_tcp_listener_pids", return_value=[4242]) as tp:
             self.assertEqual(self.eng._selected_instance_hints({"emulator": "selected"}),
                              (16384, [4242], True))
             tp.assert_called_once_with(16384)
@@ -306,7 +307,7 @@ class TestSelectedInstanceHints(unittest.TestCase):
 
     def test_falls_back_to_the_bound_adb_device(self):
         eng = _StubEngine(device_id="127.0.0.1:62001")
-        with mock.patch.object(E, "_tcp_listener_pids", return_value=[7]) as tp:
+        with mock.patch.object(EM, "_tcp_listener_pids", return_value=[7]) as tp:
             port, pids, strict = eng._selected_instance_hints({"emulator": "selected"})
         self.assertEqual((port, pids, strict), (62001, [7], True))
         tp.assert_called_once_with(62001)

@@ -4,6 +4,9 @@ import copy
 import threading
 import unittest
 from pathlib import Path
+from unittest import mock
+
+from src.workflow import engine as E
 
 
 source = ast.parse((Path(__file__).parents[1] / "apps/workflow_runner.py").read_text(encoding="utf-8"))
@@ -13,6 +16,12 @@ methods = [node for cls in source.body if isinstance(cls, ast.ClassDef)
            for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in names]
 namespace = {"List": list, "CAPTURE_BACKENDS": (), "copy": copy}
 exec(compile(ast.Module(body=methods, type_ignores=[]), "workflow_runner.py", "exec"), namespace)
+
+
+def _engine():
+    """A real engine with the device layer mocked out."""
+    with mock.patch.object(E, "ADBGameAutomation"):
+        return E.WorkflowEngine()
 
 
 class RunnerVariableDisplayTests(unittest.TestCase):
@@ -85,12 +94,7 @@ class RunnerVariableDisplayTests(unittest.TestCase):
         self.assertTrue(runner.set_activity_var("act", "difficulty", "Hard"))
 
     def test_engine_keeps_choices_as_list_and_checks_whole_options(self):
-        tree = ast.parse((Path(__file__).parents[1] / "src/workflow/engine.py").read_text(encoding="utf-8"))
-        methods = [node for cls in tree.body if isinstance(cls, ast.ClassDef)
-                   for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in {"_seed_var", "_compare", "_resolve_value", "_a_set_var", "_coerce", "_truthy"}]
-        scope = {"Dict": dict, "Any": object, "log_info": lambda message: None}
-        exec(compile(ast.Module(body=methods, type_ignores=[]), "engine.py", "exec"), scope)
-        engine = type("Engine", (), {name: scope[name] for name in ("_seed_var", "_compare", "_resolve_value", "_a_set_var", "_coerce", "_truthy")})()
+        engine = _engine()
         values = {}
         engine._seed_var({"name": "mode", "type": "select", "display": "toggle-group", "multiple": True,
                           "options": ["Hard", "Very Hard"], "value": ["Very Hard"]}, values)
@@ -127,20 +131,12 @@ class RunnerVariableDisplayTests(unittest.TestCase):
         self.assertEqual(values["mode.Hard.lives"], 1)
 
     def test_changing_a_select_swaps_its_option_children(self):
-        tree = ast.parse((Path(__file__).parents[1] / "src/workflow/engine.py").read_text(encoding="utf-8"))
-        wanted = {"_seed_var", "_set_var", "_sync_option_children", "_select_defs", "_coerce", "_truthy"}
-        methods = [node for cls in tree.body if isinstance(cls, ast.ClassDef)
-                   for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in wanted]
-        scope = {"Dict": dict, "List": list, "Any": object, "log_info": lambda message: None, "Optional": object}
-        exec(compile(ast.Module(body=methods, type_ignores=[]), "engine.py", "exec"), scope)
-        engine = type("Engine", (), {name: scope[name] for name in wanted})()
+        engine = _engine()
         element = {"name": "element", "type": "select", "value": "Fire", "options": ["Fire", "Water"],
                    "optionChildren": {"Fire": [{"name": "dmg", "type": "number", "value": 3}],
                                       "Water": [{"name": "wet", "type": "bool", "value": True}]}}
         engine.flow = {"globals": [], "activities": [{"vars": [element]}]}
         engine._globals = {}
-        engine._ctx = type("Ctx", (), {})()
-        engine._emit = lambda *args: None
         engine._vars = {}
         engine._seed_var(element, engine._vars)
         engine._set_var("element", "Water")

@@ -109,7 +109,7 @@ class TestBuildTemplateIndex(unittest.TestCase):
         owners = {(u["ownerKind"], u["activity"]) for u in btn["used"]}
         self.assertEqual(owners, {("activity", "Đánh boss"), ("function", "wait_loading")})
         self.assertEqual({u["nodeId"] for u in btn["used"]}, {"n1", "n4"})
-        self.assertEqual({u["nodeLabel"] for u in btn["used"]}, {"Chạm ảnh"})
+        self.assertEqual({u["nodeLabel"] for u in btn["used"]}, {"Tap image"})
 
     def test_missing_reference_is_reported_not_counted_as_orphan(self):
         # btn.png is referenced but absent from the folder: that node will fail

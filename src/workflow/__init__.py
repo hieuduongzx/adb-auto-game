@@ -10,6 +10,16 @@ Activities run in one of two modes:
 
 Produced by Macro2k Designer (``apps/workflow_designer.py``) and consumed
 by the Runner (``apps/workflow_runner.py``).
+
+Layout:
+
+* ``engine``      — :class:`WorkflowEngine`: loading, run lifecycle, graph walk.
+* ``catalog``     — ``NODE_TYPES``, the node catalog the walk dispatches on.
+* ``nodes/``      — node handlers by family, mixed into the engine
+  (``actions``, ``conditions``, ``vision``, ``emulator``, ``win32``,
+  ``speedhack``).
+* ``logs``        — the engine's log helpers (step detail by default).
+* ``local_vars``  — Designer-only variable overrides.
 """
 from . import local_vars
 from .engine import WorkflowEngine, NODE_TYPES
