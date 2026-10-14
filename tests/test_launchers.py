@@ -14,7 +14,11 @@ import src.utils as utils
 ROOT = Path(__file__).resolve().parents[1]
 
 
+VENV_PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
+
+
 @unittest.skipUnless(os.name == "nt", "Windows batch launchers")
+@unittest.skipUnless(VENV_PYTHON.is_file(), "needs the project .venv (absent on CI)")
 class LauncherPythonTests(unittest.TestCase):
     def _run_launcher(self, batch_name: str, app_name: str) -> Path:
         with tempfile.TemporaryDirectory() as raw_tmp:

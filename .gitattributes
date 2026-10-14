@@ -14,3 +14,7 @@
 *.pma binary
 *.ttf binary
 *.traineddata binary
+
+# The bundled OCR model is checked against SHA-256s in its model.json; the
+# official dict.txt has CRLF line ends, so its bytes must be stored verbatim.
+assets/ocr/** -text
