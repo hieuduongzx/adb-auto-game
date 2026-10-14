@@ -1982,8 +1982,9 @@ function histActivityRows(r){
       a.failed ? `<span class="hist-bad">${a.failed} ✗</span>` : "",
       a.stopped ? `<span class="hist-stop">${a.stopped} ■</span>` : "",
     ].join("");
+    const shot = a.shot ? `<button type="button" class="hist-shot" data-shot="${escHtml(a.shot)}" title="Open the screenshot taken when it failed" aria-label="Open failure screenshot for ${escHtml(a.name || "")}">${uiIco("camera", "uico-0")}</button>` : "";
     return `<div class="hist-act" role="row"><span class="hist-act-dot ${tone}" aria-hidden="true"></span>`
-      + `<span class="hist-act-name" role="cell">${escHtml(a.name || a.id || "")}</span>`
+      + `<span class="hist-act-name" role="cell">${escHtml(a.name || a.id || "")}</span>${shot}`
       + `<span class="hist-act-tally" role="cell">${tally}</span>`
       + `<span class="hist-act-time" role="cell" title="Average time per run">${avg}</span></div>`;
   }).join("") + `</div>`;
@@ -2049,7 +2050,14 @@ function renderActivityResults(){
 function wireHistory(){
   const body = $("hist-body");
   if(!body) return;
-  body.addEventListener("click", e=>{
+  body.addEventListener("click", async e=>{
+    const shotBtn = e.target.closest(".hist-shot");
+    if(shotBtn){
+      e.stopPropagation();
+      let r = null; try{ r = await api().open_failure_shot(shotBtn.dataset.shot); }catch(_){ }
+      if(!r || !r.ok){ const sum = $("hist-summary"); if(sum) sum.textContent = (r && r.error) || "Couldn't open the screenshot"; }
+      return;
+    }
     const row = e.target.closest(".hist-row");
     if(!row) return;
     H.open = H.open === row.dataset.hist ? null : row.dataset.hist;

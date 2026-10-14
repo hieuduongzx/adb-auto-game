@@ -180,7 +180,7 @@ RUNNER_ROUNDS = """(() => {
 RUNNER_HISTORY = """(() => {
   const now = Date.now() / 1000, acts = S.activities.filter(a => a.type !== 'background').slice(0, 6);
   const tally = (bad) => acts.map((a, i) => ({id: a.id, name: a.name, completed: i === bad ? 0 : 3,
-    failed: i === bad ? 2 : 0, stopped: 0, seconds: 40 + i * 23}));
+    failed: i === bad ? 2 : 0, stopped: 0, seconds: 40 + i * 23, ...(i === bad ? {shot: 'x.jpg'} : {})}));
   H.items = [
     {start: now - 3900, end: now - 120, seconds: 3780, outcome: 'completed', rounds: 3,
      reason: '3 rounds · 36 activities completed', activities: tally(-1)},

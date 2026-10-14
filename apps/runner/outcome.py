@@ -2,16 +2,20 @@
 from __future__ import annotations
 
 import datetime
+import os
+import re
 import time
 from typing import List, Optional
 
 from src import notify, run_history
 from src.utils import (
     LOG_KIND_RUN,
+    confined_path,
     load_ui_settings,
     log_error,
     log_info,
     log_success,
+    log_warning,
     save_ui_settings,
 )
 
@@ -220,11 +224,15 @@ class OutcomeMixin:
             self._run_failed = True
         self._push("activity_update", {"id": act_id, "status": status})
 
-    def _tally_activity(self, act: dict, status: str) -> None:
+    def _act_row(self, act: dict) -> dict:
         act_id = str(act.get("id"))
-        row = self._run_acts.setdefault(act_id, {
+        return self._run_acts.setdefault(act_id, {
             "id": act_id, "name": str(act.get("name") or act_id),
             "completed": 0, "failed": 0, "stopped": 0, "seconds": 0.0})
+
+    def _tally_activity(self, act: dict, status: str) -> None:
+        act_id = str(act.get("id"))
+        row = self._act_row(act)
         row[status] = row.get(status, 0) + 1
         started = self._act_t0.pop(act_id, None)
         if started:
@@ -366,6 +374,69 @@ class OutcomeMixin:
         Stop block are excluded there — so it is the dependable "this run did
         not simply finish" signal."""
         self._run_failed = True
+        path = self._save_failure_shot(act)
+        if path:
+            self._act_row(act or {})["shot"] = path
+
+    # ── Failure screenshots ──────────────────────────────────────────────────
+    # The screen as it was when an activity failed — the first thing anyone
+    # asks after an unattended run. One JPEG per failure in the workflow's
+    # Runner folder (failures/), newest FAILURE_SHOTS_KEEP kept, linked from
+    # the run's history record.
+
+    FAILURE_SHOTS_KEEP = 40
+
+    def _failure_dir(self) -> str:
+        if not self.flow:
+            return ""
+        return os.path.join(run_history.runner_dir(str(self.flow.get("name") or ""),
+                                                   self.flow_path or ""), "failures")
+
+    def _save_failure_shot(self, act: Optional[dict]) -> str:
+        folder = self._failure_dir()
+        if not folder:
+            return ""
+        try:
+            img = self.engine.auto.capture_screen()
+            if img is None:
+                return ""
+            import cv2
+            ok, buf = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+            if not ok:
+                return ""
+            os.makedirs(folder, exist_ok=True)
+            name = re.sub(r"[^\w.-]+", "_", str((act or {}).get("name") or (act or {}).get("id") or "activity"))
+            path = os.path.join(folder, f"{time.strftime('%Y%m%d_%H%M%S')}_{name[:40]}.jpg")
+            buf.tofile(path)        # unicode-safe, unlike cv2.imwrite
+            self._prune_failure_shots(folder)
+            return path
+        except Exception as exc:
+            log_warning(f"Couldn't save the failure screenshot: {exc}")
+            return ""
+
+    def _prune_failure_shots(self, folder: str) -> None:
+        try:
+            shots = sorted((e for e in os.scandir(folder) if e.is_file() and e.name.lower().endswith(".jpg")),
+                           key=lambda e: e.stat().st_mtime, reverse=True)
+        except OSError:
+            return
+        for entry in shots[self.FAILURE_SHOTS_KEEP:]:
+            try:
+                os.remove(entry.path)
+            except OSError:
+                pass
+
+    def open_failure_shot(self, path: str) -> dict:
+        """Open a failure screenshot in the default image viewer. Only files in
+        this workflow's failures/ folder — the path comes from the page."""
+        safe = confined_path(self._failure_dir(), path, (".jpg", ".png"))
+        if not safe or not os.path.isfile(safe):
+            return {"ok": False, "error": "Screenshot not found (it may have been pruned)"}
+        try:
+            os.startfile(safe)
+            return {"ok": True, "error": ""}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
     def _activity_status(self, ok: bool) -> str:
         """A stopped activity is reported as stopped, not failed.

@@ -346,3 +346,41 @@ def test_time_limit_is_a_runner_override_saved_and_reapplied(tmp_path):
     api._apply_runner_config()
     assert api.flow["activities"][0]["timeLimit"] == 15.0
     assert api._activities_payload()[0]["timeLimit"] == 15.0
+
+
+def test_failed_activity_saves_a_screenshot_and_history_links_it(tmp_path, monkeypatch):
+    import numpy as np
+    from src import run_history
+    monkeypatch.setattr(run_history, "runner_dir", lambda *a: str(tmp_path / "runner"))
+    api = runner(tmp_path)
+    api.engine._fatal = ""
+    api.engine._stop = threading.Event()
+    api.engine.auto.capture_screen.return_value = np.zeros((20, 30, 3), dtype=np.uint8)
+    api._on_engine_start()
+    api._on_activity_start({"id": "a", "name": "Claim VIP"})
+    api._on_activity_crash({"id": "a", "name": "Claim VIP"}, None)
+    api._on_activity_complete({"id": "a", "name": "Claim VIP"}, False)
+    shot = api._run_acts["a"]["shot"]
+    assert shot.endswith("_Claim_VIP.jpg") and (tmp_path / "runner" / "failures").exists()
+    import os
+    assert os.path.isfile(shot)
+    opened = []
+    monkeypatch.setattr("runner.outcome.os.startfile", lambda p: opened.append(p), raising=False)
+    assert api.open_failure_shot(shot)["ok"] is True and len(opened) == 1
+    outside = tmp_path / "evil.jpg"
+    outside.write_bytes(b"x")
+    assert api.open_failure_shot(str(outside))["ok"] is False
+
+
+def test_failure_shots_are_pruned_to_the_newest(tmp_path):
+    import os
+    api = runner(tmp_path)
+    folder = tmp_path / "f"
+    folder.mkdir()
+    for i in range(45):
+        p = folder / f"{i:03d}.jpg"
+        p.write_bytes(b"x")
+        os.utime(p, (1000 + i, 1000 + i))
+    api._prune_failure_shots(str(folder))
+    left = sorted(p.name for p in folder.iterdir())
+    assert len(left) == api.FAILURE_SHOTS_KEEP and left[0] == "005.jpg"

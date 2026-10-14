@@ -713,6 +713,12 @@ input { caret-color: var(--accent); text-align: center; }
 .hist-act-dot.err { background: var(--err); }
 .hist-act-dot.warn { background: var(--warn); }
 .hist-act-name { flex: 1; min-width: 0; color: var(--ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-shot {
+  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 20px; flex-shrink: 0;
+  border: 1px solid var(--err-bd); border-radius: var(--r-xs); background: var(--err-bg); color: var(--err); cursor: pointer;
+}
+.hist-shot:hover { background: var(--err-bd); }
+.hist-shot:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .hist-act-tally { display: inline-flex; gap: 8px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .hist-ok { color: var(--ok-ink); }
 .hist-bad { color: var(--err); font-weight: 600; }
