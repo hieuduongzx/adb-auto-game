@@ -31,7 +31,7 @@ for _p in (_PROJECT_ROOT, _APPS_DIR):
 
 import webview
 
-from src import runner_update
+from src import instance_lock, runner_update
 from src.core.adb import lifecycle
 from src.core.adb.auto.scrcpy_capture import (
     stop_scrcpy_sources,
@@ -44,6 +44,7 @@ from src.utils import (
     add_log_subscriber,
     file_url,
     log_error,
+    log_info,
     push_webview_event,
     remove_log_subscriber,
     theme_background,
@@ -274,8 +275,36 @@ def create_workflow_runner_window(title: Optional[str] = None,
     return window
 
 
+def _claim_workflow(path: Optional[str]) -> Optional[str]:
+    """Take the one-Runner-per-workflow lock for *path*.
+
+    Returns the lock file to release on close, or ``None`` when another Runner
+    already has this workflow open — that window is brought forward instead
+    and this launch should simply end.
+    """
+    if not path:
+        return ""
+    try:
+        name = str((WorkflowEngine.load_file(path) or {}).get("name") or "")
+    except Exception:
+        return ""              # unreadable: let the Runner open and say so
+    lock = instance_lock.lock_path(name, path)
+    other = instance_lock.acquire(lock)
+    if other:
+        instance_lock.focus_process_window(other)
+        log_info(f"{name or 'This workflow'} is already open in a Runner (PID {other}) — "
+                 "brought it to the front")
+        return None
+    return lock
+
+
 def run(auto_load: Optional[str] = None) -> None:
-    create_workflow_runner_window(auto_load=auto_load)
+    lock = _claim_workflow(auto_load)
+    if lock is None:
+        return
+    window = create_workflow_runner_window(auto_load=auto_load)
+    if lock:
+        window.events.closed += lambda: instance_lock.release(lock)
     webview.start(
         debug=False,
         private_mode=False,
