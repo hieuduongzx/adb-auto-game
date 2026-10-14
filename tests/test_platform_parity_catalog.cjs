@@ -21,8 +21,7 @@ const names = ctx => vm.runInContext('Object.keys(WF_NODES)', ctx);
 const node = (ctx, type) => vm.runInContext(`WF_NODES.${type}`, ctx);
 
 test('the Designer catalog and the engine registry list exactly the same node types', () => {
-  const engine = fs.readFileSync(path.join(__dirname, '../src/workflow/engine.py'), 'utf8');
-  const block = engine.slice(engine.indexOf('NODE_TYPES: Dict'), engine.indexOf('# ── Emulator launch specs'));
+  const block = fs.readFileSync(path.join(__dirname, '../src/workflow/catalog.py'), 'utf8');
   const py = new Set([...block.matchAll(/^    "(\w+)":\s*\{"label"/gm)].map(m => m[1]));
   const js = new Set(names(load()));
   assert.deepEqual([...js].filter(t => !py.has(t)).sort(), [], 'in the Designer but not the engine');

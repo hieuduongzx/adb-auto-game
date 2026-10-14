@@ -51,11 +51,13 @@ Place binaries under `vendor/` as needed (`adb`, `scrcpy`, `frida`; some tools m
 
 ## Quality checks
 
-The regression suite uses the standard library, so it does not require an
-extra test runner:
+The suite mixes unittest classes and pytest-style functions, so run it with
+pytest (`unittest discover` would silently skip the pytest functions):
 
 ```powershell
-python -m unittest discover -s tests -v
+python -m pip install -r requirements-dev.txt
+python -m pytest -q tests
+python -m ruff check .            # defects only — see ruff.toml
 python -m compileall -q src apps packaging
 ```
 

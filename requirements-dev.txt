@@ -1,0 +1,5 @@
+# Test / lint tooling (not shipped). The suite mixes unittest classes and
+# pytest-style functions; only pytest runs both, so it is the test runner.
+-r requirements.txt
+pytest>=8.0
+ruff==0.16.3

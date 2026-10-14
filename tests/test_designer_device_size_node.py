@@ -3,7 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 WORKFLOW_JS = ROOT / "apps" / "web" / "wf" / "js" / "workflow.js"
-ENGINE_PY = ROOT / "src" / "workflow" / "engine.py"
+CONDITIONS_PY = ROOT / "src" / "workflow" / "nodes" / "conditions.py"
 
 
 def test_designer_exposes_device_size_condition_fields():
@@ -16,7 +16,7 @@ def test_designer_exposes_device_size_condition_fields():
 
 
 def test_engine_registers_device_size_as_a_condition():
-    source = ENGINE_PY.read_text(encoding="utf-8")
+    from src.workflow.catalog import NODE_TYPES
 
-    assert '"if_device_size":' in source
-    assert 'if ntype == "if_device_size":' in source
+    assert NODE_TYPES["if_device_size"]["kind"] == "condition"
+    assert 'if ntype == "if_device_size":' in CONDITIONS_PY.read_text(encoding="utf-8")
