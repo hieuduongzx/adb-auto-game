@@ -353,7 +353,7 @@ function wfDuplicateActivity(id){
   const copy={ id:(src.type||"activity")+"_"+wfUid().slice(1,5),
     name:wfUniqueEntityName(src.name||"activity", WF.activities),
     type:src.type, enabled:src.enabled,
-    maxRetries:src.maxRetries, pollInterval:src.pollInterval,
+    maxRetries:src.maxRetries, pollInterval:src.pollInterval, timeLimit:src.timeLimit||0,
     vars:wfHydVars(src.vars||[]),
     graph:wfCloneGraph(src.graph||{nodes:[],edges:[],groups:[]}) };
   const i=WF.activities.findIndex(a=>a.id===id);

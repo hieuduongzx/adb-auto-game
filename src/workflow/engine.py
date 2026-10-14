@@ -63,6 +63,7 @@ from src.utils import (
     LOG_KIND_RUN,
     LOG_KIND_USER,
     get_log_activity,
+    get_log_node,
     log_activity,
     set_log_activity,
     set_log_node,
@@ -184,6 +185,10 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         # Designer test runs pause *before* any block flagged ``breakpoint``
         # (see _hit_breakpoint). Off by default, so the Runner never does.
         self.honor_breakpoints = False
+        # Pause bookkeeping for the run clock activity time limits use: time
+        # spent paused never counts against a limit (see _active_clock).
+        self._paused_total = 0.0
+        self._paused_since: Optional[float] = None
         # Passes a full Start makes over the sequence (configure_rounds):
         # 1 = once, N = N times, 0 = until stopped; rest = seconds between.
         self.rounds = 1
@@ -1059,20 +1064,32 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         t0 = time.time()
         log_info("▶ Started" + (f" — up to {retries} attempts" if retries > 1 else ""),
                  kind=LOG_KIND_ACTIVITY)
-        for attempt in range(1, retries + 1):
-            if self._stop.is_set():
-                break
-            if attempt > 1:
-                log_warning(f"↻ Attempt {attempt}/{retries}", kind=LOG_KIND_ACTIVITY)
-            self._reached_end = False
-            ok = self._run_graph(act.get("graph", {}) or {})
-            # Same success rule as a function call: the walk must reach an End
-            # node — a dead-end (e.g. a timed-out image wait with no false path)
-            # is a failure. A stop (user or Stop node) is not painted as one.
-            if ok and not self._stop.is_set():
-                ok = self._reached_end
-            if ok:
-                break
+        # The limit covers every attempt together: a stuck activity must give
+        # the rest of the sequence its turn, not start over.
+        limit = self._arm_time_limit(act)
+        timed_out = False
+        try:
+            for attempt in range(1, retries + 1):
+                if self._stop.is_set():
+                    break
+                if attempt > 1:
+                    log_warning(f"↻ Attempt {attempt}/{retries}", kind=LOG_KIND_ACTIVITY)
+                self._reached_end = False
+                ok = self._run_graph(act.get("graph", {}) or {})
+                # Same success rule as a function call: the walk must reach an End
+                # node — a dead-end (e.g. a timed-out image wait with no false path)
+                # is a failure. A stop (user or Stop node) is not painted as one.
+                if ok and not self._stop.is_set():
+                    ok = self._reached_end
+                if self._time_up() and not self._stop.is_set():
+                    ok, timed_out = False, True
+                    break
+                if ok:
+                    break
+        finally:
+            self._ctx.deadline = None
+        if timed_out:
+            self._note_time_limit(act, limit)
         elapsed = time.time() - t0
         self._emit("on_node", None)  # clear highlight between activities
         # A user Stop is not a crash — only report where a genuine failure died.
@@ -1584,7 +1601,8 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
             t = threading.Thread(
                 target=self._walk_branch,
                 args=(nodes, adj, tgt, depth, vars0, pos0, join_ctx, get_log_activity(),
-                      getattr(self._ctx, "background_stop", None)),
+                      getattr(self._ctx, "background_stop", None),
+                      getattr(self._ctx, "deadline", None)),
                 daemon=True)
             threads.append(t)
             t.start()
@@ -1628,7 +1646,7 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         return is_last, ok
 
     def _walk_branch(self, nodes, adj, tgt, depth, vars0, pos0, join_ctx=None, activity=None,
-                     background_stop=None):
+                     background_stop=None, deadline=None):
         """Entry point for a parallel branch thread: seed this thread's context
         from the fork snapshot, then walk. Isolated from siblings + the parent."""
         set_log_activity(activity)     # a branch logs under its activity's name
@@ -1637,6 +1655,7 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         self._break_loop = False
         self._ctx.join_ctx = join_ctx   # thread-local; cleared when thread exits
         self._ctx.background_stop = background_stop
+        self._ctx.deadline = deadline      # the activity's time limit holds on every branch
         self._branch_failed = False
         self._reached_end = False
         try:
@@ -1876,13 +1895,19 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
             self._try_chain_mode = False
             self._reached_end = False
             self._emit("on_activity_start", act)
+            limit = self._arm_time_limit(act)      # per pass of a background watcher
             try:
                 ok = self._run_graph(act.get("graph", {}) or {})
                 if not self._stop.is_set():
                     ok = bool(ok and self._reached_end)
+                if self._time_up() and not self._stop.is_set() and not stop_ev.is_set():
+                    ok = False
+                    self._note_time_limit(act, limit)
             except Exception as e:
                 ok = False
                 log_error(f"✖ Crashed: {e}", kind=LOG_KIND_ACTIVITY)
+            finally:
+                self._ctx.deadline = None
             if stop_ev.is_set() and not self._stop.is_set():
                 # Disabling a watcher is cancellation, not an activity failure.
                 break
@@ -1895,12 +1920,27 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
     # ── Pause / stop ─────────────────────────────────────────────────────────
 
     def pause(self) -> None:
+        if self._pause.is_set() and self._paused_since is None:
+            self._paused_since = time.monotonic()
         self._pause.clear()
         log_info("❚❚ Paused", kind=LOG_KIND_RUN)
 
     def resume(self) -> None:
+        self._close_pause_span()
         self._pause.set()
         log_info("▶ Resumed", kind=LOG_KIND_RUN)
+
+    def _close_pause_span(self) -> None:
+        since = self._paused_since
+        if since is not None:
+            self._paused_total += max(0.0, time.monotonic() - since)
+            self._paused_since = None
+
+    def _active_clock(self) -> float:
+        """Monotonic seconds that stand still while the run is paused."""
+        since = self._paused_since
+        paused = self._paused_total + ((time.monotonic() - since) if since is not None else 0.0)
+        return time.monotonic() - paused
 
     def is_paused(self) -> bool:
         return not self._pause.is_set()
@@ -1912,6 +1952,7 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         log_info("Stopping…", kind=LOG_KIND_RUN)
         self._stop.set()
         self.auto._stop_event.set()
+        self._close_pause_span()
         self._pause.set()
         self._debug_step = False
         self._debug_gate.set()
@@ -2043,8 +2084,53 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         return not self._stop.is_set()
 
     def _background_cancelled(self) -> bool:
+        """This thread's work is cancelled: its background activity was switched
+        off, or its activity ran past its time limit (``timeLimit``)."""
         event = getattr(self._ctx, "background_stop", None)
-        return bool(event is not None and event.is_set())
+        if event is not None and event.is_set():
+            return True
+        return self._time_up()
+
+    def _time_up(self) -> bool:
+        deadline = getattr(self._ctx, "deadline", None)
+        return deadline is not None and self._active_clock() >= deadline
+
+    def _halted(self) -> bool:
+        """Stop pressed, or this thread's work cancelled — every wait loop's exit."""
+        return self._stop.is_set() or self._background_cancelled()
+
+    @staticmethod
+    def _time_limit_seconds(act: Dict[str, Any]) -> float:
+        """An activity's ``timeLimit`` (minutes) in seconds; 0 = no limit."""
+        try:
+            minutes = float(act.get("timeLimit") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+        return minutes * 60.0 if math.isfinite(minutes) and minutes > 0 else 0.0
+
+    def _arm_time_limit(self, act: Dict[str, Any]) -> float:
+        """Start this thread's time limit for *act*; returns the limit in s."""
+        limit = self._time_limit_seconds(act)
+        self._ctx.deadline = (self._active_clock() + limit) if limit else None
+        return limit
+
+    def _note_time_limit(self, act: Dict[str, Any], limit: float) -> None:
+        """Record "out of time" as the crash, at the block that was running."""
+        mins = limit / 60.0
+        what = f"{mins:g} min" if mins >= 1 else f"{limit:g}s"
+        message = f"time limit ({what}) reached"
+        node_id = get_log_node()
+        graphs = [(act.get("graph") or {})] + [(f.get("graph") or {}) for f in self._functions.values()]
+        node = next((n for g in graphs for n in (g.get("nodes") or []) if n.get("id") == node_id), None)
+        with self._crash_lock:
+            self._crash = None
+        if node is not None:
+            self._note_crash(node, "time_limit", message)
+        else:
+            with self._crash_lock:
+                self._crash = {"node": None, "type": "", "label": "Time limit", "name": "",
+                               "reason": "time_limit", "message": message, "ts": time.time()}
+        log_error(f"⏱ Time limit ({what}) reached — stopping this activity", kind=LOG_KIND_ACTIVITY)
 
     def _wait_to_run(self) -> bool:
         while not self._stop.is_set() and not self._background_cancelled():

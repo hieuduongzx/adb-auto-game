@@ -900,7 +900,7 @@ class EmulatorNodes:
             log_warning(f"🖥 Could not determine ADB port for '{kind}' #{index} — skipping wait")
             return True
         end = time.time() + wait
-        while not self._stop.is_set():
+        while not self._halted():
             self._pause.wait()
             if self._emulator_adb_ready(host):
                 log_success(f"🖥 Emulator {kind} #{index} restarted and finished booting ({host})")
@@ -1009,7 +1009,7 @@ class EmulatorNodes:
         )
         end = time.time() + timeout
         # Immediate probe first so an already-booted instance returns instantly.
-        while not self._stop.is_set():
+        while not self._halted():
             self._pause.wait()
             if self._emulator_adb_ready(host):
                 log_success(

@@ -134,7 +134,7 @@ class ConditionNodes:
                 # Đảo: chờ đến khi ảnh BIẾN MẤT (màn hình loading, hộp thoại…)
                 # — true ngay khi không còn thấy template; hết timeout → false.
                 end = time.time() + max(0.0, timeout)
-                while not self._stop.is_set():
+                while not self._halted():
                     self._pause.wait()
                     if self._find_template(tpl, threshold=threshold, region=region,
                                            report=False) is None:
@@ -165,7 +165,7 @@ class ConditionNodes:
                 return False
             end = time.time() + max(0.0, timeout)
             last_read = ""
-            while not self._stop.is_set():
+            while not self._halted():
                 self._pause.wait()
                 if self._stop.is_set():
                     return False
@@ -210,7 +210,7 @@ class ConditionNodes:
             # could take the true branch before the user resumed.
             end = time.time() + max(0.0, timeout)
             last_read = ""
-            while not self._stop.is_set():
+            while not self._halted():
                 self._pause.wait()
                 if self._stop.is_set():
                     return False
@@ -443,7 +443,7 @@ class ConditionNodes:
             timeout = 30.0
         end = time.time() + timeout
         want = "closed" if negate else "running"
-        while not self._stop.is_set():
+        while not self._halted():
             self._pause.wait()
             if self._app_match(params, log=False) != negate:
                 log_info(f"📱 app is {want}")
@@ -555,7 +555,7 @@ class ConditionNodes:
         end = time.time() + timeout
         prev = frame()
         stable_since: Optional[float] = None
-        while not self._stop.is_set():
+        while not self._halted():
             self._pause.wait()
             time.sleep(0.2)
             cur = frame()

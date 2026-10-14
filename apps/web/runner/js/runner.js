@@ -593,6 +593,7 @@ function renderMeta(el, a, st, inRun){
   if(nSettings) parts.push(`${nSettings} setting${nSettings===1?"":"s"}`);
   if(a.type==="background") parts.push(`Every ${Number(a.pollInterval)||1}s`);
   else if(a.maxRetries > 1) parts.push(`${a.maxRetries} attempts`);
+  if(a.timeLimit > 0) parts.push(`<span title="Time limit - fails after this long">≤ ${+Number(a.timeLimit).toFixed(1)} min</span>`);
   el.innerHTML = parts.join('<span class="sep" aria-hidden="true">·</span>');
 }
 
@@ -843,7 +844,32 @@ function buildSettingsPanel(a){
       paintRow(a);
     };
     row.appendChild(lbl); row.appendChild(inp);
-    g.appendChild(row); panel.appendChild(g);
+    g.appendChild(row);
+
+    // Time limit — the watchdog: past this many minutes the activity fails and
+    // the run moves on (Runner setting; the workflow's own value is the default).
+    const tRow = document.createElement("div"); tRow.className = "setting-row";
+    const tLbl = document.createElement("span"); tLbl.className = "setting-label";
+    tLbl.innerHTML = `Time limit<span class="sub">Fails a stuck activity so the run goes on</span>`;
+    const tInp = document.createElement("input");
+    tInp.type = "number"; tInp.className = "setting-input runtime-setting-control";
+    tInp.min = 0; tInp.step = 1; tInp.placeholder = "none"; tInp.value = a.timeLimit > 0 ? a.timeLimit : "";
+    tInp.setAttribute("aria-label", "Time limit in minutes");
+    tInp.title = "Minutes before this activity is stopped as failed (paused time doesn't count). Empty = no limit.";
+    tInp.disabled = !!S.running;
+    tInp.onchange = async()=>{
+      let v = Math.max(0, parseFloat(tInp.value) || 0);
+      setActivitySaveState("Saving…");
+      let res = null; try{ res = await api().set_activity_time_limit(a.id, v); }catch(_){ }
+      if(res && res.ok){ v = res.timeLimit; setActivitySaveState("Saved", "ok"); }
+      else { v = a.timeLimit || 0; setActivitySaveState("Couldn't save", "error"); }
+      a.timeLimit = v; tInp.value = v > 0 ? v : "";
+      paintRow(a);
+    };
+    const tUnit = document.createElement("span"); tUnit.className = "setting-unit"; tUnit.textContent = "min";
+    tRow.appendChild(tLbl); tRow.appendChild(tInp); tRow.appendChild(tUnit);
+    g.appendChild(tRow);
+    panel.appendChild(g);
   }
 
   return panel;

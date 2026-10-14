@@ -330,6 +330,12 @@ function wfRenderInspector(){
     b.appendChild(wfActField("Name","text",act.name,v=>{ act.name=v; wfRenderActivities(); const c=$("wf-cur-act"); if(c){ c.textContent=v; c.dataset.empty="0"; c.classList.remove("is-fn"); c.title="Activity · "+v; } }));
     if(act.type==="background") b.appendChild(wfActField("Interval (s)","num",act.pollInterval,v=>act.pollInterval=parseFloat(v)||1));
     else b.appendChild(wfActField("Retry count","num",act.maxRetries,v=>act.maxRetries=parseInt(v)||1));
+    // Watchdog: a stuck activity fails after this long (all attempts together;
+    // for a background activity, each pass) so the rest of the run goes on.
+    const tl=wfActField("Time limit (min)","num",act.timeLimit||"",v=>{ act.timeLimit=Math.max(0,parseFloat(v)||0); });
+    const tlInp=tl.querySelector("input"); tlInp.min="0"; tlInp.step="1"; tlInp.placeholder="none";
+    tl.title="Fail the activity if it runs longer than this (paused time doesn't count). Empty = no limit.";
+    b.appendChild(tl);
     body.appendChild(b);
 
 

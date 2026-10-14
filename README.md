@@ -108,7 +108,10 @@ palette. **Arrange** spaces nodes automatically and can be undone with
 In the Runner, **Settings → Repeat** runs the sequence several rounds or
 until stopped, with a rest between rounds; **Schedule** presses Start by
 itself every day at set times (05:05, 17:05…); **Notifications** sends a
-Windows balloon and/or a Discord webhook message when a run ends. Every finished run is recorded in
+Windows balloon and/or a Discord webhook message when a run ends. An
+activity's **Time limit** (Designer activity properties, or the Runner's
+activity settings) fails it once it runs that long — paused time excluded —
+so one stuck activity can't hold up an unattended run. Every finished run is recorded in
 `data/runner/<workflow>/history.jsonl`: the **History** tab lists them and
 the Hub shows the newest one on each game's card, plus a Recent runs strip
 across every game.

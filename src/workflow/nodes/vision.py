@@ -418,7 +418,7 @@ class VisionHelpers:
             anywhere = self._color_anywhere(params)
             end = time.time() + max(0.0, float(params.get("timeout", 10.0)))
             hex_lbl = self._bgr_to_hex(target)
-            while not self._stop.is_set():
+            while not self._halted():
                 self._pause.wait()
                 ok, x, y, region = self._color_probe(target, tol, params)
                 where = "in the region" if anywhere else f"at ({x}, {y})"
@@ -450,7 +450,7 @@ class VisionHelpers:
             region = self._search_region(params)
             end = time.time() + max(0.0, float(params.get("timeout", 10.0)))
             hex_lbl = self._bgr_to_hex(target)
-            while not self._stop.is_set():
+            while not self._halted():
                 self._pause.wait()
                 hit = self._find_color(target, tol, region=region)
                 if hit:

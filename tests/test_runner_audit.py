@@ -330,3 +330,19 @@ def test_set_notify_refuses_a_non_discord_webhook(tmp_path, monkeypatch):
     r = api.set_notify({"when": "all", "discord": "https://discord.com/api/webhooks/1/x"})
     assert r["ok"] and saved["runNotify"]["when"] == "all"
     assert api.get_notify()["discord"] == "https://discord.com/api/webhooks/1/x"
+
+
+def test_time_limit_is_a_runner_override_saved_and_reapplied(tmp_path):
+    import json
+    api = runner(tmp_path)
+    assert api.set_activity_time_limit("a", "15") == {"ok": True, "timeLimit": 15.0}
+    assert api.flow["activities"][0]["timeLimit"] == 15.0
+    assert api.set_activity_time_limit("a", "abc")["ok"] is False
+    assert api.set_activity_time_limit("a", float("inf"))["ok"] is False
+    saved = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    assert saved["activities"]["a"]["timeLimit"] == 15.0
+    api.flow["activities"][0]["timeLimit"] = 0
+    api._runner_config = saved
+    api._apply_runner_config()
+    assert api.flow["activities"][0]["timeLimit"] == 15.0
+    assert api._activities_payload()[0]["timeLimit"] == 15.0

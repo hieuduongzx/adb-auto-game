@@ -220,6 +220,27 @@ class ControlMixin:
                 return {"ok": True, "retries": retries}
         return {"ok": False, "retries": 1}
 
+    def set_activity_time_limit(self, activity_id: str, minutes) -> dict:
+        """Runner-only time limit (minutes, 0 = none) for one activity — the
+        watchdog that fails a stuck activity so the run goes on. Saved to this
+        Runner's config like the attempts; the workflow file is never touched."""
+        try:
+            value = max(0.0, float(minutes))
+            if not math.isfinite(value):
+                raise ValueError
+        except (TypeError, ValueError):
+            return {"ok": False, "timeLimit": 0}
+        value = round(value, 2)
+        for a in self.flow.get("activities", []) or []:
+            if a.get("id") == activity_id:
+                with self._runner_config_lock:
+                    if not self._persist_runner_config(
+                            {("activities", str(activity_id), "timeLimit"): value}):
+                        return {"ok": False, "timeLimit": a.get("timeLimit", 0)}
+                    a["timeLimit"] = value
+                return {"ok": True, "timeLimit": value}
+        return {"ok": False, "timeLimit": 0}
+
     def _each_activity_var(self, variables, prefix: str = ""):
         """Yield ``(dotted name, var)`` for a variable tree.
 

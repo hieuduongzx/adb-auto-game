@@ -64,6 +64,7 @@ function wfSerializeActivity(a){
   const o={ id:a.id, name:a.name, type:a.type, enabled:a.enabled,
     vars: wfSerialVars(a.vars||[]), graph:wfCleanGraph(a.graph) };
   if(a.type==="background") o.pollInterval=a.pollInterval; else o.maxRetries=a.maxRetries;
+  if(a.timeLimit>0) o.timeLimit=a.timeLimit;
   return o;
 }
 function wfSerializeFunction(f){
@@ -95,6 +96,7 @@ function wfApplyActivityJson(act, raw){
   if(o.type==="background"||o.type==="sequence") act.type=o.type;
   if(o.enabled!==undefined) act.enabled=!!o.enabled;
   if(o.maxRetries!==undefined) act.maxRetries=parseInt(o.maxRetries,10)||1;
+  if(o.timeLimit!==undefined) act.timeLimit=Math.max(0,parseFloat(o.timeLimit)||0);
   if(o.pollInterval!==undefined) act.pollInterval=parseFloat(o.pollInterval)||1.0;
   if(o.vars!==undefined) act.vars=wfHydVars(o.vars);
   if(o.graph!==undefined) act.graph=wfHydrateGraph(o.graph);
@@ -174,6 +176,7 @@ function wfSerialize(){
       const o={ id:a.id, name:a.name, type:a.type, enabled:a.enabled,
         vars: wfSerialVars(a.vars||[]), graph:wfCleanGraph(a.graph) };
       if(a.type==="background") o.pollInterval=a.pollInterval; else o.maxRetries=a.maxRetries;
+      if(a.timeLimit>0) o.timeLimit=a.timeLimit;
       return o;
     }),
   };
@@ -324,6 +327,7 @@ function wfHydrate(flow){
     id:a.id||("act_"+wfUid().slice(1,5)), name:a.name||a.id||"activity",
     type:a.type==="background"?"background":"sequence", enabled:a.enabled!==false,
     maxRetries:a.maxRetries||1, pollInterval:a.pollInterval||1.0,
+    timeLimit:Math.max(0,parseFloat(a.timeLimit)||0),
     vars: wfHydVars(a.vars||[]),
     graph:wfHydrateGraph(a.graph),
   }));

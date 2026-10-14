@@ -377,7 +377,7 @@ class Win32Nodes:
             log_info(f"🪟 window {what} → {'yes' if ok else 'no'}{now()}")
             return ok != negate
         end = time.time() + max(0.0, float(params.get("timeout", 30) or 0))
-        while not self._stop.is_set():
+        while not self._halted():
             self._pause.wait()
             if probe() != negate:
                 log_info(f"🪟 window {what}{' (negated)' if negate else ''} — ready{now()}")
