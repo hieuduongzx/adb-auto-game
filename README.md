@@ -111,7 +111,11 @@ itself every day at set times (05:05, 17:05…); **Notifications** sends a
 Windows balloon and/or a Discord webhook message when a run ends. An
 activity's **Time limit** (Designer activity properties, or the Runner's
 activity settings) fails it once it runs that long — paused time excluded —
-so one stuck activity can't hold up an unattended run. Every finished run is recorded in
+so one stuck activity can't hold up an unattended run. **Ctrl+Shift+F12**
+stops and **Ctrl+Shift+F11** pauses the run from any window — the way out
+when a foreground-mode macro has the mouse. A failed run offers **Resume
+from** the activity that broke, and a second Run of an open workflow brings
+its Runner forward instead of opening a twin. Every finished run is recorded in
 `data/runner/<workflow>/history.jsonl`: the **History** tab lists them and
 the Hub shows the newest one on each game's card, plus a Recent runs strip
 across every game.

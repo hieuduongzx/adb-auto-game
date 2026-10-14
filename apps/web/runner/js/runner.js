@@ -332,7 +332,7 @@ function setPrimary(running){
   b.innerHTML = uiIco(running ? "square" : "play", "uico-fill") + (running ? "Stop" : "Start")
     + (badge ? `<span class="start-rounds" aria-hidden="true">${badge}</span>` : "");
   const what = !badge ? "" : badge === "∞" ? " — repeats until stopped" : ` — ${S.rounds.count} rounds`;
-  b.title = running ? "Stop the run" : `Start the run${what} (F5 or Ctrl+Enter)`;
+  b.title = running ? "Stop the run (Ctrl+Shift+F12 works from any window)" : `Start the run${what} (F5 or Ctrl+Enter)`;
   b.setAttribute("aria-label", running ? "Stop workflow" : "Start workflow");
 }
 // The swapping handler the button's onclick points at.

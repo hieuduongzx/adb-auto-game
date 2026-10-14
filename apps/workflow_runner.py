@@ -31,7 +31,7 @@ for _p in (_PROJECT_ROOT, _APPS_DIR):
 
 import webview
 
-from src import instance_lock, runner_update
+from src import hotkeys, instance_lock, runner_update
 from src.core.adb import lifecycle
 from src.core.adb.auto.scrcpy_capture import (
     stop_scrcpy_sources,
@@ -45,6 +45,7 @@ from src.utils import (
     file_url,
     log_error,
     log_info,
+    log_warning,
     push_webview_event,
     remove_log_subscriber,
     theme_background,
@@ -177,6 +178,7 @@ class WorkflowRunnerAPI(OutcomeMixin, StateMixin, UpdateMixin, ControlMixin, Set
         if runner_update.updates_supported(self._runner_info):
             threading.Thread(target=self._auto_check_update, daemon=True).start()
         self._start_schedule_watch()
+        self._start_hotkeys()
 
     # ── Log subscriber ───────────────────────────────────────────────────────
 
@@ -230,8 +232,35 @@ class WorkflowRunnerAPI(OutcomeMixin, StateMixin, UpdateMixin, ControlMixin, Set
 
     # ── Teardown ─────────────────────────────────────────────────────────────
 
+    # ── Global hotkeys ───────────────────────────────────────────────────────
+    # Stop / pause from any window — a foreground-mode macro owns the mouse
+    # and the game hides the Runner (src/hotkeys.py).
+
+    def _start_hotkeys(self) -> None:
+        self._hotkeys = hotkeys.GlobalHotkeys([
+            (*hotkeys.STOP[:2], hotkeys.STOP[2], self._hotkey_stop),
+            (*hotkeys.PAUSE[:2], hotkeys.PAUSE[2], self._hotkey_pause),
+        ]).start()
+        if self._hotkeys.registered:
+            log_info("Hotkeys from any window: " + hotkeys.STOP[2] + " stops, "
+                     + hotkeys.PAUSE[2] + " pauses / resumes")
+        if self._hotkeys.failed:
+            log_warning(f"Hotkeys {', '.join(self._hotkeys.failed)} are taken by another program "
+                        "(another Runner?) — use the buttons here instead")
+
+    def _hotkey_stop(self) -> None:
+        if self._run_live():
+            log_info(f"⌨ {hotkeys.STOP[2]} — stopping", kind=LOG_KIND_RUN)
+            self.stop()
+
+    def _hotkey_pause(self) -> None:
+        if self.engine.is_running():
+            self.pause()
+
     def _close(self) -> None:
         self._closing = True
+        if getattr(self, "_hotkeys", None) is not None:
+            self._hotkeys.stop()
         self._auto_refresh_enabled = False
         remove_log_subscriber(self._on_log)
         try:
