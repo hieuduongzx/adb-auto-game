@@ -30,7 +30,7 @@ SAFE = {
     "get_last_workflow", "get_local_vars", "list_templates", "template_thumbnail",
     "image_thumbnail", "list_trash", "unity_bridge_status", "get_diagnostics",
     "find_duplicate_templates", "list_windows", "list_assets", "get_asset_thumbnail",
-    "get_history", "get_notify",
+    "get_history", "get_notify", "recent_runs",
 }
 
 
@@ -226,6 +226,15 @@ SCENES = [
      " {outcome: 'failed', end: now - 90000, seconds: 812, rounds: 0, reason: '1 of 16 failed'},"
      " {outcome: 'stopped', end: now - 400, seconds: 95, rounds: 0, reason: 'Stopped by you', scope: 'Arena'}];"
      " GAMES.slice(0, 3).forEach((g, i) => { g.lastRun = runs[i]; }); render(); })()"),
+    ("hub-recent", "hub", (1280, 800),
+     "(() => { const now = Date.now() / 1000;"
+     " RECENT = {today: {runs: 4, completed: 3, failed: 1, stopped: 0}, runs: ["
+     " {workflow: 'Girl Wars', outcome: 'completed', end: now - 600, seconds: 3790, rounds: 3, reason: '3 rounds · 36 activities completed'},"
+     " {workflow: 'BrownDust2', outcome: 'failed', end: now - 7400, seconds: 812, rounds: 0, reason: '1 of 16 activities failed'},"
+     " {workflow: 'Girl Wars', outcome: 'completed', end: now - 30000, seconds: 3600, rounds: 3, reason: '3 rounds · 36 activities completed'},"
+     " {workflow: 'Cherry Tale', outcome: 'stopped', end: now - 90000, seconds: 95, rounds: 0, reason: 'Stopped by you', scope: 'Guild'},"
+     " {workflow: 'Girl Wars', outcome: 'completed', end: now - 170000, seconds: 3540, rounds: 3, reason: '3 rounds · 36 activities completed'}]};"
+     " renderRecent(); })()"),
     ("hub-focus", "hub", (1280, 800), "document.querySelectorAll('.game-cover')[1].focus()"),
     ("hub-new", "hub", (1280, 800), "createWorkflow()"),
     ("hub-nomatch", "hub", (1280, 800),

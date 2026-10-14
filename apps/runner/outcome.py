@@ -250,7 +250,8 @@ class OutcomeMixin:
                  for a in self.flow.get("activities", []) or []}
         round_info = self._round or {}
         record = {
-            "v": 1, "start": round(start, 1), "end": round(end, 1),
+            "v": 1, "workflow": str(self.flow.get("name") or ""),
+            "start": round(start, 1), "end": round(end, 1),
             "seconds": round(max(0.0, end - start), 1),
             "outcome": outcome.get("kind"), "reason": outcome.get("reason", ""),
             "counts": dict(outcome.get("counts") or {}),

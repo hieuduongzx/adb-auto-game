@@ -82,6 +82,17 @@
       <i data-ico="x" aria-hidden="true"></i>Clear search
     </button>
   </div>
+  <!-- Recent runs across every game (Runner history). Hidden until there is one. -->
+  <section id="recent" class="recent" aria-labelledby="recent-title" hidden>
+    <header class="recent-hd">
+      <button class="recent-toggle" id="recent-toggle" type="button" aria-expanded="true" aria-controls="recent-list">
+        <i data-ico="chevron-down" data-ico-size="uico-1" aria-hidden="true"></i>
+        <h2 class="recent-title" id="recent-title">Recent runs</h2>
+      </button>
+      <span class="recent-today" id="recent-today"></span>
+    </header>
+    <div class="recent-list" id="recent-list" role="list"></div>
+  </section>
 </main>
 
 <!-- Build panel — progress + full log of a standalone Runner build. Not modal:

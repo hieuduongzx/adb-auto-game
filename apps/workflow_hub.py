@@ -945,6 +945,49 @@ class WorkflowHubAPI:
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
+    def recent_runs(self, limit: int = 20) -> dict:
+        """The newest finished runs across every game (Runner history files).
+
+        Returns ``{"runs": [...], "today": {runs, completed, failed, stopped}}``
+        — the Hub's Recent runs strip. Each run carries ``workflow``: the name
+        the Runner recorded, or one recovered from its folder for records
+        written before the name was stored.
+        """
+        try:
+            limit = max(1, min(200, int(limit)))
+        except (TypeError, ValueError):
+            limit = 20
+        root = os.path.join(data_root(), "data", "runner")
+        runs: List[Dict[str, Any]] = []
+        try:
+            folders = [f for f in os.listdir(root) if os.path.isdir(os.path.join(root, f))]
+        except OSError:
+            folders = []
+        for folder in folders:
+            path = os.path.join(root, folder, run_history.HISTORY_FILE)
+            fallback = re.sub(r"_[0-9a-f]{8}$", "", folder).replace("_", " ").strip() or folder
+            for rec in run_history.load(path, limit):
+                if not isinstance(rec, dict) or not rec.get("end"):
+                    continue
+                runs.append({
+                    "workflow": str(rec.get("workflow") or fallback),
+                    "outcome": str(rec.get("outcome") or ""),
+                    "reason": str(rec.get("reason") or ""),
+                    "start": rec.get("start") or 0, "end": rec.get("end") or 0,
+                    "seconds": rec.get("seconds") or 0,
+                    "rounds": int(rec.get("rounds") or 0),
+                    "scope": str(rec.get("scope") or ""),
+                })
+        runs.sort(key=lambda r: float(r.get("end") or 0), reverse=True)
+        midnight = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        today = {"runs": 0, "completed": 0, "failed": 0, "stopped": 0}
+        for r in runs:
+            if float(r.get("end") or 0) >= midnight:
+                today["runs"] += 1
+                if r["outcome"] in today:
+                    today[r["outcome"]] += 1
+        return {"runs": runs[:limit], "today": today}
+
     def get_workflows_dir(self) -> dict:
         """Current library folder and whether it is the built-in default."""
         current = _workflows_dir()

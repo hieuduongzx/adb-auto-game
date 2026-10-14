@@ -380,6 +380,74 @@ function lastRunHtml(g) {
     `<span class="run-when">${escHtml(when)} · ${runLength(r.seconds)}${rounds}${scope}</span>` +
   `</span>`;
 }
+// ── Recent runs ──────────────────────────────────────────────────────────────
+// The newest finished runs of every game, newest first: what ran overnight and
+// how it went, without opening a Runner. Click a row to jump to its game.
+let RECENT = { runs: [], today: null };
+const RECENT_KEY = "m2k-hub-recent-collapsed";
+function recentCollapsed() { try { return localStorage.getItem(RECENT_KEY) === "1"; } catch { return false; } }
+async function loadRecent() {
+  const a = api();
+  if (!a || typeof a.recent_runs !== "function") return;
+  try { RECENT = (await a.recent_runs(12)) || RECENT; } catch {}
+  renderRecent();
+}
+function gameForRun(r) {
+  const name = String(r.workflow || "").trim().toLowerCase();
+  return GAMES.find((g) => String(g.name || "").trim().toLowerCase() === name)
+    || GAMES.find((g) => String(g.folder || "").trim().toLowerCase() === name.replace(/\s+/g, "")) || null;
+}
+function renderRecent() {
+  const box = $("recent"), list = $("recent-list"), today = $("recent-today");
+  if (!box || !list) return;
+  const runs = (RECENT && RECENT.runs) || [];
+  box.hidden = !runs.length;
+  if (!runs.length) return;
+  const collapsed = recentCollapsed();
+  box.classList.toggle("collapsed", collapsed);
+  $("recent-toggle").setAttribute("aria-expanded", String(!collapsed));
+  const t = RECENT.today || {};
+  if (today) {
+    today.innerHTML = t.runs
+      ? `Today <b>${t.runs}</b> run${t.runs === 1 ? "" : "s"}` +
+        (t.completed ? ` · <span class="ok">${t.completed} completed</span>` : "") +
+        (t.failed ? ` · <span class="err">${t.failed} failed</span>` : "") +
+        (t.stopped ? ` · <span class="warn">${t.stopped} stopped</span>` : "")
+      : "No runs today";
+  }
+  list.innerHTML = runs.map((r, i) => {
+    const g = gameForRun(r);
+    const word = RUN_WORD[r.outcome] || "Stopped";
+    const when = savedAgo(new Date(Number(r.end) * 1000).toISOString(), "");
+    const icon = g ? iconHtmlFor(g, "recent-icon")
+      : `<span class="recent-icon icon-mono" aria-hidden="true">${escHtml(initialsFor(r.workflow))}</span>`;
+    // Rounds already lead the reason ("3 rounds · …"); a solo run names its activity.
+    const tags = r.scope ? `<span class="recent-tag">${escHtml(r.scope)}</span>` : "";
+    return `<button type="button" class="recent-row ${escHtml(r.outcome || "stopped")}" role="listitem" data-i="${i}"` +
+      ` style="--tone:${toneFor(g ? (g.folder || g.name) : r.workflow)}" title="${escHtml(r.workflow)} — ${escHtml(word)} ${escHtml(when)}${g ? " · click to show the game" : ""}">` +
+      icon +
+      `<span class="recent-name">${escHtml(r.workflow || "?")}</span>` +
+      `<span class="recent-out"><span class="run-dot" aria-hidden="true"></span>${word}</span>` +
+      `<span class="recent-reason">${tags}${escHtml(r.reason || "")}</span>` +
+      `<span class="recent-when">${escHtml(when)}</span>` +
+      `<span class="recent-dur">${runLength(r.seconds)}</span>` +
+    `</button>`;
+  }).join("");
+}
+function onRecentClick(e) {
+  const row = e.target.closest(".recent-row");
+  if (!row) return;
+  const r = (RECENT.runs || [])[Number(row.dataset.i)];
+  const g = r && gameForRun(r);
+  if (!g) return;
+  if (FILTER) { FILTER = ""; const s = $("search"); if (s) s.value = ""; render(); }
+  const card = [...document.querySelectorAll("#grid .game")].find((el) => el.dataset.path === g.path);
+  if (!card) return;
+  card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash");
+  const cover = card.querySelector(".game-cover"); if (cover) cover.focus({ preventScroll: true });
+}
+
 /** The game's small icon: assets/icon.*, else the cover, else its initials. */
 function iconHtmlFor(g, cls) {
   const src = g.icon || g.cover;
@@ -597,6 +665,7 @@ async function loadList(opts) {
     }
     render(opts);
     setLibraryMessage("");
+    loadRecent();
   } catch (e) {
     if (!LIST_LOADED) {
       $("grid").innerHTML = "";
@@ -1018,6 +1087,13 @@ function onGridKey(e) {
 
 // ── Events ───────────────────────────────────────────────────────────────────
 function wire() {
+  const recentList = $("recent-list");
+  if (recentList) recentList.addEventListener("click", onRecentClick);
+  const recentToggle = $("recent-toggle");
+  if (recentToggle) recentToggle.addEventListener("click", () => {
+    try { localStorage.setItem(RECENT_KEY, recentCollapsed() ? "0" : "1"); } catch {}
+    renderRecent();
+  });
   // Theme toggle — drives the shared controller in web/shared/theme.js, which
   // persists through the backend so the Designer and Runner match.
   document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
@@ -1214,6 +1290,14 @@ async function init() {
   if (restored && restored.path) applyBuild(restored, { reset: true });
   await loadList({ intro: true });
   if (buildActive()) openBuildPanel();
+  // Coming back to the Hub after a run: refresh the cards' last-run lines and
+  // the Recent runs strip (at most every few seconds).
+  let lastFocusRefresh = Date.now();
+  window.addEventListener("focus", () => {
+    if (Date.now() - lastFocusRefresh < 4000 || LIST_LOADING) return;
+    lastFocusRefresh = Date.now();
+    loadList();
+  });
 }
 
 if (document.readyState === "loading") {
