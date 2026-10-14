@@ -202,8 +202,13 @@ function pvClearSwipePreview(){
 
 // ── OCR ─────────────────────────────────────────────────────────────────────
 async function pvOcrBackendChange(name){
-  const r=await api().set_ocr_backend(name);
   const el=$("pv-ocr-engine");
+  let r=null;
+  try{ r=await api().set_ocr_backend(name); }catch(e){ r=null; }
+  if(!el) return;
+  // The model loads lazily and can fail (missing runtime) — say so instead of
+  // throwing out of whatever called us.
+  if(!r){ el.textContent="OCR · unavailable"; el.className="unavailable"; return; }
   el.textContent=(r.label||wfOcrModelLabel(r.engine))+(r.available?" · ready":" · unavailable");
   el.className=r.available?"ready":"unavailable";
 }
