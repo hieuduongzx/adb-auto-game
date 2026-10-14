@@ -36,7 +36,8 @@ class LauncherPythonTests(unittest.TestCase):
             )
 
             result = subprocess.run(
-                ["cmd.exe", "/d", "/c", batch_name],
+                # By path: NoDefaultCurrentDirectoryInExePath stops cmd finding a bare name.
+                ["cmd.exe", "/d", "/c", str(tmp / batch_name)],
                 cwd=tmp,
                 capture_output=True,
                 text=True,

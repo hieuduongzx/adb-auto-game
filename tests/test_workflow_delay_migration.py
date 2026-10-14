@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 from apps.workflow_designer import WorkflowDesignerAPI
 

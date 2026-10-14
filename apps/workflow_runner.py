@@ -62,7 +62,6 @@ from src.utils import (
     log_warning,
     push_webview_event,
     remove_log_subscriber,
-    sanitize_name,
     save_ui_settings,
     slugify_workflow_name,
     theme_background,

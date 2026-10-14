@@ -1,6 +1,5 @@
 import unittest
 import threading
-import time
 from unittest import mock
 
 from src.workflow import engine as E

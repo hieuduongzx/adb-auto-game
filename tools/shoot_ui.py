@@ -261,7 +261,7 @@ def main():
                         continue
                     page = browser.new_page(viewport={"width": w, "height": h}, device_scale_factor=args.scale)
                     errors = []
-                    page.on("pageerror", lambda e: errors.append(str(e)))
+                    page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
                     page.add_init_script(BRIDGE % json.dumps(theme))
                     page.goto(f"{base}/{page_dir}/index.html")
                     time.sleep(args.wait)

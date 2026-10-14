@@ -52,16 +52,16 @@ def test_workflow_runtime_logs_are_english():
             import json
             tree = json.loads(path.read_text(encoding="utf-8"))
 
-        def visit(value, location=""):
+        def visit(value, location="", path=path):
             if isinstance(value, dict):
                 for key, child in value.items():
                     child_location = f"{location}.{key}"
                     if "log" in key.lower() and isinstance(child, str) and VIETNAMESE.search(child):
                         violations.append(f"{path.relative_to(ROOT)}:{child_location}")
-                    visit(child, child_location)
+                    visit(child, child_location, path)
             elif isinstance(value, list):
                 for index, child in enumerate(value):
-                    visit(child, f"{location}[{index}]")
+                    visit(child, f"{location}[{index}]", path)
 
         visit(tree)
     assert not violations, "Vietnamese workflow logs:\n" + "\n".join(violations)

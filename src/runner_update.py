@@ -403,7 +403,7 @@ def write_update_script(src_dir: str, install_dir: str, exe: str, pid: int,
         # Windows a moment to release the exe and its _internal DLLs; robocopy's
         # own /R retry handles any slower file release without an infinite loop.
         f'"{sys32}\\PING.EXE" -n 4 127.0.0.1 >nul',
-        f'>>"%LOG%" echo [%date% %time%] copying after shutdown grace period',
+        '>>"%LOG%" echo [%date% %time%] copying after shutdown grace period',
         # /E copies (no purge); /IS /IT force every source file over the target.
         f'"{sys32}\\Robocopy.exe" "{src_dir}" "{install_dir}" /E /IS /IT /XD {keep} '
         f'/R:3 /W:1 /NFL /NDL /NJH /NJS /NP >>"%LOG%" 2>&1',

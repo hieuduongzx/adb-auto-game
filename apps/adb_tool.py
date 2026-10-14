@@ -179,12 +179,12 @@ def cmd_info(args):
         # Current app
         app = controller.get_current_app()
         if app:
-            print(f"\nCurrent App:")
+            print("\nCurrent App:")
             print(f"  Package: {app}")
             print(f"  Name: {controller.get_app_name(app)}")
         
         # ADB server status
-        print(f"\nADB Server:")
+        print("\nADB Server:")
         print(f"  Host: {controller.host}")
         print(f"  Port: {controller.port}")
         
