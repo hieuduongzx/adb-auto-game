@@ -6,7 +6,7 @@ RUNNER_DIR = Path(__file__).parents[1] / "apps" / "web" / "runner"
 RUNNER_HTML = RUNNER_DIR / "index.html"
 RUNNER_CSS = RUNNER_DIR / "css" / "runner.css"
 RUNNER_JS = RUNNER_DIR / "js" / "runner.js"
-RUNNER_BACKEND = Path(__file__).parents[1] / "apps" / "workflow_runner.py"
+from runner_source import runner_source  # noqa: E402
 
 
 class _RunnerHTML(HTMLParser):
@@ -159,6 +159,6 @@ def test_compact_pro_log_remains_a_dark_console_in_light_theme():
 
 
 def test_loading_a_workflow_does_not_add_a_redundant_runner_log_line():
-    source = RUNNER_BACKEND.read_text(encoding="utf-8")
+    source = runner_source()
 
     assert "Loaded workflow:" not in source

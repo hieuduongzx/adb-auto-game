@@ -2,18 +2,15 @@
 import ast
 import os
 import unittest
-from pathlib import Path
+
+from runner_source import runner_methods
 
 
 class RunnerIconTests(unittest.TestCase):
     def icon_key(self, path="", info=None):
-        source = Path(__file__).parents[1] / "apps/workflow_runner.py"
-        tree = ast.parse(source.read_text(encoding="utf-8"))
-        cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "WorkflowRunnerAPI")
-        methods = [n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == "_icon_key"]
-        self.assertEqual(len(methods), 1, "Runner must define _icon_key for auto-load and get_state")
+        methods = runner_methods("_icon_key")
         namespace = {"os": os}
-        exec(compile(ast.Module(body=methods, type_ignores=[]), str(source), "exec"), namespace)
+        exec(compile(ast.Module(body=methods, type_ignores=[]), "runner", "exec"), namespace)
         runner = type("Runner", (), {"_icon_key": namespace["_icon_key"]})()
         runner.flow_path = path
         runner._runner_info = info or {}

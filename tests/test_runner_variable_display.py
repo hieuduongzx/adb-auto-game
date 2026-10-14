@@ -3,17 +3,15 @@ import ast
 import copy
 import threading
 import unittest
-from pathlib import Path
 from unittest import mock
 
 from src.workflow import engine as E
 
 
-source = ast.parse((Path(__file__).parents[1] / "apps/workflow_runner.py").read_text(encoding="utf-8"))
-names = {"_apply_runner_config", "_activities_payload", "set_activity_var",
-         "_each_activity_var", "_var_payload", "_persist_runner_config"}
-methods = [node for cls in source.body if isinstance(cls, ast.ClassDef)
-           for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in names]
+from runner_source import runner_methods  # noqa: E402
+
+methods = runner_methods("_apply_runner_config", "_activities_payload", "set_activity_var",
+                         "_each_activity_var", "_var_payload", "_persist_runner_config")
 namespace = {"List": list, "CAPTURE_BACKENDS": (), "copy": copy}
 exec(compile(ast.Module(body=methods, type_ignores=[]), "workflow_runner.py", "exec"), namespace)
 

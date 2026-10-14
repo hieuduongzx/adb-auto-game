@@ -269,7 +269,7 @@ def test_new_round_resets_rows_and_outcome_names_the_rounds(tmp_path):
 def test_finished_run_appends_one_history_record(tmp_path, monkeypatch):
     from src import run_history
     path = tmp_path / "history.jsonl"
-    monkeypatch.setattr("apps.workflow_runner.run_history.history_path", lambda *a: str(path))
+    monkeypatch.setattr(run_history, "history_path", lambda *a: str(path))
     api = runner(tmp_path)
     api.engine._fatal = ""
     api.engine._stop = threading.Event()

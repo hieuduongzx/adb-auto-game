@@ -7,19 +7,11 @@ from pathlib import Path
 ROOT = Path(__file__).parents[1]
 RUNNER_PATH = ROOT / "apps" / "workflow_runner.py"
 
+from runner_source import runner_methods  # noqa: E402
+
 
 def _runner_methods(*names):
-    tree = ast.parse(RUNNER_PATH.read_text(encoding="utf-8"))
-    wanted = set(names)
-    methods = [
-        node
-        for cls in tree.body
-        if isinstance(cls, ast.ClassDef) and cls.name == "WorkflowRunnerAPI"
-        for node in cls.body
-        if isinstance(node, ast.FunctionDef) and node.name in wanted
-    ]
-    assert {method.name for method in methods} == wanted
-    return methods
+    return runner_methods(*names)
 
 
 def test_successful_workflow_initialization_logs_one_useful_message():
