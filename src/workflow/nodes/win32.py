@@ -188,7 +188,7 @@ class Win32Nodes:
         ctrl = self._win32_ctrl()
         if ctrl is None:
             return False
-        on = bool(p.get("enabled", True))
+        on = self._truthy(p.get("enabled", True))
         ok = bool(ctrl.set_always_on_top(on))
         log_info(f"🪟 always on top → {on}")
         return ok

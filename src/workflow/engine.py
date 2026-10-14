@@ -1326,7 +1326,7 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
                 self._node_done(node, nid, "ok", "out")
                 cur = self._next(adj, cur, "out")
             elif kind == "and":
-                expected = max(1, int(params.get("count", 2) or 2))
+                expected = self._port_count(params, 2)
                 ctx = getattr(self._ctx, "join_ctx", None)
                 if ctx is None:
                     if expected <= 1:
@@ -1351,13 +1351,13 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
                     cur = self._next(adj, cur, "out")
             elif kind == "random":
                 # Pick one of count numbered ports at random (uniform distribution).
-                count = max(1, int(params.get("count", 2)))
+                count = self._port_count(params, 2)
                 chosen = str(random.randint(1, count))
                 log_info(f"🎲 random → branch {chosen}/{count}")
                 self._node_done(node, nid, "ok", chosen)
                 cur = self._next(adj, cur, chosen)
             elif kind == "try_chain":
-                count = max(1, int(params.get("count", 3)))
+                count = self._port_count(params, 3)
                 ports = [str(i + 1) for i in range(count)]
                 vars0 = dict(self._vars)
                 pos0 = self._last_pos
@@ -1406,7 +1406,7 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
                 # công vẫn sang nhánh kế. Mỗi nhánh là một đường độc lập (walk
                 # tới dead-end). Khác try_chain: không dừng ở nhánh thành công
                 # đầu tiên, và chỉ có một cổng tiếp tục chung là "end".
-                count = max(1, int(params.get("count", 3)))
+                count = self._port_count(params, 3)
                 ports = [str(i + 1) for i in range(count)]
                 break0 = self._break_loop
                 try0 = self._try_chain_mode
@@ -1557,7 +1557,7 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
         ``out`` port. Branches that arrive earlier stop at the join.
         """
         params = (nodes.get(node_id) or {}).get("params", {})
-        count = max(1, int(params.get("count", 3)))
+        count = self._port_count(params, 3)
         ports = [str(i + 1) for i in range(count)]
 
         vars0 = dict(self._vars)
@@ -1663,6 +1663,18 @@ class WorkflowEngine(VisionHelpers, ConditionNodes, ActionNodes, EmulatorNodes,
             return float(s) if ("." in s or "e" in s.lower()) else int(s)
         except (TypeError, ValueError):
             return value
+
+    @staticmethod
+    def _port_count(params: Dict, default: int) -> int:
+        """Numbered output ports of a fan-out block (parallel, try in order…).
+
+        A blank or malformed count falls back to the block's default instead of
+        raising mid-walk — the Designer draws the same default number of ports.
+        """
+        try:
+            return max(1, int(float(params.get("count", default))))
+        except (TypeError, ValueError, OverflowError):
+            return default
 
     @staticmethod
     def _truthy(value: Any) -> bool:

@@ -393,7 +393,7 @@ class EmulatorNodes:
         connectable (so the very next node can drive the freshly-booted device).
         """
         at = str(p.get("at", "")).strip()
-        if at and not self._wait_until_clock(at, bool(p.get("nextDay", True))):
+        if at and not self._wait_until_clock(at, self._truthy(p.get("nextDay", True))):
             return False  # malformed schedule time
 
         kind = self._emulator_kind(p, "ldplayer")
@@ -526,7 +526,7 @@ class EmulatorNodes:
 
     def _maybe_attach_emulator(self, p: Dict, host: str) -> None:
         """Attach ADB to ``host`` when ``attach`` is on and no device is bound yet."""
-        if (bool(p.get("attach", True))
+        if (self._truthy(p.get("attach", True))
                 and getattr(self, "_controller", "adb") != "win32"
                 and not self.auto.adb.device):
             self._attach_adb_after_boot(host)
@@ -962,7 +962,7 @@ class EmulatorNodes:
             log_warning(f"🖥 Console rejected the resolution change: {out.strip()[:200]}")
             return False
         log_success(f"🖥 Emulator resolution {kind} #{index} → {w}×{h} @ {dpi}dpi")
-        if bool(p.get("restart", True)):
+        if self._truthy(p.get("restart", True)):
             # The instance reads resolution at boot, so it must cycle to apply.
             return self._a_restart_emulator(node, {**p, "wait": p.get("wait", 120)})
         log_info("🖥 Restart the emulator to apply the new resolution")

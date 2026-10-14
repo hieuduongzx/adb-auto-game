@@ -702,7 +702,7 @@ class ActionNodes:
         title   = self._format_msg(str(p.get("title", "Workflow"))).strip() or "Workflow"
         message = self._format_msg(str(p.get("message", "Completed!")))
         log_info(f"🔔 {title}: {message}", kind=LOG_KIND_USER)
-        if bool(p.get("sound", True)):
+        if self._truthy(p.get("sound", True)):
             notify.beep()
         notify.desktop(title, message)
         return True
@@ -763,7 +763,7 @@ class ActionNodes:
         return True
 
     def _a_wait_until(self, node, p) -> bool:
-        return self._wait_until_clock(str(p.get("time", "")).strip(), bool(p.get("nextDay", True)))
+        return self._wait_until_clock(str(p.get("time", "")).strip(), self._truthy(p.get("nextDay", True)))
 
     def _a_device_info(self, node, p) -> bool:
         """Read a live device property into a variable (battery, app, size…)."""

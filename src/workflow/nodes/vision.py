@@ -208,9 +208,14 @@ class VisionHelpers:
         region=None,
         report: bool = True,
     ):
-        """wait_for_template + one overlay report when done (found or timeout)."""
-        res = self.auto.wait_for_template(
-            tpl, timeout=timeout, threshold=threshold, region=region)
+        """Poll for *tpl* until found or *timeout*; one overlay report at the end.
+
+        Polled here rather than through ``auto.wait_for_template``: that helper
+        cannot see the workflow's Pause, so a paused Tap image kept looking and
+        tapped the moment its image appeared — mid-pause.
+        """
+        res = self._poll(lambda: self.auto.find_template(tpl, threshold=threshold, region=region),
+                         timeout, interval=0.5)
         if report:
             self._report_template_match(tpl, res, threshold, region)
         return res
@@ -281,15 +286,30 @@ class VisionHelpers:
         if not templates:
             return None
         finder = self._find_any_parallel if parallel else self._find_any
-        end = time.time() + max(0.0, timeout)
-        while not self._stop.is_set():
-            self._pause.wait()
-            hit = finder(templates, threshold, region=region)
+        return self._poll(lambda: finder(templates, threshold, region=region), timeout, interval=0.25)
+
+    def _poll(self, probe, timeout: float, interval: float = 0.25):
+        """Call *probe* until it returns something truthy, or *timeout* runs out.
+
+        Stop ends the wait at once (``None``). Pause holds it — no probe runs
+        while paused — and the time spent paused does not count against the
+        timeout, so a resumed wait gets the rest of its budget back.
+        """
+        left = max(0.0, float(timeout))
+        while not self._stop.is_set() and not self._background_cancelled():
+            if not self._pause.is_set():
+                if not self._wait_to_run():
+                    return None
+                continue
+            started = time.monotonic()
+            hit = probe()
             if hit:
                 return hit
-            if time.time() >= end:
+            if left <= 0:
                 return None
-            time.sleep(0.25)
+            nap = min(interval, left)
+            time.sleep(nap)
+            left -= max(nap, time.monotonic() - started)
         return None
 
     # ── Color (pixel) helpers ────────────────────────────────────────────────
@@ -381,7 +401,7 @@ class VisionHelpers:
             return False
         tol = max(0, int(params.get("tolerance", 10) or 0))
         if ntype == "if_color":
-            negate = bool(params.get("negate", False))
+            negate = self._truthy(params.get("negate", False))
             ok, x, y, region = self._color_probe(target, tol, params)
             if ok:
                 # Lưu vị trí "found" như các node ảnh — để "Tap → last found
@@ -394,7 +414,7 @@ class VisionHelpers:
             )
             return ok != negate
         if ntype == "wait_color":
-            negate = bool(params.get("negate", False))
+            negate = self._truthy(params.get("negate", False))
             anywhere = self._color_anywhere(params)
             end = time.time() + max(0.0, float(params.get("timeout", 10.0)))
             hex_lbl = self._bgr_to_hex(target)

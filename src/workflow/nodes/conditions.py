@@ -69,20 +69,20 @@ class ConditionNodes:
         if ntype == "wait_stable":
             return self._c_wait_stable(params)
         if ntype == "if_app":
-            return self._app_match(params) != bool(params.get("negate", False))
+            return self._app_match(params) != self._truthy(params.get("negate", False))
         if ntype == "wait_app":
             return self._c_wait_app(params)
         if ntype == "if_image":
             tpl = self._resolve_template(params.get("template", ""))
             threshold = float(params.get("threshold", 0.85))
-            negate = bool(params.get("negate", False))
+            negate = self._truthy(params.get("negate", False))
             res = self._find_template(tpl, threshold=threshold, region=self._search_region(params))
             if res:
                 self._last_pos = (res[0], res[1])
             return (res is not None) != negate
         if ntype == "if_image_any":
             templates = self._templates_list(params)
-            negate = bool(params.get("negate", False))
+            negate = self._truthy(params.get("negate", False))
             parallel = params.get("mode", "sequential") == "parallel"
             finder = self._find_any_parallel if parallel else self._find_any
             hit = finder(templates, float(params.get("threshold", 0.85)), region=self._search_region(params))
@@ -130,7 +130,7 @@ class ConditionNodes:
             threshold = float(params.get("threshold", 0.85))
             timeout = float(params.get("timeout", 10.0))
             region = self._search_region(params)
-            if bool(params.get("negate", False)):
+            if self._truthy(params.get("negate", False)):
                 # Đảo: chờ đến khi ảnh BIẾN MẤT (màn hình loading, hộp thoại…)
                 # — true ngay khi không còn thấy template; hết timeout → false.
                 end = time.time() + max(0.0, timeout)
@@ -246,7 +246,7 @@ class ConditionNodes:
                 time.sleep(min(0.5, max(0.0, end - time.time())))
             return False
         if ntype == "if_text":
-            negate = bool(params.get("negate", False))
+            negate = self._truthy(params.get("negate", False))
             # needle nhận biến — đồng bộ với if_app.package.
             needle, regex = self._ocr_needle(params)
             region = self._region(params)
@@ -295,7 +295,7 @@ class ConditionNodes:
                 self._sleep(0.4)
             return False
         if ntype == "if_time":
-            negate = bool(params.get("negate", False))
+            negate = self._truthy(params.get("negate", False))
             now = time.localtime()
             cur = now.tm_hour * 60 + now.tm_min
             a = self._parse_hhmm(params.get("from"), 0)
@@ -436,7 +436,7 @@ class ConditionNodes:
         seconds — the crash-detection / "wait for the game to close" loop that
         previously needed loop ∞ + if_app + break.
         """
-        negate = bool(params.get("negate", False))
+        negate = self._truthy(params.get("negate", False))
         try:
             timeout = max(0.0, float(params.get("timeout", 30.0)))
         except (TypeError, ValueError):
