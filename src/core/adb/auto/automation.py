@@ -436,6 +436,7 @@ class ADBGameAutomation:
                 best = self.matcher.match(
                     screen, template, threshold=0.0,
                     use_grayscale=use_grayscale, multi_scale=multi_scale, scales=scales,
+                    region=region, verify_color=False,
                 )
                 if best:
                     cx, cy, conf, sc = best
@@ -455,6 +456,7 @@ class ADBGameAutomation:
         threshold: float = 0.8,
         use_grayscale: bool = False,
         screen: Optional[np.ndarray] = None,
+        region: Optional[Tuple[int, int, int, int]] = None,
     ) -> List[Tuple[int, int, float]]:
         """Find all instances of template in screen
 
@@ -471,7 +473,8 @@ class ADBGameAutomation:
         if template is None:
             return []
         
-        return self.matcher.match_all(screen, template, threshold=threshold, use_grayscale=use_grayscale)
+        return self.matcher.match_all(screen, template, threshold=threshold,
+                                      use_grayscale=use_grayscale, region=region)
 
     def wait_for_template(
         self,

@@ -90,11 +90,13 @@ class VisionHelpers:
             "label": label or "",
         }
 
-    def _best_match_raw(self, tpl: str, region=None):
+    def _best_match_raw(self, tpl: str, region=None, screen=None):
         """Best match at any confidence (for fail overlay). Returns matcher tuple
-        ``(cx, cy, conf, scale)`` or ``None``."""
+        ``(cx, cy, conf, scale)`` or ``None``. ``screen`` is the frame the probe
+        judged; without it the latest frame stands in."""
         try:
-            screen = self.auto.get_latest_screen()
+            if screen is None:
+                screen = self.auto.get_latest_screen()
             if screen is None:
                 screen = self.auto.capture_screen()
             if screen is None:
@@ -106,7 +108,7 @@ class VisionHelpers:
             # without requiring a real match.
             return self.auto.matcher.match(
                 screen, template, threshold=0.01, multi_scale=False,
-                scales=[1.0], region=region,
+                scales=[1.0], region=region, verify_color=False,
             )
         except Exception:
             return None
@@ -118,9 +120,10 @@ class VisionHelpers:
         threshold: float,
         region=None,
         label: str = "",
+        screen=None,
     ) -> None:
         """Emit on_match for one template probe. ``res`` is find_template's
-        ``(cx, cy, conf)`` or ``None``."""
+        ``(cx, cy, conf)`` or ``None``; ``screen`` the frame it was judged on."""
         if not self.report_matches:
             return
         name = os.path.basename(tpl or "") or "?"
@@ -134,7 +137,7 @@ class VisionHelpers:
             rects.append(self._rect_from_center(
                 cx, cy, conf, tw, th, 1.0, ok, label or name))
         else:
-            best = self._best_match_raw(tpl, region)
+            best = self._best_match_raw(tpl, region, screen)
             if best:
                 cx, cy, conf, scale = best
                 rects.append(self._rect_from_center(
@@ -194,10 +197,14 @@ class VisionHelpers:
 
     def _find_template(self, tpl: str, threshold: float = 0.85, region=None,
                        report: bool = True):
-        """find_template + optional match overlay report."""
-        res = self.auto.find_template(tpl, threshold=threshold, region=region)
+        """find_template + optional match overlay report.
+
+        The frame is captured here so a miss overlay is drawn on the very
+        pixels that were judged, not on a later frame."""
+        screen = self.auto.capture_screen() if report and self.report_matches else None
+        res = self.auto.find_template(tpl, threshold=threshold, region=region, screen=screen)
         if report:
-            self._report_template_match(tpl, res, threshold, region)
+            self._report_template_match(tpl, res, threshold, region, screen=screen)
         return res
 
     def _wait_for_template(
@@ -214,10 +221,19 @@ class VisionHelpers:
         cannot see the workflow's Pause, so a paused Tap image kept looking and
         tapped the moment its image appeared — mid-pause.
         """
-        res = self._poll(lambda: self.auto.find_template(tpl, threshold=threshold, region=region),
-                         timeout, interval=0.5)
+        frame: Dict[str, Any] = {}
+
+        def probe():
+            if not (report and self.report_matches):
+                return self.auto.find_template(tpl, threshold=threshold, region=region)
+            frame["screen"] = self.auto.capture_screen()
+            return self.auto.find_template(tpl, threshold=threshold, region=region,
+                                           screen=frame["screen"])
+
+        res = self._poll(probe, timeout, interval=0.5)
         if report:
-            self._report_template_match(tpl, res, threshold, region)
+            self._report_template_match(tpl, res, threshold, region,
+                                        screen=frame.get("screen"))
         return res
 
     def _find_any(self, templates: List[str], threshold: float, region=None):
@@ -235,9 +251,9 @@ class VisionHelpers:
             # report only the winner (or the first miss below)
             res = self.auto.find_template(tpl, threshold=threshold, region=region, screen=screen)
             if res:
-                self._report_template_match(tpl, res, threshold, region)
+                self._report_template_match(tpl, res, threshold, region, screen=screen)
                 return (res[0], res[1])
-        self._report_template_match(templates[0], None, threshold, region)
+        self._report_template_match(templates[0], None, threshold, region, screen=screen)
         return None
 
     def _find_any_parallel(self, templates: List[str], threshold: float, region=None):
@@ -269,10 +285,12 @@ class VisionHelpers:
         for t in threads:
             t.join()
         if results:
-            tpl, x, y, conf = results[0]
-            self._report_template_match(tpl, (x, y, conf), threshold, region)
+            # Several on screen at once: the most confident one wins, not
+            # whichever thread happened to finish first.
+            tpl, x, y, conf = max(results, key=lambda r: r[3])
+            self._report_template_match(tpl, (x, y, conf), threshold, region, screen=screen)
             return (x, y)
-        self._report_template_match(templates[0], None, threshold, region)
+        self._report_template_match(templates[0], None, threshold, region, screen=screen)
         return None
 
     def _wait_any(self, templates: List[str], timeout: float, threshold: float,
