@@ -197,6 +197,24 @@ def stop_scrcpy_sources() -> None:
         src.stop()
 
 
+def release_scrcpy_sources(keep=()) -> None:
+    """Stop the frame sources of every serial not in ``keep``.
+
+    Each source runs a scrcpy server and decodes its H.264 stream at up to
+    30 fps for as long as it lives, so one left behind per device the user
+    switched away from adds up fast with several emulators. A later capture
+    of a released serial simply starts a fresh source.
+    """
+    wanted = {str(s) for s in keep if s}
+    with _SOURCES_LOCK:
+        drop = [s for s in _SOURCES if s not in wanted]
+        sources = [_SOURCES.pop(s) for s in drop]
+    for src in sources:
+        src.stop()
+    if sources:
+        log_debug(f"[capture] released scrcpy source(s): {', '.join(drop)}")
+
+
 def warm_scrcpy_source(controller_or_serial) -> bool:
     """Pre-start the headless scrcpy stream for a device.
 

@@ -45,6 +45,7 @@ from src.core.adb.auto.scrcpy_capture import (
     CAPTURE_BACKENDS,
     capture_screen as capture_screen_frame,
     get_capture_backend,
+    release_scrcpy_sources,
     set_capture_backend,
     stop_scrcpy_sources,
 )
@@ -259,6 +260,10 @@ class DevScopeAPI:
             self.controller.device = None
             self.controller.device_id = serial or None
             self._connected_serial = None
+            # Stop the stream of the device we moved away from (see
+            # release_scrcpy_sources) — they pile up with several emulators.
+            threading.Thread(target=release_scrcpy_sources, args=({serial},),
+                             daemon=True).start()
             threading.Thread(
                 target=self._connect_device, args=(serial,), daemon=True,
             ).start()
@@ -307,11 +312,12 @@ class DevScopeAPI:
                 self.scanner.ensure_adb_server_running()
                 if deep:
                     try:
-                        self.scanner.scan_all(stop_on_first=False)
+                        self.scanner.scan_all(stop_on_first=False, quiet=True)
                     except Exception as exc:
                         log_warning(f"ADB port scan failed: {exc}")
                 devices = self.controller.online_devices()
-                items = self.scanner.unique_devices(devices)
+                items = self.scanner.unique_devices(
+                    devices, prefer=(self._selected_serial, self._connected_serial))
                 if items and not self._selected_serial:
                     first = items[0].get("serial")
                     if first:
@@ -367,7 +373,9 @@ class DevScopeAPI:
             time.sleep(5)
             if not self._closing:
                 now = time.monotonic()
-                deep = now - self._last_deep_scan >= self._deep_scan_interval
+                # Every 2 min once connected: the scan holds the device lock.
+                interval = self._deep_scan_interval * (4 if self._connected_serial else 1)
+                deep = now - self._last_deep_scan >= interval
                 if deep:
                     self._last_deep_scan = now
                 self._device_worker(deep=deep)

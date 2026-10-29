@@ -5,7 +5,7 @@ import socket
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, Iterable, List, Optional, Tuple, Set
 
 from .constants import ALL_EMULATOR_PORTS, EMULATOR_PORT_RANGES, get_adb_path
 from src.utils import (
@@ -43,6 +43,13 @@ class DeviceScanner:
         # seconds) only logs when something actually changes — no spam.
         self._last_server_ok: Optional[bool] = None
         self._last_device_count: int = -1
+        # serial -> (model, fingerprint) for transports that stayed listed.
+        # unique_devices runs on every 5s poll; without this each poll shells
+        # every alias of every emulator (a few seconds with several running).
+        self._fp_cache: Dict[str, Tuple[str, str]] = {}
+        # Serials already reported by a scan — repeat background scans only
+        # log devices that are new, not every emulator every time.
+        self._announced: Set[str] = set()
 
     @staticmethod
     def parse_device_states(output: str) -> Dict[str, str]:
@@ -115,7 +122,7 @@ class DeviceScanner:
                 out.append(t)
         return out
 
-    def unique_devices(self, devices) -> List[dict]:
+    def unique_devices(self, devices, prefer: Iterable[Optional[str]] = ()) -> List[dict]:
         """One entry per *physical* device, as ``[{"serial","name"}]``.
 
         A single emulator can appear under several ADB serials at once
@@ -125,10 +132,21 @@ class DeviceScanner:
         to one, while genuinely different emulators stay separate — even when
         they share a port number on different hosts. The representative serial
         prefers a loopback (``127.0.0.1``) address, then a LAN IP, then the
-        ``emulator-*`` console form.
+        ``emulator-*`` console form — except that a serial in ``prefer`` (the
+        one the user picked) always represents its group, so a scan that adds
+        another alias can't swap the picker's entry out from under the user.
         """
+        preferred = {str(p) for p in prefer if p}
+        listed = {d.serial for d in devices}
+        for gone in [s for s in self._fp_cache if s not in listed]:
+            # A port that drops off may come back as a different instance.
+            del self._fp_cache[gone]
         info = []  # (serial, model, fingerprint)
         for d in devices:
+            cached = self._fp_cache.get(d.serial)
+            if cached is not None:
+                info.append((d.serial, *cached))
+                continue
             model = fp = ""
             # A just-`adb connect`-ed device is briefly offline; retry so its
             # fingerprint is stable instead of splitting one emulator into
@@ -155,11 +173,15 @@ class DeviceScanner:
                     fp = (d.shell("getprop ro.serialno", timeout=3.0) or "").strip()
                 except Exception:
                     fp = ""
-            if not fp:
+            if fp:
+                self._fp_cache[d.serial] = (model, fp)
+            else:
                 fp = "@" + d.serial  # can't fingerprint → treat as its own device
             info.append((d.serial, model, fp))
 
         def rank(serial: str):
+            if serial in preferred:
+                return (-1, serial)
             if serial.startswith("127.0.0.1:"):
                 return (0, serial)
             if serial.startswith("emulator-"):
@@ -232,7 +254,8 @@ class DeviceScanner:
         self,
         ports: List[str],
         max_workers: int = 16,
-        stop_on_first: bool = False
+        stop_on_first: bool = False,
+        quiet: bool = False,
     ) -> List[Tuple[str, str]]:
         """
         Scan a list of ports for devices
@@ -241,6 +264,7 @@ class DeviceScanner:
             ports: List of host:port strings to scan
             max_workers: Number of parallel threads
             stop_on_first: If True, stop after finding first device
+            quiet: Only log devices this scanner hasn't reported before
             
         Returns:
             List of (device_serial, host) tuples
@@ -260,7 +284,9 @@ class DeviceScanner:
                     try:
                         device_serial = future.result()
                         if device_serial and device_serial not in found_serials:
-                            log_success(f"Found device {device_serial} on {host}")
+                            if not quiet or device_serial not in self._announced:
+                                log_success(f"Found device {device_serial} on {host}")
+                            self._announced.add(device_serial)
                             found_devices.append((device_serial, host))
                             found_serials.add(device_serial)
                             
@@ -275,20 +301,29 @@ class DeviceScanner:
                             
                     except Exception as e:
                         log_error(f"Error processing result for {host}: {e}")
-            
+
+            if not stop_on_first:
+                # A full sweep is the whole picture: forget devices that went
+                # away so one that comes back is announced again.
+                self._announced = set(found_serials)
             return found_devices
             
         except Exception as e:
             log_error(f"Error during port scan: {e}")
             return []
     
-    def scan_all(self, stop_on_first: bool = False) -> List[Tuple[str, str]]:
-        """Scan all emulator ports (loopback + LAN IPs for 0.0.0.0-bound ones)."""
-        targets = self._scan_targets()
-        log_info(f"Scanning {len(targets)} ports for all emulators...")
-        log_info("Supported: MuMu, LDPlayer, BlueStacks, Nox, MEmu")
+    def scan_all(self, stop_on_first: bool = False,
+                 quiet: bool = False) -> List[Tuple[str, str]]:
+        """Scan all emulator ports (loopback + LAN IPs for 0.0.0.0-bound ones).
 
-        return self.scan_ports(targets, stop_on_first=stop_on_first)
+        ``quiet`` is for background scans: the banner goes to debug and only
+        newly found devices are logged."""
+        targets = self._scan_targets()
+        log = log_debug if quiet else log_info
+        log(f"Scanning {len(targets)} ports for all emulators...")
+        log("Supported: MuMu, LDPlayer, BlueStacks, Nox, MEmu")
+
+        return self.scan_ports(targets, stop_on_first=stop_on_first, quiet=quiet)
     
     def scan_emulator(self, emulator_type: str) -> List[Tuple[str, str]]:
         """Scan specific emulator type"""

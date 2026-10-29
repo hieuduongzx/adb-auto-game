@@ -5,6 +5,7 @@ import threading
 import time
 
 from src.core.adb import lifecycle
+from src.core.adb.auto.scrcpy_capture import release_scrcpy_sources
 from src.utils import (
     log_error,
     log_warning,
@@ -28,11 +29,21 @@ class DeviceMixin:
             self.engine.auto.adb.device_id = serial
             self._connected_serial = None
             self.engine.set_selected_device(serial)
+            self._release_other_captures(serial)
             threading.Thread(target=self._connect_device, args=(serial,), daemon=True).start()
             return True
         except Exception as e:
             log_error(f"Select device error: {e}")
             return False
+
+    def _release_other_captures(self, serial: str) -> None:
+        """Stop the scrcpy streams of devices the footer moved away from;
+        each one keeps a server and a 30 fps decoder alive otherwise. A live
+        run keeps its own device's stream."""
+        keep = {serial}
+        if self._run_live():
+            keep.add(getattr(self.engine.auto.adb, "device_id", None))
+        threading.Thread(target=release_scrcpy_sources, args=(keep,), daemon=True).start()
 
     def _connect_device(self, serial: str) -> None:
         with self._device_lock:
@@ -100,10 +111,15 @@ class DeviceMixin:
             try:
                 if force_scan:
                     try:
-                        adb.scan_all_devices()
+                        adb.scanner.scan_all(stop_on_first=False, quiet=True)
                     except Exception as exc:
                         log_warning(f"ADB port scan failed: {exc}")
-                devices = adb.list_devices(include_app=False) or []
+                # One row per emulator (its ADB aliases collapsed), keeping the
+                # footer's pick as the row's serial; fingerprints are cached so
+                # the 5s poll doesn't shell every device each time.
+                devices = adb.scanner.unique_devices(
+                    adb.online_devices(),
+                    prefer=(self._selected_serial, self._connected_serial))
                 if devices and not self._selected_serial:
                     first = devices[0].get("serial")
                     if first:
@@ -136,7 +152,9 @@ class DeviceMixin:
             time.sleep(5)
             if not self._closing and self._adb_workflow():
                 now = time.monotonic()
-                deep = now - self._last_deep_scan >= self._deep_scan_interval
+                # Every 2 min once connected: the scan holds the device lock.
+                interval = self._deep_scan_interval * (4 if self._connected_serial else 1)
+                deep = now - self._last_deep_scan >= interval
                 if deep:
                     self._last_deep_scan = now
                 self._device_worker(force_scan=deep)

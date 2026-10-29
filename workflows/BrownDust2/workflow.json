@@ -9,8 +9,8 @@
   "capture": "scrcpy",
   "input": "adb",
   "win32": {
-    "window": "BrownDust II.exe",
-    "matchBy": "exe",
+    "window": "UnityWndClass",
+    "matchBy": "class",
     "inputMode": "unity_bridge",
     "path": "D:\\Neowiz\\Browndust2\\BrownDust2_10000002\\BrownDust II.exe"
   },
@@ -366,27 +366,39 @@
             "delay": 3
           },
           {
-            "id": "nngyks9j",
-            "type": "wait_image",
-            "x": 1008,
+            "id": "nyjwcnvn",
+            "type": "if_text",
+            "x": 1360,
             "y": 272,
             "params": {
-              "template": "templates/crop_20260922_124530_1200_680_383_47.png",
-              "threshold": 0.85,
-              "timeout": 300,
-              "negate": false
+              "match": "text",
+              "text": "TOUCH TO START",
+              "pattern": "",
+              "x": 1202,
+              "y": 678,
+              "w": 383,
+              "h": 53,
+              "negate": false,
+              "whitelist": ""
             },
             "delay": 1
           },
           {
-            "id": "n16kvm7q",
-            "type": "if_image",
-            "x": 1360,
+            "id": "nt94d8g7",
+            "type": "wait_text",
+            "x": 1008,
             "y": 272,
             "params": {
-              "template": "templates/crop_20260922_124530_1200_680_383_47.png",
-              "threshold": 0.85,
-              "negate": false
+              "match": "text",
+              "text": "TOUCH TO START",
+              "pattern": "",
+              "x": 1202,
+              "y": 678,
+              "w": 383,
+              "h": 53,
+              "timeout": 10,
+              "negate": false,
+              "whitelist": ""
             },
             "delay": 1
           }
@@ -433,27 +445,27 @@
             "to": "nan17tve"
           },
           {
-            "from": "n9mbkagd",
-            "fromPort": "out",
-            "to": "nngyks9j"
-          },
-          {
             "from": "n6ndne8t",
             "fromPort": "out",
-            "to": "n16kvm7q"
+            "to": "nyjwcnvn"
           },
           {
-            "from": "n16kvm7q",
+            "from": "nyjwcnvn",
             "fromPort": "true",
             "to": "n6ndne8t"
           },
           {
-            "from": "n16kvm7q",
+            "from": "nyjwcnvn",
             "fromPort": "false",
             "to": "nxeeg0sp"
           },
           {
-            "from": "nngyks9j",
+            "from": "n9mbkagd",
+            "fromPort": "out",
+            "to": "nt94d8g7"
+          },
+          {
+            "from": "nt94d8g7",
             "fromPort": "true",
             "to": "n6ndne8t"
           }
@@ -2416,7 +2428,7 @@
       "id": "sequence_zsir",
       "name": "Event",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [],
       "graph": {
         "nodes": [
@@ -3056,7 +3068,7 @@
       "id": "sequence_614i",
       "name": "Event Battle",
       "type": "sequence",
-      "enabled": true,
+      "enabled": false,
       "vars": [
         {
           "name": "type",

@@ -644,7 +644,16 @@ function appendLog(entry){
   updateLogCount();
 }
 function rebuildDeviceSelect(devices, connected){
-  const sel=$("device-select"), prev=sel.value; sel.innerHTML="";
+  const sel=$("device-select"), prev=sel.value;
+  // The 5s poll re-sends the list; only rebuild when it changed, and leave a
+  // focused/open picker alone so it doesn't snap shut mid-choice.
+  const key=JSON.stringify((devices||[]).map(d=>[d.serial,d.name]));
+  if(sel.dataset.key===key){
+    if(document.activeElement!==sel && devices&&devices.length)
+      sel.value=connected||S.connectedSerial||prev||devices[0].serial||"";
+    return;
+  }
+  sel.dataset.key=key; sel.innerHTML="";
   if(!devices||!devices.length){
     const o=document.createElement("option"); o.value="";
     o.textContent="No devices - auto-scanning…";

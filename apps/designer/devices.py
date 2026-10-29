@@ -9,6 +9,7 @@ import webview
 
 from src.core.adb import device_info
 from src.core.adb.auto.scrcpy_capture import (
+    release_scrcpy_sources,
     warm_scrcpy_source,
 )
 from src.utils import (
@@ -154,11 +155,23 @@ class DeviceMixin:
             self.controller.device_id = serial or None
             self._connected_serial = None
             self._sync_engine_device()
+            self._release_other_captures(serial)
             threading.Thread(target=self._connect_device, args=(serial,), daemon=True).start()
             return True
         except Exception as e:
             log_error(f"Select device error: {e}")
             return False
+
+    def _release_other_captures(self, serial: Optional[str]) -> None:
+        """Stop the scrcpy streams of devices the picker moved away from.
+
+        A test run still in flight keeps its device's stream — switching the
+        Preview mid-run must not cut the engine's capture."""
+        keep = {serial}
+        eng = self._engine
+        if eng is not None and eng.is_running():
+            keep.add(getattr(eng.auto.adb, "device_id", None))
+        threading.Thread(target=release_scrcpy_sources, args=(keep,), daemon=True).start()
 
     def _sync_engine_device(self) -> None:
         """Tell the engine which device the picker has selected.
@@ -223,22 +236,19 @@ class DeviceMixin:
 
     def _device_worker(self, deep: bool = False) -> None:
         """Refresh the device list. ``deep`` also probes known emulator ports
-        (slower) — used on a 30s cadence when nothing is connected so a new
+        (slower, quiet) — see ``_device_poll`` for the cadence — so a new
         emulator instance is found without a manual Scan ports click."""
         with self._device_lock:
             try:
                 self.scanner.ensure_adb_server_running()
-                devices = self.controller.online_devices()
-                items = self.scanner.unique_devices(devices)
                 if deep:
                     try:
-                        found = self.scanner.scan_all(stop_on_first=False) or []
-                        if found:
-                            log_info(f"Auto-scan found {len(found)} device(s)")
+                        self.scanner.scan_all(stop_on_first=False, quiet=True)
                     except Exception as exc:
                         log_warning(f"Auto port scan failed: {exc}")
-                    devices = self.controller.online_devices()
-                    items = self.scanner.unique_devices(devices)
+                devices = self.controller.online_devices()
+                items = self.scanner.unique_devices(
+                    devices, prefer=(self._selected_serial, self._connected_serial))
                 if items and not self._selected_serial:
                     first = items[0].get("serial")
                     if first:
@@ -298,8 +308,10 @@ class DeviceMixin:
                 self._sync_engine_device()
 
     def _device_poll(self) -> None:
-        """Light refresh every 5s; when no device is connected, also deep-scan
-        emulator ports about every 30s so a newly started instance is found.
+        """Light refresh every 5s, plus a quiet deep scan of emulator ports so
+        a newly started instance is found: about every 30s while nothing is
+        connected, every 2 min once a device is (the scan holds the device
+        lock for seconds, and the picker can't switch until it's done).
 
         Parked for the whole time a Win32 project is open: the preview captures
         a window, so polling the ADB server would just be noise (and would start
@@ -312,7 +324,8 @@ class DeviceMixin:
                 continue
             deep = False
             now = time.monotonic()
-            if now - self._last_deep_scan >= self._deep_scan_interval:
+            interval = self._deep_scan_interval * (4 if self._connected_serial else 1)
+            if now - self._last_deep_scan >= interval:
                 deep = True
                 self._last_deep_scan = now
             self._device_worker(deep=deep)

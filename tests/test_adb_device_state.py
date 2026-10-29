@@ -183,6 +183,100 @@ class TestAdbConnectVerification(unittest.TestCase):
             )
 
 
+class TestUniqueDevices(unittest.TestCase):
+    """One picker row per emulator, stable while aliases come and go."""
+
+    @staticmethod
+    def _alias(serial, android_id="abc123", model="MuMu"):
+        return _Device(serial, shell_result=f"{model}\n{android_id}\n")
+
+    def test_aliases_collapse_to_loopback_serial(self):
+        scanner = DeviceScanner()
+        devices = [self._alias("emulator-5554"), self._alias("127.0.0.1:5555")]
+
+        self.assertEqual(scanner.unique_devices(devices),
+                         [{"serial": "127.0.0.1:5555", "name": "MuMu"}])
+
+    def test_preferred_serial_represents_its_group(self):
+        # A scan adding 127.0.0.1:16384 (sorts before :5555) must not swap
+        # the row the user picked.
+        scanner = DeviceScanner()
+        devices = [self._alias("127.0.0.1:5555"), self._alias("127.0.0.1:16384")]
+
+        self.assertEqual(scanner.unique_devices(devices)[0]["serial"], "127.0.0.1:16384")
+        self.assertEqual(
+            scanner.unique_devices(devices, prefer=("127.0.0.1:5555", None)),
+            [{"serial": "127.0.0.1:5555", "name": "MuMu"}],
+        )
+
+    def test_different_emulators_stay_separate(self):
+        scanner = DeviceScanner()
+        devices = [self._alias("127.0.0.1:5555", "aaa"),
+                   self._alias("127.0.0.1:5557", "bbb")]
+
+        self.assertEqual(len(scanner.unique_devices(devices)), 2)
+
+    def test_fingerprints_are_cached_while_listed(self):
+        scanner = DeviceScanner()
+        dev = self._alias("127.0.0.1:5555")
+
+        scanner.unique_devices([dev])
+        scanner.unique_devices([dev])
+
+        self.assertEqual(len(dev.shell_calls), 1)
+
+    def test_cache_drops_serial_that_left(self):
+        # The port can come back as a different instance — re-fingerprint it.
+        scanner = DeviceScanner()
+        first = self._alias("127.0.0.1:5555", "aaa")
+        scanner.unique_devices([first])
+        scanner.unique_devices([])
+        again = self._alias("127.0.0.1:5555", "bbb")
+
+        scanner.unique_devices([again])
+
+        self.assertEqual(len(again.shell_calls), 1)
+        self.assertEqual(scanner._fp_cache["127.0.0.1:5555"], ("MuMu", "bbb"))
+
+
+class TestQuietScan(unittest.TestCase):
+    def test_background_scan_logs_only_new_devices(self):
+        scanner = DeviceScanner()
+        scanner._try_connect_to_host = lambda host: host
+        ports = ["127.0.0.1:5555", "127.0.0.1:5557"]
+
+        with mock.patch("src.core.adb.scanner.log_success") as log:
+            scanner.scan_ports(ports, quiet=True)
+            self.assertEqual(log.call_count, 2)
+            scanner.scan_ports(ports, quiet=True)
+            self.assertEqual(log.call_count, 2)
+            scanner.scan_ports(ports)            # manual scan reports all
+            self.assertEqual(log.call_count, 4)
+
+
+class TestReleaseScrcpySources(unittest.TestCase):
+    def test_keeps_only_wanted_serials(self):
+        from src.core.adb.auto import scrcpy_capture as cap
+
+        stopped = []
+
+        class _Src:
+            def __init__(self, serial):
+                self.serial = serial
+
+            def stop(self):
+                stopped.append(self.serial)
+
+        with mock.patch.dict(cap._SOURCES, clear=True):
+            for serial in ("a", "b", "c"):
+                cap._SOURCES[serial] = _Src(serial)
+
+            cap.release_scrcpy_sources({"b", None})
+
+            self.assertEqual(sorted(stopped), ["a", "c"])
+            self.assertEqual(list(cap._SOURCES), ["b"])
+
+
 class TestTimedAdbClient(unittest.TestCase):
     def test_host_connection_uses_default_timeout(self):
         client = TimedAdbClient(timeout=3.0)
